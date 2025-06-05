@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block title %}Confirm Delete - {{ region.name }} - AssetBox{% endblock %}
+
+{% block page_header %}
+    <div class="page-pretitle">Organization / Regions</div>
+    <h2 class="page-title">Confirm Deletion</h2>
+{% endblock %}
+
+{% block content %}
+<div class="col-md-6">
+    <div class="card border-danger">
+        <div class="card-header">
+            <h3 class="card-title">Delete Region</h3>
+        </div>
+        <div class="card-body">
+            <p>Are you sure you want to delete the region: <strong>{{ region.name }} ({{ region.slug }})</strong>?</p>
+            
+            {# Add warning about related objects #}
+            {% if region.sites.count > 0 or region.children.count > 0 %}
+                <p class="text-warning">
+                    Warning: This region has {{ region.sites.count }} assigned site{{ region.sites.count|pluralize }} 
+                    and {{ region.children.count }} child region{{ region.children.count|pluralize }}. 
+                    Deleting it may affect related objects depending on your setup.
+                    {# Adjust warning based on on_delete behavior #}
+                </p>
+            {% endif %}
+
+            <p class="text-danger">This action cannot be undone.</p>
+            
+            <form method="post">
+                {% csrf_token %}
+                <div class="d-flex justify-content-end">
+                     {# Updated namespace #}
+                    <a href="{% url 'organization:region_detail' pk=region.pk %}" class="btn btn-link me-2">Cancel</a>
+                    <button type="submit" class="btn btn-danger">Confirm Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+    <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
+    <title>{% block title %}AssetBox{% endblock %}</title>
+    <!-- CSS files -->
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.1.0/dist/css/tabler.min.css" rel="stylesheet"/>
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.1.0/dist/css/tabler-flags.min.css" rel="stylesheet"/>
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.1.0/dist/css/tabler-payments.min.css" rel="stylesheet"/>
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.1.0/dist/css/tabler-vendors.min.css" rel="stylesheet"/>
+    {% block extra_head %}{% endblock %}
+    <style>
+        /* Optional: Add custom styles here */
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .page-wrapper {
+            flex-grow: 1;
+        }
+    </style>
+</head>
+<body class="layout-fluid layout-combo">
+    <script src="https://unpkg.com/htmx.org@1.9.10" integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC" crossorigin="anonymous"></script>
+
+    <div class="page">
+        <!-- Top Navbar -->
+        {% include "partials/_topbar.html" %}
+
+        <!-- Vertical Sidebar Navbar -->
+        {% include "partials/_sidebar.html" %}
+
+        <div class="page-wrapper">
+            <!-- Page header -->
+            <div class="page-header d-print-none">
+                <div class="container-xl">
+                    {# Render Breadcrumbs #}
+                    {% if breadcrumbs %}
+                        <ol class="breadcrumb breadcrumb-arrows" aria-label="breadcrumbs">
+                            {% for label, url in breadcrumbs %}
+                                {% if url %}
+                                    <li class="breadcrumb-item"><a href="{{ url }}">{{ label }}</a></li>
+                                {% else %}
+                                    <li class="breadcrumb-item active" aria-current="page">{{ label }}</li>
+                                {% endif %}
+                            {% endfor %}
+                        </ol>
+                    {% endif %}
+                    {# End Breadcrumbs #}
+                    <div class="row g-2 align-items-center mt-2"> {# Add margin-top #}
+                        <div class="col">
+                            {% block page_header %}
+                            <!-- Page pre-title -->
+                            <div class="page-pretitle">
+                                Overview
+                            </div>
+                            <h2 class="page-title">
+                                Dashboard
+                            </h2>
+                            {% endblock %}
+                        </div>
+                        <!-- Page title actions -->
+                        <div class="col-auto ms-auto d-print-none">
+                            {% block page_actions %}{% endblock %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Page body -->
+            <div class="page-body">
+                <div class="container-xl">
+                    {% block content %}
+                    <!-- Content here -->
+                    {% endblock %}
+                </div>
+            </div>
+            <footer class="footer footer-transparent d-print-none">
+                <div class="container-xl">
+                    <div class="row text-center align-items-center flex-row-reverse">
+                        <div class="col-lg-auto ms-lg-auto">
+                            <ul class="list-inline list-inline-dots mb-0">
+                                <li class="list-inline-item"><a href="#" target="_blank" class="link-secondary" rel="noopener">Documentation</a></li>
+                                <li class="list-inline-item"><a href="#" class="link-secondary">License</a></li>
+                                <li class="list-inline-item"><a href="https://github.com/your-repo" target="_blank" class="link-secondary" rel="noopener">Source code</a></li>
+                            </ul>
+                        </div>
+                        <div class="col-12 col-lg-auto mt-3 mt-lg-0">
+                            <ul class="list-inline list-inline-dots mb-0">
+                                <li class="list-inline-item">
+                                    Copyright &copy; {% now "Y" %}
+                                    <a href="." class="link-secondary">AssetBox</a>.
+                                    All rights reserved.
+                                </li>
+                                <li class="list-inline-item">
+                                    Theme by <a href="https://tabler.io" class="link-secondary" rel="noopener">Tabler</a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.1.0/dist/js/tabler.min.js"></script>
+    {% block extra_scripts %}
+    <script>
+        // NetBox-inspired Dark Mode Toggle Logic - Simplified Initialization
+        (function() {
+            const LOCAL_STORAGE_KEY = 'theme';
+
+            /**
+             * Set the color mode attribute on <html/> and store preference.
+             */
+            function setMode(mode) {
+                document.documentElement.setAttribute("data-bs-theme", mode);
+                localStorage.setItem(LOCAL_STORAGE_KEY, mode);
+                console.log(`Theme attribute set to: ${mode}`); // Debugging
+            }
+
+            // No updateButtonVisibility function needed - rely on Tabler CSS
+
+            /**
+             * Determine the initial theme based on storage or browser preference.
+             */
+            function initMode() {
+                let initialMode = 'light'; // Default to light
+                try {
+                    const storedTheme = localStorage.getItem(LOCAL_STORAGE_KEY);
+                    const preferDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+                    if (storedTheme) {
+                        initialMode = storedTheme;
+                    } else if (preferDark) {
+                        initialMode = 'dark';
+                    }
+                } catch (error) {
+                    console.error("Error determining initial theme:", error);
+                }
+                // DO NOT call setMode here anymore
+                return initialMode; // Return the mode for DOMContentLoaded
+            }
+
+            // Add event listeners and set initial theme attribute after the DOM is fully loaded
+            document.addEventListener('DOMContentLoaded', () => {
+                // Determine and set the initial theme attribute here
+                const initialTheme = initMode();
+                setMode(initialTheme);
+                console.log(`Initial theme set inside DOMContentLoaded: ${initialTheme}`); // Debugging
+
+                // Use event delegation on the document for the toggle buttons
+                document.addEventListener('click', (event) => {
+                    const toggleButton = event.target.closest('.color-mode-toggle');
+
+                    if (toggleButton) {
+                        event.preventDefault();
+                        const currentTheme = document.documentElement.getAttribute('data-bs-theme');
+                        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                        setMode(newTheme); // Set attribute and localStorage
+                        // No need to call updateButtonVisibility
+                    }
+                });
+            });
+
+        })(); // IIFE to avoid polluting global scope
+    </script>
+    {% endblock %}
+
+    {# Placeholder for dynamically loaded modals #}
+    <div id="modal-placeholder"></div>
+
+</body>
+</html> 

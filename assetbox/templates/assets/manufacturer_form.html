@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}{% if object %}Edit Manufacturer{% else %}Add Manufacturer{% endif %}{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <h2 class="page-title">
+                    {% if object %}Edit {{ object.name }}{% else %}Add Manufacturer{% endif %}
+                </h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="page-body">
+    <div class="container-xl">
+        <div class="row row-cards">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <form method="post">
+                            {% csrf_token %}
+                            {{ form|crispy }}
+                            <div class="form-footer">
+                                <button type="submit" class="btn btn-primary">{% if object %}Update{% else %}Create{% endif %} Manufacturer</button>
+                                <a href="{% url 'assets:manufacturer_list' %}" class="btn btn-secondary">Cancel</a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

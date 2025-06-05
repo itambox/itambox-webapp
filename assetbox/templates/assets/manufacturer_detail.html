@@ -1,0 +1,33 @@
+{% extends 'generic/object_detail_base.html' %}
+{% load render_table from django_tables2 %}
+{% load static %}
+
+{# Define the specific details for a Manufacturer object #}
+{% block object_details %}
+<dl class="row">
+    <dt class="col-sm-3">Name:</dt>
+    <dd class="col-sm-9">{{ object.name }}</dd>
+
+    <dt class="col-sm-3">Description:</dt>
+    <dd class="col-sm-9">{{ object.description|linebreaksbr|default:"<i>Not Set</i>"|safe }}</dd>
+</dl>
+{% endblock object_details %}
+
+{# Remove Assets table from here #}
+{% block related_objects %}
+    {# This block is now only used for the sidebar related objects card #}
+    {# We calculated the Asset count in the view for the sidebar card #}
+{% endblock related_objects %}
+
+{# Add the Assets table to the new full_width_content block #}
+{% block full_width_content %}
+    {% if assets_table %}
+    <div class="card mb-4">
+        <div class="card-header"><h3 class="card-title">Assets from this Manufacturer ({{ assets_table.rows|length }})</h3></div>
+        <div class="table-responsive">
+            {% render_table assets_table %}
+        </div>
+        {# Optional: Add pagination if needed later #}
+    </div>
+    {% endif %}
+{% endblock full_width_content %}

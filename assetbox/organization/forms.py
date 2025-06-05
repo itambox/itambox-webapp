@@ -1,0 +1,367 @@
+from django import forms
+# Import models from this app
+from .models import Site, Region, SiteGroup, Tenant, Location, TenantGroup, AssetHolder
+# Import models from other apps
+from extras.models import Tag # UPDATED: Import Tag from extras
+from django.contrib.auth import get_user_model
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Layout, Submit, HTML, Row, Column
+from django.urls import reverse
+
+User = get_user_model()
+
+# --- Standard Button Layout Helper --- 
+def add_standard_buttons(helper, instance, list_url_name):
+    """Adds standard Create/Update and Cancel buttons to a FormHelper."""
+    button_text = 'Update' if instance and instance.pk else 'Create'
+    cancel_url = reverse(list_url_name)
+    helper.layout.append(
+        HTML('<div class="mt-4"></div>')
+    )
+    helper.layout.append(
+        Submit('submit', button_text, css_class='btn btn-primary')
+    )
+    helper.layout.append(
+        HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>')
+    )
+
+# --- Site Form ---
+class SiteForm(forms.ModelForm):
+    # Point querysets to models within this app
+    region = forms.ModelChoiceField(
+        queryset=Region.objects.all(), 
+        required=False, 
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    group = forms.ModelChoiceField(
+        queryset=SiteGroup.objects.all(), 
+        required=False, 
+        label="Site Group",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    tenant = forms.ModelChoiceField(
+        queryset=Tenant.objects.all(), 
+        required=False, 
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    tags = forms.ModelMultipleChoiceField(
+        queryset=Tag.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={'class': 'form-select'}), # Or CheckboxSelectMultiple
+    )
+
+    class Meta:
+        model = Site
+        fields = [
+            'name', 'slug', 'status', 'region', 'group', 'tenant', 
+            'facility', 'time_zone', 'description', 'physical_address', 
+            'shipping_address', 'latitude', 'longitude', 'comments', 'tags'
+        ]
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'slug': forms.TextInput(attrs={'class': 'form-control'}),
+            'status': forms.Select(attrs={'class': 'form-select'}),
+            'facility': forms.TextInput(attrs={'class': 'form-control'}),
+            'time_zone': forms.TextInput(attrs={'class': 'form-control'}), # Consider TimeZoneField later
+            'description': forms.TextInput(attrs={'class': 'form-control'}),
+            'physical_address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'shipping_address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'latitude': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.000001'}),
+            'longitude': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.000001'}),
+            'comments': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
+        }
+        help_texts = {
+            'slug': 'URL-friendly identifier.',
+            'latitude': 'GPS coordinate (decimal format xx.yyyyyy)',
+            'longitude': 'GPS coordinate (decimal format xx.yyyyyy)',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+        self.helper.layout = Layout(
+            # Define field layout using standard Crispy tags or list fields
+            'name', 'slug', 'status',
+            Row(
+                Column('region', css_class='form-group col-md-4 mb-0'),
+                Column('group', css_class='form-group col-md-4 mb-0'),
+                Column('tenant', css_class='form-group col-md-4 mb-0'),
+                css_class='mb-3'
+            ),
+            'facility', 'time_zone', 'description', 
+            'physical_address', 'shipping_address',
+            Row(
+                Column('latitude', css_class='form-group col-md-6 mb-0'),
+                Column('longitude', css_class='form-group col-md-6 mb-0'),
+                css_class='mb-3'
+            ),
+            'comments', 'tags'
+        )
+        add_standard_buttons(self.helper, self.instance, 'organization:site_list')
+
+# --- Region Form ---
+class RegionForm(forms.ModelForm):
+    parent = forms.ModelChoiceField(
+        queryset=Region.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'})
+        # TODO: Consider filtering queryset to prevent selecting self/descendants?
+    )
+    tags = forms.ModelMultipleChoiceField(
+        queryset=Tag.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
+    )
+
+    class Meta:
+        model = Region
+        fields = ['name', 'slug', 'parent', 'description', 'tags']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'slug': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+        help_texts = {
+            'slug': 'URL-friendly identifier.',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+        self.helper.layout = Layout(
+            'name', 'slug', 'parent', 'description', 'tags'
+        )
+        add_standard_buttons(self.helper, self.instance, 'organization:region_list')
+
+# --- Site Group Form ---
+class SiteGroupForm(forms.ModelForm):
+    parent = forms.ModelChoiceField(
+        queryset=SiteGroup.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'})
+        # TODO: Filter queryset to prevent self/descendants?
+    )
+    tags = forms.ModelMultipleChoiceField(
+        queryset=Tag.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
+    )
+
+    class Meta:
+        model = SiteGroup
+        fields = ['name', 'slug', 'parent', 'description', 'tags']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'slug': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+        help_texts = {
+            'slug': 'URL-friendly identifier.',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+        self.helper.layout = Layout(
+            'name', 'slug', 'parent', 'description', 'tags'
+        )
+        add_standard_buttons(self.helper, self.instance, 'organization:sitegroup_list')
+
+# --- Location Form ---
+class LocationForm(forms.ModelForm):
+    site = forms.ModelChoiceField(
+        queryset=Site.objects.all(),
+        required=True, # Site is required
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    parent = forms.ModelChoiceField(
+        queryset=Location.objects.all(), # Allow selecting any location as parent
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'})
+        # TODO: Filter queryset to prevent selecting self/descendants or locations from different sites?
+    )
+    tenant = forms.ModelChoiceField(
+        queryset=Tenant.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    tags = forms.ModelMultipleChoiceField(
+        queryset=Tag.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
+    )
+
+    class Meta:
+        model = Location
+        fields = [
+            'site', 'name', 'slug', 'status', 'parent', 'tenant',
+            'facility', 'description', 'tags'
+        ]
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'slug': forms.TextInput(attrs={'class': 'form-control'}),
+            'status': forms.Select(attrs={'class': 'form-select'}),
+            'facility': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+        help_texts = {
+            'slug': 'URL-friendly identifier.',
+            'facility': 'Building, Floor, Room, Rack, etc.'
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+        self.helper.layout = Layout(
+            'site', 'name', 'slug', 'status', 'parent', 'tenant',
+            'facility', 'description', 'tags'
+        )
+        add_standard_buttons(self.helper, self.instance, 'organization:location_list')
+
+    # Optional: Add validation to prevent selecting self/descendant as parent
+    # def clean_parent(self):
+    #     parent = self.cleaned_data.get('parent')
+    #     if parent and self.instance and self.instance.pk:
+    #         # Check if parent is self
+    #         if parent.pk == self.instance.pk:
+    #             raise forms.ValidationError("A location cannot be its own parent.")
+    #         # Check if parent is a descendant (more complex)
+    #         # ... logic to traverse down the tree from self.instance ...
+    #         # if parent is in descendants:
+    #         #     raise forms.ValidationError("Cannot set a descendant as a parent.")
+    #     return parent
+
+# --- TenantGroup Form ---
+class TenantGroupForm(forms.ModelForm):
+    parent = forms.ModelChoiceField(
+        queryset=TenantGroup.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'})
+        # TODO: Filter queryset to prevent self/descendants?
+    )
+    tags = forms.ModelMultipleChoiceField(
+        queryset=Tag.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
+    )
+
+    class Meta:
+        model = TenantGroup
+        fields = ['name', 'slug', 'parent', 'description', 'tags']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'slug': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+        help_texts = {
+            'slug': 'URL-friendly identifier.',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+        self.helper.layout = Layout(
+            'name', 'slug', 'parent', 'description', 'tags'
+        )
+        add_standard_buttons(self.helper, self.instance, 'organization:tenantgroup_list')
+
+# --- Tenant Form ---
+class TenantForm(forms.ModelForm):
+    group = forms.ModelChoiceField(
+        queryset=TenantGroup.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    tags = forms.ModelMultipleChoiceField(
+        queryset=Tag.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
+    )
+
+    class Meta:
+        model = Tenant
+        fields = ['name', 'slug', 'group', 'description', 'comments', 'tags']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'slug': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'comments': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
+        }
+        help_texts = {
+            'slug': 'URL-friendly identifier.',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+        self.helper.layout = Layout(
+            'name', 'slug', 'group', 'description', 'comments', 'tags'
+        )
+        add_standard_buttons(self.helper, self.instance, 'organization:tenant_list')
+
+# --- AssetHolder Form ---
+class AssetHolderForm(forms.ModelForm):
+    tenant = forms.ModelChoiceField(
+        queryset=Tenant.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    # Add tags field later if using a specific widget like NetBox uses
+
+    class Meta:
+        model = AssetHolder
+        fields = [
+            'first_name', 'last_name', 'upn', 'email', 'tenant',
+            'description', 'comments', # 'tags' excluded for now
+        ]
+        widgets = {
+            'first_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'upn': forms.TextInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'comments': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True # Let crispy render the form tag
+
+        button_text = 'Update' if self.instance and self.instance.pk else 'Create'
+        cancel_url = reverse('organization:assetholder_list') # Assuming this URL name
+
+        self.helper.layout = Layout(
+            Row(
+                Column('first_name', css_class='form-group col-md-6 mb-0'),
+                Column('last_name', css_class='form-group col-md-6 mb-0'),
+                css_class='mb-3'
+            ),
+            Row(
+                Column('upn', css_class='form-group col-md-6 mb-0'),
+                Column('email', css_class='form-group col-md-6 mb-0'),
+                css_class='mb-3'
+            ),
+            'tenant',
+            'description',
+            'comments',
+            # Add 'tags' here later if needed
+            HTML('<div class="mt-4"></div>'),
+            Submit('submit', button_text, css_class='btn btn-primary'),
+            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+        )
+
+# TODO: Add TagForm 

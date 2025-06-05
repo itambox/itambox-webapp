@@ -1,0 +1,193 @@
+{% extends 'generic/object_detail_base.html' %}
+{% load render_table from django_tables2 %}
+{% load static %}
+
+{% block title %}{{ object.name }} - Location Details - AssetBox{% endblock %}
+
+{% block page_header %}
+    <div class="page-pretitle">Organization / Locations</div>
+    <h2 class="page-title">
+        {{ object.name }}
+    </h2>
+{% endblock %}
+
+{% block page_actions %}
+    <div class="btn-list">
+        <a href="{% url 'organization:location_update' pk=object.pk %}" class="btn">Edit</a>
+        <a href="{% url 'organization:location_delete' pk=object.pk %}" class="btn btn-danger">Delete</a>
+    </div>
+{% endblock %}
+
+{% block object_details %}
+<dl class="row">
+    <dt class="col-sm-3">Name:</dt>
+    <dd class="col-sm-9">{{ object.name }}</dd>
+
+    <dt class="col-sm-3">Slug:</dt>
+    <dd class="col-sm-9">{{ object.slug }}</dd>
+
+    <dt class="col-sm-3">Site:</dt>
+    <dd class="col-sm-9">
+        {% if object.site %}
+            <a href="{% url 'organization:site_detail' pk=object.site.pk %}">{{ object.site }}</a>
+        {% else %}
+             <i>None</i> {# Site is mandatory, but handle display just in case #}
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">Parent Location:</dt>
+    <dd class="col-sm-9">
+        {% if object.parent %}
+            <a href="{% url 'organization:location_detail' pk=object.parent.pk %}">{{ object.parent }}</a>
+        {% else %}
+             <i>None</i>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">Tenant:</dt>
+    <dd class="col-sm-9">
+        {% if object.tenant %}
+            <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant }}</a>
+        {% else %}
+             <i>None</i>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">Status:</dt>
+    <dd class="col-sm-9">{{ object.get_status_display }}</dd>
+
+    <dt class="col-sm-3">Facility:</dt>
+    <dd class="col-sm-9">{{ object.facility|default:"<i>Not Set</i>"|safe }}</dd>
+
+    <dt class="col-sm-3">Description:</dt>
+    <dd class="col-sm-9">{{ object.description|linebreaksbr|default:"<i>Not Set</i>"|safe }}</dd>
+
+</dl>
+{% endblock object_details %}
+
+{% block related_objects %}{% endblock related_objects %}
+
+{% block full_width_content %}
+    {% if assets_table %}
+    <div class="card mb-4">
+        <div class="card-header"><h3 class="card-title">Assets in this Location ({{ assets_table.rows|length }})</h3></div>
+        <div class="table-responsive">
+            {% render_table assets_table %}
+        </div>
+        {# Optional: Add pagination if needed later #}
+    </div>
+    {% endif %}
+     {# TODO: Add Child Locations card/table here? #}
+{% endblock full_width_content %}
+
+{% block content %}
+<div class="row g-4">
+    {# Left Column - Details #}
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Location Information</h3>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-3">Name:</dt>
+                    <dd class="col-sm-9">{{ object.name }}</dd>
+
+                    <dt class="col-sm-3">Slug:</dt>
+                    <dd class="col-sm-9">{{ object.slug }}</dd>
+
+                    <dt class="col-sm-3">Site:</dt>
+                    <dd class="col-sm-9">
+                        {% if object.site %}
+                            <a href="{% url 'organization:site_detail' pk=object.site.pk %}">{{ object.site }}</a>
+                        {% else %}
+                            <i>None</i>
+                        {% endif %}
+                    </dd>
+
+                    <dt class="col-sm-3">Parent:</dt>
+                    <dd class="col-sm-9">
+                        {% if object.parent %}
+                            <a href="{% url 'organization:location_detail' pk=object.parent.pk %}">{{ object.parent }}</a>
+                        {% else %}
+                            <i>None</i>
+                        {% endif %}
+                    </dd>
+
+                    <dt class="col-sm-3">Status:</dt>
+                    <dd class="col-sm-9">{{ object.get_status_display }}</dd>
+
+                    <dt class="col-sm-3">Tenant:</dt>
+                    <dd class="col-sm-9">
+                        {% if object.tenant %}
+                            <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant }}</a>
+                        {% else %}
+                            <i>None</i>
+                        {% endif %}
+                    </dd>
+
+                    <dt class="col-sm-3">Facility:</dt>
+                    <dd class="col-sm-9">{{ object.facility|default:"<i>Not Set</i>"|safe }}</dd>
+
+                    <dt class="col-sm-3">Description:</dt>
+                    <dd class="col-sm-9">{{ object.description|linebreaksbr|default:"<i>Not Set</i>"|safe }}</dd>
+                </dl>
+            </div>
+        </div>
+
+        {# TODO: Add Assets in this location section #}
+         <div class="card mt-4">
+            <div class="card-header">
+                <h3 class="card-title">Assets in this Location ({{ assets_table.rows|length }})</h3>
+            </div>
+            <div class="table-responsive">
+                {% render_table assets_table %}
+            </div>
+        </div>
+
+         <div class="card mt-4">
+            <div class="card-header">
+                <h3 class="card-title">Child Locations ({{ object.children.count }})</h3>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for child_loc in object.children.all %}
+                    <a href="{% url 'organization:location_detail' pk=child_loc.pk %}" class="list-group-item list-group-item-action">
+                       {{ child_loc.name }}
+                       <span class="text-muted small ms-2">({{ child_loc.slug }})</span>
+                    </a>
+                {% empty %}
+                    <div class="list-group-item text-muted">No child locations defined.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+
+    {# Right Column - Metadata & Tags #}
+    <div class="col-md-4">
+         <div class="card mb-4">
+             <div class="card-body">
+                 <h3 class="card-title">Metadata</h3>
+                 <p class="text-muted small">
+                     Created: {{ object.created_at|date:"Y-m-d H:i" }} <br>
+                     Updated: {{ object.updated_at|date:"Y-m-d H:i" }}
+                 </p>
+            </div>
+        </div>
+
+        <div class="card">
+             <div class="card-header">
+                <h3 class="card-title">Tags</h3>
+            </div>
+             <div class="card-body">
+                {% for tag in object.tags.all %}
+                    {# TODO: Link to tag view? Add color? #}
+                    <span class="badge bg-secondary">{{ tag.name }}</span>
+                {% empty %}
+                    <span class="text-muted"><i>No tags assigned.</i></span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

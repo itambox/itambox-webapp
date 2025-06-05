@@ -1,0 +1,26 @@
+{% load utility_tags %}
+{% load core_constants %}
+{% load django_tables2 %}
+
+{% get_pagination_choices as choices %}
+
+{# Per Page Dropdown #}
+<div class="dropdown me-3 d-none d-sm-block">
+    <button class="btn btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+        {{ paginator.per_page }} Per Page
+    </button>
+    <ul class="dropdown-menu" style="max-height: 200px; overflow-y: auto;">
+        {% for count, label in choices %}
+            <li>
+                <a class="dropdown-item{% if count == paginator.per_page %} active{% endif %}"
+                   href="?{% querystring per_page=count page=1 %}"
+                   hx-get="?{% querystring per_page=count page=1 %}"
+                   hx-target="#object-list-table-container"
+                   hx-swap="outerHTML"
+                   hx-push-url="true">
+                    {{ label }}
+                </a>
+            </li>
+        {% endfor %}
+    </ul>
+</div> 

@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ tenantgroup.name }} - Tenant Group Details - AssetBox{% endblock %}
+
+{% block page_header %}
+    <div class="page-pretitle">Organization / Tenant Groups</div>
+    <h2 class="page-title">
+        {{ tenantgroup.name }}
+    </h2>
+{% endblock %}
+
+{% block page_actions %}
+    <div class="btn-list">
+        <a href="{% url 'organization:tenantgroup_update' pk=tenantgroup.pk %}" class="btn">Edit</a>
+        <a href="{% url 'organization:tenantgroup_delete' pk=tenantgroup.pk %}" class="btn btn-danger">Delete</a>
+    </div>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Tenant Group Information</h3>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-3">Name:</dt>
+                    <dd class="col-sm-9">{{ tenantgroup.name }}</dd>
+
+                    <dt class="col-sm-3">Slug:</dt>
+                    <dd class="col-sm-9">{{ tenantgroup.slug }}</dd>
+
+                    <dt class="col-sm-3">Parent:</dt>
+                    <dd class="col-sm-9">
+                        {% if tenantgroup.parent %}
+                            <a href="{% url 'organization:tenantgroup_detail' pk=tenantgroup.parent.pk %}">{{ tenantgroup.parent.name }}</a>
+                        {% else %}
+                            <i>None</i>
+                        {% endif %}
+                    </dd>
+
+                    <dt class="col-sm-3">Description:</dt>
+                    <dd class="col-sm-9">{{ tenantgroup.description|default:"<i>None</i>"|safe }}</dd>
+                </dl>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h3 class="card-title">Tenants in this Group ({{ tenantgroup.tenants.count }})</h3>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for tenant in tenantgroup.tenants.all %}
+                    <a href="{% url 'organization:tenant_detail' pk=tenant.pk %}" class="list-group-item list-group-item-action">
+                       {{ tenant.name }}
+                       <span class="text-muted small ms-2">({{ tenant.slug }})</span>
+                    </a>
+                {% empty %}
+                    <div class="list-group-item text-muted">No tenants assigned to this group.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+         <div class="card mt-4">
+            <div class="card-header">
+                <h3 class="card-title">Child Groups ({{ tenantgroup.children.count }})</h3>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for child_group in tenantgroup.children.all %}
+                    <a href="{% url 'organization:tenantgroup_detail' pk=child_group.pk %}" class="list-group-item list-group-item-action">
+                       {{ child_group.name }}
+                       <span class="text-muted small ms-2">({{ child_group.slug }})</span>
+                    </a>
+                {% empty %}
+                    <div class="list-group-item text-muted">No child groups defined.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+    <div class="col-md-4">
+         <div class="card mb-4">
+             <div class="card-body">
+                 <h3 class="card-title">Metadata</h3>
+                 <p class="text-muted small">
+                     Created: {{ tenantgroup.created_at|date:"Y-m-d H:i" }} <br>
+                     Updated: {{ tenantgroup.updated_at|date:"Y-m-d H:i" }}
+                 </p>
+            </div>
+        </div>
+
+        <div class="card">
+             <div class="card-header">
+                <h3 class="card-title">Tags</h3>
+            </div>
+             <div class="card-body">
+                {% for tag in tenantgroup.tags.all %}
+                    <span class="badge bg-secondary">{{ tag.name }}</span>
+                {% empty %}
+                    <span class="text-muted"><i>No tags assigned.</i></span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

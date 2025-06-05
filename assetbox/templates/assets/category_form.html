@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+
+{% block title %}
+    {% if category %}Edit {{ category.name }}{% else %}Create Asset Role{% endif %} - AssetBox
+{% endblock %}
+
+{% block page_header %}
+    <div class="page-pretitle">Assets / Asset Roles</div>
+    <h2 class="page-title">
+        {% if category %}Edit Asset Role: {{ category.name }}{% else %}Create New Asset Role{% endif %}
+    </h2>
+{% endblock %}
+
+{% block content %}
+<div class="col-md-6">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Asset Role Details</h3>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+
+                <div class="mb-3">
+                    <label class="form-label required">{{ form.name.label }}</label>
+                    {{ form.name }}
+                    {% if form.name.errors %}<div class="invalid-feedback d-block">{{ form.name.errors|join:", " }}</div>{% endif %}
+                </div>
+                 <div class="mb-3">
+                    <label class="form-label">{{ form.description.label }}</label>
+                    {{ form.description }}
+                    {% if form.description.errors %}<div class="invalid-feedback d-block">{{ form.description.errors|join:", " }}</div>{% endif %}
+                </div>
+
+                {# Non-field errors #}
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger" role="alert">
+                        {{ form.non_field_errors|join:", " }}
+                    </div>
+                {% endif %}
+
+                <div class="card-footer text-end">
+                    <a href="{% url 'assets:category_list' %}" class="btn btn-link">Cancel</a>
+                    <button type="submit" class="btn btn-primary">{% if category %}Update Asset Role{% else %}Create Asset Role{% endif %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %} 

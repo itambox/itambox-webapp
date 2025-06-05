@@ -1,0 +1,92 @@
+{% extends 'generic/object_detail_base.html' %}
+{% load render_table from django_tables2 %}
+{% load static %}
+
+{# --- Page Title and Header --- #}
+{% block title %}{{ object.name }} - Site Details - AssetBox{% endblock %}
+
+{% block page_header %}
+    <div class="page-pretitle">Organization / Sites</div>
+    <h2 class="page-title">
+        {{ object.name }}
+    </h2>
+{% endblock %}
+
+{# --- Main Site Details --- #}
+{% block object_details %}
+<dl class="row">
+    <dt class="col-sm-3">Name:</dt>
+    <dd class="col-sm-9">{{ object.name }}</dd>
+
+    <dt class="col-sm-3">Slug:</dt>
+    <dd class="col-sm-9">{{ object.slug }}</dd>
+
+    <dt class="col-sm-3">Status:</dt>
+    <dd class="col-sm-9">{{ object.get_status_display }}</dd>
+
+    <dt class="col-sm-3">Region:</dt>
+    <dd class="col-sm-9">
+        {% if object.region %}
+            <a href="{% url 'organization:region_detail' pk=object.region.pk %}">{{ object.region }}</a>
+        {% else %}
+             <i>None</i>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">Site Group:</dt>
+    <dd class="col-sm-9">
+        {% if object.group %}
+            <a href="{% url 'organization:sitegroup_detail' pk=object.group.pk %}">{{ object.group }}</a>
+        {% else %}
+             <i>None</i>
+        {% endif %}
+    </dd>
+
+     <dt class="col-sm-3">Tenant:</dt>
+    <dd class="col-sm-9">
+        {% if object.tenant %}
+            <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant }}</a>
+        {% else %}
+             <i>None</i>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">Facility:</dt>
+    <dd class="col-sm-9">{{ object.facility|default:"<i>Not Set</i>"|safe }}</dd>
+
+    <dt class="col-sm-3">Time Zone:</dt>
+    <dd class="col-sm-9">{{ object.time_zone|default:"<i>Not Set</i>"|safe }}</dd>
+
+    <dt class="col-sm-3">Description:</dt>
+    <dd class="col-sm-9">{{ object.description|linebreaksbr|default:"<i>Not Set</i>"|safe }}</dd>
+
+    {# Add address/GPS fields if needed #}
+    <dt class="col-sm-3">Physical Address:</dt>
+    <dd class="col-sm-9">{{ object.physical_address|linebreaksbr|default:"<i>Not Set</i>"|safe }}</dd>
+     <dt class="col-sm-3">Shipping Address:</dt>
+    <dd class="col-sm-9">{{ object.shipping_address|linebreaksbr|default:"<i>Not Set</i>"|safe }}</dd>
+    <dt class="col-sm-3">GPS Coordinates:</dt>
+    <dd class="col-sm-9">{{ object.latitude|default:"?" }}, {{ object.longitude|default:"?" }}</dd>
+
+</dl>
+{% endblock object_details %}
+
+{# --- Related Objects (Sidebar) --- #}
+{% block related_objects %}
+    {# This block is intentionally left empty for Sites. #}
+    {# Counts are shown in the dedicated 'Related Objects' card via context. #}
+{% endblock related_objects %}
+
+
+{# --- Full Width Content (Locations Table) --- #}
+{% block full_width_content %}
+    {% if locations_table %}
+    <div class="card mb-4">
+        <div class="card-header"><h3 class="card-title">Locations in this Site ({{ locations_table.rows|length }})</h3></div>
+        <div class="table-responsive">
+            {% render_table locations_table %}
+        </div>
+        {# Optional: Add pagination if needed later #}
+    </div>
+    {% endif %}
+{% endblock full_width_content %}

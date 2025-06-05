@@ -1,0 +1,21 @@
+{# assetbox/templates/assets/partials/asset_checkout_modal.html #}
+{% load crispy_forms_tags %}
+
+<div class="modal modal-blur fade" id="asset-checkout-modal" tabindex="-1" aria-labelledby="assetCheckOutModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            {# Use target "#asset-checkout-modal" and swap outerHTML to replace the modal content on POST #}
+            <form hx-post="{% url 'assets:asset_checkout_modal' pk=asset.pk %}" hx-target="#asset-checkout-modal" hx-swap="outerHTML">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title" id="assetCheckOutModalLabel">Check Out Asset: {{ asset.name }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Select either a User or an Asset Holder to check this asset out to.</p>
+                    {% crispy form %}
+                </div>
+            </form>
+        </div>
+    </div>
+</div> 

@@ -1,0 +1,113 @@
+{% load crispy_forms_tags %}
+<div class="modal modal-blur fade" id="table-config-modal" tabindex="-1" aria-labelledby="tableConfigModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title" id="tableConfigModalLabel">Configure {{ table_verbose_name }} Table</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Select the columns to display in the table. Use Ctrl/Cmd-click to select multiple columns.</p>
+                    <div class="row">
+                        <div class="col-md-5">
+                            <label for="id_available_columns_widget" class="form-label">Available Columns</label>
+                            <select name="available_columns_widget" multiple class="form-select" size="10" id="id_available_columns_widget">
+                                {% for value, text in form.get_available_columns_choices %}
+                                    <option value="{{ value }}">{{ text }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="mt-2 text-center">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-add-cols">Add &rarr;</button>
+                            </div>
+                        </div>
+                        <div class="col-md-5 offset-md-1">
+                            {{ form.columns.label_tag }}
+                            {{ form.columns }}
+                            <div class="mt-2 text-center">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-remove-cols">&larr; Remove</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary ms-2" id="btn-cols-up">&uarr;</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary ms-1" id="btn-cols-down">&darr;</button>
+                            </div>
+                        </div>
+                    </div>
+                     {% if form.errors %}
+                        <div class="alert alert-danger mt-3">
+                            Please correct the errors below.
+                            {{ form.non_field_errors }}
+                            {% for field in form %}
+                                {% if field.errors %}
+                                    <strong>{{ field.label }}:</strong> {{ field.errors|striptags }}
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="btn-apply-cols"
+                            hx-post="{% url 'table_config' model_name=table_name %}"
+                            hx-include="[name='csrfmiddlewaretoken'], [name='columns']"
+                            hx-target="#table-config-modal"
+                            hx-swap="outerHTML">
+                        Apply
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        const modal = document.getElementById('table-config-modal');
+        if (!modal) return;
+
+        const availableList = modal.querySelector('#id_available_columns_widget');
+        const selectedList = modal.querySelector('[name=columns]');
+        const addButton = modal.querySelector('#btn-add-cols');
+        const removeButton = modal.querySelector('#btn-remove-cols');
+        const upButton = modal.querySelector('#btn-cols-up');
+        const downButton = modal.querySelector('#btn-cols-down');
+        const applyButton = modal.querySelector('#btn-apply-cols');
+
+        function moveOptions(sourceList, destList) {
+            // Revert: Do not handle selection state during move
+            // const isMovingToSelected = destList.name === 'columns';
+            Array.from(sourceList.selectedOptions).forEach(option => {
+                // option.selected = isMovingToSelected;
+                destList.appendChild(option);
+            });
+        }
+
+        function moveOption(list, direction) {
+            const selectedOption = list.selectedOptions[0];
+            if (!selectedOption) return;
+
+            if (direction === 'up' && selectedOption.previousElementSibling) {
+                list.insertBefore(selectedOption, selectedOption.previousElementSibling);
+            } else if (direction === 'down' && selectedOption.nextElementSibling) {
+                list.insertBefore(selectedOption.nextElementSibling, selectedOption);
+            }
+        }
+
+        addButton.addEventListener('click', () => moveOptions(availableList, selectedList));
+        removeButton.addEventListener('click', () => moveOptions(selectedList, availableList));
+        upButton.addEventListener('click', () => moveOption(selectedList, 'up'));
+        downButton.addEventListener('click', () => moveOption(selectedList, 'down'));
+
+        // Restore: Select all options in selectedList before HTMX request
+        applyButton.addEventListener('htmx:beforeRequest', function(event) {
+            console.log("Selecting all columns before HTMX request..."); // DEBUG
+            const optionsToSelect = Array.from(selectedList.options);
+            console.log(`Found ${optionsToSelect.length} options in selectedList to select:`, optionsToSelect.map(o => o.value)); // DEBUG
+            optionsToSelect.forEach(option => {
+                option.selected = true;
+            });
+            // Verify selection (for browser console)
+            // console.log("Selected options after setting:", Array.from(selectedList.selectedOptions).map(o => o.value));
+        });
+
+    })();
+</script> 

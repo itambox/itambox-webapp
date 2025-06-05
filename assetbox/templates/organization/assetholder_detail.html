@@ -1,0 +1,51 @@
+{% extends 'generic/object_detail_base.html' %}
+{% load render_table from django_tables2 %}
+
+{# Define the specific details for an Asset Holder #}
+{% block object_details %}
+<dl class="row">
+    <dt class="col-sm-4">UPN:</dt>
+    <dd class="col-sm-8">{{ object.upn }}</dd>
+
+    <dt class="col-sm-4">First Name:</dt>
+    <dd class="col-sm-8">{{ object.first_name }}</dd>
+
+    <dt class="col-sm-4">Last Name:</dt>
+    <dd class="col-sm-8">{{ object.last_name }}</dd>
+
+    <dt class="col-sm-4">Email:</dt>
+    <dd class="col-sm-8">{{ object.email|default:"<i>Not Set</i>"|safe }}</dd>
+
+    <dt class="col-sm-4">Tenant:</dt>
+    <dd class="col-sm-8">
+        {% if object.tenant %}
+            <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant }}</a>
+        {% else %}
+             <i>Not Set</i>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">Linked User:</dt>
+    <dd class="col-sm-8">{{ object.user.username|default:"<i>None</i>"|safe }}</dd>
+
+    <dt class="col-sm-4">Description:</dt>
+    <dd class="col-sm-8">{{ object.description|linebreaksbr|default:"<i>Not Set</i>"|safe }}</dd>
+
+</dl>
+{% endblock object_details %}
+
+{# Leave related_objects empty for the sidebar #}
+{% block related_objects %}{% endblock related_objects %}
+
+{# Add the Assignments table to the full_width_content block #}
+{% block full_width_content %}
+    {% if assignments_table %}
+    <div class="card mb-4">
+        <div class="card-header"><h3 class="card-title">Current Assignments ({{ assignments_table.rows|length }})</h3></div>
+        <div class="table-responsive">
+            {% render_table assignments_table %}
+        </div>
+        {# Optional: Add pagination if needed later #}
+    </div>
+    {% endif %}
+{% endblock full_width_content %}

@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block title %}Confirm Delete Manufacturer{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <h2 class="page-title">
+                    Confirm Deletion
+                </h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="page-body">
+    <div class="container-xl">
+        <div class="row row-cards">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <p>Are you sure you want to delete the manufacturer "<strong>{{ object.name }}</strong>"?</p>
+                        {% if related_assets_count > 0 %}
+                            <div class="alert alert-danger" role="alert">
+                                <h4 class="alert-title">Warning!</h4>
+                                <div class="text-secondary">This manufacturer is associated with {{ related_assets_count }} asset{{ related_assets_count|pluralize }}. Deleting it might cause issues.</div>
+                            </div>
+                        {% endif %}
+                        <form method="post">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger">Confirm Delete</button>
+                            <a href="{% url 'assets:manufacturer_list' %}" class="btn btn-secondary">Cancel</a>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

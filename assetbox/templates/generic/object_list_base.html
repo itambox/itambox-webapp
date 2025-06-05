@@ -1,0 +1,290 @@
+{% extends 'base.html' %}
+{% load render_table from django_tables2 %}
+{% load static %}
+{% load utility_tags %} {# We will create this tag file next #}
+{% load i18n %}
+{% load crispy_forms_tags %} {# <--- Load crispy_forms_tags #}
+
+{% block title %}{{ title|default:"List View" }} - AssetBox{% endblock %}
+
+{% block page_header %}
+    {# Default header, can be overridden #}
+    <div class="page-pretitle">
+        {{ pretitle|default:"Manage" }}
+    </div>
+    <h2 class="page-title">
+        {{ title|default:"Objects" }}
+    </h2>
+{% endblock %}
+
+{% block page_actions %}
+    {# Standard page actions: Add, Import, Export #}
+    <div class="btn-list">
+        {% block extra_controls %}{% endblock %} {# For view-specific buttons #}
+
+        {% if create_url_name %}
+        <a href="{% url create_url_name %}" class="btn btn-primary d-none d-sm-inline-block">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+            Create {{ object_type|default:"Object" }}
+        </a>
+        <a href="{% url create_url_name %}" class="btn btn-primary d-sm-none btn-icon" aria-label="Create new {{ object_type|default:"object" }}">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+        </a>
+        {% endif %}
+        
+        {# Placeholder for Import/Export buttons like NetBox #}
+        {% if export_url_name %}
+        <a href="#" class="btn btn-secondary d-none d-sm-inline-block">Export</a>
+        {% endif %}
+    </div>
+{% endblock page_actions %}
+
+{% block content %}
+<div class="row row-cards">
+    <div class="col-12">
+        {# Main Card Wrapper #}
+        <div class="card">
+            {# Tabs Header #}
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs" data-bs-toggle="tabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <a href="#tab-results" class="nav-link active" data-bs-toggle="tab" aria-selected="true" role="tab">
+                            Results
+                            <span class="badge bg-secondary text-secondary-fg ms-1">{{ table.page.paginator.count|default:"0" }}</span>
+                        </a>
+                    </li>
+                    {% if filter_form %}
+                    <li class="nav-item" role="presentation">
+                        <a href="#tab-filters" class="nav-link" data-bs-toggle="tab" aria-selected="false" tabindex="-1" role="tab">
+                            Filters
+                            {# TODO: Add badge for active filters #}
+                            {% get_active_filters as active_filters_present %}
+                            {% if active_filters_present %}
+                                <span class="badge bg-info-lt ms-1">Active</span>
+                            {% endif %}
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+
+            {# Tab Content Area #}
+            <div class="card-body tab-content p-0">
+
+                {# --- Results Tab --- #}
+                <div class="tab-pane active show" id="tab-results" role="tabpanel">
+
+                    {# Row for Search/Configure Controls (NetBox Style) #}
+                    {# This form is mainly for the search input submission (handled by page reload/GET) #}
+                    <form method="get" action="" class="filter-form-results p-3 border-bottom">
+                        <div class="row align-items-center">
+                            {# Quick Search Input Group #}
+                            <div class="col-auto">
+                                {% if filter_form and filter_form.form.q %}
+                                <div class="input-group input-group-flat quicksearch">
+                                    <input type="search" name="q" class="form-control" placeholder="Quick search..." value="{{ request.GET.q|default:"" }}">
+                                    <span class="input-group-text">
+                                        {# Placeholder for clear button JS - TODO: Add JS #}
+                                        <a href="#" class="link-secondary {% if not request.GET.q %}d-none{% endif %}" title="Clear search" data-bs-toggle="tooltip" onclick="this.previousElementSibling.value=''; this.closest('form').submit(); return false;">
+                                             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-x" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
+                                        </a>
+                                    </span>
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            {# Spacer to push configure button right #}
+                            <div class="col"></div>
+
+                            {# Configure Table Button #}
+                            <div class="col-auto">
+                                {% if model_name_str %}
+                                <div class="table-configure">
+                                    <button type="button" class="btn btn-outline-secondary"
+                                            hx-get="{% url 'table_config' model_name=model_name_str %}"
+                                            hx-target="#modal-placeholder"
+                                            hx-on::after-request="new bootstrap.Modal(document.getElementById('table-config-modal')).show()">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-settings me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" /><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" /></svg>
+                                        Configure Table
+                                    </button>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {# Hidden fields to preserve other filters when searching/configuring #}
+                        {% if filter_form %}
+                            {% for field_name, value in request.GET.items %}
+                                {% if field_name != 'q' and field_name != 'page' and field_name != 'per_page' %}
+                                    {# Handle list values from MultipleChoiceFilter #}
+                                    {% for single_value in request.GET.getlist|lookup:field_name %}
+                                        <input type="hidden" name="{{ field_name }}" value="{{ single_value }}">
+                                    {% endfor %}
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
+                    </form>
+                    {# End Row for Search/Configure Controls #}
+
+                    {# Table Rendering Container (for HTMX) #}
+                    <div id="object-list-table-container">
+                        <div class="table-responsive">
+                            {% block table %}
+                                {% if table %}
+                                    {% render_table table %}
+                                {% else %}
+                                    <div class="p-3">
+                                        <p class="text-muted mb-0">No table data available.</p>
+                                    </div>
+                                {% endif %}
+                            {% endblock table %}
+                        </div>
+                    </div>
+                    {# End Table Rendering Container #}
+
+                    {# Pagination Controls Container #}
+                    {% if table.page %}
+                    <div class="card-footer d-flex align-items-center">
+                        {# Per Page Dropdown #}
+                        {% include 'partials/pagination_per_page.html' with paginator=table.page.paginator %}
+
+                        {# Page Number Summary #}
+                        <p class="m-0 text-secondary flex-grow-1">
+                            {% blocktrans with start=table.page.start_index end=table.page.end_index total=table.page.paginator.count %}
+                            Showing <span>{{ start }}</span> to <span>{{ end }}</span> of <span>{{ total }}</span> entries
+                            {% endblocktrans %}
+                        </p>
+
+                        {# Page Links #}
+                        {% include 'partials/pagination_links.html' with page_obj=table.page %}
+
+                    </div>
+                    {% endif %}
+                    {# End Pagination Controls Container #}
+
+                </div>
+                {# --- End Results Tab --- #}
+
+                {# --- Filters Tab --- #}
+                {% if filter_form %}
+                <div class="tab-pane p-3" id="tab-filters" role="tabpanel">
+                    {# Filter Form (GET method for applying filters) #}
+                    <form method="get" action="" class="filter-form-tab">
+                         <h4 class="mb-3">Filter</h4>
+                         {# Revert to rendering the whole form with crispy #}
+                         {% crispy filter_form.form %}
+                         <div class="mt-3">
+                             <button type="submit" class="btn btn-primary">Apply Filter</button>
+                             <a href="{{ request.path }}" class="btn btn-secondary ms-2">Clear Filters</a>
+                         </div>
+                    </form>
+                </div>
+                {% endif %}
+                {# --- End Filters Tab --- #}
+            </div> {# End Tab Content Area #}
+        </div> {# End Main Card #}
+
+        {# --- Bulk Actions Form (Separate POST form) --- #}
+        <form method="post" action="" id="bulk-actions-form">
+            {% csrf_token %}
+            <div class="card-body border-top py-3 d-none mt-3" id="bulk-actions-bar">
+                <div class="d-flex align-items-center">
+                    <div class="text-secondary">
+                        <input class="form-check-input m-0 align-middle" type="checkbox" id="bulk-actions-master-cb" disabled> <span id="selected-count">0</span> items selected
+                    </div>
+                    <div class="ms-auto">
+                        {# Hidden input to store selected PKs #}
+                        <input type="hidden" name="selected_pks" id="selected-pks-input">
+                        <button type="submit" name="_bulk_edit" class="btn btn-primary">Edit Selected</button>
+                        <button type="submit" name="_bulk_delete" class="btn btn-danger">Delete Selected</button>
+                    </div>
+                </div>
+            </div>
+        </form>
+        {# --- End Bulk Actions Form --- #}
+
+    </div> {# End Col #}
+</div> {# End Row #}
+
+{# Checkbox JS #}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const table = document.querySelector('table.table');
+    if (!table) return;
+
+    const headerCheckbox = table.querySelector('thead .form-check-input[type=checkbox]');
+    const rowCheckboxes = table.querySelectorAll('tbody .form-check-input[type=checkbox]');
+    const bulkActionsBar = document.getElementById('bulk-actions-bar');
+    const selectedCountSpan = document.getElementById('selected-count');
+    const selectedPksInput = document.getElementById('selected-pks-input');
+    const bulkMasterCheckbox = document.getElementById('bulk-actions-master-cb');
+
+    function updateBulkActions() {
+        if (!bulkActionsBar || !selectedCountSpan || !selectedPksInput || !bulkMasterCheckbox) return;
+
+        let selectedCount = 0;
+        const selectedPks = [];
+
+        rowCheckboxes.forEach(cb => {
+            if (cb.checked) {
+                selectedCount++;
+                if(cb.value) selectedPks.push(cb.value);
+            }
+        });
+
+        selectedCountSpan.textContent = selectedCount;
+        selectedPksInput.value = selectedPks.join(',');
+
+        if (selectedCount > 0) {
+            bulkActionsBar.classList.remove('d-none');
+            bulkMasterCheckbox.checked = true;
+            bulkMasterCheckbox.indeterminate = selectedCount < rowCheckboxes.length;
+        } else {
+            bulkActionsBar.classList.add('d-none');
+            bulkMasterCheckbox.checked = false;
+            bulkMasterCheckbox.indeterminate = false;
+        }
+
+        if (headerCheckbox) {
+             headerCheckbox.checked = selectedCount > 0 && selectedCount === rowCheckboxes.length;
+             headerCheckbox.indeterminate = selectedCount > 0 && selectedCount < rowCheckboxes.length;
+        }
+    }
+
+    if (headerCheckbox) {
+        headerCheckbox.addEventListener('change', function () {
+            rowCheckboxes.forEach(cb => {
+                cb.checked = headerCheckbox.checked;
+            });
+            updateBulkActions();
+        });
+    }
+
+    rowCheckboxes.forEach(cb => {
+        cb.addEventListener('change', updateBulkActions);
+    });
+
+    updateBulkActions();
+
+    // Basic JS for clear search button
+    const quickSearchInput = document.querySelector('.quicksearch input[name="q"]');
+    const clearSearchButton = document.querySelector('.quicksearch a[title="Clear search"]');
+    if (quickSearchInput && clearSearchButton) {
+        quickSearchInput.addEventListener('input', function() {
+            if (this.value) {
+                clearSearchButton.classList.remove('d-none');
+            } else {
+                clearSearchButton.classList.add('d-none');
+            }
+        });
+        // Add onclick directly in template for simplicity now
+        // clearSearchButton.addEventListener('click', function(e) {
+        //     e.preventDefault();
+        //     quickSearchInput.value = '';
+        //     clearSearchButton.classList.add('d-none');
+        //     quickSearchInput.closest('form').submit();
+        // });
+    }
+});
+</script>
+
+{% endblock content %}

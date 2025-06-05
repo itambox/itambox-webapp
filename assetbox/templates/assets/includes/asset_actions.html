@@ -1,0 +1,16 @@
+{% comment %} assetbox/templates/assets/includes/asset_actions.html {% endcomment %}
+<div class="dropdown">
+    <button class="btn btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
+        Actions
+    </button>
+    <div class="dropdown-menu dropdown-menu-end" data-bs-strategy="fixed">
+        {# Use record.pk which django-tables2 provides for the row's object pk #}
+        <a class="dropdown-item" href="{% url 'assets:asset_update' pk=record.pk %}">
+            Edit
+        </a>
+        <a class="dropdown-item text-danger" href="{% url 'assets:asset_delete' pk=record.pk %}">
+            Delete
+        </a>
+        {# Add other actions like check-in/out later #}
+    </div>
+</div>

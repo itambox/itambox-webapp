@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block title %}Tenant Groups - AssetBox{% endblock %}
+
+{% block page_header %}
+    <div class="page-pretitle">Organization</div>
+    <h2 class="page-title">Tenant Groups</h2>
+{% endblock %}
+
+{% block page_actions %}
+    <div class="btn-list">
+        <a href="{% url 'organization:tenantgroup_create' %}" class="btn btn-primary">Create Tenant Group</a>
+    </div>
+{% endblock %}
+
+{% block content %}
+<div class="col-12">
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter text-nowrap table-hover">
+                <thead>
+                    <tr>
+                        <th class="w-1"><input class="form-check-input m-0 align-middle" type="checkbox" aria-label="Select all tenant groups"></th>
+                        <th>Name</th>
+                        <th>Parent</th>
+                        <th>Description</th>
+                        <th>Tenants</th> {# Count #}
+                        <th></th> {# Actions #}
+                    </tr>
+                </thead>
+                <tbody>
+                {% for group in tenantgroups %}
+                    <tr>
+                        <td><input class="form-check-input m-0 align-middle" type="checkbox" aria-label="Select tenant group {{ group.name }}"></td>
+                        <td><a href="{% url 'organization:tenantgroup_detail' pk=group.pk %}">{{ group.name }}</a></td>
+                        <td>
+                            {% if group.parent %}
+                                <a href="{% url 'organization:tenantgroup_detail' pk=group.parent.pk %}">{{ group.parent.name }}</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ group.description|truncatechars:50 }}</td>
+                        <td>{{ group.tenants.count }}</td>
+                        <td class="text-end">
+                           <span class="dropdown">
+                                <button class="btn dropdown-toggle align-text-top" data-bs-boundary="viewport" data-bs-toggle="dropdown">Actions</button>
+                                <div class="dropdown-menu dropdown-menu-end">
+                                    <a class="dropdown-item" href="{% url 'organization:tenantgroup_update' pk=group.pk %}">Edit</a>
+                                    <a class="dropdown-item text-danger" href="{% url 'organization:tenantgroup_delete' pk=group.pk %}">Delete</a>
+                                </div>
+                            </span>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6" class="text-center text-muted">No tenant groups found.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {# TODO: Pagination #}
+    </div>
+</div>
+{% endblock %} 

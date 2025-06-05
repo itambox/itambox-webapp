@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+
+{% block title %}Confirm Delete - {{ category.name }} - AssetBox{% endblock %}
+
+{% block page_header %}
+    <div class="page-pretitle">Assets / Asset Roles</div>
+    <h2 class="page-title">Confirm Deletion</h2>
+{% endblock %}
+
+{% block content %}
+<div class="col-md-6">
+    <div class="card border-danger">
+        <div class="card-header">
+            <h3 class="card-title">Delete Asset Role</h3>
+        </div>
+        <div class="card-body">
+            {% if asset_count > 0 %}
+                <div class="alert alert-danger" role="alert">
+                    Cannot delete this asset role because it is assigned to {{ asset_count }} asset{{ asset_count|pluralize }}.
+                </div>
+                <p>Please reassign assets to a different role before deleting this one.</p>
+                <div class="d-flex justify-content-end">
+                    <a href="{% url 'assets:category_list' %}" class="btn btn-link">Cancel</a>
+                </div>
+            {% else %}
+                <p>Are you sure you want to delete the asset role: <strong>{{ category.name }}</strong>?</p>
+                <p class="text-danger">This action cannot be undone.</p>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-flex justify-content-end">
+                        <a href="{% url 'assets:category_list' %}" class="btn btn-link me-2">Cancel</a>
+                        <button type="submit" class="btn btn-danger">Confirm Delete</button>
+                    </div>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

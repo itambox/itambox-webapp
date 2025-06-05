@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block title %}Check Out {{ asset.name }} - AssetBox{% endblock %}
+
+{% block page_header %}
+    <div class="page-pretitle">
+        Assets
+    </div>
+    <h2 class="page-title">
+        Check Out: {{ asset.name }} <span class="text-muted">({{ asset.asset_tag }})</span>
+    </h2>
+{% endblock %}
+
+{% block content %}
+<div class="col-md-6">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Select User</h3>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label class="form-label required">{{ form.assigned_to.label }}</label>
+                    {{ form.assigned_to }}
+                    {% if form.assigned_to.errors %}<div class="invalid-feedback d-block">{{ form.assigned_to.errors|join:", " }}</div>{% endif %}
+                </div>
+
+                {# Non-field errors #}
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger" role="alert">
+                        {{ form.non_field_errors|join:", " }}
+                    </div>
+                {% endif %}
+
+                <div class="form-footer text-end">
+                    <a href="{% url 'assets:asset_detail' pk=asset.pk %}" class="btn btn-link">Cancel</a>
+                    <button type="submit" class="btn btn-primary">Check Out Asset</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %} 
