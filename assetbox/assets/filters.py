@@ -3,6 +3,8 @@ from .models import Asset, Category, Manufacturer
 from organization.models import Location
 from django import forms
 from django.db.models import Q
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Layout, Submit, HTML
 
 class AssetFilterSet(django_filters.FilterSet):
     # Add filters for specific fields
@@ -36,6 +38,21 @@ class AssetFilterSet(django_filters.FilterSet):
         # Define fields that can be filtered directly (in addition to custom ones above)
         fields = ['status', 'category', 'manufacturer', 'location'] # Keep this minimal if defining explicitly
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Initialize FormHelper
+        self.form.helper = FormHelper()
+        self.form.helper.form_method = 'get' # Important for filters
+        self.form.helper.form_tag = False # Template handles <form> tag
+        # Define a simple layout, adding the submit button
+        self.form.helper.layout = Layout(
+            *self.filters.keys(), # Render all defined filter fields
+            HTML('<div class="mt-3">'),
+            Submit('submit', 'Apply Filter', css_class='btn btn-primary'),
+            HTML('<a href="{{ request.path }}" class="btn btn-secondary ms-2">Clear Filters</a>'),
+            HTML('</div>')
+        )
+
     def search(self, queryset, name, value):
         """Perform basic search across designated fields."""
         if not value.strip():
@@ -48,13 +65,6 @@ class AssetFilterSet(django_filters.FilterSet):
             Q(serial_number__icontains=value)
         ).distinct()
 
-    # Optional: Add form helper for crispy rendering if needed
-    # def __init__(self, *args, **kwargs):
-    #     super().__init__(*args, **kwargs)
-    #     self.helper = FormHelper()
-    #     self.helper.form_method = 'get'
-    #     self.helper.layout = Layout(...)
-
 # --- Category Filter --- 
 class CategoryFilterSet(django_filters.FilterSet):
     q = django_filters.CharFilter(
@@ -66,6 +76,19 @@ class CategoryFilterSet(django_filters.FilterSet):
     class Meta:
         model = Category
         fields = ['name'] # Add other specific fields if needed later
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.form.helper = FormHelper()
+        self.form.helper.form_method = 'get'
+        self.form.helper.form_tag = False
+        self.form.helper.layout = Layout(
+            *self.filters.keys(),
+            HTML('<div class="mt-3">'),
+            Submit('submit', 'Apply Filter', css_class='btn btn-primary'),
+            HTML('<a href="{{ request.path }}" class="btn btn-secondary ms-2">Clear Filters</a>'),
+            HTML('</div>')
+        )
 
     def search(self, queryset, name, value):
         if not value.strip():
@@ -86,6 +109,19 @@ class ManufacturerFilterSet(django_filters.FilterSet):
     class Meta:
         model = Manufacturer
         fields = ['name'] # Add other specific fields if needed later
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.form.helper = FormHelper()
+        self.form.helper.form_method = 'get'
+        self.form.helper.form_tag = False
+        self.form.helper.layout = Layout(
+            *self.filters.keys(),
+            HTML('<div class="mt-3">'),
+            Submit('submit', 'Apply Filter', css_class='btn btn-primary'),
+            HTML('<a href="{{ request.path }}" class="btn btn-secondary ms-2">Clear Filters</a>'),
+            HTML('</div>')
+        )
 
     def search(self, queryset, name, value):
         if not value.strip():

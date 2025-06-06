@@ -3,6 +3,8 @@ from django import forms
 from django.db.models import Q
 from .models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder
 from extras.models import Tag # Import Tag
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Layout, Submit, HTML # Import Helper, Layout, Submit
 
 # --- Base Search Filter --- 
 class BaseOrgFilterSet(django_filters.FilterSet):
@@ -20,6 +22,23 @@ class BaseOrgFilterSet(django_filters.FilterSet):
         conjoined=True, # Use AND logic for tags
         widget=forms.SelectMultiple(attrs={'class': 'form-select'})
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Initialize FormHelper
+        self.form.helper = FormHelper()
+        self.form.helper.form_method = 'get' # Important for filters
+        self.form.helper.form_tag = False # Template handles <form> tag
+        # Define a simple layout, adding the submit button
+        # We'll add fields dynamically based on the FilterSet definition
+        self.form.helper.layout = Layout(
+            *self.filters.keys(), # Render all defined filter fields
+            HTML('<div class="mt-3">'), # Add margin like the template had
+            Submit('submit', 'Apply Filter', css_class='btn btn-primary'),
+            # Add Clear button as HTML link within the layout
+            HTML('<a href="{{ request.path }}" class="btn btn-secondary ms-2">Clear Filters</a>'),
+            HTML('</div>')
+        )
 
     def search(self, queryset, name, value):
         # Default search: name and description (override in subclasses)

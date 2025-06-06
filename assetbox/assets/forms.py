@@ -6,7 +6,7 @@ from .models import Asset, Category, Manufacturer # Keep Asset, Category, Manufa
 from organization.models import Location, AssetHolder # Import Location and AssetHolder
 from django.contrib.auth import get_user_model
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, HTML
+from crispy_forms.layout import Layout, Submit, HTML, Button
 from django.urls import reverse
 
 User = get_user_model()
@@ -180,17 +180,11 @@ class AssetCheckOutForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         # Important: Don't render the <form> tag via crispy, template will handle it
-        self.helper.form_tag = False 
+        self.helper.form_tag = False
         # Define layout including fields and buttons for crispy to render
         self.helper.layout = Layout(
             'asset_holder',
             HTML('<p class="text-muted text-center my-2">OR</p>'), # Add separator
             'location',
             # 'notes', # Uncomment if notes field is added
-            # Add buttons to the layout
-            HTML('<div class="modal-footer justify-content-start">'), # Mimic modal footer spacing/alignment
-            Submit('submit', 'Assign Asset', css_class='btn btn-primary'), # Changed button text
-            # Add a Cancel button (data-bs-dismiss) - tricky with crispy, might need JS or keep in template
-            HTML('<button type="button" class="btn btn-secondary ms-2" data-bs-dismiss="modal">Cancel</button>'),
-            HTML('</div>')
         )

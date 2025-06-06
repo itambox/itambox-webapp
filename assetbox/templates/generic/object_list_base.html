@@ -113,10 +113,12 @@
                         </div>
                         {# Hidden fields to preserve other filters when searching/configuring #}
                         {% if filter_form %}
-                            {% for field_name, value in request.GET.items %}
-                                {% if field_name != 'q' and field_name != 'page' and field_name != 'per_page' %}
-                                    {# Handle list values from MultipleChoiceFilter #}
-                                    {% for single_value in request.GET.getlist|lookup:field_name %}
+                            {# Use request.GET.lists to iterate over (key, list_of_values) pairs #}
+                            {% for field_name, value_list in request.GET.lists %}
+                                {# Also ignore the submit button name #}
+                                {% if field_name != 'q' and field_name != 'page' and field_name != 'per_page' and field_name != 'submit' %}
+                                    {# Iterate over the list of values for this field #}
+                                    {% for single_value in value_list %}
                                         <input type="hidden" name="{{ field_name }}" value="{{ single_value }}">
                                     {% endfor %}
                                 {% endif %}
@@ -172,10 +174,6 @@
                          <h4 class="mb-3">Filter</h4>
                          {# Revert to rendering the whole form with crispy #}
                          {% crispy filter_form.form %}
-                         <div class="mt-3">
-                             <button type="submit" class="btn btn-primary">Apply Filter</button>
-                             <a href="{{ request.path }}" class="btn btn-secondary ms-2">Clear Filters</a>
-                         </div>
                     </form>
                 </div>
                 {% endif %}

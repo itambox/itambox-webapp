@@ -13,6 +13,7 @@ from django.contrib.contenttypes.models import ContentType
 from organization.models import AssetHolderAssignment
 from django.urls import reverse
 from django.db.models import Q # <-- Import Q (needed by search method in filterset)
+from django.contrib import messages # <--- Add this import
 
 User = get_user_model()
 
@@ -63,6 +64,7 @@ def asset_create(request):
             print("[asset_create] Form IS valid") # DEBUG
             asset = form.save() # Save the new asset
             # TODO: Add success message (django.contrib.messages)
+            messages.success(request, f"Asset '{asset}' created successfully.")
             # Redirect to the detail view of the created asset
             return redirect('assets:asset_detail', pk=asset.pk)
         else:
@@ -109,6 +111,7 @@ def asset_update(request, pk):
         if form.is_valid():
             form.save() # Save the changes
             # TODO: Add success message
+            messages.success(request, f"Asset '{asset}' updated successfully.")
             return redirect('assets:asset_detail', pk=asset.pk) # Redirect to detail view
     else:
         form = AssetForm(instance=asset) # Pre-populate form with asset data
@@ -131,6 +134,7 @@ def asset_delete(request, pk):
         asset_name = asset.name # Store name before deleting for potential message
         asset.delete()
         # TODO: Add success message (e.g., f"Asset '{asset_name}' deleted successfully.")
+        messages.success(request, f"Asset '{asset_name}' deleted successfully.")
         return redirect('assets:asset_list')
 
     context = {
@@ -230,6 +234,7 @@ def asset_checkin(request, pk):
             notes=f"Checked in from Asset Holder: {from_str}" 
         )
         # TODO: Add success message
+        messages.success(request, f"Asset '{asset}' successfully checked in from Asset Holder: {from_str}.")
     elif asset.location:
         # Check in (clear) from Location
         checked_in_from = asset.location
@@ -246,10 +251,11 @@ def asset_checkin(request, pk):
             notes=f"Checked in from Location: {from_str}" 
         )
         # TODO: Add success message
+        messages.success(request, f"Asset '{asset}' successfully checked in from Location: {from_str}.")
     else:
         # Asset was not assigned to a holder or location
         # TODO: Add potential error message (e.g., asset not checked out)
-        pass 
+        messages.warning(request, f"Asset '{asset}' was not checked out to a holder or assigned to a location.")
         
     return redirect('assets:asset_detail', pk=asset.pk)
 
@@ -329,6 +335,7 @@ def category_create(request):
         if form.is_valid():
             form.save()
             # TODO: Message
+            messages.success(request, f"Category '{form.cleaned_data['name']}' created successfully.")
             return redirect('assets:category_list')
     else:
         form = CategoryForm()
@@ -348,6 +355,7 @@ def category_update(request, pk):
         if form.is_valid():
             form.save()
             # TODO: Message
+            messages.success(request, f"Category '{category.name}' updated successfully.")
             return redirect('assets:category_list')
     else:
         form = CategoryForm(instance=category)
@@ -371,9 +379,12 @@ def category_delete(request, pk):
             # or rely on the template displaying the warning correctly.
             # For now, just redirecting back as before if POST attempted on protected object.
             # TODO: Add message if deletion is prevented
+            messages.error(request, f"Category '{category.name}' cannot be deleted because it is associated with {related_objects_count} asset(s).")
             return redirect('assets:category_list')
+        category_name = category.name # Store name for message
         category.delete()
         # TODO: Message
+        messages.success(request, f"Category '{category_name}' deleted successfully.")
         return redirect('assets:category_list')
 
     context = {
@@ -460,6 +471,7 @@ def manufacturer_create(request):
         if form.is_valid():
             form.save()
             # TODO: Message
+            messages.success(request, f"Manufacturer '{form.cleaned_data['name']}' created successfully.")
             return redirect('assets:manufacturer_list')
     else:
         form = ManufacturerForm()
@@ -479,6 +491,7 @@ def manufacturer_update(request, pk):
         if form.is_valid():
             form.save()
             # TODO: Message
+            messages.success(request, f"Manufacturer '{manufacturer.name}' updated successfully.")
             return redirect('assets:manufacturer_list')
     else:
         form = ManufacturerForm(instance=manufacturer)
@@ -499,9 +512,12 @@ def manufacturer_delete(request, pk):
     if request.method == 'POST':
         if related_objects_count > 0:
              # TODO: Add message if deletion is prevented
+            messages.error(request, f"Manufacturer '{manufacturer.name}' cannot be deleted because it is associated with {related_objects_count} asset(s).")
             return redirect('assets:manufacturer_list')
+        manufacturer_name = manufacturer.name # Store name for message
         manufacturer.delete()
         # TODO: Message
+        messages.success(request, f"Manufacturer '{manufacturer_name}' deleted successfully.")
         return redirect('assets:manufacturer_list')
 
     context = {

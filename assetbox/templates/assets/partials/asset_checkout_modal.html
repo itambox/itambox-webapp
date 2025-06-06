@@ -12,8 +12,13 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Select either a User or an Asset Holder to check this asset out to.</p>
+                    <p>Select either an Asset Holder or a Location to check this asset out to.</p>
                     {% crispy form %}
+                </div>
+                {# Add the modal footer with buttons INSIDE the form #}
+                <div class="modal-footer justify-content-start">
+                    <button type="submit" class="btn btn-primary">Assign Asset</button>
+                    <button type="button" class="btn btn-secondary ms-2" data-bs-dismiss="modal">Cancel</button>
                 </div>
             </form>
         </div>

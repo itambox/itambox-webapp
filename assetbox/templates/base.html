@@ -72,6 +72,17 @@
             <!-- Page body -->
             <div class="page-body">
                 <div class="container-xl">
+                    {# --- Django Messages --- #}
+                    {# {% if messages %} #} {# <-- Remove old message block #}
+                    {#     {% for message in messages %} #}
+                    {#         <div class=\"alert alert-dismissible {% if message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %}\" role=\"alert\"> #}
+                    {#             <button type=\"button\" class=\"btn-close\" data-bs-dismiss=\"alert\" aria-label=\"Close\"></button> #}
+                    {#             {{ message }} #}
+                    {#         </div> #}
+                    {#     {% endfor %} #}
+                    {# {% endif %} #} {# <-- Remove old message block #}
+                    {# --- End Django Messages --- #}
+
                     {% block content %}
                     <!-- Content here -->
                     {% endblock %}
@@ -170,6 +181,58 @@
 
     {# Placeholder for dynamically loaded modals #}
     <div id="modal-placeholder"></div>
+
+    {# --- NetBox-style Toast Messages Container --- #}
+    <div id="django-messages" class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100"> {# Increased z-index #}
+      {% load utility_tags %} {# Load our custom tags #}
+      {% if messages %}
+        {% for message in messages %}
+          {% include "partials/_toast.html" with status=message.level_tag|status_from_tag message=message %}
+        {% endfor %}
+      {% endif %}
+      {# We might add non-field errors here later if needed #}
+    </div>
+    {# --- End Toast Messages Container --- #}
+
+    {# Script to initialize toasts #}
+    <script>
+      document.addEventListener('DOMContentLoaded', (event) => {
+        const toastElList = document.querySelectorAll('#django-messages .toast');
+        toastElList.forEach(toastEl => {
+          const toast = new bootstrap.Toast(toastEl);
+          toast.show();
+          // Optional: Remove toast from DOM after hiding to prevent buildup
+          toastEl.addEventListener('hidden.bs.toast', () => {
+            toastEl.remove();
+          });
+        });
+      });
+
+      // If using HTMX OOB swaps for messages, initialize new toasts after swap
+      document.body.addEventListener('htmx:afterSwap', function(evt) {
+        const toastElList = evt.detail.elt.querySelectorAll('.toast');
+        if (toastElList.length > 0) {
+             toastElList.forEach(toastEl => {
+                const toast = new bootstrap.Toast(toastEl);
+                toast.show();
+                toastEl.addEventListener('hidden.bs.toast', () => {
+                    toastEl.remove();
+                });
+            });
+        }
+        // Also check if the target *is* the toast container for OOB swaps
+        if (evt.detail.target.id === 'django-messages') {
+             const containerToasts = evt.detail.target.querySelectorAll('.toast');
+             containerToasts.forEach(toastEl => {
+                const toast = new bootstrap.Toast(toastEl);
+                toast.show();
+                toastEl.addEventListener('hidden.bs.toast', () => {
+                    toastEl.remove();
+                });
+             });
+        }
+      });
+    </script>
 
 </body>
 </html> 
