@@ -101,7 +101,7 @@ def asset_detail(request, pk):
         'assignment': assignment, # Pass assignment to context
         'logs': logs, # Add logs to context
     }
-    return render(request, 'assets/asset_detail.html', context)
+    return render(request, 'assets/assets/asset_detail.html', context)
 
 @login_required
 def asset_update(request, pk):
@@ -204,7 +204,7 @@ def asset_checkout_modal(request, pk):
         'form': form,
         'asset': asset,
     }
-    return render(request, 'assets/partials/asset_checkout_modal.html', context)
+    return render(request, 'assets/includes/asset_checkout_modal.html', context)
 
 @login_required
 @require_POST
@@ -326,7 +326,7 @@ def category_detail(request, pk):
         'view_options': ['update', 'delete'],
         'related_objects_list': related_objects_list,
     }
-    return render(request, 'assets/category_detail.html', context)
+    return render(request, 'assets/categories/category_detail.html', context)
 
 @login_required
 def category_create(request):
@@ -462,7 +462,7 @@ def manufacturer_detail(request, pk):
         'view_options': ['update', 'delete'],
         'related_objects_list': related_objects_list,
     }
-    return render(request, 'assets/manufacturer_detail.html', context)
+    return render(request, 'assets/manufacturers/manufacturer_detail.html', context)
 
 @login_required
 def manufacturer_create(request):

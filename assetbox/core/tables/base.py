@@ -11,7 +11,7 @@ class BaseTable(tables.Table):
     class Meta:
         # Default attributes, can be overridden by subclasses
         attrs = {"class": "table table-vcenter card-table table-hover"}
-        template_name = "tables/htmx_table.html"
+        template_name = "global_includes\htmx_table.html"
         default_columns = () # Subclasses should define this
 
     def __init__(self, *args, request=None, **kwargs):

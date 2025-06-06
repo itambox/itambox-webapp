@@ -147,7 +147,7 @@
                     {% if table.page %}
                     <div class="card-footer d-flex align-items-center">
                         {# Per Page Dropdown #}
-                        {% include 'partials/pagination_per_page.html' with paginator=table.page.paginator %}
+                        {% include 'global_includes/pagination_per_page.html' with paginator=table.page.paginator %}
 
                         {# Page Number Summary #}
                         <p class="m-0 text-secondary flex-grow-1">
@@ -157,7 +157,7 @@
                         </p>
 
                         {# Page Links #}
-                        {% include 'partials/pagination_links.html' with page_obj=table.page %}
+                        {% include 'global_includes/pagination_links.html' with page_obj=table.page %}
 
                     </div>
                     {% endif %}

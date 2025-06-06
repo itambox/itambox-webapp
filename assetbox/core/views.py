@@ -78,7 +78,19 @@ def table_config(request, model_name):
 
     context = {
         'form': form,
-        'table_name': table_key, # Pass the key used in prefs
-        'table_verbose_name': model._meta.verbose_name_plural.title(),
+        'model_name': model_name,
+        # 'table_name': table_name, # Not strictly needed in modal?
     }
-    return render(request, 'core/partials/table_config_modal.html', context) 
+    # Render the specific modal partial
+    return render(request, 'core/includes/table_config_modal.html', context) # Path updated
+
+# @login_required
+# def user_preferences_view(request):
+#     # ... (view logic) ...
+
+# @login_required
+# def table_config(request, model_name):
+#     # ... (previous table_config implementation) ...
+#     # ... (rest of the function remains unchanged) ...
+#     # ... (return the same context) ...
+#     # ... (return the same render call) ... 

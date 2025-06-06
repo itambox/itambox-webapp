@@ -28,10 +28,10 @@
 
     <div class="page">
         <!-- Top Navbar -->
-        {% include "partials/_topbar.html" %}
+        {% include "global_includes/_topbar.html" %}
 
         <!-- Vertical Sidebar Navbar -->
-        {% include "partials/_sidebar.html" %}
+        {% include "global_includes/_sidebar.html" %}
 
         <div class="page-wrapper">
             <!-- Page header -->
@@ -187,7 +187,7 @@
       {% load utility_tags %} {# Load our custom tags #}
       {% if messages %}
         {% for message in messages %}
-          {% include "partials/_toast.html" with status=message.level_tag|status_from_tag message=message %}
+          {% include "global_includes/_toast.html" with status=message.level_tag|status_from_tag message=message %}
         {% endfor %}
       {% endif %}
       {# We might add non-field errors here later if needed #}

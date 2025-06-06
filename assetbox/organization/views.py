@@ -105,7 +105,7 @@ def site_detail(request, pk):
         'related_objects_list': related_objects_list, # Pass related objects list for sidebar
     }
     # Render the specific template
-    return render(request, 'organization/site_detail.html', context)
+    return render(request, 'organization/sites/site_detail.html', context)
 
 @login_required
 def site_create(request):
@@ -223,7 +223,7 @@ def region_detail(request, pk):
         'related_objects_list': related_objects_list, # Pass related objects list for sidebar
     }
     # Render the specific template
-    return render(request, 'organization/region_detail.html', context)
+    return render(request, 'organization/regions/region_detail.html', context)
 
 @login_required
 def region_create(request):
@@ -336,7 +336,7 @@ def sitegroup_detail(request, pk):
         'related_objects_list': related_objects_list,
     }
     # Render the specific template
-    return render(request, 'organization/sitegroup_detail.html', context)
+    return render(request, 'organization/sitegroups/sitegroup_detail.html', context)
 
 @login_required
 def sitegroup_create(request):
@@ -445,7 +445,7 @@ def location_detail(request, pk):
         'view_options': ['update', 'delete'],
         'related_objects_list': related_objects_list, # Pass related objects list
     }
-    return render(request, 'organization/location_detail.html', context)
+    return render(request, 'organization/locations/location_detail.html', context)
 
 @login_required
 def location_create(request):
@@ -516,7 +516,7 @@ def tenantgroup_detail(request, pk):
         pk=pk
     )
     context = {'tenantgroup': tenantgroup}
-    return render(request, 'organization/tenantgroup_detail.html', context)
+    return render(request, 'organization/tenantgroups/tenantgroup_detail.html', context)
 
 @login_required
 def tenantgroup_create(request):
@@ -587,7 +587,7 @@ def tenant_detail(request, pk):
         pk=pk
     )
     context = {'tenant': tenant}
-    return render(request, 'organization/tenant_detail.html', context)
+    return render(request, 'organization/tenants/tenant_detail.html', context)
 
 @login_required
 def tenant_create(request):
@@ -690,7 +690,7 @@ def assetholder_detail(request, pk):
         'related_objects_list': related_objects_list, # Pass related objects list for sidebar
     }
     # Render the specific detail template now
-    return render(request, 'organization/assetholder_detail.html', context)
+    return render(request, 'organization/assetholders/assetholder_detail.html', context)
 
 @login_required
 def assetholder_create(request):

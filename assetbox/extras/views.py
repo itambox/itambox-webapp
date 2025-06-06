@@ -46,7 +46,7 @@ def tag_detail(request, pk):
         'tag': tag,
         # 'related_sites': related_sites,
     }
-    return render(request, 'extras/tag_detail.html', context)
+    return render(request, 'extras/tags/tag_detail.html', context)
 
 @login_required
 def tag_create(request):
