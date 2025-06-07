@@ -6,7 +6,7 @@ from django.urls import reverse
 
 # Create your models here.
 
-class Category(models.Model):
+class AssetRole(models.Model):
     name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -52,7 +52,7 @@ class Asset(models.Model):
     name = models.CharField(max_length=255)
     asset_tag = models.CharField(max_length=50, unique=True)
     serial_number = models.CharField(max_length=100, blank=True, null=True)
-    category = models.ForeignKey(Category, on_delete=models.SET_NULL, blank=True, null=True)
+    asset_role = models.ForeignKey(AssetRole, on_delete=models.SET_NULL, blank=True, null=True)
     model = models.CharField(max_length=255)
     manufacturer = models.ForeignKey(Manufacturer, on_delete=models.PROTECT, related_name='assets')
     purchase_date = models.DateField(blank=True, null=True)

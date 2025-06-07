@@ -1,0 +1,16 @@
+{% extends 'rest_framework/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block head %}
+  {{ block.super }}
+  {# TODO: Replace with AssetBox specific favicon if desired #}
+  {# <link rel="icon" type="image/png" href="{% static 'favicon.ico' %}" /> #}
+{% endblock head %}
+
+{% block title %}{% if name %}{{ name }} | {% endif %}AssetBox {% trans "REST API" %}{% endblock %}
+
+{% block branding %}
+  {# Link to the AssetBox dashboard #}
+  <a class="navbar-brand" href="{% url 'dashboard' %}">AssetBox</a>
+{% endblock branding %} 

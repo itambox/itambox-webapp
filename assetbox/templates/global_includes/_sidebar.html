@@ -73,8 +73,8 @@
                                 <a href="{% url 'assets:asset_list' %}" 
                                    class="dropdown-item {% if request.resolver_match.url_name == 'asset_list' %}active{% endif %}">Assets</a> {# List All #}
                                 {# TODO: Add filtered views later (Archived, Deployed etc.) #}
-                                <a href="{% url 'assets:category_list' %}" 
-                                   class="dropdown-item {% if request.resolver_match.url_name == 'category_list' %}active{% endif %}">Asset Roles</a>
+                                <a href="{% url 'assets:asset_role_list' %}" 
+                                   class="dropdown-item {% if request.resolver_match.url_name == 'asset_role_list' %}active{% endif %}">Asset Roles</a>
 
                                 <div class="dropdown-divider"></div>
                                 <span class="dropdown-header">Asset Types</span>

@@ -8,24 +8,24 @@ from assetbox.organization.models import Site, Location # Absolute import
 User = get_user_model()
 
 # Renamed from Category to AssetRole
-class AssetRole(TaggableModel, BaseAssetModel):
-    name = models.CharField(max_length=100, unique=True)
-    slug = models.SlugField(max_length=100, unique=True)
-    description = models.TextField(blank=True)
+class AssetRole(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    description = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ('name',)
         verbose_name = "Asset Role"
         verbose_name_plural = "Asset Roles"
 
     def __str__(self):
         return self.name
 
-    def get_absolute_url(self):
-        # Update URL name
-        return reverse('assets:assetrole_detail', kwargs={'pk': self.pk})
+    # Assuming get_absolute_url was added during previous rename attempts
+    # def get_absolute_url(self):
+    #     return reverse('assets:assetrole_detail', kwargs={'pk': self.pk})
 
-class Manufacturer(TaggableModel, BaseAssetModel):
+class Manufacturer(models.Model):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     description = models.TextField(blank=True)
@@ -39,37 +39,44 @@ class Manufacturer(TaggableModel, BaseAssetModel):
     def get_absolute_url(self):
         return reverse('assets:manufacturer_detail', kwargs={'pk': self.pk})
 
-class Asset(TaggableModel, BaseAssetModel):
+class Asset(models.Model):
+    STATUS_IN_USE = 'in_use'
+    STATUS_AVAILABLE = 'available'
+    STATUS_PENDING_REPAIR = 'pending_repair'
+    STATUS_RETIRED = 'retired'
     STATUS_CHOICES = [
-        ('available', 'Available'),
-        ('in_use', 'In Use'),
-        ('in_repair', 'In Repair'),
-        ('missing', 'Missing'),
-        ('archived', 'Archived'),
-        ('pending_disposal', 'Pending Disposal'),
+        (STATUS_IN_USE, 'In Use'),
+        (STATUS_AVAILABLE, 'Available'),
+        (STATUS_PENDING_REPAIR, 'Pending Repair'),
+        (STATUS_RETIRED, 'Retired'),
     ]
-    name = models.CharField(max_length=100)
-    asset_tag = models.CharField(max_length=50, unique=True, blank=True, null=True)
-    serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
-    # Changed from category to asset_role
-    asset_role = models.ForeignKey(AssetRole, on_delete=models.PROTECT, related_name='assets')
+    name = models.CharField(max_length=255)
+    asset_tag = models.CharField(max_length=50, unique=True)
+    serial_number = models.CharField(max_length=100, blank=True, null=True)
+    asset_role = models.ForeignKey(AssetRole, on_delete=models.SET_NULL, blank=True, null=True)
+    model = models.CharField(max_length=255)
     manufacturer = models.ForeignKey(Manufacturer, on_delete=models.PROTECT, related_name='assets')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='available')
-    location = models.ForeignKey(Location, on_delete=models.SET_NULL, blank=True, null=True, related_name='assets')
     purchase_date = models.DateField(blank=True, null=True)
-    purchase_cost = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-    warranty_end_date = models.DateField(blank=True, null=True)
-    notes = models.TextField(blank=True)
-
-    class Meta:
-        ordering = ('name',)
-        # Add constraints if needed, e.g., unique_together=[('name', 'asset_tag')] ?
+    warranty_expiration = models.DateField(blank=True, null=True)
+    status = models.CharField(
+        max_length=50,
+        choices=STATUS_CHOICES,
+        default=STATUS_AVAILABLE,
+    )
+    location = models.ForeignKey('organization.Location', on_delete=models.SET_NULL, blank=True, null=True, related_name='assets')
+    notes = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.name or f"Asset {self.pk}"
+        return f"{self.name} ({self.asset_tag})"
 
     def get_absolute_url(self):
+        """Return the canonical URL for the asset."""
         return reverse('assets:asset_detail', kwargs={'pk': self.pk})
+
+    class Meta:
+        pass
 
 class ActivityLog(models.Model):
     ACTION_CHOICES = [

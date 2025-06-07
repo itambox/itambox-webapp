@@ -18,12 +18,12 @@ urlpatterns = [
 
     # Organization URLs were moved to organization.urls
 
-    # Asset Roles (Category) URLs
-    path('asset-roles/', views.category_list, name='category_list'),
-    path('asset-roles/create/', views.category_create, name='category_create'),
-    path('asset-roles/<int:pk>/', views.category_detail, name='category_detail'),
-    path('asset-roles/<int:pk>/edit/', views.category_update, name='category_update'),
-    path('asset-roles/<int:pk>/delete/', views.category_delete, name='category_delete'),
+    # Asset Roles (AssetRole) URLs
+    path('asset-roles/', views.asset_role_list, name='asset_role_list'),
+    path('asset-roles/create/', views.asset_role_create, name='asset_role_create'),
+    path('asset-roles/<int:pk>/', views.asset_role_detail, name='asset_role_detail'),
+    path('asset-roles/<int:pk>/edit/', views.asset_role_update, name='asset_role_update'),
+    path('asset-roles/<int:pk>/delete/', views.asset_role_delete, name='asset_role_delete'),
 
     # Manufacturer URLs
     path('manufacturers/', views.manufacturer_list, name='manufacturer_list'),

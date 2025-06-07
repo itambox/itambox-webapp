@@ -1,5 +1,5 @@
 import django_filters
-from .models import Asset, Category, Manufacturer
+from .models import Asset, AssetRole, Manufacturer
 from organization.models import Location
 from django import forms
 from django.db.models import Q
@@ -19,8 +19,8 @@ class AssetFilterSet(django_filters.FilterSet):
         choices=Asset.STATUS_CHOICES,
         widget=forms.SelectMultiple(attrs={'class': 'form-select'})
     )
-    category = django_filters.ModelChoiceFilter(
-        queryset=Category.objects.all(),
+    asset_role = django_filters.ModelChoiceFilter(
+        queryset=AssetRole.objects.all(),
         label='Asset Role',
         widget=forms.Select(attrs={'class': 'form-select'})
     )
@@ -36,7 +36,7 @@ class AssetFilterSet(django_filters.FilterSet):
     class Meta:
         model = Asset
         # Define fields that can be filtered directly (in addition to custom ones above)
-        fields = ['status', 'category', 'manufacturer', 'location'] # Keep this minimal if defining explicitly
+        fields = ['status', 'asset_role', 'manufacturer', 'location'] # Keep this minimal if defining explicitly
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -65,8 +65,8 @@ class AssetFilterSet(django_filters.FilterSet):
             Q(serial_number__icontains=value)
         ).distinct()
 
-# --- Category Filter --- 
-class CategoryFilterSet(django_filters.FilterSet):
+# --- AssetRole Filter --- 
+class AssetRoleFilterSet(django_filters.FilterSet):
     q = django_filters.CharFilter(
         method='search',
         label='Search',
@@ -74,7 +74,7 @@ class CategoryFilterSet(django_filters.FilterSet):
     )
 
     class Meta:
-        model = Category
+        model = AssetRole
         fields = ['name'] # Add other specific fields if needed later
 
     def __init__(self, *args, **kwargs):

@@ -4,14 +4,25 @@ from django.utils.translation import gettext_lazy as _
 
 class TableConfigForm(forms.Form):
     """
-    Form for configuring user's table preferences.
-    Inspired by NetBox - simplified to only handle selected columns for submission.
+    Form for configuring table columns.
+    Adapted from NetBox pattern.
     """
+    # Hidden field to pass table name to JS/API
+    # table_name = forms.CharField(widget=forms.HiddenInput())
+
+    available_columns = forms.MultipleChoiceField(
+        choices=[],
+        required=False,
+        widget=forms.SelectMultiple(
+            attrs={'size': 10, 'class': 'form-select available-columns'}
+        ),
+        label=_('Available Columns')
+    )
     columns = forms.MultipleChoiceField(
         choices=[],
         required=False,
         widget=forms.SelectMultiple(
-            attrs={'size': 10, 'class': 'form-select'}
+            attrs={'size': 10, 'class': 'form-select selected-columns'}
         ),
         label=_('Selected Columns')
     )
@@ -19,73 +30,40 @@ class TableConfigForm(forms.Form):
     def __init__(self, table, *args, **kwargs):
         self.table = table
         user_config = kwargs.pop('user_config', {})
-        print(f"[TableConfigForm __init__] Received user_config: {user_config}") # DEBUG
 
         super().__init__(*args, **kwargs)
 
-        if table:
-            all_possible_choices = [] # Store all valid column choices
-            selected_column_names = user_config.get('columns', table.Meta.default_columns)
-            print(f"[TableConfigForm __init__] Determined selected_column_names: {selected_column_names}") # DEBUG
+        # Determine initial selected columns (from user prefs or table defaults)
+        initial_selected_names = user_config.get('columns', getattr(table.Meta, 'default_columns', []))
 
-            for name, column in table.columns.items():
-                if name in ('pk', 'actions'):
-                    continue
-                choice = (name, str(column.verbose_name))
-                all_possible_choices.append(choice)
+        # Populate choices based on the table definition
+        all_choices_dict = {}
+        available_choices = []
+        selected_choices = []
 
-            # Populate choices for the 'columns' field with ALL possible columns
-            # This allows validation to pass for any valid column moved client-side.
-            self.fields['columns'].choices = all_possible_choices
+        for name, column in table.columns.items():
+            # Exclude non-configurable columns (like pk or specific action columns)
+            if name in getattr(table.Meta, 'exclude_columns', ('pk', 'actions')):
+                continue
+            choice = (name, str(column.verbose_name))
+            all_choices_dict[name] = choice
+            if name not in initial_selected_names:
+                available_choices.append(choice)
 
-            # Set the initial value for the 'columns' field based on saved prefs/defaults
-            self.fields['columns'].initial = selected_column_names
-            print(f"[TableConfigForm __init__] Set columns.initial to: {self.fields['columns'].initial}") # DEBUG
+        # Build ordered selected choices based on initial_selected_names
+        for name in initial_selected_names:
+            if name in all_choices_dict:
+                selected_choices.append(all_choices_dict[name])
 
-            # Create choices for rendering the *available* columns widget (even though it's not a form field)
-            # This is done dynamically in the template now.
+        # Assign choices to the form fields
+        self.fields['available_columns'].choices = available_choices
+        self.fields['columns'].choices = selected_choices
 
-    # Method to provide choices for the *available* columns widget in the template
-    def get_available_columns_choices(self):
-        if not self.table:
-            return []
-        
-        selected_names = self.fields['columns'].initial or []
-        print(f"[get_available] Using initial selected_names: {selected_names}") # DEBUG
-        # Use choices from the field which contains all possibilities
-        all_choices_dict = dict(self.fields['columns'].choices)
-        
-        available_choices = [
-            (name, verbose_name) 
-            for name, verbose_name in all_choices_dict.items() 
-            if name not in selected_names
-        ]
-        return available_choices
-
-    # Method to provide choices for the *selected* columns widget in the template
-    def get_selected_columns_choices(self):
-        if not self.table:
-            return []
-
-        selected_names = self.fields['columns'].initial or []
-        print(f"[get_selected] Using initial selected_names: {selected_names}") # DEBUG
-        all_choices_dict = dict(self.fields['columns'].choices)
-
-        selected_choices = [
-            (name, verbose_name)
-            for name, verbose_name in all_choices_dict.items()
-            if name in selected_names
-        ]
-        # Preserve order from selected_names if possible
-        # selected_choices_dict = dict(selected_choices)
-        # ordered_selected_choices = [(name, selected_choices_dict[name]) for name in selected_names if name in selected_choices_dict]
-        # return ordered_selected_choices
-        # Simplify: Return the filtered list directly without reordering for now
-        print(f"[get_selected_columns_choices] Returning (unordered): {selected_choices}") # DEBUG
-        return selected_choices
+        # No initial values needed as choices dictate the lists
 
     @property
     def table_name(self):
+        # Helper to get the app_label.model_name string for API/config key
         if not self.table:
             return None
         app_label = self.table.Meta.model._meta.app_label

@@ -1,12 +1,12 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
-from .models import Asset, ActivityLog, Category, Manufacturer # Keep only Asset models
-from .forms import AssetForm, CategoryForm, ManufacturerForm, AssetCheckOutForm # Keep only Asset forms
+from .models import Asset, ActivityLog, AssetRole, Manufacturer # Keep only Asset models
+from .forms import AssetForm, AssetRoleForm, ManufacturerForm, AssetCheckOutForm # Keep only Asset forms
 from django.contrib.auth import get_user_model
 from django_tables2 import RequestConfig
-from .tables import AssetTable, CategoryTable, ManufacturerTable
-from .filters import AssetFilterSet, CategoryFilterSet, ManufacturerFilterSet # <-- Import the FilterSets
+from .tables import AssetTable, AssetRoleTable, ManufacturerTable
+from .filters import AssetFilterSet, AssetRoleFilterSet, ManufacturerFilterSet # <-- Import the FilterSets
 from core.utils import get_paginate_count, get_model_viewname
 from django.http import HttpResponse
 from django.contrib.contenttypes.models import ContentType
@@ -29,7 +29,7 @@ def dashboard(request):
 def asset_list(request):
     # Start with base queryset
     queryset = Asset.objects.all().select_related(
-        'category', 'manufacturer', 'location'
+        'asset_role', 'manufacturer', 'location'
     )
 
     # Apply filters
@@ -85,7 +85,7 @@ def asset_create(request):
 def asset_detail(request, pk):
     # Fetch asset and related logs efficiently, including asset_holder
     asset = get_object_or_404(
-        Asset.objects.select_related('category', 'location', 'manufacturer'),
+        Asset.objects.select_related('asset_role', 'location', 'manufacturer'),
         pk=pk
     )
     # Fetch assignment separately
@@ -259,17 +259,17 @@ def asset_checkin(request, pk):
         
     return redirect('assets:asset_detail', pk=asset.pk)
 
-# --- Category (Asset Role) Views ---
+# --- AssetRole (Asset Role) Views ---
 
 @login_required
-def category_list(request):
-    queryset = Category.objects.all()
+def asset_role_list(request):
+    queryset = AssetRole.objects.all()
     
     # Apply filters
-    filterset = CategoryFilterSet(request.GET, queryset=queryset)
+    filterset = AssetRoleFilterSet(request.GET, queryset=queryset)
     queryset = filterset.qs
 
-    table = CategoryTable(queryset, request=request)
+    table = AssetRoleTable(queryset, request=request)
     RequestConfig(request, paginate={'per_page': get_paginate_count(request)}).configure(table)
 
     model = table.Meta.model
@@ -277,38 +277,38 @@ def category_list(request):
 
     context = {
         'table': table,
-        'title': 'Categories', # Title for the page
-        'object_type': 'Category', # For Create button
-        'create_url_name': 'assets:category_create',
-        'list_url_name': 'assets:category_list', # For potential future use (e.g., breadcrumbs)
+        'title': 'Asset Roles', # Title for the page
+        'object_type': 'AssetRole', # For Create button
+        'create_url_name': 'assets:asset_role_create',
+        'list_url_name': 'assets:asset_role_list', # For potential future use (e.g., breadcrumbs)
         'model_name_str': model_name_str, # Add model name string
         'filter_form': filterset, # <-- Add filter form
     }
     return render(request, 'generic/object_list_base.html', context)
 
 @login_required
-def category_detail(request, pk):
-    category = get_object_or_404(
-        Category.objects.prefetch_related(
+def asset_role_detail(request, pk):
+    asset_role = get_object_or_404(
+        AssetRole.objects.prefetch_related(
             'asset_set', 'asset_set__manufacturer', 'asset_set__location' # Prefetch assets and their FKs
         ), 
         pk=pk
     )
 
     # Prepare Assets table
-    assets_table = AssetTable(category.asset_set.all(), request=request)
+    assets_table = AssetTable(asset_role.asset_set.all(), request=request)
     RequestConfig(request, paginate=False).configure(assets_table)
 
-    model = Category
+    model = AssetRole
 
     # --- Prepare Related Objects List ---
     related_objects_list = []
     # Assets
-    asset_count = category.asset_set.count()
+    asset_count = asset_role.asset_set.count()
     if asset_count:
         # Add filtering parameters to the URL
         asset_list_url = reverse('assets:asset_list')
-        filtered_asset_url = f"{asset_list_url}?category={category.pk}"
+        filtered_asset_url = f"{asset_list_url}?asset_role={asset_role.pk}"
         related_objects_list.append({
             'label': 'Assets',
             'count': asset_count,
@@ -317,8 +317,8 @@ def category_detail(request, pk):
     # --- End Related Objects List ---
 
     context = {
-        'object': category,
-        'title': str(category),
+        'object': asset_role,
+        'title': str(asset_role),
         'object_type': model._meta.verbose_name.title(),
         'assets_table': assets_table,
         'update_url_name': get_model_viewname(model, 'update'),
@@ -326,52 +326,52 @@ def category_detail(request, pk):
         'view_options': ['update', 'delete'],
         'related_objects_list': related_objects_list,
     }
-    return render(request, 'assets/categories/category_detail.html', context)
+    return render(request, 'assets/assetroles/asset_role_detail.html', context)
 
 @login_required
-def category_create(request):
+def asset_role_create(request):
     if request.method == 'POST':
-        form = CategoryForm(request.POST)
+        form = AssetRoleForm(request.POST)
         if form.is_valid():
             form.save()
             # TODO: Message
-            messages.success(request, f"Category '{form.cleaned_data['name']}' created successfully.")
-            return redirect('assets:category_list')
+            messages.success(request, f"AssetRole '{form.cleaned_data['name']}' created successfully.")
+            return redirect('assets:asset_role_list')
     else:
-        form = CategoryForm()
+        form = AssetRoleForm()
     context = {
         'form': form,
-        'title': 'Create New Category',
-        'return_url': 'assets:category_list',
+        'title': 'Create New AssetRole',
+        'return_url': 'assets:asset_role_list',
     }
     # Render the generic edit template
     return render(request, 'generic/object_edit.html', context)
 
 @login_required
-def category_update(request, pk):
-    category = get_object_or_404(Category, pk=pk)
+def asset_role_update(request, pk):
+    asset_role = get_object_or_404(AssetRole, pk=pk)
     if request.method == 'POST':
-        form = CategoryForm(request.POST, instance=category)
+        form = AssetRoleForm(request.POST, instance=asset_role)
         if form.is_valid():
             form.save()
             # TODO: Message
-            messages.success(request, f"Category '{category.name}' updated successfully.")
-            return redirect('assets:category_list')
+            messages.success(request, f"AssetRole '{asset_role.name}' updated successfully.")
+            return redirect('assets:asset_role_list')
     else:
-        form = CategoryForm(instance=category)
+        form = AssetRoleForm(instance=asset_role)
     context = {
         'form': form,
-        'object': category, # Pass the object being edited
-        'title': f'Update Category: {category.name}',
-        'return_url': 'assets:category_list',
+        'object': asset_role, # Pass the object being edited
+        'title': f'Update AssetRole: {asset_role.name}',
+        'return_url': 'assets:asset_role_list',
     }
     # Render the generic edit template
     return render(request, 'generic/object_edit.html', context)
 
 @login_required
-def category_delete(request, pk):
-    category = get_object_or_404(Category, pk=pk)
-    related_objects_count = category.asset_set.count() # Check related assets
+def asset_role_delete(request, pk):
+    asset_role = get_object_or_404(AssetRole, pk=pk)
+    related_objects_count = asset_role.asset_set.count() # Check related assets
 
     if request.method == 'POST':
         if related_objects_count > 0:
@@ -379,18 +379,18 @@ def category_delete(request, pk):
             # or rely on the template displaying the warning correctly.
             # For now, just redirecting back as before if POST attempted on protected object.
             # TODO: Add message if deletion is prevented
-            messages.error(request, f"Category '{category.name}' cannot be deleted because it is associated with {related_objects_count} asset(s).")
-            return redirect('assets:category_list')
-        category_name = category.name # Store name for message
-        category.delete()
+            messages.error(request, f"AssetRole '{asset_role.name}' cannot be deleted because it is associated with {related_objects_count} asset(s).")
+            return redirect('assets:asset_role_list')
+        asset_role_name = asset_role.name # Store name for message
+        asset_role.delete()
         # TODO: Message
-        messages.success(request, f"Category '{category_name}' deleted successfully.")
-        return redirect('assets:category_list')
+        messages.success(request, f"AssetRole '{asset_role_name}' deleted successfully.")
+        return redirect('assets:asset_role_list')
 
     context = {
-        'object': category,
+        'object': asset_role,
         'related_objects_count': related_objects_count,
-        'list_url_name': 'assets:category_list'
+        'list_url_name': 'assets:asset_role_list'
     }
     # Render the generic delete confirmation template
     return render(request, 'generic/object_confirm_delete.html', context)
@@ -426,7 +426,7 @@ def manufacturer_list(request):
 def manufacturer_detail(request, pk):
     manufacturer = get_object_or_404(
         Manufacturer.objects.prefetch_related(
-            'assets', 'assets__category', 'assets__location' # Prefetch assets and their FKs for table
+            'assets', 'assets__asset_role', 'assets__location' # Prefetch assets and their FKs for table
         ), 
         pk=pk
     )

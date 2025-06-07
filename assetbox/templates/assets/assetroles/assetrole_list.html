@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% load render_table from django_tables2 %}
+
+{% block title %}Asset Roles - AssetBox{% endblock %}
+
+{% block page_header %}
+    <div class="page-pretitle">Assets</div>
+    <h2 class="page-title">Asset Roles</h2>
+{% endblock %}
+
+{% block page_actions %}
+    <div class="btn-list">
+        {# Use the correct URL name #}
+        <a href="{% url 'assets:asset_role_create' %}" class="btn btn-primary">Create Asset Role</a>
+    </div>
+{% endblock %}
+
+{% block content %}
+    {# If this specific template is used, it should likely extend #}
+    {# generic/object_list_base.html instead of base.html #}
+    {# and override specific blocks like 'table' if needed. #}
+
+    {# Assuming the generic template IS used, this file is likely #}
+    {# no longer needed. The view passes the AssetRoleTable to the #}
+    {# generic template which renders it. #}
+
+    {# Minimal content if this template IS rendered directly by mistake: #}
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Asset Roles</h3>
+            </div>
+            {% if table %}
+                {% render_table table 'global_includes/htmx_table.html' %}
+            {% else %}
+                <div class="card-body">
+                    <p class="text-muted">No asset roles found.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+{% endblock %} 

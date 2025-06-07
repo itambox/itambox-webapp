@@ -15,6 +15,8 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# AssetBox Version
+VERSION = '0.1.0'
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -39,13 +41,15 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'assets',
     'organization',
-    'extras',
     'django_tables2',
     'django_htmx',
     'django_filters',
     'crispy_forms',
     'crispy_bootstrap5',
     'core',
+    'extras.apps.ExtrasConfig',
+    'rest_framework',
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -135,3 +139,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Crispy Forms Settings
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
+
+# Django REST Framework Settings
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    # Add other DRF settings here if needed in the future
+    # e.g., authentication, permissions, pagination
+}

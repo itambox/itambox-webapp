@@ -5,6 +5,7 @@ from django.http import HttpResponse
 from django.apps import apps # To find models/tables dynamically
 from django.urls import reverse
 from importlib import import_module
+from django.http import Http404
 
 from .models import UserPreference # Import the model
 from .forms import TableConfigForm
@@ -13,11 +14,10 @@ from .forms import TableConfigForm
 @login_required
 def table_config(request, model_name):
     """
-    View for configuring table columns via a modal form.
-    Saves preferences to UserPreference model.
+    View to render the table configuration modal form.
+    Saving/Resetting is handled via API and JavaScript.
     """
-    # Dynamically find the Table class based on model_name
-    # (Assumes a naming convention: AppLabel.ModelName -> AppLabelTable in app.tables)
+    # Dynamically find the Table class
     app_label, model_lower = model_name.split('.')
     model = apps.get_model(app_label, model_lower)
     table_class_name = f"{model.__name__}Table"
@@ -25,10 +25,6 @@ def table_config(request, model_name):
         tables_module = import_module(f'{app_label}.tables')
         table_class = getattr(tables_module, table_class_name)
     except (ModuleNotFoundError, AttributeError):
-        # Handle error: Table class not found
-        # (render an error message or redirect)
-        # For now, just return an empty response or raise Http404
-        from django.http import Http404
         raise Http404(f"Table class {table_class_name} not found for {model_name}")
 
     # Instantiate the table (only need structure, no data)
@@ -38,51 +34,23 @@ def table_config(request, model_name):
     prefs, _ = UserPreference.objects.get_or_create(user=request.user)
 
     # Key for storing this table's config within the JSONField
-    table_key = f"{model_name}" # e.g., "assets.asset"
+    table_key = f"tables.{model_name}" # Use dot notation for nested access
 
     # Get current config for this table from preferences
-    user_config = prefs.data.get('tables', {}).get(table_key, {})
-    print(f"[table_config GET] User config for {table_key}: {user_config}") # DEBUG
+    # Simplified access assuming prefs.data = {"tables": {"app.model": {...}}}
+    user_config = prefs.data.get('tables', {}).get(model_name, {}) # Get config for this specific table
 
-    if request.method == 'POST':
-        print(f"[table_config] Entered POST block for user {request.user}. Table key: {table_key}") # DEBUG
-        print(f"[table_config POST] Raw request.POST: {request.POST}") # DEBUG Raw POST data
-        # Initialize form only with table structure and POST data for cleaning
-        form = TableConfigForm(table=table, data=request.POST)
-        if form.is_valid():
-            # Update the preferences data safely
-            if 'tables' not in prefs.data or not isinstance(prefs.data.get('tables'), dict):
-                prefs.data['tables'] = {} # Ensure 'tables' key exists and is a dict
-            
-            table_prefs = prefs.data['tables'].get(table_key, {}) # Get existing or empty dict for this table
-            table_prefs['columns'] = form.cleaned_data['columns'] # Update/set columns
-            
-            prefs.data['tables'][table_key] = table_prefs # Put it back into the main data dict
-            
-            print(f"[table_config POST] Preparing to save preferences for {request.user}. Table key: {table_key}. Data: {prefs.data}") # DEBUG before save
-            prefs.save()
-            # Verify data after save (optional but good for debugging)
-            prefs.refresh_from_db()
-            print(f"[table_config POST] Verified saved preferences for {request.user}: {prefs.data}") # DEBUG after save
-
-            # Send HX-Refresh header to trigger page reload
-            response = HttpResponse("")
-            response['HX-Refresh'] = 'true'
-            return response
-        else:
-             print(f"[table_config POST] Form invalid for user {request.user}. Errors: {form.errors}") # DEBUG form errors
-        # If form is invalid, fall through to render the form with errors
-
-    else: # GET request
-        form = TableConfigForm(table=table, user_config=user_config)
+    # POST is no longer handled here
+    # Always initialize form with table structure and user config
+    form = TableConfigForm(table=table, user_config=user_config)
 
     context = {
         'form': form,
-        'model_name': model_name,
-        # 'table_name': table_name, # Not strictly needed in modal?
+        'table_name': form.table_name, # Pass table name for JS/API
+        'table_verbose_name': model._meta.verbose_name_plural.title(),
     }
     # Render the specific modal partial
-    return render(request, 'core/includes/table_config_modal.html', context) # Path updated
+    return render(request, 'core/includes/table_config_modal.html', context)
 
 # @login_required
 # def user_preferences_view(request):

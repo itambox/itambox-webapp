@@ -17,14 +17,22 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from assets import views as asset_views # Import the assets views
-from . import views # Import core views
+from . import views as core_views # Import core views, aliased to avoid clash
 
+# Main URL Patterns
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', asset_views.dashboard, name='dashboard'), # Add root path for dashboard
-    path('assets/', include('assets.urls')), # Prefix assets URLs with 'assets/'
+    path('', asset_views.dashboard, name='dashboard'), # Root path for dashboard
+
+    # UI Paths
+    path('assets/', include('assets.urls')),
     path('organization/', include('organization.urls')),
     path('extras/', include('extras.urls')),
-    # Add URL for table configuration
-    path('tables/config/<str:model_name>/', views.table_config, name='table_config'),
+    path('tables/config/<str:model_name>/', core_views.table_config, name='table_config'),
+
+    # API Paths (prefixed with /api/) - Point directly to the main api.urls
+    path('api/', include('assetbox.api.urls', namespace='api')), # Added namespace='api'
+
+    # Path for core app non-API views if any (e.g., User Preferences UI view)
+    # path('core/', include('core.urls')), # Example if core had UI views
 ]

@@ -5,3 +5,5 @@ django-filter~=23.1
 django-tables2~=2.7.0
 django-crispy-forms>=2.0
 crispy-bootstrap5>=2022.1
+djangorestframework
+drf-spectacular

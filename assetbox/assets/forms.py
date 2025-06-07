@@ -1,7 +1,7 @@
 from django import forms
 from django.core.exceptions import ValidationError # Import ValidationError
 # Import models from this app
-from .models import Asset, Category, Manufacturer # Keep Asset, Category, Manufacturer
+from .models import Asset, AssetRole, Manufacturer # Keep Asset, AssetRole, Manufacturer
 # Import models from other apps
 from organization.models import Location, AssetHolder # Import Location and AssetHolder
 from django.contrib.auth import get_user_model
@@ -13,8 +13,8 @@ User = get_user_model()
 
 class AssetForm(forms.ModelForm):
     # Define choices for related fields if needed, or rely on default widgets
-    category = forms.ModelChoiceField(
-        queryset=Category.objects.all(), 
+    asset_role = forms.ModelChoiceField(
+        queryset=AssetRole.objects.all(), 
         label="Asset Role",
         required=False, 
         widget=forms.Select(attrs={'class': 'form-select'})
@@ -42,7 +42,7 @@ class AssetForm(forms.ModelForm):
         model = Asset
         fields = [
             'name', 'asset_tag', 'serial_number', 'model', 'manufacturer', 
-            'category', 'status', 'location',
+            'asset_role', 'status', 'location',
             'purchase_date', 'warranty_expiration', 'notes'
         ]
         widgets = {
@@ -70,7 +70,7 @@ class AssetForm(forms.ModelForm):
         self.helper.layout = Layout(
             # Define field layout if needed, or just list them
             'name', 'asset_tag', 'serial_number', 'model', 'manufacturer',
-            'category', 'status', 'location',
+            'asset_role', 'status', 'location',
             'purchase_date', 'warranty_expiration', 'notes',
             # Buttons
             HTML('<div class="mt-4">'),
@@ -79,10 +79,10 @@ class AssetForm(forms.ModelForm):
             HTML('</div>')
         )
 
-# --- Category (Asset Role) Form ---
-class CategoryForm(forms.ModelForm):
+# --- AssetRole (Asset Role) Form ---
+class AssetRoleForm(forms.ModelForm):
     class Meta:
-        model = Category
+        model = AssetRole
         fields = ['name', 'description']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
@@ -96,7 +96,7 @@ class CategoryForm(forms.ModelForm):
         self.helper.form_tag = True
 
         button_text = 'Update' if self.instance and self.instance.pk else 'Create'
-        cancel_url = reverse('assets:category_list')
+        cancel_url = reverse('assets:asset_role_list')
 
         self.helper.layout = Layout(
             'name',

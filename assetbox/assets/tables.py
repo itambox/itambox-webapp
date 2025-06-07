@@ -1,7 +1,7 @@
 # assetbox/assets/tables.py
 import django_tables2 as tables
 from django_tables2.utils import A  # Alias for Accessor
-from .models import Asset, Category, Manufacturer
+from .models import Asset, AssetRole, Manufacturer
 from core.tables.columns import ActionsColumn
 from core.tables.base import BaseTable # Import BaseTable
 from django.urls import reverse, NoReverseMatch
@@ -18,12 +18,12 @@ class AssetTable(BaseTable): # Inherit from BaseTable
     class Meta(BaseTable.Meta): # Inherit Meta from BaseTable
         model = Asset
         fields = (
-            'pk', 'name', 'asset_tag', 'serial_number', 'model', 'category', 
+            'pk', 'name', 'asset_tag', 'serial_number', 'model', 'asset_role', 
             'status', 'assignee', 'location', 'purchase_date', 'actions',
         )
         # Define default columns (adjust as desired)
         default_columns = (
-            'pk', 'name', 'asset_tag', 'serial_number', 'category', 
+            'pk', 'name', 'asset_tag', 'serial_number', 'asset_role', 
             'status', 'assignee', 'location', 'actions',
         )
         # Remove template_name and attrs, inherited from BaseTable
@@ -55,7 +55,7 @@ class AssetTable(BaseTable): # Inherit from BaseTable
     def render_serial_number(self, value):
         return value or "—"
         
-    def render_category(self, value):
+    def render_asset_role(self, value):
         return value.name if value else "—"
 
     def render_location(self, value):
@@ -65,14 +65,14 @@ class AssetTable(BaseTable): # Inherit from BaseTable
         # Format date if it exists
         return value.strftime("%Y-%m-%d") if value else "—"
 
-class CategoryTable(BaseTable): # Inherit from BaseTable
+class AssetRoleTable(BaseTable): # Inherit from BaseTable
     pk = tables.CheckBoxColumn(accessor='pk', attrs = { "th__input": {"title": "Select all rows"}})
-    name = tables.LinkColumn('assets:category_detail', args=[A('pk')], verbose_name='Name')
+    name = tables.LinkColumn('assets:asset_role_detail', args=[A('pk')], verbose_name='Name')
     asset_count = tables.Column(verbose_name='Asset Count', orderable=False)
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta): # Inherit Meta
-        model = Category
+        model = AssetRole
         fields = ('pk', 'name', 'description', 'asset_count', 'actions')
         default_columns = ('pk', 'name', 'asset_count', 'description', 'actions')
 
