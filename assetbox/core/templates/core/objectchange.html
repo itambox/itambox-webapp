@@ -64,7 +64,6 @@
         <div class="card">
             <h2 class="card-header">{% trans "Difference" %}</h2>
             <div class="card-body">
-                {# NetBox Style: Separate blocks for removed and added #}
                 {% if not diff_removed_json == '{}' or not diff_added_json == '{}' %}
                     {% if not diff_removed_json == '{}' %}
                         <pre class="change-diff change-removed">{{ diff_removed_json }}</pre>
@@ -89,11 +88,11 @@
         <div class="card">
             <h2 class="card-header">{% trans "Pre-Change Data" %}</h2>
             <div class="card-body p-0"> {# Remove padding for pre #}
-            {% if object.prechange_data %}
-                <pre class="change-data" id="prechange-data">{{ prechange_data_json }}</pre>
-            {% else %}
-                <div class="p-3"><span class="text-muted">{% trans "None" %}</span></div> {# Add padding back if empty #}
-            {% endif %}
+                {% if object.prechange_data %}
+                    <pre class="change-data">{% for line in diff_lines %}{% with prefix=line|slice:":2" %}{% if prefix == '- ' or prefix == '  ' %}<span class="diff-line {% if prefix == '- ' %}removed{% elif prefix == '  ' %}context{% endif %}">{{ line|slice:"2:"|escape }}</span>{% endif %}{% endwith %}{% endfor %}</pre>
+                {% else %}
+                    <div class="p-3"><span class="text-muted">{% trans "None" %}</span></div> {# Add padding back if empty #}
+                {% endif %}
             </div>
         </div>
     </div>
@@ -102,7 +101,7 @@
             <h2 class="card-header">{% trans "Post-Change Data" %}</h2>
             <div class="card-body p-0"> {# Remove padding for pre #}
                 {% if object.postchange_data %}
-                   <pre class="change-data" id="postchange-data">{{ postchange_data_json }}</pre>
+                    <pre class="change-data">{% for line in diff_lines %}{% with prefix=line|slice:":2" %}{% if prefix == '+ ' or prefix == '  ' %}<span class="diff-line {% if prefix == '+ ' %}added{% elif prefix == '  ' %}context{% endif %}">{{ line|slice:"2:"|escape }}</span>{% endif %}{% endwith %}{% endfor %}</pre>
                 {% else %}
                   <div class="p-3"><span class="text-muted">{% trans "None" %}</span></div> {# Add padding back if empty #}
                 {% endif %}
@@ -110,49 +109,5 @@
         </div>
     </div>
 </div>
-
-{# JSON data for JS highlighting #}
-{{ diff_added_keys|json_script:"added-keys" }}
-{{ diff_removed_keys|json_script:"removed-keys" }}
-
-{# Add script block at the end of the content block #}
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const addedKeys = JSON.parse(document.getElementById('added-keys').textContent);
-        const removedKeys = JSON.parse(document.getElementById('removed-keys').textContent);
-
-        const preChangeEl = document.getElementById('prechange-data');
-        const postChangeEl = document.getElementById('postchange-data');
-
-        function highlightLines(element, keysToHighlight, className) {
-            if (!element || !keysToHighlight || keysToHighlight.length === 0) return;
-
-            const lines = element.textContent.split('\n');
-            const highlightedLines = lines.map(line => {
-                const trimmedLine = line.trim();
-                // Regex to match a JSON key line: starts with optional whitespace, then quote, key, quote, colon
-                const keyMatch = trimmedLine.match(/^"([^"]+)"\s*:/); 
-                if (keyMatch) {
-                    const key = keyMatch[1];
-                    if (keysToHighlight.includes(key)) {
-                        // Escape HTML characters in the line before wrapping
-                        const escapedLine = line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-                        return `<span class="${className}">${escapedLine}</span>`;
-                    }
-                }
-                // Escape non-matching lines too, just in case
-                return line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-            });
-
-            element.innerHTML = highlightedLines.join('\n');
-        }
-
-        // Highlight removed lines in Pre-Change block (keys that were present before but changed/removed)
-        highlightLines(preChangeEl, removedKeys, 'removed');
-
-        // Highlight added lines in Post-Change block (keys that are new or changed)
-        highlightLines(postChangeEl, addedKeys, 'added');
-    });
-</script>
 
 {% endblock %}

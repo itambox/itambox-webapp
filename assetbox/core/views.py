@@ -101,22 +101,36 @@ class ObjectChangeView(DetailView):
         prechange_data = obj.prechange_data or {}
         postchange_data = obj.postchange_data or {}
 
-        # Calculate keys that were added/removed/changed
+        # --- Server-side Diff Calculation (NetBox Style) ---
+        # Get string representations for comparison
+        prechange_string = json.dumps(prechange_data, cls=DjangoJSONEncoder, indent=2, sort_keys=True)
+        postchange_string = json.dumps(postchange_data, cls=DjangoJSONEncoder, indent=2, sort_keys=True)
+
+        # Split into lines for difflib
+        prechange_lines = prechange_string.splitlines(keepends=True)
+        postchange_lines = postchange_string.splitlines(keepends=True)
+
+        # Generate diff using difflib.Differ
+        differ = difflib.Differ()
+        diff_lines = list(differ.compare(prechange_lines, postchange_lines))
+        context['diff_lines'] = diff_lines
+        # --- End Diff Calculation ---
+
+        # Keep full JSON for reference if needed, but remove parts used only by JS
+        context['prechange_data_json'] = prechange_string # Keep for potential reference
+        context['postchange_data_json'] = postchange_string # Keep for potential reference
+
+        # --- Calculate JSON subsets for the top "Difference" block (User Fixed - Keep As Is) ---
         diff_added_keys = {k for k, v in postchange_data.items() if k not in prechange_data or prechange_data[k] != v}
         diff_removed_keys = {k for k, v in prechange_data.items() if k not in postchange_data or postchange_data[k] != v}
-
-        # Calculate JSON subsets for the NetBox-style Difference block
         diff_added = {k: v for k, v in postchange_data.items() if k in diff_added_keys}
         diff_removed = {k: v for k, v in prechange_data.items() if k in diff_removed_keys}
         context['diff_added_json'] = json.dumps(diff_added, cls=DjangoJSONEncoder, indent=2)
         context['diff_removed_json'] = json.dumps(diff_removed, cls=DjangoJSONEncoder, indent=2)
+        # --- End Difference Block Calculation ---
 
-        # Pass full JSON strings for Pre/Post boxes
-        context['prechange_data_json'] = json.dumps(prechange_data, cls=DjangoJSONEncoder, indent=2)
-        context['postchange_data_json'] = json.dumps(postchange_data, cls=DjangoJSONEncoder, indent=2)
-        
-        # Pass key sets for JavaScript highlighting
-        context['diff_added_keys'] = list(diff_added_keys)
-        context['diff_removed_keys'] = list(diff_removed_keys)
+        # REMOVED context variables for JS highlighting
+        # context['diff_added_keys'] = list(diff_added_keys)
+        # context['diff_removed_keys'] = list(diff_removed_keys)
 
         return context 
