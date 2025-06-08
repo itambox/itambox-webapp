@@ -11,6 +11,13 @@ class UserPreference(models.Model):
     """
     Stores user-specific preferences, including table configurations.
     """
+    THEME_DARK = 'dark'
+    THEME_LIGHT = 'light'
+    THEME_CHOICES = (
+        (THEME_LIGHT, 'Light'),
+        (THEME_DARK, 'Dark'),
+    )
+
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,

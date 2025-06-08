@@ -1,0 +1,41 @@
+{% extends 'generic/object_list_base.html' %}
+{% load helpers %}
+{% load crispy_forms_tags %}
+{% load render_table from django_tables2 %}
+{% load i18n %}
+
+{% block title %}{% trans "Search Results" %}{% endblock %}
+
+{% block content_full %} {# Use content_full block to remove sidebars if desired #}
+  <div class="row mb-3">
+    <div class="col col-md-6 offset-md-3">
+        <form action="{% url 'search' %}" method="get" class="form">
+            {% crispy form %}
+        </form>
+    </div>
+  </div>
+
+  {% if query %}
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">{% blocktrans count results_count=results_count %}{{ results_count }} Result Found{% plural %}{{ results_count }} Results Found{% endblocktrans %}</h3>
+      </div>
+      {% if table %}
+        <div class="table-responsive"> {# Required by Tabler for proper table rendering #}
+          {# Restore standard render_table tag #}
+          {% render_table table %}
+        </div>
+      {% else %}
+         <div class="card-body">
+             <span class="text-muted">No results found for '{{ query }}'.</span>
+         </div>
+      {% endif %}
+    </div>
+    {# Add pagination controls here if pagination is implemented #}
+    {# {% include 'inc/paginator.html' with page=table.page %} #}
+  {% else %}
+    {# Optionally show a message if no query was entered #}
+    {# <p class="text-center text-muted">Enter a search term above.</p> #}
+  {% endif %}
+
+{% endblock content_full %}

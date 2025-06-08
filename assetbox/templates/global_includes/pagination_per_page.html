@@ -13,12 +13,8 @@
         {% for count, label in choices %}
             <li>
                 <a class="dropdown-item{% if count == paginator.per_page %} active{% endif %}"
-                   href="?{% querystring per_page=count page=1 %}"
-                   hx-get="?{% querystring per_page=count page=1 %}"
-                   hx-target="#object-list-table-container"
-                   hx-swap="outerHTML"
-                   hx-push-url="true">
-                    {{ label }}
+                   href="{% update_querystring request per_page=count page=1 %}">
+                    {{ label }} 
                 </a>
             </li>
         {% endfor %}

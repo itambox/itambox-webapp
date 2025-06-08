@@ -73,6 +73,10 @@ class Location(models.Model):
         # Consider showing parent hierarchy later if needed
         return self.name
 
+    def get_absolute_url(self):
+        # TODO: Verify URL name
+        return reverse('organization:location_detail', kwargs={'pk': self.pk})
+
 class Region(models.Model):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
@@ -93,6 +97,10 @@ class Region(models.Model):
 
     def __str__(self):
         return self.name
+
+    def get_absolute_url(self):
+        # TODO: Verify URL name
+        return reverse('organization:region_detail', kwargs={'pk': self.pk})
 
 class SiteGroup(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -117,6 +125,10 @@ class SiteGroup(models.Model):
     def __str__(self):
         return self.name
 
+    def get_absolute_url(self):
+        # TODO: Verify URL name
+        return reverse('organization:sitegroup_detail', kwargs={'pk': self.pk})
+
 class TenantGroup(models.Model):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
@@ -140,6 +152,10 @@ class TenantGroup(models.Model):
     def __str__(self):
         return self.name
 
+    def get_absolute_url(self):
+        # TODO: Verify URL name
+        return reverse('organization:tenantgroup_detail', kwargs={'pk': self.pk})
+
 class Tenant(models.Model):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
@@ -158,6 +174,13 @@ class Tenant(models.Model):
 
     class Meta:
         ordering = ['name']
+
+    def get_absolute_url(self):
+        # TODO: Verify URL name
+        return reverse('organization:tenant_detail', kwargs={'pk': self.pk})
+
+    def __str__(self):
+        return self.name
 
 class Site(models.Model):
     STATUS_PLANNED = 'planned'
@@ -197,6 +220,10 @@ class Site(models.Model):
 
     def __str__(self):
         return self.name
+
+    def get_absolute_url(self):
+        # TODO: Verify URL name
+        return reverse('organization:site_detail', kwargs={'pk': self.pk})
 
 # +++ AssetHolder Model +++
 class AssetHolder(models.Model):

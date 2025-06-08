@@ -127,41 +127,13 @@
                     </form>
                     {# End Row for Search/Configure Controls #}
 
-                    {# Table Rendering Container (for HTMX) #}
-                    <div id="object-list-table-container">
-                        <div class="table-responsive">
-                            {% block table %}
-                                {% if table %}
-                                    {% render_table table %}
-                                {% else %}
-                                    <div class="p-3">
-                                        <p class="text-muted mb-0">No table data available.</p>
-                                    </div>
-                                {% endif %}
-                            {% endblock table %}
-                        </div>
+                    {# --- Content Wrapper for HTMX Updates --- #}
+                    <div id="object-list-content">
+                         {# Content is now loaded dynamically via HTMX or initial page load includes it #}
+                         {# Initial load includes the wrapper partial #}
+                         {% include 'generic/partials/object_list_content_wrapper.html' %}
                     </div>
-                    {# End Table Rendering Container #}
-
-                    {# Pagination Controls Container #}
-                    {% if table.page %}
-                    <div class="card-footer d-flex align-items-center">
-                        {# Per Page Dropdown #}
-                        {% include 'global_includes/pagination_per_page.html' with paginator=table.page.paginator %}
-
-                        {# Page Number Summary #}
-                        <p class="m-0 text-secondary flex-grow-1">
-                            {% blocktrans with start=table.page.start_index end=table.page.end_index total=table.page.paginator.count %}
-                            Showing <span>{{ start }}</span> to <span>{{ end }}</span> of <span>{{ total }}</span> entries
-                            {% endblocktrans %}
-                        </p>
-
-                        {# Page Links #}
-                        {% include 'global_includes/pagination_links.html' with page_obj=table.page %}
-
-                    </div>
-                    {% endif %}
-                    {# End Pagination Controls Container #}
+                    {# --- End Content Wrapper --- #}
 
                 </div>
                 {# --- End Results Tab --- #}

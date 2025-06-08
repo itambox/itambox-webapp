@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% block title_tab %}{% trans "User Account" %}{% endblock %} - AssetBox{% endblock %}
+
+{% block page_header %}
+    <div class="page-pretitle">
+        User Account
+    </div>
+    <h2 class="page-title">
+        {% block page_title %}{% if user.get_full_name %}{{ user.get_full_name }}{% else %}{{ user.username }}{% endif %}{% endblock %}
+    </h2>
+{% endblock %}
+
+{% block content %}
+{# Horizontal Tabs #}
+<div class="card">
+    <div class="card-header">
+        <ul class="nav nav-tabs card-header-tabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <a href="{% url 'users:user_profile' %}" class="nav-link{% if active_tab == 'profile' %} active{% endif %}">{% trans "Profile" %}</a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a href="{% url 'users:user_notifications' %}" class="nav-link{% if active_tab == 'notifications' %} active{% endif %}">{% trans "Notifications" %} <span class="badge bg-secondary-lt ms-1">Dummy</span></a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a href="{% url 'users:user_subscriptions' %}" class="nav-link{% if active_tab == 'subscriptions' %} active{% endif %}">{% trans "Subscriptions" %} <span class="badge bg-secondary-lt ms-1">Dummy</span></a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a href="{% url 'users:user_preferences' %}" class="nav-link{% if active_tab == 'preferences' %} active{% endif %}">{% trans "Preferences" %}</a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a href="{% url 'users:user_password' %}" class="nav-link{% if active_tab == 'password' %} active{% endif %}">{% trans "Change Password" %}</a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a href="{% url 'users:user_api_tokens' %}" class="nav-link{% if active_tab == 'api_tokens' %} active{% endif %}">{% trans "API Tokens" %} <span class="badge bg-secondary-lt ms-1">Dummy</span></a>
+            </li>
+        </ul>
+    </div>
+    <div class="card-body">
+        {# Tab Content - Only the active tab's content is rendered by the specific view #}
+        {% block content_tab %}{% endblock %}
+    </div>
+</div>
+{% endblock %} 

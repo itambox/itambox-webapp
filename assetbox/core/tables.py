@@ -1,10 +1,12 @@
 import django_tables2 as tables
+from django_tables2.utils import A # Ensure A is imported
 from .models import ObjectChange
-from django.utils.html import format_html
-from django.urls import reverse
+from django.utils.html import format_html, escape
+from django.urls import reverse, NoReverseMatch
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from .utils import get_model_viewname # Import the utility function
+from django.contrib.contenttypes.models import ContentType # Ensure ContentType is imported
 
 # Base Table for common settings
 class BaseTable(tables.Table):
@@ -108,4 +110,50 @@ class ActionsColumn(tables.Column):
         if not url_edit and not url_delete:
             return self.default
 
-        return mark_safe("\n".join(html_parts)) 
+        return mark_safe("\n".join(html_parts))
+
+# --- Search Results Table (Aligned with NetBox approach) ---
+class SearchResultTable(tables.Table):
+    """
+    Table for displaying heterogeneous search results (aligned with NetBox).
+    The data passed to this table should be a list of objects/dicts,
+    each having an '_object_type_id' and an 'object' attribute holding the actual model instance.
+    """
+    # Use accessor for the ContentType ID stored on the wrapper object
+    object_type = tables.Column(
+        accessor='_object_type_id', 
+        verbose_name='Type',
+        orderable=False
+    )
+    # Use 'object' as column name, accessing the model instance on the wrapper
+    object = tables.Column(
+        accessor='object', # Access the 'object' attribute of the wrapper
+        linkify=True,     # Restore linkify
+        verbose_name='Result',
+        orderable=False # Ordering by str representation might be unreliable
+    )
+
+    class Meta:
+        # No specific model - it handles multiple types
+        attrs = {
+            'class': 'table table-hover object-list'
+        }
+        # Use the new field names
+        fields = ('object_type', 'object', ) 
+        # sequence = (...) # Define order if needed
+
+    # Simplified render_object_type, expects ContentType ID as value
+    def render_object_type(self, value):
+        try:
+            ct = ContentType.objects.get_for_id(value)
+            # Format similar to NetBox
+            return ct.name.capitalize()
+        except ContentType.DoesNotExist:
+            return "Unknown Type"
+
+    # Optional: Implement render_parent if needed
+    # def render_parent(self, record):
+    #     if hasattr(record, 'site'): # Example for Location
+    #         return record.site
+    #     # Add checks for other parent relationships
+    #     return "—" 

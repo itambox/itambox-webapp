@@ -51,7 +51,8 @@ def asset_list(request):
         'model_name_str': model_name_str, # Add model name string
         'filter_form': filterset, # <-- Pass the filter form to context
     }
-    # Now render the generic template directly
+    
+    # Always render the full template - NetBox approach
     return render(request, 'generic/object_list_base.html', context)
 
 @login_required
@@ -263,12 +264,14 @@ def asset_checkin(request, pk):
 
 @login_required
 def asset_role_list(request):
+    # Start with base queryset
     queryset = AssetRole.objects.all()
-    
+
     # Apply filters
     filterset = AssetRoleFilterSet(request.GET, queryset=queryset)
     queryset = filterset.qs
 
+    # Create and configure table
     table = AssetRoleTable(queryset, request=request)
     RequestConfig(request, paginate={'per_page': get_paginate_count(request)}).configure(table)
 
@@ -277,13 +280,13 @@ def asset_role_list(request):
 
     context = {
         'table': table,
-        'title': 'Asset Roles', # Title for the page
-        'object_type': 'AssetRole', # For Create button
-        'create_url_name': 'assets:asset_role_create',
-        'list_url_name': 'assets:asset_role_list', # For potential future use (e.g., breadcrumbs)
+        'title': 'Asset Roles', # Title for card
+        'object_type': 'Asset Role', # Used in the Create button
+        'create_url_name': 'assets:asset_role_create', # URL name for the create button
         'model_name_str': model_name_str, # Add model name string
         'filter_form': filterset, # <-- Add filter form
     }
+    # Always render the full template - NetBox approach
     return render(request, 'generic/object_list_base.html', context)
 
 @login_required
@@ -399,12 +402,14 @@ def asset_role_delete(request, pk):
 
 @login_required
 def manufacturer_list(request):
+    # Start with base queryset
     queryset = Manufacturer.objects.all()
 
     # Apply filters
     filterset = ManufacturerFilterSet(request.GET, queryset=queryset)
-    queryset = filterset.qs
+    queryset = filterset.qs  
 
+    # Create and configure table
     table = ManufacturerTable(queryset, request=request)
     RequestConfig(request, paginate={'per_page': get_paginate_count(request)}).configure(table)
 
@@ -413,13 +418,13 @@ def manufacturer_list(request):
 
     context = {
         'table': table,
-        'title': 'Manufacturers',
-        'object_type': 'Manufacturer',
-        'create_url_name': 'assets:manufacturer_create',
-        'list_url_name': 'assets:manufacturer_list',
-        'model_name_str': model_name_str, # Add to context
+        'title': 'Manufacturers', # Title for card
+        'object_type': 'Manufacturer', # Used in the Create button 
+        'create_url_name': 'assets:manufacturer_create', # URL name for the create button
+        'model_name_str': model_name_str, # Add model name string
         'filter_form': filterset, # <-- Add filter form
     }
+    # Always render the full template - NetBox approach
     return render(request, 'generic/object_list_base.html', context)
 
 @login_required

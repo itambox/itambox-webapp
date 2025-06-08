@@ -8,3 +8,5 @@ class OrganizationConfig(AppConfig):
     def ready(self):
         # Import signals
         import organization.signals
+        # Import search indexes to register them
+        import organization.search

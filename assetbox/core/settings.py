@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'extras.apps.ExtrasConfig',
     'rest_framework',
     'drf_spectacular',
+    'users',
 ]
 
 MIDDLEWARE = [
@@ -60,6 +61,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_htmx.middleware.HtmxMiddleware',
     'core.middleware.CurrentUserMiddleware',
 ]
 
@@ -150,3 +152,10 @@ REST_FRAMEWORK = {
     # Add other DRF settings here if needed in the future
     # e.g., authentication, permissions, pagination
 }
+
+SEARCH_BACKEND = 'core.search_backends.DatabaseBackend'
+
+# Login/Logout Redirects
+LOGIN_URL = 'login' # URL name for the login view
+LOGIN_REDIRECT_URL = 'dashboard' # URL name to redirect to after successful login
+LOGOUT_REDIRECT_URL = 'login' # URL name to redirect to after logout

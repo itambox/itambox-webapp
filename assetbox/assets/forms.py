@@ -6,7 +6,7 @@ from .models import Asset, AssetRole, Manufacturer # Keep Asset, AssetRole, Manu
 from organization.models import Location, AssetHolder # Import Location and AssetHolder
 from django.contrib.auth import get_user_model
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, HTML, Button
+from crispy_forms.layout import Layout, Submit, HTML, Button, Div
 from django.urls import reverse
 
 User = get_user_model()
@@ -43,7 +43,7 @@ class AssetForm(forms.ModelForm):
         fields = [
             'name', 'asset_tag', 'serial_number', 'model', 'manufacturer', 
             'asset_role', 'status', 'location',
-            'purchase_date', 'warranty_expiration', 'notes'
+            'purchase_date', 'warranty_expiration', 'notes', 'tags'
         ]
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
@@ -68,12 +68,37 @@ class AssetForm(forms.ModelForm):
         #    cancel_url = reverse('assets:asset_detail', kwargs={'pk': self.instance.pk})
 
         self.helper.layout = Layout(
-            # Define field layout if needed, or just list them
-            'name', 'asset_tag', 'serial_number', 'model', 'manufacturer',
-            'asset_role', 'status', 'location',
-            'purchase_date', 'warranty_expiration', 'notes',
-            # Buttons
-            HTML('<div class="mt-4">'),
+            Div(
+                Div('name', css_class='col-md-6'),
+                Div('asset_tag', css_class='col-md-6'),
+                css_class='row'
+            ),
+            Div(
+                Div('asset_role', css_class='col-md-6'),
+                Div('status', css_class='col-md-6'),
+                css_class='row'
+            ),
+             Div(
+                Div('manufacturer', css_class='col-md-6'),
+                Div('model', css_class='col-md-6'),
+                css_class='row'
+            ),
+            Div(
+                Div('serial_number', css_class='col-md-6'),
+                Div('location', css_class='col-md-6'),
+                css_class='row'
+            ),
+            Div(
+                Div('purchase_date', css_class='col-md-6'),
+                Div('warranty_expiration', css_class='col-md-6'),
+                css_class='row'
+            ),
+            Div(
+                Div('tags', css_class='col-md-12'),
+                css_class='row'
+            ),
+            'notes',
+            HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
             HTML('</div>')

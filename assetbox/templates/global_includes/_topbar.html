@@ -11,12 +11,14 @@
         </h1>
         <div class="navbar-nav flex-row order-md-last">
             <div class="nav-item d-none d-md-flex me-3">
-                <div class="input-icon">
-                    <span class="input-icon-addon">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"></path><path d="M21 21l-6 -6"></path></svg>
-                    </span>
-                    <input type="text" value="" class="form-control" placeholder="Search…" aria-label="Search in website">
-                </div>
+                <form action="{% url 'search' %}" method="get" autocomplete="off" novalidate="">
+                    <div class="input-icon">
+                        <span class="input-icon-addon">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" /><path d="M21 21l-6 -6" /></svg>
+                        </span>
+                        <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="form-control" placeholder="Search…" aria-label="Search in website">
+                    </div>
+                </form>
             </div>
             <div class="d-flex">
                 <button class="nav-link px-0 color-mode-toggle hide-theme-dark" title="Enable dark mode" data-bs-toggle="tooltip" data-bs-placement="bottom">
@@ -62,13 +64,18 @@
                 <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
                     {% if user.is_authenticated %}
                         <a href="#" class="dropdown-item">Status</a>
-                        <a href="#" class="dropdown-item">Profile</a> {# TODO: Link to profile #}
+                        <a href="{% url 'users:user_profile' %}" class="dropdown-item">Profile</a>
                         <a href="#" class="dropdown-item">Feedback</a>
                         <div class="dropdown-divider"></div>
                         <a href="#" class="dropdown-item">Settings</a> {# TODO: Link to settings #}
-                        <a href="{% url 'admin:logout' %}" class="dropdown-item">Logout</a>
+                        {# Use a mini-form for POST logout #}
+                        <form action="{% url 'logout' %}" method="post" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="dropdown-item">Logout</button>
+                        </form>
                     {% else %}
-                        <a href="{% url 'admin:login' %}" class="dropdown-item">Login</a>
+                        {# Fallback login link remains a simple GET link #}
+                        <a href="{% url 'login' %}" class="dropdown-item">Login</a>
                     {% endif %}
                 </div>
             </div>

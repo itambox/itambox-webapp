@@ -5,7 +5,8 @@ from .forms import TagForm # Assuming a TagForm exists
 from django_tables2 import RequestConfig
 from .tables import TagTable
 from .filters import TagFilterSet # <-- Import FilterSet
-from core.utils import get_paginate_count # Import the utility function
+from core.utils import get_paginate_count, get_model_viewname # Import the utility function
+from assets.tables import AssetTable # Import AssetTable
 
 # Create your views here.
 
@@ -39,13 +40,32 @@ def tag_list(request):
 @login_required
 def tag_detail(request, pk):
     tag = get_object_or_404(Tag, pk=pk)
-    # TODO: Fetch related objects (sites, locations, etc.) efficiently?
-    # Example: Get related sites (requires related_name='tags' on Site.tags)
-    # related_sites = tag.sites.all() 
+    model = Tag # Get the model class
+
+    # Fetch related assets using the related_name from Asset.tags
+    related_assets = tag.assets.all().prefetch_related(
+        'asset_role', 'manufacturer', 'location', 'location__site' # Prefetch for efficiency
+    )
+    
+    # Create and configure the assets table
+    assets_table = AssetTable(related_assets, request=request)
+    # Disable pagination for related table or set a smaller page size
+    RequestConfig(request, paginate=False).configure(assets_table) 
+
+    # TODO: Fetch related objects for the sidebar list (locations, etc.)
+    # related_objects_list = [] 
+
     context = {
-        'tag': tag,
-        # 'related_sites': related_sites,
+        'object': tag, # Pass object with standard key
+        'title': str(tag), # Use tag name as title
+        'object_type': model._meta.verbose_name.title(), # Pass verbose name
+        'assets_table': assets_table, # Add assets table to context
+        'update_url_name': get_model_viewname(model, 'update'),
+        'delete_url_name': get_model_viewname(model, 'delete'),
+        'view_options': ['update', 'delete'], # Enable buttons
+        # 'related_objects_list': related_objects_list, # Add related items later
     }
+    # Use the standard detail template path
     return render(request, 'extras/tags/tag_detail.html', context)
 
 @login_required

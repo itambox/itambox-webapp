@@ -19,6 +19,11 @@ class AssetRole(models.Model):
     def __str__(self):
         return self.name
 
+    def get_absolute_url(self):
+        # TODO: Verify this URL name is correct
+        return reverse('assets:asset_role_detail', kwargs={'pk': self.pk})
+        # return "/" # TEMPORARY DEBUG: Return static string
+
 # Location model was moved to organization app
 
 class Manufacturer(models.Model):
@@ -32,6 +37,11 @@ class Manufacturer(models.Model):
 
     def __str__(self):
         return self.name
+
+    def get_absolute_url(self):
+        # TODO: Verify this URL name is correct
+        return reverse('assets:manufacturer_detail', kwargs={'pk': self.pk})
+        # return "/" # TEMPORARY DEBUG: Return static string
 
 # Region, SiteGroup, Tenant, Tag, Site models were moved to organization app
 
@@ -66,6 +76,7 @@ class Asset(models.Model):
     notes = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    tags = models.ManyToManyField('extras.Tag', related_name="assets", blank=True)
 
     def __str__(self):
         return f"{self.name} ({self.asset_tag})"

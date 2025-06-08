@@ -6,5 +6,7 @@ class AssetsConfig(AppConfig):
     name = 'assets'
 
     def ready(self):
-        # Import signals only when AppConfig is ready
+        # Import signals
         import assets.signals
+        # Import search indexes to register them
+        import assets.search

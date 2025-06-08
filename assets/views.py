@@ -16,6 +16,8 @@ from assetbox.organization.models import AssetHolderAssignment
 from django.urls import reverse
 from django.db.models import Q
 from django.contrib import messages
+from django.template.loader import get_template
+from django.template import Context
 
 User = get_user_model()
 
@@ -29,6 +31,12 @@ def dashboard(request):
 
 @login_required
 def asset_list(request):
+    # --- DEBUG --- 
+    print(f"[asset_list VIEW] Request Method: {request.method}")
+    print(f"[asset_list VIEW] Is HTMX: {request.htmx}")
+    print(f"[asset_list VIEW] request.GET: {request.GET}")
+    # --- END DEBUG --- 
+
     # Start with base queryset
     queryset = Asset.objects.all().select_related(
         'asset_role', 'manufacturer', 'location' # Updated field
@@ -53,7 +61,15 @@ def asset_list(request):
         'model_name_str': model_name_str,
         'filter_form': filterset,
     }
-    return render(request, 'generic/object_list_base.html', context)
+
+    # Check if the request is from HTMX
+    if request.htmx:
+        # If HTMX, render the partial that includes the #object-list-content wrapper
+        # This ensures the outerHTML swap works correctly
+        return render(request, 'generic/partials/object_list_content_wrapper.html', context)
+    else:
+        # Otherwise, render the full base template
+        return render(request, 'generic/object_list_base.html', context)
 
 @login_required
 def asset_create(request):

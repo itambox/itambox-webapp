@@ -123,6 +123,28 @@
             </div>
         </div>
         
+        {# Tags Card - Add here #}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="card-title">Tags</h3>
+            </div>
+            <div class="card-body">
+                {% if asset.tags.exists %}
+                    {% for tag in asset.tags.all %}
+                        {# Use CSS variable for background-color #}
+                        <a href="{% url 'extras:tag_detail' pk=tag.pk %}" 
+                           class="badge me-1 mb-1" 
+                           style="--tag-color: #{% if tag.color %}{{ tag.color }}{% else %}adb5bd{% endif %}; background-color: var(--tag-color); color: #fff; text-decoration: none;">
+                            {{ tag.name }}
+                        </a>
+                    {% endfor %}
+                {% else %}
+                    <span class="text-muted"><i>No tags assigned.</i></span>
+                {% endif %}
+            </div>
+        </div>
+        {# End Tags Card #}
+
         {# Activity Log Card #}
         <div class="card">
             <div class="card-header">
