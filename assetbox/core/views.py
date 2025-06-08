@@ -6,9 +6,16 @@ from django.apps import apps # To find models/tables dynamically
 from django.urls import reverse
 from importlib import import_module
 from django.http import Http404
+from django.views.generic import DetailView
+from django_tables2 import SingleTableView
+from django.utils.decorators import method_decorator
+import json
+from django.core.serializers.json import DjangoJSONEncoder
+import difflib
 
-from .models import UserPreference # Import the model
+from .models import UserPreference, ObjectChange # Import the model
 from .forms import TableConfigForm
+from .tables import ObjectChangeTable
 # from .tables.base import SESSION_KEY_PREFIX # No longer needed
 
 @login_required
@@ -62,3 +69,54 @@ def table_config(request, model_name):
 #     # ... (rest of the function remains unchanged) ...
 #     # ... (return the same context) ...
 #     # ... (return the same render call) ... 
+
+@method_decorator(login_required, name='dispatch')
+class ObjectChangeListView(SingleTableView):
+    model = ObjectChange
+    table_class = ObjectChangeTable
+    template_name = 'core/objectchange_list.html'
+    context_object_name = 'object_changes'
+    # Add pagination if desired
+    # paginate_by = 25
+
+    # Add filtering later if needed (using django-filter)
+    # filterset_class = ObjectChangeFilterSet
+
+    def get_queryset(self):
+        queryset = super().get_queryset().prefetch_related(
+            'user', 'changed_object_type', 'related_object_type'
+        )
+        # Add filtering logic here if using a filterset
+        return queryset
+
+@method_decorator(login_required, name='dispatch')
+class ObjectChangeView(DetailView):
+    model = ObjectChange
+    template_name = 'core/objectchange.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        obj = self.get_object()
+
+        prechange_data = obj.prechange_data or {}
+        postchange_data = obj.postchange_data or {}
+
+        # Calculate keys that were added/removed/changed
+        diff_added_keys = {k for k, v in postchange_data.items() if k not in prechange_data or prechange_data[k] != v}
+        diff_removed_keys = {k for k, v in prechange_data.items() if k not in postchange_data or postchange_data[k] != v}
+
+        # Calculate JSON subsets for the NetBox-style Difference block
+        diff_added = {k: v for k, v in postchange_data.items() if k in diff_added_keys}
+        diff_removed = {k: v for k, v in prechange_data.items() if k in diff_removed_keys}
+        context['diff_added_json'] = json.dumps(diff_added, cls=DjangoJSONEncoder, indent=2)
+        context['diff_removed_json'] = json.dumps(diff_removed, cls=DjangoJSONEncoder, indent=2)
+
+        # Pass full JSON strings for Pre/Post boxes
+        context['prechange_data_json'] = json.dumps(prechange_data, cls=DjangoJSONEncoder, indent=2)
+        context['postchange_data_json'] = json.dumps(postchange_data, cls=DjangoJSONEncoder, indent=2)
+        
+        # Pass key sets for JavaScript highlighting
+        context['diff_added_keys'] = list(diff_added_keys)
+        context['diff_removed_keys'] = list(diff_removed_keys)
+
+        return context 

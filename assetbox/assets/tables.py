@@ -2,8 +2,7 @@
 import django_tables2 as tables
 from django_tables2.utils import A  # Alias for Accessor
 from .models import Asset, AssetRole, Manufacturer
-from core.tables.columns import ActionsColumn
-from core.tables.base import BaseTable # Import BaseTable
+from core.tables import ActionsColumn, BaseTable
 from django.urls import reverse, NoReverseMatch
 from django.utils.safestring import mark_safe
 from django.contrib.contenttypes.models import ContentType

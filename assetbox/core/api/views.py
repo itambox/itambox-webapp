@@ -1,10 +1,10 @@
 # core/api/views.py
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
 
-from core.models import UserPreference
-from .serializers import UserPreferenceSerializer
+from core.models import UserPreference, ObjectChange
+from .serializers import UserPreferenceSerializer, ObjectChangeSerializer
 
 class UserPreferenceViewSet(viewsets.ViewSet):
     """
@@ -51,3 +51,13 @@ class UserPreferenceViewSet(viewsets.ViewSet):
     # We don't need retrieve, update, partial_update as we handle everything
     # via list (GET) and create (POST/PUT) for the single user pref object.
     # The destroy handles DELETE.
+
+class ObjectChangeViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Read-only API endpoint for viewing ObjectChanges (changelog).
+    """
+    queryset = ObjectChange.objects.all().prefetch_related(
+        'user', 'changed_object_type', 'related_object_type'
+    )
+    serializer_class = ObjectChangeSerializer
+    permission_classes = [IsAdminUser] # Adjust permissions as needed

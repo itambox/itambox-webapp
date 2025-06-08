@@ -11,21 +11,21 @@ from organization.api.serializers import NestedLocationSerializer, NestedTenantS
 #
 
 class NestedAssetRoleSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='api:assetrole-detail')
+    url = serializers.HyperlinkedIdentityField(view_name='api:assets_api:assetrole-detail')
 
     class Meta:
         model = AssetRole
         fields = ['id', 'url', 'name']
 
 class NestedManufacturerSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='api:manufacturer-detail')
+    url = serializers.HyperlinkedIdentityField(view_name='api:assets_api:manufacturer-detail')
 
     class Meta:
         model = Manufacturer
         fields = ['id', 'url', 'name']
 
 class NestedAssetSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='api:asset-detail')
+    url = serializers.HyperlinkedIdentityField(view_name='api:assets_api:asset-detail')
 
     class Meta:
         model = Asset
@@ -36,7 +36,7 @@ class NestedAssetSerializer(serializers.ModelSerializer):
 #
 
 class AssetRoleSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='api:assetrole-detail')
+    url = serializers.HyperlinkedIdentityField(view_name='api:assets_api:assetrole-detail')
     asset_count = serializers.IntegerField(read_only=True)
 
     class Meta:
@@ -44,7 +44,7 @@ class AssetRoleSerializer(serializers.ModelSerializer):
         fields = ['id', 'url', 'name', 'description', 'asset_count', 'created_at', 'updated_at']
 
 class ManufacturerSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='api:manufacturer-detail')
+    url = serializers.HyperlinkedIdentityField(view_name='api:assets_api:manufacturer-detail')
     asset_count = serializers.IntegerField(read_only=True)
 
     class Meta:
@@ -52,7 +52,7 @@ class ManufacturerSerializer(serializers.ModelSerializer):
         fields = ['id', 'url', 'name', 'description', 'asset_count', 'created_at', 'updated_at']
 
 class AssetSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='api:asset-detail')
+    url = serializers.HyperlinkedIdentityField(view_name='api:assets_api:asset-detail')
     asset_role = NestedAssetRoleSerializer(read_only=True)
     asset_role_id = serializers.PrimaryKeyRelatedField(
         queryset=AssetRole.objects.all(), source='asset_role', write_only=True, required=False, allow_null=True

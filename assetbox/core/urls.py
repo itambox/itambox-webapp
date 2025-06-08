@@ -35,4 +35,8 @@ urlpatterns = [
 
     # Path for core app non-API views if any (e.g., User Preferences UI view)
     # path('core/', include('core.urls')), # Example if core had UI views
+
+    # Changelog
+    path('changelog/', core_views.ObjectChangeListView.as_view(), name='objectchange_list'),
+    path('changelog/<int:pk>/', core_views.ObjectChangeView.as_view(), name='objectchange'),
 ]

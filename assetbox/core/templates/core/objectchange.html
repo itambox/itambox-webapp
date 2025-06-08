@@ -1,0 +1,158 @@
+{% extends 'generic/object_detail_base.html' %}
+{% load i18n %}
+{% load helpers %}
+
+{% block title %}{{ object }}{% endblock %}
+
+{% block breadcrumbs %}
+  <li class="breadcrumb-item"><a href="{% url 'core:objectchange_list' %}">{% trans "Change Log" %}</a></li>
+  {# Simplified breadcrumb logic #}
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col col-md-5">
+        <div class="card">
+            <h2 class="card-header">{% trans "Change Details" %}</h2>
+            <table class="table table-hover attr-table">
+                <tr>
+                    <th scope="row">{% trans "Time" %}</th>
+                    <td>{{ object.time|annotated_time }}</td> {# Use annotated_time helper #}
+                </tr>
+                <tr>
+                    <th scope="row">{% trans "User" %}</th>
+                    <td>
+                        {% if object.user %}
+                          {{ object.user|linkify }}
+                        {% else %}
+                          {{ object.user_name }} (user deleted)
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">{% trans "Action" %}</th>
+                    <td>
+                        <span class="badge bg-{{ object.get_action_color }}">{{ object.get_action_display }}</span> {# Use action color helper #}
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">{% trans "Object Type" %}</th>
+                    <td>
+                        {{ object.object_type_repr|default:object.changed_object_type }}
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">{% trans "Object" %}</th>
+                    <td>
+                        {% if object.changed_object and object.get_changed_object_url %}
+                            <a href="{{ object.get_changed_object_url }}">{{ object.object_repr }}</a>
+                        {% else %}
+                            {{ object.object_repr }}
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">{% trans "Request ID" %}</th>
+                    <td>
+                        <a href="{% url 'objectchange_list' %}?request_id={{ object.request_id }}">{{ object.request_id }}</a>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    <div class="col col-md-7">
+        <div class="card">
+            <h2 class="card-header">{% trans "Difference" %}</h2>
+            <div class="card-body">
+                {# NetBox Style: Separate blocks for removed and added #}
+                {% if not diff_removed_json == '{}' or not diff_added_json == '{}' %}
+                    {% if not diff_removed_json == '{}' %}
+                        <pre class="change-diff change-removed">{{ diff_removed_json }}</pre>
+                    {% endif %}
+                    {% if not diff_added_json == '{}' %}
+                        <pre class="change-diff change-added">{{ diff_added_json }}</pre>
+                    {% endif %}
+                {% else %}
+                     <span class="text-muted">
+                         {% if object.action == 'create' %} {% trans "Object Created" %}
+                         {% elif object.action == 'delete' %} {% trans "Object Deleted" %}
+                         {% else %} {% trans "No Changes Logged" %}
+                         {% endif %}
+                     </span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="col col-md-6">
+        <div class="card">
+            <h2 class="card-header">{% trans "Pre-Change Data" %}</h2>
+            <div class="card-body p-0"> {# Remove padding for pre #}
+            {% if object.prechange_data %}
+                <pre class="change-data" id="prechange-data">{{ prechange_data_json }}</pre>
+            {% else %}
+                <div class="p-3"><span class="text-muted">{% trans "None" %}</span></div> {# Add padding back if empty #}
+            {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col col-md-6">
+        <div class="card">
+            <h2 class="card-header">{% trans "Post-Change Data" %}</h2>
+            <div class="card-body p-0"> {# Remove padding for pre #}
+                {% if object.postchange_data %}
+                   <pre class="change-data" id="postchange-data">{{ postchange_data_json }}</pre>
+                {% else %}
+                  <div class="p-3"><span class="text-muted">{% trans "None" %}</span></div> {# Add padding back if empty #}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{# JSON data for JS highlighting #}
+{{ diff_added_keys|json_script:"added-keys" }}
+{{ diff_removed_keys|json_script:"removed-keys" }}
+
+{# Add script block at the end of the content block #}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const addedKeys = JSON.parse(document.getElementById('added-keys').textContent);
+        const removedKeys = JSON.parse(document.getElementById('removed-keys').textContent);
+
+        const preChangeEl = document.getElementById('prechange-data');
+        const postChangeEl = document.getElementById('postchange-data');
+
+        function highlightLines(element, keysToHighlight, className) {
+            if (!element || !keysToHighlight || keysToHighlight.length === 0) return;
+
+            const lines = element.textContent.split('\n');
+            const highlightedLines = lines.map(line => {
+                const trimmedLine = line.trim();
+                // Regex to match a JSON key line: starts with optional whitespace, then quote, key, quote, colon
+                const keyMatch = trimmedLine.match(/^"([^"]+)"\s*:/); 
+                if (keyMatch) {
+                    const key = keyMatch[1];
+                    if (keysToHighlight.includes(key)) {
+                        // Escape HTML characters in the line before wrapping
+                        const escapedLine = line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                        return `<span class="${className}">${escapedLine}</span>`;
+                    }
+                }
+                // Escape non-matching lines too, just in case
+                return line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            });
+
+            element.innerHTML = highlightedLines.join('\n');
+        }
+
+        // Highlight removed lines in Pre-Change block (keys that were present before but changed/removed)
+        highlightLines(preChangeEl, removedKeys, 'removed');
+
+        // Highlight added lines in Post-Change block (keys that are new or changed)
+        highlightLines(postChangeEl, addedKeys, 'added');
+    });
+</script>
+
+{% endblock %}

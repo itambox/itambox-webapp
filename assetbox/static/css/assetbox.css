@@ -1,0 +1,56 @@
+/* assetbox/static/css/assetbox.css */
+
+/* Changelog Diff Styling (inspired by NetBox - Block style) */
+pre.change-diff {
+    font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.875rem; /* Adjust as needed */
+    white-space: pre-wrap; /* Allow wrapping */
+    word-wrap: break-word;
+    margin-bottom: 0; /* Remove default pre margin */
+    padding: 0.5rem; /* Add padding back to pre */
+    border-radius: var(--tblr-border-radius);
+    border: none; 
+    color: #ffffff; /* Default text color for readability */
+}
+
+/* Apply NetBox block styles */
+pre.change-diff.change-removed {
+    background-color: #d63939; /* Netbox red */
+}
+
+pre.change-diff.change-added {
+    background-color: #2fb344; /* Netbox green */
+    margin-top: 1px; /* Add slight separation */
+}
+
+/* Remove rules for individual lines */
+/*
+.diff-line {
+    ...
+}
+.diff-line.added {
+    ...
+}
+.diff-line.removed {
+    ...
+}
+*/
+
+/* Pre-Change / Post-Change Data Box */
+pre.change-data {
+    font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.875rem;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 400px; /* Limit height and make scrollable */
+    overflow-y: auto;
+    /* Optional: Add border/padding similar to NetBox .block if desired */
+    /* padding: 1rem; */
+    /* border: 1px solid var(--tblr-border-color); */
+    /* border-radius: var(--tblr-border-radius); */
+}
+
+/* Remove rules for highlighting spans inside pre.change-data */
+/* pre.change-data > span { ... } */
+/* pre.change-data > span.added { ... } */
+/* pre.change-data > span.removed { ... } */

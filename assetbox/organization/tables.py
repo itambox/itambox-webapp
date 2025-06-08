@@ -2,9 +2,9 @@
 import django_tables2 as tables
 from django_tables2.utils import A
 from .models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, AssetHolderAssignment
-from core.tables.columns import ActionsColumn
-from core.tables.base import BaseTable
+from core.tables import ActionsColumn, BaseTable
 from assets.models import Asset
+from django.urls import reverse
 
 class RegionTable(BaseTable):
     pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})

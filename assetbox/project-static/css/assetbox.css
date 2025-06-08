@@ -1,0 +1,25 @@
+/* General styles */
+body {
+    padding-top: 4.5rem; /* Adjust based on fixed navbar height */
+}
+
+/* Add specific styles for highlighted diff lines */
+pre.change-data span.added {
+    display: block; /* Ensure span takes full width */
+    background-color: #dfd; /* Light green background */
+    border-left: 3px solid #0a0; /* Green left border */
+}
+
+pre.change-data span.removed {
+    display: block; /* Ensure span takes full width */
+    background-color: #fdd; /* Light red background */
+    border-left: 3px solid #d00; /* Red left border */
+    text-decoration: line-through; /* Optional: strike-through */
+}
+
+/* Ensure pre tags don't add extra margins/padding inside cards */
+.card-body pre {
+    margin: 0;
+    border-radius: 0; /* Remove border-radius if inherited */
+    border: none; /* Remove borders if inherited */
+}

@@ -13,42 +13,42 @@ from assetbox.api.serializers import GenericObjectSerializer
 #
 
 class NestedRegionSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='api:region-detail')
+    url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:region-detail')
 
     class Meta:
         model = Region
         fields = ['id', 'url', 'name', 'slug']
 
 class NestedSiteGroupSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='api:sitegroup-detail')
+    url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:sitegroup-detail')
 
     class Meta:
         model = SiteGroup
         fields = ['id', 'url', 'name', 'slug']
 
 class NestedTenantSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='api:tenant-detail')
+    url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:tenant-detail')
 
     class Meta:
         model = Tenant
         fields = ['id', 'url', 'name', 'slug']
 
 class NestedTenantGroupSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='api:tenantgroup-detail')
+    url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:tenantgroup-detail')
 
     class Meta:
         model = TenantGroup
         fields = ['id', 'url', 'name', 'slug']
 
 class NestedSiteSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='api:site-detail')
+    url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:site-detail')
 
     class Meta:
         model = Site
         fields = ['id', 'url', 'name', 'slug']
 
 class NestedLocationSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='api:location-detail')
+    url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:location-detail')
 
     class Meta:
         model = Location
@@ -59,7 +59,7 @@ class NestedLocationSerializer(serializers.ModelSerializer):
 #
 
 class SiteSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='api:site-detail')
+    url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:site-detail')
     # Use nested serializers for read, allow writing via PK
     region = NestedRegionSerializer(read_only=True)
     region_id = serializers.PrimaryKeyRelatedField(
@@ -84,7 +84,7 @@ class SiteSerializer(serializers.ModelSerializer):
         ]
 
 class RegionSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='api:region-detail')
+    url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:region-detail')
     parent = NestedRegionSerializer(read_only=True)
     parent_id = serializers.PrimaryKeyRelatedField(
         queryset=Region.objects.all(), source='parent', write_only=True, required=False, allow_null=True
@@ -100,7 +100,7 @@ class RegionSerializer(serializers.ModelSerializer):
         ]
 
 class SiteGroupSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='api:sitegroup-detail')
+    url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:sitegroup-detail')
     parent = NestedSiteGroupSerializer(read_only=True)
     parent_id = serializers.PrimaryKeyRelatedField(
         queryset=SiteGroup.objects.all(), source='parent', write_only=True, required=False, allow_null=True
@@ -116,7 +116,7 @@ class SiteGroupSerializer(serializers.ModelSerializer):
         ]
 
 class LocationSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='api:location-detail')
+    url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:location-detail')
     site = NestedSiteSerializer(read_only=True)
     site_id = serializers.PrimaryKeyRelatedField(
         queryset=Site.objects.all(), source='site', write_only=True # Site is required for Location
@@ -140,7 +140,7 @@ class LocationSerializer(serializers.ModelSerializer):
         ]
 
 class TenantGroupSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='api:tenantgroup-detail')
+    url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:tenantgroup-detail')
     parent = NestedTenantGroupSerializer(read_only=True)
     parent_id = serializers.PrimaryKeyRelatedField(
         queryset=TenantGroup.objects.all(), source='parent', write_only=True, required=False, allow_null=True
@@ -156,7 +156,7 @@ class TenantGroupSerializer(serializers.ModelSerializer):
         ]
 
 class TenantSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='api:tenant-detail')
+    url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:tenant-detail')
     group = NestedTenantGroupSerializer(read_only=True)
     group_id = serializers.PrimaryKeyRelatedField(
         queryset=TenantGroup.objects.all(), source='group', write_only=True, required=False, allow_null=True
@@ -170,7 +170,7 @@ class TenantSerializer(serializers.ModelSerializer):
         ]
 
 class AssetHolderSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='api:assetholder-detail')
+    url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:assetholder-detail')
     tenant = NestedTenantSerializer(read_only=True)
     tenant_id = serializers.PrimaryKeyRelatedField(
         queryset=Tenant.objects.all(), source='tenant', write_only=True, required=False, allow_null=True
@@ -186,7 +186,7 @@ class AssetHolderSerializer(serializers.ModelSerializer):
         ]
 
 class AssetHolderAssignmentSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='api:assetholderassignment-detail')
+    url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:assetholderassignment-detail')
     asset_holder = AssetHolderSerializer(read_only=True)
     assigned_object_type = ContentTypeField(
         queryset=ContentType.objects.all()
