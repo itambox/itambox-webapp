@@ -19,39 +19,67 @@ from assets.tables import AssetTable # Import AssetTable
 from assets.models import Asset # Import Asset model
 
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 
 # Import filters
 from .filters import (
     SiteFilterSet, RegionFilterSet, SiteGroupFilterSet, LocationFilterSet,
     TenantFilterSet, TenantGroupFilterSet, AssetHolderFilterSet
 )
+from users.models import UserPreference # Import UserPreference
 
 User = get_user_model()
 
 # Create your views here.
 
+# --- Helper function (optional, reduces repetition) ---
+def _configure_table_from_prefs(request, TableClass, queryset):
+    all_available_columns = list(TableClass.base_columns.keys())
+    prefs, _ = UserPreference.objects.get_or_create(user=request.user)
+    app_label = TableClass._meta.model._meta.app_label
+    table_class_name = TableClass.__name__
+    user_config = prefs.data.get('tables', {}).get(app_label, {}).get(table_class_name, {})
+    saved_visible_columns = user_config.get('columns', None)
+    
+    final_sequence = []
+    if saved_visible_columns is not None:
+        final_sequence = [col for col in saved_visible_columns if col in all_available_columns]
+    else:
+        meta = getattr(TableClass, 'Meta', None)
+        if hasattr(meta, 'default_columns'):
+             final_sequence = [col for col in meta.default_columns if col in all_available_columns]
+        elif hasattr(meta, 'fields'):
+            final_sequence = [col for col in meta.fields if col in all_available_columns]
+        else:
+            final_sequence = all_available_columns
+            
+    # Ensure pk and actions are positioned
+    if 'pk' in final_sequence: final_sequence.remove('pk')
+    if 'actions' in final_sequence: final_sequence.remove('actions')
+    if 'pk' in all_available_columns: final_sequence.insert(0, 'pk')
+    if 'actions' in all_available_columns: final_sequence.append('actions')
+    
+    columns_to_exclude = tuple(col for col in all_available_columns if col not in final_sequence)
+    
+    table = TableClass(queryset, request=request, sequence=tuple(final_sequence), exclude=columns_to_exclude)
+    RequestConfig(request, paginate={'per_page': get_paginate_count(request)}).configure(table)
+    return table
+# --- End Helper --- 
+
 # --- Site Views ---
 
 @login_required
 def site_list(request):
-    queryset = Site.objects.all().select_related('region', 'group', 'tenant')
-    
-    # Apply filters
+    queryset = Site.objects.all()
     filterset = SiteFilterSet(request.GET, queryset=queryset)
     queryset = filterset.qs
-
-    table = SiteTable(queryset, request=request)
-    RequestConfig(request, paginate={'per_page': get_paginate_count(request)}).configure(table)
+    table = _configure_table_from_prefs(request, SiteTable, queryset)
     model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
+    model_name_str = f"{model._meta.app_label}.{table.__class__.__name__}"
     context = {
-        'table': table,
-        'title': 'Sites',
-        'object_type': 'Site',
+        'table': table, 'title': 'Sites', 'object_type': 'Site',
         'create_url_name': 'organization:site_create',
-        'list_url_name': 'organization:site_list',
-        'model_name_str': model_name_str,
-        'filter_form': filterset, # <-- Add filter form
+        'model_name_str': model_name_str, 'filter_form': filterset,
     }
     return render(request, 'generic/object_list_base.html', context)
 
@@ -155,24 +183,16 @@ def site_delete(request, pk):
 
 @login_required
 def region_list(request):
-    queryset = Region.objects.all().prefetch_related('sites') # Prefetch for count
-
-    # Apply filters
+    queryset = Region.objects.all()
     filterset = RegionFilterSet(request.GET, queryset=queryset)
     queryset = filterset.qs
-
-    table = RegionTable(queryset, request=request)
-    RequestConfig(request, paginate={'per_page': get_paginate_count(request)}).configure(table)
+    table = _configure_table_from_prefs(request, RegionTable, queryset)
     model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
+    model_name_str = f"{model._meta.app_label}.{table.__class__.__name__}"
     context = {
-        'table': table,
-        'title': 'Regions',
-        'object_type': 'Region',
+        'table': table, 'title': 'Regions', 'object_type': 'Region',
         'create_url_name': 'organization:region_create',
-        'list_url_name': 'organization:region_list',
-        'model_name_str': model_name_str,
-        'filter_form': filterset, # <-- Add filter form
+        'model_name_str': model_name_str, 'filter_form': filterset,
     }
     return render(request, 'generic/object_list_base.html', context)
 
@@ -270,24 +290,16 @@ def region_delete(request, pk):
 
 @login_required
 def sitegroup_list(request):
-    queryset = SiteGroup.objects.all().prefetch_related('sites') # Prefetch for count
-
-    # Apply filters
+    queryset = SiteGroup.objects.all()
     filterset = SiteGroupFilterSet(request.GET, queryset=queryset)
     queryset = filterset.qs
-
-    table = SiteGroupTable(queryset, request=request)
-    RequestConfig(request, paginate={'per_page': get_paginate_count(request)}).configure(table)
+    table = _configure_table_from_prefs(request, SiteGroupTable, queryset)
     model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
+    model_name_str = f"{model._meta.app_label}.{table.__class__.__name__}"
     context = {
-        'table': table,
-        'title': 'Site Groups',
-        'object_type': 'Site Group',
+        'table': table, 'title': 'Site Groups', 'object_type': 'Site Group',
         'create_url_name': 'organization:sitegroup_create',
-        'list_url_name': 'organization:sitegroup_list',
-        'model_name_str': model_name_str,
-        'filter_form': filterset, # <-- Add filter form
+        'model_name_str': model_name_str, 'filter_form': filterset,
     }
     return render(request, 'generic/object_list_base.html', context)
 
@@ -379,24 +391,16 @@ def sitegroup_delete(request, pk):
 
 @login_required
 def location_list(request):
-    queryset = Location.objects.all().select_related('site', 'tenant')
-
-    # Apply filters
+    queryset = Location.objects.all().select_related('site') # Add select_related
     filterset = LocationFilterSet(request.GET, queryset=queryset)
     queryset = filterset.qs
-
-    table = LocationTable(queryset, request=request)
-    RequestConfig(request, paginate={'per_page': get_paginate_count(request)}).configure(table)
+    table = _configure_table_from_prefs(request, LocationTable, queryset)
     model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
+    model_name_str = f"{model._meta.app_label}.{table.__class__.__name__}"
     context = {
-        'table': table,
-        'title': 'Locations',
-        'object_type': 'Location',
+        'table': table, 'title': 'Locations', 'object_type': 'Location',
         'create_url_name': 'organization:location_create',
-        'list_url_name': 'organization:location_list',
-        'model_name_str': model_name_str,
-        'filter_form': filterset, # <-- Add filter form
+        'model_name_str': model_name_str, 'filter_form': filterset,
     }
     return render(request, 'generic/object_list_base.html', context)
 
@@ -488,24 +492,16 @@ def location_delete(request, pk):
 
 @login_required
 def tenantgroup_list(request):
-    queryset = TenantGroup.objects.all().prefetch_related('tenants') # Prefetch for count
-
-    # Apply filters
+    queryset = TenantGroup.objects.all()
     filterset = TenantGroupFilterSet(request.GET, queryset=queryset)
     queryset = filterset.qs
-
-    table = TenantGroupTable(queryset, request=request)
-    RequestConfig(request, paginate={'per_page': get_paginate_count(request)}).configure(table)
+    table = _configure_table_from_prefs(request, TenantGroupTable, queryset)
     model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
+    model_name_str = f"{model._meta.app_label}.{table.__class__.__name__}"
     context = {
-        'table': table,
-        'title': 'Tenant Groups',
-        'object_type': 'Tenant Group',
+        'table': table, 'title': 'Tenant Groups', 'object_type': 'Tenant Group',
         'create_url_name': 'organization:tenantgroup_create',
-        'list_url_name': 'organization:tenantgroup_list',
-        'model_name_str': model_name_str,
-        'filter_form': filterset, # <-- Add filter form
+        'model_name_str': model_name_str, 'filter_form': filterset,
     }
     return render(request, 'generic/object_list_base.html', context)
 
@@ -559,24 +555,16 @@ def tenantgroup_delete(request, pk):
 
 @login_required
 def tenant_list(request):
-    queryset = Tenant.objects.all().select_related('group')
-
-    # Apply filters
+    queryset = Tenant.objects.all().select_related('group') # Add select_related
     filterset = TenantFilterSet(request.GET, queryset=queryset)
     queryset = filterset.qs
-
-    table = TenantTable(queryset, request=request)
-    RequestConfig(request, paginate={'per_page': get_paginate_count(request)}).configure(table)
+    table = _configure_table_from_prefs(request, TenantTable, queryset)
     model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
+    model_name_str = f"{model._meta.app_label}.{table.__class__.__name__}"
     context = {
-        'table': table,
-        'title': 'Tenants',
-        'object_type': 'Tenant',
+        'table': table, 'title': 'Tenants', 'object_type': 'Tenant',
         'create_url_name': 'organization:tenant_create',
-        'list_url_name': 'organization:tenant_list',
-        'model_name_str': model_name_str,
-        'filter_form': filterset, # <-- Add filter form
+        'model_name_str': model_name_str, 'filter_form': filterset,
     }
     return render(request, 'generic/object_list_base.html', context)
 
@@ -632,26 +620,16 @@ def tenant_delete(request, pk):
 
 @login_required
 def assetholder_list(request):
-    # Annotate count or prefetch?
-    # Prefetching might be better if displaying assignments on list (not default)
-    queryset = AssetHolder.objects.select_related('tenant').prefetch_related('assignments')
-
-    # Apply filters
+    queryset = AssetHolder.objects.all()
     filterset = AssetHolderFilterSet(request.GET, queryset=queryset)
     queryset = filterset.qs
-
-    table = AssetHolderTable(queryset, request=request)
-    RequestConfig(request, paginate={'per_page': get_paginate_count(request)}).configure(table)
+    table = _configure_table_from_prefs(request, AssetHolderTable, queryset)
     model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
+    model_name_str = f"{model._meta.app_label}.{table.__class__.__name__}"
     context = {
-        'table': table,
-        'title': 'Asset Holders',
-        'object_type': 'Asset Holder',
+        'table': table, 'title': 'Asset Holders', 'object_type': 'Asset Holder',
         'create_url_name': 'organization:assetholder_create',
-        'list_url_name': 'organization:assetholder_list',
-        'model_name_str': model_name_str,
-        'filter_form': filterset, # <-- Add filter form
+        'model_name_str': model_name_str, 'filter_form': filterset,
     }
     return render(request, 'generic/object_list_base.html', context)
 

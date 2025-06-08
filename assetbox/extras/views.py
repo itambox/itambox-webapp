@@ -7,6 +7,7 @@ from .tables import TagTable
 from .filters import TagFilterSet # <-- Import FilterSet
 from core.utils import get_paginate_count, get_model_viewname # Import the utility function
 from assets.tables import AssetTable # Import AssetTable
+from users.models import UserPreference # Import UserPreference
 
 # Create your views here.
 
@@ -15,16 +16,42 @@ from assets.tables import AssetTable # Import AssetTable
 @login_required
 def tag_list(request):
     queryset = Tag.objects.all()
-
-    # Apply filters
     filterset = TagFilterSet(request.GET, queryset=queryset)
     queryset = filterset.qs
 
-    table = TagTable(queryset, request=request)
+    # --- Determine Columns & Configure Table ---
+    TableClass = TagTable
+    all_available_columns = list(TableClass.base_columns.keys()) 
+    prefs, _ = UserPreference.objects.get_or_create(user=request.user)
+    app_label = TableClass._meta.model._meta.app_label
+    table_class_name = TableClass.__name__
+    user_config = prefs.data.get('tables', {}).get(app_label, {}).get(table_class_name, {})
+    saved_visible_columns = user_config.get('columns', None)
+    
+    final_sequence = []
+    if saved_visible_columns is not None:
+        final_sequence = [col for col in saved_visible_columns if col in all_available_columns]
+    else:
+        meta = getattr(TableClass, 'Meta', None)
+        if hasattr(meta, 'default_columns'):
+             final_sequence = [col for col in meta.default_columns if col in all_available_columns]
+        elif hasattr(meta, 'fields'):
+            final_sequence = [col for col in meta.fields if col in all_available_columns]
+        else:
+            final_sequence = all_available_columns
+            
+    if 'pk' in final_sequence: final_sequence.remove('pk')
+    if 'actions' in final_sequence: final_sequence.remove('actions')
+    if 'pk' in all_available_columns: final_sequence.insert(0, 'pk')
+    if 'actions' in all_available_columns: final_sequence.append('actions')
+    
+    columns_to_exclude = tuple(col for col in all_available_columns if col not in final_sequence)
+    table = TableClass(queryset, request=request, sequence=tuple(final_sequence), exclude=columns_to_exclude)
     RequestConfig(request, paginate={'per_page': get_paginate_count(request)}).configure(table)
+    # --- End Configuration ---
 
     model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
+    model_name_str = f"{model._meta.app_label}.{table.__class__.__name__}"
 
     context = {
         'table': table,
@@ -33,7 +60,7 @@ def tag_list(request):
         'create_url_name': 'extras:tag_create',
         'list_url_name': 'extras:tag_list',
         'model_name_str': model_name_str,
-        'filter_form': filterset, # <-- Add filter form
+        'filter_form': filterset,
     }
     return render(request, 'generic/object_list_base.html', context)
 

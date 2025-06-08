@@ -14,13 +14,16 @@ from django.core.serializers.json import DjangoJSONEncoder
 import difflib
 from django.conf import settings # Add settings
 from django.contrib.auth import get_user_model # Import get_user_model
+from users.forms import TableConfigForm # Correct import
+from users.models import UserPreference # Import UserPreference from users
+from django.template.loader import get_template # Import get_template
 
 # --- New Imports for SearchView ---
 from django.views.generic import View  # Add View
 from django.utils.module_loading import import_string # Add import_string
 
-from .models import UserPreference, ObjectChange # Import the model
-from .forms import TableConfigForm
+# Only import ObjectChange from core models now
+from .models import ObjectChange 
 from .tables import ObjectChangeTable
 # from .tables.base import SESSION_KEY_PREFIX # No longer needed
 
@@ -37,10 +40,9 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
 from django.contrib import messages
 from django.contrib.auth.views import PasswordChangeView as DjangoPasswordChangeView
-from .models import ObjectChange, UserPreference
+from .models import ObjectChange
 from .tables import ObjectChangeTable
 # from .filters import ObjectChangeFilterSet # Comment out unused import
-from .forms import TableConfigForm # Only import TableConfigForm
 from .utils import get_model_viewname, get_paginate_count
 
 User = get_user_model() # Get the User model
@@ -48,43 +50,35 @@ User = get_user_model() # Get the User model
 @login_required
 def table_config(request, model_name):
     """
-    View to render the table configuration modal form.
-    Saving/Resetting is handled via API and JavaScript.
+    Handle modal display and saving of table configuration.
     """
-    # Dynamically find the Table class
-    app_label, model_lower = model_name.split('.')
-    model = apps.get_model(app_label, model_lower)
-    table_class_name = f"{model.__name__}Table"
-    try:
-        tables_module = import_module(f'{app_label}.tables')
-        table_class = getattr(tables_module, table_class_name)
-    except (ModuleNotFoundError, AttributeError):
-        raise Http404(f"Table class {table_class_name} not found for {model_name}")
-
-    # Instantiate the table (only need structure, no data)
-    table = table_class(data=[], request=request)
-
-    # Get or create UserPreference for the current user
+    # Get the relevant Table class
+    app_label, table_part = model_name.split('.')
+    app_config = apps.get_app_config(app_label)
+    table_module = import_string(f'{app_config.name}.tables')
+    TableClass = getattr(table_module, table_part)
+    
+    table = TableClass([]) # Instantiate with empty data just to get columns
+    table_verbose_name = TableClass.Meta.model._meta.verbose_name_plural.title()
+    
+    # --- Load User Preferences --- 
     prefs, _ = UserPreference.objects.get_or_create(user=request.user)
+    # Use the app_label and table_part separately to access nested dict
+    table_key_for_form = f'{app_label}.{table_part}' # Key for the form/JS
+    user_config = prefs.data.get('tables', {}).get(app_label, {}).get(table_part, {}) # Get nested config
+    print(f"[table_config] Fetched user_config for {app_label}.{table_part}: {user_config}") # DEBUG
+    # --- End Load --- 
 
-    # Key for storing this table's config within the JSONField
-    table_key = f"tables.{model_name}" # Use dot notation for nested access
+    # Pass user_config to the form constructor
+    form = TableConfigForm(table=table, user_config=user_config) 
 
-    # Get current config for this table from preferences
-    # Simplified access assuming prefs.data = {"tables": {"app.model": {...}}}
-    user_config = prefs.data.get('tables', {}).get(model_name, {}) # Get config for this specific table
-
-    # POST is no longer handled here
-    # Always initialize form with table structure and user config
-    form = TableConfigForm(table=table, user_config=user_config)
-
+    template = get_template('core/includes/table_config_modal.html')
     context = {
         'form': form,
-        'table_name': form.table_name, # Pass table name for JS/API
-        'table_verbose_name': model._meta.verbose_name_plural.title(),
+        'table_name': table_key_for_form, # Use the consistent key for JS
+        'table_verbose_name': table_verbose_name,
     }
-    # Render the specific modal partial
-    return render(request, 'core/includes/table_config_modal.html', context)
+    return HttpResponse(template.render(context, request))
 
 # @login_required
 # def user_preferences_view(request):

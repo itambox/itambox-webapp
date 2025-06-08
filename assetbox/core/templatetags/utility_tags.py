@@ -2,6 +2,8 @@
 from django import template
 from django.contrib.messages import constants as messages
 from urllib.parse import urlencode
+from django.contrib.auth import get_user_model # Import get_user_model
+from django.utils.translation import gettext_lazy as _ # Import gettext_lazy
 
 register = template.Library()
 
@@ -71,17 +73,13 @@ def update_querystring(request, **kwargs):
     if not request:
         return ''
     
-    print(f"[update_querystring] Initial request.GET: {request.GET}") # DEBUG
-    print(f"[update_querystring] Initial kwargs: {kwargs}") # DEBUG
-    
     query_params = request.GET.copy() # Get a mutable copy
     
     # Update parameters from kwargs
     for key, value in kwargs.items():
-        # Ensure value is string, handle None to remove parameter
         if value is not None:
             query_params[key] = str(value)
-        elif key in query_params: # Remove key if value is None
+        elif key in query_params:
             del query_params[key]
 
     # Explicitly remove any empty string values or keys
@@ -89,35 +87,19 @@ def update_querystring(request, **kwargs):
     for key in keys_to_delete:
         del query_params[key]
         
-    print(f"[update_querystring] Query params before page=1 check: {query_params}") # DEBUG
-    page_value = query_params.get('page')
-    print(f"[update_querystring] Value of 'page' before check: {page_value} (type: {type(page_value)})", flush=True) # DEBUG
-
     # Don't include page=1 in the query string (it's the default)
     if 'page' in query_params and query_params['page'] == '1':
-        print("[update_querystring] Condition met: Removing page=1", flush=True) # DEBUG
         del query_params['page']
-    else:
-        print("[update_querystring] Condition NOT met for removing page=1", flush=True) # DEBUG
 
-    print(f"[update_querystring] Final query_params before encode: {query_params}") # DEBUG
-
-    # --- Refined Check --- 
     # If the dictionary is empty after modifications, return empty string
     if not query_params:
-        print("[update_querystring] Returning empty string (query_params dict is empty)") # DEBUG
         return ''
 
-    # Encode the parameters - only add '?' if there are non-empty params
+    # Encode the parameters
     encoded_params = query_params.urlencode(safe='/')
-    print(f"[update_querystring] Encoded params: '{encoded_params}'") # DEBUG
     
-    # Fallback check, though the dict check should cover it
+    # Return with leading '?' only if there are encoded params
     if encoded_params and encoded_params.strip():
-        result = '?' + encoded_params
-        print(f"[update_querystring] Returning: '{result}'") # DEBUG
-        return result
+        return '?' + encoded_params
     else:
-        # This case should ideally not be reached if the dict check works
-        print("[update_querystring] Returning empty string (encoded_params was empty/whitespace)") # DEBUG 
-        return ''
+        return '' # Should ideally not be reached due to the dict check

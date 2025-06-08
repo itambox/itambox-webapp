@@ -22,8 +22,8 @@ class AssetTable(BaseTable): # Inherit from BaseTable
         )
         # Define default columns (adjust as desired)
         default_columns = (
-            'pk', 'name', 'asset_tag', 'serial_number', 'asset_role', 
-            'status', 'assignee', 'location', 'actions',
+            'pk', 'name', 'asset_tag', 'serial_number', 'model', 'asset_role', 
+            'status', 'assignee', 'location', 'purchase_date', 'actions',
         )
         # Remove template_name and attrs, inherited from BaseTable
 

@@ -1,6 +1,5 @@
 # core/api/serializers.py
 from rest_framework import serializers
-from core.models import UserPreference
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 
@@ -9,11 +8,6 @@ from core.choices import ObjectChangeActionChoices
 from .fields import ChoiceField, ContentTypeField
 
 User = get_user_model()
-
-class UserPreferenceSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = UserPreference
-        fields = ['data'] # Only expose the data field
 
 # Minimal serializer for nested User representation
 class NestedUserSerializer(serializers.ModelSerializer):

@@ -11,13 +11,25 @@ from django.contrib.contenttypes.models import ContentType # Ensure ContentType 
 # Base Table for common settings
 class BaseTable(tables.Table):
     class Meta:
+        model = None # Should be overridden by subclasses
+        # Use tuple for attributes
         attrs = {
-            'class': 'table table-hover object-list' # Default Bootstrap/NetBox style
+            'class': 'table table-hover table-vcenter card-table', 
+            'thead': {
+                'class': 'text-nowrap'
+            }
         }
-        # Define default columns that should always be excluded if present
-        # exclude = ('id',)
-        # Default template (can be overridden by subclasses)
-        # template_name = "django_tables2/bootstrap5.html"
+        # Define default columns to exclude from configuration modal
+        exclude_from_config = ('pk', 'actions')
+    
+    # Ensure __init__ is outside Meta
+    def __init__(self, *args, **kwargs):
+        # Remove default exclude tuple
+        # default_exclude = ('pk', 'actions')
+        # explicit_exclude = set(kwargs.get('exclude', ()))
+        # exclude_cols = tuple(explicit_exclude.union(default_exclude))
+        # kwargs['exclude'] = exclude_cols
+        super().__init__(*args, **kwargs)
 
 class ObjectChangeTable(tables.Table):
     """

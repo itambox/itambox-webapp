@@ -26,6 +26,7 @@ class APIRootView(APIView):
                 ("core", reverse("api:core_api:api-root", request=request, format=format)),
                 ("organization", reverse("api:organization_api:api-root", request=request, format=format)),
                 ("extras", reverse("api:extras_api:api-root", request=request, format=format)),
+                ("users", reverse("api:users_api:api-root", request=request, format=format)),
                 # Additional apps can be added here
             )
         )

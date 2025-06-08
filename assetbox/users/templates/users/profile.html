@@ -1,18 +1,65 @@
 {% extends 'users/base.html' %}
 {% load i18n %}
 {% load crispy_forms_tags %}
+{% load render_table from django_tables2 %}
 
 {% block title_tab %}{% trans "Profile" %}{% endblock %}
 
 {% block content_tab %}
-<form method="post">
-    {% csrf_token %}
-    <div class="card-body">
-        <h3 class="card-title">{% trans "Profile" %}</h3>
-        {{ form|crispy }}
+<div class="row row-cards"> {# Row for top two cards #}
+    {# Profile Form Card #}
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">{% trans "Profile" %}</h3>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    {{ form|crispy }}
+                    <div class="text-end mt-4">
+                        <button type="submit" class="btn btn-primary">{% trans "Save Changes" %}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
-    <div class="card-footer text-end">
-        <button type="submit" class="btn btn-primary">{% trans "Save Changes" %}</button>
+
+    {# Assigned Groups Card #}
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">{% trans "Assigned Groups" %}</h3>
+            </div>
+            <div class="card-body">
+                {% if user_groups %}
+                    <ul class="list-unstyled">
+                        {% for group in user_groups %}
+                            <li>{{ group.name }}</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted">{% trans "User is not assigned to any groups." %}</p>
+                {% endif %}
+            </div>
+        </div>
     </div>
-</form>
-{% endblock %} 
+</div> {# End row for top two cards #}
+
+{# Separate Card for Recent Activity (Below) #}
+<div class="card mt-4"> 
+    <div class="card-header">
+        <h3 class="card-title">{% trans "Recent Activity" %}</h3>
+    </div>
+    <div class="card-body p-0"> 
+        <div class="table-responsive">
+            {% render_table activity_table %}
+        </div>
+    </div>
+    <div class="card-footer text-center"> 
+        <a href="{% url 'objectchange_list' %}?user={{ request.user.pk }}" class="btn btn-sm btn-outline-secondary">
+            View All Activity
+        </a>
+    </div>
+</div>
+{% endblock %}

@@ -14,6 +14,8 @@ from organization.models import AssetHolderAssignment
 from django.urls import reverse
 from django.db.models import Q # <-- Import Q (needed by search method in filterset)
 from django.contrib import messages # <--- Add this import
+from users.models import UserPreference # Import UserPreference
+import json # Added for json.dumps
 
 User = get_user_model()
 
@@ -27,49 +29,88 @@ def dashboard(request):
 
 @login_required
 def asset_list(request):
-    # Start with base queryset
     queryset = Asset.objects.all().select_related(
         'asset_role', 'manufacturer', 'location'
     )
-
-    # Apply filters
     filterset = AssetFilterSet(request.GET, queryset=queryset)
-    queryset = filterset.qs # Use the filtered queryset
+    queryset = filterset.qs 
 
-    # Create and configure table with the filtered queryset
-    table = AssetTable(queryset, request=request)
+    # --- Determine Columns to Show/Exclude --- 
+    TableClass = AssetTable # Get the table class
+    all_available_columns = list(TableClass.base_columns.keys()) # List of all columns defined on the table
+    
+    prefs, created = UserPreference.objects.get_or_create(user=request.user)
+    
+    app_label = TableClass._meta.model._meta.app_label
+    table_class_name = TableClass.__name__
+
+    user_config = prefs.data.get('tables', {}).get(app_label, {}).get(table_class_name, {}) 
+    
+    saved_visible_columns = user_config.get('columns', None) 
+
+    # --- Determine Final Visible Column Sequence --- 
+    final_sequence = []
+    if saved_visible_columns is not None:
+        # User has preferences: Use their saved list, ensuring columns still exist
+        final_sequence = [col for col in saved_visible_columns if col in all_available_columns]
+    else:
+        # No user preference: use table defaults
+        meta = getattr(TableClass, 'Meta', None)
+        if hasattr(meta, 'default_columns'):
+             final_sequence = [col for col in meta.default_columns if col in all_available_columns]
+        elif hasattr(meta, 'fields'):
+            final_sequence = [col for col in meta.fields if col in all_available_columns]
+        else:
+            # Fallback: Show all available columns if no defaults defined
+            final_sequence = all_available_columns
+    
+    # --- Ensure pk and actions are correctly positioned --- 
+    # Remove them first to avoid duplicates and control position
+    if 'pk' in final_sequence: final_sequence.remove('pk')
+    if 'actions' in final_sequence: final_sequence.remove('actions')
+    
+    # Add them back in desired positions (if they exist on the table class)
+    if 'pk' in all_available_columns:
+        final_sequence.insert(0, 'pk')
+    if 'actions' in all_available_columns:
+        final_sequence.append('actions')
+
+    # Instantiate table using BOTH sequence and exclude for maximum explicitness
+    table = TableClass(
+        queryset, 
+        request=request, 
+        sequence=tuple(final_sequence), 
+        exclude=tuple(col for col in all_available_columns if col not in final_sequence)
+    )
+
+    # Configure pagination (and sorting if needed)
     RequestConfig(request, paginate={'per_page': get_paginate_count(request)}).configure(table)
 
     model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
+    model_name_str = f"{model._meta.app_label}.{table.__class__.__name__}" # Use table class name
 
     context = {
         'table': table,
-        'title': 'Assets', # Title for the page and card header
-        'object_type': 'Asset', # Used in the 'Create' button label
-        'create_url_name': 'assets:asset_create', # URL name for the create button
-        'model_name_str': model_name_str, # Add model name string
-        'filter_form': filterset, # <-- Pass the filter form to context
+        'title': 'Assets',
+        'object_type': 'Asset',
+        'create_url_name': 'assets:asset_create',
+        'model_name_str': model_name_str,
+        'filter_form': filterset,
     }
     
-    # Always render the full template - NetBox approach
     return render(request, 'generic/object_list_base.html', context)
 
 @login_required
 def asset_create(request):
     if request.method == 'POST':
-        print("[asset_create] Entered POST block") # DEBUG
-        print(f"[asset_create] request.POST: {request.POST}") # DEBUG
         form = AssetForm(request.POST)
         if form.is_valid():
-            print("[asset_create] Form IS valid") # DEBUG
             asset = form.save() # Save the new asset
             # TODO: Add success message (django.contrib.messages)
             messages.success(request, f"Asset '{asset}' created successfully.")
             # Redirect to the detail view of the created asset
             return redirect('assets:asset_detail', pk=asset.pk)
         else:
-            print("[asset_create] Form IS NOT valid") # DEBUG
             print(f"[asset_create] Form errors: {form.errors}") # DEBUG
     else:
         form = AssetForm() # Create an empty form for GET request
@@ -264,29 +305,52 @@ def asset_checkin(request, pk):
 
 @login_required
 def asset_role_list(request):
-    # Start with base queryset
     queryset = AssetRole.objects.all()
-
-    # Apply filters
     filterset = AssetRoleFilterSet(request.GET, queryset=queryset)
     queryset = filterset.qs
 
-    # Create and configure table
-    table = AssetRoleTable(queryset, request=request)
+    # --- Determine Columns & Configure Table --- 
+    TableClass = AssetRoleTable
+    all_available_columns = list(TableClass.base_columns.keys())
+    prefs, _ = UserPreference.objects.get_or_create(user=request.user)
+    app_label = TableClass._meta.model._meta.app_label
+    table_class_name = TableClass.__name__
+    user_config = prefs.data.get('tables', {}).get(app_label, {}).get(table_class_name, {})
+    saved_visible_columns = user_config.get('columns', None)
+    
+    final_sequence = []
+    if saved_visible_columns is not None:
+        final_sequence = [col for col in saved_visible_columns if col in all_available_columns]
+    else:
+        meta = getattr(TableClass, 'Meta', None)
+        if hasattr(meta, 'default_columns'):
+             final_sequence = [col for col in meta.default_columns if col in all_available_columns]
+        elif hasattr(meta, 'fields'):
+            final_sequence = [col for col in meta.fields if col in all_available_columns]
+        else:
+            final_sequence = all_available_columns
+            
+    if 'pk' in final_sequence: final_sequence.remove('pk')
+    if 'actions' in final_sequence: final_sequence.remove('actions')
+    if 'pk' in all_available_columns: final_sequence.insert(0, 'pk')
+    if 'actions' in all_available_columns: final_sequence.append('actions')
+    
+    columns_to_exclude = tuple(col for col in all_available_columns if col not in final_sequence)
+    table = TableClass(queryset, request=request, sequence=tuple(final_sequence), exclude=columns_to_exclude)
     RequestConfig(request, paginate={'per_page': get_paginate_count(request)}).configure(table)
+    # --- End Configuration --- 
 
     model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
+    model_name_str = f"{model._meta.app_label}.{table.__class__.__name__}"
 
     context = {
         'table': table,
-        'title': 'Asset Roles', # Title for card
-        'object_type': 'Asset Role', # Used in the Create button
-        'create_url_name': 'assets:asset_role_create', # URL name for the create button
-        'model_name_str': model_name_str, # Add model name string
-        'filter_form': filterset, # <-- Add filter form
+        'title': 'Asset Roles', 
+        'object_type': 'Asset Role', 
+        'create_url_name': 'assets:asset_role_create', 
+        'model_name_str': model_name_str, # Use corrected name
+        'filter_form': filterset, 
     }
-    # Always render the full template - NetBox approach
     return render(request, 'generic/object_list_base.html', context)
 
 @login_required
@@ -402,29 +466,52 @@ def asset_role_delete(request, pk):
 
 @login_required
 def manufacturer_list(request):
-    # Start with base queryset
     queryset = Manufacturer.objects.all()
-
-    # Apply filters
     filterset = ManufacturerFilterSet(request.GET, queryset=queryset)
     queryset = filterset.qs  
 
-    # Create and configure table
-    table = ManufacturerTable(queryset, request=request)
+    # --- Determine Columns & Configure Table --- 
+    TableClass = ManufacturerTable
+    all_available_columns = list(TableClass.base_columns.keys())
+    prefs, _ = UserPreference.objects.get_or_create(user=request.user)
+    app_label = TableClass._meta.model._meta.app_label
+    table_class_name = TableClass.__name__
+    user_config = prefs.data.get('tables', {}).get(app_label, {}).get(table_class_name, {})
+    saved_visible_columns = user_config.get('columns', None)
+    
+    final_sequence = []
+    if saved_visible_columns is not None:
+        final_sequence = [col for col in saved_visible_columns if col in all_available_columns]
+    else:
+        meta = getattr(TableClass, 'Meta', None)
+        if hasattr(meta, 'default_columns'):
+             final_sequence = [col for col in meta.default_columns if col in all_available_columns]
+        elif hasattr(meta, 'fields'):
+            final_sequence = [col for col in meta.fields if col in all_available_columns]
+        else:
+            final_sequence = all_available_columns
+            
+    if 'pk' in final_sequence: final_sequence.remove('pk')
+    if 'actions' in final_sequence: final_sequence.remove('actions')
+    if 'pk' in all_available_columns: final_sequence.insert(0, 'pk')
+    if 'actions' in all_available_columns: final_sequence.append('actions')
+    
+    columns_to_exclude = tuple(col for col in all_available_columns if col not in final_sequence)
+    table = TableClass(queryset, request=request, sequence=tuple(final_sequence), exclude=columns_to_exclude)
     RequestConfig(request, paginate={'per_page': get_paginate_count(request)}).configure(table)
+    # --- End Configuration --- 
 
     model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
+    model_name_str = f"{model._meta.app_label}.{table.__class__.__name__}"
 
     context = {
         'table': table,
-        'title': 'Manufacturers', # Title for card
-        'object_type': 'Manufacturer', # Used in the Create button 
-        'create_url_name': 'assets:manufacturer_create', # URL name for the create button
-        'model_name_str': model_name_str, # Add model name string
-        'filter_form': filterset, # <-- Add filter form
+        'title': 'Manufacturers',
+        'object_type': 'Manufacturer',
+        'create_url_name': 'assets:manufacturer_create',
+        'model_name_str': model_name_str, # Use corrected name
+        'filter_form': filterset,
     }
-    # Always render the full template - NetBox approach
     return render(request, 'generic/object_list_base.html', context)
 
 @login_required

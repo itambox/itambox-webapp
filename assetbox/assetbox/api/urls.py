@@ -15,6 +15,7 @@ urlpatterns = [
     path("core/", include("core.api.urls", namespace="core_api")),
     path("organization/", include("organization.api.urls", namespace="organization_api")),
     path("extras/", include("extras.api.urls", namespace="extras_api")),
+    path("users/", include("users.api.urls", namespace="users_api")),
     # API Schema
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
     # Added schema UI/JSON paths back, assuming they were intended
