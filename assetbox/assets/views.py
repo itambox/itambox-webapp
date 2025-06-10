@@ -87,14 +87,17 @@ def asset_list(request):
     RequestConfig(request, paginate={'per_page': get_paginate_count(request)}).configure(table)
 
     model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{table.__class__.__name__}" # Use table class name
+    # --- Revert model_name_str and add table_config_key --- 
+    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}" # For bulk delete form
+    table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}" # For config modal URL
 
     context = {
         'table': table,
         'title': 'Assets',
         'object_type': 'Asset',
         'create_url_name': 'assets:asset_create',
-        'model_name_str': model_name_str,
+        'model_name_str': model_name_str, # Pass the app_label.modelname
+        'table_config_key': table_config_key, # Pass the app_label.TableName
         'filter_form': filterset,
     }
     
@@ -341,14 +344,17 @@ def asset_role_list(request):
     # --- End Configuration --- 
 
     model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{table.__class__.__name__}"
+    # --- Revert model_name_str and add table_config_key --- 
+    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}" # For bulk delete form
+    table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}" # For config modal URL
 
     context = {
         'table': table,
         'title': 'Asset Roles', 
         'object_type': 'Asset Role', 
         'create_url_name': 'assets:asset_role_create', 
-        'model_name_str': model_name_str, # Use corrected name
+        'model_name_str': model_name_str, # Pass the app_label.modelname
+        'table_config_key': table_config_key, # Pass the app_label.TableName
         'filter_form': filterset, 
     }
     return render(request, 'generic/object_list_base.html', context)
@@ -502,14 +508,17 @@ def manufacturer_list(request):
     # --- End Configuration --- 
 
     model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{table.__class__.__name__}"
+    # --- Revert model_name_str and add table_config_key --- 
+    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}" # For bulk delete form
+    table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}" # For config modal URL
 
     context = {
         'table': table,
         'title': 'Manufacturers',
         'object_type': 'Manufacturer',
         'create_url_name': 'assets:manufacturer_create',
-        'model_name_str': model_name_str, # Use corrected name
+        'model_name_str': model_name_str, # Pass the app_label.modelname
+        'table_config_key': table_config_key, # Pass the app_label.TableName
         'filter_form': filterset,
     }
     return render(request, 'generic/object_list_base.html', context)

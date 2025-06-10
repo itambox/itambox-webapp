@@ -48,6 +48,10 @@ urlpatterns = [
     path('changelog/', core_views.ObjectChangeListView.as_view(), name='objectchange_list'),
     path('changelog/<int:pk>/', core_views.ObjectChangeView.as_view(), name='objectchange'),
 
+    # Bulk Actions
+    path('bulk-delete/', core_views.bulk_delete, name='bulk_delete'),
+    # path('bulk-edit/', core_views.bulk_edit, name='bulk_edit'), # Placeholder for future bulk edit
+
     # Remove individual user paths from core
     # path('user/profile/', core_views.UserProfileView.as_view(), name='user_profile'),
     # ... (remove other core user paths) ...

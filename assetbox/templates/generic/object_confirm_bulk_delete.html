@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load helpers %}{# Assuming NetBox-style helpers exist or will be created #}
+{% load crispy_forms_tags %}
+
+{% block title %}{% trans "Confirm Bulk Deletion" %}{% endblock %}
+
+{% block page_header %}
+    <h1 class="page-title">
+        {% trans "Confirm Bulk Deletion" %}
+    </h1>
+{% endblock %}
+
+{% block content %}
+<form method="post">
+    {% csrf_token %}
+    {# Pass back the primary keys and the model type #}
+    <input type="hidden" name="model_name" value="{{ model_name }}" />
+    {% for pk in object_pks %}
+        <input type="hidden" name="pk" value="{{ pk }}" />
+    {% endfor %}
+
+    <div class="row">
+        <div class="col-md-6 offset-md-3">
+            <div class="card card-danger">
+                <div class="card-header">
+                    <h3 class="card-title">{% blocktrans count counter=objects|length %}Delete {{ counter }} {{ model_verbose_name }}{% plural %}Delete {{ counter }} {{ model_verbose_name_plural }}{% endblocktrans %}</h3>
+                </div>
+                <div class="card-body">
+                    <p>{% trans "Are you sure you want to delete the selected objects?" %}</p>
+                    <ul class="list-group list-group-flush">
+                        {% for obj in objects %}
+                        <li class="list-group-item">{{ obj }}</li>
+                        {% endfor %}
+                    </ul>
+                    {# Optional: Display dependent objects check later if needed #}
+                </div>
+                <div class="card-footer text-end">
+                    <a href="{{ return_url }}" class="btn btn-secondary">{% trans "Cancel" %}</a>
+                    <button type="submit" name="_confirm" class="btn btn-danger">{% trans "Confirm Deletion" %}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock content %} 

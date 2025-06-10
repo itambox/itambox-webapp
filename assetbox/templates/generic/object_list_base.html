@@ -98,10 +98,12 @@
 
                             {# Configure Table Button #}
                             <div class="col-auto">
-                                {% if model_name_str %}
+                                {# Check if table_config_key exists #}
+                                {% if table_config_key %}
                                 <div class="table-configure">
+                                    {# Use table_config_key for the modal URL #}
                                     <button type="button" class="btn btn-outline-secondary"
-                                            hx-get="{% url 'table_config' model_name=model_name_str %}"
+                                            hx-get="{% url 'table_config' model_name=table_config_key %}"
                                             hx-target="#modal-placeholder"
                                             hx-on::after-request="new bootstrap.Modal(document.getElementById('table-config-modal')).show()">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-settings me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" /><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" /></svg>
@@ -154,17 +156,21 @@
         </div> {# End Main Card #}
 
         {# --- Bulk Actions Form (Separate POST form) --- #}
-        <form method="post" action="" id="bulk-actions-form">
+        <form method="post" action="{% url 'bulk_delete' %}" id="bulk-actions-form">
             {% csrf_token %}
+            {# Use model_name_str for the bulk delete model name #}
+            <input type="hidden" name="model_name" value="{{ model_name_str }}" /> 
             <div class="card-body border-top py-3 d-none mt-3" id="bulk-actions-bar">
                 <div class="d-flex align-items-center">
                     <div class="text-secondary">
                         <input class="form-check-input m-0 align-middle" type="checkbox" id="bulk-actions-master-cb" disabled> <span id="selected-count">0</span> items selected
                     </div>
                     <div class="ms-auto">
-                        {# Hidden input to store selected PKs #}
-                        <input type="hidden" name="selected_pks" id="selected-pks-input">
-                        <button type="submit" name="_bulk_edit" class="btn btn-primary">Edit Selected</button>
+                        {# Placeholder for dynamically generated PK inputs #}
+                        <div id="bulk-pk-inputs"></div> 
+                        {# REMOVE old single hidden input #}
+                        {# <input type="hidden" name="pk" id="selected-pks-input"> #}
+                        <button type="submit" name="_bulk_edit" class="btn btn-primary" formaction="#">Edit Selected</button> {# TODO: Update formaction for bulk edit #}
                         <button type="submit" name="_bulk_delete" class="btn btn-danger">Delete Selected</button>
                     </div>
                 </div>
@@ -192,18 +198,17 @@ document.addEventListener('DOMContentLoaded', function () {
     const rowCheckboxes = table.querySelectorAll('tbody td input[type=checkbox]'); // Use simplified selector here too if needed initially
     const bulkActionsBar = document.getElementById('bulk-actions-bar');
     const selectedCountSpan = document.getElementById('selected-count');
-    const selectedPksInput = document.getElementById('selected-pks-input');
+    const pkInputsContainer = document.getElementById('bulk-pk-inputs'); // Get the new container
 
     function updateBulkActions(currentCheckboxes) {
-        // Simplify query here too
         const checkboxesToUpdate = currentCheckboxes || table.querySelectorAll('tbody td input[type=checkbox]');
         
-        if (!bulkActionsBar || !selectedCountSpan || !selectedPksInput || !bulkMasterCheckbox) return;
+        if (!bulkActionsBar || !selectedCountSpan || !pkInputsContainer || !bulkMasterCheckbox) return; // Check pkInputsContainer
 
         let selectedCount = 0;
         const selectedPks = [];
 
-        checkboxesToUpdate.forEach(cb => { // Use the passed/queried list
+        checkboxesToUpdate.forEach(cb => { 
             if (cb.checked) {
                 selectedCount++;
                 if(cb.value) selectedPks.push(cb.value);
@@ -211,7 +216,17 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         selectedCountSpan.textContent = selectedCount;
-        selectedPksInput.value = selectedPks.join(',');
+
+        // --- Update hidden inputs --- 
+        pkInputsContainer.innerHTML = ''; // Clear previous inputs
+        selectedPks.forEach(pk => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'pk'; // Use the name expected by the view
+            input.value = pk;
+            pkInputsContainer.appendChild(input);
+        });
+        // --- End Update --- 
 
         if (selectedCount > 0) {
             bulkActionsBar.classList.remove('d-none');

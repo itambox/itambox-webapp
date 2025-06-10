@@ -44,6 +44,9 @@ from .models import ObjectChange
 from .tables import ObjectChangeTable
 # from .filters import ObjectChangeFilterSet # Comment out unused import
 from .utils import get_model_viewname, get_paginate_count
+from django.contrib.contenttypes.models import ContentType # Add ContentType
+from django.utils.http import urlencode
+from django.views.decorators.http import require_POST # Add require_POST
 
 User = get_user_model() # Get the User model
 
@@ -324,3 +327,61 @@ class SearchView(View):
 
 # class UserSubscriptionsView(UserGenericTabView):
 #     active_tab = 'subscriptions' 
+
+# Generic Bulk Delete View
+@login_required
+@require_POST # Only allow POST requests
+def bulk_delete(request):
+    model_name = request.POST.get('model_name') # e.g., "assets.Asset"
+    object_pks = request.POST.getlist('pk') # List of primary keys to delete
+    return_url = request.META.get('HTTP_REFERER', reverse('dashboard')) # Where to redirect back
+
+    if not model_name or not object_pks:
+        messages.error(request, "Missing model name or object IDs for bulk deletion.")
+        return redirect(return_url)
+
+    try:
+        app_label, model_lower = model_name.split('.')
+        model = apps.get_model(app_label=app_label, model_name=model_lower)
+    except (ValueError, LookupError):
+        messages.error(request, f"Invalid model specified: {model_name}")
+        return redirect(return_url)
+
+    # Check delete permission for the model
+    # Simplified check - assumes delete perm follows standard pattern
+    delete_perm = f'{app_label}.delete_{model_lower}'
+    if not request.user.has_perm(delete_perm):
+        messages.error(request, f"You do not have permission to delete {model._meta.verbose_name_plural}.")
+        return redirect(return_url)
+        
+    queryset = model.objects.filter(pk__in=object_pks)
+    objects_to_delete = list(queryset) # Evaluate queryset
+    
+    if not objects_to_delete:
+        messages.warning(request, f"No valid {model._meta.verbose_name_plural} selected for deletion.")
+        return redirect(return_url)
+
+    # Handle the two POST scenarios
+    if '_confirm' in request.POST:
+        # --- User has confirmed deletion --- 
+        try:
+            count = len(objects_to_delete)
+            model.objects.filter(pk__in=object_pks).delete() # Perform bulk delete
+            messages.success(request, f"Successfully deleted {count} {model._meta.verbose_name_plural}.")
+            return redirect(return_url)
+        except ProtectedError as e:
+            # Handle protected objects (optional, basic message for now)
+            messages.error(request, f"Could not delete objects due to protected relationships: {e}")
+            return redirect(return_url)
+            
+    else:
+        # --- Initial POST from list view - Show confirmation --- 
+        context = {
+            'model_name': model_name,
+            'model_verbose_name': model._meta.verbose_name,
+            'model_verbose_name_plural': model._meta.verbose_name_plural,
+            'objects': objects_to_delete,
+            'object_pks': object_pks, # Pass PKs back to the confirmation form
+            'return_url': return_url, 
+        }
+        return render(request, 'generic/object_confirm_bulk_delete.html', context) 

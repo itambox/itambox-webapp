@@ -51,7 +51,8 @@ def tag_list(request):
     # --- End Configuration ---
 
     model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{table.__class__.__name__}"
+    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}" # For bulk delete form
+    table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}" # For config modal URL
 
     context = {
         'table': table,
@@ -59,7 +60,8 @@ def tag_list(request):
         'object_type': 'Tag',
         'create_url_name': 'extras:tag_create',
         'list_url_name': 'extras:tag_list',
-        'model_name_str': model_name_str,
+        'model_name_str': model_name_str, # Pass the app_label.modelname
+        'table_config_key': table_config_key, # Pass the app_label.TableName
         'filter_form': filterset,
     }
     return render(request, 'generic/object_list_base.html', context)

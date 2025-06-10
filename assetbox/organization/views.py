@@ -75,11 +75,13 @@ def site_list(request):
     queryset = filterset.qs
     table = _configure_table_from_prefs(request, SiteTable, queryset)
     model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{table.__class__.__name__}"
+    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
+    table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}"
     context = {
         'table': table, 'title': 'Sites', 'object_type': 'Site',
         'create_url_name': 'organization:site_create',
-        'model_name_str': model_name_str, 'filter_form': filterset,
+        'model_name_str': model_name_str, 'table_config_key': table_config_key,
+        'filter_form': filterset,
     }
     return render(request, 'generic/object_list_base.html', context)
 
@@ -188,11 +190,13 @@ def region_list(request):
     queryset = filterset.qs
     table = _configure_table_from_prefs(request, RegionTable, queryset)
     model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{table.__class__.__name__}"
+    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
+    table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}"
     context = {
         'table': table, 'title': 'Regions', 'object_type': 'Region',
         'create_url_name': 'organization:region_create',
-        'model_name_str': model_name_str, 'filter_form': filterset,
+        'model_name_str': model_name_str, 'table_config_key': table_config_key,
+        'filter_form': filterset,
     }
     return render(request, 'generic/object_list_base.html', context)
 
@@ -295,11 +299,13 @@ def sitegroup_list(request):
     queryset = filterset.qs
     table = _configure_table_from_prefs(request, SiteGroupTable, queryset)
     model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{table.__class__.__name__}"
+    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
+    table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}"
     context = {
         'table': table, 'title': 'Site Groups', 'object_type': 'Site Group',
         'create_url_name': 'organization:sitegroup_create',
-        'model_name_str': model_name_str, 'filter_form': filterset,
+        'model_name_str': model_name_str, 'table_config_key': table_config_key,
+        'filter_form': filterset,
     }
     return render(request, 'generic/object_list_base.html', context)
 
@@ -396,11 +402,13 @@ def location_list(request):
     queryset = filterset.qs
     table = _configure_table_from_prefs(request, LocationTable, queryset)
     model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{table.__class__.__name__}"
+    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
+    table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}"
     context = {
         'table': table, 'title': 'Locations', 'object_type': 'Location',
         'create_url_name': 'organization:location_create',
-        'model_name_str': model_name_str, 'filter_form': filterset,
+        'model_name_str': model_name_str, 'table_config_key': table_config_key,
+        'filter_form': filterset,
     }
     return render(request, 'generic/object_list_base.html', context)
 
@@ -497,11 +505,13 @@ def tenantgroup_list(request):
     queryset = filterset.qs
     table = _configure_table_from_prefs(request, TenantGroupTable, queryset)
     model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{table.__class__.__name__}"
+    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
+    table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}"
     context = {
         'table': table, 'title': 'Tenant Groups', 'object_type': 'Tenant Group',
         'create_url_name': 'organization:tenantgroup_create',
-        'model_name_str': model_name_str, 'filter_form': filterset,
+        'model_name_str': model_name_str, 'table_config_key': table_config_key,
+        'filter_form': filterset,
     }
     return render(request, 'generic/object_list_base.html', context)
 
@@ -560,11 +570,13 @@ def tenant_list(request):
     queryset = filterset.qs
     table = _configure_table_from_prefs(request, TenantTable, queryset)
     model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{table.__class__.__name__}"
+    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
+    table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}"
     context = {
         'table': table, 'title': 'Tenants', 'object_type': 'Tenant',
         'create_url_name': 'organization:tenant_create',
-        'model_name_str': model_name_str, 'filter_form': filterset,
+        'model_name_str': model_name_str, 'table_config_key': table_config_key,
+        'filter_form': filterset,
     }
     return render(request, 'generic/object_list_base.html', context)
 
@@ -625,11 +637,13 @@ def assetholder_list(request):
     queryset = filterset.qs
     table = _configure_table_from_prefs(request, AssetHolderTable, queryset)
     model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{table.__class__.__name__}"
+    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
+    table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}"
     context = {
         'table': table, 'title': 'Asset Holders', 'object_type': 'Asset Holder',
         'create_url_name': 'organization:assetholder_create',
-        'model_name_str': model_name_str, 'filter_form': filterset,
+        'model_name_str': model_name_str, 'table_config_key': table_config_key,
+        'filter_form': filterset,
     }
     return render(request, 'generic/object_list_base.html', context)
 
