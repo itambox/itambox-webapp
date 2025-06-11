@@ -75,6 +75,7 @@ def table_config(request, model_name):
     # Pass user_config to the form constructor
     form = TableConfigForm(table=table, user_config=user_config) 
 
+    # Use consolidated template path
     template = get_template('core/includes/table_config_modal.html')
     context = {
         'form': form,
@@ -98,7 +99,7 @@ def table_config(request, model_name):
 class ObjectChangeListView(SingleTableView):
     model = ObjectChange
     table_class = ObjectChangeTable
-    template_name = 'core/objectchange_list.html'
+    template_name = 'core/objectchange/objectchange_list.html'
     context_object_name = 'object_changes'
     # Add pagination if desired
     # paginate_by = 25
@@ -116,7 +117,7 @@ class ObjectChangeListView(SingleTableView):
 @method_decorator(login_required, name='dispatch')
 class ObjectChangeView(DetailView):
     model = ObjectChange
-    template_name = 'core/objectchange.html'
+    template_name = 'core/objectchange/objectchange.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -160,7 +161,7 @@ class ObjectChangeView(DetailView):
         return context 
 
 # --- Search View ---
-class SearchView(View):
+class SearchView(LoginRequiredMixin, View):
     template_name = 'core/search.html' 
 
     def get(self, request):
