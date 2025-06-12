@@ -33,25 +33,64 @@
                         <div class="dropdown-menu-columns">
                             <div class="dropdown-menu-column">
                                 <span class="dropdown-header">Sites</span>
-                                <a class="dropdown-item {% if request.resolver_match.url_name == 'site_list' %}active{% endif %}" 
-                                   href="{% url 'organization:site_list' %}">Sites</a>
-                                <a class="dropdown-item {% if request.resolver_match.url_name == 'region_list' %}active{% endif %}" 
-                                   href="{% url 'organization:region_list' %}">Regions</a>
-                                <a class="dropdown-item {% if request.resolver_match.url_name == 'sitegroup_list' %}active{% endif %}" 
-                                   href="{% url 'organization:sitegroup_list' %}">Site Groups</a>
-                                <a class="dropdown-item {% if request.resolver_match.url_name == 'location_list' %}active{% endif %}" 
-                                   href="{% url 'organization:location_list' %}">Locations</a>
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3  {% if request.resolver_match.url_name == 'site_list' %}active{% endif %}">
+                                    <a href="{% url 'organization:site_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Sites</a>
+                                    <div class="btn-group ms-1">
+                                        <a href="{% url 'organization:site_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Add Site">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'region_list' %}active{% endif %}">
+                                   <a href="{% url 'organization:region_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Regions</a>
+                                   <div class="btn-group ms-1">
+                                       <a href="{% url 'organization:region_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Add Region">
+                                           <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+                                       </a>
+                                   </div>
+                                </div>
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'sitegroup_list' %}active{% endif %}">
+                                   <a href="{% url 'organization:sitegroup_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Site Groups</a>
+                                   <div class="btn-group ms-1">
+                                       <a href="{% url 'organization:sitegroup_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Add Site Group">
+                                           <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+                                       </a>
+                                   </div>
+                                </div>
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'location_list' %}active{% endif %}">
+                                   <a href="{% url 'organization:location_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Locations</a>
+                                   <div class="btn-group ms-1">
+                                       <a href="{% url 'organization:location_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Add Location">
+                                           <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+                                       </a>
+                                   </div>
+                                </div>
                                 
                                 <div class="dropdown-divider"></div>
                                 <span class="dropdown-header">Tenancy</span>
-                                <a class="dropdown-item {% if request.resolver_match.url_name == 'tenant_list' %}active{% endif %}" 
-                                   href="{% url 'organization:tenant_list' %}">Tenants</a>
-                                <a class="dropdown-item" href="{% url 'organization:assetholder_list' %}">
-                                    Asset Holders
-                                </a>
-                                <a class="dropdown-item" href="{% url 'organization:assetholderassignment_list' %}">
-                                    Assignments
-                                </a>
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'tenant_list' %}active{% endif %}">
+                                   <a href="{% url 'organization:tenant_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Tenants</a>
+                                   <div class="btn-group ms-1">
+                                       <a href="{% url 'organization:tenant_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Add Tenant">
+                                           <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+                                       </a>
+                                   </div>
+                                </div>
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'assetholder_list' %}active{% endif %}">
+                                    <a href="{% url 'organization:assetholder_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Asset Holders</a>
+                                    <div class="btn-group ms-1">
+                                       <a href="{% url 'organization:assetholder_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Add Asset Holder">
+                                           <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+                                       </a>
+                                   </div>
+                                </div>
+                                {# Wrap Assignments link for consistent styling/indentation #}
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'assetholderassignment_list' %}active{% endif %}">
+                                    <a href="{% url 'organization:assetholderassignment_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">
+                                        Assignments
+                                    </a>
+                                    {# No button group here #}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -70,17 +109,35 @@
                         <div class="dropdown-menu-columns">
                             <div class="dropdown-menu-column">
                                 <span class="dropdown-header">Assets</span>
-                                <a href="{% url 'assets:asset_list' %}" 
-                                   class="dropdown-item {% if request.resolver_match.url_name == 'asset_list' %}active{% endif %}">Assets</a> {# List All #}
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'asset_list' %}active{% endif %}">
+                                    <a href="{% url 'assets:asset_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Assets</a>
+                                    <div class="btn-group ms-1">
+                                        <a href="{% url 'assets:asset_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Add Asset">
+                                             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+                                        </a>
+                                    </div>
+                                </div>
                                 {# TODO: Add filtered views later (Archived, Deployed etc.) #}
-                                <a href="{% url 'assets:asset_role_list' %}" 
-                                   class="dropdown-item {% if request.resolver_match.url_name == 'asset_role_list' %}active{% endif %}">Asset Roles</a>
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'asset_role_list' %}active{% endif %}">
+                                   <a href="{% url 'assets:asset_role_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Asset Roles</a>
+                                   <div class="btn-group ms-1">
+                                       <a href="{% url 'assets:asset_role_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Add Asset Role">
+                                           <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+                                       </a>
+                                   </div>
+                                </div>
 
                                 <div class="dropdown-divider"></div>
                                 <span class="dropdown-header">Asset Types</span>
                                 {# <a href="#" class="dropdown-item">Asset Types</a> #}
-                                <a href="{% url 'assets:manufacturer_list' %}" 
-                                   class="dropdown-item {% if request.resolver_match.url_name == 'manufacturer_list' %}active{% endif %}">Manufacturers</a>
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'manufacturer_list' %}active{% endif %}">
+                                   <a href="{% url 'assets:manufacturer_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Manufacturers</a>
+                                   <div class="btn-group ms-1">
+                                       <a href="{% url 'assets:manufacturer_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Add Manufacturer">
+                                           <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+                                       </a>
+                                   </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -98,9 +155,19 @@
                      <div class="dropdown-menu {% if request.resolver_match.app_name == 'extras' %}show{% endif %}">
                          <div class="dropdown-menu-columns">
                             <div class="dropdown-menu-column">
-                                <a href="#" class="dropdown-item">Custom Fields</a> {# TODO: URL #}
-                                <a href="{% url 'extras:tag_list' %}" 
-                                   class="dropdown-item {% if request.resolver_match.url_name == 'tag_list' %}active{% endif %}">Tags</a>
+                                {# Wrap Custom Fields link #}
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0">
+                                    <a href="#" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Custom Fields</a> {# TODO: URL #}
+                                    {# No button group here #}
+                                </div>
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'tag_list' %}active{% endif %}">
+                                    <a href="{% url 'extras:tag_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Tags</a>
+                                    <div class="btn-group ms-1">
+                                        <a href="{% url 'extras:tag_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Add Tag">
+                                             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+                                        </a>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -119,7 +186,11 @@
                          <div class="dropdown-menu-columns">
                             <div class="dropdown-menu-column">
                                 <span class="dropdown-header">Logging</span>
-                                <a href="{% url 'objectchange_list' %}" class="dropdown-item {% if request.resolver_match.url_name == 'objectchange_list' %}active{% endif %}">Changelog</a>
+                                {# Wrap Changelog link #}
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'objectchange_list' %}active{% endif %}">
+                                    <a href="{% url 'objectchange_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Changelog</a>
+                                    {# No button group here #}
+                                </div>
                                 {# Add other logging views here later if needed #}
                             </div>
                         </div>

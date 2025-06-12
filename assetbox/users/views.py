@@ -18,7 +18,7 @@ User = get_user_model()
 class UserProfileView(LoginRequiredMixin, UpdateView):
     model = User
     form_class = UserProfileForm
-    template_name = 'users/profile.html' # Update template path
+    template_name = 'users/profile.html' # Path relative to TEMPLATES DIRS
     success_url = reverse_lazy('users:user_profile') # Update URL name
 
     def get_object(self, queryset=None):
@@ -45,7 +45,7 @@ class UserProfileView(LoginRequiredMixin, UpdateView):
         return context
 
 class UserPasswordView(LoginRequiredMixin, DjangoPasswordChangeView):
-    template_name = 'users/password.html' # Update template path
+    template_name = 'users/password.html' # Path relative to TEMPLATES DIRS
     success_url = reverse_lazy('users:user_profile') # Update URL name
 
     def form_valid(self, form):
@@ -59,7 +59,7 @@ class UserPasswordView(LoginRequiredMixin, DjangoPasswordChangeView):
 
 class UserPreferencesView(LoginRequiredMixin, View):
     form_class = UserPreferencesForm
-    template_name = 'users/preferences.html'
+    template_name = 'users/preferences.html' # Path relative to TEMPLATES DIRS
 
     def _get_preference(self, user):
         preference, _ = UserPreference.objects.get_or_create(user=user)
@@ -136,7 +136,7 @@ class UserPreferencesView(LoginRequiredMixin, View):
 
 # Dummy Views for other tabs
 class UserGenericTabView(LoginRequiredMixin, TemplateView):
-    template_name = 'users/dummy_tab.html' # Update template path
+    template_name = 'users/dummy_tab.html' # Path relative to TEMPLATES DIRS
     active_tab = '' 
 
     def get_context_data(self, **kwargs):

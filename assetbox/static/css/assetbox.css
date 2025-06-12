@@ -40,3 +40,10 @@ pre.block {
 .page-body .card {
     margin-bottom: 1rem;
 }
+
+/* Ensure topbar stays above sidebar in combo layout */
+header.navbar {
+    z-index: 1040; /* Higher than typical sidebars/modals */
+}
+
+/* Add any other custom styles below */
