@@ -19,31 +19,36 @@ OBJ_TYPE_CHOICES = [
 
 class SearchForm(forms.Form):
     q = forms.CharField(
-        label='',
+        label='Search',
         widget=forms.TextInput(attrs={'placeholder': 'Search AssetBox', 'class': 'form-control'})
     )
-    obj_type = forms.ChoiceField(
-        label='Object Type',
-        choices=[('', 'All Types')] + OBJ_TYPE_CHOICES,
+    obj_type = forms.MultipleChoiceField(
+        label='Object type(s)',
+        choices=OBJ_TYPE_CHOICES,
         required=False,
+        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'id': 'id_obj_type_select'})
+    )
+    lookup_choices = (
+        ('icontains', 'Partial match'),
+        ('iexact', 'Exact match'),
+        ('istartswith', 'Starts with'),
+        ('iendswith', 'Ends with'),
+        ('iregex', 'Regex'),
+    )
+    lookup = forms.ChoiceField(
+        label='Lookup',
+        choices=lookup_choices,
+        required=False,
+        initial='icontains',
         widget=forms.Select(attrs={'class': 'form-select'})
     )
+    # --- End Lookup Field --- 
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helper = FormHelper()
-        self.helper.form_method = 'get'
-        self.helper.form_action = reverse('search')
-        self.helper.layout = Layout(
-            Div(
-                Field('q', css_class=''),
-                HTML('<button type="submit" class="btn btn-primary"><i class="ti ti-search"></i> Search</button>'),
-                css_class='input-group mb-3'
-            ),
-            Field('obj_type', css_class='')
-        )
-        self.helper.form_tag = False
-        self.helper.disable_csrf = True
+    # Remove __init__ method if not using Crispy Helper
+    # def __init__(self, *args, **kwargs):
+    #     super().__init__(*args, **kwargs)
+    #     self.helper = FormHelper()
+    #     ...
 
 # Remove TableConfigForm definition
 # class TableConfigForm(forms.Form): ...

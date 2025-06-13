@@ -41,9 +41,85 @@ pre.block {
     margin-bottom: 1rem;
 }
 
-/* Ensure topbar stays above sidebar in combo layout */
-header.navbar {
-    z-index: 1040; /* Higher than typical sidebars/modals */
+/* Tom Select Customizations for Tabler Alignment */
+
+/* Wrapper - Ensure it behaves like a form-select */
+.ts-wrapper.form-select {
+    border: none; /* Tom Select adds its own border via ts-control */
+    padding: 0;
+    height: auto; /* Let inner control define height */
 }
 
-/* Add any other custom styles below */
+.ts-control {
+    border-color: var(--tblr-border-color);
+    background-color: var(--tblr-bg-surface);
+    color: var(--tblr-body-color);
+    box-shadow: none !important; 
+    padding: 0.5rem 0.75rem;
+    min-height: calc(1.5em + 1rem + 2px); 
+    align-items: center; 
+}
+.ts-wrapper.multi .ts-control > div {
+    background: var(--tblr-primary);
+    color: var(--tblr-primary-fg);
+    border-radius: var(--tblr-border-radius-sm);
+    padding: 0.15rem 0.5rem;
+    margin: 0.125rem 0.25rem 0.125rem 0;
+}
+.ts-wrapper.multi .ts-control > div .remove {
+    border-left: 1px solid var(--tblr-secondary-fg);
+    margin-left: 0.25rem;
+    padding-left: 0.25rem;
+    opacity: 0.7;
+}
+.ts-wrapper.multi .ts-control > div .remove:hover {
+    opacity: 1;
+}
+
+/* Dropdown */
+.ts-dropdown {
+    background: var(--tblr-bg-surface);
+    border: 1px solid var(--tblr-border-color);
+    box-shadow: var(--tblr-box-shadow-lg);
+    color: var(--tblr-body-color);
+}
+.ts-dropdown .ts-dropdown-content {
+    max-height: 200px; 
+}
+.ts-dropdown .active { 
+    background-color: var(--tblr-secondary);
+    color: var(--tblr-primary-fg);
+}
+.ts-dropdown .option { 
+     padding: 0.5rem 0.75rem;
+}
+.ts-dropdown .optgroup-header { 
+    color: var(--tblr-secondary);
+    font-weight: bold;
+    padding: 0.5rem 0.75rem 0.25rem;
+}
+
+[data-bs-theme="dark"] .ts-control {
+    border-color: var(--tblr-border-color);
+    background-color: var(--tblr-bg-surface);
+    color: var(--tblr-body-color);
+}
+[data-bs-theme="dark"] .ts-wrapper.multi .ts-control > div {
+    background: var(--tblr-secondary);
+    color: var(--tblr-secondary-fg);
+}
+[data-bs-theme="dark"] .ts-wrapper.multi .ts-control > div .remove {
+     border-left-color: var(--tblr-secondary-fg);
+}
+[data-bs-theme="dark"] .ts-dropdown {
+    background: var(--tblr-bg-surface);
+    border-color: var(--tblr-border-color);
+    color: var(--tblr-body-color);
+}
+[data-bs-theme="dark"] .ts-dropdown .active {
+    background-color: var(--tblr-secondary);
+    color: var(--tblr-secondary-fg);
+}
+[data-bs-theme="dark"] .ts-dropdown .optgroup-header {
+    color: var(--tblr-secondary);
+}

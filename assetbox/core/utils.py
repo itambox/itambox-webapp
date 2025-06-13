@@ -1,5 +1,9 @@
 from .constants import DEFAULT_PAGINATE_COUNT, PAGINATE_COUNT_CHOICES
 import datetime # Import datetime
+from django.conf import settings
+from django.core.paginator import Paginator
+from django.contrib.contenttypes.models import ContentType # Import ContentType
+from django.utils.module_loading import import_string # Import import_string
 
 def get_model_viewname(model, action):
     """
@@ -128,3 +132,35 @@ def log_change(instance, action, prechange_data=None, postchange_data=None, user
         print(f"[LOG_CHANGE] Error logging change for {instance}: {e}") # DEBUG
         import traceback
         traceback.print_exc() # Print full traceback
+
+# --- Add Helper Function --- 
+def get_content_type_by_natural_key(natural_key):
+    """
+    Return a ContentType object based on its natural key string (e.g., 'app_label.model').
+    Returns None if not found or invalid format.
+    """
+    try:
+        app_label, model = natural_key.lower().split('.')
+        return ContentType.objects.get(app_label=app_label, model=model)
+    except (ContentType.DoesNotExist, ValueError, AttributeError):
+        return None
+# --- End Helper --- 
+
+# --- Add get_table_for_model --- 
+def get_table_for_model(model):
+    """
+    Return the django-tables2 Table class for the given model,
+    or None if not found.
+    Assumes table class name is ModelNameTable (e.g., Asset -> AssetTable).
+    """
+    app_label = model._meta.app_label
+    model_name = model.__name__
+    table_class_name = f"{model_name}Table"
+    try:
+        tables_module = import_string(f'{app_label}.tables')
+        return getattr(tables_module, table_class_name)
+    except (ImportError, AttributeError):
+        # Log this? Could indicate missing tables.py or wrong naming convention
+        print(f"[get_table_for_model] Warning: Could not find {table_class_name} in {app_label}.tables")
+        return None
+# --- End get_table_for_model ---

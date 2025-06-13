@@ -43,7 +43,7 @@ from django.contrib.auth.views import PasswordChangeView as DjangoPasswordChange
 from .models import ObjectChange
 from .tables import ObjectChangeTable
 # from .filters import ObjectChangeFilterSet # Comment out unused import
-from .utils import get_model_viewname, get_paginate_count
+from .utils import get_model_viewname, get_paginate_count, get_table_for_model # Import the new helper
 from django.contrib.contenttypes.models import ContentType # Add ContentType
 from django.utils.http import urlencode
 from django.views.decorators.http import require_POST # Add require_POST
@@ -165,65 +165,47 @@ class SearchView(LoginRequiredMixin, View):
     template_name = 'core/search.html' 
 
     def get(self, request):
-        # --- Remove moved import, use module-level one --- 
-        # from assetbox.assets.models import AssetRole, Manufacturer
-        
-        results = []
-        table = None
-        form = SearchForm(request.GET) # Populate form from query params
-        query = request.GET.get('q', '') # Get query directly for context even if form invalid
+        query = request.GET.get('q', '').strip()
+        # obj_type is now a list from the form
+        obj_types = request.GET.getlist('obj_type') 
+        lookup = request.GET.get('lookup', 'icontains')
 
-        if form.is_valid():
-            query = form.cleaned_data.get('q', '')
-            obj_type = form.cleaned_data.get('obj_type') 
+        allowed_lookups = {'icontains', 'iexact', 'istartswith', 'iendswith', 'iregex'}
+        if lookup not in allowed_lookups:
+            lookup = 'icontains'
 
-            if query: 
-                try:
-                    backend_path = settings.SEARCH_BACKEND
-                    if not backend_path:
-                        raise ValueError("SEARCH_BACKEND setting is not configured.")
-                    backend_class = import_string(backend_path)
-                    backend = backend_class() 
-                except (ImportError, AttributeError, ValueError) as e:
-                    print(f"Error loading search backend: {e}")
-                    backend = None 
+        form = SearchForm(request.GET)
+        results_data = {}
+        results_count = 0
 
-                if backend: 
-                    # Initialize raw_results
-                    raw_results = [] 
-                    try:
-                        # Perform search
-                        raw_results = backend.search(
-                            term=query,
-                            user=request.user,
-                            obj_type=obj_type
-                        )
-                    except Exception as e:
-                        # Catch and print any error during search
-                        print(f"ERROR during backend.search: {type(e).__name__}: {e}")
-                        # Optionally add a user message
-                        # messages.error(request, f"An error occurred during search: {e}")
-                        # Ensure results remain empty if search fails
-                        raw_results = []
-                    
-                    # Use raw_results directly now
-                    results = raw_results
-                    table = SearchResultTable(data=results)
-            else:
-                results = []
-                table = SearchResultTable(data=results)
+        if query:
+            search_backend_cls = import_string(settings.SEARCH_BACKEND)
+            search_backend = search_backend_cls()
+            # Pass the list of obj_types to the search backend
+            results_data = search_backend.search(query, user=request.user, obj_types=obj_types, lookup=lookup) 
 
-        else:
-            table = None 
-            results = []
+            # Process results for template (create tables, get counts)
+            for model, data in results_data.items():
+                results_count += data['count']
+                # Instantiate table with limited results for preview
+                table_class = get_table_for_model(model)
+                if table_class:
+                    # Limit results shown on search page (e.g., first 10)
+                    data['table'] = table_class(data['queryset'][:10], request=request) 
+                    # Add list URL (replace with actual logic if needed)
+                    data['list_url'] = f'/{model._meta.app_label}/{model._meta.model_name}s/' 
+                else:
+                    data['table'] = None
 
         context = {
             'form': form,
-            'query': query, 
-            'table': table,
-            'results_count': len(results) if results else 0,
+            'query': query,
+            'obj_types': obj_types, # Pass list to context
+            'lookup': lookup,
+            'results': results_data,
+            'results_count': results_count,
         }
-        return render(request, self.template_name, context) 
+        return render(request, self.template_name, context)
 
 # User Account Views
 # class UserProfileView(LoginRequiredMixin, UpdateView):

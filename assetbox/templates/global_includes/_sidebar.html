@@ -32,9 +32,9 @@
                     <div class="dropdown-menu {% if request.resolver_match.app_name == 'organization' %}show{% endif %}">
                         <div class="dropdown-menu-columns">
                             <div class="dropdown-menu-column">
-                                <span class="dropdown-header">Sites</span>
+                                <span class="dropdown-header text-info">Sites</span>
                                 <div class="dropdown-item d-flex justify-content-between align-items-center ps-3  {% if request.resolver_match.url_name == 'site_list' %}active{% endif %}">
-                                    <a href="{% url 'organization:site_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Sites</a>
+                                    <a href="{% url 'organization:site_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none ">Sites</a>
                                     <div class="btn-group ms-1">
                                         <a href="{% url 'organization:site_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Add Site">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
@@ -67,7 +67,7 @@
                                 </div>
                                 
                                 <div class="dropdown-divider"></div>
-                                <span class="dropdown-header">Tenancy</span>
+                                <span class="dropdown-header text-info">Tenancy</span>
                                 <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'tenant_list' %}active{% endif %}">
                                    <a href="{% url 'organization:tenant_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Tenants</a>
                                    <div class="btn-group ms-1">
@@ -108,7 +108,7 @@
                      <div class="dropdown-menu {% if request.resolver_match.app_name == 'assets' %}show{% endif %}">
                         <div class="dropdown-menu-columns">
                             <div class="dropdown-menu-column">
-                                <span class="dropdown-header">Assets</span>
+                                <span class="dropdown-header text-info">Assets</span>
                                 <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'asset_list' %}active{% endif %}">
                                     <a href="{% url 'assets:asset_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Assets</a>
                                     <div class="btn-group ms-1">
@@ -128,7 +128,7 @@
                                 </div>
 
                                 <div class="dropdown-divider"></div>
-                                <span class="dropdown-header">Asset Types</span>
+                                <span class="dropdown-header text-info">Asset Types</span>
                                 {# <a href="#" class="dropdown-item">Asset Types</a> #}
                                 <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'manufacturer_list' %}active{% endif %}">
                                    <a href="{% url 'assets:manufacturer_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Manufacturers</a>
@@ -185,7 +185,7 @@
                      <div class="dropdown-menu {% if request.resolver_match.app_name == 'core' and 'objectchange' in request.resolver_match.url_name %}show{% endif %}">
                          <div class="dropdown-menu-columns">
                             <div class="dropdown-menu-column">
-                                <span class="dropdown-header">Logging</span>
+                                <span class="dropdown-header text-info">Logging</span>
                                 {# Wrap Changelog link #}
                                 <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'objectchange_list' %}active{% endif %}">
                                     <a href="{% url 'objectchange_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Changelog</a>

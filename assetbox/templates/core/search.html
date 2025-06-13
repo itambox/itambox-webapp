@@ -1,41 +1,104 @@
-{% extends 'generic/object_list_base.html' %}
+{% extends 'base.html' %}
+{% load static %}
+{% load i18n %}
 {% load helpers %}
 {% load crispy_forms_tags %}
 {% load render_table from django_tables2 %}
 {% load i18n %}
 
-{% block title %}{% trans "Search Results" %}{% endblock %}
+{% block title %}{% if query %}{% trans "Search Results" %}{% else %}{% trans "Search" %}{% endif %}{% endblock %}
 
-{% block content_full %} {# Use content_full block to remove sidebars if desired #}
-  <div class="row mb-3">
-    <div class="col col-md-6 offset-md-3">
-        <form action="{% url 'search' %}" method="get" class="form">
-            {% crispy form %}
-        </form>
-    </div>
-  </div>
+{% block page_header %}
+    <h1 class="page-title">
+        {% if query %}
+            {% blocktrans trimmed with q=query %}
+                Search Results for "{{ q }}"
+            {% endblocktrans %}
+        {% else %}
+            {% trans "Search" %}
+        {% endif %}
+    </h1>
+{% endblock %}
 
-  {% if query %}
-    <div class="card">
-      <div class="card-header">
-        <h3 class="card-title">{% blocktrans count results_count=results_count %}{{ results_count }} Result Found{% plural %}{{ results_count }} Results Found{% endblocktrans %}</h3>
-      </div>
-      {% if table %}
-        <div class="table-responsive"> {# Required by Tabler for proper table rendering #}
-          {# Restore standard render_table tag #}
-          {% render_table table %}
+{% block content %}
+<div class="row">
+    <div class="col-md-3">
+        {# Search Form Card #}
+        <div class="card mb-3">
+            <div class="card-header"><h3 class="card-title">{% trans "Search Options" %}</h3></div>
+            <div class="card-body">
+                <form action="{% url 'search' %}" method="get" class="options-form">
+                    <div class="mb-3">
+                        <label for="{{ form.q.id_for_label }}" class="form-label">{{ form.q.label }}</label>
+                        {{ form.q }}
+                    </div>
+                    <div class="mb-3">
+                        <label for="{{ form.obj_type.id_for_label }}" class="form-label">{{ form.obj_type.label }}</label>
+                        {{ form.obj_type }}
+                    </div>
+                    <div class="mb-3">
+                        <label for="{{ form.lookup.id_for_label }}" class="form-label">{{ form.lookup.label }}</label>
+                        {{ form.lookup }}
+                    </div>
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary w-100">{% trans "Search" %}</button>
+                    </div>
+                </form>
+            </div>
         </div>
-      {% else %}
-         <div class="card-body">
-             <span class="text-muted">No results found for '{{ query }}'.</span>
-         </div>
-      {% endif %}
     </div>
-    {# Add pagination controls here if pagination is implemented #}
-    {# {% include 'inc/paginator.html' with page=table.page %} #}
-  {% else %}
-    {# Optionally show a message if no query was entered #}
-    {# <p class="text-center text-muted">Enter a search term above.</p> #}
-  {% endif %}
+    <div class="col-md-9">
+        {# Results Section (Keep Existing Logic/Block Intact) #}
+        {% block results %}
+            {% if results %}
+                {% for content_type, data in results.items %}
+                    {% if data.table %}
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h3 class="card-title">{{ data.verbose_name_plural }}</h3>
+                                <div class="card-actions">
+                                    <span class="badge bg-cyan text-cyan-fg">{{ data.count }} found</span>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                {% render_table data.table 'django_tables2/bootstrap5-responsive.html' %}
+                            </div>
+                            {% if data.count > data.table.page.paginator.per_page %}
+                            <div class="card-footer">
+                                <a href="{{ data.list_url }}?q={{ query|urlencode }}">View all {{ data.count }} {{ data.verbose_name_plural }}</a>
+                            </div>
+                             {% endif %}
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            {% elif query %}
+                <div class="card card-body">
+                    <p class="text-muted">{% trans "No results found." %}</p>
+                </div>
+            {% endif %}
+        {% endblock results %}
+    </div>
+</div>
+{% endblock content %}
 
-{% endblock content_full %}
+{% block extra_scripts %}
+    {# Add script block to initialize Tom Select #}
+    {{ block.super }}
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        var el = document.getElementById('id_obj_type_select');
+        if(el){
+          new TomSelect(el, {
+            plugins: {
+				remove_button:{
+					title:'Remove this item',
+				}
+			},
+            // Add other Tom Select options if needed
+            // persist: false,
+            // create: true
+          });
+        }
+      });
+    </script>
+{% endblock extra_scripts %}
