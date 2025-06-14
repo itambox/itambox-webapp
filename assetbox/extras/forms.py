@@ -1,7 +1,7 @@
 from django import forms
-from .models import Tag
+from .models import Tag, ConfigTemplate
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, HTML
+from crispy_forms.layout import Layout, Submit, HTML, Div, Field
 from django.urls import reverse
 
 class TagForm(forms.ModelForm):
@@ -18,8 +18,8 @@ class TagForm(forms.ModelForm):
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'slug': forms.TextInput(attrs={'class': 'form-control'}),
-            # 'color': forms.TextInput(attrs={'type': 'color', 'class': 'form-control form-control-color'}), # Widget defined above
-            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'color': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '00ff00'}),
+            'description': forms.TextInput(attrs={'class': 'form-control'}),
         }
         help_texts = {
             'slug': 'URL-friendly identifier.',
@@ -31,20 +31,17 @@ class TagForm(forms.ModelForm):
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
         self.helper.form_tag = True
-        self.helper.layout = Layout(
-            'name', 'slug', 'color', 'description'
-        )
-        # Use standard button helper if defined, otherwise define here
-        button_text = 'Update' if self.instance and self.instance.pk else 'Create'
+        button_text = 'Update' if self.instance.pk else 'Create'
         cancel_url = reverse('extras:tag_list')
-        self.helper.layout.append(
-            HTML('<div class="mt-4"></div>')
-        )
-        self.helper.layout.append(
-            Submit('submit', button_text, css_class='btn btn-primary')
-        )
-        self.helper.layout.append(
-            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>')
+        self.helper.layout = Layout(
+            'name',
+            'slug',
+            'color',
+            'description',
+            HTML('<div class="mt-3">'),
+            Submit('submit', button_text, css_class='btn btn-primary'),
+            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+            HTML('</div>')
         )
 
     def clean_color(self):
@@ -67,4 +64,31 @@ class TagForm(forms.ModelForm):
         elif len(color) == 0:
             return '' # Allow empty
         else:
-             raise forms.ValidationError("Ensure the color hex code is 6 characters long.") 
+             raise forms.ValidationError("Ensure the color hex code is 6 characters long.")
+
+class ConfigTemplateForm(forms.ModelForm):
+    class Meta:
+        model = ConfigTemplate
+        fields = ['name', 'description', 'template_content']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'template_content': forms.Textarea(attrs={'class': 'form-control', 'rows': 15}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+        button_text = 'Update' if self.instance.pk else 'Create'
+        cancel_url = reverse('extras:configtemplate_list')
+        self.helper.layout = Layout(
+            'name',
+            'description',
+            'template_content',
+            HTML('<div class="mt-3">'),
+            Submit('submit', button_text, css_class='btn btn-primary'),
+            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+            HTML('</div>')
+        ) 

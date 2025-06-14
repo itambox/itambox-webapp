@@ -54,7 +54,7 @@ class ManufacturerSerializer(serializers.ModelSerializer):
 class AssetSerializer(serializers.ModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:assets_api:asset-detail')
     asset_role = NestedAssetRoleSerializer(read_only=True)
-    asset_role_id = serializers.PrimaryKeyRelatedField(
+    assetrole_id = serializers.PrimaryKeyRelatedField(
         queryset=AssetRole.objects.all(), source='asset_role', write_only=True, required=False, allow_null=True
     )
     manufacturer = NestedManufacturerSerializer(read_only=True)
@@ -71,7 +71,7 @@ class AssetSerializer(serializers.ModelSerializer):
         model = Asset
         fields = [
             'id', 'url', 'name', 'asset_tag', 'serial_number', 'status',
-            'asset_role', 'asset_role_id', 'manufacturer', 'manufacturer_id',
+            'asset_role', 'assetrole_id', 'manufacturer', 'manufacturer_id',
             'location', 'location_id', 'purchase_date', 'warranty_expiration',
             'notes', 'created_at', 'updated_at'
         ]

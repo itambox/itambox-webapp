@@ -25,9 +25,9 @@ class AssetRoleViewSet(viewsets.ModelViewSet):
     filterset_class = AssetRoleFilterSet
 
 class ManufacturerViewSet(viewsets.ModelViewSet):
-    # Annotate the queryset to calculate asset_count
+    # Annotate the queryset to calculate asset_count following the new relationship
     queryset = Manufacturer.objects.annotate(
-        asset_count=Count('assets') # Assumes related_name is 'assets'
+        asset_count=Count('asset_types__assets') # Corrected relation
     )
     serializer_class = ManufacturerSerializer
     filter_backends = (DjangoFilterBackend,)

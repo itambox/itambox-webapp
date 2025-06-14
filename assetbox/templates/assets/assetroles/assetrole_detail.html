@@ -12,6 +12,15 @@
             <div class="row">
                 <div class="col-md-12">
                     <dl class="row">
+                        {% if object.color %}
+                        <dt class="col-sm-3 text-secondary">Color</dt>
+                        <dd class="col-sm-9">
+                            <span class="badge" style="background-color: #{{ object.color }}; color: #fff;">
+                                #{{ object.color }}
+                            </span>
+                        </dd>
+                        {% endif %}
+
                         <dt class="col-sm-3 text-secondary">Name</dt>
                         <dd class="col-sm-9">{{ object.name }}</dd>
 
@@ -19,40 +28,58 @@
                         <dd class="col-sm-9">{{ object.slug }}</dd>
 
                         <dt class="col-sm-3 text-secondary">Description</dt>
-                        <dd class="col-sm-9">{{ object.description|linebreaksbr|default:"<i>None</i>"|safe }}</dd>
+                        <dd class="col-sm-9">{{ object.description|linebreaksbr|default:"&mdash;"|safe }}</dd>
+                        
+                        {% if object.config_template %}
+                        <dt class="col-sm-3 text-secondary">Config Template</dt>
+                        <dd class="col-sm-9">
+                            <a href="{% url 'extras:configtemplate_detail' pk=object.config_template.pk %}">
+                                {{ object.config_template.name }}
+                            </a>
+                        </dd>
+                        {% endif %}
+                        
+                        {% if object.tags.exists %}
+                        <dt class="col-sm-3 text-secondary">Tags</dt>
+                        <dd class="col-sm-9">
+                            {% for tag in object.tags.all %}
+                                {% include 'global_includes/_tag.html' with tag=tag %}
+                            {% endfor %}
+                        </dd>
+                        {% endif %}
                     </dl>
                 </div>
             </div>
         </div>
     </div>
-{% endblock %}
+{% endblock content_left %}
 
 {% block content_full_width_extra %}
     {# Assets Table #}
-    <div class="card">
+    {% if assets_table %}
+    <div class="card mt-4">
         <div class="card-header">
             <h3 class="card-title">Assets in this Role</h3>
-            {# Optional: Add count badge #}
              <span class="badge bg-secondary text-secondary-fg ms-2">{{ assets_table.rows|length }}</span>
         </div>
         <div class="table-responsive">
             {% render_table assets_table 'global_includes/htmx_table.html' %}
         </div>
     </div>
-{% endblock %}
-
-{# Leave related_objects empty for the sidebar, assets shown below #}
-{% block related_objects %}{% endblock related_objects %}
-
-{# Add the Assets table to the full_width_content block #}
-{% block full_width_content %}
-    {% if assets_table %}
-    <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">Assets with this Role ({{ assets_table.rows|length }})</h3></div>
-        <div class="table-responsive">
-            {% render_table assets_table %}
+    {% else %}
+     <div class="card mt-4">
+        <div class="card-header">
+            <h3 class="card-title">Assets in this Role</h3>
         </div>
-        {# Optional: Add pagination if needed later #}
+        <div class="card-body">
+            <p class="text-muted">No assets found with this role.</p>
+        </div>
     </div>
     {% endif %}
-{% endblock full_width_content %}
+{% endblock content_full_width_extra %}
+
+{# Clear related objects block from base if not needed #}
+{% block related_objects %}{% endblock related_objects %}
+
+{# Clear full_width_content block from base if not needed #}
+{% block full_width_content %}{% endblock full_width_content %}

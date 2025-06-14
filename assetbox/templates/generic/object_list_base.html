@@ -146,7 +146,7 @@
                     {# Filter Form (GET method for applying filters) #}
                     <form method="get" action="" class="filter-form-tab">
                          <h4 class="mb-3">Filter</h4>
-                         {# Revert to rendering the whole form with crispy #}
+                         {# Render the .form attribute of the filterset #}
                          {% crispy filter_form.form %}
                     </form>
                 </div>

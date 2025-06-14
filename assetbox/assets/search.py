@@ -12,7 +12,7 @@ class AssetIndex(SearchIndex):
         'notes',          # Search in notes (Corrected from 'comments')
         # Optional related fields (uncomment if needed and ensure models support __str__)
         # 'model__name',
-        # 'asset_role__name',
+        # 'assetrole__name',
         # 'manufacturer__name',
         # 'location__name',
         # 'location__site__name', # Search site name via location

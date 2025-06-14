@@ -19,11 +19,11 @@ urlpatterns = [
     # Organization URLs were moved to organization.urls
 
     # Asset Roles (AssetRole) URLs
-    path('asset-roles/', views.asset_role_list, name='asset_role_list'),
-    path('asset-roles/create/', views.asset_role_create, name='asset_role_create'),
-    path('asset-roles/<int:pk>/', views.asset_role_detail, name='asset_role_detail'),
-    path('asset-roles/<int:pk>/edit/', views.asset_role_update, name='asset_role_update'),
-    path('asset-roles/<int:pk>/delete/', views.asset_role_delete, name='asset_role_delete'),
+    path('roles/', views.assetrole_list, name='assetrole_list'),
+    path('roles/create/', views.assetrole_create, name='assetrole_create'),
+    path('roles/<int:pk>/', views.assetrole_detail, name='assetrole_detail'),
+    path('roles/<int:pk>/edit/', views.assetrole_update, name='assetrole_update'),
+    path('roles/<int:pk>/delete/', views.assetrole_delete, name='assetrole_delete'),
 
     # Manufacturer URLs
     path('manufacturers/', views.manufacturer_list, name='manufacturer_list'),
@@ -31,6 +31,17 @@ urlpatterns = [
     path('manufacturers/<int:pk>/', views.manufacturer_detail, name='manufacturer_detail'),
     path('manufacturers/<int:pk>/edit/', views.manufacturer_update, name='manufacturer_update'),
     path('manufacturers/<int:pk>/delete/', views.manufacturer_delete, name='manufacturer_delete'),
+
+    # Asset Types (using Class-Based Views)
+    path('types/', views.AssetTypeListView.as_view(), name='assettype_list'),
+    path('types/create/', views.AssetTypeCreateView.as_view(), name='assettype_create'),
+    path('types/<slug:slug>/', views.AssetTypeDetailView.as_view(), name='assettype_detail'),
+    path('types/<slug:slug>/edit/', views.AssetTypeUpdateView.as_view(), name='assettype_update'),
+    path('types/<slug:slug>/delete/', views.AssetTypeDeleteView.as_view(), name='assettype_delete'),
+
+    # Asset Roles (using function-based views, standardized names)
+    path('roles/', views.assetrole_list, name='assetrole_list'),
+    path('roles/create/', views.assetrole_create, name='assetrole_create'),
 
     # TODO: Add URLs for Customization (Tags - moved to extras?)
 ] 

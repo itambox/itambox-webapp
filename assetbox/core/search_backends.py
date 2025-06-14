@@ -92,7 +92,7 @@ class DatabaseBackend:
                     # Add list URL if available
                     # 'list_url': reverse(f"{model._meta.app_label}:{model._meta.model_name}_list"),
                 }
-                
+
         return results
 
 # Instantiate the default backend

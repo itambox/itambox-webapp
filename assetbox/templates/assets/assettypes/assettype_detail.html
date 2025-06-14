@@ -1,0 +1,86 @@
+{% extends 'generic/object_detail_base.html' %}
+{% load static %}
+{% load helpers %}
+
+{% block content_left %}
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Asset Type Details</h3>
+        </div>
+        <div class="card-body">
+            <dl class="row">
+                <dt class="col-sm-3 text-secondary">Manufacturer</dt>
+                <dd class="col-sm-9">{{ object.manufacturer|linkify }}</dd>
+
+                <dt class="col-sm-3 text-secondary">Model</dt>
+                <dd class="col-sm-9">{{ object.model }}</dd>
+
+                <dt class="col-sm-3 text-secondary">Slug</dt>
+                <dd class="col-sm-9">{{ object.slug }}</dd>
+
+                <dt class="col-sm-3 text-secondary">Part Number</dt>
+                <dd class="col-sm-9">{{ object.part_number|default:"&mdash;"|safe }}</dd>
+
+                <dt class="col-sm-3 text-secondary">Description</dt>
+                <dd class="col-sm-9">{{ object.description|linebreaksbr|default:"&mdash;"|safe }}</dd>
+            </dl>
+        </div>
+    </div>
+
+    {# TODO: Add related assets table #}
+    {# {% include 'assets/inc/asset_list.html' with table=assets_table parent_object=object %} #}
+{% endblock %}
+
+{% block content_right %}
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Specifications</h3>
+        </div>
+        <div class="card-body">
+            <dl class="row">
+                <dt class="col-sm-4 text-secondary">CPU</dt>
+                <dd class="col-sm-8">{{ object.cpu|default:"&mdash;"|safe }}</dd>
+
+                <dt class="col-sm-4 text-secondary">RAM (GB)</dt>
+                <dd class="col-sm-8">{{ object.ram_gb|default:"&mdash;"|safe }}</dd>
+
+                <dt class="col-sm-4 text-secondary">Storage (GB)</dt>
+                <dd class="col-sm-8">{{ object.storage_capacity_gb|default:"&mdash;"|safe }}</dd>
+
+                <dt class="col-sm-4 text-secondary">Storage Type</dt>
+                <dd class="col-sm-8">{{ object.get_storage_type_display|default:"&mdash;"|safe }}</dd>
+
+                <dt class="col-sm-4 text-secondary">GPU</dt>
+                <dd class="col-sm-8">{{ object.gpu|default:"&mdash;"|safe }}</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="card mt-3">
+        <div class="card-header">
+            <h3 class="card-title">Comments</h3>
+        </div>
+        <div class="card-body">
+            {% if object.comments %}
+                {{ object.comments|linebreaksbr }}
+            {% else %}
+                <span class="text-muted">None</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card mt-3">
+        <div class="card-header">
+            <h3 class="card-title">Tags</h3>
+        </div>
+        <div class="card-body">
+            {% if object.tags.exists %}
+                {% for tag in object.tags.all %}
+                    {% include 'global_includes/_tag.html' with tag=tag %}
+                {% endfor %}
+            {% else %}
+                <span class="text-muted">None</span>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %} 

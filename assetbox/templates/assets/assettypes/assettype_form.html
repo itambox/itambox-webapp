@@ -1,0 +1,13 @@
+{% extends 'generic/object_edit.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}{% if object %}Edit{% else %}Create{% endif %} Asset Type - AssetBox{% endblock %}
+
+{% block page_header %}
+    <div class="page-pretitle">Assets</div>
+    <h2 class="page-title">{% if object %}Edit{% else %}Create{% endif %} Asset Type</h2>
+{% endblock %}
+
+{% block form %}
+    {% crispy form %}
+{% endblock %} 

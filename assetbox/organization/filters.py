@@ -1,7 +1,8 @@
 import django_filters
 from django import forms
 from django.db.models import Q
-from .models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder
+from assets.models import Manufacturer, AssetType
+from organization.models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder
 from extras.models import Tag # Import Tag
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML # Import Helper, Layout, Submit
@@ -189,3 +190,25 @@ class AssetHolderFilterSet(BaseOrgFilterSet):
             Q(description__icontains=value) |
             Q(comments__icontains=value)
         ).distinct() 
+    
+class AssetTypeFilterSet(BaseOrgFilterSet):
+    manufacturer = django_filters.ModelChoiceFilter(
+        queryset=Manufacturer.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    class Meta:
+        model = AssetType
+        fields = ['manufacturer', 'model', 'part_number', 'cpu', 'storage_type']
+    
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(model__icontains=value) |
+            Q(part_number__icontains=value) |
+            Q(description__icontains=value) |
+            Q(cpu__icontains=value) |
+            Q(gpu__icontains=value) |
+            Q(manufacturer__name__icontains=value)
+        ).distinct()
+    

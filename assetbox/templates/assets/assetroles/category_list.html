@@ -9,7 +9,7 @@
 
 {% block page_actions %}
     <div class="btn-list">
-        <a href="{% url 'assets:asset_role_create' %}" class="btn btn-primary">Create Asset Role</a>
+        <a href="{% url 'assets:assetrole_create' %}" class="btn btn-primary">Create Asset Role</a>
     </div>
 {% endblock %}
 
@@ -31,16 +31,16 @@
                 {% for cat in categories %}
                     <tr>
                         <td><input class="form-check-input m-0 align-middle" type="checkbox" aria-label="Select asset role {{ cat.name }}"></td>
-                        <td><a href="{% url 'assets:asset_role_update' pk=cat.pk %}">{{ cat.name }}</a></td>
+                        <td><a href="{% url 'assets:assetrole_update' pk=cat.pk %}">{{ cat.name }}</a></td>
                         <td>{{ cat.description|truncatechars:80 }}</td>
                         <td>{{ cat.asset_set.count }}</td>
                         <td class="text-end">
                            <span class="dropdown">
                                 <button class="btn dropdown-toggle align-text-top" data-bs-boundary="viewport" data-bs-toggle="dropdown">Actions</button>
                                 <div class="dropdown-menu dropdown-menu-end">
-                                    <a class="dropdown-item" href="{% url 'assets:asset_role_update' pk=cat.pk %}">Edit</a>
+                                    <a class="dropdown-item" href="{% url 'assets:assetrole_update' pk=cat.pk %}">Edit</a>
                                     {% if cat.asset_set.count == 0 %}
-                                        <a class="dropdown-item text-danger" href="{% url 'assets:asset_role_delete' pk=cat.pk %}">Delete</a>
+                                        <a class="dropdown-item text-danger" href="{% url 'assets:assetrole_delete' pk=cat.pk %}">Delete</a>
                                     {% else %}
                                         <span class="dropdown-item text-muted disabled" title="Cannot delete role with assigned assets">Delete</span>
                                     {% endif %}

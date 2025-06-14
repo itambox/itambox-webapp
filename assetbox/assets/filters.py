@@ -1,10 +1,11 @@
 import django_filters
-from .models import Asset, AssetRole, Manufacturer
+from .models import Asset, AssetRole, Manufacturer, AssetType
 from organization.models import Location
 from django import forms
 from django.db.models import Q
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML
+from django.contrib.contenttypes.models import ContentType
 
 class AssetFilterSet(django_filters.FilterSet):
     # Add filters for specific fields
@@ -129,4 +130,31 @@ class ManufacturerFilterSet(django_filters.FilterSet):
         return queryset.filter(
             Q(name__icontains=value) |
             Q(description__icontains=value)
+        ).distinct()
+
+class AssetTypeFilter(django_filters.FilterSet):
+    q = django_filters.CharFilter(
+        method='search',
+        label='Search',
+    )
+    manufacturer = django_filters.ModelChoiceFilter(
+        queryset=Manufacturer.objects.all(),
+        field_name='manufacturer',
+        label='Manufacturer'
+    )
+
+    class Meta:
+        model = AssetType
+        fields = ['manufacturer', 'model', 'part_number', 'cpu', 'storage_type']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(model__icontains=value) |
+            Q(part_number__icontains=value) |
+            Q(description__icontains=value) |
+            Q(cpu__icontains=value) |
+            Q(gpu__icontains=value) |
+            Q(manufacturer__name__icontains=value)
         ).distinct() 
