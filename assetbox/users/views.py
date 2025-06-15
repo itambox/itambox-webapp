@@ -59,80 +59,24 @@ class UserPasswordView(LoginRequiredMixin, DjangoPasswordChangeView):
 
 class UserPreferencesView(LoginRequiredMixin, View):
     form_class = UserPreferencesForm
-    template_name = 'users/preferences.html' # Path relative to TEMPLATES DIRS
+    template_name = 'users/preferences.html'
 
-    def _get_preference(self, user):
-        preference, _ = UserPreference.objects.get_or_create(user=user)
-        return preference
+    def get(self, request, *args, **kwargs):
+        # Pass the user to the form constructor
+        form = self.form_class(user=request.user)
+        return render(request, self.template_name, {'form': form})
 
-    def _get_table_configs(self, preference):
-        configs = []
-        table_configs = preference.data.get('tables', {})
-        for table_key, config in table_configs.items():
-            # Simple display for now, assumes key is like 'assets.AssetTable'
-            table_name = table_key.split('.')[-1] if '.' in table_key else table_key
-            configs.append({
-                'key': table_key,
-                'name': table_name,
-                'columns': ", ".join(config.get('columns', [])),
-                'ordering': ", ".join(config.get('ordering', [])),
-            })
-        return sorted(configs, key=lambda x: x['name']) # Sort alphabetically
-
-    def get(self, request):
-        preference = self._get_preference(request.user)
-        initial_data = {
-            'pagination_per_page': preference.data.get('pagination', {}).get('per_page', 25),
-            'theme': preference.data.get('ui', {}).get('theme', UserPreference.THEME_LIGHT),
-        }
-        form = self.form_class(initial=initial_data)
-        table_configs = self._get_table_configs(preference)
-        
-        context = {
-            'form': form,
-            'table_configs': table_configs,
-            'active_tab': 'preferences',
-            'user': request.user,
-        }
-        return render(request, self.template_name, context)
-
-    def post(self, request):
-        preference = self._get_preference(request.user)
-        form = self.form_class(request.POST)
-        # Checkboxes for clearing table configs will have name 'pk' and value as table_key
-        clear_tables = request.POST.getlist('pk') 
-        
+    def post(self, request, *args, **kwargs):
+        # Pass the user *and* request.POST data to the form constructor
+        form = self.form_class(request.user, request.POST)
         if form.is_valid():
-            # Save general preferences
-            if 'pagination' not in preference.data: preference.data['pagination'] = {}
-            if 'ui' not in preference.data: preference.data['ui'] = {}
-            preference.data['pagination']['per_page'] = form.cleaned_data['pagination_per_page']
-            preference.data['ui']['theme'] = form.cleaned_data['theme']
-            
-            # Clear selected table configs
-            if clear_tables:
-                if 'tables' in preference.data:
-                    for table_key in clear_tables:
-                        if table_key in preference.data['tables']:
-                            del preference.data['tables'][table_key]
-                            messages.info(request, f"Cleared saved configuration for {table_key}")
-                    # Clean up empty 'tables' dict if needed
-                    if not preference.data['tables']:
-                        del preference.data['tables']
-                
-            preference.save()
-            messages.success(request, "Preferences updated successfully.")
+            form.save() # Call the form's save method
+            messages.success(request, "Preferences saved successfully.")
+            # Use namespaced URL name for redirect
             return redirect('users:user_preferences') 
-        
-        # If form is invalid, re-render with errors and existing table configs
-        table_configs = self._get_table_configs(preference)
-        context = {
-            'form': form,
-            'table_configs': table_configs,
-            'active_tab': 'preferences',
-            'user': request.user,
-        }
-        return render(request, self.template_name, context)
+        else:
+            messages.error(request, "There was an error saving your preferences.")
+        return render(request, self.template_name, {'form': form})
 
 # Dummy Views for other tabs
 class UserGenericTabView(LoginRequiredMixin, TemplateView):

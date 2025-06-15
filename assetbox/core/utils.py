@@ -4,6 +4,8 @@ from django.conf import settings
 from django.core.paginator import Paginator
 from django.contrib.contenttypes.models import ContentType # Import ContentType
 from django.utils.module_loading import import_string # Import import_string
+from django.shortcuts import reverse
+from users.models import UserPreference # Import UserPreference
 
 def get_model_viewname(model, action):
     """
@@ -17,27 +19,43 @@ def get_model_viewname(model, action):
 def get_paginate_count(request):
     """
     Determine the number of objects to display per page.
-    Checks request query parameters first, then user preferences (TODO), then default.
+    Checks request query parameters first, then user preferences, then default.
     """
-    # Check for per_page query parameter
+    # 1. Check for per_page query parameter
     try:
-        per_page = int(request.GET.get('per_page', 0))
-        # Validate against choices
-        if per_page in dict(PAGINATE_COUNT_CHOICES):
-            print(f"[get_paginate_count] Using per_page from query param: {per_page}") # DEBUG
-            return per_page
-    except ValueError:
+        per_page_param = request.GET.get('per_page')
+        if per_page_param:
+            per_page = int(per_page_param)
+            # Validate against choices
+            if per_page in dict(PAGINATE_COUNT_CHOICES):
+                # print(f"[get_paginate_count] Using per_page from query param: {per_page}") # DEBUG
+                return per_page
+    except (ValueError, TypeError): # Catch potential int conversion error or None
         pass
 
-    # TODO: Check user preferences
-    # if request.user.is_authenticated:
-    #    user_pref = request.user.preferences.data.get('pagination', {}).get('per_page')
-    #    if user_pref in dict(PAGINATE_COUNT_CHOICES):
-    #        return user_pref
+    # 2. Check user preferences (if logged in)
+    if request.user.is_authenticated:
+        try:
+            # Use filter().first() to avoid DoesNotExist exception if no prefs exist yet
+            prefs = UserPreference.objects.filter(user=request.user).first()
+            if prefs and prefs.data:
+                user_pref_val = prefs.data.get('pagination', {}).get('per_page')
+                if user_pref_val:
+                    try: 
+                        user_pref = int(user_pref_val) # Ensure it's an integer
+                        if user_pref in dict(PAGINATE_COUNT_CHOICES):
+                            # print(f"[get_paginate_count] Using per_page from user prefs: {user_pref}") # DEBUG
+                            return user_pref
+                    except (ValueError, TypeError):
+                         pass # Ignore invalid preference value
+        except Exception as e:
+            # Log error maybe? For now, just ignore preference errors and fallback
+            # print(f"[get_paginate_count] Error checking user prefs: {e}") # DEBUG
+            pass
 
-    # Fallback to default
-    print(f"[get_paginate_count] Using default per_page: {DEFAULT_PAGINATE_COUNT}") # DEBUG
-    return DEFAULT_PAGINATE_COUNT 
+    # 3. Fallback to default
+    # print(f"[get_paginate_count] Using default per_page: {DEFAULT_PAGINATE_COUNT}") # DEBUG
+    return DEFAULT_PAGINATE_COUNT
 
 # Simple base class placeholder for ChoiceSets
 # Subclasses should define CHOICES = ( (value, label, color), ... )
@@ -164,3 +182,55 @@ def get_table_for_model(model):
         print(f"[get_table_for_model] Warning: Could not find {table_class_name} in {app_label}.tables")
         return None
 # --- End get_table_for_model ---
+
+def get_model_from_string(model_string):
+    """Resolve a model string like 'app_label.ModelName' to the actual model class."""
+    try:
+        app_label, model_name = model_string.split('.')
+        return ContentType.objects.get(app_label=app_label, model=model_name.lower()).model_class()
+    except (ContentType.DoesNotExist, ValueError):
+        return None
+
+# --- Breadcrumbs Functionality (Example) ---
+def build_breadcrumbs(request, obj=None):
+    breadcrumbs = [{'url': reverse('dashboard'), 'name': 'Home'}]
+    path_parts = request.path.strip('/').split('/')
+
+    # Simple example, needs refinement based on URL structure
+    if len(path_parts) > 0 and path_parts[0]:
+        # Assume first part is app/major section
+        app_url_name = f"{path_parts[0]}:index" # Placeholder for potential app index
+        try:
+            # Attempt to generate a URL for the app/section index
+            # This is highly dependent on your URL naming conventions
+            # For 'assets', maybe we link to 'assets:asset_list'?
+            if path_parts[0] == 'assets':
+                 list_url = reverse('assets:asset_list') # Specific example
+                 breadcrumbs.append({'url': list_url, 'name': path_parts[0].capitalize()})
+            # Add more specific app logic here if needed
+        except Exception: # Catch NoReverseMatch etc.
+            breadcrumbs.append({'url': None, 'name': path_parts[0].capitalize()})
+
+    if obj:
+        # If an object is provided, add its list view and itself
+        model_meta = obj._meta
+        list_view_name = f"{model_meta.app_label}:{model_meta.model_name}_list"
+        try:
+            list_url = reverse(list_view_name)
+            breadcrumbs.append({'url': list_url, 'name': model_meta.verbose_name_plural.capitalize()})
+        except Exception:
+            # Fallback if list view doesn't exist by that name
+            pass 
+        breadcrumbs.append({'url': obj.get_absolute_url(), 'name': str(obj)})
+    elif len(path_parts) > 1:
+        # If no object, but more path parts, assume the last part is the current page title
+        # This is a guess and might need adjustment
+        page_title = path_parts[-1].replace('-', ' ').capitalize()
+        if breadcrumbs[-1]['name'].lower() != page_title.lower(): # Avoid duplicate
+             breadcrumbs.append({'url': request.path, 'name': page_title})
+        
+    # Mark the last item as active
+    if breadcrumbs:
+        breadcrumbs[-1]['is_active'] = True
+
+    return breadcrumbs

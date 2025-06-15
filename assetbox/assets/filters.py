@@ -132,7 +132,7 @@ class ManufacturerFilterSet(django_filters.FilterSet):
             Q(description__icontains=value)
         ).distinct()
 
-class AssetTypeFilter(django_filters.FilterSet):
+class AssetTypeFilterSet(django_filters.FilterSet):
     q = django_filters.CharFilter(
         method='search',
         label='Search',

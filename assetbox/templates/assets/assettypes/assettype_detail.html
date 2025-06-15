@@ -1,38 +1,51 @@
 {% extends 'generic/object_detail_base.html' %}
 {% load static %}
 {% load helpers %}
+{% load render_table from django_tables2 %}
 
-{% block content_left %}
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title">Asset Type Details</h3>
-        </div>
-        <div class="card-body">
-            <dl class="row">
-                <dt class="col-sm-3 text-secondary">Manufacturer</dt>
-                <dd class="col-sm-9">{{ object.manufacturer|linkify }}</dd>
+{# Override the main details block for basic info #}
+{% block object_details %}
+    <dl class="row">
+        <dt class="col-sm-3 text-secondary">Manufacturer</dt>
+        <dd class="col-sm-9">{{ object.manufacturer|linkify }}</dd>
 
-                <dt class="col-sm-3 text-secondary">Model</dt>
-                <dd class="col-sm-9">{{ object.model }}</dd>
+        <dt class="col-sm-3 text-secondary">Model</dt>
+        <dd class="col-sm-9">{{ object.model }}</dd>
 
-                <dt class="col-sm-3 text-secondary">Slug</dt>
-                <dd class="col-sm-9">{{ object.slug }}</dd>
+        <dt class="col-sm-3 text-secondary">Slug</dt>
+        <dd class="col-sm-9">{{ object.slug }}</dd>
 
-                <dt class="col-sm-3 text-secondary">Part Number</dt>
-                <dd class="col-sm-9">{{ object.part_number|default:"&mdash;"|safe }}</dd>
+        <dt class="col-sm-3 text-secondary">Part Number</dt>
+        <dd class="col-sm-9">{{ object.part_number|default:"&mdash;"|safe }}</dd>
+    </dl>
+{% endblock object_details %}
 
-                <dt class="col-sm-3 text-secondary">Description</dt>
-                <dd class="col-sm-9">{{ object.description|linebreaksbr|default:"&mdash;"|safe }}</dd>
-            </dl>
-        </div>
+{# Override page actions to use slug instead of pk #}
+{% block page_actions %}
+    <div class="btn-list">
+        {# --- Standard Edit/Delete --- #}
+        {% if 'update' in view_options and update_url_name %}
+        {# Use slug=object.slug for AssetType URLs #}
+        <a href="{% url update_url_name slug=object.slug %}" class="btn">
+            Edit
+        </a>
+        {% endif %}
+         {% if 'delete' in view_options and delete_url_name %}
+         {# Use slug=object.slug for AssetType URLs #}
+        <a href="{% url delete_url_name slug=object.slug %}" class="btn btn-danger">
+            Delete
+        </a>
+        {% endif %}
+
+        {# --- Placeholder for Extra Actions (like Check In/Out) --- #}
+        {% block extra_page_actions %}{% endblock %}
     </div>
+{% endblock page_actions %}
 
-    {# TODO: Add related assets table #}
-    {# {% include 'assets/inc/asset_list.html' with table=assets_table parent_object=object %} #}
-{% endblock %}
-
-{% block content_right %}
-    <div class="card">
+{# Add extra cards to the left column #}
+{% block extra_cards_left %}
+    {# Specifications Card #}
+    <div class="card mt-4">
         <div class="card-header">
             <h3 class="card-title">Specifications</h3>
         </div>
@@ -56,31 +69,38 @@
         </div>
     </div>
 
-    <div class="card mt-3">
-        <div class="card-header">
-            <h3 class="card-title">Comments</h3>
-        </div>
-        <div class="card-body">
-            {% if object.comments %}
-                {{ object.comments|linebreaksbr }}
-            {% else %}
-                <span class="text-muted">None</span>
-            {% endif %}
-        </div>
-    </div>
-
-    <div class="card mt-3">
-        <div class="card-header">
-            <h3 class="card-title">Tags</h3>
-        </div>
+    {# Tags Card (Mimics base template but on the left) #}
+    <div class="card mt-4">
+        <div class="card-header"><h3 class="card-title">Tags</h3></div>
         <div class="card-body">
             {% if object.tags.exists %}
                 {% for tag in object.tags.all %}
-                    {% include 'global_includes/_tag.html' with tag=tag %}
+                    {% include 'partials/tag.html' with tag=tag %}
                 {% endfor %}
             {% else %}
                 <span class="text-muted">None</span>
             {% endif %}
         </div>
     </div>
-{% endblock %} 
+{% endblock extra_cards_left %}
+
+{# Add related assets table to the full width block #}
+{% block full_width_content %}
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Related Assets</h3>
+        </div>
+        {# Check if assets_table exists in context (passed from view) #}
+        {% if assets_table %}
+            {% render_table assets_table %}
+        {% else %}
+            <div class="card-body">
+                <span class="text-muted">No related assets found.</span>
+            </div>
+        {% endif %}
+    </div>
+{% endblock full_width_content %}
+
+{# Description card is handled by base template in left column #}
+{# Comments card is handled by base template in right column #}
+{# Related Objects list card is handled by base template in right column (needs related_objects_list in context) #} 

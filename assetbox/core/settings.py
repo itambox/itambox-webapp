@@ -159,3 +159,14 @@ SEARCH_BACKEND = 'core.search_backends.DatabaseBackend'
 LOGIN_URL = 'login' # URL name for the login view
 LOGIN_REDIRECT_URL = 'dashboard' # URL name to redirect to after successful login
 LOGOUT_REDIRECT_URL = 'login' # URL name to redirect to after logout
+
+# --- Pagination Settings --- 
+DEFAULT_PAGINATE_COUNT = 25 
+PAGINATE_COUNT_CHOICES = (
+    (25, '25'), 
+    (50, '50'),
+    (100, '100'),
+    (250, '250'),
+    (500, '500'),
+    (1000, '1000'),
+)

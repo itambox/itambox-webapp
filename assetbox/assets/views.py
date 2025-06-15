@@ -6,7 +6,7 @@ from .forms import AssetForm, AssetRoleForm, ManufacturerForm, AssetCheckOutForm
 from django.contrib.auth import get_user_model
 from django_tables2 import RequestConfig
 from .tables import AssetTable, AssetRoleTable, ManufacturerTable, AssetTypeTable
-from .filters import AssetFilterSet, AssetRoleFilterSet, ManufacturerFilterSet, AssetTypeFilter # <-- Import the FilterSets
+from .filters import AssetFilterSet, AssetRoleFilterSet, ManufacturerFilterSet, AssetTypeFilterSet 
 from core.utils import get_paginate_count, get_model_viewname
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.contrib.contenttypes.models import ContentType
@@ -16,6 +16,7 @@ from django.db.models import Q # <-- Import Q (needed by search method in filter
 from django.contrib import messages # <--- Add this import
 from users.models import UserPreference # Import UserPreference
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
+from django.contrib.auth.mixins import LoginRequiredMixin
 
 User = get_user_model()
 
@@ -652,41 +653,85 @@ def manufacturer_delete(request, pk):
 
 # --- Asset Type Views (Class-Based) ---
 
-class AssetTypeListView(ListView):
+class AssetTypeListView(LoginRequiredMixin, ListView):
     model = AssetType
-    template_name = 'assets/assettypes/assettype_list.html' # Standardized path
-    context_object_name = 'asset_types' # Optional, defaults to object_list
-    paginate_by = 10 # Example pagination
+    template_name = 'assets/assettypes/assettype_list.html'
+    context_object_name = 'asset_types'
+    filterset_class = AssetTypeFilterSet # Specify the filterset class
+    paginate_by = 20 # Or get from settings/user prefs
 
     def get_queryset(self):
-        queryset = super().get_queryset()
-        self.filterset = AssetTypeFilter(self.request.GET, queryset=queryset)
-        return self.filterset.qs
+        queryset = super().get_queryset().select_related('manufacturer')
+        self.filterset = self.filterset_class(self.request.GET, queryset=queryset)
+        return self.filterset.qs # Return the filtered queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        table = AssetTypeTable(self.object_list)
-        # Configure table pagination if needed, or handle in template
-        # RequestConfig(self.request, paginate={"per_page": self.paginate_by}).configure(table)
+        
+        # Instantiate table with the filtered queryset
+        table = AssetTypeTable(self.object_list, request=self.request)
+        # Use RequestConfig for sorting and pagination (uses paginate_by)
+        RequestConfig(self.request, paginate={'per_page': self.paginate_by}).configure(table)
+        
+        # --- Add required context for object_list_base template --- 
+        model = self.model # Get the model from the view
         context['table'] = table
-        # Pass the filterset instance itself, not just the form
+        context['title'] = 'Asset Types' # Add title
+        context['object_type'] = 'Asset Type' # Add object type verbose name
+        context['create_url_name'] = 'assets:assettype_create' # Add create URL name
+        # Add model_name_str for bulk operations
+        context['model_name_str'] = f"{model._meta.app_label}.{model._meta.model_name}"
+        # Add table_config_key for the "Configure Table" button
+        context['table_config_key'] = f"{model._meta.app_label}.{table.__class__.__name__}"
+        # Add the filterset instance itself for rendering the form
         context['filter_form'] = self.filterset 
+        # --- End required context additions --- 
+
         return context
 
-class AssetTypeDetailView(DetailView):
+class AssetTypeDetailView(LoginRequiredMixin, DetailView):
     model = AssetType
     template_name = 'assets/assettypes/assettype_detail.html'
     slug_field = 'slug' # Use slug for lookup
     slug_url_kwarg = 'slug' # Match URL pattern kwarg
-    context_object_name = 'asset_type'
+    context_object_name = 'object' # Use 'object' for consistency with base template
 
-    # TODO: Add related assets table if needed
-    # def get_context_data(self, **kwargs):
-    #     context = super().get_context_data(**kwargs)
-    #     related_assets = Asset.objects.filter(asset_type=self.object)
-    #     assets_table = AssetTable(related_assets)
-    #     context['assets_table'] = assets_table
-    #     return context
+    def get_queryset(self):
+        # Prefetch related manufacturer and tags for efficiency
+        return super().get_queryset().select_related('manufacturer').prefetch_related('tags')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        asset_type = self.object # Get the current AssetType instance
+
+        # --- Prepare Related Assets Table --- 
+        related_assets = Asset.objects.filter(asset_type=asset_type).select_related(
+            'asset_role', 'location' # Necessary select_related for the table columns
+        )
+        assets_table = AssetTable(related_assets, request=self.request)
+        RequestConfig(self.request, paginate=False).configure(assets_table) # Disable pagination for related table
+        context['assets_table'] = assets_table
+
+        # --- Prepare Related Objects List (for right column card) ---
+        related_objects_list = []
+        asset_count = related_assets.count()
+        if asset_count:
+            asset_list_url = reverse('assets:asset_list')
+            filtered_asset_url = f"{asset_list_url}?asset_type={asset_type.pk}" # Filter by asset_type pk
+            related_objects_list.append({
+                'label': 'Assets',
+                'count': asset_count,
+                'url': filtered_asset_url
+            })
+        context['related_objects_list'] = related_objects_list
+        
+        # --- Add other necessary context for base template ---
+        context['object_type'] = self.model._meta.verbose_name.title()
+        context['update_url_name'] = get_model_viewname(self.model, 'update')
+        context['delete_url_name'] = get_model_viewname(self.model, 'delete')
+        context['view_options'] = ['update', 'delete'] # Enable Edit/Delete buttons
+
+        return context
 
 class AssetTypeCreateView(CreateView):
     model = AssetType

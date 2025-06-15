@@ -56,3 +56,14 @@ class SearchForm(forms.Form):
 # Remove UserProfileForm and UserPreferencesForm definitions
 # class UserProfileForm(forms.ModelForm): ...
 # class UserPreferencesForm(forms.Form): ... 
+
+class SlugModelForm(forms.ModelForm):
+    """Base ModelForm for models that include a slug field."""
+
+    class Media:
+        # Define the JavaScript file needed for slug functionality
+        js = (
+            'js/slugify.js', # Path relative to STATIC_URL
+        )
+
+# You can add other core forms below if needed 

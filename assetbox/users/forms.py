@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 # Import UserPreference from this app's models
 from .models import UserPreference 
 from django.utils.translation import gettext_lazy as _
+from django.conf import settings # Import settings
 
 User = get_user_model()
 
@@ -13,15 +14,76 @@ class UserProfileForm(forms.ModelForm):
 
 class UserPreferencesForm(forms.Form):
     # Define fields explicitly
-    pagination_per_page = forms.IntegerField(
+    pagination_per_page = forms.ChoiceField(
+        choices=settings.PAGINATE_COUNT_CHOICES,
         label='Items Per Page',
-        min_value=1,
+        widget=forms.Select(attrs={'class': 'form-select'})
     )
     theme = forms.ChoiceField(
-        choices=UserPreference.THEME_CHOICES, # Reference choices from core model
+        choices=UserPreference.THEME_CHOICES, # Reference choices from model
         required=False,
-        widget=forms.Select()
+        widget=forms.Select(attrs={'class': 'form-select'})
     )
+    
+    def __init__(self, user, *args, **kwargs):
+        """Load initial data from UserPreference."""
+        super().__init__(*args, **kwargs)
+        self.user = user
+        try:
+            # Use filter().first() to avoid DoesNotExist exception
+            prefs = UserPreference.objects.filter(user=self.user).first()
+            if prefs and prefs.data:
+                pagination_prefs = prefs.data.get('pagination', {})
+                theme_prefs = prefs.data.get('theme', {})
+                
+                initial_per_page = pagination_prefs.get('per_page', settings.DEFAULT_PAGINATE_COUNT)
+                # Use THEME_LIGHT as the default
+                initial_theme = theme_prefs.get('theme', UserPreference.THEME_LIGHT)
+                
+                # Ensure initial value is valid before setting
+                if initial_per_page in dict(settings.PAGINATE_COUNT_CHOICES):
+                    self.fields['pagination_per_page'].initial = initial_per_page
+                else:
+                    # Fallback if stored pref is invalid
+                    self.fields['pagination_per_page'].initial = settings.DEFAULT_PAGINATE_COUNT
+                
+                if initial_theme in dict(UserPreference.THEME_CHOICES):
+                     self.fields['theme'].initial = initial_theme
+                else:
+                     # Fallback if stored pref is invalid
+                    self.fields['theme'].initial = UserPreference.THEME_LIGHT
+                    
+            else:
+                # Set defaults if no preferences exist
+                self.fields['pagination_per_page'].initial = settings.DEFAULT_PAGINATE_COUNT
+                # Use THEME_LIGHT as the default
+                self.fields['theme'].initial = UserPreference.THEME_LIGHT
+                
+        except Exception:
+            # Fallback to defaults on any error loading preferences
+            self.fields['pagination_per_page'].initial = settings.DEFAULT_PAGINATE_COUNT
+             # Use THEME_LIGHT as the default
+            self.fields['theme'].initial = UserPreference.THEME_LIGHT
+
+    def save(self):
+        """Save form data to UserPreference."""
+        prefs, created = UserPreference.objects.get_or_create(user=self.user)
+        
+        # Ensure prefs.data is initialized as a dict if it's None or not set
+        if prefs.data is None:
+            prefs.data = {}
+        
+        # Update pagination preferences
+        if 'pagination' not in prefs.data:
+            prefs.data['pagination'] = {}
+        prefs.data['pagination']['per_page'] = self.cleaned_data['pagination_per_page']
+
+        # Update theme preferences
+        if 'theme' not in prefs.data:
+            prefs.data['theme'] = {}
+        prefs.data['theme']['theme'] = self.cleaned_data['theme']
+        
+        prefs.save()
 
 class TableConfigForm(forms.Form):
     """

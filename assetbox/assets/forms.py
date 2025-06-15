@@ -9,6 +9,7 @@ from django.contrib.auth import get_user_model
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Button, Div, Fieldset, Row, Column
 from django.urls import reverse
+from core.forms import SlugModelForm # Import SlugModelForm
 
 User = get_user_model()
 
@@ -171,13 +172,14 @@ class AssetRoleForm(forms.ModelForm):
             raise forms.ValidationError("Ensure the color hex code is 6 characters long.")
 
 # --- Manufacturer Form ---
-class ManufacturerForm(forms.ModelForm):
+# Use SlugModelForm for ManufacturerForm as well
+class ManufacturerForm(SlugModelForm):
     class Meta:
         model = Manufacturer
         fields = ['name', 'slug', 'description']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'slug': forms.TextInput(attrs={'class': 'form-control'}),
+            'slug': forms.TextInput(attrs={'class': 'form-control', 'slugify': 'name'}), # Add slugify attribute
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
         help_texts = {
@@ -189,8 +191,9 @@ class ManufacturerForm(forms.ModelForm):
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
         self.helper.form_tag = True
-        # No form tag needed, crispy tag handles it
-        # self.helper.form_action = reverse('assets:manufacturer_create') # Or update URL
+        
+        # Set slug source field
+        self.fields['slug'].widget.attrs['slugify'] = 'name'
 
         # Define button layout
         button_text = 'Update' if self.instance and self.instance.pk else 'Create'
@@ -205,7 +208,8 @@ class ManufacturerForm(forms.ModelForm):
         )
 
 # --- Asset Type Form ---
-class AssetTypeForm(forms.ModelForm):
+# Inherit from SlugModelForm
+class AssetTypeForm(SlugModelForm):
     manufacturer = forms.ModelChoiceField(
         queryset=Manufacturer.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'})
@@ -226,7 +230,8 @@ class AssetTypeForm(forms.ModelForm):
         ]
         widgets = {
             'model': forms.TextInput(attrs={'class': 'form-control'}),
-            'slug': forms.TextInput(attrs={'class': 'form-control'}),
+            # Add the slugify attribute to the slug field
+            'slug': forms.TextInput(attrs={'class': 'form-control', 'slugify': 'model'}), 
             'part_number': forms.TextInput(attrs={'class': 'form-control'}),
             'cpu': forms.TextInput(attrs={'class': 'form-control'}),
             'ram_gb': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
@@ -246,12 +251,16 @@ class AssetTypeForm(forms.ModelForm):
         self.helper.form_method = 'post'
         self.helper.form_tag = True
         
+        # Set slug source field
+        self.fields['slug'].widget.attrs['slugify'] = 'model'
+        
         button_text = 'Update' if self.instance.pk else 'Create'
         cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse('assets:assettype_list')
-
+        
+        # Use Crispy Forms layout for better structure
         self.helper.layout = Layout(
             Fieldset(
-                'Asset Type Details',
+                'General Information',
                 Row(
                     Column('manufacturer', css_class='col-md-6'),
                     Column('model', css_class='col-md-6')
@@ -260,27 +269,24 @@ class AssetTypeForm(forms.ModelForm):
                     Column('slug', css_class='col-md-6'),
                     Column('part_number', css_class='col-md-6')
                 ),
-                 'description',
-                css_class='mb-3'
+                'description'
             ),
             Fieldset(
-                'Specifications',
-                 Row(
+                'Specifications (Optional)',
+                Row(
                     Column('cpu', css_class='col-md-6'),
                     Column('ram_gb', css_class='col-md-6')
                 ),
-                 Row(
-                    Column('storage_capacity_gb', css_class='col-md-6'),
-                    Column('storage_type', css_class='col-md-6')
-                ),
-                 'gpu',
-                css_class='mb-3'
+                Row(
+                    Column('storage_capacity_gb', css_class='col-md-4'),
+                    Column('storage_type', css_class='col-md-4'),
+                    Column('gpu', css_class='col-md-4')
+                )
             ),
             Fieldset(
-                'Other',
+                'Additional Information',
                 'comments',
-                'tags',
-                css_class='mb-3'
+                'tags' # Ensure tags field is included
             ),
             HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),
