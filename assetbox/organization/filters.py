@@ -58,7 +58,7 @@ class RegionFilterSet(BaseOrgFilterSet):
     )
     class Meta:
         model = Region
-        fields = ['name', 'slug', 'parent']
+        fields = ['name', 'parent']
 
 # --- SiteGroup Filter ---
 class SiteGroupFilterSet(BaseOrgFilterSet):
@@ -69,7 +69,7 @@ class SiteGroupFilterSet(BaseOrgFilterSet):
     )
     class Meta:
         model = SiteGroup
-        fields = ['name', 'slug', 'parent']
+        fields = ['name', 'parent']
 
 # --- Site Filter --- 
 class SiteFilterSet(BaseOrgFilterSet):
@@ -92,7 +92,7 @@ class SiteFilterSet(BaseOrgFilterSet):
     )
     class Meta:
         model = Site
-        fields = ['name', 'slug', 'status', 'region', 'group', 'tenant']
+        fields = ['name', 'status', 'region', 'group', 'tenant']
 
     # Override default search for Site
     def search(self, queryset, name, value):
@@ -126,7 +126,7 @@ class LocationFilterSet(BaseOrgFilterSet):
     )
     class Meta:
         model = Location
-        fields = ['name', 'slug', 'status', 'site', 'parent', 'tenant']
+        fields = ['name', 'status', 'site', 'parent', 'tenant']
 
     # Override default search for Location
     def search(self, queryset, name, value):
@@ -146,7 +146,7 @@ class TenantGroupFilterSet(BaseOrgFilterSet):
     )
     class Meta:
         model = TenantGroup
-        fields = ['name', 'slug', 'parent']
+        fields = ['name', 'parent']
 
 # --- Tenant Filter --- 
 class TenantFilterSet(BaseOrgFilterSet):
@@ -156,7 +156,7 @@ class TenantFilterSet(BaseOrgFilterSet):
     )
     class Meta:
         model = Tenant
-        fields = ['name', 'slug', 'group']
+        fields = ['name', 'group']
 
     # Override default search for Tenant
     def search(self, queryset, name, value):

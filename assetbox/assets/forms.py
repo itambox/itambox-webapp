@@ -3,13 +3,16 @@ from django.core.exceptions import ValidationError # Import ValidationError
 # Import models from this app
 from .models import Asset, AssetRole, Manufacturer, AssetType # Keep Asset, AssetRole, Manufacturer, AssetType
 # Import models from other apps
-from organization.models import Location, AssetHolder # Import Location and AssetHolder
+from organization.models import Location, AssetHolder, Region, Site # Import Location, AssetHolder, Region, Site
 from extras.models import ConfigTemplate, Tag # Import ConfigTemplate
 from django.contrib.auth import get_user_model
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Button, Div, Fieldset, Row, Column
 from django.urls import reverse
-from core.forms import SlugModelForm # Import SlugModelForm
+# --- Import FilterForm and FilterSets --- 
+from core.forms import SlugModelForm, BootstrapMixin, FilterForm 
+from .filters import AssetFilterSet, AssetRoleFilterSet, ManufacturerFilterSet, AssetTypeFilterSet
+# --- End Imports --- 
 
 User = get_user_model()
 
@@ -346,3 +349,19 @@ class AssetCheckOutForm(forms.Form):
             'location',
             # 'notes', # Uncomment if notes field is added
         )
+
+# --- Asset Filter Form --- 
+class AssetFilterForm(FilterForm):
+    filterset_class = AssetFilterSet
+
+# --- AssetRole Filter Form --- 
+class AssetRoleFilterForm(FilterForm):
+    filterset_class = AssetRoleFilterSet
+
+# --- Manufacturer Filter Form --- 
+class ManufacturerFilterForm(FilterForm):
+    filterset_class = ManufacturerFilterSet
+
+# --- AssetType Filter Form --- 
+class AssetTypeFilterForm(FilterForm):
+    filterset_class = AssetTypeFilterSet

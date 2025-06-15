@@ -35,9 +35,9 @@ from .tables import SearchResultTable # Add SearchResultTable
 # Use the direct app name import path
 from assets.models import AssetRole, Manufacturer 
 
-from django.views.generic import View, ListView, DetailView, UpdateView
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.urls import reverse_lazy
+from django.views.generic import View, ListView, DetailView, UpdateView, DeleteView
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.urls import reverse_lazy, reverse, NoReverseMatch
 from django.contrib import messages
 from django.contrib.auth.views import PasswordChangeView as DjangoPasswordChangeView
 from .models import ObjectChange
@@ -47,6 +47,8 @@ from .utils import get_model_viewname, get_paginate_count, get_table_for_model #
 from django.contrib.contenttypes.models import ContentType # Add ContentType
 from django.utils.http import urlencode
 from django.views.decorators.http import require_POST # Add require_POST
+from django.db.models import ProtectedError # To handle deletion prevention
+from .forms import ConfirmationForm # A generic confirmation form
 
 User = get_user_model() # Get the User model
 
@@ -368,3 +370,284 @@ def bulk_delete(request):
             'return_url': return_url, 
         }
         return render(request, 'generic/object_confirm_bulk_delete.html', context) 
+
+# =============================================================================
+# Generic Object Views (NetBox-inspired base classes)
+# =============================================================================
+
+class ObjectListView(LoginRequiredMixin, ListView):
+    """Base view for listing objects."""
+    filterset = None
+    filterset_form = None
+    table = None
+    template_name = 'generic/object_list_base.html' # Default template
+    # action_buttons = ('add', 'import', 'export') # Common actions
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.filterset:
+            self.filter = self.filterset(self.request.GET, queryset)
+            if not self.filter.is_valid():
+                # Handle invalid filter data if necessary (e.g., log or message)
+                # For now, just return the unfiltered queryset or apply default filters
+                pass 
+            return self.filter.qs
+        return queryset
+
+    def get_paginate_by(self, queryset):
+        """Get page size from user preferences or settings."""
+        return get_paginate_count(self.request)
+
+    def get_table(self):
+        """Return the django-tables2 Table instance."""
+        queryset = self.get_queryset()
+        # Allow specifying table class via attribute or method
+        table_class = self.table or get_table_for_model(self.model)
+        if not table_class:
+            raise Http404(f"No table defined for model {self.model._meta.model_name}")
+        
+        table = table_class(queryset, request=self.request)
+        # Apply pagination
+        paginate = {
+            'paginator_class': self.paginator_class,
+            'per_page': self.get_paginate_by(queryset)
+        }
+        table.paginate(**paginate)
+        return table
+
+    def get_context_data(self, **kwargs):
+        # Ensure self.model is set before calling super() or accessing _meta
+        # It should normally be set by ListView if queryset is defined,
+        # but we add a safeguard.
+        _model = getattr(self, 'model', None)
+        if not _model and self.queryset is not None:
+            _model = self.queryset.model
+        elif not _model and hasattr(self, 'object_list') and self.object_list is not None:
+             # Fallback if queryset isn't used directly but object_list is populated
+            _model = self.object_list.model
+        
+        if not _model:
+             # If we still can't determine the model, something is wrong
+             raise ImproperlyConfigured(
+                 f"{self.__class__.__name__} is missing a QuerySet. Define "
+                 f"{self.__class__.__name__}.model, {self.__class__.__name__}.queryset, or override "
+                 f"{self.__class__.__name__}.get_queryset()."
+             )
+
+        # Call super() AFTER we've potentially identified the model
+        context = super().get_context_data(**kwargs)
+        
+        # --- Set self.model before calling get_table --- 
+        self.model = _model
+        # --- End Set self.model ---
+
+        table = self.get_table()
+        filter_form = self.filterset_form(self.request.GET) if self.filterset_form else None
+        context['table'] = table
+        context['filter_form'] = filter_form
+        context['model'] = _model # Use the determined model
+        context['verbose_name_plural'] = _model._meta.verbose_name_plural
+        # --- Add model_name_str --- 
+        context['model_name_str'] = f"{_model._meta.app_label}.{_model._meta.model_name}"
+        # --- End Add model_name_str --- 
+        # --- Add table_config_key --- 
+        context['table_config_key'] = f"{_model._meta.app_label}.{table.__class__.__name__}" # Key for config modal URL
+        # --- End Add table_config_key --- 
+
+        # Ensure add_url also uses the determined model
+        try:
+             context['add_url'] = reverse(f'{_model._meta.app_label}:{_model._meta.model_name}_add')
+        except NoReverseMatch:
+             context['add_url'] = None # Handle cases where add view doesn't exist
+
+        # Add action buttons (e.g., 'add') if specified
+        if hasattr(self, 'action_buttons') and 'add' in self.action_buttons:
+            try: # --- Restore TRY/EXCEPT block ---
+                 # Correctly generate the create URL name using the determined _model
+                create_url_name = get_model_viewname(_model, 'create') 
+                # Try resolving it to ensure it exists before adding to context
+                reverse(create_url_name) # Check if URL can be reversed
+                context['create_url_name'] = create_url_name
+            except NoReverseMatch:
+                # If the create URL doesn't exist, don't add it to context
+                pass 
+            # --- END Restore TRY/EXCEPT block ---
+
+        # Get pagination context
+        if self.paginate_by:
+            context['paginate_by'] = self.paginate_by
+
+        # Add other common context like permissions, bulk action form etc.
+        # print(f"[DEBUG] ObjectListView context for {_model}: model_name_str = {context.get('model_name_str')}") # Remove DEBUG print
+        return context
+
+class ObjectDetailView(LoginRequiredMixin, DetailView):
+    """Base view for displaying a single object."""
+    template_name = 'generic/object_detail.html' # Default template
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Add common detail view context: permissions, related objects, changelog etc.
+        obj = self.get_object()
+        app_label = obj._meta.app_label
+        model_name = obj._meta.model_name
+        # Permissions
+        context['can_change'] = self.request.user.has_perm(f'{app_label}.change_{model_name}')
+        context['can_delete'] = self.request.user.has_perm(f'{app_label}.delete_{model_name}')
+        context['edit_url'] = reverse(f'{app_label}:{model_name}_edit', kwargs={'pk': obj.pk})
+        context['delete_url'] = reverse(f'{app_label}:{model_name}_delete', kwargs={'pk': obj.pk})
+        # Changelog (if using ChangeLoggingMixin)
+        if hasattr(obj, 'get_changelog_url'): # Assumes method exists
+            context['changelog_url'] = obj.get_changelog_url()
+        elif ContentType.objects.filter(app_label='core', model='objectchange').exists():
+            # Generic changelog link based on ContentType
+            obj_type = ContentType.objects.get_for_model(obj)
+            changelog_url = reverse('objectchange_list') + '?' + urlencode({'changed_object_type': obj_type.pk, 'changed_object_id': obj.pk})
+            context['changelog_url'] = changelog_url
+
+        # Add related object panels/tabs here later
+        return context
+
+class ObjectEditView(LoginRequiredMixin, UpdateView):
+    """Base view for creating or editing an object."""
+    model_form = None # Subclasses must specify form class
+    template_name = 'generic/object_edit.html' # Default template
+    # default_return_url can be set by subclasses
+
+    def get_form_class(self):
+        if self.model_form:
+            return self.model_form
+        return super().get_form_class()
+    
+    def get_object(self, queryset=None):
+        # Handle create view (pk not present in URL)
+        if 'pk' not in self.kwargs:
+            return None
+        return super().get_object(queryset)
+
+    def get_form(self, form_class=None):
+        """Instantiate the form with the object instance."""
+        kwargs = self.get_form_kwargs()
+        # For create views, instance will be None
+        kwargs['instance'] = self.object
+        if form_class is None:
+            form_class = self.get_form_class()
+        return form_class(**kwargs)
+
+    def get_success_url(self):
+        # Priority: POST param -> default_return_url -> object.get_absolute_url() -> list view
+        if self.request.POST.get('return_url'):
+            return self.request.POST.get('return_url')
+        if hasattr(self, 'default_return_url') and self.default_return_url:
+            return reverse(self.default_return_url)
+        if self.object and hasattr(self.object, 'get_absolute_url'):
+            return self.object.get_absolute_url()
+        # Fallback to list view
+        list_view_name = get_model_viewname(self.model, 'list') # Use helper
+        return reverse(list_view_name)
+
+    def form_valid(self, form):
+        is_creating = self.object is None # self.object is None when creating
+        self.object = form.save() # self.object is now set
+        # Get model from the form
+        _model = form._meta.model 
+        # Use _model instead of self.model
+        msg = f"{'Created' if is_creating else 'Modified'} {_model._meta.verbose_name} "
+        msg += f"<a href='{self.object.get_absolute_url()}'>{self.object}</a>" if hasattr(self.object, 'get_absolute_url') else f"{self.object}"
+        messages.success(self.request, msg)
+        
+        # Handle different save buttons
+        if self.request.POST.get('_addanother'):
+            # Use _model here too
+            add_view_name = get_model_viewname(_model, 'add') 
+            return redirect(reverse(add_view_name))
+        elif self.request.POST.get('_continue'):
+            # Use _model here too
+            edit_view_name = get_model_viewname(_model, 'edit') 
+            return redirect(reverse(edit_view_name, kwargs={'pk': self.object.pk}))
+            
+        return HttpResponseRedirect(self.get_success_url()) # Default redirect
+
+    def get_context_data(self, **kwargs):
+        # Determine the model class reliably
+        _model = getattr(self, 'model', None)
+        if not _model and hasattr(self, 'queryset') and self.queryset is not None:
+            _model = self.queryset.model
+        elif not _model and hasattr(self, 'model_form') and self.model_form is not None:
+             _model = self.model_form._meta.model
+        elif not _model and hasattr(self, 'form_class') and self.form_class is not None:
+            # Fallback to form_class if model_form isn't used directly
+            if hasattr(self.form_class, '_meta') and hasattr(self.form_class._meta, 'model'):
+                _model = self.form_class._meta.model
+
+        if not _model:
+             raise ImproperlyConfigured(
+                 f"{self.__class__.__name__} needs a model attribute, or a queryset/model_form with a model."
+             )
+
+        context = super().get_context_data(**kwargs)
+        context['model'] = _model # Use determined model
+        context['verbose_name'] = _model._meta.verbose_name
+        context['is_editing'] = self.object is not None
+        
+        # Define cancel URL using the determined model
+        if self.object and hasattr(self.object, 'get_absolute_url'):
+            context['cancel_url'] = self.object.get_absolute_url()
+        else:
+            try:
+                 list_view_name = get_model_viewname(_model, 'list') # Use determined model
+                 context['cancel_url'] = reverse(list_view_name)
+            except NoReverseMatch:
+                 context['cancel_url'] = reverse('dashboard') # Sensible fallback
+        return context
+
+class ObjectDeleteView(LoginRequiredMixin, DeleteView):
+    """Base view for deleting an object."""
+    template_name = 'generic/object_delete.html' # Default confirmation template
+    # default_return_url can be set by subclasses
+    form_class = ConfirmationForm # Generic confirmation form
+
+    def get_success_url(self):
+        # Priority: POST param -> default_return_url -> list view
+        if self.request.POST.get('return_url'):
+            return self.request.POST.get('return_url')
+        if hasattr(self, 'default_return_url') and self.default_return_url:
+            return reverse(self.default_return_url)
+        # Fallback to list view
+        list_view_name = get_model_viewname(self.model, 'list')
+        return reverse(list_view_name)
+
+    def get_form_kwargs(self):
+        # Pass the object to the confirmation form
+        kwargs = super().get_form_kwargs()
+        kwargs['instance'] = self.object
+        return kwargs
+
+    def form_valid(self, form):
+        """Handle object deletion and potential ProtectedError."""
+        obj_repr = str(self.object)
+        try:
+            self.object.delete()
+            messages.success(self.request, f"Deleted {self.model._meta.verbose_name} {obj_repr}.")
+            return HttpResponseRedirect(self.get_success_url())
+        except ProtectedError as e:
+            messages.error(self.request, f"Unable to delete {obj_repr}. Objects are protected: {e}")
+            # Redirect back to the object's detail view if possible, else list view
+            if hasattr(self.object, 'get_absolute_url'):
+                return redirect(self.object.get_absolute_url())
+            return redirect(self.get_success_url()) # Redirect to list/default
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['model'] = self.model
+        context['verbose_name'] = self.model._meta.verbose_name
+        # Define cancel URL - usually the object's detail view
+        if hasattr(self.object, 'get_absolute_url'):
+            context['cancel_url'] = self.object.get_absolute_url()
+        else:
+            # Fallback if no detail view (unlikely for deletable objects)
+            list_view_name = get_model_viewname(self.model, 'list')
+            context['cancel_url'] = reverse(list_view_name)
+        # Pass return_url if provided in GET params
+        context['return_url'] = self.request.GET.get('return_url', context['cancel_url'])
+        return context 

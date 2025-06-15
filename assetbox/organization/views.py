@@ -2,24 +2,29 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST # Keep this if needed for other views
 from django.urls import reverse # Add this import
+from django.views.generic import View
+from django.contrib.auth import get_user_model
 
 # Import models from the organization app
 from .models import Site, Region, SiteGroup, Tenant, Location, TenantGroup, AssetHolder, AssetHolderAssignment
 # Import models from the extras app
 from extras.models import Tag # Added import for Tag from extras
 # Import forms from the organization app
-from .forms import SiteForm, RegionForm, SiteGroupForm, LocationForm, TenantGroupForm, TenantForm, AssetHolderForm
+from .forms import (
+    SiteForm, RegionForm, SiteGroupForm, LocationForm, TenantGroupForm, TenantForm, AssetHolderForm,
+    SiteFilterForm, RegionFilterForm, SiteGroupFilterForm, LocationFilterForm, TenantFilterForm,
+    TenantGroupFilterForm, AssetHolderFilterForm # Placeholder imports - will create forms next
+)
 from django_tables2 import RequestConfig
 from .tables import ( # Import the tables
     SiteTable, RegionTable, SiteGroupTable, LocationTable, TenantTable, TenantGroupTable,
     AssetHolderTable, AssetHolderAssignmentTable
 )
+# Import core views and utilities
+from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView # Import base CBVs
 from core.utils import get_paginate_count, get_model_viewname # Import the utility function and get_model_viewname
 from assets.tables import AssetTable # Import AssetTable
 from assets.models import Asset # Import Asset model
-
-from django.contrib.auth import get_user_model
-from django.contrib.contenttypes.models import ContentType
 
 # Import filters
 from .filters import (
@@ -28,62 +33,22 @@ from .filters import (
 )
 from users.models import UserPreference # Import UserPreference
 
+# Import Count from django.db.models
+from django.db.models import Count
+from django.contrib.contenttypes.models import ContentType
+
 User = get_user_model()
 
 # Create your views here.
 
-# --- Helper function (optional, reduces repetition) ---
-def _configure_table_from_prefs(request, TableClass, queryset):
-    all_available_columns = list(TableClass.base_columns.keys())
-    prefs, _ = UserPreference.objects.get_or_create(user=request.user)
-    app_label = TableClass._meta.model._meta.app_label
-    table_class_name = TableClass.__name__
-    user_config = prefs.data.get('tables', {}).get(app_label, {}).get(table_class_name, {})
-    saved_visible_columns = user_config.get('columns', None)
-    
-    final_sequence = []
-    if saved_visible_columns is not None:
-        final_sequence = [col for col in saved_visible_columns if col in all_available_columns]
-    else:
-        meta = getattr(TableClass, 'Meta', None)
-        if hasattr(meta, 'default_columns'):
-             final_sequence = [col for col in meta.default_columns if col in all_available_columns]
-        elif hasattr(meta, 'fields'):
-            final_sequence = [col for col in meta.fields if col in all_available_columns]
-        else:
-            final_sequence = all_available_columns
-            
-    # Ensure pk and actions are positioned
-    if 'pk' in final_sequence: final_sequence.remove('pk')
-    if 'actions' in final_sequence: final_sequence.remove('actions')
-    if 'pk' in all_available_columns: final_sequence.insert(0, 'pk')
-    if 'actions' in all_available_columns: final_sequence.append('actions')
-    
-    columns_to_exclude = tuple(col for col in all_available_columns if col not in final_sequence)
-    
-    table = TableClass(queryset, request=request, sequence=tuple(final_sequence), exclude=columns_to_exclude)
-    RequestConfig(request, paginate={'per_page': get_paginate_count(request)}).configure(table)
-    return table
-# --- End Helper --- 
-
 # --- Site Views ---
 
-@login_required
-def site_list(request):
-    queryset = Site.objects.all()
-    filterset = SiteFilterSet(request.GET, queryset=queryset)
-    queryset = filterset.qs
-    table = _configure_table_from_prefs(request, SiteTable, queryset)
-    model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
-    table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}"
-    context = {
-        'table': table, 'title': 'Sites', 'object_type': 'Site',
-        'create_url_name': 'organization:site_create',
-        'model_name_str': model_name_str, 'table_config_key': table_config_key,
-        'filter_form': filterset,
-    }
-    return render(request, 'generic/object_list_base.html', context)
+class SiteListView(ObjectListView):
+    queryset = Site.objects.select_related('region', 'group', 'tenant').prefetch_related('tags')
+    filterset = SiteFilterSet
+    filterset_form = SiteFilterForm # Use the dedicated form
+    table = SiteTable
+    action_buttons = ('add',)
 
 @login_required
 def site_detail(request, pk):
@@ -183,22 +148,14 @@ def site_delete(request, pk):
 
 # --- Region Views ---
 
-@login_required
-def region_list(request):
-    queryset = Region.objects.all()
-    filterset = RegionFilterSet(request.GET, queryset=queryset)
-    queryset = filterset.qs
-    table = _configure_table_from_prefs(request, RegionTable, queryset)
-    model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
-    table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}"
-    context = {
-        'table': table, 'title': 'Regions', 'object_type': 'Region',
-        'create_url_name': 'organization:region_create',
-        'model_name_str': model_name_str, 'table_config_key': table_config_key,
-        'filter_form': filterset,
-    }
-    return render(request, 'generic/object_list_base.html', context)
+class RegionListView(ObjectListView):
+    queryset = Region.objects.annotate(
+        site_count=Count('sites')
+    ).prefetch_related('tags')
+    filterset = RegionFilterSet
+    filterset_form = RegionFilterForm # Use the dedicated form
+    table = RegionTable
+    action_buttons = ('add',)
 
 @login_required
 def region_detail(request, pk):
@@ -292,22 +249,14 @@ def region_delete(request, pk):
 
 # --- Site Group Views ---
 
-@login_required
-def sitegroup_list(request):
-    queryset = SiteGroup.objects.all()
-    filterset = SiteGroupFilterSet(request.GET, queryset=queryset)
-    queryset = filterset.qs
-    table = _configure_table_from_prefs(request, SiteGroupTable, queryset)
-    model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
-    table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}"
-    context = {
-        'table': table, 'title': 'Site Groups', 'object_type': 'Site Group',
-        'create_url_name': 'organization:sitegroup_create',
-        'model_name_str': model_name_str, 'table_config_key': table_config_key,
-        'filter_form': filterset,
-    }
-    return render(request, 'generic/object_list_base.html', context)
+class SiteGroupListView(ObjectListView):
+    queryset = SiteGroup.objects.annotate(
+        site_count=Count('sites')
+    ).prefetch_related('tags')
+    filterset = SiteGroupFilterSet
+    filterset_form = SiteGroupFilterForm # Use the dedicated form
+    table = SiteGroupTable
+    action_buttons = ('add',)
 
 @login_required
 def sitegroup_detail(request, pk):
@@ -395,22 +344,12 @@ def sitegroup_delete(request, pk):
 
 # --- Location Views ---
 
-@login_required
-def location_list(request):
-    queryset = Location.objects.all().select_related('site') # Add select_related
-    filterset = LocationFilterSet(request.GET, queryset=queryset)
-    queryset = filterset.qs
-    table = _configure_table_from_prefs(request, LocationTable, queryset)
-    model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
-    table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}"
-    context = {
-        'table': table, 'title': 'Locations', 'object_type': 'Location',
-        'create_url_name': 'organization:location_create',
-        'model_name_str': model_name_str, 'table_config_key': table_config_key,
-        'filter_form': filterset,
-    }
-    return render(request, 'generic/object_list_base.html', context)
+class LocationListView(ObjectListView):
+    queryset = Location.objects.select_related('site', 'site__region', 'tenant').prefetch_related('tags') # Add site__region prefetch
+    filterset = LocationFilterSet
+    filterset_form = LocationFilterForm # Use the dedicated form
+    table = LocationTable
+    action_buttons = ('add',)
 
 @login_required
 def location_detail(request, pk):
@@ -498,22 +437,14 @@ def location_delete(request, pk):
 
 # --- Tenant Group Views ---
 
-@login_required
-def tenantgroup_list(request):
-    queryset = TenantGroup.objects.all()
-    filterset = TenantGroupFilterSet(request.GET, queryset=queryset)
-    queryset = filterset.qs
-    table = _configure_table_from_prefs(request, TenantGroupTable, queryset)
-    model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
-    table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}"
-    context = {
-        'table': table, 'title': 'Tenant Groups', 'object_type': 'Tenant Group',
-        'create_url_name': 'organization:tenantgroup_create',
-        'model_name_str': model_name_str, 'table_config_key': table_config_key,
-        'filter_form': filterset,
-    }
-    return render(request, 'generic/object_list_base.html', context)
+class TenantGroupListView(ObjectListView):
+    queryset = TenantGroup.objects.annotate(
+        tenant_count=Count('tenants')
+    ).prefetch_related('tags')
+    filterset = TenantGroupFilterSet
+    filterset_form = TenantGroupFilterForm # Use the dedicated form
+    table = TenantGroupTable
+    action_buttons = ('add',)
 
 @login_required
 def tenantgroup_detail(request, pk):
@@ -563,22 +494,12 @@ def tenantgroup_delete(request, pk):
 
 # --- Tenant Views ---
 
-@login_required
-def tenant_list(request):
-    queryset = Tenant.objects.all().select_related('group') # Add select_related
-    filterset = TenantFilterSet(request.GET, queryset=queryset)
-    queryset = filterset.qs
-    table = _configure_table_from_prefs(request, TenantTable, queryset)
-    model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
-    table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}"
-    context = {
-        'table': table, 'title': 'Tenants', 'object_type': 'Tenant',
-        'create_url_name': 'organization:tenant_create',
-        'model_name_str': model_name_str, 'table_config_key': table_config_key,
-        'filter_form': filterset,
-    }
-    return render(request, 'generic/object_list_base.html', context)
+class TenantListView(ObjectListView):
+    queryset = Tenant.objects.select_related('group').prefetch_related('tags')
+    filterset = TenantFilterSet
+    filterset_form = TenantFilterForm # Use the dedicated form
+    table = TenantTable
+    action_buttons = ('add',)
 
 @login_required
 def tenant_detail(request, pk):
@@ -630,22 +551,12 @@ def tenant_delete(request, pk):
 
 # --- AssetHolder Views ---
 
-@login_required
-def assetholder_list(request):
-    queryset = AssetHolder.objects.all()
-    filterset = AssetHolderFilterSet(request.GET, queryset=queryset)
-    queryset = filterset.qs
-    table = _configure_table_from_prefs(request, AssetHolderTable, queryset)
-    model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
-    table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}"
-    context = {
-        'table': table, 'title': 'Asset Holders', 'object_type': 'Asset Holder',
-        'create_url_name': 'organization:assetholder_create',
-        'model_name_str': model_name_str, 'table_config_key': table_config_key,
-        'filter_form': filterset,
-    }
-    return render(request, 'generic/object_list_base.html', context)
+class AssetHolderListView(ObjectListView):
+    queryset = AssetHolder.objects.prefetch_related('tags', 'assignments')
+    filterset = AssetHolderFilterSet
+    filterset_form = AssetHolderFilterForm # Use the dedicated form
+    table = AssetHolderTable
+    action_buttons = ('add',)
 
 @login_required
 def assetholder_detail(request, pk):
@@ -740,24 +651,25 @@ def assetholder_delete(request, pk):
     }
     return render(request, 'generic/object_confirm_delete.html', context)
 
-
 # --- AssetHolderAssignment Views ---
 
+# Keep the function-based view for now unless refactoring is desired later
 @login_required
 def assetholderassignment_list(request):
-    queryset = AssetHolderAssignment.objects.all().select_related(
-        'asset_holder', 'content_type'
-    ).prefetch_related('assigned_object') # Prefetch generic relation
-
+    # Corrected select_related fields and removed invalid prefetch_related for GFK
+    queryset = AssetHolderAssignment.objects.select_related('asset_holder', 'content_type') 
+    # TODO: Add FilterSet and FilterForm if filtering is needed
+    # filterset = AssetHolderAssignmentFilterSet(request.GET, queryset=queryset)
+    # queryset = filterset.qs
     table = AssetHolderAssignmentTable(queryset, request=request)
-    # Assignments list is read-only, no create button or model config needed usually
     RequestConfig(request, paginate={'per_page': get_paginate_count(request)}).configure(table)
-
+    model = AssetHolderAssignment
+    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}"
+    table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}"
     context = {
-        'table': table,
-        'title': 'Asset Holder Assignments',
-        'list_url_name': 'organization:assetholderassignment_list',
-        # No object_type or create_url_name needed for read-only
+        'table': table, 'title': 'Asset Holder Assignments', 'object_type': 'Asset Holder Assignment',
+        # 'create_url_name': 'organization:assetholderassignment_create', # No create view typically for assignments
+        'model_name_str': model_name_str, 'table_config_key': table_config_key,
+        # 'filter_form': filterset.form if filterset else None, # Uncomment if filterset is added
     }
-    # Use the standard list base, but without create/config buttons
     return render(request, 'generic/object_list_base.html', context)

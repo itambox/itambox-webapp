@@ -7,6 +7,6 @@ class AssetsConfig(AppConfig):
 
     def ready(self):
         # Import signals
-        import assets.signals
+        # import assets.signals # Removed signal import
         # Import search indexes to register them
         import assets.search

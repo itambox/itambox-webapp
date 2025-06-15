@@ -11,7 +11,7 @@ class TagFilter(django_filters.FilterSet):
     
     class Meta:
         model = Tag
-        fields = ['name', 'slug', 'color']
+        fields = ['name']
     
     def search(self, queryset, name, value):
         if not value.strip():

@@ -3,12 +3,12 @@ from django.utils.text import slugify # For potential slug generation
 from django.urls import reverse
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from extras.models import Tag # Assuming extras.Tag is your tagging model
 from django.conf import settings # Import settings
+from core.models import BaseModel, ChangeLoggingMixin # Added import
 
 # Create your models here.
 
-class Location(models.Model):
+class Location(BaseModel, ChangeLoggingMixin):
     STATUS_PLANNED = 'planned'
     STATUS_STAGING = 'staging'
     STATUS_ACTIVE = 'active'
@@ -53,8 +53,8 @@ class Location(models.Model):
     facility = models.CharField(max_length=100, blank=True)
     description = models.TextField(blank=True) # Using TextField for potentially longer descriptions
     tags = models.ManyToManyField('extras.Tag', related_name="locations", blank=True)
-    created_at = models.DateTimeField(auto_now_add=True, editable=False)
-    updated_at = models.DateTimeField(auto_now=True, editable=False)
+    # created_at = models.DateTimeField(auto_now_add=True, editable=False) # Removed
+    # updated_at = models.DateTimeField(auto_now=True, editable=False) # Removed
 
     class Meta:
         ordering = ['site', 'name']
@@ -77,7 +77,7 @@ class Location(models.Model):
         # TODO: Verify URL name
         return reverse('organization:location_detail', kwargs={'pk': self.pk})
 
-class Region(models.Model):
+class Region(BaseModel, ChangeLoggingMixin):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     parent = models.ForeignKey(
@@ -89,8 +89,8 @@ class Region(models.Model):
     )
     description = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', related_name="regions", blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    # created_at = models.DateTimeField(auto_now_add=True) # Removed
+    # updated_at = models.DateTimeField(auto_now=True) # Removed
 
     class Meta:
         ordering = ['name']
@@ -102,7 +102,7 @@ class Region(models.Model):
         # TODO: Verify URL name
         return reverse('organization:region_detail', kwargs={'pk': self.pk})
 
-class SiteGroup(models.Model):
+class SiteGroup(BaseModel, ChangeLoggingMixin):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     parent = models.ForeignKey(
@@ -114,8 +114,8 @@ class SiteGroup(models.Model):
     )
     description = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', related_name="sitegroups", blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    # created_at = models.DateTimeField(auto_now_add=True) # Removed
+    # updated_at = models.DateTimeField(auto_now=True) # Removed
 
     class Meta:
         ordering = ['name']
@@ -129,7 +129,7 @@ class SiteGroup(models.Model):
         # TODO: Verify URL name
         return reverse('organization:sitegroup_detail', kwargs={'pk': self.pk})
 
-class TenantGroup(models.Model):
+class TenantGroup(BaseModel, ChangeLoggingMixin):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     parent = models.ForeignKey(
@@ -141,8 +141,8 @@ class TenantGroup(models.Model):
     )
     description = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', related_name="tenantgroups", blank=True)
-    created_at = models.DateTimeField(auto_now_add=True, editable=False)
-    updated_at = models.DateTimeField(auto_now=True, editable=False)
+    # created_at = models.DateTimeField(auto_now_add=True, editable=False) # Removed
+    # updated_at = models.DateTimeField(auto_now=True, editable=False) # Removed
 
     class Meta:
         ordering = ['name']
@@ -156,7 +156,7 @@ class TenantGroup(models.Model):
         # TODO: Verify URL name
         return reverse('organization:tenantgroup_detail', kwargs={'pk': self.pk})
 
-class Tenant(models.Model):
+class Tenant(BaseModel, ChangeLoggingMixin):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     group = models.ForeignKey(
@@ -169,8 +169,8 @@ class Tenant(models.Model):
     description = models.TextField(blank=True)
     comments = models.TextField(blank=True) # Added comments
     tags = models.ManyToManyField('extras.Tag', related_name="tenants", blank=True)
-    created_at = models.DateTimeField(auto_now_add=True, editable=False)
-    updated_at = models.DateTimeField(auto_now=True, editable=False)
+    # created_at = models.DateTimeField(auto_now_add=True, editable=False) # Removed
+    # updated_at = models.DateTimeField(auto_now=True, editable=False) # Removed
 
     class Meta:
         ordering = ['name']
@@ -182,7 +182,7 @@ class Tenant(models.Model):
     def __str__(self):
         return self.name
 
-class Site(models.Model):
+class Site(BaseModel, ChangeLoggingMixin):
     STATUS_PLANNED = 'planned'
     STATUS_STAGING = 'staging'
     STATUS_ACTIVE = 'active'
@@ -212,8 +212,8 @@ class Site(models.Model):
     longitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
     comments = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', related_name="sites", blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    # created_at = models.DateTimeField(auto_now_add=True) # Removed
+    # updated_at = models.DateTimeField(auto_now=True) # Removed
 
     class Meta:
         ordering = ['name']
@@ -226,7 +226,7 @@ class Site(models.Model):
         return reverse('organization:site_detail', kwargs={'pk': self.pk})
 
 # +++ AssetHolder Model +++
-class AssetHolder(models.Model):
+class AssetHolder(BaseModel, ChangeLoggingMixin):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL, # Keep holder if user is deleted, set user link to null
@@ -247,9 +247,9 @@ class AssetHolder(models.Model):
     )
     description = models.TextField(blank=True)
     comments = models.TextField(blank=True)
-    tags = models.ManyToManyField(Tag, blank=True, related_name='organization_assetholders') # M2M to extras.Tag
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    tags = models.ManyToManyField('extras.Tag', blank=True, related_name='organization_assetholders') # M2M to extras.Tag
+    # created_at = models.DateTimeField(auto_now_add=True) # Removed
+    # updated_at = models.DateTimeField(auto_now=True) # Removed
 
     class Meta:
         ordering = ['last_name', 'first_name', 'upn']
@@ -257,6 +257,7 @@ class AssetHolder(models.Model):
             models.UniqueConstraint(fields=['upn'], name='organization_assetholder_unique_upn')
         ]
         verbose_name = "Asset Holder"
+        verbose_name_plural = "Asset Holders"
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.upn})"
@@ -275,7 +276,7 @@ class AssetHolderAssignment(models.Model):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     assigned_object = GenericForeignKey('content_type', 'object_id')
-    tags = models.ManyToManyField(Tag, blank=True, related_name='organization_assetholderassignments') # M2M to extras.Tag
+    tags = models.ManyToManyField('extras.Tag', blank=True, related_name='organization_assetholderassignments') # M2M to extras.Tag
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -288,6 +289,7 @@ class AssetHolderAssignment(models.Model):
             )
         ]
         verbose_name = "Asset Holder Assignment"
+        verbose_name_plural = "Asset Holder Assignments"
 
     def __str__(self):
-        return f"{self.asset_holder} assigned to {self.content_type.model} {self.object_id}"
+        return f"Assignment for {self.asset_holder} to {self.assigned_object}"

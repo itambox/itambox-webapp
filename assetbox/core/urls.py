@@ -32,9 +32,10 @@ urlpatterns = [
     path('search/', core_views.SearchView.as_view(), name='search'),
 
     # UI Paths
-    path('assets/', include('assets.urls')),
-    path('organization/', include('organization.urls')),
+    path('assets/', include('assets.urls', namespace='assets')),
+    path('organization/', include('organization.urls', namespace='organization')),
     path('extras/', include('extras.urls')),
+    path('software/', include('software.urls', namespace='software')),
     path('tables/config/<str:model_name>/', core_views.table_config, name='table_config'),
     path('user/', include('users.urls')), # Include the users app URLs
 

@@ -7,6 +7,11 @@ from django.contrib.auth import get_user_model
 from django_tables2 import RequestConfig
 from .tables import AssetTable, AssetRoleTable, ManufacturerTable, AssetTypeTable
 from .filters import AssetFilterSet, AssetRoleFilterSet, ManufacturerFilterSet, AssetTypeFilterSet 
+# --- Add imports needed for CBVs --- 
+from . import filters
+from . import forms
+from . import tables
+# --- End imports ---
 from core.utils import get_paginate_count, get_model_viewname
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.contrib.contenttypes.models import ContentType
@@ -17,6 +22,7 @@ from django.contrib import messages # <--- Add this import
 from users.models import UserPreference # Import UserPreference
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin
+from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
 
 User = get_user_model()
 
@@ -28,84 +34,99 @@ def dashboard(request):
     context = {}
     return render(request, 'dashboard.html', context)
 
-@login_required
-def asset_list(request):
+# @login_required
+# def asset_list(request):
+#     queryset = Asset.objects.all().select_related(
+#         'asset_role', 
+#         'asset_type',  # Select the related asset_type
+#         'asset_type__manufacturer', # Select the manufacturer via asset_type
+#         'location'
+#     )
+#     filterset = AssetFilterSet(request.GET, queryset=queryset)
+#     queryset = filterset.qs 
+# 
+#     # --- Determine Columns to Show/Exclude --- 
+#     TableClass = AssetTable # Get the table class
+#     all_available_columns = list(TableClass.base_columns.keys()) # List of all columns defined on the table
+#     
+#     prefs, created_at = UserPreference.objects.get_or_create(user=request.user)
+#     
+#     app_label = TableClass._meta.model._meta.app_label
+#     table_class_name = TableClass.__name__
+# 
+#     user_config = prefs.data.get('tables', {}).get(app_label, {}).get(table_class_name, {}) 
+#     
+#     saved_visible_columns = user_config.get('columns', None) 
+# 
+#     # --- Determine Final Visible Column Sequence --- 
+#     final_sequence = []
+#     if saved_visible_columns is not None:
+#         # User has preferences: Use their saved list, ensuring columns still exist
+#         final_sequence = [col for col in saved_visible_columns if col in all_available_columns]
+#     else:
+#         # No user preference: use table defaults
+#         meta = getattr(TableClass, 'Meta', None)
+#         if hasattr(meta, 'default_columns'):
+#              final_sequence = [col for col in meta.default_columns if col in all_available_columns]
+#         elif hasattr(meta, 'fields'):
+#             final_sequence = [col for col in meta.fields if col in all_available_columns]
+#         else:
+#             # Fallback: Show all available columns if no defaults defined
+#             final_sequence = all_available_columns
+#     
+#     # --- Ensure pk and actions are correctly positioned --- 
+#     # Remove them first to avoid duplicates and control position
+#     if 'pk' in final_sequence: final_sequence.remove('pk')
+#     if 'actions' in final_sequence: final_sequence.remove('actions')
+#     
+#     # Add them back in desired positions (if they exist on the table class)
+#     if 'pk' in all_available_columns:
+#         final_sequence.insert(0, 'pk')
+#     if 'actions' in all_available_columns:
+#         final_sequence.append('actions')
+# 
+#     # Instantiate table using BOTH sequence and exclude for maximum explicitness
+#     table = TableClass(
+#         queryset, 
+#         request=request, 
+#         sequence=tuple(final_sequence), 
+#         exclude=tuple(col for col in all_available_columns if col not in final_sequence)
+#     )
+# 
+#     # Configure pagination (and sorting if needed)
+#     RequestConfig(request, paginate={'per_page': get_paginate_count(request)}).configure(table)
+# 
+#     model = table.Meta.model
+#     # --- Revert model_name_str and add table_config_key --- 
+#     model_name_str = f"{model._meta.app_label}.{model._meta.model_name}" # For bulk delete form
+#     table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}" # For config modal URL
+# 
+#     context = {
+#         'table': table,
+#         'title': 'Assets',
+#         'object_type': 'Asset',
+#         'create_url_name': 'assets:asset_create',
+#         'model_name_str': model_name_str, # Pass the app_label.modelname
+#         'table_config_key': table_config_key, # Pass the app_label.TableName
+#         'filter_form': filterset.form,
+#     }
+#     
+#     return render(request, 'generic/object_list_base.html', context)
+
+# --- Asset Views (Refactored to CBV) ---
+class AssetListView(ObjectListView):
     queryset = Asset.objects.all().select_related(
         'asset_role', 
-        'asset_type',  # Select the related asset_type
-        'asset_type__manufacturer', # Select the manufacturer via asset_type
+        'asset_type', 
+        'asset_type__manufacturer',
         'location'
     )
-    filterset = AssetFilterSet(request.GET, queryset=queryset)
-    queryset = filterset.qs 
-
-    # --- Determine Columns to Show/Exclude --- 
-    TableClass = AssetTable # Get the table class
-    all_available_columns = list(TableClass.base_columns.keys()) # List of all columns defined on the table
-    
-    prefs, created = UserPreference.objects.get_or_create(user=request.user)
-    
-    app_label = TableClass._meta.model._meta.app_label
-    table_class_name = TableClass.__name__
-
-    user_config = prefs.data.get('tables', {}).get(app_label, {}).get(table_class_name, {}) 
-    
-    saved_visible_columns = user_config.get('columns', None) 
-
-    # --- Determine Final Visible Column Sequence --- 
-    final_sequence = []
-    if saved_visible_columns is not None:
-        # User has preferences: Use their saved list, ensuring columns still exist
-        final_sequence = [col for col in saved_visible_columns if col in all_available_columns]
-    else:
-        # No user preference: use table defaults
-        meta = getattr(TableClass, 'Meta', None)
-        if hasattr(meta, 'default_columns'):
-             final_sequence = [col for col in meta.default_columns if col in all_available_columns]
-        elif hasattr(meta, 'fields'):
-            final_sequence = [col for col in meta.fields if col in all_available_columns]
-        else:
-            # Fallback: Show all available columns if no defaults defined
-            final_sequence = all_available_columns
-    
-    # --- Ensure pk and actions are correctly positioned --- 
-    # Remove them first to avoid duplicates and control position
-    if 'pk' in final_sequence: final_sequence.remove('pk')
-    if 'actions' in final_sequence: final_sequence.remove('actions')
-    
-    # Add them back in desired positions (if they exist on the table class)
-    if 'pk' in all_available_columns:
-        final_sequence.insert(0, 'pk')
-    if 'actions' in all_available_columns:
-        final_sequence.append('actions')
-
-    # Instantiate table using BOTH sequence and exclude for maximum explicitness
-    table = TableClass(
-        queryset, 
-        request=request, 
-        sequence=tuple(final_sequence), 
-        exclude=tuple(col for col in all_available_columns if col not in final_sequence)
-    )
-
-    # Configure pagination (and sorting if needed)
-    RequestConfig(request, paginate={'per_page': get_paginate_count(request)}).configure(table)
-
-    model = table.Meta.model
-    # --- Revert model_name_str and add table_config_key --- 
-    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}" # For bulk delete form
-    table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}" # For config modal URL
-
-    context = {
-        'table': table,
-        'title': 'Assets',
-        'object_type': 'Asset',
-        'create_url_name': 'assets:asset_create',
-        'model_name_str': model_name_str, # Pass the app_label.modelname
-        'table_config_key': table_config_key, # Pass the app_label.TableName
-        'filter_form': filterset,
-    }
-    
-    return render(request, 'generic/object_list_base.html', context)
+    filterset = filters.AssetFilterSet
+    filterset_form = forms.AssetFilterForm # Corrected: Point to AssetFilterForm
+    table = tables.AssetTable
+    action_buttons = ('add',) # Add action_buttons
+    # template_name = 'assets/assets/asset_list.html' # Optionally override generic template
+    # Define context overrides if needed, otherwise base class handles it
 
 @login_required
 def asset_create(request):
@@ -308,60 +329,15 @@ def asset_checkin(request, pk):
         
     return redirect('assets:asset_detail', pk=asset.pk)
 
-# --- AssetRole (Asset Role) Views ---
+# --- AssetRole (Asset Role) Views (Refactored to CBV) ---
 
-@login_required
-def assetrole_list(request):
+class AssetRoleListView(ObjectListView):
     queryset = AssetRole.objects.all()
-    filterset = AssetRoleFilterSet(request.GET, queryset=queryset)
-    queryset = filterset.qs
-
-    # --- Determine Columns & Configure Table --- 
-    TableClass = AssetRoleTable
-    all_available_columns = list(TableClass.base_columns.keys())
-    prefs, _ = UserPreference.objects.get_or_create(user=request.user)
-    app_label = TableClass._meta.model._meta.app_label
-    table_class_name = TableClass.__name__
-    user_config = prefs.data.get('tables', {}).get(app_label, {}).get(table_class_name, {})
-    saved_visible_columns = user_config.get('columns', None)
-    
-    final_sequence = []
-    if saved_visible_columns is not None:
-        final_sequence = [col for col in saved_visible_columns if col in all_available_columns]
-    else:
-        meta = getattr(TableClass, 'Meta', None)
-        if hasattr(meta, 'default_columns'):
-             final_sequence = [col for col in meta.default_columns if col in all_available_columns]
-        elif hasattr(meta, 'fields'):
-            final_sequence = [col for col in meta.fields if col in all_available_columns]
-        else:
-            final_sequence = all_available_columns
-            
-    if 'pk' in final_sequence: final_sequence.remove('pk')
-    if 'actions' in final_sequence: final_sequence.remove('actions')
-    if 'pk' in all_available_columns: final_sequence.insert(0, 'pk')
-    if 'actions' in all_available_columns: final_sequence.append('actions')
-    
-    columns_to_exclude = tuple(col for col in all_available_columns if col not in final_sequence)
-    table = TableClass(queryset, request=request, sequence=tuple(final_sequence), exclude=columns_to_exclude)
-    RequestConfig(request, paginate={'per_page': get_paginate_count(request)}).configure(table)
-    # --- End Configuration --- 
-
-    model = table.Meta.model
-    # --- Revert model_name_str and add table_config_key --- 
-    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}" # For bulk delete form
-    table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}" # For config modal URL
-
-    context = {
-        'table': table,
-        'title': 'Asset Roles', 
-        'object_type': 'Asset Role', 
-        'create_url_name': 'assets:assetrole_create', 
-        'model_name_str': model_name_str, # Pass the app_label.modelname
-        'table_config_key': table_config_key, # Pass the app_label.TableName
-        'filter_form': filterset, 
-    }
-    return render(request, 'generic/object_list_base.html', context)
+    filterset = filters.AssetRoleFilterSet
+    filterset_form = forms.AssetRoleFilterForm # Corrected: Point to AssetRoleFilterForm
+    table = tables.AssetRoleTable
+    action_buttons = ('add',) # Add action_buttons
+    # template_name = 'assets/assetroles/assetrole_list.html' # Optionally override
 
 @login_required
 def assetrole_detail(request, pk):
@@ -473,60 +449,15 @@ def assetrole_delete(request, pk):
     # Render the generic delete confirmation template
     return render(request, 'generic/object_confirm_delete.html', context)
 
-# --- Manufacturer Views ---
+# --- Manufacturer Views (Refactored to CBV) ---
 
-@login_required
-def manufacturer_list(request):
+class ManufacturerListView(ObjectListView):
     queryset = Manufacturer.objects.all()
-    filterset = ManufacturerFilterSet(request.GET, queryset=queryset)
-    queryset = filterset.qs  
-
-    # --- Determine Columns & Configure Table --- 
-    TableClass = ManufacturerTable
-    all_available_columns = list(TableClass.base_columns.keys())
-    prefs, _ = UserPreference.objects.get_or_create(user=request.user)
-    app_label = TableClass._meta.model._meta.app_label
-    table_class_name = TableClass.__name__
-    user_config = prefs.data.get('tables', {}).get(app_label, {}).get(table_class_name, {})
-    saved_visible_columns = user_config.get('columns', None)
-    
-    final_sequence = []
-    if saved_visible_columns is not None:
-        final_sequence = [col for col in saved_visible_columns if col in all_available_columns]
-    else:
-        meta = getattr(TableClass, 'Meta', None)
-        if hasattr(meta, 'default_columns'):
-             final_sequence = [col for col in meta.default_columns if col in all_available_columns]
-        elif hasattr(meta, 'fields'):
-            final_sequence = [col for col in meta.fields if col in all_available_columns]
-        else:
-            final_sequence = all_available_columns
-            
-    if 'pk' in final_sequence: final_sequence.remove('pk')
-    if 'actions' in final_sequence: final_sequence.remove('actions')
-    if 'pk' in all_available_columns: final_sequence.insert(0, 'pk')
-    if 'actions' in all_available_columns: final_sequence.append('actions')
-    
-    columns_to_exclude = tuple(col for col in all_available_columns if col not in final_sequence)
-    table = TableClass(queryset, request=request, sequence=tuple(final_sequence), exclude=columns_to_exclude)
-    RequestConfig(request, paginate={'per_page': get_paginate_count(request)}).configure(table)
-    # --- End Configuration --- 
-
-    model = table.Meta.model
-    # --- Revert model_name_str and add table_config_key --- 
-    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}" # For bulk delete form
-    table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}" # For config modal URL
-
-    context = {
-        'table': table,
-        'title': 'Manufacturers',
-        'object_type': 'Manufacturer',
-        'create_url_name': 'assets:manufacturer_create',
-        'model_name_str': model_name_str, # Pass the app_label.modelname
-        'table_config_key': table_config_key, # Pass the app_label.TableName
-        'filter_form': filterset,
-    }
-    return render(request, 'generic/object_list_base.html', context)
+    filterset = filters.ManufacturerFilterSet
+    filterset_form = forms.ManufacturerFilterForm # Corrected: Point to ManufacturerFilterForm
+    table = tables.ManufacturerTable
+    action_buttons = ('add',) # Add action_buttons
+    # template_name = 'assets/manufacturers/manufacturer_list.html' # Optionally override
 
 @login_required
 def manufacturer_detail(request, pk):
@@ -653,41 +584,21 @@ def manufacturer_delete(request, pk):
 
 # --- Asset Type Views (Class-Based) ---
 
-class AssetTypeListView(LoginRequiredMixin, ListView):
-    model = AssetType
-    template_name = 'assets/assettypes/assettype_list.html'
-    context_object_name = 'asset_types'
-    filterset_class = AssetTypeFilterSet # Specify the filterset class
-    paginate_by = 20 # Or get from settings/user prefs
+# Refactor AssetTypeListView to use ObjectListView
+class AssetTypeListView(ObjectListView): # Inherit from ObjectListView
+    queryset = AssetType.objects.select_related('manufacturer') # Keep the base queryset
+    filterset = filters.AssetTypeFilterSet # Keep filterset
+    filterset_form = forms.AssetTypeFilterForm # Explicitly set the filter form
+    table = tables.AssetTypeTable # Keep the table
+    action_buttons = ('add',) # Define action buttons like others
+    # Remove template_name - ObjectListView handles it
+    # Remove context_object_name - ObjectListView handles it
+    # Remove paginate_by - ObjectListView handles it via get_paginate_count
+    # Remove get_queryset method - ObjectListView handles filtering
+    # Remove get_context_data method - ObjectListView handles context generation
 
-    def get_queryset(self):
-        queryset = super().get_queryset().select_related('manufacturer')
-        self.filterset = self.filterset_class(self.request.GET, queryset=queryset)
-        return self.filterset.qs # Return the filtered queryset
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        
-        # Instantiate table with the filtered queryset
-        table = AssetTypeTable(self.object_list, request=self.request)
-        # Use RequestConfig for sorting and pagination (uses paginate_by)
-        RequestConfig(self.request, paginate={'per_page': self.paginate_by}).configure(table)
-        
-        # --- Add required context for object_list_base template --- 
-        model = self.model # Get the model from the view
-        context['table'] = table
-        context['title'] = 'Asset Types' # Add title
-        context['object_type'] = 'Asset Type' # Add object type verbose name
-        context['create_url_name'] = 'assets:assettype_create' # Add create URL name
-        # Add model_name_str for bulk operations
-        context['model_name_str'] = f"{model._meta.app_label}.{model._meta.model_name}"
-        # Add table_config_key for the "Configure Table" button
-        context['table_config_key'] = f"{model._meta.app_label}.{table.__class__.__name__}"
-        # Add the filterset instance itself for rendering the form
-        context['filter_form'] = self.filterset 
-        # --- End required context additions --- 
-
-        return context
+# Keep Detail, Create, Update, Delete views as they are for now,
+# unless further refactoring to ObjectDetailView etc. is desired later.
 
 class AssetTypeDetailView(LoginRequiredMixin, DetailView):
     model = AssetType

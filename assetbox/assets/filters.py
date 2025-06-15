@@ -39,21 +39,6 @@ class AssetFilterSet(django_filters.FilterSet):
         # Define fields that can be filtered directly (in addition to custom ones above)
         fields = ['status', 'asset_role', 'manufacturer', 'location'] # Keep this minimal if defining explicitly
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Initialize FormHelper
-        self.form.helper = FormHelper()
-        self.form.helper.form_method = 'get' # Important for filters
-        self.form.helper.form_tag = False # Template handles <form> tag
-        # Define a simple layout, adding the submit button
-        self.form.helper.layout = Layout(
-            *self.filters.keys(), # Render all defined filter fields
-            HTML('<div class="mt-3">'),
-            Submit('submit', 'Apply Filter', css_class='btn btn-primary'),
-            HTML('<a href="{{ request.path }}" class="btn btn-secondary ms-2">Clear Filters</a>'),
-            HTML('</div>')
-        )
-
     def search(self, queryset, name, value):
         """Perform basic search across designated fields."""
         if not value.strip():
@@ -78,19 +63,6 @@ class AssetRoleFilterSet(django_filters.FilterSet):
         model = AssetRole
         fields = ['name'] # Add other specific fields if needed later
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.form.helper = FormHelper()
-        self.form.helper.form_method = 'get'
-        self.form.helper.form_tag = False
-        self.form.helper.layout = Layout(
-            *self.filters.keys(),
-            HTML('<div class="mt-3">'),
-            Submit('submit', 'Apply Filter', css_class='btn btn-primary'),
-            HTML('<a href="{{ request.path }}" class="btn btn-secondary ms-2">Clear Filters</a>'),
-            HTML('</div>')
-        )
-
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
@@ -110,19 +82,6 @@ class ManufacturerFilterSet(django_filters.FilterSet):
     class Meta:
         model = Manufacturer
         fields = ['name'] # Add other specific fields if needed later
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.form.helper = FormHelper()
-        self.form.helper.form_method = 'get'
-        self.form.helper.form_tag = False
-        self.form.helper.layout = Layout(
-            *self.filters.keys(),
-            HTML('<div class="mt-3">'),
-            Submit('submit', 'Apply Filter', css_class='btn btn-primary'),
-            HTML('<a href="{{ request.path }}" class="btn btn-secondary ms-2">Clear Filters</a>'),
-            HTML('</div>')
-        )
 
     def search(self, queryset, name, value):
         if not value.strip():

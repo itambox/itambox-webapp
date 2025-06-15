@@ -2,10 +2,11 @@
 from django.db.models import Count # Import Count
 from rest_framework import viewsets
 from django_filters.rest_framework import DjangoFilterBackend
-from assets.models import Asset, AssetRole, Manufacturer
+from assets.models import Asset, AssetRole, Manufacturer, AssetType, InstalledSoftware
 from assets.filters import AssetFilterSet, AssetRoleFilterSet, ManufacturerFilterSet
 from .serializers import (
-    AssetSerializer, AssetRoleSerializer, ManufacturerSerializer
+    AssetSerializer, AssetRoleSerializer, ManufacturerSerializer, AssetTypeSerializer,
+    InstalledSoftwareSerializer
 )
 
 class AssetViewSet(viewsets.ModelViewSet):
@@ -31,4 +32,15 @@ class ManufacturerViewSet(viewsets.ModelViewSet):
     )
     serializer_class = ManufacturerSerializer
     filter_backends = (DjangoFilterBackend,)
-    filterset_class = ManufacturerFilterSet 
+    filterset_class = ManufacturerFilterSet
+
+class InstalledSoftwareViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Read-only API endpoint for installed software inventory.
+    """
+    queryset = InstalledSoftware.objects.select_related(
+        'asset', 'software', 'software__manufacturer'
+    ).all()
+    serializer_class = InstalledSoftwareSerializer
+    filterset_fields = ['asset_id', 'software_id', 'software__manufacturer_id', 'version_detected']
+    search_fields = ['asset__name', 'software__name', 'version_detected'] 

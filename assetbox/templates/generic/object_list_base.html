@@ -80,7 +80,7 @@
                         <div class="row align-items-center">
                             {# Quick Search Input Group #}
                             <div class="col-auto">
-                                {% if filter_form and filter_form.form.q %}
+                                {% if filter_form and filter_form.q %}
                                 <div class="input-group input-group-flat quicksearch">
                                     <input type="search" name="q" class="form-control" placeholder="Quick search..." value="{{ request.GET.q|default:"" }}">
                                     <span class="input-group-text">
@@ -146,8 +146,16 @@
                     {# Filter Form (GET method for applying filters) #}
                     <form method="get" action="" class="filter-form-tab">
                          <h4 class="mb-3">Filter</h4>
-                         {# Render the .form attribute of the filterset #}
-                         {% crispy filter_form.form %}
+                         {# Render the filter_form directly #}
+                         {% crispy filter_form %}
+                         
+                         {# --- Add Filter Buttons --- #}
+                         <div class="mt-4 d-flex justify-content-between">
+                             <button type="submit" name="_apply" class="btn btn-primary">Apply Filters</button>
+                             {# Link to clear filters (remove query params) #}
+                             <a href="?" class="btn btn-outline-secondary">Clear Filters</a> {# Basic clear, might need JS for complex cases #}
+                         </div>
+                         {# --- End Filter Buttons --- #}
                     </form>
                 </div>
                 {% endif %}

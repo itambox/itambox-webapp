@@ -67,7 +67,7 @@ class UserPreferencesForm(forms.Form):
 
     def save(self):
         """Save form data to UserPreference."""
-        prefs, created = UserPreference.objects.get_or_create(user=self.user)
+        prefs, created_at = UserPreference.objects.get_or_create(user=self.user)
         
         # Ensure prefs.data is initialized as a dict if it's None or not set
         if prefs.data is None:

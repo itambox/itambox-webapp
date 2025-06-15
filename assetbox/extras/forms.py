@@ -3,6 +3,8 @@ from .models import Tag, ConfigTemplate
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Div, Field
 from django.urls import reverse
+from core.forms import FilterForm
+from .filters import TagFilter, ConfigTemplateFilter
 
 class TagForm(forms.ModelForm):
     # Explicitly define color field to allow '#' prefix initially
@@ -91,4 +93,12 @@ class ConfigTemplateForm(forms.ModelForm):
             Submit('submit', button_text, css_class='btn btn-primary'),
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
             HTML('</div>')
-        ) 
+        )
+
+# --- Tag Filter Form --- 
+class TagFilterForm(FilterForm):
+    filterset_class = TagFilter
+
+# --- ConfigTemplate Filter Form --- 
+class ConfigTemplateFilterForm(FilterForm):
+    filterset_class = ConfigTemplateFilter 

@@ -1,7 +1,7 @@
 from django.contrib import admin
 # Import models from this app
 from .models import (
-    Asset, AssetRole, Manufacturer, AssetType, ActivityLog
+    Asset, AssetRole, Manufacturer, AssetType, ActivityLog, InstalledSoftware
 )
 
 # Register your models here.
@@ -34,10 +34,9 @@ class AssetTypeAdmin(admin.ModelAdmin):
 
 @admin.register(Asset)
 class AssetAdmin(admin.ModelAdmin):
-    list_display = ('name', 'asset_tag', 'status', 'manufacturer', 'model', 'asset_role', 'location', 'updated_at')
+    list_display = ('name', 'asset_tag', 'status', 'manufacturer', 'model', 'asset_role', 'location')
     list_filter = ('status', 'asset_role', 'asset_type__manufacturer', 'location', 'asset_type')
     search_fields = ('name', 'asset_tag', 'serial_number', 'asset_type__model')
-    readonly_fields = ('created_at', 'updated_at')
 
 @admin.register(ActivityLog)
 class ActivityLogAdmin(admin.ModelAdmin):
@@ -45,5 +44,13 @@ class ActivityLogAdmin(admin.ModelAdmin):
     list_filter = ('action', 'user')
     search_fields = ('asset__name', 'asset__asset_tag', 'notes')
     readonly_fields = ('asset', 'user', 'action', 'timestamp')
+
+@admin.register(InstalledSoftware)
+class InstalledSoftwareAdmin(admin.ModelAdmin):
+    list_display = ('asset', 'software', 'version_detected', 'last_seen_date', 'discovered_by_agent')
+    list_filter = ('software__manufacturer', 'software', 'discovered_by_agent', 'asset__location')
+    search_fields = ('asset__name', 'asset__asset_tag', 'software__name', 'version_detected', 'notes')
+    date_hierarchy = 'last_seen_date'
+    raw_id_fields = ('asset', 'software')
 
 # Registrations for Site, Region, SiteGroup, Tenant, Tag, Location moved to organization/admin.py

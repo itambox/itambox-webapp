@@ -5,7 +5,7 @@ app_name = 'extras'
 
 urlpatterns = [
     # Tags
-    path('tags/', views.tag_list, name='tag_list'),
+    path('tags/', views.TagListView.as_view(), name='tag_list'),
     path('tags/create/', views.tag_create, name='tag_create'),
     path('tags/<int:pk>/', views.tag_detail, name='tag_detail'),
     path('tags/<int:pk>/edit/', views.tag_update, name='tag_update'),

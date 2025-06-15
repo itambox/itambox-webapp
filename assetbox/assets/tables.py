@@ -27,6 +27,8 @@ class AssetTable(BaseTable): # Inherit from BaseTable
             'pk', 'name', 'asset_tag', 'asset_type', 'asset_type__manufacturer', 'asset_type__model', 'asset_role', 
             'status', 'assignee', 'location', 'actions',
         )
+        # *** Explicitly set default order_by for AssetTable ***
+        order_by = ('name',)
         # Remove template_name and attrs, inherited from BaseTable
 
     def render_assignee(self, record):
@@ -106,13 +108,18 @@ class AssetTypeTable(BaseTable):
     pk = tables.CheckBoxColumn(accessor='pk')
     manufacturer = tables.Column(linkify=True) # Linkify using default get_absolute_url
     model = tables.LinkColumn('assets:assettype_detail', args=[A('slug')], verbose_name='Model')
-    # TODO: Decide if asset count is needed here, could be expensive
-    # asset_count = tables.Column(verbose_name='Instances', orderable=False)
+    created_at = tables.DateTimeColumn(format="Y-m-d") # Explicitly add 'created'
+    last_updated = tables.DateTimeColumn(format="Y-m-d H:i") # Explicitly add 'last_updated'
+    actions = ActionsColumn() # Add actions column
 
     class Meta(BaseTable.Meta):
         model = AssetType
-        fields = ('pk', 'manufacturer', 'model', 'part_number', 'actions')
+        # Add 'created' and 'last_updated' to fields
+        fields = ('pk', 'manufacturer', 'model', 'part_number', 'created', 'last_updated', 'actions') 
+        # Keep default columns as before, or add created/last_updated if desired
         default_columns = ('pk', 'manufacturer', 'model', 'part_number', 'actions')
+        # *** Explicitly set default order_by ***
+        order_by = ('manufacturer', 'model')
 
     # def render_asset_count(self, record):
     #    return Asset.objects.filter(asset_type=record).count() # Example if Asset links to AssetType

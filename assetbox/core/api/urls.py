@@ -1,20 +1,17 @@
 # core/api/urls.py
-from django.urls import path
-# Remove CoreRootView import as it's not defined/needed here
-# from .views import CoreRootView 
-from rest_framework.routers import DefaultRouter # Import router
-from . import views # Import views
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from . import views 
 
 app_name = 'core_api'
 
-# --- Use a router for ViewSets like ObjectChangeViewSet --- 
+# Router for core-specific ViewSets
 router = DefaultRouter()
 router.register(r'object-changes', views.ObjectChangeViewSet, basename='objectchange')
+# Register ContentTypeViewSet if needed later
+# router.register(r'content-types', views.ContentTypeViewSet, basename='contenttype')
 
-urlpatterns = router.urls
-
-# We don't need a separate CoreRootView URL pattern here.
-# The main /api/ root view links to /api/core/, which is handled by the router.
-# urlpatterns += [
-#     path('', CoreRootView.as_view(), name='api-root'),
-# ]
+# Only include the router for this app
+urlpatterns = [
+    path('', include(router.urls)),
+]

@@ -6,6 +6,8 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Field, HTML, Div
 from django.urls import reverse
 from .search import SEARCH_INDEXES
+from .utils import get_model_viewname # Import utility if needed
+import django_filters
 
 # Define choices for the obj_type field dynamically
 # Format: ("app_label.model_name", "App Label | Model Name")
@@ -57,6 +59,51 @@ class SearchForm(forms.Form):
 # class UserProfileForm(forms.ModelForm): ...
 # class UserPreferencesForm(forms.Form): ... 
 
+class BootstrapMixin(forms.Form):
+    """
+    Adds the base Bootstrap CSS classes to form elements.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name, field in self.fields.items():
+            if isinstance(field.widget, (forms.TextInput, forms.Textarea, forms.PasswordInput, forms.EmailInput, forms.NumberInput)):
+                field.widget.attrs.update({'class': 'form-control'})
+            elif isinstance(field.widget, forms.Select):
+                field.widget.attrs.update({'class': 'form-select'})
+            elif isinstance(field.widget, (forms.CheckboxInput, forms.RadioSelect)):
+                # Checkboxes/radios might need form-check-input on the input itself,
+                # and the label needs form-check-label. This is often handled by templates.
+                pass
+            elif isinstance(field.widget, forms.SelectMultiple):
+                 field.widget.attrs.update({'class': 'form-select'})
+            elif isinstance(field.widget, forms.ClearableFileInput):
+                field.widget.attrs.update({'class': 'form-control'}) # Basic styling
+
+class ConfirmationForm(BootstrapMixin, forms.Form):
+    """Generic confirmation form."""
+    # Add a hidden field to convey the return URL
+    return_url = forms.CharField(widget=forms.HiddenInput(), required=False)
+
+    def __init__(self, *args, instance=None, **kwargs):
+        """
+        instance: The object being confirmed for deletion/action.
+        """
+        super().__init__(*args, **kwargs)
+        self.instance = instance
+        # Optionally, pre-populate return_url if provided
+        if kwargs.get('initial') and 'return_url' in kwargs['initial']:
+            self.fields['return_url'].initial = kwargs['initial']['return_url']
+        elif instance and hasattr(instance, 'get_absolute_url'):
+            # Default return URL to object detail view if possible
+            self.fields['return_url'].initial = instance.get_absolute_url()
+        elif instance:
+            # Fallback: try to get list view URL
+            try:
+                list_view_name = get_model_viewname(instance.__class__, 'list')
+                self.fields['return_url'].initial = reverse(list_view_name)
+            except Exception:
+                pass # If all else fails, return_url remains empty
+
 class SlugModelForm(forms.ModelForm):
     """Base ModelForm for models that include a slug field."""
 
@@ -65,5 +112,67 @@ class SlugModelForm(forms.ModelForm):
         js = (
             'js/slugify.js', # Path relative to STATIC_URL
         )
+
+# --- Base FilterForm --- 
+class FilterForm(BootstrapMixin, forms.Form):
+    """Base Form for FilterSets.
+
+    Takes a FilterSet class and adapts its fields for rendering within a standard Django form.
+    """
+    filterset_class = None
+
+    def __init__(self, *args, **kwargs):
+        self.queryset = kwargs.pop('queryset', None)
+        super(FilterForm, self).__init__(*args, **kwargs) # Initialize Form & BootstrapMixin
+
+        if self.filterset_class is None:
+            raise NotImplementedError("'filterset_class' must be defined on the FilterForm subclass.")
+
+        filterset_data = args[0] if args else None
+        self.filterset = self.filterset_class(filterset_data, queryset=self.queryset)
+
+        # Copy FilterSet fields to the form
+        for name, filter_field in self.filterset.filters.items():
+            if hasattr(filter_field, 'field'): # Handles ModelChoiceFilter, ModelMultipleChoiceFilter etc.
+                self.fields[name] = filter_field.field
+            else:
+                # Basic type mapping for common filters
+                field_type = forms.CharField # Default
+                if isinstance(filter_field, django_filters.BooleanFilter):
+                    field_type = forms.BooleanField
+                elif isinstance(filter_field, django_filters.NumberFilter):
+                    field_type = forms.DecimalField # Or IntegerField depending on need
+                elif isinstance(filter_field, django_filters.DateFilter):
+                    field_type = forms.DateField
+                elif isinstance(filter_field, django_filters.DateTimeFilter):
+                    field_type = forms.DateTimeField
+                elif isinstance(filter_field, django_filters.MultipleChoiceFilter):
+                    # Use the choices defined on the filter
+                    self.fields[name] = forms.MultipleChoiceField(
+                        label=filter_field.label if filter_field.label else name.replace('_', ' ').capitalize(),
+                        required=False,
+                        choices=filter_field.extra.get('choices', []) # Get choices from filter
+                    )
+                    continue # Skip default field creation at the end
+                # Add more specific mappings if needed
+                
+                # Create the field instance
+                self.fields[name] = field_type(
+                    label=filter_field.label if filter_field.label else name.replace('_', ' ').capitalize(),
+                    required=False 
+                )
+        
+        # Add FormHelper
+        self.helper = FormHelper()
+        self.helper.form_method = 'get' # Filters use GET
+        self.helper.form_tag = False # Template provides the <form> tag
+        # No explicit layout needed, Crispy will render fields sequentially by default
+        # --- End Add FormHelper --- 
+
+    def search(self):
+        """Returns the filtered queryset if the form is valid, else the original."""
+        if self.is_valid():
+            return self.filterset.qs
+        return self.filterset.queryset # Return unfiltered queryset on invalid form
 
 # You can add other core forms below if needed 

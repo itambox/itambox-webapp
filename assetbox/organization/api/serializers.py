@@ -3,8 +3,9 @@ from rest_framework import serializers
 # Use app-relative imports for models within the same Django project
 from organization.models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, AssetHolderAssignment
 from django.contrib.contenttypes.models import ContentType
-from assetbox.api.fields import ContentTypeField
-from assetbox.api.serializers import GenericObjectSerializer
+# Correct the import paths for core API components
+from core.api.fields import ContentTypeField
+from core.api.serializers import GenericObjectSerializer # Assuming GenericObjectSerializer lives in core
 
 # Inspired by NetBox API serializers
 

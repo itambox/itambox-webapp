@@ -8,6 +8,22 @@ from django.utils.translation import gettext_lazy as _
 from .utils import get_model_viewname # Import the utility function
 from django.contrib.contenttypes.models import ContentType # Ensure ContentType is imported
 
+# =============================================================================
+# Custom Columns
+# =============================================================================
+
+class BooleanColumn(tables.Column):
+    """
+    Custom column for rendering boolean values as icons (check/cross).
+    """
+    def render(self, value, record, bound_column):
+        if value is True:
+            return mark_safe('<span class="text-success"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-circle-check" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M9 12l2 2l4 -4" /></svg></span>')
+        elif value is False:
+            return mark_safe('<span class="text-danger"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-circle-x" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M10 10l4 4m0 -4l-4 4" /></svg></span>')
+        else:
+            return "—" # Render dash for None or other values
+
 # Base Table for common settings
 class BaseTable(tables.Table):
     class Meta:

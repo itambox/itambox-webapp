@@ -1,11 +1,14 @@
 from .constants import DEFAULT_PAGINATE_COUNT, PAGINATE_COUNT_CHOICES
 import datetime # Import datetime
+from decimal import Decimal # Import Decimal
 from django.conf import settings
 from django.core.paginator import Paginator
 from django.contrib.contenttypes.models import ContentType # Import ContentType
 from django.utils.module_loading import import_string # Import import_string
 from django.shortcuts import reverse
 from users.models import UserPreference # Import UserPreference
+from django.db.models import Model
+from django.forms.models import model_to_dict
 
 def get_model_viewname(model, action):
     """
@@ -71,30 +74,67 @@ class ChoiceSet:
     pass 
 
 from django.contrib.contenttypes.models import ContentType
-from django.forms.models import model_to_dict
 from .middleware import get_current_request_id, get_current_user
 
-def serialize_object(obj, extra_data=None, exclude_fields=None):
+def serialize_object(obj: Model, extra_fields=None) -> dict:
     """
-    Serialize a model instance into a dictionary, suitable for storing in ObjectChange.
-    Similar to NetBox's approach.
+    Serialize a model instance into a dictionary suitable for change logging.
+    Excludes certain fields like primary key and AutoFields by default.
+    Includes fields specified in `extra_fields`.
+    Handles M2M fields by serializing their PKs.
+    Converts date/datetime/Decimal to JSON-serializable formats.
     """
-    data = model_to_dict(obj, exclude=exclude_fields)
-    # Add any M2M fields or other related data if needed
-    # ... (implementation depends on specific model needs)
+    if not obj:
+        return None
+    
+    data = {}
+    m2m_fields = {f.name for f in obj._meta.many_to_many}
+    # Exclude primary key and specific extra fields if needed
+    excluded_field_names = {'pk', obj._meta.pk.name}
+    if extra_fields:
+         # Ensure extra_fields doesn't accidentally exclude fields we want (like FKs for logging)
+         # This logic assumes extra_fields lists fields *to be included* even if normally excluded
+         pass # Current exclusion logic handles this
+    else:
+        extra_fields = set()
 
-    # Include any extra data provided
-    if extra_data:
-        data.update(extra_data)
+    for field in obj._meta.get_fields():
+        # Exclude auto-created fields, relations handled separately, and explicitly excluded fields
+        # Keep concrete fields unless they are the PK
+        if not field.concrete or field.name == obj._meta.pk.name:
+             if field.name not in extra_fields:
+                 continue
+            
+        field_name = field.name
+        
+        try:
+            field_value = getattr(obj, field_name)
+        except AttributeError:
+            # This might happen for reverse relations if not excluded properly
+            continue 
 
-    # Convert objects to JSON-serializable formats
-    for key, value in data.items():
-        if hasattr(value, 'pk'): # Handle related objects (convert to PK)
-            data[key] = getattr(value, 'pk')
-        elif isinstance(value, (datetime.date, datetime.datetime)): # Convert date/datetime to ISO string
-            data[key] = value.isoformat()
-        # Add more type conversions if needed (e.g., Decimal to string)
-
+        if field_name in m2m_fields:
+            # Serialize M2M as a list of related object PKs
+            if hasattr(field_value, 'all'): # Check if it's a related manager
+                 data[field_name] = sorted(list(field_value.values_list('pk', flat=True)))
+            else:
+                data[field_name] = []
+        elif field.is_relation: # OneToOneField, ForeignKey
+            # Serialize FK/O2O as related object PK
+            if field_value is not None:
+                data[field_name] = field_value.pk
+            else:
+                data[field_name] = None
+        else: # Handle plain fields
+            # Convert non-JSON serializable types
+            if isinstance(field_value, (datetime.date, datetime.datetime)):
+                data[field_name] = field_value.isoformat()
+            elif isinstance(field_value, Decimal):
+                 data[field_name] = str(field_value)
+            # Assume other basic types are directly serializable
+            else:
+                data[field_name] = field_value # Store directly
+                 
     return data
 
 def log_change(instance, action, prechange_data=None, postchange_data=None, user=None, request_id=None):

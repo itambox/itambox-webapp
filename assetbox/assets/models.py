@@ -3,10 +3,13 @@ from django.conf import settings # Required for referencing AUTH_USER_MODEL
 from django.utils.text import slugify # Needed for slug generation if we automate it later
 from django.db.models import Q, CheckConstraint, F # Import Q and CheckConstraint
 from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
+from software.models import Software # Import Software model
+from core.models import BaseModel, ChangeLoggingMixin # Added import
 
 # Create your models here.
 
-class AssetRole(models.Model):
+class AssetRole(BaseModel, ChangeLoggingMixin):
     """Categorizes assets based on their functional role (e.g., Laptop, Monitor, Server)."""
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
@@ -25,8 +28,6 @@ class AssetRole(models.Model):
         related_name='asset_roles',
         blank=True
     )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.name
@@ -35,25 +36,10 @@ class AssetRole(models.Model):
         # Use standardized URL name
         return reverse('assets:assetrole_detail', args=[self.pk])
 
-    def save(self, *args, **kwargs):
-        # Auto-generate slug if it's empty
-        if not self.slug:
-            self.slug = slugify(self.name)
-        super().save(*args, **kwargs)
-
-    class Meta:
-        verbose_name = "Asset Role"
-        verbose_name_plural = "Asset Roles"
-        ordering = ('name',)
-
-# Location model was moved to organization app
-
-class Manufacturer(models.Model):
+class Manufacturer(BaseModel, ChangeLoggingMixin):
     name = models.CharField(max_length=255, unique=True)
     slug = models.SlugField(max_length=255, unique=True)  # Re-add unique=True
     description = models.TextField(blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['name']
@@ -64,15 +50,7 @@ class Manufacturer(models.Model):
     def get_absolute_url(self):
         return reverse('assets:manufacturer_detail', kwargs={'pk': self.pk})
 
-    def save(self, *args, **kwargs):
-        # Auto-generate slug if it's empty
-        if not self.slug:
-            self.slug = slugify(self.name)
-        super().save(*args, **kwargs)
-
-# Region, SiteGroup, Tenant, Tag, Site models were moved to organization app
-
-class AssetType(models.Model):
+class AssetType(BaseModel, ChangeLoggingMixin):
     """Defines a specific type of asset (e.g., a specific laptop model)."""
     STORAGE_SSD = 'ssd'
     STORAGE_NVME = 'nvme'
@@ -108,12 +86,8 @@ class AssetType(models.Model):
     comments = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', related_name="asset_types", blank=True)
 
-    # Standard fields (auto-managed by Django)
-    created = models.DateTimeField(auto_now_add=True, editable=False)
-    last_updated = models.DateTimeField(auto_now=True, editable=False)
-
     class Meta:
-        ordering = ['manufacturer', 'model']
+        # ordering = ['manufacturer', 'model'] # Removed old ordering
         unique_together = ('manufacturer', 'model') # Ensure model is unique per manufacturer
         verbose_name = "Asset Type"
         verbose_name_plural = "Asset Types"
@@ -135,7 +109,7 @@ class AssetType(models.Model):
                  counter += 1
         super().save(*args, **kwargs)
 
-class Asset(models.Model):
+class Asset(BaseModel, ChangeLoggingMixin):
     # --- Define choices as class attributes --- 
     STATUS_IN_USE = 'in_use'
     STATUS_AVAILABLE = 'available'
@@ -163,8 +137,6 @@ class Asset(models.Model):
     )
     location = models.ForeignKey('organization.Location', on_delete=models.SET_NULL, blank=True, null=True, related_name='assets')
     notes = models.TextField(blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
     tags = models.ManyToManyField('extras.Tag', related_name="assets", blank=True)
 
     @property
@@ -182,13 +154,10 @@ class Asset(models.Model):
         """Return the canonical URL for the asset."""
         return reverse('assets:asset_detail', kwargs={'pk': self.pk})
 
-    class Meta:
-        pass
-
 class ActivityLog(models.Model):
     ACTION_CHOICES = [
-        ('created', 'Created'),
-        ('updated', 'Updated'),
+        ('created_at', 'Created'),
+        ('updated_at', 'Updated'),
         ('checked_out', 'Checked Out'),
         ('checked_in', 'Checked In'),
         # Add other actions like 'audited', 'repaired', etc. later
@@ -205,3 +174,58 @@ class ActivityLog(models.Model):
 
     def __str__(self):
         return f"{self.asset} - {self.get_action_display()} by {self.user or 'System'} on {self.timestamp.strftime('%Y-%m-%d %H:%M')}"
+
+class InstalledSoftware(BaseModel):
+    """
+    Represents an instance of software discovered or inventoried on a specific asset.
+    Distinct from license assignment/tracking.
+    """
+    asset = models.ForeignKey(
+        to=Asset,
+        on_delete=models.CASCADE, # If Asset is deleted, remove its inventory
+        related_name='installed_software'
+    )
+    software = models.ForeignKey(
+        to=Software,
+        on_delete=models.PROTECT, # Don't delete Software catalog item if installed instance exists
+        related_name='installed_instances'
+    )
+    version_detected = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Specific version discovered on the asset (e.g., 16.78.1)"
+    )
+    install_date = models.DateField(
+        blank=True,
+        null=True,
+        help_text="Estimated or known installation date"
+    )
+    discovered_by_agent = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name="Discovered By",
+        help_text="Identifier for the discovery source or agent (e.g., SCCM, Intune, Lansweeper)"
+    )
+    last_seen_date = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="Timestamp when this software was last detected on the asset"
+    )
+    notes = models.TextField(
+        blank=True,
+        help_text="Optional notes specific to this installation"
+    )
+
+    class Meta:
+        unique_together = ('asset', 'software', 'version_detected') # Allow tracking same sw multiple times if version changes
+        ordering = ['asset', 'software', '-last_seen_date']
+        verbose_name = "Installed Software Instance"
+        verbose_name_plural = "Installed Software Instances"
+
+    def __str__(self):
+        version_part = f" (v{self.version_detected})" if self.version_detected else ""
+        return f"{self.software.name}{version_part} on {self.asset.name}"
+
+    def get_absolute_url(self):
+        # Likely won't have its own detail view, link back to the asset
+        return self.asset.get_absolute_url()

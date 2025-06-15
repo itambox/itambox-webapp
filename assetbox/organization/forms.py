@@ -7,6 +7,11 @@ from django.contrib.auth import get_user_model
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Row, Column
 from django.urls import reverse
+from core.forms import FilterForm # Import the base FilterForm
+from .filters import ( # Import the FilterSet classes
+    SiteFilterSet, RegionFilterSet, SiteGroupFilterSet, LocationFilterSet,
+    TenantFilterSet, TenantGroupFilterSet, AssetHolderFilterSet
+)
 
 User = get_user_model()
 
@@ -363,5 +368,28 @@ class AssetHolderForm(forms.ModelForm):
             Submit('submit', button_text, css_class='btn btn-primary'),
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
         )
+
+# --- Filter Forms ---
+
+class SiteFilterForm(FilterForm):
+    filterset_class = SiteFilterSet
+
+class RegionFilterForm(FilterForm):
+    filterset_class = RegionFilterSet
+
+class SiteGroupFilterForm(FilterForm):
+    filterset_class = SiteGroupFilterSet
+
+class LocationFilterForm(FilterForm):
+    filterset_class = LocationFilterSet
+
+class TenantFilterForm(FilterForm):
+    filterset_class = TenantFilterSet
+
+class TenantGroupFilterForm(FilterForm):
+    filterset_class = TenantGroupFilterSet
+
+class AssetHolderFilterForm(FilterForm):
+    filterset_class = AssetHolderFilterSet
 
 # TODO: Add TagForm 

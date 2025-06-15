@@ -9,16 +9,30 @@ from .fields import ChoiceField, ContentTypeField
 
 User = get_user_model()
 
+# --- ContentType Serializer --- 
+
+class ContentTypeSerializer(serializers.ModelSerializer):
+    """Basic serializer for ContentType model."""
+    url = serializers.HyperlinkedIdentityField(view_name='core-api:contenttype-detail') # Placeholder view name
+
+    class Meta:
+        model = ContentType
+        fields = ['id', 'url', 'app_label', 'model']
+
+# --- Nested User Serializer --- 
+
 # Minimal serializer for nested User representation
 class NestedUserSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='users-api:user-detail') # Adjust view_name if needed
+    # url = serializers.HyperlinkedIdentityField(view_name='users_api:user-detail') # Adjust view_name if needed
 
     class Meta:
         model = User
-        fields = ['id', 'url', 'username']
+        fields = ['id', 'username'] # Keep it minimal for nesting
+
+# --- ObjectChange Serializer --- 
 
 class ObjectChangeSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='core-api:objectchange-detail') # Assuming this view name
+    url = serializers.HyperlinkedIdentityField(view_name='core_api:objectchange-detail') # Use underscore
     user = NestedUserSerializer(read_only=True)
     action = ChoiceField(choices=ObjectChangeActionChoices(), read_only=True)
     changed_object_type = ContentTypeField(read_only=True)
@@ -50,3 +64,21 @@ class ObjectChangeSerializer(serializers.ModelSerializer):
             'object_type': str(obj.changed_object_type),
             'display': obj.object_repr, # Use the stored representation
         }
+
+# --- Generic Object Serializer (for GFKs) --- 
+
+class GenericObjectSerializer(serializers.Serializer):
+    """
+    Simple serializer for representing related objects via GenericForeignKey.
+    Adjust as needed based on desired output for GFK relations.
+    """
+    object_type = serializers.CharField(source='content_type.model', read_only=True)
+    object_id = serializers.IntegerField(source='pk', read_only=True)
+    display = serializers.CharField(source='__str__', read_only=True)
+    # Add url if your models have a get_api_url() method or similar
+    # url = serializers.SerializerMethodField()
+    
+    # def get_url(self, obj):
+    #     if hasattr(obj, 'get_api_url'):
+    #         return obj.get_api_url()
+    #     return None

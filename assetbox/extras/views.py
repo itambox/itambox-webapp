@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from .models import Tag, ConfigTemplate
-from .forms import TagForm, ConfigTemplateForm # Assuming a TagForm and ConfigTemplateForm exist
+from .forms import TagForm, ConfigTemplateForm, TagFilterForm # Added TagFilterForm
 from django_tables2 import RequestConfig
 from .tables import TagTable, ConfigTemplateTable
 from .filters import TagFilter, ConfigTemplateFilter # <-- Import FilterSet
@@ -12,63 +12,21 @@ from users.models import UserPreference # Import UserPreference
 from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.contrib import messages
+from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
+from . import forms
+from . import filters
+from . import tables
 
 # Create your views here.
 
 # --- Tag Views ---
 
-@login_required
-def tag_list(request):
-    queryset = Tag.objects.all()
-    filterset = TagFilter(request.GET, queryset=queryset)
-    queryset = filterset.qs
-
-    # --- Determine Columns & Configure Table ---
-    TableClass = TagTable
-    all_available_columns = list(TableClass.base_columns.keys()) 
-    prefs, _ = UserPreference.objects.get_or_create(user=request.user)
-    app_label = TableClass._meta.model._meta.app_label
-    table_class_name = TableClass.__name__
-    user_config = prefs.data.get('tables', {}).get(app_label, {}).get(table_class_name, {})
-    saved_visible_columns = user_config.get('columns', None)
-    
-    final_sequence = []
-    if saved_visible_columns is not None:
-        final_sequence = [col for col in saved_visible_columns if col in all_available_columns]
-    else:
-        meta = getattr(TableClass, 'Meta', None)
-        if hasattr(meta, 'default_columns'):
-             final_sequence = [col for col in meta.default_columns if col in all_available_columns]
-        elif hasattr(meta, 'fields'):
-            final_sequence = [col for col in meta.fields if col in all_available_columns]
-        else:
-            final_sequence = all_available_columns
-            
-    if 'pk' in final_sequence: final_sequence.remove('pk')
-    if 'actions' in final_sequence: final_sequence.remove('actions')
-    if 'pk' in all_available_columns: final_sequence.insert(0, 'pk')
-    if 'actions' in all_available_columns: final_sequence.append('actions')
-    
-    columns_to_exclude = tuple(col for col in all_available_columns if col not in final_sequence)
-    table = TableClass(queryset, request=request, sequence=tuple(final_sequence), exclude=columns_to_exclude)
-    RequestConfig(request, paginate={'per_page': get_paginate_count(request)}).configure(table)
-    # --- End Configuration ---
-
-    model = table.Meta.model
-    model_name_str = f"{model._meta.app_label}.{model._meta.model_name}" # For bulk delete form
-    table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}" # For config modal URL
-
-    context = {
-        'table': table,
-        'title': 'Tags',
-        'object_type': 'Tag',
-        'create_url_name': 'extras:tag_create',
-        'list_url_name': 'extras:tag_list',
-        'model_name_str': model_name_str, # Pass the app_label.modelname
-        'table_config_key': table_config_key, # Pass the app_label.TableName
-        'filter_form': filterset,
-    }
-    return render(request, 'generic/object_list_base.html', context)
+# Remove the function-based tag_list view below
+# @login_required
+# def tag_list(request):
+#     ...
+#     return render(request, 'generic/object_list_base.html', context)
+# End removal of tag_list
 
 @login_required
 def tag_detail(request, pk):
@@ -77,7 +35,7 @@ def tag_detail(request, pk):
 
     # Fetch related assets using the related_name from Asset.tags
     related_assets = tag.assets.all().prefetch_related(
-        'asset_role', 'manufacturer', 'location', 'location__site' # Prefetch for efficiency
+        'asset_role', 'asset_type__manufacturer', 'location', 'location__site' # Prefetch for efficiency
     )
     
     # Create and configure the assets table
@@ -151,16 +109,18 @@ def tag_delete(request, pk):
 
 # --- ConfigTemplate Views ---
 
-class ConfigTemplateListView(LoginRequiredMixin, ListView):
-    model = ConfigTemplate
-    template_name = 'extras/configtemplates/configtemplate_list.html'
-    context_object_name = 'config_templates'
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        table = ConfigTemplateTable(self.object_list)
-        context['table'] = table
-        return context
+# Refactor ConfigTemplateListView to use ObjectListView
+class ConfigTemplateListView(ObjectListView): # Inherit from ObjectListView
+    queryset = ConfigTemplate.objects.all() # Base queryset
+    filterset = filters.ConfigTemplateFilter # Set the filterset
+    filterset_form = forms.ConfigTemplateFilterForm # Set the filter form
+    table = tables.ConfigTemplateTable # Set the table
+    action_buttons = ('add',) # Add standard action buttons
+    # template_name removed, ObjectListView handles it
+    # context_object_name removed, ObjectListView handles it
+    # get_context_data removed, ObjectListView handles table instantiation
+
+# Keep Detail, Create, Update, Delete views as standard CBVs for now
 
 class ConfigTemplateDetailView(LoginRequiredMixin, DetailView):
     model = ConfigTemplate
@@ -195,3 +155,12 @@ class ConfigTemplateDeleteView(LoginRequiredMixin, DeleteView):
     def delete(self, request, *args, **kwargs):
         messages.success(request, "Config template deleted successfully.")
         return super().delete(request, *args, **kwargs)
+
+# Refactor tag_list to CBV
+class TagListView(ObjectListView):
+    queryset = Tag.objects.all()
+    filterset = TagFilter
+    filterset_form = TagFilterForm # Assuming TagFilterForm exists
+    table = TagTable
+    action_buttons = ('add',) # Add create button
+    template_name = 'generic/object_list_base.html' # Use base template

@@ -1,0 +1,25 @@
+{% extends 'generic/object_edit.html' %}
+
+{% block title %}{% if object.pk %}Edit {{ object }}{% else %}Add Software{% endif %}{% endblock %}
+
+{% block form %}
+    {# Define the form fields here; crispy in base template will render them #}
+    <div class="card">
+        <h5 class="card-header">
+            Software Details
+        </h5>
+        <div class="card-body">
+            {{ form.name|as_crispy_field }}
+            {{ form.manufacturer|as_crispy_field }}
+            {{ form.description|as_crispy_field }}
+        </div>
+    </div>
+    <div class="card">
+        <h5 class="card-header">
+            Tags
+        </h5>
+        <div class="card-body">
+            {{ form.tags|as_crispy_field }}
+        </div>
+    </div>
+{% endblock %} 
