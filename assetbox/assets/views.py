@@ -23,6 +23,7 @@ from users.models import UserPreference # Import UserPreference
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
+from django.db.models import Count
 
 User = get_user_model()
 
@@ -111,22 +112,59 @@ def dashboard(request):
 #         'filter_form': filterset.form,
 #     }
 #     
-#     return render(request, 'generic/object_list_base.html', context)
+#     return render(request, 'generic/object_list.html', context)
 
-# --- Asset Views (Refactored to CBV) ---
+# --- Asset Views ---
 class AssetListView(ObjectListView):
     queryset = Asset.objects.all().select_related(
         'asset_role', 
         'asset_type', 
         'asset_type__manufacturer',
         'location'
-    )
+    ).prefetch_related('tags') # Add tags prefetch
     filterset = filters.AssetFilterSet
-    filterset_form = forms.AssetFilterForm # Corrected: Point to AssetFilterForm
+    filterset_form = forms.AssetFilterForm
     table = tables.AssetTable
-    action_buttons = ('add',) # Add action_buttons
-    # template_name = 'assets/assets/asset_list.html' # Optionally override generic template
-    # Define context overrides if needed, otherwise base class handles it
+    action_buttons = ('add',)
+
+class AssetDetailView(ObjectDetailView):
+    queryset = Asset.objects.select_related(
+        'asset_role', 'location', 'asset_type', 'asset_type__manufacturer'
+    ).prefetch_related(
+        'logs__user', 'tags' # Prefetch user for logs and tags
+    )
+    # template_name = 'assets/assets/asset_detail.html' # Can be inferred
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        asset = self.get_object()
+
+        # Fetch assignment separately
+        assignment = AssetHolderAssignment.objects.filter(
+            content_type=ContentType.objects.get_for_model(Asset),
+            object_id=asset.pk
+        ).select_related('asset_holder').first()
+
+        # Add assignment and logs to context
+        context['assignment'] = assignment
+        context['logs'] = asset.logs.all() # Logs are prefetched
+        # Base view handles title, object_type, etc.
+        return context
+
+class AssetEditView(ObjectEditView):
+    queryset = Asset.objects.all()
+    model = Asset
+    model_form = AssetForm
+    template_name = 'generic/object_edit.html'
+    # Default success_url goes to object detail view
+
+class AssetDeleteView(ObjectDeleteView):
+    queryset = Asset.objects.all()
+    model = Asset
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('assets:asset_list')
+    # No related objects check needed for Asset deletion itself (dependencies handled by other models)
+    # Base view handles success message
 
 @login_required
 def asset_create(request):
@@ -150,28 +188,6 @@ def asset_create(request):
     }
     # Render the generic edit template
     return render(request, 'generic/object_edit.html', context)
-
-@login_required
-def asset_detail(request, pk):
-    # Fetch asset and related logs efficiently, including asset_holder
-    asset = get_object_or_404(
-        Asset.objects.select_related('asset_role', 'location', 'asset_type', 'asset_type__manufacturer'),
-        pk=pk
-    )
-    # Fetch assignment separately
-    assignment = AssetHolderAssignment.objects.filter(
-        content_type=ContentType.objects.get_for_model(Asset),
-        object_id=asset.pk
-    ).select_related('asset_holder').first()
-    
-    logs = asset.logs.select_related('user').all() # Fetch logs related to this asset
-    
-    context = {
-        'asset': asset,
-        'assignment': assignment, # Pass assignment to context
-        'logs': logs, # Add logs to context
-    }
-    return render(request, 'assets/assets/asset_detail.html', context)
 
 @login_required
 def asset_update(request, pk):
@@ -337,353 +353,200 @@ class AssetRoleListView(ObjectListView):
     filterset_form = forms.AssetRoleFilterForm # Corrected: Point to AssetRoleFilterForm
     table = tables.AssetRoleTable
     action_buttons = ('add',) # Add action_buttons
-    # template_name = 'assets/assetroles/assetrole_list.html' # Optionally override
+    # template_name = 'assets/assetroles/assetrole_list.html' # Optional override
 
-@login_required
-def assetrole_detail(request, pk):
-    asset_role = get_object_or_404(
-        AssetRole.objects.prefetch_related(
-            'asset_set', 'asset_set__manufacturer', 'asset_set__location' # Prefetch assets and their FKs
-        ), 
-        pk=pk
-    )
+class AssetRoleDetailView(ObjectDetailView):
+    queryset = AssetRole.objects.prefetch_related('tags', 'asset_set') # Use related_name 'asset_set'
+    # template_name = 'assets/assetroles/assetrole_detail.html' # Can be inferred
 
-    # Prepare Assets table
-    assets_table = AssetTable(asset_role.asset_set.all(), request=request)
-    RequestConfig(request, paginate=False).configure(assets_table)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        assetrole = self.get_object()
 
+        # Prepare Assets table (using related_name 'asset_set')
+        assets_table = AssetTable(assetrole.asset_set.all(), request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assets_table)
+
+        # Prepare Related Objects List
+        related_objects_list = []
+        asset_count = assetrole.asset_set.count()
+        if asset_count:
+            related_objects_list.append({
+                'label': 'Assets',
+                'count': asset_count,
+                'url': f"{reverse('assets:asset_list')}?asset_role={assetrole.slug}" # Filter link
+            })
+
+        context['assets_table'] = assets_table
+        context['related_objects_list'] = related_objects_list
+        return context
+
+class AssetRoleEditView(ObjectEditView):
+    queryset = AssetRole.objects.all()
     model = AssetRole
+    model_form = AssetRoleForm
+    template_name = 'generic/object_edit.html'
+    # Default success_url goes to object detail view
 
-    # --- Prepare Related Objects List ---
-    related_objects_list = []
-    # Assets
-    asset_count = asset_role.asset_set.count()
-    if asset_count:
-        # Add filtering parameters to the URL
-        asset_list_url = reverse('assets:asset_list')
-        filtered_asset_url = f"{asset_list_url}?asset_role={asset_role.pk}"
-        related_objects_list.append({
-            'label': 'Assets',
-            'count': asset_count,
-            'url': filtered_asset_url # <-- Use filtered URL
-        })
-    # --- End Related Objects List ---
+class AssetRoleDeleteView(ObjectDeleteView):
+    queryset = AssetRole.objects.all()
+    model = AssetRole
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('assets:assetrole_list')
 
-    context = {
-        'object': asset_role,
-        'title': str(asset_role),
-        'object_type': model._meta.verbose_name.title(),
-        'assets_table': assets_table,
-        'update_url_name': get_model_viewname(model, 'update'),
-        'delete_url_name': get_model_viewname(model, 'delete'),
-        'view_options': ['update', 'delete'],
-        'related_objects_list': related_objects_list,
-    }
-    return render(request, 'assets/assetroles/assetrole_detail.html', context)
+    def post(self, request, *args, **kwargs):
+        assetrole = self.get_object()
+        asset_count = assetrole.asset_set.count() # Use related_name
 
-@login_required
-def assetrole_create(request):
-    if request.method == 'POST':
-        form = AssetRoleForm(request.POST)
-        if form.is_valid():
-            asset_role = form.save()
-            messages.success(request, f"Asset Role '{asset_role}' created successfully.")
-            # Use standardized URL name
-            return redirect('assets:assetrole_detail', pk=asset_role.pk)
-    else:
-        form = AssetRoleForm()
-    context = {
-        'form': form,
-        'title': 'Create New Asset Role',
-        # Use standardized URL name
-        'return_url': 'assets:assetrole_list',
-    }
-    return render(request, 'generic/object_edit.html', context)
+        if asset_count > 0:
+            messages.error(
+                request,
+                f"Cannot delete asset role '{assetrole.name}': It is associated with {asset_count} asset{'s' if asset_count != 1 else ''}."
+            )
+            return redirect(assetrole.get_absolute_url())
 
-@login_required
-def assetrole_update(request, pk):
-    asset_role = get_object_or_404(AssetRole, pk=pk)
-    if request.method == 'POST':
-        form = AssetRoleForm(request.POST, instance=asset_role)
-        if form.is_valid():
-            form.save()
-            messages.success(request, f"Asset Role '{asset_role}' updated successfully.")
-            # Use standardized URL name
-            return redirect('assets:assetrole_detail', pk=asset_role.pk)
-    else:
-        form = AssetRoleForm(instance=asset_role)
-    context = {
-        'form': form,
-        'object': asset_role,
-        'title': f'Update Asset Role: {asset_role}',
-        # Use standardized URL name
-        'return_url': 'assets:assetrole_list', 
-    }
-    return render(request, 'generic/object_edit.html', context)
-
-@login_required
-def assetrole_delete(request, pk):
-    asset_role = get_object_or_404(AssetRole, pk=pk)
-    related_objects_count = asset_role.asset_set.count() # Check related assets
-
-    if request.method == 'POST':
-        if related_objects_count > 0:
-            # Error handling for deletion prevention should ideally be done here
-            # or rely on the template displaying the warning correctly.
-            # For now, just redirecting back as before if POST attempted on protected object.
-            # TODO: Add message if deletion is prevented
-            messages.error(request, f"AssetRole '{asset_role.name}' cannot be deleted because it is associated with {related_objects_count} asset(s).")
-            return redirect('assets:assetrole_list')
-        assetrole_name = asset_role.name # Store name for message
-        asset_role.delete()
-        # TODO: Message
-        messages.success(request, f"AssetRole '{assetrole_name}' deleted successfully.")
-        return redirect('assets:assetrole_list')
-
-    context = {
-        'object': asset_role,
-        'related_objects_count': related_objects_count,
-        # Use standardized URL name
-        'list_url_name': 'assets:assetrole_list'
-    }
-    # Render the generic delete confirmation template
-    return render(request, 'generic/object_confirm_delete.html', context)
+        return super().post(request, *args, **kwargs)
 
 # --- Manufacturer Views (Refactored to CBV) ---
 
 class ManufacturerListView(ObjectListView):
-    queryset = Manufacturer.objects.all()
+    queryset = Manufacturer.objects.annotate(
+        asset_count=Count('asset_types__assets') # Count assets through AssetType
+    )
     filterset = filters.ManufacturerFilterSet
-    filterset_form = forms.ManufacturerFilterForm # Corrected: Point to ManufacturerFilterForm
+    filterset_form = forms.ManufacturerFilterForm
     table = tables.ManufacturerTable
-    action_buttons = ('add',) # Add action_buttons
-    # template_name = 'assets/manufacturers/manufacturer_list.html' # Optionally override
+    action_buttons = ('add',)
 
-@login_required
-def manufacturer_detail(request, pk):
-    manufacturer = get_object_or_404(
-        Manufacturer.objects.prefetch_related(
-            'asset_types', # Prefetch related AssetType objects
-            'asset_types__assets', # Prefetch Assets via AssetType
-            'asset_types__assets__asset_role', # Prefetch AssetRole via AssetType->Asset
-            'asset_types__assets__location'  # Prefetch Location via AssetType->Asset
-        ), 
-        pk=pk
+class ManufacturerDetailView(ObjectDetailView):
+    queryset = Manufacturer.objects.prefetch_related(
+        'asset_types', 'asset_types__assets' # Prefetch asset types and their assets
     )
+    # template_name = 'assets/manufacturers/manufacturer_detail.html' # Can be inferred
 
-    # Prepare Assets table by filtering Assets based on the manufacturer via AssetType
-    related_assets = Asset.objects.filter(asset_type__manufacturer=manufacturer).select_related(
-        'asset_type', 'asset_role', 'location' # Necessary select_related for the table
-    )
-    assets_table = AssetTable(related_assets, request=request)
-    RequestConfig(request, paginate=False).configure(assets_table)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        manufacturer = self.get_object()
 
+        # Prepare Asset Types table
+        asset_types_table = AssetTypeTable(manufacturer.asset_types.all(), request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(asset_types_table)
+
+        # Prepare Related Objects List (Assets count)
+        related_objects_list = []
+        # We need to count assets linked through this manufacturer's asset types
+        asset_count = Asset.objects.filter(asset_type__manufacturer=manufacturer).count()
+        if asset_count:
+            related_objects_list.append({
+                'label': 'Assets',
+                'count': asset_count,
+                'url': f"{reverse('assets:asset_list')}?manufacturer={manufacturer.slug}" # Filter link
+            })
+        assettype_count = manufacturer.asset_types.count()
+        if assettype_count:
+            related_objects_list.append({
+                'label': 'Asset Types',
+                'count': assettype_count,
+                'url': f"{reverse('assets:assettype_list')}?manufacturer={manufacturer.slug}" # Filter link
+            })
+
+        context['asset_types_table'] = asset_types_table
+        context['related_objects_list'] = related_objects_list
+        return context
+
+class ManufacturerEditView(ObjectEditView):
+    queryset = Manufacturer.objects.all()
     model = Manufacturer
+    model_form = ManufacturerForm
+    template_name = 'generic/object_edit.html'
+    # Default success_url goes to object detail view
 
-    # --- Prepare Related Objects List --- 
-    related_objects_list = []
-    # Asset Types linked to this Manufacturer
-    asset_type_count = manufacturer.asset_types.count()
-    if asset_type_count:
-        asset_type_list_url = reverse('assets:assettype_list')
-        filtered_asset_type_url = f"{asset_type_list_url}?manufacturer={manufacturer.pk}"
-        related_objects_list.append({
-            'label': 'Asset Types',
-            'count': asset_type_count,
-            'url': filtered_asset_type_url
-        })
-        
-    # Assets (count derived from the filtered queryset)
-    asset_count = related_assets.count()
-    if asset_count:
-        asset_list_url = reverse('assets:asset_list')
-        # Filter assets by manufacturer indirectly via asset_type
-        filtered_asset_url = f"{asset_list_url}?asset_type__manufacturer={manufacturer.pk}" 
-        related_objects_list.append({
-            'label': 'Assets',
-            'count': asset_count,
-            'url': filtered_asset_url
-        })
-    # --- End Related Objects List --- 
+class ManufacturerDeleteView(ObjectDeleteView):
+    queryset = Manufacturer.objects.all()
+    model = Manufacturer
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('assets:manufacturer_list')
 
-    context = {
-        'object': manufacturer,
-        'title': str(manufacturer),
-        'object_type': model._meta.verbose_name.title(),
-        'assets_table': assets_table,
-        'update_url_name': get_model_viewname(model, 'update'),
-        'delete_url_name': get_model_viewname(model, 'delete'),
-        'view_options': ['update', 'delete'],
-        'related_objects_list': related_objects_list,
-    }
-    return render(request, 'assets/manufacturers/manufacturer_detail.html', context)
+    def post(self, request, *args, **kwargs):
+        manufacturer = self.get_object()
+        # Prevent deletion if linked to any AssetTypes
+        asset_type_count = manufacturer.asset_types.count()
 
-@login_required
-def manufacturer_create(request):
-    if request.method == 'POST':
-        form = ManufacturerForm(request.POST)
-        if form.is_valid():
-            form.save()
-            # TODO: Message
-            messages.success(request, f"Manufacturer '{form.cleaned_data['name']}' created successfully.")
-            return redirect('assets:manufacturer_list')
-    else:
-        form = ManufacturerForm()
-    context = {
-        'form': form,
-        'title': 'Create New Manufacturer',
-        'return_url': 'assets:manufacturer_list',
-    }
-    # Render the generic edit template
-    return render(request, 'generic/object_edit.html', context)
+        if asset_type_count > 0:
+            messages.error(
+                request,
+                f"Cannot delete manufacturer '{manufacturer.name}': It is associated with {asset_type_count} asset type{'s' if asset_type_count != 1 else ''}."
+            )
+            return redirect(manufacturer.get_absolute_url())
 
-@login_required
-def manufacturer_update(request, pk):
-    manufacturer = get_object_or_404(Manufacturer, pk=pk)
-    if request.method == 'POST':
-        form = ManufacturerForm(request.POST, instance=manufacturer)
-        if form.is_valid():
-            form.save()
-            # TODO: Message
-            messages.success(request, f"Manufacturer '{manufacturer.name}' updated successfully.")
-            return redirect('assets:manufacturer_list')
-    else:
-        form = ManufacturerForm(instance=manufacturer)
-    context = {
-        'form': form,
-        'object': manufacturer, # Pass the object being edited
-        'title': f'Update Manufacturer: {manufacturer.name}',
-        'return_url': 'assets:manufacturer_list',
-    }
-    # Render the generic edit template
-    return render(request, 'generic/object_edit.html', context)
+        return super().post(request, *args, **kwargs)
 
-@login_required
-def manufacturer_delete(request, pk):
-    manufacturer = get_object_or_404(Manufacturer, pk=pk)
-    related_objects_count = manufacturer.assets.count() # Check related assets
+# --- Asset Type Views ---
 
-    if request.method == 'POST':
-        if related_objects_count > 0:
-             # TODO: Add message if deletion is prevented
-            messages.error(request, f"Manufacturer '{manufacturer.name}' cannot be deleted because it is associated with {related_objects_count} asset(s).")
-            return redirect('assets:manufacturer_list')
-        manufacturer_name = manufacturer.name # Store name for message
-        manufacturer.delete()
-        # TODO: Message
-        messages.success(request, f"Manufacturer '{manufacturer_name}' deleted successfully.")
-        return redirect('assets:manufacturer_list')
-
-    context = {
-        'object': manufacturer,
-        'related_objects_count': related_objects_count,
-        'list_url_name': 'assets:manufacturer_list'
-    }
-    # Render the generic delete confirmation template
-    return render(request, 'generic/object_confirm_delete.html', context)
-
-# --- Asset Type Views (Class-Based) ---
-
-# Refactor AssetTypeListView to use ObjectListView
 class AssetTypeListView(ObjectListView): # Inherit from ObjectListView
-    queryset = AssetType.objects.select_related('manufacturer') # Keep the base queryset
+    queryset = AssetType.objects.select_related('manufacturer').prefetch_related('tags') # Add tags
     filterset = filters.AssetTypeFilterSet # Keep filterset
     filterset_form = forms.AssetTypeFilterForm # Explicitly set the filter form
     table = tables.AssetTypeTable # Keep the table
     action_buttons = ('add',) # Define action buttons like others
-    # Remove template_name - ObjectListView handles it
-    # Remove context_object_name - ObjectListView handles it
-    # Remove paginate_by - ObjectListView handles it via get_paginate_count
-    # Remove get_queryset method - ObjectListView handles filtering
-    # Remove get_context_data method - ObjectListView handles context generation
 
-# Keep Detail, Create, Update, Delete views as they are for now,
-# unless further refactoring to ObjectDetailView etc. is desired later.
-
-class AssetTypeDetailView(LoginRequiredMixin, DetailView):
-    model = AssetType
-    template_name = 'assets/assettypes/assettype_detail.html'
-    slug_field = 'slug' # Use slug for lookup
-    slug_url_kwarg = 'slug' # Match URL pattern kwarg
-    context_object_name = 'object' # Use 'object' for consistency with base template
-
-    def get_queryset(self):
-        # Prefetch related manufacturer and tags for efficiency
-        return super().get_queryset().select_related('manufacturer').prefetch_related('tags')
+class AssetTypeDetailView(ObjectDetailView): # Inherit from ObjectDetailView
+    queryset = AssetType.objects.select_related('manufacturer').prefetch_related('tags', 'assets')
+    slug_field = 'slug' # Still need this if lookup is by slug
+    slug_url_kwarg = 'slug' # Still need this if lookup is by slug
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        asset_type = self.object # Get the current AssetType instance
+        assettype = self.get_object()
 
-        # --- Prepare Related Assets Table --- 
-        related_assets = Asset.objects.filter(asset_type=asset_type).select_related(
-            'asset_role', 'location' # Necessary select_related for the table columns
-        )
-        assets_table = AssetTable(related_assets, request=self.request)
-        RequestConfig(self.request, paginate=False).configure(assets_table) # Disable pagination for related table
-        context['assets_table'] = assets_table
+        # Prepare Assets table
+        assets_table = AssetTable(assettype.assets.all(), request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assets_table)
 
-        # --- Prepare Related Objects List (for right column card) ---
+        # Prepare Related Objects List
         related_objects_list = []
-        asset_count = related_assets.count()
+        asset_count = assettype.assets.count()
         if asset_count:
-            asset_list_url = reverse('assets:asset_list')
-            filtered_asset_url = f"{asset_list_url}?asset_type={asset_type.pk}" # Filter by asset_type pk
             related_objects_list.append({
                 'label': 'Assets',
                 'count': asset_count,
-                'url': filtered_asset_url
+                'url': f"{reverse('assets:asset_list')}?asset_type={assettype.slug}" # Filter link
             })
-        context['related_objects_list'] = related_objects_list
-        
-        # --- Add other necessary context for base template ---
-        context['object_type'] = self.model._meta.verbose_name.title()
-        context['update_url_name'] = get_model_viewname(self.model, 'update')
-        context['delete_url_name'] = get_model_viewname(self.model, 'delete')
-        context['view_options'] = ['update', 'delete'] # Enable Edit/Delete buttons
 
+        context['assets_table'] = assets_table
+        context['related_objects_list'] = related_objects_list
         return context
 
-class AssetTypeCreateView(CreateView):
+class AssetTypeEditView(ObjectEditView): # Consolidate Create and Update
+    queryset = AssetType.objects.all() # Base queryset for edit view
     model = AssetType
-    form_class = AssetTypeForm
-    template_name = 'assets/assettypes/assettype_form.html' # Standardized path
-    # success_url set in get_success_url
-
-    def get_success_url(self):
-        # Redirect to the detail view of the newly created object
-        return reverse('assets:assettype_detail', kwargs={'slug': self.object.slug})
-
-    def form_valid(self, form):
-        messages.success(self.request, "Asset type created successfully.")
-        return super().form_valid(form)
-
-class AssetTypeUpdateView(UpdateView):
-    model = AssetType
-    form_class = AssetTypeForm
-    template_name = 'assets/assettypes/assettype_form.html'
+    model_form = AssetTypeForm
+    template_name = 'generic/object_edit.html' # Use generic template
+    # Need to handle slug lookup for the update case
     slug_field = 'slug'
     slug_url_kwarg = 'slug'
-    # success_url set in get_success_url
 
-    def get_success_url(self):
-        return reverse('assets:assettype_detail', kwargs={'slug': self.object.slug})
+    # Success URL and messages are handled by the base ObjectEditView
 
-    def form_valid(self, form):
-        messages.success(self.request, "Asset type updated successfully.")
-        return super().form_valid(form)
-
-class AssetTypeDeleteView(DeleteView):
+class AssetTypeDeleteView(ObjectDeleteView): # Inherit from ObjectDeleteView
+    queryset = AssetType.objects.all()
     model = AssetType
-    template_name = 'assets/assettypes/assettype_confirm_delete.html' # Standardized path
-    slug_field = 'slug'
-    slug_url_kwarg = 'slug'
+    template_name = 'generic/object_confirm_delete.html' # Use generic template
     success_url = reverse_lazy('assets:assettype_list')
+    slug_field = 'slug' # Still need this if lookup is by slug
+    slug_url_kwarg = 'slug' # Still need this if lookup is by slug
 
-    def delete(self, request, *args, **kwargs):
-        # TODO: Add protection check if assets are linked to this type
-        asset_type_name = self.get_object().model # Get name before deletion
-        messages.success(request, f"Asset type '{asset_type_name}' deleted successfully.")
-        return super().delete(request, *args, **kwargs)
+    def post(self, request, *args, **kwargs):
+        assettype = self.get_object()
+        asset_count = assettype.assets.count()
+
+        if asset_count > 0:
+            messages.error(
+                request,
+                f"Cannot delete asset type '{assettype}': It is associated with {asset_count} asset{'s' if asset_count != 1 else ''}."
+            )
+            return redirect(assettype.get_absolute_url())
+
+        return super().post(request, *args, **kwargs)
 
 # Site, Region, SiteGroup views moved to organization/views.py

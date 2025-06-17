@@ -25,7 +25,7 @@ from . import tables
 # @login_required
 # def tag_list(request):
 #     ...
-#     return render(request, 'generic/object_list_base.html', context)
+#     return render(request, 'generic/object_list.html', context)
 # End removal of tag_list
 
 @login_required
@@ -163,4 +163,4 @@ class TagListView(ObjectListView):
     filterset_form = TagFilterForm # Assuming TagFilterForm exists
     table = TagTable
     action_buttons = ('add',) # Add create button
-    template_name = 'generic/object_list_base.html' # Use base template
+    template_name = 'generic/object_list.html' # Use base template

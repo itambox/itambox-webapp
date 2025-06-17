@@ -1,8 +1,10 @@
-{% extends 'generic/object_detail_base.html' %}
+{% extends 'generic/object_detail.html' %}
 {% load render_table from django_tables2 %}
 {% load static %}
 
 {% block title %}{{ object.name }} - Location Details - AssetBox{% endblock %}
+
+{% block page_pretitle %}Organization / Locations{% endblock %}
 
 {% block page_header %}
     <div class="page-pretitle">Organization / Locations</div>
@@ -65,19 +67,38 @@
 </dl>
 {% endblock object_details %}
 
-{% block related_objects %}{% endblock related_objects %}
+{% block related_objects %}
+    {# Base template uses related_objects_list context variable #}
+{% endblock related_objects %}
 
 {% block full_width_content %}
-    {% if assets_table %}
+    {% if assets_table and assets_table.rows %}
     <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">Assets in this Location ({{ assets_table.rows|length }})</h3></div>
+        <div class="card-header"><h3 class="card-title">Assets in this Location ({{ assets_table.page.paginator.count }})</h3></div>
         <div class="table-responsive">
             {% render_table assets_table %}
         </div>
-        {# Optional: Add pagination if needed later #}
+        {% if assets_table.page %}
+             <div class="card-footer d-flex align-items-center">
+                 {% include 'global_includes/pagination_per_page.html' with paginator=assets_table.page.paginator %}
+                 <p class="m-0 text-secondary flex-grow-1">
+                    {% blocktrans with start=assets_table.page.start_index end=assets_table.page.end_index total=assets_table.page.paginator.count %}
+                    Showing <span>{{ start }}</span> to <span>{{ end }}</span> of <span>{{ total }}</span> entries
+                    {% endblocktrans %}
+                 </p>
+                 {% include 'global_includes/pagination_links.html' with page_obj=assets_table.page %}
+             </div>
+         {% endif %}
+    </div>
+    {% elif assets_table %}
+     <div class="card mb-4">
+        <div class="card-header"><h3 class="card-title">Assets in this Location (0)</h3></div>
+         <div class="card-body">
+            <p class="text-muted">No assets found in this location.</p>
+         </div>
     </div>
     {% endif %}
-     {# TODO: Add Child Locations card/table here? #}
+    {# TODO: Add Child Locations card/table here later if needed #}
 {% endblock full_width_content %}
 
 {% block content %}

@@ -3,10 +3,12 @@ import django_tables2 as tables
 from django_tables2.utils import A  # Alias for Accessor
 from .models import Asset, AssetRole, Manufacturer, AssetType
 from core.tables import ActionsColumn, BaseTable
+from extras.tables import TagColumn # Import TagColumn
 from django.urls import reverse, NoReverseMatch
 from django.utils.safestring import mark_safe
 from django.contrib.contenttypes.models import ContentType
 from organization.models import AssetHolderAssignment
+from django.utils.html import format_html
 
 class AssetTable(BaseTable): # Inherit from BaseTable
     pk = tables.CheckBoxColumn(accessor='pk', attrs = { "th__input": {"title": "Select all rows"}})
@@ -89,20 +91,45 @@ class AssetRoleTable(BaseTable): # Inherit from BaseTable
             return mark_safe(f'<span class="badge" style="background-color: #{value};">&nbsp;</span> #{value}')
         return "—"
 
-class ManufacturerTable(BaseTable): # Inherit from BaseTable
-    pk = tables.CheckBoxColumn(accessor='pk', attrs = { "th__input": {"title": "Select all rows"}})
-    name = tables.LinkColumn('assets:manufacturer_detail', args=[A('pk')], verbose_name='Name')
-    asset_count = tables.Column(verbose_name='Asset Count', orderable=False)
+class ManufacturerTable(BaseTable):
+    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"onclick": "toggle(this)"}})
+    name = tables.LinkColumn()
+    asset_type_count = tables.Column(
+        verbose_name='Asset Types',
+        linkify=True,
+        accessor='asset_types.count' # Directly access the count using the related name
+    )
+    asset_count = tables.Column(
+        accessor='pk', # Use pk temporarily, will be replaced by render method
+        verbose_name='Assets'
+    )
+    # description = tables.Column()
+    # slug = tables.Column()
+    tags = TagColumn(url_name='assets:manufacturer_list')
     actions = ActionsColumn()
 
-    class Meta(BaseTable.Meta): # Inherit Meta
-        model = Manufacturer
-        fields = ('pk', 'name', 'description', 'asset_count', 'actions')
-        default_columns = ('pk', 'name', 'asset_count', 'description', 'actions')
+    # Removed the problematic render_asset_count method
+    # It's now handled by the asset_type_count column using accessor
 
     def render_asset_count(self, record):
-        # Calculate count dynamically or pass via annotation in view
-        return record.assets.count() # Use related_name 'assets'
+        # This method counts Assets related via AssetType
+        asset_count = Asset.objects.filter(asset_type__manufacturer=record).count()
+        # TODO: Consider annotating this count in the view for performance.
+        return asset_count
+
+    def render_asset_type_count(self, value, record):
+        # Customize the link for asset_type_count
+        url = reverse('assets:assettype_list') + f'?manufacturer_id={record.pk}'
+        return format_html('<a href="{}">{}</a>', url, value)
+
+    class Meta(BaseTable.Meta):
+        model = Manufacturer
+        fields = (
+            'pk', 'name', 'asset_type_count', 'asset_count', 'description', 'tags', 'actions'
+        )
+        default_columns = (
+            'pk', 'name', 'asset_type_count', 'asset_count', 'description', 'actions'
+        )
 
 class AssetTypeTable(BaseTable):
     pk = tables.CheckBoxColumn(accessor='pk')

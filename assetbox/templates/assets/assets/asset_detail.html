@@ -1,178 +1,150 @@
-{% extends 'base.html' %}
+{% extends 'generic/object_detail.html' %}
+{% load static %}
+{% load utility_tags %}
 
-{% block title %}{{ asset.name }} ({{ asset.asset_tag }}) - AssetBox{% endblock %}
+{# --- Page Title --- #}
+{% block title %}{{ object.name }} ({{ object.asset_tag }}) - AssetBox{% endblock %}
 
-{% block page_header %}
-    <div class="page-pretitle">
-        Asset Details
-    </div>
-    <h2 class="page-title">
-        {{ asset.name }} <span class="text-muted">({{ asset.asset_tag }})</span>
-    </h2>
-{% endblock %}
+{# --- Page Header (from base) --- #}
+{% block page_pretitle %}Asset Details{% endblock %}
+{# Base template uses {{ object }} for main title #}
 
-{% block page_actions %}
-    <div class="btn-list">
-        {# Check Out Button (Show if Available AND not assigned to Holder AND no Location set) #}
-        {% if asset.status == 'available' and not assignment and not asset.location %}
-            <button type="button" class="btn btn-info"
-                    hx-get="{% url 'assets:asset_checkout_modal' pk=asset.pk %}"
-                    hx-target="#modal-placeholder"
-                    hx-swap="innerHTML"
-                    hx-on::after-request="new bootstrap.Modal(document.getElementById('asset-checkout-modal')).show()"
-                    >
-                Check Out...
+{# --- Page Actions (from base) --- #}
+{% block extra_page_actions %}
+    {# Check Out Button (Show if Available AND not assigned to Holder AND no Location set) #}
+    {% if object.status == 'available' and not assignment and not object.location %}
+        <button type="button" class="btn btn-info"
+                hx-get="{% url 'assets:asset_checkout_modal' pk=object.pk %}"
+                hx-target="#modal-placeholder"
+                hx-swap="innerHTML"
+                hx-on::after-request="new bootstrap.Modal(document.getElementById('asset-checkout-modal')).show()"
+                >
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-upload" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" /><path d="M7 9l5 -5l5 5" /><path d="M12 4l0 12" /></svg>
+            Check Out...
+        </button>
+    {% endif %}
+
+    {# Check In Button (Show if assigned to Holder OR has a Location) #}
+    {% if assignment or object.location %}
+        <form method="post" action="{% url 'assets:asset_checkin' pk=object.pk %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-success">
+                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-download" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" /><path d="M7 11l5 5l5 -5" /><path d="M12 4l0 12" /></svg>
+                Check In
             </button>
+        </form>
+    {% endif %}
+{% endblock extra_page_actions %}
+
+{# --- Asset Specific Details --- #}
+{% block object_details %}
+<dl class="row">
+    <dt class="col-sm-3">Asset Tag:</dt>
+    <dd class="col-sm-9">{{ object.asset_tag }}</dd>
+
+    <dt class="col-sm-3">Serial Number:</dt>
+    <dd class="col-sm-9">{{ object.serial_number|default:"<i>Not Set</i>"|safe }}</dd>
+    
+    <dt class="col-sm-3">Type:</dt>
+    <dd class="col-sm-9">
+        {% if object.asset_type %}
+            <a href="{% url 'assets:assettype_detail' slug=object.asset_type.slug %}">{{ object.asset_type }}</a>
+        {% else %}
+             <i>Not Set</i>
         {% endif %}
+    </dd>
 
-        {# Check In Button (Show if assigned to Holder OR has a Location) #}
-        {% if assignment or asset.location %}
-            <form method="post" action="{% url 'assets:asset_checkin' pk=asset.pk %}" class="d-inline">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-success">
-                    Check In
-                </button>
-            </form>
+    <dt class="col-sm-3">Manufacturer:</dt>
+    <dd class="col-sm-9">
+         {% if object.manufacturer %}
+            <a href="{% url 'assets:manufacturer_detail' pk=object.manufacturer.pk %}">{{ object.manufacturer }}</a>
+        {% else %}
+             <i>N/A</i>
         {% endif %}
+    </dd>
 
-        {# Existing Edit/Delete Buttons #}
-        <a href="{% url 'assets:asset_update' pk=asset.pk %}" class="btn">
-            Edit
-        </a>
-        <a href="{% url 'assets:asset_delete' pk=asset.pk %}" class="btn btn-danger">
-            Delete
-        </a>
+    <dt class="col-sm-3">Role:</dt>
+    <dd class="col-sm-9">
+        {% if object.asset_role %}
+            <a href="{% url 'assets:assetrole_detail' pk=object.asset_role.pk %}">{{ object.asset_role }}</a>
+        {% else %}
+             <i>Not Set</i>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">Status:</dt>
+    <dd class="col-sm-9">
+        {# TODO: Add status badge utility tag #}
+        {{ object.get_status_display }}
+    </dd>
+    
+    <dt class="col-sm-3">Purchase Date:</dt>
+    <dd class="col-sm-9">{{ object.purchase_date|date:"Y-m-d"|default:"<i>Not Set</i>"|safe }}</dd>
+
+    <dt class="col-sm-3">Warranty Expiration:</dt>
+    <dd class="col-sm-9">{{ object.warranty_expiration|date:"Y-m-d"|default:"<i>Not Set</i>"|safe }}</dd>
+</dl>
+{% endblock object_details %}
+
+{# --- Extra Cards Left Column --- #}
+{% block extra_cards_left %}
+    {# Assignment Card #}
+    <div class="card mt-4">
+        <div class="card-header">
+            <h3 class="card-title">Assignment</h3>
+        </div>
+         <div class="card-body">
+            <dl class="row">
+                <dt class="col-sm-3">Assigned To:</dt>
+                <dd class="col-sm-9">
+                    {% if assignment and assignment.asset_holder %}
+                        <a href="{% url 'organization:assetholder_detail' pk=assignment.asset_holder.pk %}">{{ assignment.asset_holder }}</a>
+                    {% else %}
+                        <i>Unassigned</i>
+                    {% endif %}
+                </dd>
+
+                <dt class="col-sm-3">Location:</dt>
+                <dd class="col-sm-9">
+                     {% if object.location %}
+                        <a href="{% url 'organization:location_detail' pk=object.location.pk %}">{{ object.location }}</a>
+                    {% else %}
+                        <i>Not Set</i>
+                    {% endif %}
+                </dd>
+            </dl>
+        </div>
     </div>
-{% endblock %}
 
-{% block content %}
-<div class="row g-4">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">Asset Information</h3>
-            </div>
-            <div class="card-body">
-                <dl class="row">
-                    <dt class="col-sm-3">Asset Tag:</dt>
-                    <dd class="col-sm-9">{{ asset.asset_tag }}</dd>
+    {# Notes Card - Handled by base template #}
+{% endblock extra_cards_left %}
 
-                    <dt class="col-sm-3">Serial Number:</dt>
-                    <dd class="col-sm-9">{{ asset.serial_number|default:"<i>Not Set</i>"|safe }}</dd>
-                    
-                    <dt class="col-sm-3">Model:</dt>
-                    <dd class="col-sm-9">{{ asset.model }}</dd>
-
-                    <dt class="col-sm-3">Manufacturer:</dt>
-                    <dd class="col-sm-9">{{ asset.manufacturer.name|default:"<i>Not Set</i>"|safe }}</dd>
-
-                    <dt class="col-sm-3">Asset Role:</dt>
-                    <dd class="col-sm-9">{{ asset.asset_role.name|default:"<i>Not Set</i>"|safe }}</dd>
-
-                    <dt class="col-sm-3">Status:</dt>
-                    <dd class="col-sm-9">{{ asset.get_status_display }}</dd>
-                    
-                    <dt class="col-sm-3">Purchase Date:</dt>
-                    <dd class="col-sm-9">{{ asset.purchase_date|date:"Y-m-d"|default:"<i>Not Set</i>"|safe }}</dd>
-
-                    <dt class="col-sm-3">Warranty Expiration:</dt>
-                    <dd class="col-sm-9">{{ asset.warranty_expiration|date:"Y-m-d"|default:"<i>Not Set</i>"|safe }}</dd>
-                </dl>
-            </div>
+{# --- Extra Cards Right Column --- #}
+{% block extra_cards_right %}
+    {# Activity Log Card #}
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Activity Log</h3>
         </div>
-
-        <div class="card mt-4">
-            <div class="card-header">
-                <h3 class="card-title">Assignment</h3>
-            </div>
-             <div class="card-body">
-                <dl class="row">
-                    <dt class="col-sm-3">Assigned To:</dt>
-                    <dd class="col-sm-9">
-                        {% if assignment and assignment.asset_holder %}
-                            {{ assignment.asset_holder }} {# TODO: Link later #}
-                        {% else %}
-                            <i>Unassigned</i>
-                        {% endif %}
-                    </dd>
-
-                    <dt class="col-sm-3">Location:</dt>
-                    <dd class="col-sm-9">{{ asset.location.name|default:"<i>Not Set</i>"|safe }}</dd>
-                </dl>
-            </div>
-        </div>
-
-        <div class="card mt-4">
-            <div class="card-header">
-                <h3 class="card-title">Notes</h3>
-            </div>
-             <div class="card-body">
-                {{ asset.notes|linebreaksbr|default:"<i>No notes provided.</i>"|safe }}
-            </div>
-        </div>
-
-    </div>
-    <div class="col-md-4">
-        <div class="card mb-4"> {# Added mb-4 for spacing #}
-             <div class="card-body">
-                 <h3 class="card-title">Metadata</h3>
-                 <p class="text-muted small">
-                     Created: {{ asset.created_at|date:"Y-m-d H:i" }} <br>
-                     Updated: {{ asset.updated_at|date:"Y-m-d H:i" }}
-                 </p>
-            </div>
-        </div>
-        
-        {# Tags Card - Add here #}
-        <div class="card mb-4">
-            <div class="card-header">
-                <h3 class="card-title">Tags</h3>
-            </div>
-            <div class="card-body">
-                {% if asset.tags.exists %}
-                    {% for tag in asset.tags.all %}
-                        {# Use CSS variable for background-color #}
-                        <a href="{% url 'extras:tag_detail' pk=tag.pk %}" 
-                           class="badge me-1 mb-1" 
-                           style="--tag-color: #{% if tag.color %}{{ tag.color }}{% else %}adb5bd{% endif %}; background-color: var(--tag-color); color: #fff; text-decoration: none;">
-                            {{ tag.name }}
-                        </a>
-                    {% endfor %}
-                {% else %}
-                    <span class="text-muted"><i>No tags assigned.</i></span>
-                {% endif %}
-            </div>
-        </div>
-        {# End Tags Card #}
-
-        {# Activity Log Card #}
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">Activity Log</h3>
-            </div>
-            <div class="list-group list-group-flush list-group-hoverable" style="max-height: 400px; overflow-y: auto;">
-                {% for log in logs %}
-                    <div class="list-group-item">
-                        <div class="row align-items-center">
-                            <div class="col-auto">{# <span class="badge bg-primary"></span> Icon? #}</div>
-                            <div class="col text-truncate">
-                                <span class="text-body d-block">{{ log.get_action_display }}</span>
-                                <small class="text-muted text-truncate mt-n1">{{ log.notes|default:"-" }}</small>
-                            </div>
-                             <div class="col-auto text-muted text-end">
-                                <small>{{ log.timestamp|date:"Y-m-d H:i" }}<br>by {{ log.user.username|default:"System" }}</small>
-                            </div>
+        <div class="list-group list-group-flush list-group-hoverable" style="max-height: 400px; overflow-y: auto;">
+            {% for log in logs %}
+                <div class="list-group-item">
+                    <div class="row align-items-center">
+                        <div class="col-auto">{# <span class="badge bg-primary"></span> Icon? #}</div>
+                        <div class="col text-truncate">
+                            <span class="text-body d-block">{{ log.get_action_display }}</span>
+                            <small class="text-muted text-truncate mt-n1">{{ log.notes|default:"-" }}</small>
+                        </div>
+                         <div class="col-auto text-muted text-end">
+                            <small>{{ log.timestamp|date:"Y-m-d H:i" }}<br>by {{ log.user.username|default:"System" }}</small>
                         </div>
                     </div>
-                {% empty %}
-                    <div class="list-group-item">
-                        <div class="text-muted text-center">No activity recorded yet.</div>
-                    </div>
-                {% endfor %}
-            </div>
+                </div>
+            {% empty %}
+                <div class="list-group-item">
+                    <div class="text-muted text-center">No activity recorded yet.</div>
+                </div>
+            {% endfor %}
         </div>
     </div>
-</div>
-
-
-{% endblock %} 
+{% endblock extra_cards_right %} 

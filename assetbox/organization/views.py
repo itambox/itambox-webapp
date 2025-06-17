@@ -1,9 +1,11 @@
+# --- START OF FILE views.py ---
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_POST # Keep this if needed for other views
-from django.urls import reverse # Add this import
+from django.urls import reverse, reverse_lazy
 from django.views.generic import View
 from django.contrib.auth import get_user_model
+from django.contrib import messages
 
 # Import models from the organization app
 from .models import Site, Region, SiteGroup, Tenant, Location, TenantGroup, AssetHolder, AssetHolderAssignment
@@ -50,101 +52,85 @@ class SiteListView(ObjectListView):
     table = SiteTable
     action_buttons = ('add',)
 
-@login_required
-def site_detail(request, pk):
-    # Fetch site and prefetch related locations and tags
-    site = get_object_or_404(
-        Site.objects.select_related('region', 'group', 'tenant').prefetch_related(
+class SiteDetailView(ObjectDetailView):
+    queryset = Site.objects.select_related('region', 'group', 'tenant').prefetch_related(
             'locations', 'locations__tenant', # Prefetch locations and their tenant
             'tags'
-        ), 
-        pk=pk
     )
-    
-    # Prepare Locations table
-    locations_table = LocationTable(site.locations.all(), request=request)
-    RequestConfig(request, paginate=False).configure(locations_table) # Disable pagination for embedded table
-    
+    # template_name = 'organization/sites/site_detail.html' # Can be inferred
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        site = self.get_object()
+
+        # Prepare Locations table
+        locations_table = LocationTable(site.locations.all(), request=self.request)
+        # Use RequestConfig from self.request
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(locations_table)
+
+        # Prepare Related Objects List
+        related_objects_list = []
+        location_count = site.locations.count()
+        if location_count:
+            related_objects_list.append({
+                'label': 'Locations',
+                'count': location_count,
+                'url': f"{reverse('organization:location_list')}?site={site.slug}" # Filter link
+            })
+        asset_count = Asset.objects.filter(location__site=site).count()
+        if asset_count:
+            related_objects_list.append({
+                'label': 'Assets',
+                'count': asset_count,
+                'url': f"{reverse('assets:asset_list')}?site={site.slug}" # Filter link
+            })
+
+        # *** INDENTATION FIX START ***
+        context['locations_table'] = locations_table
+        context['related_objects_list'] = related_objects_list
+        # Base view already adds common context like title, object_type, etc.
+        # Base view provides edit/delete URLs in context['action_urls'] based on get_model_viewname
+        return context
+        # *** INDENTATION FIX END ***
+
+class SiteEditView(ObjectEditView):
+    queryset = Site.objects.all() # Required by base view
     model = Site
+    model_form = SiteForm
+    template_name = 'generic/object_edit.html'
+    # success_url is handled by base view's get_success_url -> object.get_absolute_url()
+    # Success messages handled by base view's form_valid
 
-    # --- Prepare Related Objects List ---
-    related_objects_list = []
-    # Locations
-    location_count = site.locations.count()
-    if location_count:
-        related_objects_list.append({
-            'label': 'Locations',
-            'count': location_count,
-            # TODO: Add filtering parameter later ?site={site.slug}
-            'url': reverse('organization:location_list')
-        })
-    # Assets (at this site via locations)
-    asset_count = Asset.objects.filter(location__site=site).count()
-    if asset_count:
-        related_objects_list.append({
-            'label': 'Assets',
-            'count': asset_count,
-            # TODO: Add filtering parameter later ?site={site.slug}
-            'url': reverse('assets:asset_list')
-        })
-    # --- End Related Objects List ---
-    
-    context = {
-        'object': site, # Use generic 'object'
-        'title': str(site),
-        'object_type': model._meta.verbose_name.title(),
-        'locations_table': locations_table, # Pass locations table for full width block
-        'update_url_name': get_model_viewname(model, 'update'),
-        'delete_url_name': get_model_viewname(model, 'delete'),
-        'view_options': ['update', 'delete'],
-        'related_objects_list': related_objects_list, # Pass related objects list for sidebar
-    }
-    # Render the specific template
-    return render(request, 'organization/sites/site_detail.html', context)
+class SiteDeleteView(ObjectDeleteView):
+    queryset = Site.objects.all()
+    model = Site
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('organization:site_list')
 
-@login_required
-def site_create(request):
-    if request.method == 'POST':
-        form = SiteForm(request.POST) # Use organization form
-        if form.is_valid():
-            # TODO: Automatically generate slug if needed
-            site = form.save()
-            # TODO: Add message
-            # Use organization URL name
-            return redirect('organization:site_detail', pk=site.pk)
-    else:
-        form = SiteForm() # Use organization form
-    context = {'form': form, 'title': 'Create Site', 'return_url': 'organization:site_list'}
-    return render(request, 'generic/object_edit.html', context)
+    def post(self, request, *args, **kwargs):
+        site = self.get_object()
+        # Correctly check related locations and assets via locations
+        location_count = site.locations.count()
+        asset_count = Asset.objects.filter(location__site=site).count()
 
-@login_required
-def site_update(request, pk):
-    site = get_object_or_404(Site, pk=pk) # Use organization model
-    if request.method == 'POST':
-        form = SiteForm(request.POST, instance=site) # Use organization form
-        if form.is_valid():
-            form.save()
-            # TODO: Add message
-            # Use organization URL name
-            return redirect('organization:site_detail', pk=site.pk)
-    else:
-        form = SiteForm(instance=site) # Use organization form
-    context = {'form': form, 'object': site, 'title': f'Update Site: {site.name}', 'return_url': 'organization:site_list'}
-    return render(request, 'generic/object_edit.html', context)
+        # *** INDENTATION FIX START ***
+        if location_count > 0 or asset_count > 0:
+            related_object_details = []
+            if location_count > 0:
+                related_object_details.append(f"{location_count} location{'s' if location_count != 1 else ''}")
+            if asset_count > 0:
+                related_object_details.append(f"{asset_count} asset{'s' if asset_count != 1 else ''}")
 
-@login_required
-def site_delete(request, pk):
-    site = get_object_or_404(Site, pk=pk) # Use organization model
-    related_count = site.locations.count() + site.assets.count()
-    if request.method == 'POST':
-        if related_count > 0:
-            # TODO: Error message
-            return redirect('organization:site_list')
-        site.delete()
-        # TODO: Message
-        return redirect('organization:site_list')
-    context = {'object': site, 'related_objects_count': related_count, 'list_url_name': 'organization:site_list'}
-    return render(request, 'generic/object_confirm_delete.html', context)
+            messages.error(
+                request,
+                f"Cannot delete site '{site.name}': It is associated with {', '.join(related_object_details)}."
+            )
+            # Redirect back to the site detail page or list page
+            return redirect(site.get_absolute_url())
+
+        # If no related objects, proceed with deletion using superclass method
+        return super().post(request, *args, **kwargs)
+        # *** INDENTATION FIX END ***
 
 # --- Region Views ---
 
@@ -157,95 +143,70 @@ class RegionListView(ObjectListView):
     table = RegionTable
     action_buttons = ('add',)
 
-@login_required
-def region_detail(request, pk):
-    # Fetch region and prefetch related sites and tags
-    region = get_object_or_404(
-        Region.objects.prefetch_related('children', 'tags', 'sites__tenant', 'sites__group'), # Include tenant/group for site table links
-        pk=pk
+class RegionDetailView(ObjectDetailView):
+    queryset = Region.objects.prefetch_related(
+        'children', 'tags', 'sites__tenant', 'sites__group' # Include tenant/group for site table links
     )
-    
-    # Prepare Sites table
-    sites_table = SiteTable(region.sites.all(), request=request)
-    RequestConfig(request, paginate=False).configure(sites_table) # Disable pagination
-    
+    # template_name = 'organization/regions/region_detail.html' # Can be inferred
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        region = self.get_object()
+
+        # Prepare Sites table
+        sites_table = SiteTable(region.sites.all(), request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(sites_table)
+
+        # Prepare Related Objects List
+        related_objects_list = []
+        site_count = region.sites.count()
+        if site_count:
+            related_objects_list.append({
+                'label': 'Sites',
+                'count': site_count,
+                'url': f"{reverse('organization:site_list')}?region={region.slug}" # Filter link
+            })
+        child_count = region.children.count()
+        if child_count:
+             related_objects_list.append({
+                'label': 'Child Regions',
+                'count': child_count,
+                'url': f"{reverse('organization:region_list')}?parent={region.slug}" # Filter link
+            })
+
+        # *** INDENTATION FIX START ***
+        context['sites_table'] = sites_table
+        context['related_objects_list'] = related_objects_list
+        return context
+        # *** INDENTATION FIX END ***
+
+class RegionEditView(ObjectEditView):
+    queryset = Region.objects.all()
     model = Region
+    model_form = RegionForm
+    template_name = 'generic/object_edit.html'
+    # Default success_url goes to object detail view
 
-    # --- Prepare Related Objects List ---
-    related_objects_list = []
-    # Sites
-    site_count = region.sites.count()
-    if site_count:
-        related_objects_list.append({
-            'label': 'Sites',
-            'count': site_count,
-            # TODO: Add filtering parameter later ?region={region.slug}
-            'url': reverse('organization:site_list') 
-        })
-    # Child Regions
-    child_count = region.children.count()
-    if child_count:
-         related_objects_list.append({
-            'label': 'Child Regions',
-            'count': child_count,
-            # TODO: Add filtering parameter later ?parent={region.slug}
-            'url': reverse('organization:region_list')
-        })
-    # --- End Related Objects List ---
+class RegionDeleteView(ObjectDeleteView):
+    queryset = Region.objects.all()
+    model = Region
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('organization:region_list')
 
-    context = {
-        'object': region, # Use generic 'object'
-        'title': str(region),
-        'object_type': model._meta.verbose_name.title(),
-        'sites_table': sites_table, # Pass sites table for full width block
-        'update_url_name': get_model_viewname(model, 'update'),
-        'delete_url_name': get_model_viewname(model, 'delete'),
-        'view_options': ['update', 'delete'], 
-        'related_objects_list': related_objects_list, # Pass related objects list for sidebar
-    }
-    # Render the specific template
-    return render(request, 'organization/regions/region_detail.html', context)
+    def post(self, request, *args, **kwargs):
+        region = self.get_object()
+        site_count = region.sites.count()
 
-@login_required
-def region_create(request):
-    if request.method == 'POST':
-        form = RegionForm(request.POST)
-        if form.is_valid():
-            form.save()
-            # TODO: Message
-            return redirect('organization:region_list')
-    else:
-        form = RegionForm()
-    context = {'form': form, 'title': 'Create Region', 'return_url': 'organization:region_list'}
-    return render(request, 'generic/object_edit.html', context)
-
-@login_required
-def region_update(request, pk):
-    region = get_object_or_404(Region, pk=pk)
-    if request.method == 'POST':
-        form = RegionForm(request.POST, instance=region)
-        if form.is_valid():
-            form.save()
-            # TODO: Message
-            return redirect('organization:region_list')
-    else:
-        form = RegionForm(instance=region)
-    context = {'form': form, 'object': region, 'title': f'Update Region: {region.name}', 'return_url': 'organization:region_list'}
-    return render(request, 'generic/object_edit.html', context)
-
-@login_required
-def region_delete(request, pk):
-    region = get_object_or_404(Region, pk=pk)
-    site_count = region.sites.count()
-    if request.method == 'POST':
+        # *** INDENTATION FIX START ***
         if site_count > 0:
-            # TODO: Error message
-            return redirect('organization:region_list')
-        region.delete()
-        # TODO: Message
-        return redirect('organization:region_list')
-    context = {'object': region, 'related_objects_count': site_count, 'list_url_name': 'organization:region_list'}
-    return render(request, 'generic/object_confirm_delete.html', context)
+            messages.error(
+                request,
+                f"Cannot delete region '{region.name}': It is associated with {site_count} site{'s' if site_count != 1 else ''}."
+            )
+            return redirect(region.get_absolute_url())
+
+        return super().post(request, *args, **kwargs)
+        # *** INDENTATION FIX END ***
 
 # --- Site Group Views ---
 
@@ -258,89 +219,70 @@ class SiteGroupListView(ObjectListView):
     table = SiteGroupTable
     action_buttons = ('add',)
 
-@login_required
-def sitegroup_detail(request, pk):
-    # Fetch sitegroup and prefetch related sites (with their tenant/region), children, tags
-    sitegroup = get_object_or_404(
-        SiteGroup.objects.prefetch_related('children', 'tags', 'sites__tenant', 'sites__region'), 
-        pk=pk
+class SiteGroupDetailView(ObjectDetailView):
+    queryset = SiteGroup.objects.prefetch_related(
+        'children', 'tags', 'sites__tenant', 'sites__region' # Prefetch related for SiteTable links
     )
-    
-    # Prepare Sites table
-    sites_table = SiteTable(sitegroup.sites.all(), request=request)
-    RequestConfig(request, paginate=False).configure(sites_table) # Disable pagination
-    
+    # template_name = 'organization/sitegroups/sitegroup_detail.html' # Can be inferred
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        sitegroup = self.get_object()
+
+        # Prepare Sites table
+        sites_table = SiteTable(sitegroup.sites.all(), request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(sites_table)
+
+        # Prepare Related Objects List
+        related_objects_list = []
+        site_count = sitegroup.sites.count()
+        if site_count:
+            related_objects_list.append({
+                'label': 'Sites',
+                'count': site_count,
+                'url': f"{reverse('organization:site_list')}?group={sitegroup.slug}" # Filter link
+            })
+        child_count = sitegroup.children.count()
+        if child_count:
+             related_objects_list.append({
+                'label': 'Child Groups',
+                'count': child_count,
+                'url': f"{reverse('organization:sitegroup_list')}?parent={sitegroup.slug}" # Filter link
+            })
+
+        # *** INDENTATION FIX START ***
+        context['sites_table'] = sites_table
+        context['related_objects_list'] = related_objects_list
+        return context
+        # *** INDENTATION FIX END ***
+
+class SiteGroupEditView(ObjectEditView):
+    queryset = SiteGroup.objects.all()
     model = SiteGroup
-    
-    related_objects_list = [] # Use a different name to avoid context clash
-    # Sites
-    site_count = sitegroup.sites.count()
-    if site_count:
-        related_objects_list.append({
-            'label': 'Sites',
-            'count': site_count,
-            # TODO: Add filtering parameter later ?group={sitegroup.slug}
-            'url': reverse('organization:site_list')
-        })
-    # Child Groups
-    child_count = sitegroup.children.count()
-    if child_count:
-         related_objects_list.append({
-            'label': 'Child Groups',
-            'count': child_count,
-            # TODO: Add filtering parameter later ?parent={sitegroup.slug}
-            'url': reverse('organization:sitegroup_list')
-        })
-         
-    context = {
-        'object': sitegroup, # Use generic 'object'
-        'title': str(sitegroup),
-        'object_type': model._meta.verbose_name.title(),
-        'sites_table': sites_table, # Pass sites table
-        'update_url_name': get_model_viewname(model, 'update'),
-        'delete_url_name': get_model_viewname(model, 'delete'),
-        'view_options': ['update', 'delete'], 
-        'related_objects_list': related_objects_list,
-    }
-    # Render the specific template
-    return render(request, 'organization/sitegroups/sitegroup_detail.html', context)
+    model_form = SiteGroupForm
+    template_name = 'generic/object_edit.html'
+    # Default success_url goes to object detail view
 
-@login_required
-def sitegroup_create(request):
-    if request.method == 'POST':
-        form = SiteGroupForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect('organization:sitegroup_list')
-    else:
-        form = SiteGroupForm()
-    context = {'form': form, 'title': 'Create Site Group', 'return_url': 'organization:sitegroup_list'}
-    return render(request, 'generic/object_edit.html', context)
+class SiteGroupDeleteView(ObjectDeleteView):
+    queryset = SiteGroup.objects.all()
+    model = SiteGroup
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('organization:sitegroup_list')
 
-@login_required
-def sitegroup_update(request, pk):
-    sitegroup = get_object_or_404(SiteGroup, pk=pk)
-    if request.method == 'POST':
-        form = SiteGroupForm(request.POST, instance=sitegroup)
-        if form.is_valid():
-            form.save()
-            return redirect('organization:sitegroup_list')
-    else:
-        form = SiteGroupForm(instance=sitegroup)
-    context = {'form': form, 'object': sitegroup, 'title': f'Update Site Group: {sitegroup.name}', 'return_url': 'organization:sitegroup_list'}
-    return render(request, 'generic/object_edit.html', context)
+    def post(self, request, *args, **kwargs):
+        sitegroup = self.get_object()
+        site_count = sitegroup.sites.count()
 
-@login_required
-def sitegroup_delete(request, pk):
-    sitegroup = get_object_or_404(SiteGroup, pk=pk)
-    site_count = sitegroup.sites.count()
-    if request.method == 'POST':
+        # *** INDENTATION FIX START ***
         if site_count > 0:
-            return redirect('organization:sitegroup_list')
-        sitegroup.delete()
-        return redirect('organization:sitegroup_list')
-    context = {'object': sitegroup, 'related_objects_count': site_count, 'list_url_name': 'organization:sitegroup_list'}
-    return render(request, 'generic/object_confirm_delete.html', context)
+            messages.error(
+                request,
+                f"Cannot delete site group '{sitegroup.name}': It is associated with {site_count} site{'s' if site_count != 1 else ''}."
+            )
+            return redirect(sitegroup.get_absolute_url())
+
+        return super().post(request, *args, **kwargs)
+        # *** INDENTATION FIX END ***
 
 # --- Location Views ---
 
@@ -351,89 +293,72 @@ class LocationListView(ObjectListView):
     table = LocationTable
     action_buttons = ('add',)
 
-@login_required
-def location_detail(request, pk):
-    location = get_object_or_404(
-        Location.objects.select_related('site', 'parent', 'tenant').prefetch_related('children', 'tags', 'assets'), # Changed asset_set to assets
-        pk=pk
+class LocationDetailView(ObjectDetailView):
+    queryset = Location.objects.select_related(
+        'site', 'parent', 'tenant'
+    ).prefetch_related(
+        'children', 'tags', 'assets' # Changed asset_set to assets
     )
+    # template_name = 'organization/locations/location_detail.html' # Can be inferred
 
-    # Prepare Assets table
-    assets_table = AssetTable(location.assets.all(), request=request)
-    RequestConfig(request, paginate=False).configure(assets_table)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        location = self.get_object()
 
+        # Prepare Assets table
+        assets_table = AssetTable(location.assets.all(), request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assets_table)
+
+        # Prepare Related Objects List
+        related_objects_list = []
+        asset_count = location.assets.count()
+        if asset_count:
+            related_objects_list.append({
+                'label': 'Assets',
+                'count': asset_count,
+                'url': f"{reverse('assets:asset_list')}?location={location.slug}" # Filter link
+            })
+        child_count = location.children.count()
+        if child_count:
+             related_objects_list.append({
+                'label': 'Child Locations',
+                'count': child_count,
+                'url': f"{reverse('organization:location_list')}?parent={location.slug}" # Filter link
+            })
+
+        # *** INDENTATION FIX START ***
+        context['assets_table'] = assets_table
+        context['related_objects_list'] = related_objects_list
+        return context
+        # *** INDENTATION FIX END ***
+
+class LocationEditView(ObjectEditView):
+    queryset = Location.objects.all()
     model = Location
+    model_form = LocationForm
+    template_name = 'generic/object_edit.html'
+    # Default success_url goes to object detail view
 
-    # --- Prepare Related Objects List ---
-    related_objects_list = []
-    # Assets
-    asset_count = location.assets.count()
-    if asset_count:
-        related_objects_list.append({
-            'label': 'Assets',
-            'count': asset_count,
-            # TODO: Add filtering parameter later ?location={location.slug}
-            'url': reverse('assets:asset_list')
-        })
-    # Child Locations
-    child_count = location.children.count()
-    if child_count:
-         related_objects_list.append({
-            'label': 'Child Locations',
-            'count': child_count,
-            # TODO: Add filtering parameter later ?parent={location.slug}
-            'url': reverse('organization:location_list')
-        })
-    # --- End Related Objects List ---
+class LocationDeleteView(ObjectDeleteView):
+    queryset = Location.objects.all()
+    model = Location
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('organization:location_list')
 
-    context = {
-        'object': location, # Use generic 'object'
-        'title': str(location),
-        'object_type': model._meta.verbose_name.title(),
-        'assets_table': assets_table, # Pass assets table
-        'update_url_name': get_model_viewname(model, 'update'),
-        'delete_url_name': get_model_viewname(model, 'delete'),
-        'view_options': ['update', 'delete'],
-        'related_objects_list': related_objects_list, # Pass related objects list
-    }
-    return render(request, 'organization/locations/location_detail.html', context)
+    def post(self, request, *args, **kwargs):
+        location = self.get_object()
+        asset_count = location.assets.count()
 
-@login_required
-def location_create(request):
-    if request.method == 'POST':
-        form = LocationForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect('organization:location_list')
-    else:
-        form = LocationForm()
-    context = {'form': form, 'title': 'Create Location', 'return_url': 'organization:location_list'}
-    return render(request, 'generic/object_edit.html', context)
+        # *** INDENTATION FIX START ***
+        if asset_count > 0:
+            messages.error(
+                request,
+                f"Cannot delete location '{location.name}': It is associated with {asset_count} asset{'s' if asset_count != 1 else ''}."
+            )
+            return redirect(location.get_absolute_url())
 
-@login_required
-def location_update(request, pk):
-    location = get_object_or_404(Location, pk=pk)
-    if request.method == 'POST':
-        form = LocationForm(request.POST, instance=location)
-        if form.is_valid():
-            form.save()
-            return redirect('organization:location_list')
-    else:
-        form = LocationForm(instance=location)
-    context = {'form': form, 'object': location, 'title': f'Update Location: {location.name}', 'return_url': 'organization:location_list'}
-    return render(request, 'generic/object_edit.html', context)
-
-@login_required
-def location_delete(request, pk):
-    location = get_object_or_404(Location, pk=pk)
-    related_count = location.assets.count()
-    if request.method == 'POST':
-        if related_count > 0:
-            return redirect('organization:location_list')
-        location.delete()
-        return redirect('organization:location_list')
-    context = {'object': location, 'related_objects_count': related_count, 'list_url_name': 'organization:location_list'}
-    return render(request, 'generic/object_confirm_delete.html', context)
+        return super().post(request, *args, **kwargs)
+        # *** INDENTATION FIX END ***
 
 # --- Tenant Group Views ---
 
@@ -446,51 +371,70 @@ class TenantGroupListView(ObjectListView):
     table = TenantGroupTable
     action_buttons = ('add',)
 
-@login_required
-def tenantgroup_detail(request, pk):
-    tenantgroup = get_object_or_404(
-        TenantGroup.objects.prefetch_related('children', 'tags', 'tenants'),
-        pk=pk
+class TenantGroupDetailView(ObjectDetailView):
+    queryset = TenantGroup.objects.prefetch_related(
+        'children', 'tags', 'tenants' # Removed 'tenants__group' as it's self-referential
     )
-    context = {'tenantgroup': tenantgroup}
-    return render(request, 'organization/tenantgroups/tenantgroup_detail.html', context)
+    # template_name = 'organization/tenantgroups/tenantgroup_detail.html' # Can be inferred
 
-@login_required
-def tenantgroup_create(request):
-    if request.method == 'POST':
-        form = TenantGroupForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect('organization:tenantgroup_list')
-    else:
-        form = TenantGroupForm()
-    context = {'form': form, 'title': 'Create Tenant Group', 'return_url': 'organization:tenantgroup_list'}
-    return render(request, 'generic/object_edit.html', context)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        tenantgroup = self.get_object()
 
-@login_required
-def tenantgroup_update(request, pk):
-    tenantgroup = get_object_or_404(TenantGroup, pk=pk)
-    if request.method == 'POST':
-        form = TenantGroupForm(request.POST, instance=tenantgroup)
-        if form.is_valid():
-            form.save()
-            return redirect('organization:tenantgroup_list')
-    else:
-        form = TenantGroupForm(instance=tenantgroup)
-    context = {'form': form, 'object': tenantgroup, 'title': f'Update Tenant Group: {tenantgroup.name}', 'return_url': 'organization:tenantgroup_list'}
-    return render(request, 'generic/object_edit.html', context)
+        # Prepare Tenants table
+        tenants_table = TenantTable(tenantgroup.tenants.all(), request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(tenants_table)
 
-@login_required
-def tenantgroup_delete(request, pk):
-    tenantgroup = get_object_or_404(TenantGroup, pk=pk)
-    tenant_count = tenantgroup.tenants.count()
-    if request.method == 'POST':
+        # Prepare Related Objects List
+        related_objects_list = []
+        tenant_count = tenantgroup.tenants.count()
+        if tenant_count:
+            related_objects_list.append({
+                'label': 'Tenants',
+                'count': tenant_count,
+                'url': f"{reverse('organization:tenant_list')}?group={tenantgroup.slug}" # Filter link
+            })
+        child_count = tenantgroup.children.count()
+        if child_count:
+            related_objects_list.append({
+                'label': 'Child Groups',
+                'count': child_count,
+                'url': f"{reverse('organization:tenantgroup_list')}?parent={tenantgroup.slug}" # Filter link
+            })
+
+        # *** INDENTATION FIX START ***
+        context['tenants_table'] = tenants_table
+        context['related_objects_list'] = related_objects_list
+        return context
+        # *** INDENTATION FIX END ***
+
+class TenantGroupEditView(ObjectEditView):
+    queryset = TenantGroup.objects.all()
+    model = TenantGroup
+    model_form = TenantGroupForm
+    template_name = 'generic/object_edit.html'
+    # Default success_url goes to object detail view
+
+class TenantGroupDeleteView(ObjectDeleteView):
+    queryset = TenantGroup.objects.all()
+    model = TenantGroup
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('organization:tenantgroup_list')
+
+    def post(self, request, *args, **kwargs):
+        tenantgroup = self.get_object()
+        tenant_count = tenantgroup.tenants.count()
+
+        # *** INDENTATION FIX START ***
         if tenant_count > 0:
-            return redirect('organization:tenantgroup_list')
-        tenantgroup.delete()
-        return redirect('organization:tenantgroup_list')
-    context = {'object': tenantgroup, 'related_objects_count': tenant_count, 'list_url_name': 'organization:tenantgroup_list'}
-    return render(request, 'generic/object_confirm_delete.html', context)
+            messages.error(
+                request,
+                f"Cannot delete tenant group '{tenantgroup.name}': It is associated with {tenant_count} tenant{'s' if tenant_count != 1 else ''}."
+            )
+            return redirect(tenantgroup.get_absolute_url())
+
+        return super().post(request, *args, **kwargs)
+        # *** INDENTATION FIX END ***
 
 # --- Tenant Views ---
 
@@ -501,51 +445,91 @@ class TenantListView(ObjectListView):
     table = TenantTable
     action_buttons = ('add',)
 
-@login_required
-def tenant_detail(request, pk):
-    tenant = get_object_or_404(
-        Tenant.objects.select_related('group').prefetch_related('tags', 'sites', 'locations'), # Added sites/locations
-        pk=pk
+class TenantDetailView(ObjectDetailView):
+    queryset = Tenant.objects.select_related('group').prefetch_related(
+        'tags', 'sites__region', 'locations__site' # Prefetch for related tables
     )
-    context = {'tenant': tenant}
-    return render(request, 'organization/tenants/tenant_detail.html', context)
+    # template_name = 'organization/tenants/tenant_detail.html' # Can be inferred
 
-@login_required
-def tenant_create(request):
-    if request.method == 'POST':
-        form = TenantForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect('organization:tenant_list')
-    else:
-        form = TenantForm()
-    context = {'form': form, 'title': 'Create Tenant', 'return_url': 'organization:tenant_list'}
-    return render(request, 'generic/object_edit.html', context)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        tenant = self.get_object()
 
-@login_required
-def tenant_update(request, pk):
-    tenant = get_object_or_404(Tenant, pk=pk)
-    if request.method == 'POST':
-        form = TenantForm(request.POST, instance=tenant)
-        if form.is_valid():
-            form.save()
-            return redirect('organization:tenant_list')
-    else:
-        form = TenantForm(instance=tenant)
-    context = {'form': form, 'object': tenant, 'title': f'Update Tenant: {tenant.name}', 'return_url': 'organization:tenant_list'}
-    return render(request, 'generic/object_edit.html', context)
+        # Prepare Sites table
+        sites_table = SiteTable(tenant.sites.all(), request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(sites_table)
 
-@login_required
-def tenant_delete(request, pk):
-    tenant = get_object_or_404(Tenant, pk=pk)
-    related_count = tenant.sites.count() + tenant.locations.count() # Add other counts if needed
-    if request.method == 'POST':
+        # Prepare Locations table
+        locations_table = LocationTable(tenant.locations.all(), request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(locations_table)
+
+        # Prepare AssetHolders table
+        assetholders_table = AssetHolderTable(tenant.asset_holders.all(), request=self.request) # Use related_name
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assetholders_table)
+
+        # Prepare Related Objects List
+        related_objects_list = []
+        site_count = tenant.sites.count()
+        if site_count:
+            related_objects_list.append({
+                'label': 'Sites',
+                'count': site_count,
+                'url': f"{reverse('organization:site_list')}?tenant={tenant.slug}" # Filter link
+            })
+        location_count = tenant.locations.count()
+        if location_count:
+            related_objects_list.append({
+                'label': 'Locations',
+                'count': location_count,
+                'url': f"{reverse('organization:location_list')}?tenant={tenant.slug}" # Filter link
+            })
+        assetholder_count = tenant.asset_holders.count()
+        if assetholder_count:
+            related_objects_list.append({
+                'label': 'Asset Holders',
+                'count': assetholder_count,
+                'url': f"{reverse('organization:assetholder_list')}?tenant={tenant.slug}" # Filter link
+            })
+
+        # *** INDENTATION FIX START ***
+        context['sites_table'] = sites_table
+        context['locations_table'] = locations_table
+        context['assetholders_table'] = assetholders_table
+        context['related_objects_list'] = related_objects_list
+        return context
+        # *** INDENTATION FIX END ***
+
+class TenantEditView(ObjectEditView):
+    queryset = Tenant.objects.all()
+    model = Tenant
+    model_form = TenantForm
+    template_name = 'generic/object_edit.html'
+    # Default success_url goes to object detail view
+
+class TenantDeleteView(ObjectDeleteView):
+    queryset = Tenant.objects.all()
+    model = Tenant
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('organization:tenant_list')
+
+    def post(self, request, *args, **kwargs):
+        tenant = self.get_object()
+        related_count = tenant.sites.count() + tenant.locations.count() + tenant.asset_holders.count()
+
+        # *** INDENTATION FIX START ***
         if related_count > 0:
-            return redirect('organization:tenant_list')
-        tenant.delete()
-        return redirect('organization:tenant_list')
-    context = {'object': tenant, 'related_objects_count': related_count, 'list_url_name': 'organization:tenant_list'}
-    return render(request, 'generic/object_confirm_delete.html', context)
+            related_details = []
+            if tenant.sites.exists(): related_details.append(f"{tenant.sites.count()} sites")
+            if tenant.locations.exists(): related_details.append(f"{tenant.locations.count()} locations")
+            if tenant.asset_holders.exists(): related_details.append(f"{tenant.asset_holders.count()} asset holders")
+            messages.error(
+                request,
+                f"Cannot delete tenant '{tenant.name}': It is associated with {', '.join(related_details)}."
+            )
+            return redirect(tenant.get_absolute_url())
+
+        return super().post(request, *args, **kwargs)
+        # *** INDENTATION FIX END ***
 
 # TODO: Add views for Tag
 
@@ -558,98 +542,64 @@ class AssetHolderListView(ObjectListView):
     table = AssetHolderTable
     action_buttons = ('add',)
 
-@login_required
-def assetholder_detail(request, pk):
-    assetholder = get_object_or_404(
-        AssetHolder.objects.select_related('tenant', 'user').prefetch_related('assignments__assigned_object', 'assignments__content_type', 'tags'), # Added content_type prefetch
-        pk=pk
+class AssetHolderDetailView(ObjectDetailView):
+    queryset = AssetHolder.objects.select_related('tenant', 'user').prefetch_related(
+        'assignments__assigned_object', 'assignments__content_type', 'tags' # Added content_type prefetch
     )
-    assignments_table = AssetHolderAssignmentTable(assetholder.assignments.all(), request=request) # Pass request for potential future features
-    RequestConfig(request, paginate=False).configure(assignments_table) # Disable pagination for embedded table
-    
+    # template_name = 'organization/assetholders/assetholder_detail.html' # Can be inferred
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        assetholder = self.get_object()
+
+        # Prepare Assignments table
+        assignments_table = AssetHolderAssignmentTable(assetholder.assignments.all(), request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assignments_table)
+
+        # Prepare Related Objects List
+        related_objects_list = []
+        assignment_count = assetholder.assignments.count()
+        if assignment_count:
+            related_objects_list.append({
+                'label': 'Assignments',
+                'count': assignment_count,
+                # Link to the filtered list view for assignments related to this holder
+                'url': f"{reverse('organization:assetholderassignment_list')}?asset_holder={assetholder.pk}" # Filter link
+            })
+
+        # *** INDENTATION FIX START ***
+        context['assignments_table'] = assignments_table
+        context['related_objects_list'] = related_objects_list
+        return context
+        # *** INDENTATION FIX END ***
+
+class AssetHolderEditView(ObjectEditView):
+    queryset = AssetHolder.objects.all()
     model = AssetHolder
+    model_form = AssetHolderForm
+    template_name = 'generic/object_edit.html'
+    # Default success_url goes to object detail view
 
-    # --- Prepare Related Objects List ---
-    related_objects_list = []
-    # Assignments
-    assignment_count = assetholder.assignments.count()
-    if assignment_count:
-        related_objects_list.append({
-            'label': 'Assignments',
-            'count': assignment_count,
-            # TODO: Add filtering parameter later ?assetholder={assetholder.upn}
-            'url': reverse('organization:assetholderassignment_list') 
-        })
-    # --- End Related Objects List ---
-    
-    context = {
-        'object': assetholder, # Use generic 'object'
-        'title': str(assetholder), # Use object string representation for title
-        'object_type': model._meta.verbose_name.title(),
-        'assignments_table': assignments_table, # Pass table for full width block
-        'update_url_name': get_model_viewname(model, 'update'),
-        'delete_url_name': get_model_viewname(model, 'delete'),
-        'view_options': ['update', 'delete'], # Standard actions
-        'related_objects_list': related_objects_list, # Pass related objects list for sidebar
-    }
-    # Render the specific detail template now
-    return render(request, 'organization/assetholders/assetholder_detail.html', context)
+class AssetHolderDeleteView(ObjectDeleteView):
+    queryset = AssetHolder.objects.all()
+    model = AssetHolder
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('organization:assetholder_list')
 
-@login_required
-def assetholder_create(request):
-    if request.method == 'POST':
-        form = AssetHolderForm(request.POST)
-        if form.is_valid():
-            assetholder = form.save()
-            # TODO: Message
-            # Redirect to list or detail view
-            return redirect('organization:assetholder_list')
-    else:
-        form = AssetHolderForm()
-    context = {
-        'form': form,
-        'title': 'Create Asset Holder',
-        'return_url': 'organization:assetholder_list',
-    }
-    return render(request, 'generic/object_edit.html', context)
+    def post(self, request, *args, **kwargs):
+        assetholder = self.get_object()
+        assignment_count = assetholder.assignments.count()
 
-@login_required
-def assetholder_update(request, pk):
-    assetholder = get_object_or_404(AssetHolder, pk=pk)
-    if request.method == 'POST':
-        form = AssetHolderForm(request.POST, instance=assetholder)
-        if form.is_valid():
-            form.save()
-            # TODO: Message
-            return redirect('organization:assetholder_list')
-    else:
-        form = AssetHolderForm(instance=assetholder)
-    context = {
-        'form': form,
-        'object': assetholder,
-        'title': f'Update Asset Holder: {assetholder}',
-        'return_url': 'organization:assetholder_list',
-    }
-    return render(request, 'generic/object_edit.html', context)
+        # *** INDENTATION FIX START ***
+        if assignment_count > 0:
+            messages.error(
+                request,
+                f"Cannot delete asset holder '{assetholder}': It has {assignment_count} assignment{'s' if assignment_count != 1 else ''}."
+            )
+            return redirect(assetholder.get_absolute_url())
 
-@login_required
-def assetholder_delete(request, pk):
-    assetholder = get_object_or_404(AssetHolder, pk=pk)
-    related_count = assetholder.assignments.count()
-    if request.method == 'POST':
-        if related_count > 0:
-            # TODO: Error - cannot delete holder with assignments
-            return redirect('organization:assetholder_list')
-        assetholder.delete()
-        # TODO: Message
-        return redirect('organization:assetholder_list')
-
-    context = {
-        'object': assetholder,
-        'related_objects_count': related_count,
-        'list_url_name': 'organization:assetholder_list'
-    }
-    return render(request, 'generic/object_confirm_delete.html', context)
+        return super().post(request, *args, **kwargs)
+        # *** INDENTATION FIX END ***
 
 # --- AssetHolderAssignment Views ---
 
@@ -657,7 +607,7 @@ def assetholder_delete(request, pk):
 @login_required
 def assetholderassignment_list(request):
     # Corrected select_related fields and removed invalid prefetch_related for GFK
-    queryset = AssetHolderAssignment.objects.select_related('asset_holder', 'content_type') 
+    queryset = AssetHolderAssignment.objects.select_related('asset_holder', 'content_type')
     # TODO: Add FilterSet and FilterForm if filtering is needed
     # filterset = AssetHolderAssignmentFilterSet(request.GET, queryset=queryset)
     # queryset = filterset.qs
@@ -672,4 +622,4 @@ def assetholderassignment_list(request):
         'model_name_str': model_name_str, 'table_config_key': table_config_key,
         # 'filter_form': filterset.form if filterset else None, # Uncomment if filterset is added
     }
-    return render(request, 'generic/object_list_base.html', context)
+    return render(request, 'generic/object_list.html', context)

@@ -1,4 +1,4 @@
-{% extends 'generic/object_detail_base.html' %}
+{% extends 'generic/object_detail.html' %}
 {% load static %}
 {% load helpers %}
 {% load render_table from django_tables2 %}
@@ -20,24 +20,24 @@
     </dl>
 {% endblock object_details %}
 
-{# Override page actions to use slug instead of pk #}
+{# Override page actions to use slug instead of pk, and use action_urls #}
 {% block page_actions %}
     <div class="btn-list">
-        {# --- Standard Edit/Delete --- #}
-        {% if 'update' in view_options and update_url_name %}
-        {# Use slug=object.slug for AssetType URLs #}
-        <a href="{% url update_url_name slug=object.slug %}" class="btn">
+        {# --- Standard Edit/Delete using action_urls from context --- #}
+        {% if action_urls.edit %}
+        <a href="{{ action_urls.edit }}" class="btn">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-pencil" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" /><path d="M13.5 6.5l4 4" /></svg>
             Edit
         </a>
         {% endif %}
-         {% if 'delete' in view_options and delete_url_name %}
-         {# Use slug=object.slug for AssetType URLs #}
-        <a href="{% url delete_url_name slug=object.slug %}" class="btn btn-danger">
+         {% if action_urls.delete %}
+        <a href="{{ action_urls.delete }}" class="btn btn-danger">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
             Delete
         </a>
         {% endif %}
 
-        {# --- Placeholder for Extra Actions (like Check In/Out) --- #}
+        {# --- Placeholder for Extra Actions --- #}
         {% block extra_page_actions %}{% endblock %}
     </div>
 {% endblock page_actions %}
@@ -69,8 +69,8 @@
         </div>
     </div>
 
-    {# Tags Card (Mimics base template but on the left) #}
-    <div class="card mt-4">
+    {# Tags Card (Mimics base template but on the left) - REMOVED, handled by base #}
+    {# <div class="card mt-4">
         <div class="card-header"><h3 class="card-title">Tags</h3></div>
         <div class="card-body">
             {% if object.tags.exists %}
@@ -81,7 +81,7 @@
                 <span class="text-muted">None</span>
             {% endif %}
         </div>
-    </div>
+    </div> #}
 {% endblock extra_cards_left %}
 
 {# Add related assets table to the full width block #}
@@ -102,5 +102,20 @@
 {% endblock full_width_content %}
 
 {# Description card is handled by base template in left column #}
+{% block content_right %}
+    <div class="card mb-3">
+        <h5 class="card-header">Tags</h5>
+        <div class="list-group list-group-flush list-group-hoverable">
+            {% for tag in object.tags.all %}
+                <div class="list-group-item">
+                    {# Use the correct include path #}
+                    {% include 'inc/tags.html' with tag=tag %} 
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% include 'inc/panels/change_log.html' %}
+{% endblock content_right %}
+
 {# Comments card is handled by base template in right column #}
 {# Related Objects list card is handled by base template in right column (needs related_objects_list in context) #} 

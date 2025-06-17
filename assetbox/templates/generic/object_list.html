@@ -50,7 +50,8 @@
                     <li class="nav-item" role="presentation">
                         <a href="#tab-results" class="nav-link active" data-bs-toggle="tab" aria-selected="true" role="tab">
                             Results
-                            <span class="badge bg-secondary text-secondary-fg ms-1">{{ table.page.paginator.count|default:"0" }}</span>
+                            {# Updated to use the ID of the content wrapper for potential count updates via HTMX later #}
+                            <span class="badge bg-secondary text-secondary-fg ms-1" id="object-list-count">{{ table.page.paginator.count|default:"0" }}</span>
                         </a>
                     </li>
                     {% if filter_form %}
@@ -74,63 +75,57 @@
                 {# --- Results Tab --- #}
                 <div class="tab-pane active show" id="tab-results" role="tabpanel">
 
-                    {# Row for Search/Configure Controls (NetBox Style) #}
-                    {# This form is mainly for the search input submission (handled by page reload/GET) #}
-                    <form method="get" action="" class="filter-form-results p-3 border-bottom">
-                        <div class="row align-items-center">
-                            {# Quick Search Input Group #}
-                            <div class="col-auto">
-                                {% if filter_form and filter_form.q %}
-                                <div class="input-group input-group-flat quicksearch">
-                                    <input type="search" name="q" class="form-control" placeholder="Quick search..." value="{{ request.GET.q|default:"" }}">
+                    {# Row for Search and Table Configure Button - Adjusted alignment #}
+                    <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+                        {# Quick Search Input Group - Moved back here #}
+                        {% if filter_form.q %}
+                        <div class="quicksearch-results-tab" style="flex-grow: 1; max-width: 200px; margin-right: 1rem;"> {# Wrapper for styling #}
+                            <form method="get" action="" class="filter-form-inline" {# Simplified form for inline search #}
+                                hx-get=""
+                                hx-target="#object-list-content"
+                                hx-swap="outerHTML"
+                                hx-push-url="true">
+                                <div class="input-group input-group-flat">
+                                    <input type="search" name="q" class="form-control" placeholder="Search..."
+                                           value="{{ request.GET.q|default:"" }}"
+                                           hx-trigger="keyup changed delay:500ms, search">
                                     <span class="input-group-text">
-                                        {# Placeholder for clear button JS - TODO: Add JS #}
-                                        <a href="#" class="link-secondary {% if not request.GET.q %}d-none{% endif %}" title="Clear search" data-bs-toggle="tooltip" onclick="this.previousElementSibling.value=''; this.closest('form').submit(); return false;">
-                                             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-x" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
+                                        <a href="#" class="link-secondary {% if not request.GET.q %}d-none{% endif %}" title="Clear search" data-bs-toggle="tooltip"
+                                           onclick="this.closest('form').querySelector('input[name=q]').value=''; this.closest('form').dispatchEvent(new Event('submit', { bubbles: true })); return false;">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-x" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
                                         </a>
                                     </span>
                                 </div>
-                                {% endif %}
-                            </div>
-
-                            {# Spacer to push configure button right #}
-                            <div class="col"></div>
-
-                            {# Configure Table Button #}
-                            <div class="col-auto">
-                                {# Check if table_config_key exists #}
-                                {% if table_config_key %}
-                                <div class="table-configure">
-                                    {# Use table_config_key for the modal URL #}
-                                    <button type="button" class="btn btn-outline-secondary"
-                                            hx-get="{% url 'table_config' model_name=table_config_key %}"
-                                            hx-target="#modal-placeholder"
-                                            hx-on::after-request="new bootstrap.Modal(document.getElementById('table-config-modal')).show()">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-settings me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" /><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" /></svg>
-                                        Configure Table
-                                    </button>
-                                </div>
-                                {% endif %}
-                            </div>
+                                {# Hidden fields from filter form needed for inline search to work with other filters #}
+                                {% for field in filter_form %}
+                                    {% if field.name != 'q' and field.value %}
+                                        <input type="hidden" name="{{ field.name }}" value="{{ field.value }}">
+                                    {% endif %}
+                                {% endfor %}
+                           </form>
                         </div>
-                        {# Hidden fields to preserve other filters when searching/configuring #}
-                        {% if filter_form %}
-                            {# Use request.GET.lists to iterate over (key, list_of_values) pairs #}
-                            {% for field_name, value_list in request.GET.lists %}
-                                {# Also ignore the submit button name #}
-                                {% if field_name != 'q' and field_name != 'page' and field_name != 'per_page' and field_name != 'submit' %}
-                                    {# Iterate over the list of values for this field #}
-                                    {% for single_value in value_list %}
-                                        <input type="hidden" name="{{ field_name }}" value="{{ single_value }}">
-                                    {% endfor %}
-                                {% endif %}
-                            {% endfor %}
+                        {% else %}
+                        <div></div> {# Empty div to maintain space if no search #}
                         {% endif %}
-                    </form>
-                    {# End Row for Search/Configure Controls #}
+
+                        {# Configure Table Button #}
+                        {% if table_config_key %}
+                        <div class="table-configure ms-auto"> {# Added ms-auto if needed #}
+                            <button type="button" class="btn btn-outline-secondary"
+                                    hx-get="{% url 'table_config' model_name=table_config_key %}"
+                                    hx-target="#modal-placeholder"
+                                    hx-on::after-request="new bootstrap.Modal(document.getElementById('table-config-modal')).show()">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-settings me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" /><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" /></svg>
+                                Configure Table
+                            </button>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {# End Row for Search/Configure Control #}
 
                     {# --- Content Wrapper for HTMX Updates --- #}
-                    <div id="object-list-content">
+                    {# Added hx-boost="true" to enable AJAX links/forms within #}
+                    <div id="object-list-content" hx-boost="true">
                          {# Content is now loaded dynamically via HTMX or initial page load includes it #}
                          {# Initial load includes the wrapper partial #}
                          {% include 'generic/partials/object_list_content_wrapper.html' %}
@@ -143,17 +138,28 @@
                 {# --- Filters Tab --- #}
                 {% if filter_form %}
                 <div class="tab-pane p-3" id="tab-filters" role="tabpanel">
-                    {# Filter Form (GET method for applying filters) #}
-                    <form method="get" action="" class="filter-form-tab">
-                         <h4 class="mb-3">Filter</h4>
-                         {# Render the filter_form directly #}
-                         {% crispy filter_form %}
-                         
+                    {# Filter Form (GET method for applying filters) - Added HTMX attributes #}
+                    <form method="get" action="" class="filter-form-tab"
+                          hx-get=""
+                          hx-target="#object-list-content"
+                          hx-swap="outerHTML"
+                          hx-push-url="true">
+
+                         {# Quick Search Input Group - REMOVED FROM HERE #}
+
+                         <h4 class="mb-3">Advanced Filters</h4>
+                         {# Render the rest of the filter_form directly #}
+                         {% crispy filter_form 'bootstrap5' exclude_field='q' %} {# Exclude 'q' field here as it was rendered above #}
+
                          {# --- Add Filter Buttons --- #}
                          <div class="mt-4 d-flex justify-content-between">
                              <button type="submit" name="_apply" class="btn btn-primary">Apply Filters</button>
-                             {# Link to clear filters (remove query params) #}
-                             <a href="?" class="btn btn-outline-secondary">Clear Filters</a> {# Basic clear, might need JS for complex cases #}
+                             {# Clear Filters link updated with HTMX attributes #}
+                             <a href="?" class="btn btn-outline-secondary"
+                                hx-get="?"
+                                hx-target="#object-list-content"
+                                hx-swap="outerHTML"
+                                hx-push-url="true">Clear Filters</a>
                          </div>
                          {# --- End Filter Buttons --- #}
                     </form>

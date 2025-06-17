@@ -23,7 +23,7 @@ class SoftwareListView(ObjectListView):
     filterset = filters.SoftwareFilterSet
     filterset_form = forms.SoftwareFilterForm
     table = tables.SoftwareTable
-    template_name = 'generic/object_list_base.html' # Use a specific template or generic one
+    template_name = 'generic/object_list.html' # Use a specific template or generic one
     action_buttons = ('add', 'import', 'export') # Standard list view actions
 
 class SoftwareDetailView(ObjectDetailView):

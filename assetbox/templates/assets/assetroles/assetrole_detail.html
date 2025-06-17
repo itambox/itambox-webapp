@@ -1,85 +1,68 @@
-{% extends 'generic/object_detail_base.html' %}
+{% extends 'generic/object_detail.html' %}
 {% load render_table from django_tables2 %}
 {% load static %}
+{% load utility_tags %}
 
-{# Define the specific details for an AssetRole object #}
-{% block content_left %}
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title">Asset Role Details</h3>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-12">
-                    <dl class="row">
-                        {% if object.color %}
-                        <dt class="col-sm-3 text-secondary">Color</dt>
-                        <dd class="col-sm-9">
-                            <span class="badge" style="background-color: #{{ object.color }}; color: #fff;">
-                                #{{ object.color }}
-                            </span>
-                        </dd>
-                        {% endif %}
+{# --- Page Title --- #}
+{% block title %}{{ object.name }} - Asset Role Details - AssetBox{% endblock %}
 
-                        <dt class="col-sm-3 text-secondary">Name</dt>
-                        <dd class="col-sm-9">{{ object.name }}</dd>
+{# --- Page Header (from base) --- #}
+{% block page_pretitle %}Assets / Asset Roles{% endblock %}
 
-                        <dt class="col-sm-3 text-secondary">Slug</dt>
-                        <dd class="col-sm-9">{{ object.slug }}</dd>
+{# --- Page Actions (from base) --- #}
 
-                        <dt class="col-sm-3 text-secondary">Description</dt>
-                        <dd class="col-sm-9">{{ object.description|linebreaksbr|default:"&mdash;"|safe }}</dd>
-                        
-                        {% if object.config_template %}
-                        <dt class="col-sm-3 text-secondary">Config Template</dt>
-                        <dd class="col-sm-9">
-                            <a href="{% url 'extras:configtemplate_detail' pk=object.config_template.pk %}">
-                                {{ object.config_template.name }}
-                            </a>
-                        </dd>
-                        {% endif %}
-                        
-                        {% if object.tags.exists %}
-                        <dt class="col-sm-3 text-secondary">Tags</dt>
-                        <dd class="col-sm-9">
-                            {% for tag in object.tags.all %}
-                                {% include 'global_includes/_tag.html' with tag=tag %}
-                            {% endfor %}
-                        </dd>
-                        {% endif %}
-                    </dl>
-                </div>
-            </div>
-        </div>
-    </div>
-{% endblock content_left %}
+{# --- Asset Role Specific Details --- #}
+{% block object_details %}
+<dl class="row">
+    <dt class="col-sm-3">Name:</dt>
+    <dd class="col-sm-9">{{ object.name }}</dd>
 
-{% block content_full_width_extra %}
-    {# Assets Table #}
-    {% if assets_table %}
-    <div class="card mt-4">
-        <div class="card-header">
-            <h3 class="card-title">Assets in this Role</h3>
-             <span class="badge bg-secondary text-secondary-fg ms-2">{{ assets_table.rows|length }}</span>
-        </div>
+    {% if object.color %}
+    <dt class="col-sm-3">Color:</dt>
+    <dd class="col-sm-9">
+        <span class="badge me-1" style="background-color: #{{ object.color }};">&nbsp;</span>
+        <code>#{{ object.color }}</code>
+    </dd>
+    {% endif %}
+
+    <dt class="col-sm-3">Slug:</dt>
+    <dd class="col-sm-9">{{ object.slug }}</dd>
+
+    <dt class="col-sm-3">Description:</dt>
+    <dd class="col-sm-9">{{ object.description|linebreaksbr|default:"<i>Not Set</i>"|safe }}</dd>
+    
+    {% if object.config_template %}
+    <dt class="col-sm-3">Config Template:</dt>
+    <dd class="col-sm-9">
+        <a href="{% url 'extras:configtemplate_detail' pk=object.config_template.pk %}">
+            {{ object.config_template.name }}
+        </a>
+    </dd>
+    {% endif %}
+</dl>
+{% endblock object_details %}
+
+{# --- Related Objects (Sidebar) --- #}
+{% block related_objects %}
+    {# Base template uses related_objects_list context variable #}
+{% endblock related_objects %}
+
+{# --- Full Width Content (Assets Table) --- #}
+{% block full_width_content %}
+    {% if assets_table and assets_table.rows %}
+    <div class="card mb-4">
+        <div class="card-header"><h3 class="card-title">Assets in this Role ({{ assets_table.page.paginator.count }})</h3></div>
         <div class="table-responsive">
-            {% render_table assets_table 'global_includes/htmx_table.html' %}
+            {% render_table assets_table %}
         </div>
+        {% include 'generic/includes/table_pagination.html' with table=assets_table %}
     </div>
-    {% else %}
-     <div class="card mt-4">
-        <div class="card-header">
-            <h3 class="card-title">Assets in this Role</h3>
-        </div>
-        <div class="card-body">
+     {% elif assets_table %}
+     <div class="card mb-4">
+        <div class="card-header"><h3 class="card-title">Assets in this Role (0)</h3></div>
+         <div class="card-body">
             <p class="text-muted">No assets found with this role.</p>
-        </div>
+         </div>
     </div>
     {% endif %}
-{% endblock content_full_width_extra %}
-
-{# Clear related objects block from base if not needed #}
-{% block related_objects %}{% endblock related_objects %}
-
-{# Clear full_width_content block from base if not needed #}
-{% block full_width_content %}{% endblock full_width_content %}
+{% endblock full_width_content %}

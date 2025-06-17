@@ -380,8 +380,33 @@ class ObjectListView(LoginRequiredMixin, ListView):
     filterset = None
     filterset_form = None
     table = None
-    template_name = 'generic/object_list_base.html' # Default template
-    # action_buttons = ('add', 'import', 'export') # Common actions
+    template_name = 'generic/object_list.html' # Default template
+    # template_name_partial = 'generic/partials/object_list_content_wrapper.html' # Define partial template name
+    # action_buttons = () # Tuple of actions ('add', 'import', 'export')
+
+    # --- Add get method to handle HTMX --- 
+    def get(self, request, *args, **kwargs):
+        # Default behavior: call super().get() to get full context and response
+        response = super().get(request, *args, **kwargs)
+        
+        # Check if it's an HTMX request
+        if request.htmx:
+            # For HTMX, we want to render ONLY the content wrapper partial
+            # The context should already be correctly populated by super().get()
+            # Ensure the context has the 'table' object
+            context = self.get_context_data() 
+            # Override the response to render the partial template
+            # We should use render_to_string or similar if just returning HTML fragment
+            # Or, if the partial needs the full context, we can use render
+            # with a specific template name.
+            
+            # Let's assume the partial needs the standard context
+            partial_template_name = 'generic/partials/object_list_content_wrapper.html'
+            return render(request, partial_template_name, context)
+        else:
+            # For non-HTMX requests, return the default response (full page)
+            return response
+    # --- End get method ---
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -483,7 +508,7 @@ class ObjectListView(LoginRequiredMixin, ListView):
 
 class ObjectDetailView(LoginRequiredMixin, DetailView):
     """Base view for displaying a single object."""
-    template_name = 'generic/object_detail.html' # Default template
+    template_name = 'generic/object_detail.html' # Default template - corrected name
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -494,7 +519,7 @@ class ObjectDetailView(LoginRequiredMixin, DetailView):
         # Permissions
         context['can_change'] = self.request.user.has_perm(f'{app_label}.change_{model_name}')
         context['can_delete'] = self.request.user.has_perm(f'{app_label}.delete_{model_name}')
-        context['edit_url'] = reverse(f'{app_label}:{model_name}_edit', kwargs={'pk': obj.pk})
+        context['edit_url'] = reverse(f'{app_label}:{model_name}_update', kwargs={'pk': obj.pk})
         context['delete_url'] = reverse(f'{app_label}:{model_name}_delete', kwargs={'pk': obj.pk})
         # Changelog (if using ChangeLoggingMixin)
         if hasattr(obj, 'get_changelog_url'): # Assumes method exists

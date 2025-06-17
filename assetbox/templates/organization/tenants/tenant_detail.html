@@ -1,120 +1,96 @@
-{% extends 'base.html' %}
+{% extends 'generic/object_detail.html' %}
+{% load render_table from django_tables2 %}
+{% load static %}
 
-{% block title %}{{ tenant.name }} - Tenant Details - AssetBox{% endblock %}
+{# --- Page Title --- #}
+{% block title %}{{ object.name }} - Tenant Details - AssetBox{% endblock %}
 
-{% block page_header %}
-    <div class="page-pretitle">Organization / Tenants</div>
-    <h2 class="page-title">
-        {{ tenant.name }}
-    </h2>
-{% endblock %}
+{# --- Page Header (from base) --- #}
+{% block page_pretitle %}Organization / Tenants{% endblock %}
 
-{% block page_actions %}
-    <div class="btn-list">
-        <a href="{% url 'organization:tenant_update' pk=tenant.pk %}" class="btn">Edit</a>
-        <a href="{% url 'organization:tenant_delete' pk=tenant.pk %}" class="btn btn-danger">Delete</a>
+{# --- Page Actions (from base) --- #}
+
+{# --- Tenant Specific Details --- #}
+{% block object_details %}
+<dl class="row">
+    <dt class="col-sm-3">Name:</dt>
+    <dd class="col-sm-9">{{ object.name }}</dd>
+
+    <dt class="col-sm-3">Slug:</dt>
+    <dd class="col-sm-9">{{ object.slug }}</dd>
+
+    <dt class="col-sm-3">Group:</dt>
+    <dd class="col-sm-9">
+        {% if object.group %}
+            <a href="{% url 'organization:tenantgroup_detail' pk=object.group.pk %}">{{ object.group.name }}</a>
+        {% else %}
+            <i>None</i>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">Description:</dt>
+    <dd class="col-sm-9">{{ object.description|default:"<i>None</i>"|safe }}</dd>
+</dl>
+{% endblock object_details %}
+
+{# --- Related Objects (Sidebar) --- #}
+{% block related_objects %}
+    {# Base template uses related_objects_list context variable #}
+{% endblock related_objects %}
+
+{# --- Full Width Content (Sites, Locations, AssetHolders Tables) --- #}
+{% block full_width_content %}
+    {# Render Sites table #}
+    {% if sites_table and sites_table.rows %}
+    <div class="card mb-4">
+        <div class="card-header"><h3 class="card-title">Sites ({{ sites_table.page.paginator.count }})</h3></div>
+        <div class="table-responsive">
+            {% render_table sites_table %}
+        </div>
+        {% include 'generic/includes/table_pagination.html' with table=sites_table %}
     </div>
-{% endblock %}
-
-{% block content %}
-<div class="row g-4">
-    <div class="col-md-8">
-        {# Tenant Info #}
-        <div class="card mb-4">
-            <div class="card-header">
-                <h3 class="card-title">Tenant Information</h3>
-            </div>
-            <div class="card-body">
-                <dl class="row">
-                    <dt class="col-sm-3">Name:</dt>
-                    <dd class="col-sm-9">{{ tenant.name }}</dd>
-
-                    <dt class="col-sm-3">Slug:</dt>
-                    <dd class="col-sm-9">{{ tenant.slug }}</dd>
-
-                    <dt class="col-sm-3">Group:</dt>
-                    <dd class="col-sm-9">
-                        {% if tenant.group %}
-                            <a href="{% url 'organization:tenantgroup_detail' pk=tenant.group.pk %}">{{ tenant.group.name }}</a>
-                        {% else %}
-                            <i>None</i>
-                        {% endif %}
-                    </dd>
-
-                    <dt class="col-sm-3">Description:</dt>
-                    <dd class="col-sm-9">{{ tenant.description|default:"<i>None</i>"|safe }}</dd>
-                </dl>
-            </div>
-        </div>
-
-        {# Comments #}
-        <div class="card mb-4">
-            <div class="card-header">
-                <h3 class="card-title">Comments</h3>
-            </div>
-             <div class="card-body">
-                {{ tenant.comments|linebreaksbr|default:"<i>No comments provided.</i>"|safe }}
-            </div>
-        </div>
-
-         {# Related Sites #}
-        <div class="card mb-4">
-            <div class="card-header">
-                <h3 class="card-title">Sites Assigned ({{ tenant.sites.count }})</h3>
-            </div>
-            <div class="list-group list-group-flush">
-                {% for site in tenant.sites.all %}
-                    <a href="{% url 'organization:site_detail' pk=site.pk %}" class="list-group-item list-group-item-action">
-                       {{ site.name }}
-                       <span class="text-muted small ms-2">({{ site.slug }})</span>
-                    </a>
-                {% empty %}
-                    <div class="list-group-item text-muted">No sites assigned to this tenant.</div>
-                {% endfor %}
-            </div>
-        </div>
-
-        {# Related Locations #}
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">Locations Assigned ({{ tenant.locations.count }})</h3>
-            </div>
-            <div class="list-group list-group-flush">
-                {% for location in tenant.locations.all %}
-                    <a href="{% url 'organization:location_detail' pk=location.pk %}" class="list-group-item list-group-item-action">
-                       {{ location.name }}
-                       <span class="text-muted small ms-2">({{ location.slug }})</span>
-                    </a>
-                {% empty %}
-                    <div class="list-group-item text-muted">No locations assigned to this tenant.</div>
-                {% endfor %}
-            </div>
-        </div>
-
+     {% elif sites_table %}
+     <div class="card mb-4">
+        <div class="card-header"><h3 class="card-title">Sites (0)</h3></div>
+         <div class="card-body">
+            <p class="text-muted">No sites found for this tenant.</p>
+         </div>
     </div>
-    <div class="col-md-4">
-         <div class="card mb-4">
-             <div class="card-body">
-                 <h3 class="card-title">Metadata</h3>
-                 <p class="text-muted small">
-                     Created: {{ tenant.created_at|date:"Y-m-d H:i" }} <br>
-                     Updated: {{ tenant.updated_at|date:"Y-m-d H:i" }}
-                 </p>
-            </div>
-        </div>
+    {% endif %}
 
-        <div class="card">
-             <div class="card-header">
-                <h3 class="card-title">Tags</h3>
-            </div>
-             <div class="card-body">
-                {% for tag in tenant.tags.all %}
-                    <span class="badge bg-secondary">{{ tag.name }}</span>
-                {% empty %}
-                    <span class="text-muted"><i>No tags assigned.</i></span>
-                {% endfor %}
-            </div>
+    {# Render Locations table #}
+    {% if locations_table and locations_table.rows %}
+    <div class="card mb-4">
+        <div class="card-header"><h3 class="card-title">Locations ({{ locations_table.page.paginator.count }})</h3></div>
+        <div class="table-responsive">
+            {% render_table locations_table %}
         </div>
+         {% include 'generic/includes/table_pagination.html' with table=locations_table %}
     </div>
-</div>
-{% endblock %} 
+     {% elif locations_table %}
+     <div class="card mb-4">
+        <div class="card-header"><h3 class="card-title">Locations (0)</h3></div>
+         <div class="card-body">
+            <p class="text-muted">No locations found for this tenant.</p>
+         </div>
+    </div>
+    {% endif %}
+    
+    {# Render Asset Holders table #}
+    {% if assetholders_table and assetholders_table.rows %}
+    <div class="card mb-4">
+        <div class="card-header"><h3 class="card-title">Asset Holders ({{ assetholders_table.page.paginator.count }})</h3></div>
+        <div class="table-responsive">
+            {% render_table assetholders_table %}
+        </div>
+         {% include 'generic/includes/table_pagination.html' with table=assetholders_table %}
+    </div>
+     {% elif assetholders_table %}
+     <div class="card mb-4">
+        <div class="card-header"><h3 class="card-title">Asset Holders (0)</h3></div>
+         <div class="card-body">
+            <p class="text-muted">No asset holders found for this tenant.</p>
+         </div>
+    </div>
+    {% endif %}
+{% endblock full_width_content %} 
