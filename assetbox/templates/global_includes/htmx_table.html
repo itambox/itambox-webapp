@@ -12,8 +12,8 @@
                         <th {{ column.attrs.th.as_html }}>
                             <a href="{{ request.path }}{% querystring table.prefixed_order_by_field=column.order_by_alias.next %}" 
                                hx-get="{% querystring table.prefixed_order_by_field=column.order_by_alias.next %}" 
-                               hx-target="#object-list-table-container" 
-                               hx-swap="outerHTML" 
+                               hx-target="#object-list-content" 
+                               hx-swap="outerHTML"
                                hx-push-url="true">
                                 {{ column.header }}
                             </a>

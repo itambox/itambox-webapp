@@ -5,14 +5,33 @@
 {% load static %}
 {% load crispy_forms_tags %}
 
-{# This wrapper is crucial for hx-swap="outerHTML" #}
+{# This wrapper IS crucial for hx-swap="outerHTML" #}
 <div id="object-list-content">
+
+    {# Render OOB swaps ONLY for HTMX requests #}
+    {% if request.htmx %}
+        {# OOB Swap: Update the filter tab badge #}
+        <span id="filters-tab-content" hx-swap-oob="true">
+            Filters
+            {% get_active_filters as active_filters_present %}
+            {% if active_filters_present %}
+                <span class="badge bg-info-lt ms-1">Active</span>
+            {% endif %}
+        </span>
+
+        {# OOB Swap: Update the count badge #}
+        <span id="object-list-count" hx-swap-oob="true" class="badge bg-secondary text-secondary-fg ms-1">
+            {{ table.page.paginator.count|default:"0" }}
+        </span>
+    {% endif %}
+
     {# Include the table rendering container directly #}
     <div id="object-list-table-container">
         <div class="table-responsive">
             {% block table %}
                 {% if table %}
-                    {% render_table table %}
+                    {# Explicitly use the HTMX-aware table template #}
+                    {% render_table table "global_includes/htmx_table.html" %}
                 {% else %}
                     <div class="p-3">
                         <p class="text-muted mb-0">No table data available.</p>
@@ -22,7 +41,7 @@
         </div>
     </div>
     {# End Table Rendering Container #}
-    
+
     {# Include the pagination controls directly #}
     {% if table.page %}
     <div class="card-footer d-flex align-items-center">
@@ -42,4 +61,5 @@
     </div>
     {% endif %}
     {# End Pagination Controls Container #}
-</div> 
+
+</div> {# End div#object-list-content wrapper #} 

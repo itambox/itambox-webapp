@@ -1,0 +1,122 @@
+{% load render_table from django_tables2 %}
+{% load utility_tags %}
+{% load i18n %}
+
+{# --- OOB Swaps (Must be outside the main target) --- #}
+<span id="page-title-block" hx-swap-oob="true">{{ object }} - {{ title|default:"Detail View" }} - AssetBox</span>
+
+<div id="breadcrumbs-block" hx-swap-oob="true">
+    {% if breadcrumbs %}
+        <ol class="breadcrumb breadcrumb-arrows" aria-label="breadcrumbs">
+            {% for label, url in breadcrumbs %}
+                {% if url %}
+                    <li class="breadcrumb-item"><a href="{{ url }}">{{ label }}</a></li>
+                {% else %}
+                    <li class="breadcrumb-item active" aria-current="page">{{ label }}</li>
+                {% endif %}
+            {% endfor %}
+        </ol>
+    {% endif %}
+</div>
+
+<div id="page-header-block" hx-swap-oob="true">
+    <div class="page-pretitle">{{ object_type|default:"Object" }} Details</div>
+    <h2 class="page-title">{{ object }}</h2>
+</div>
+
+<div id="page-actions-block" hx-swap-oob="true">
+    <div class="btn-list">
+        {% if action_urls.edit %}
+        <a href="{{ action_urls.edit }}" class="btn">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-pencil" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" /><path d="M13.5 6.5l4 4" /></svg>
+            Edit
+        </a>
+        {% endif %}
+         {% if action_urls.delete %}
+        <a href="{{ action_urls.delete }}" class="btn btn-danger">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
+            Delete
+        </a>
+        {% endif %}
+        {# Placeholder for Extra Actions #}
+        {% block extra_page_actions %}{% endblock %}
+    </div>
+</div>
+{# --- End OOB Swaps --- #}
+
+
+{# --- Main Target Content (Replaces innerHTML of #page-body-main) --- #}
+{# --- Replicates structure inside {% block content %} of generic/object_detail.html --- #}
+<div class="container-xl"> {# Add the container wrapper #}
+    <div class="row g-4">
+
+        {# --- Left Column --- #}
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header"><h3 class="card-title">{{ object_type|default:"Object" }} Information</h3></div>
+                <div class="card-body">
+                    {% block object_details %}
+                        <p class="text-muted"><em>(Detail block override missing)</em></p>
+                    {% endblock object_details %}
+                </div>
+            </div>
+            {% if object.comments %}
+            <div class="card mt-4"><div class="card-header"><h3 class="card-title">Comments</h3></div><div class="card-body">{{ object.comments|linebreaksbr|safe }}</div></div>
+            {% endif %}
+            {% if object.notes %}
+             <div class="card mt-4"><div class="card-header"><h3 class="card-title">Notes</h3></div><div class="card-body">{{ object.notes|linebreaksbr|safe }}</div></div>
+            {% endif %}
+             {% if object.description %}
+             <div class="card mt-4"><div class="card-header"><h3 class="card-title">Description</h3></div><div class="card-body">{{ object.description|linebreaksbr|safe }}</div></div>
+            {% endif %}
+            {% block hierarchy %}{% endblock hierarchy %}
+            {% block extra_cards_left %}{% endblock %}
+        </div>
+
+        {# --- Right Column --- #}
+        <div class="col-md-4">
+            {% if object.created_at or object.updated_at %}
+             <div class="card mb-4">
+                 <div class="card-body">
+                     <h3 class="card-title">Metadata</h3>
+                     <p class="text-muted small">
+                        {% if object.created_at %}Created: {{ object.created_at|date:"Y-m-d H:i" }} <br>{% endif %}
+                        {% if object.updated_at %}Updated: {{ object.updated_at|date:"Y-m-d H:i" }}{% endif %}
+                     </p>
+                </div>
+            </div>
+            {% endif %}
+            {% if object.tags.all %}
+                <div class="card mb-4">
+                    <div class="card-header"><h3 class="card-title">Tags</h3></div>
+                    <div class="card-body">
+                        {% for tag in object.tags.all %}{% include 'inc/tags.html' with tag=tag %}{% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+            {% block related_objects %}{% endblock related_objects %}
+             {% if related_objects_list %}
+             <div class="card mb-4">
+                 <div class="card-header"><h3 class="card-title">Related Objects</h3></div>
+                 <div class="list-group list-group-flush">
+                     {% for item in related_objects_list %}
+                         <a href="{{ item.url }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                             {{ item.label }}
+                             <span class="badge bg-primary rounded-pill">{{ item.count }}</span>
+                         </a>
+                     {% endfor %}
+                 </div>
+             </div>
+             {% endif %}
+            {% block extra_cards_right %}{% endblock %}
+        </div>
+    </div>
+
+    {# --- Full Width Content Block --- #}
+    <div class="row g-4 mt-2">
+        <div class="col-12">
+            {% block full_width_content %}{% endblock full_width_content %}
+        </div>
+    </div>
+</div> {# End container-xl #}
+{# Note: No script tags here #}

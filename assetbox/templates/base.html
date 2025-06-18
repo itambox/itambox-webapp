@@ -8,7 +8,7 @@
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
     <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
-    <title>{% block title %}AssetBox{% endblock %}</title>
+    <title>{% block title %}<span id="page-title-block">AssetBox</span>{% endblock %}</title>
     <!-- CSS files -->
     <link href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet"/>
     <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.1.0/dist/css/tabler-flags.min.css" rel="stylesheet"/>
@@ -21,22 +21,22 @@
         /* Optional: Add custom styles here */
         body {
             min-height: 100vh;
-            display: flex;
-            flex-direction: column;
+            display: flex;  /* Uncommented */
+            flex-direction: column;  /* Uncommented */
         }
         .page-wrapper {
-            flex-grow: 1;
+            flex-grow: 1;  /* Uncommented */
         }
     </style>
 </head>
-<body class="layout-fluid layout-combo">
+<body class="layout-fluid layout-combo" hx-boost="true" hx-target="#page-body-main">
     <script src="https://unpkg.com/htmx.org@1.9.10" integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC" crossorigin="anonymous"></script>
 
     <div class="page">
         {# Move Sidebar OUTSIDE page-wrapper #}
         {% include "global_includes/_sidebar.html" %}
 
-        {# page-wrapper now contains the topbar and the rest #}
+        {# page-wrapper now contains the topbar and the rest - REMOVE ID #}
         <div class="page-wrapper">
             <!-- Top Navbar -->
             {% include "global_includes/_topbar.html" %}
@@ -45,6 +45,7 @@
             <div class="page-header d-print-none">
                 <div class="container-xl">
                     {# Render Breadcrumbs #}
+                    <div id="breadcrumbs-block" hx-swap-oob="true">
                     {% if breadcrumbs %}
                         <ol class="breadcrumb breadcrumb-arrows" aria-label="breadcrumbs">
                             {% for label, url in breadcrumbs %}
@@ -56,10 +57,11 @@
                             {% endfor %}
                         </ol>
                     {% endif %}
+                    </div>
                     {# End Breadcrumbs #}
                     <div class="row g-2 align-items-center mt-2"> {# Add margin-top #}
                         <div class="col">
-                            {% block page_header %}
+                            {% block page_header %}<div id="page-header-block" hx-swap-oob="true">
                             <!-- Page pre-title -->
                             <div class="page-pretitle">
                                 Overview
@@ -67,17 +69,17 @@
                             <h2 class="page-title">
                                 Dashboard
                             </h2>
-                            {% endblock %}
+                            </div>{% endblock %}
                         </div>
                         <!-- Page title actions -->
                         <div class="col-auto ms-auto d-print-none">
-                            {% block page_actions %}{% endblock %}
+                            {% block page_actions %}<div id="page-actions-block"></div>{% endblock %}
                         </div>
                     </div>
                 </div>
             </div>
             <!-- Page body -->
-            <div class="page-body">
+            <div class="page-body" id="page-body-main">
                 <div class="container-xl">
                     {# --- Django Messages --- #}
                     {# {% if messages %} #} {# <-- Remove old message block #}
@@ -259,6 +261,11 @@
 
     {# Slug handling script #}
     <script src="{% static 'js/slug-handling.js' %}"></script>
+
+    {# --- Add the missing javascript block definition --- #}
+    {% block javascript %}
+    {# Page-specific javascript will be inserted here #}
+    {% endblock javascript %}
 
 </body>
 </html> 

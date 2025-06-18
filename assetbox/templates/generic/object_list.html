@@ -5,9 +5,9 @@
 {% load i18n %}
 {% load crispy_forms_tags %} {# <--- Load crispy_forms_tags #}
 
-{% block title %}{{ title|default:"List View" }} - AssetBox{% endblock %}
+{% block title %}<span id="page-title-block" hx-swap-oob="true">{{ title|default:"List View" }} - AssetBox</span>{% endblock %}
 
-{% block page_header %}
+{% block page_header %}<div id="page-header-block" hx-swap-oob="true">
     {# Default header, can be overridden #}
     <div class="page-pretitle">
         {{ pretitle|default:"Manage" }}
@@ -15,9 +15,9 @@
     <h2 class="page-title">
         {{ title|default:"Objects" }}
     </h2>
-{% endblock %}
+</div>{% endblock %}
 
-{% block page_actions %}
+{% block page_actions %}<div id="page-actions-block" hx-swap-oob="true">
     {# Standard page actions: Add, Import, Export #}
     <div class="btn-list">
         {% block extra_controls %}{% endblock %} {# For view-specific buttons #}
@@ -37,7 +37,7 @@
         <a href="#" class="btn btn-secondary d-none d-sm-inline-block">Export</a>
         {% endif %}
     </div>
-{% endblock page_actions %}
+</div>{% endblock page_actions %}
 
 {% block content %}
 <div class="row row-cards">
@@ -57,12 +57,15 @@
                     {% if filter_form %}
                     <li class="nav-item" role="presentation">
                         <a href="#tab-filters" class="nav-link" data-bs-toggle="tab" aria-selected="false" tabindex="-1" role="tab">
-                            Filters
-                            {# TODO: Add badge for active filters #}
-                            {% get_active_filters as active_filters_present %}
-                            {% if active_filters_present %}
-                                <span class="badge bg-info-lt ms-1">Active</span>
-                            {% endif %}
+                            {# Wrap content for OOB swap #}
+                            <span id="filters-tab-content">
+                                Filters
+                                {# TODO: Add badge for active filters #}
+                                {% get_active_filters as active_filters_present %}
+                                {% if active_filters_present %}
+                                    <span class="badge bg-info-lt ms-1">Active</span>
+                                {% endif %}
+                            </span>
                         </a>
                     </li>
                     {% endif %}
@@ -124,8 +127,7 @@
                     {# End Row for Search/Configure Control #}
 
                     {# --- Content Wrapper for HTMX Updates --- #}
-                    {# Added hx-boost="true" to enable AJAX links/forms within #}
-                    <div id="object-list-content" hx-boost="true">
+                    <div id="object-list-content">
                          {# Content is now loaded dynamically via HTMX or initial page load includes it #}
                          {# Initial load includes the wrapper partial #}
                          {% include 'generic/partials/object_list_content_wrapper.html' %}
@@ -154,7 +156,7 @@
                          {# --- Add Filter Buttons --- #}
                          <div class="mt-4 d-flex justify-content-between">
                              <button type="submit" name="_apply" class="btn btn-primary">Apply Filters</button>
-                             {# Clear Filters link updated with HTMX attributes #}
+                             {# Clear Filters link #}
                              <a href="?" class="btn btn-outline-secondary"
                                 hx-get="?"
                                 hx-target="#object-list-content"
@@ -315,3 +317,51 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 {% endblock content %}
+
+{% block javascript %}
+<script>
+document.body.addEventListener('htmx:afterOnLoad', function(event) {
+    console.log('[Tab Switch Debug] htmx:afterOnLoad event detected.', event.detail);
+    const triggeringElement = event.detail.elt;
+    const targetElement = event.detail.target;
+    const isFailedSwap = event.detail.failed;
+    const xhr = event.detail.xhr;
+
+    // Log details
+    console.log('[Tab Switch Debug] Triggering Element:', triggeringElement);
+    console.log('[Tab Switch Debug] Target Element:', targetElement);
+    console.log('[Tab Switch Debug] Failed Swap:', isFailedSwap);
+    console.log('[Tab Switch Debug] XHR Status:', xhr ? xhr.status : 'N/A');
+
+    // Only proceed if the swap didn't fail
+    if (!isFailedSwap && targetElement && triggeringElement) {
+        console.log('[Tab Switch Debug] Swap successful, checking conditions...');
+        // Check if the target was the object list content AND the trigger was inside the filters tab
+        const triggerInFilters = triggeringElement.closest('#tab-filters');
+        console.log('[Tab Switch Debug] Trigger inside #tab-filters:', triggerInFilters ? triggerInFilters : 'null/not found');
+
+        if (targetElement.id === 'object-list-content' && triggerInFilters) {
+            console.log('[Tab Switch Debug] Conditions met: Target is #object-list-content and trigger was in #tab-filters.');
+            // Find the "Results" tab trigger link
+            const resultsTabTrigger = document.querySelector('a[href="#tab-results"][data-bs-toggle="tab"]');
+            if (resultsTabTrigger) {
+                console.log('[Tab Switch Debug] Found results tab trigger, attempting to activate...');
+                try {
+                    const tab = new bootstrap.Tab(resultsTabTrigger);
+                    tab.show();
+                    console.log('[Tab Switch Debug] Bootstrap tab.show() called.');
+                } catch (e) {
+                    console.error('[Tab Switch Debug] Error activating Bootstrap tab:', e);
+                }
+            } else {
+                console.log('[Tab Switch Debug] Could not find results tab trigger.');
+            }
+        } else {
+            console.log('[Tab Switch Debug] Conditions not met. Target ID:', targetElement.id, 'Trigger in filters:', !!triggerInFilters);
+        }
+    } else {
+        console.log('[Tab Switch Debug] Swap failed or target/triggering element missing.');
+    }
+});
+</script>
+{% endblock javascript %}

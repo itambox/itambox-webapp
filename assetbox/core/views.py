@@ -384,29 +384,46 @@ class ObjectListView(LoginRequiredMixin, ListView):
     # template_name_partial = 'generic/partials/object_list_content_wrapper.html' # Define partial template name
     # action_buttons = () # Tuple of actions ('add', 'import', 'export')
 
-    # --- Add get method to handle HTMX --- 
-    def get(self, request, *args, **kwargs):
-        # Default behavior: call super().get() to get full context and response
-        response = super().get(request, *args, **kwargs)
-        
-        # Check if it's an HTMX request
-        if request.htmx:
-            # For HTMX, we want to render ONLY the content wrapper partial
-            # The context should already be correctly populated by super().get()
-            # Ensure the context has the 'table' object
-            context = self.get_context_data() 
-            # Override the response to render the partial template
-            # We should use render_to_string or similar if just returning HTML fragment
-            # Or, if the partial needs the full context, we can use render
-            # with a specific template name.
-            
-            # Let's assume the partial needs the standard context
-            partial_template_name = 'generic/partials/object_list_content_wrapper.html'
-            return render(request, partial_template_name, context)
-        else:
-            # For non-HTMX requests, return the default response (full page)
-            return response
-    # --- End get method ---
+    # --- Add get method to handle HTMX ---
+    # REMOVED custom get method - render_to_response is cleaner for CBVs
+
+    # --- Add render_to_response to handle HTMX requests ---
+    def render_to_response(self, context, **response_kwargs):
+        """
+        Override render_to_response to handle HTMX requests.
+        - Renders the full view template for other HTMX requests (e.g., hx-boost).
+        """
+        # --- DEBUGGING HTMX CHECK ---
+        # print(f"[DEBUG] Inside render_to_response: request.htmx = {getattr(self.request, 'htmx', 'AttributeNotFound')}") # Keep commented out for now
+        # --- END DEBUGGING ---
+        if self.request.htmx:
+            # Check if the target is the specific object list content div
+            if self.request.headers.get('HX-Target') == 'object-list-content':
+                # Render only the content wrapper partial for table updates
+                print("[DEBUG] HTMX request targeting #object-list-content: Rendering partial object_list_content_wrapper.html") # DEBUG
+                context['request'] = self.request
+                return render(
+                    self.request,
+                    'generic/partials/object_list_content_wrapper.html', # Use the correct partial for table swaps
+                    context
+                )
+            else:
+                # For other HTMX requests (like hx-boost), render the new HTMX page wrapper partial.
+                # This partial contains the main content block and OOB blocks.
+                print(f"[DEBUG] HTMX request targeting other ({self.request.headers.get('HX-Target', 'N/A')}): Rendering new partial htmx_list_page_wrapper.html") # DEBUG
+                context['request'] = self.request
+                return render(
+                    self.request,
+                    'generic/partials/htmx_list_page_wrapper.html', # Use the NEW partial for boosted requests
+                    context
+                )
+                # pass # No longer falling through
+        # else: # No need for explicit else
+        #     print("[DEBUG] Standard request: Rendering full page") # DEBUG
+
+        # Standard rendering (for non-HTMX requests)
+        return super().render_to_response(context, **response_kwargs)
+    # --- End render_to_response ---
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -420,8 +437,9 @@ class ObjectListView(LoginRequiredMixin, ListView):
         return queryset
 
     def get_paginate_by(self, queryset):
-        """Get page size from user preferences or settings."""
-        return get_paginate_count(self.request)
+        # Ensure ListView's built-in pagination is disabled
+        # Rely solely on RequestConfig in get_context_data
+        return None
 
     def get_table(self):
         """Return the django-tables2 Table instance."""
@@ -432,12 +450,12 @@ class ObjectListView(LoginRequiredMixin, ListView):
             raise Http404(f"No table defined for model {self.model._meta.model_name}")
         
         table = table_class(queryset, request=self.request)
-        # Apply pagination
-        paginate = {
-            'paginator_class': self.paginator_class,
-            'per_page': self.get_paginate_by(queryset)
-        }
-        table.paginate(**paginate)
+        # REMOVED pagination logic from here - Handled by RequestConfig in get_context_data
+        # paginate = {
+        #     'paginator_class': self.paginator_class,
+        #     'per_page': self.get_paginate_by(queryset)
+        # }
+        # table.paginate(**paginate)
         return table
 
     def get_context_data(self, **kwargs):
@@ -532,6 +550,32 @@ class ObjectDetailView(LoginRequiredMixin, DetailView):
 
         # Add related object panels/tabs here later
         return context
+
+    # --- Add HTMX handling for Detail View --- 
+    def render_to_response(self, context, **response_kwargs):
+        if self.request.htmx:
+            # If HTMX, render the partial wrapper designed for detail pages
+            print(f"[DEBUG] HTMX request detected (Target: {self.request.headers.get('HX-Target', 'N/A')}): Rendering partial htmx_detail_page_wrapper.html") # DEBUG
+            context['request'] = self.request # Ensure request is in context
+            # Include object_type if needed by the partial's OOB blocks
+            context['object_type'] = self.object._meta.verbose_name 
+            # Include action_urls if needed by the partial's OOB blocks
+            app_label = self.object._meta.app_label
+            model_name = self.object._meta.model_name
+            context['action_urls'] = {
+                'edit': reverse(f'{app_label}:{model_name}_update', kwargs={'pk': self.object.pk}) if self.request.user.has_perm(f'{app_label}.change_{model_name}') else None,
+                'delete': reverse(f'{app_label}:{model_name}_delete', kwargs={'pk': self.object.pk}) if self.request.user.has_perm(f'{app_label}.delete_{model_name}') else None,
+            }
+            # Pass any other necessary context for OOB blocks here...
+            return render(
+                self.request,
+                'generic/partials/htmx_detail_page_wrapper.html',
+                context
+            )
+        
+        # Standard rendering for non-HTMX requests
+        return super().render_to_response(context, **response_kwargs)
+    # --- End HTMX Handling --- 
 
 class ObjectEditView(LoginRequiredMixin, UpdateView):
     """Base view for creating or editing an object."""

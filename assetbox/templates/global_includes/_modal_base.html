@@ -1,0 +1,57 @@
+{% comment %}
+    Base modal structure using Bootstrap 5.
+    Expects context variables:
+    - modal_title: The title for the modal header.
+    - content_template: Path to the template to include in the modal body.
+    - form_url: The URL the form inside the modal should POST to.
+    - form_id: (Optional) ID for the form element.
+    - object: (Optional) The object being acted upon, passed to the content_template.
+    - additional_classes: (Optional) Extra CSS classes for the modal dialog.
+    - include_footer: (Optional, default True) Whether to include the default footer with close/submit. Content template can provide its own footer.
+{% endcomment %}
+
+<div class="modal fade" id="{{ modal_id|default:'htmxModal' }}" tabindex="-1" aria-labelledby="htmxModalLabel" aria-hidden="true">
+    <div class="modal-dialog {{ additional_classes }}">
+        <div class="modal-content">
+            <form {% if form_url %}hx-post="{{ form_url }}"{% endif %}
+                  {% if form_id %}id="{{ form_id }}"{% endif %}
+                  {# Target the modal content itself for replacement on success/error #}
+                  hx-target="#{{ modal_id|default:'htmxModal' }} .modal-content" 
+                  hx-swap="outerHTML">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title" id="htmxModalLabel">{{ modal_title|default:"Action" }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    {% if content_template %}
+                        {% include content_template with object=object form=form only %}
+                    {% else %}
+                        <p>Modal content missing.</p>
+                    {% endif %}
+                </div>
+                {% if include_footer|default:True %}
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Submit</button> {# TODO: Make button type configurable #}
+                </div>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+</div>
+
+{# Basic script to show the modal once loaded via HTMX #}
+<script type="text/javascript">
+    (function() {
+        const modalElement = document.getElementById('{{ modal_id|default:'htmxModal' }}');
+        if (modalElement) {
+            const modal = new bootstrap.Modal(modalElement);
+            // Ensure modal is removed from DOM after hiding to prevent duplicates
+            modalElement.addEventListener('hidden.bs.modal', event => {
+                modalElement.remove();
+            });
+            modal.show();
+        }
+    })();
+</script> 
