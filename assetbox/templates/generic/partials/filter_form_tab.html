@@ -1,0 +1,21 @@
+{% load crispy_forms_tags %}
+{% load utility_tags %}
+
+<form method="get" action="{{ request.path }}" class="filter-form-tab"
+      hx-get="{{ request.path }}"
+      hx-target="#object-list-dynamic-content"
+      hx-swap="innerHTML"
+      hx-push-url="true">
+
+     <h4 class="mb-3">Advanced Filters</h4>
+     {% crispy filter_form 'bootstrap5' exclude_field='q' %}
+
+     <div class="mt-4 d-flex justify-content-between">
+         <button type="submit" name="_apply" class="btn btn-primary">Apply Filters</button>
+         <a href="{{ request.path }}" class="btn btn-outline-secondary"
+            hx-get="{{ request.path }}"
+            hx-target="#object-list-dynamic-content"
+            hx-swap="innerHTML"
+            hx-push-url="true">Clear Filters</a>
+     </div>
+</form> 

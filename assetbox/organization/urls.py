@@ -53,8 +53,8 @@ urlpatterns = [
     path('asset-holders/<int:pk>/edit/', views.AssetHolderEditView.as_view(), name='assetholder_update'),
     path('asset-holders/<int:pk>/delete/', views.AssetHolderDeleteView.as_view(), name='assetholder_delete'),
 
-    # Asset Holder Assignments (List only - Function-based view, no .as_view() needed)
-    path('asset-holder-assignments/', views.assetholderassignment_list, name='assetholderassignment_list'),
+    # Asset Holder Assignments (List only - Refactored to CBV)
+    path('asset-holder-assignments/', views.AssetHolderAssignmentListView.as_view(), name='assetholderassignment_list'),
 
     # TODO: Add URLs for Tag
 ] 

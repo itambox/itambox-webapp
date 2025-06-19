@@ -4,62 +4,30 @@
 {% load core_constants %}
 {% load static %}
 {% load crispy_forms_tags %}
+{% load partials %}
 
-{# This wrapper IS crucial for hx-swap="outerHTML" #}
-<div id="object-list-content">
+{# Partial for Filters Tab Badge (OOB Candidate) #}
+{% startpartial filters-tab-content %}
+    <span id="filters-tab-content" hx-swap-oob="true">
+        Filters
+        {% get_active_filters as active_filters_present %}
+        {% if active_filters_present %}
+            <span class="badge bg-info-lt ms-1">Active</span>
+        {% endif %}
+    </span>
+{% endpartial %}
 
-    {# Render OOB swaps ONLY for HTMX requests #}
-    {% if request.htmx %}
-        {# OOB Swap: Update the filter tab badge #}
-        <span id="filters-tab-content" hx-swap-oob="true">
-            Filters
-            {% get_active_filters as active_filters_present %}
-            {% if active_filters_present %}
-                <span class="badge bg-info-lt ms-1">Active</span>
-            {% endif %}
-        </span>
+{# Partial for Object Count Badge (OOB Candidate) #}
+{% startpartial object-list-count %}
+    <span id="object-list-count" hx-swap-oob="true" class="badge bg-secondary text-secondary-fg ms-1">
+        {{ table.page.paginator.count|default:"0" }}
+    </span>
+{% endpartial %}
 
-        {# OOB Swap: Update the count badge #}
-        <span id="object-list-count" hx-swap-oob="true" class="badge bg-secondary text-secondary-fg ms-1">
-            {{ table.page.paginator.count|default:"0" }}
-        </span>
-    {% endif %}
+{# --- REMOVE definition for table and pagination --- #}
+{# {% startpartial list-table-and-pagination %} ... {% endpartial %} #}
 
-    {# Include the table rendering container directly #}
-    <div id="object-list-table-container">
-        <div class="table-responsive">
-            {% block table %}
-                {% if table %}
-                    {# Explicitly use the HTMX-aware table template #}
-                    {% render_table table "global_includes/htmx_table.html" %}
-                {% else %}
-                    <div class="p-3">
-                        <p class="text-muted mb-0">No table data available.</p>
-                    </div>
-                {% endif %}
-            {% endblock table %}
-        </div>
-    </div>
-    {# End Table Rendering Container #}
+{# REMOVED old list-content partial definition and render call #}
 
-    {# Include the pagination controls directly #}
-    {% if table.page %}
-    <div class="card-footer d-flex align-items-center">
-        {# Per Page Dropdown #}
-        {% include 'global_includes/pagination_per_page.html' with paginator=table.page.paginator %}
-
-        {# Page Number Summary #}
-        <p class="m-0 text-secondary flex-grow-1">
-            {% blocktrans with start=table.page.start_index end=table.page.end_index total=table.page.paginator.count %}
-            Showing <span>{{ start }}</span> to <span>{{ end }}</span> of <span>{{ total }}</span> entries
-            {% endblocktrans %}
-        </p>
-
-        {# Page Links #}
-        {% include 'global_includes/pagination_links.html' with page_obj=table.page %}
-
-    </div>
-    {% endif %}
-    {# End Pagination Controls Container #}
-
-</div> {# End div#object-list-content wrapper #} 
+{# REMOVED Render the main partial when this template is included #}
+{# {% partial "list-table-and-pagination" %} #} 

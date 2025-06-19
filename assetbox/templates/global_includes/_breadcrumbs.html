@@ -1,0 +1,18 @@
+{% load utility_tags %}
+
+{# Renders Bootstrap breadcrumbs based on a list of tuples passed in context #}
+{# Expected context variable: breadcrumbs = [(url, label), (url, label), ...] #}
+{# The last item is treated as the active page. #}
+
+{% if breadcrumbs %}
+<ol class="breadcrumb breadcrumb-arrows" aria-label="breadcrumbs">
+    {% for url, label in breadcrumbs %}
+        {% if not forloop.last %}
+            <li class="breadcrumb-item"><a href="{{ url|default:'#' }}">{{ label }}</a></li>
+        {% else %}
+            {# Last item is active, no link #}
+            <li class="breadcrumb-item active" aria-current="page">{{ label }}</li>
+        {% endif %}
+    {% endfor %}
+</ol>
+{% endif %} 

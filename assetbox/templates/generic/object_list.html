@@ -1,9 +1,152 @@
-{% extends 'base.html' %}
-{% load render_table from django_tables2 %}
+{% extends base_template|default:"base.html" %}
+{% load helpers %}
+{% load partials %}
 {% load static %}
+{% load render_table from django_tables2 %}
 {% load utility_tags %} {# We will create this tag file next #}
 {% load i18n %}
 {% load crispy_forms_tags %} {# <--- Load crispy_forms_tags #}
+
+{% block tabs %}
+    <ul class="nav nav-tabs px-3" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="results-tab" data-bs-toggle="tab" data-bs-target="#tab-results" type="button" role="tab" aria-controls="results" aria-selected="true">
+                {{ title }}
+                {# OOB Target: Update count when filters change #}
+                <span id="object-list-count" class="badge rounded-pill bg-secondary">
+                    {{ table.rows|length }}
+                </span>
+            </button>
+        </li>
+        {% if filter_form %}
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="filters-tab" data-bs-toggle="tab" data-bs-target="#tab-filters" type="button" role="tab" aria-controls="filters" aria-selected="false">
+                <i class="mdi mdi-filter-variant"></i> Filters
+                {# OOB Target: Update filter content when filters change #}
+                <span id="filters-applied-count" class="badge rounded-pill {% if filter_form.applied_filters %}bg-primary{% else %}bg-secondary{% endif %}">
+                    {{ filter_form.applied_filters|length }}
+                </span>
+            </button>
+        </li>
+        {% endif %}
+    </ul>
+{% endblock tabs %}
+
+{% block content %}
+{# Add card wrapper around the tab content #}
+<div class="card">
+    <div class="tab-content">
+        {# Main Results Tab #}
+        <div class="tab-pane active show" id="tab-results" role="tabpanel" aria-labelledby="results-tab">
+            {# New container for all dynamically updated content #}
+            <div id="object-list-dynamic-content">
+                {# REMOVE OOB Definitions for count/filters - They are only needed in HTMX response #}
+                {# {% startpartial filters-tab-content ... %} ... {% endpartial %} #}
+                {# {% startpartial object-list-count ... %} ... {% endpartial %} #}
+                {# {% startpartial filters-applied-count ... %} ... {% endpartial %} #}
+
+                {# --- Render Main Content Directly --- #}
+                {# Row for Search and Table Configure Button #}
+                <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+                    {# Quick Search Input Group #}
+                    {% if filter_form.q is not None %}
+                        <div class="quicksearch-results-tab" style="flex-grow: 1; max-width: 200px; margin-right: 1rem;">
+                            <form method="get" action="" class="filter-form-inline"
+                                hx-get="{{ request.get_full_path }}"
+                                hx-target="#object-list-dynamic-content"
+                                hx-swap="innerHTML"
+                                hx-push-url="true">
+                                <div class="input-group input-group-flat">
+                                    <input type="search" name="q" class="form-control" placeholder="Search..."
+                                           value="{{ request.GET.q|default:"" }}"
+                                           hx-trigger="keyup changed delay:500ms, search">
+                                    <span class="input-group-text">
+                                        <a href="#" class="link-secondary {% if not request.GET.q %}d-none{% endif %}" title="Clear search" data-bs-toggle="tooltip"
+                                           onclick="this.closest('form').querySelector('input[name=q]').value=''; this.closest('form').dispatchEvent(new Event('submit', { bubbles: true })); return false;">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-x" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
+                                        </a>
+                                    </span>
+                                </div>
+                                {# Hidden fields from filter form #}
+                                {% for field in filter_form %}
+                                    {% if field.name != 'q' and field.value %}
+                                        <input type="hidden" name="{{ field.name }}" value="{{ field.value }}">
+                                    {% endif %}
+                                {% endfor %}
+                           </form>
+                        </div>
+                    {% else %}
+                        <div></div> {# Placeholder #}
+                    {% endif %}
+
+                    {# Configure Table Button #}
+                    {% if table_config_key %}
+                        <div class="table-configure ms-auto">
+                            <button type="button" class="btn btn-outline-secondary"
+                                    hx-get="{% url 'table_config' model_name=table_config_key %}"
+                                    hx-target="#modal-placeholder"
+                                    hx-on::after-request="new bootstrap.Modal(document.getElementById('table-config-modal')).show()">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-settings me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" /><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" /></svg>
+                                Configure Table
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+
+                {# Table Rendering Container #}
+                <div id="object-list-table-container">
+                    <div class="table-responsive">
+                       {% if table %}
+                           {% render_table table "global_includes/htmx_table.html" %}
+                       {% else %}
+                           <div class="p-3">
+                               <p class="text-muted mb-0">No table data available.</p>
+                           </div>
+                       {% endif %}
+                    </div>
+                </div>
+
+                {# --- END Main Content Area --- #}
+
+                {# REMOVE final partial call #}
+            </div> {# End #object-list-dynamic-content #}
+        </div>
+
+        {# Filters Tab #}
+        {% if filter_form %}
+        <div class="tab-pane" id="tab-filters" role="tabpanel" aria-labelledby="filters-tab">
+            {# OOB Target: Swap content when filters are applied from main form #}
+            <div id="filters-tab-content">
+                {% include 'generic/partials/filter_form_tab.html' %}
+            </div>
+        </div>
+        {% endif %}
+    </div> {# End .tab-content #}
+
+    {# Pagination Controls Container (Moved outside dynamic content, inside card) #}
+    <div id="object-list-pagination">
+        {% if table.page %}
+        <div class="card-footer d-flex align-items-center">
+            {% include 'global_includes/pagination_per_page.html' with paginator=table.page.paginator hx_target="#object-list-dynamic-content" %}
+            <p class="m-0 text-secondary flex-grow-1 text-center">
+                {% blocktrans with start=table.page.start_index end=table.page.end_index total=table.page.paginator.count %}
+                    Showing <span>{{ start }}</span> to <span>{{ end }}</span> of <span>{{ total }}</span> {{ table.Meta.model|verbose_name_plural }}
+                {% endblocktrans %}
+            </p>
+            {% include 'global_includes/pagination_links.html' with page_obj=table.page hx_target="#object-list-dynamic-content" %}
+        </div>
+        {% endif %}
+    </div> {# End #object-list-pagination #}
+
+</div> {# End card wrapper #}
+{% endblock content %}
+
+{% block modals %}
+    {{ block.super }}
+    {% if table_config_form %}
+        {% include 'core/modals/table_config.html' %}
+    {% endif %}
+{% endblock modals %}
 
 {% block title %}<span id="page-title-block" hx-swap-oob="true">{{ title|default:"List View" }} - AssetBox</span>{% endblock %}
 
@@ -39,285 +182,6 @@
     </div>
 </div>{% endblock page_actions %}
 
-{% block content %}
-<div class="row row-cards">
-    <div class="col-12">
-        {# Main Card Wrapper #}
-        <div class="card">
-            {# Tabs Header #}
-            <div class="card-header">
-                <ul class="nav nav-tabs card-header-tabs" data-bs-toggle="tabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <a href="#tab-results" class="nav-link active" data-bs-toggle="tab" aria-selected="true" role="tab">
-                            Results
-                            {# Updated to use the ID of the content wrapper for potential count updates via HTMX later #}
-                            <span class="badge bg-secondary text-secondary-fg ms-1" id="object-list-count">{{ table.page.paginator.count|default:"0" }}</span>
-                        </a>
-                    </li>
-                    {% if filter_form %}
-                    <li class="nav-item" role="presentation">
-                        <a href="#tab-filters" class="nav-link" data-bs-toggle="tab" aria-selected="false" tabindex="-1" role="tab">
-                            {# Wrap content for OOB swap #}
-                            <span id="filters-tab-content">
-                                Filters
-                                {# TODO: Add badge for active filters #}
-                                {% get_active_filters as active_filters_present %}
-                                {% if active_filters_present %}
-                                    <span class="badge bg-info-lt ms-1">Active</span>
-                                {% endif %}
-                            </span>
-                        </a>
-                    </li>
-                    {% endif %}
-                </ul>
-            </div>
-
-            {# Tab Content Area #}
-            <div class="card-body tab-content p-0">
-
-                {# --- Results Tab --- #}
-                <div class="tab-pane active show" id="tab-results" role="tabpanel">
-
-                    {# Row for Search and Table Configure Button - Adjusted alignment #}
-                    <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
-                        {# Quick Search Input Group - Moved back here #}
-                        {% if filter_form.q %}
-                        <div class="quicksearch-results-tab" style="flex-grow: 1; max-width: 200px; margin-right: 1rem;"> {# Wrapper for styling #}
-                            <form method="get" action="" class="filter-form-inline" {# Simplified form for inline search #}
-                                hx-get=""
-                                hx-target="#object-list-content"
-                                hx-swap="outerHTML"
-                                hx-push-url="true">
-                                <div class="input-group input-group-flat">
-                                    <input type="search" name="q" class="form-control" placeholder="Search..."
-                                           value="{{ request.GET.q|default:"" }}"
-                                           hx-trigger="keyup changed delay:500ms, search">
-                                    <span class="input-group-text">
-                                        <a href="#" class="link-secondary {% if not request.GET.q %}d-none{% endif %}" title="Clear search" data-bs-toggle="tooltip"
-                                           onclick="this.closest('form').querySelector('input[name=q]').value=''; this.closest('form').dispatchEvent(new Event('submit', { bubbles: true })); return false;">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-x" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
-                                        </a>
-                                    </span>
-                                </div>
-                                {# Hidden fields from filter form needed for inline search to work with other filters #}
-                                {% for field in filter_form %}
-                                    {% if field.name != 'q' and field.value %}
-                                        <input type="hidden" name="{{ field.name }}" value="{{ field.value }}">
-                                    {% endif %}
-                                {% endfor %}
-                           </form>
-                        </div>
-                        {% else %}
-                        <div></div> {# Empty div to maintain space if no search #}
-                        {% endif %}
-
-                        {# Configure Table Button #}
-                        {% if table_config_key %}
-                        <div class="table-configure ms-auto"> {# Added ms-auto if needed #}
-                            <button type="button" class="btn btn-outline-secondary"
-                                    hx-get="{% url 'table_config' model_name=table_config_key %}"
-                                    hx-target="#modal-placeholder"
-                                    hx-on::after-request="new bootstrap.Modal(document.getElementById('table-config-modal')).show()">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-settings me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" /><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" /></svg>
-                                Configure Table
-                            </button>
-                        </div>
-                        {% endif %}
-                    </div>
-                    {# End Row for Search/Configure Control #}
-
-                    {# --- Content Wrapper for HTMX Updates --- #}
-                    <div id="object-list-content">
-                         {# Content is now loaded dynamically via HTMX or initial page load includes it #}
-                         {# Initial load includes the wrapper partial #}
-                         {% include 'generic/partials/object_list_content_wrapper.html' %}
-                    </div>
-                    {# --- End Content Wrapper --- #}
-
-                </div>
-                {# --- End Results Tab --- #}
-
-                {# --- Filters Tab --- #}
-                {% if filter_form %}
-                <div class="tab-pane p-3" id="tab-filters" role="tabpanel">
-                    {# Filter Form (GET method for applying filters) - Added HTMX attributes #}
-                    <form method="get" action="" class="filter-form-tab"
-                          hx-get=""
-                          hx-target="#object-list-content"
-                          hx-swap="outerHTML"
-                          hx-push-url="true">
-
-                         {# Quick Search Input Group - REMOVED FROM HERE #}
-
-                         <h4 class="mb-3">Advanced Filters</h4>
-                         {# Render the rest of the filter_form directly #}
-                         {% crispy filter_form 'bootstrap5' exclude_field='q' %} {# Exclude 'q' field here as it was rendered above #}
-
-                         {# --- Add Filter Buttons --- #}
-                         <div class="mt-4 d-flex justify-content-between">
-                             <button type="submit" name="_apply" class="btn btn-primary">Apply Filters</button>
-                             {# Clear Filters link #}
-                             <a href="?" class="btn btn-outline-secondary"
-                                hx-get="?"
-                                hx-target="#object-list-content"
-                                hx-swap="outerHTML"
-                                hx-push-url="true">Clear Filters</a>
-                         </div>
-                         {# --- End Filter Buttons --- #}
-                    </form>
-                </div>
-                {% endif %}
-                {# --- End Filters Tab --- #}
-            </div> {# End Tab Content Area #}
-        </div> {# End Main Card #}
-
-        {# --- Bulk Actions Form (Separate POST form) --- #}
-        <form method="post" action="{% url 'bulk_delete' %}" id="bulk-actions-form">
-            {% csrf_token %}
-            {# Use model_name_str for the bulk delete model name #}
-            <input type="hidden" name="model_name" value="{{ model_name_str }}" /> 
-            <div class="card-body border-top py-3 d-none mt-3" id="bulk-actions-bar">
-                <div class="d-flex align-items-center">
-                    <div class="text-secondary">
-                        <input class="form-check-input m-0 align-middle" type="checkbox" id="bulk-actions-master-cb" disabled> <span id="selected-count">0</span> items selected
-                    </div>
-                    <div class="ms-auto">
-                        {# Placeholder for dynamically generated PK inputs #}
-                        <div id="bulk-pk-inputs"></div> 
-                        {# REMOVE old single hidden input #}
-                        {# <input type="hidden" name="pk" id="selected-pks-input"> #}
-                        <button type="submit" name="_bulk_edit" class="btn btn-primary" formaction="#">Edit Selected</button> {# TODO: Update formaction for bulk edit #}
-                        <button type="submit" name="_bulk_delete" class="btn btn-danger">Delete Selected</button>
-                    </div>
-                </div>
-            </div>
-        </form>
-        {# --- End Bulk Actions Form --- #}
-
-    </div> {# End Col #}
-</div> {# End Row #}
-
-{# Checkbox JS #}
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const bulkMasterCheckbox = document.getElementById('bulk-actions-master-cb');
-
-    // console.log("[CheckboxJS] Script loaded. Trying to find table..."); // DEBUG
-    const table = document.querySelector('table.table');
-    if (!table) {
-        // console.error("[CheckboxJS] Error: Could not find table element with class 'table'. Aborting."); // DEBUG
-        return;
-    }
-    // console.log("[CheckboxJS] Table element found:", table); // DEBUG
-    const headerCheckbox = table.querySelector('thead .form-check-input[type=checkbox]'); // Keep reference for updateBulkActions
-
-    const rowCheckboxes = table.querySelectorAll('tbody td input[type=checkbox]'); // Use simplified selector here too if needed initially
-    const bulkActionsBar = document.getElementById('bulk-actions-bar');
-    const selectedCountSpan = document.getElementById('selected-count');
-    const pkInputsContainer = document.getElementById('bulk-pk-inputs'); // Get the new container
-
-    function updateBulkActions(currentCheckboxes) {
-        const checkboxesToUpdate = currentCheckboxes || table.querySelectorAll('tbody td input[type=checkbox]');
-        
-        if (!bulkActionsBar || !selectedCountSpan || !pkInputsContainer || !bulkMasterCheckbox) return; // Check pkInputsContainer
-
-        let selectedCount = 0;
-        const selectedPks = [];
-
-        checkboxesToUpdate.forEach(cb => { 
-            if (cb.checked) {
-                selectedCount++;
-                if(cb.value) selectedPks.push(cb.value);
-            }
-        });
-
-        selectedCountSpan.textContent = selectedCount;
-
-        // --- Update hidden inputs --- 
-        pkInputsContainer.innerHTML = ''; // Clear previous inputs
-        selectedPks.forEach(pk => {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = 'pk'; // Use the name expected by the view
-            input.value = pk;
-            pkInputsContainer.appendChild(input);
-        });
-        // --- End Update --- 
-
-        if (selectedCount > 0) {
-            bulkActionsBar.classList.remove('d-none');
-            bulkMasterCheckbox.checked = true;
-            bulkMasterCheckbox.indeterminate = selectedCount < checkboxesToUpdate.length;
-        } else {
-            bulkActionsBar.classList.add('d-none');
-            bulkMasterCheckbox.checked = false;
-            bulkMasterCheckbox.indeterminate = false;
-        }
-
-        if (headerCheckbox) {
-             headerCheckbox.checked = selectedCount > 0 && selectedCount === checkboxesToUpdate.length;
-             headerCheckbox.indeterminate = selectedCount > 0 && selectedCount < checkboxesToUpdate.length;
-        }
-    }
-
-    // --- Use Event Delegation --- 
-    // console.log("[CheckboxJS] Attaching change listener to table..."); // DEBUG
-    table.addEventListener('change', function(event) {
-        // console.log("[CheckboxJS] Table 'change' event detected. Target:", event.target); // DEBUG
-        const targetCheckbox = event.target;
-
-        // Check if the header checkbox was changed
-        if (targetCheckbox.matches('input[type=checkbox]') && targetCheckbox.closest('thead')) {
-            // console.log('Header checkbox clicked! (delegated - simplified selector)'); // DEBUG
-            const isChecked = targetCheckbox.checked;
-            // --- Re-query row checkboxes INSIDE the handler --- 
-            const currentRowCheckboxes = table.querySelectorAll('tbody td input[type=checkbox]'); 
-            // console.log(`[CheckboxJS] Found ${currentRowCheckboxes.length} row checkboxes to toggle.`); // DEBUG
-            currentRowCheckboxes.forEach((cb, index) => {
-                // Only change if the state is different, prevents infinite loops if logic gets complex
-                // console.log(`[CheckboxJS] Toggling row ${index}. Current: ${cb.checked}, Target: ${isChecked}`); // DEBUG
-                if (cb.checked !== isChecked) {
-                    cb.checked = isChecked;
-                    // console.log(`[CheckboxJS] Row ${index} toggled to ${isChecked}`); // DEBUG
-                }
-            });
-            // console.log("[CheckboxJS] Finished toggling rows. Calling updateBulkActions..."); // DEBUG
-            updateBulkActions(currentRowCheckboxes); // Pass the re-queried list
-            // console.log("[CheckboxJS] updateBulkActions called."); // DEBUG
-        }
-        // Check if a row checkbox was changed
-        else if (targetCheckbox.matches('input[type=checkbox]') && targetCheckbox.closest('tbody')) {
-            // --- Also re-query for updateBulkActions --- 
-            const currentRowsForUpdate = table.querySelectorAll('tbody td input[type=checkbox]');
-            // console.log('Row checkbox clicked! (delegated - simplified selector)'); // DEBUG
-            // Pass the up-to-date list to updateBulkActions
-            updateBulkActions(currentRowsForUpdate); 
-        }
-    });
-    // console.log("[CheckboxJS] Change listener attached."); // DEBUG
-    // --- End Event Delegation --- 
-
-    // Initial update on page load
-    updateBulkActions(); // Call without args, it will query
-
-    // Basic JS for clear search button
-    const quickSearchInput = document.querySelector('.quicksearch input[name="q"]');
-    const clearSearchButton = document.querySelector('.quicksearch a[title="Clear search"]');
-    if (quickSearchInput && clearSearchButton) {
-        quickSearchInput.addEventListener('input', function() {
-            if (this.value) {
-                clearSearchButton.classList.remove('d-none');
-            } else {
-                clearSearchButton.classList.add('d-none');
-            }
-        });
-        // Add onclick directly in template for simplicity now
-    }
-});
-</script>
-
-{% endblock content %}
-
 {% block javascript %}
 <script>
 document.body.addEventListener('htmx:afterOnLoad', function(event) {
@@ -336,10 +200,11 @@ document.body.addEventListener('htmx:afterOnLoad', function(event) {
     // Only proceed if the swap didn't fail
     if (!isFailedSwap && targetElement && triggeringElement) {
         console.log('[Tab Switch Debug] Swap successful, checking conditions...');
-        // Check if the target was the object list content AND the trigger was inside the filters tab
+        // Check if the target was the NEW results content div AND the trigger was inside the filters tab
         const triggerInFilters = triggeringElement.closest('#tab-filters');
         console.log('[Tab Switch Debug] Trigger inside #tab-filters:', triggerInFilters ? triggerInFilters : 'null/not found');
 
+        // UPDATED Check for the original target ID
         if (targetElement.id === 'object-list-content' && triggerInFilters) {
             console.log('[Tab Switch Debug] Conditions met: Target is #object-list-content and trigger was in #tab-filters.');
             // Find the "Results" tab trigger link

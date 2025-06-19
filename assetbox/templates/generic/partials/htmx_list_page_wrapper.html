@@ -1,34 +1,32 @@
+{% load partials %}
 {% load render_table from django_tables2 %}
 {% load static %}
 {% load utility_tags %}
 {% load i18n %}
 {% load crispy_forms_tags %}
 
-{# --- OOB Swaps (Must be outside the main target) --- #}
-<span id="page-title-block" hx-swap-oob="true">{{ title|default:"List View" }} - AssetBox</span>
+{# This template is rendered FOR HTMX requests targeting #object-list-dynamic-content #}
+{# It includes OOB blocks for header/title/actions AND OOB blocks for filter/count badges #}
+{# It THEN renders the main list content (search, table) directly. Pagination is handled OOB. #}
 
-<div id="breadcrumbs-block" hx-swap-oob="true">
-    {% if breadcrumbs %}
-        <ol class="breadcrumb breadcrumb-arrows" aria-label="breadcrumbs">
-            {% for label, url in breadcrumbs %}
-                {% if url %}
-                    <li class="breadcrumb-item"><a href="{{ url }}">{{ label }}</a></li>
-                {% else %}
-                    <li class="breadcrumb-item active" aria-current="page">{{ label }}</li>
-                {% endif %}
-            {% endfor %}
-        </ol>
-    {% endif %}
-</div>
+{# --- OOB Block: Page Title --- #}
+<span id="page-title-block" hx-swap-oob="true">
+    {{ title|default:"List View" }} - AssetBox
+</span>
 
+{# --- OOB Block: Page Header --- #}
 <div id="page-header-block" hx-swap-oob="true">
-    <div class="page-pretitle">{{ pretitle|default:"Manage" }}</div>
-    <h2 class="page-title">{{ title|default:"Objects" }}</h2>
+    <div class="page-pretitle">
+        {{ pretitle|default:"Manage" }}
+    </div>
+    <h2 class="page-title">
+        {{ title|default:"Objects" }}
+    </h2>
 </div>
 
+{# --- OOB Block: Page Actions --- #}
 <div id="page-actions-block" hx-swap-oob="true">
     <div class="btn-list">
-        {% block extra_controls %}{% endblock %} {# Allow specific views to add buttons here #}
         {% if create_url_name %}
         <a href="{% url create_url_name %}" class="btn btn-primary d-none d-sm-inline-block">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
@@ -43,106 +41,106 @@
         {% endif %}
     </div>
 </div>
-{# --- End OOB Swaps --- #}
+
+{# --- OOB Partial Definitions (These target elements OUTSIDE #object-list-dynamic-content) --- #}
+{% startpartial filters-tab-content hx-swap-oob="true" %}
+    {% include 'generic/partials/filter_form_tab.html' %}
+{% endpartial %}
+
+{% startpartial object-list-count hx-swap-oob="true" %}
+    {{ table.rows|length|default:"0" }}
+{% endpartial %}
+
+{% startpartial filters-applied-count hx-swap-oob="true" %}
+    {{ filter_form.applied_filters|length|default:"0" }}
+{% endpartial %}
+
+{# --- OOB Partial Definition for Pagination --- #}
+{% startpartial object-list-pagination hx-swap-oob="true" %}
+    {% if table.page %}
+    <div class="card-footer d-flex align-items-center">
+        {# Per Page Dropdown - Target remains the dynamic content area #}
+        {% include 'global_includes/pagination_per_page.html' with paginator=table.page.paginator hx_target="#object-list-dynamic-content" %}
+
+        {# Page Number Summary #}
+        <p class="m-0 text-secondary flex-grow-1 text-center">
+            {% blocktrans with start=table.page.start_index end=table.page.end_index total=table.page.paginator.count %}
+                Showing <span>{{ start }}</span> to <span>{{ end }}</span> of <span>{{ total }}</span> {{ table.Meta.model|verbose_name_plural }}
+            {% endblocktrans %}
+        </p>
+
+        {# Page Links - Target remains the dynamic content area #}
+        {% include 'global_includes/pagination_links.html' with page_obj=table.page hx_target="#object-list-dynamic-content" %}
+    </div>
+    {% else %}
+        {# Render empty if no pagination needed, to clear previous state #}
+    {% endif %}
+{% endpartial %}
+{# --- END OOB Pagination --- #}
+
+{# --- END OOB Definitions --- #}
 
 
-{# --- Main Target Content (This will replace the innerHTML of #page-body-main) --- #}
-{# --- This content replicates the structure inside the {% block content %} of generic/object_list.html --- #}
-<div class="container-xl">
-    <div class="row row-cards">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <ul class="nav nav-tabs card-header-tabs" data-bs-toggle="tabs" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <a href="#tab-results" class="nav-link active" data-bs-toggle="tab" aria-selected="true" role="tab">
-                                Results
-                                <span class="badge bg-secondary text-secondary-fg ms-1" id="object-list-count">{{ table.page.paginator.count|default:"0" }}</span>
-                            </a>
-                        </li>
-                        {% if filter_form %}
-                        <li class="nav-item" role="presentation">
-                            <a href="#tab-filters" class="nav-link" data-bs-toggle="tab" aria-selected="false" tabindex="-1" role="tab">
-                                <span id="filters-tab-content">
-                                    Filters
-                                    {% get_active_filters as active_filters_present %}
-                                    {% if active_filters_present %}
-                                        <span class="badge bg-info-lt ms-1">Active</span>
-                                    {% endif %}
-                                </span>
-                            </a>
-                        </li>
-                        {% endif %}
-                    </ul>
+{# --- Main Content Area (Rendered directly, replaces innerHTML of #object-list-dynamic-content) --- #}
+
+{# Row for Search and Table Configure Button #}
+<div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+    {# Quick Search Input Group #}
+    {% if filter_form.q is not None %}
+        <div class="quicksearch-results-tab" style="flex-grow: 1; max-width: 200px; margin-right: 1rem;">
+            <form method="get" action="" class="filter-form-inline"
+                hx-get="{{ request.get_full_path }}"
+                hx-target="#object-list-dynamic-content"
+                hx-swap="innerHTML"
+                hx-push-url="true">
+                <div class="input-group input-group-flat">
+                    <input type="search" name="q" class="form-control" placeholder="Search..."
+                           value="{{ request.GET.q|default:"" }}"
+                           hx-trigger="keyup changed delay:500ms, search">
+                    <span class="input-group-text">
+                        <a href="#" class="link-secondary {% if not request.GET.q %}d-none{% endif %}" title="Clear search" data-bs-toggle="tooltip"
+                           onclick="this.closest('form').querySelector('input[name=q]').value=''; this.closest('form').dispatchEvent(new Event('submit', { bubbles: true })); return false;">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-x" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
+                        </a>
+                    </span>
                 </div>
-
-                <div class="card-body tab-content p-0">
-                    <div class="tab-pane active show" id="tab-results" role="tabpanel">
-                        <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
-                            {% if filter_form.q %}
-                            <div class="quicksearch-results-tab" style="flex-grow: 1; max-width: 200px; margin-right: 1rem;">
-                                <form method="get" action="" class="filter-form-inline"
-                                    hx-get="" hx-target="#object-list-content" hx-swap="outerHTML" hx-push-url="true">
-                                    <div class="input-group input-group-flat">
-                                        <input type="search" name="q" class="form-control" placeholder="Search..." value="{{ request.GET.q|default:"" }}" hx-trigger="keyup changed delay:500ms, search">
-                                        <span class="input-group-text">
-                                            <a href="#" class="link-secondary {% if not request.GET.q %}d-none{% endif %}" title="Clear search" data-bs-toggle="tooltip" onclick="this.closest('form').querySelector('input[name=q]').value=''; this.closest('form').dispatchEvent(new Event('submit', { bubbles: true })); return false;">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-x" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
-                                            </a>
-                                        </span>
-                                    </div>
-                                    {% for field in filter_form %}{% if field.name != 'q' and field.value %}<input type="hidden" name="{{ field.name }}" value="{{ field.value }}">{% endif %}{% endfor %}
-                                </form>
-                            </div>
-                            {% else %}<div></div>{% endif %}
-                            {% if table_config_key %}
-                            <div class="table-configure ms-auto">
-                                <button type="button" class="btn btn-outline-secondary"
-                                        hx-get="{% url 'table_config' model_name=table_config_key %}" hx-target="#modal-placeholder"
-                                        hx-on::after-request="new bootstrap.Modal(document.getElementById('table-config-modal')).show()">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-settings me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" /><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" /></svg>
-                                    Configure Table
-                                </button>
-                            </div>
-                            {% endif %}
-                        </div>
-                        <div id="object-list-content"> {# Inner wrapper for table/pagination swaps #}
-                            {# This includes the actual table wrapper partial #}
-                            {% include 'generic/partials/object_list_content_wrapper.html' with table=table filter_form=filter_form %}
-                        </div>
-                    </div>
-                    {% if filter_form %}
-                    <div class="tab-pane p-3" id="tab-filters" role="tabpanel">
-                        <form method="get" action="" class="filter-form-tab"
-                              hx-get="" hx-target="#object-list-content" hx-swap="outerHTML" hx-push-url="true">
-                            <h4 class="mb-3">Advanced Filters</h4>
-                            {% crispy filter_form 'bootstrap5' exclude_field='q' %}
-                            <div class="mt-4 d-flex justify-content-between">
-                                <button type="submit" name="_apply" class="btn btn-primary">Apply Filters</button>
-                                <a href="?" class="btn btn-outline-secondary" hx-get="?" hx-target="#object-list-content" hx-swap="outerHTML" hx-push-url="true">Clear Filters</a>
-                            </div>
-                        </form>
-                    </div>
+                {# Hidden fields from filter form #}
+                {% for field in filter_form %}
+                    {% if field.name != 'q' and field.value %}
+                        <input type="hidden" name="{{ field.name }}" value="{{ field.value }}">
                     {% endif %}
-                </div>
-            </div>
-            <form method="post" action="{% url 'bulk_delete' %}" id="bulk-actions-form">
-                {% csrf_token %}
-                <input type="hidden" name="model_name" value="{{ model_name_str }}" />
-                <div class="card-body border-top py-3 d-none mt-3" id="bulk-actions-bar">
-                    <div class="d-flex align-items-center">
-                        <div class="text-secondary">
-                            <input class="form-check-input m-0 align-middle" type="checkbox" id="bulk-actions-master-cb" disabled> <span id="selected-count">0</span> items selected
-                        </div>
-                        <div class="ms-auto">
-                            <div id="bulk-pk-inputs"></div>
-                            <button type="submit" name="_bulk_edit" class="btn btn-primary" formaction="#">Edit Selected</button>
-                            <button type="submit" name="_bulk_delete" class="btn btn-danger">Delete Selected</button>
-                        </div>
-                    </div>
-                </div>
-            </form>
+                {% endfor %}
+           </form>
         </div>
+    {% else %}
+        <div></div> {# Placeholder #}
+    {% endif %}
+
+    {# Configure Table Button #}
+    {% if table_config_key %}
+        <div class="table-configure ms-auto">
+            <button type="button" class="btn btn-outline-secondary"
+                    hx-get="{% url 'table_config' model_name=table_config_key %}"
+                    hx-target="#modal-placeholder"
+                    hx-on::after-request="new bootstrap.Modal(document.getElementById('table-config-modal')).show()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-settings me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" /><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" /></svg>
+                Configure Table
+            </button>
+        </div>
+    {% endif %}
+</div>
+
+{# Table Rendering Container #}
+<div id="object-list-table-container">
+    <div class="table-responsive">
+       {% if table %}
+           {% render_table table "global_includes/htmx_table.html" %}
+       {% else %}
+           <div class="p-3">
+               <p class="text-muted mb-0">No table data available.</p>
+           </div>
+       {% endif %}
     </div>
 </div>
-{# Note: No script tags here - they should be handled by base.html #}
+
+{# --- END Main Content Area --- #}

@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'subscriptions',
     'licenses',
     'django_tables2',
+    'template_partials',
     'django_htmx',
     'django_filters',
     'crispy_forms',
@@ -70,11 +71,25 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'core.urls'
 
+# Keep your existing default_loaders definition if you have one, or define it:
+default_loaders = [
+    "django.template.loaders.filesystem.Loader",
+    "django.template.loaders.app_directories.Loader",
+]
+
+# Configure cached and partial loaders
+# TODO: Consider enabling cached loader in production (requires defining CACHES)
+# cached_loaders = [("django.template.loaders.cached.Loader", default_loaders)]
+# partial_loaders = [("template_partials.loader.Loader", cached_loaders)]
+# For now, use non-cached version for simplicity
+partial_loaders = [("template_partials.loader.Loader", default_loaders)]
+
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [BASE_DIR / 'templates'],
-        'APP_DIRS': True,
+        'APP_DIRS': False, # Explicit loaders are defined below
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.debug',
@@ -82,7 +97,25 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'core.context_processors.breadcrumbs',
+                 # Add any custom ones AssetBox needs
             ],
+            # Ensure 'loaders' is set correctly: - REMOVED partial_loaders
+            'loaders': partial_loaders,
+            # Explicitly register libraries if auto-discovery fails - REMOVED
+            # 'libraries': {
+            #     'htmx_tags': 'django_htmx.templatetags.htmx_tags',
+            #     # Add other potentially problematic libraries here if needed
+            # },
+            # Add 'builtins' if not already present for template_partials tags
+            # 'builtins': [ # REMOVED builtins as APP_DIRS handles discovery
+            #     # 'template_partials.templatetags.partials', # Removed - Loader should handle this
+            #     # Add other custom builtins if needed
+            #     'django_tables2.templatetags.django_tables2', # Ensure tables2 tags are loaded if needed globally
+            #     'django.templatetags.static', # Common builtin
+            #     'crispy_forms.templatetags.crispy_forms_tags', # Common builtin
+            #     # 'django_htmx', # Removed - htmx tags should be loaded explicitly
+            # ],
+            # 'debug': DEBUG, # Link to your project's DEBUG setting - Handled by Django automatically based on DEBUG setting
         },
     },
 ]

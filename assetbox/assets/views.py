@@ -24,6 +24,8 @@ from django.views.generic import ListView, DetailView, CreateView, UpdateView, D
 from django.contrib.auth.mixins import LoginRequiredMixin
 from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
 from django.db.models import Count
+import json
+from django.utils import timezone
 
 User = get_user_model()
 
@@ -238,58 +240,75 @@ def asset_checkout_modal(request, pk):
     # Ensure asset is available before proceeding
     if asset.status != 'available':
         # TODO: Handle error - return forbidden or message?
+        # Returning a simple message inside the modal might be better UX
+        # For now, returning a basic forbidden response
         return HttpResponse("Asset is not available for assignment.", status=403)
 
     if request.method == 'POST':
         form = AssetCheckOutForm(request.POST)
         if form.is_valid():
-            selected_holder = form.cleaned_data.get('asset_holder') # Use .get()
-            selected_location = form.cleaned_data.get('location') # Use .get()
+            selected_holder = form.cleaned_data.get('asset_holder')
+            selected_location = form.cleaned_data.get('location')
             
-            log_action = 'updated' # Default log action
-            log_notes = ''
-
+            # --- Checkout Logic --- 
+            assignee = None
+            assignee_type = None
             if selected_holder:
-                # Assign to Asset Holder
-                AssetHolderAssignment.objects.create(
-                    asset_holder=selected_holder,
-                    assigned_object=asset
-                )
-                asset.status = 'in_use' # Set status to in_use for holder assignment
-                asset.save()
-                log_action = 'checked_out'
-                log_notes = f"Assigned to Asset Holder: {selected_holder}"
-
+                assignee = selected_holder
+                assignee_type = ContentType.objects.get_for_model(AssetHolder)
+                asset.location = None # Clear location if assigned to holder
             elif selected_location:
-                # Assign to Location
-                asset.location = selected_location
-                # Do NOT change status when assigning to location
-                asset.save()
-                log_action = 'updated' # Or a new 'location_assigned'?
-                log_notes = f"Assigned to Location: {selected_location}"
-            
-            # Always create log entry
+                assignee = selected_location
+                assignee_type = ContentType.objects.get_for_model(Location)
+                asset.location = selected_location # Set location
+
+            # Update asset status
+            asset.status = 'assigned'
+            asset.save(update_fields=['status', 'location'])
+
+            # Create/update assignment record
+            AssetHolderAssignment.objects.update_or_create(
+                content_type=ContentType.objects.get_for_model(Asset),
+                object_id=asset.pk,
+                defaults={
+                    'assigned_object_type': assignee_type,
+                    'assigned_object_id': assignee.pk,
+                    'assigned_date': timezone.now() # Use timezone aware now
+                }
+            )
+
+            # Create Activity Log
             ActivityLog.objects.create(
                 asset=asset,
+                action='checked_out',
                 user=request.user,
-                action=log_action, 
-                notes=log_notes
+                notes=f"Checked out to {'Holder' if selected_holder else 'Location'}: {assignee}"
             )
-            
-            # Send HX-Refresh header to reload the main page (asset detail)
-            response = HttpResponse("")
-            response['HX-Refresh'] = 'true'
-            return response
-        else:
-            # Form is invalid, re-render the modal with errors
-            pass # Fall through to render GET part
-    else:
-        form = AssetCheckOutForm() # Empty form for GET
 
-    context = {
-        'form': form,
-        'asset': asset,
-    }
+            messages.success(request, f"Asset '{asset}' checked out successfully to {assignee}.")
+            # --- End Checkout Logic ---
+
+            # --- HTMX Response for Success --- 
+            response = HttpResponse(status=204) # No Content
+            # Trigger events for JS to close modal and potentially refresh list
+            response['HX-Trigger'] = json.dumps({
+                "closeModalEvent": None, 
+                "assetListUpdated": None, # Trigger list refresh
+                "showMessage": {"message": f"Asset '{asset}' checked out to {assignee}.", "level": "success"} # Send message via trigger
+            }) 
+            return response
+            # --- End HTMX Response --- 
+        else:
+            # --- HTMX Response for Validation Error --- 
+            # Re-render *only* the form partial within the modal template
+            context = {'form': form, 'asset': asset, 'request': request}
+            return render(request, "assets/includes/asset_checkout_modal.html#checkout-modal-form", context)
+            # --- End HTMX Response --- 
+    else: # GET request
+        form = AssetCheckOutForm()
+
+    # Initial GET still renders the whole modal template via the placeholder swap
+    context = {'form': form, 'asset': asset}
     return render(request, 'assets/includes/asset_checkout_modal.html', context)
 
 @login_required

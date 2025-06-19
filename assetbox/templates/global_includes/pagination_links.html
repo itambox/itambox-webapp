@@ -6,12 +6,12 @@
     {% if page_obj.has_previous %}
         <li class="page-item">
             <a class="page-link"
-               href="{% querystring request.GET page=page_obj.previous_page_number %}"
-               hx-get="{% querystring request.GET page=page_obj.previous_page_number %}"
-               hx-target="#object-list-content"
+               href="{% update_querystring request page=1 %}"
+               hx-get="{% update_querystring request page=1 %}"
+               hx-target="{{ hx_target|default:'#object-list-dynamic-content' }}"
                hx-swap="innerHTML"
-               tabindex="-1">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 6l-6 6l6 6" /></svg>
+               hx-push-url="true">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevrons-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M11 7l-5 5l5 5" /><path d="M17 7l-5 5l5 5" /></svg>
                 Prev
             </a>
         </li>
@@ -30,11 +30,14 @@
             <li class="page-item active"><a class="page-link" href="#" tabindex="-1">{{ i }}</a></li>
         {% elif i > page_obj.number|add:'-3' and i < page_obj.number|add:'3' %}
             <li class="page-item">
-                <a class="page-link"
-                   href="{% querystring request.GET page=i %}"
-                   hx-get="{% querystring request.GET page=i %}"
-                   hx-target="#object-list-content"
-                   hx-swap="outerHTML">{{ i }}</a>
+                <a class="page-link {% if i == page_obj.number %}active{% endif %}"
+                   href="{% update_querystring request page=i %}"
+                   hx-get="{% update_querystring request page=i %}"
+                   hx-target="{{ hx_target|default:'#object-list-dynamic-content' }}"
+                   hx-swap="innerHTML"
+                   hx-push-url="true">
+                    {{ i }}
+                </a>
             </li>
         {% elif i == page_obj.number|add:'-3' or i == page_obj.number|add:'3' %}
              <li class="page-item disabled"><span class="page-link">…</span></li>
@@ -45,19 +48,20 @@
     {% if page_obj.has_next %}
         <li class="page-item">
             <a class="page-link"
-               href="{% querystring request.GET page=page_obj.next_page_number %}"
-               hx-get="{% querystring request.GET page=page_obj.next_page_number %}"
-               hx-target="#object-list-content"
-               hx-swap="outerHTML">
+               href="{% update_querystring request page=page_obj.next_page_number %}"
+               hx-get="{% update_querystring request page=page_obj.next_page_number %}"
+               hx-target="{{ hx_target|default:'#object-list-dynamic-content' }}"
+               hx-swap="innerHTML"
+               hx-push-url="true">
                 Next
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 6l6 6l-6 6" /></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 6l6 6l-6 6" /></svg>
             </a>
         </li>
     {% else %}
         <li class="page-item disabled">
             <a class="page-link" href="#" tabindex="-1" aria-disabled="true">
                 Next
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 6l6 6l-6 6" /></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 6l-6 6l6 6" /></svg>
             </a>
         </li>
     {% endif %}
