@@ -26,6 +26,7 @@ from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectD
 from django.db.models import Count
 import json
 from django.utils import timezone
+from django.template.loader import render_to_string # Added for partial rendering
 
 User = get_user_model()
 
@@ -33,8 +34,27 @@ User = get_user_model()
 
 @login_required # Ensure user is logged in to see the dashboard
 def dashboard(request):
-    # We can add context data here later (e.g., asset counts)
-    context = {}
+    """Displays the main dashboard page."""
+    context = {
+        # Add necessary dashboard context data here later
+        'title': 'Dashboard', # Add title for consistency
+        'breadcrumbs': [(None, 'Dashboard')], # Basic breadcrumbs
+    }
+
+    if request.htmx:
+        # Check if it's a boosted request or explicitly targets the main body
+        is_boosted_main_swap = getattr(request.htmx, 'boosted', False) or \
+                               (getattr(request.htmx, 'target', None) and request.htmx.target == '#page-body-main')
+
+        if is_boosted_main_swap:
+            # Render ONLY the content block wrapped in the standard page body wrapper
+            # This assumes the wrapper handles OOB updates for title/breadcrumbs etc.
+            context['content_template_name'] = 'dashboard_content.html' # Template with only the content block
+            return render(request, 'generic/partials/page_body_content_wrapper.html', context)
+        # Handle other potential HTMX requests targeting different elements if needed later
+        # else: pass
+
+    # Standard full page render
     return render(request, 'dashboard.html', context)
 
 # @login_required

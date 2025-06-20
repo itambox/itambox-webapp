@@ -6,6 +6,7 @@
 {% block title_tab %}{% trans "Profile" %}{% endblock %}
 
 {% block content_tab %}
+{# This content is included inside the card body defined in users/inc/tabs.html #}
 <div class="row row-cards"> {# Row for top two cards #}
     {# Profile Form Card #}
     <div class="col-md-6">
@@ -47,16 +48,21 @@
 </div> {# End row for top two cards #}
 
 {# Separate Card for Recent Activity (Below) #}
-<div class="card mt-4"> 
+<div class="card mt-4">
     <div class="card-header">
         <h3 class="card-title">{% trans "Recent Activity" %}</h3>
     </div>
-    <div class="card-body p-0"> 
+    <div class="card-body p-0">
         <div class="table-responsive">
-            {% render_table activity_table %}
+            {# Ensure activity_table exists in context #}
+            {% if activity_table %}
+                {% render_table activity_table %}
+            {% else %}
+                <div class="text-center p-4 text-muted">{% trans "No activity data available." %}</div>
+            {% endif %}
         </div>
     </div>
-    <div class="card-footer text-center"> 
+    <div class="card-footer text-center">
         <a href="{% url 'objectchange_list' %}?user={{ request.user.pk }}" class="btn btn-sm btn-outline-secondary">
             View All Activity
         </a>

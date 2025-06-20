@@ -1,7 +1,7 @@
 # assetbox/core/views.py
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 from django.apps import apps # To find models/tables dynamically
 from django.urls import reverse
 from importlib import import_module
@@ -23,7 +23,7 @@ from django.views.generic import View  # Add View
 from django.utils.module_loading import import_string # Add import_string
 
 # Only import ObjectChange from core models now
-from .models import ObjectChange 
+from .models import ObjectChange
 from .tables import ObjectChangeTable
 # from .tables.base import SESSION_KEY_PREFIX # No longer needed
 
@@ -31,9 +31,9 @@ from .tables import ObjectChangeTable
 from .forms import SearchForm # Add SearchForm
 from .tables import SearchResultTable # Add SearchResultTable
 
-# --- Model Imports for Debugging --- 
+# --- Model Imports for Debugging ---
 # Use the direct app name import path
-from assets.models import AssetRole, Manufacturer 
+from assets.models import AssetRole, Manufacturer
 
 from django.views.generic import View, ListView, DetailView, UpdateView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
@@ -49,12 +49,76 @@ from django.utils.http import urlencode
 from django.views.decorators.http import require_POST # Add require_POST
 from django.db.models import ProtectedError # To handle deletion prevention
 from .forms import ConfirmationForm # A generic confirmation form
+from django.core.exceptions import ImproperlyConfigured # Added ImproperlyConfigured
 
 User = get_user_model() # Get the User model
 
 # =============================================================================
+# NEW Base HTMX View
+# =============================================================================
+class BaseHTMXView: # No Django View inheritance needed here, it's a mixin
+    """
+    Mixin to handle HTMX request rendering, specifically for boosted main-body swaps.
+    Views using this should ensure their templates do *not* extend base.html.
+    They should also define breadcrumbs and title in get_context_data.
+    """
+    page_body_partial_name = "generic/partials/page_body_content_wrapper.html" # Partial for #page-body-main swaps (hx-boost)
+
+    def get_template_names(self):
+        # Ensure subclasses provide template_name or override this
+        if not hasattr(self, 'template_name') or not self.template_name:
+            raise ImproperlyConfigured(
+                f"{self.__class__.__name__} needs a template_name attribute defined."
+            )
+        return [self.template_name]
+
+    def render_to_response(self, context, **response_kwargs):
+        """
+        Override render_to_response to handle HTMX requests.
+        - Renders page body partial for boosted navigation targeting the main body.
+        - Falls back to standard rendering otherwise.
+        """
+        request = self.request # Get request from the view instance
+
+        if getattr(request, 'htmx', False):
+            context['request'] = request # Ensure request is always in context for partials
+
+            is_boosted_main_swap = getattr(request.htmx, 'boosted', False) or \
+                                   (getattr(request.htmx, 'target', None) and request.htmx.target == '#page-body-main')
+
+            if is_boosted_main_swap:
+                # Render the PAGE BODY partial when boosting/swapping main content.
+                # It expects 'content_template_name', 'breadcrumbs', 'title', 'page_actions' in context.
+                context['content_template_name'] = self.get_template_names()[0] # Pass the view's specific template
+                # Ensure common context variables expected by the wrapper are present
+                context.setdefault('title', 'AssetBox') # Provide a default title
+                context.setdefault('breadcrumbs', [(reverse('dashboard'), 'Dashboard'), (None, context['title'])])
+                context.setdefault('page_actions', None) # e.g., buttons, passed via context
+
+                return render(request, self.page_body_partial_name, context)
+
+        # Standard rendering for non-HTMX requests or non-main-body swaps
+        # This relies on the base Django view's render_to_response (e.g., TemplateView.render_to_response)
+        # Ensure the method we call exists in the MRO
+        if hasattr(super(), 'render_to_response'):
+            return super().render_to_response(context, **response_kwargs)
+        else:
+            # Fallback if super().render_to_response is not available (e.g., mixing with raw View)
+            # This requires TemplateResponseMixin or similar to be in the MRO
+            if hasattr(self, 'response_class') and hasattr(self, 'get_template_names'):
+                 return self.response_class(
+                    request=request,
+                    template=self.get_template_names(),
+                    context=context,
+                    using=self.template_engine,
+                    **response_kwargs
+                )
+            else:
+                raise ImproperlyConfigured(f"{self.__class__.__name__} or its superclasses must provide a render_to_response method or be mixed with TemplateResponseMixin.")
+
+
+# =============================================================================
 # Generic Object Views (NetBox-inspired base classes)
-# MOVE THIS ENTIRE BLOCK UP, BEFORE ObjectChangeListView etc.
 # =============================================================================
 
 class ObjectListView(LoginRequiredMixin, ListView):
@@ -180,6 +244,7 @@ class ObjectListView(LoginRequiredMixin, ListView):
 class ObjectDetailView(LoginRequiredMixin, DetailView):
     """Base view for displaying a single object."""
     template_name = 'generic/object_detail.html'
+    detail_page_body_partial_name = "generic/partials/htmx_detail_page_wrapper.html" # Specific wrapper for detail views
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -214,26 +279,34 @@ class ObjectDetailView(LoginRequiredMixin, DetailView):
             changelog_url = reverse('objectchange_list') + '?' + urlencode({'changed_object_type': obj_type.pk, 'changed_object_id': obj.pk})
             context['changelog_url'] = changelog_url
 
+        # Action buttons/URLs for the wrapper template
+        context['page_actions'] = {
+            'edit_url': context.get('edit_url'),
+            'delete_url': context.get('delete_url'),
+        }
+        # Pass the main template name to the wrapper
+        context['content_template_name'] = self.template_name
+
         return context
 
     def render_to_response(self, context, **response_kwargs):
-        if self.request.htmx:
-            # If HTMX, render the partial wrapper designed for detail pages
-            context['request'] = self.request
-            context['object_type'] = self.object._meta.verbose_name 
-            # Pass necessary action URLs for OOB blocks
-            context['action_urls'] = {
-                'edit': context.get('edit_url'),
-                'delete': context.get('delete_url'),
-            }
-            return render(
-                self.request,
-                'generic/partials/htmx_detail_page_wrapper.html', # Assuming this exists for detail views
-                context
-            )
+        request = self.request
+        if getattr(request, 'htmx', False):
+            context['request'] = request # Ensure request is always in context for partials
+
+            is_boosted_main_swap = getattr(request.htmx, 'boosted', False) or \
+                                   (getattr(request.htmx, 'target', None) and request.htmx.target == '#page-body-main')
+
+            if is_boosted_main_swap:
+                 # Render the DETAIL PAGE BODY partial when boosting/swapping main content.
+                 # This includes the necessary structure and OOB blocks for header/etc.
+                 # It includes the specific object detail template via context['content_template_name']
+                 return render(request, self.detail_page_body_partial_name, context)
+
+        # Standard rendering for non-HTMX requests (renders self.template_name)
         return super().render_to_response(context, **response_kwargs)
 
-class ObjectEditView(LoginRequiredMixin, UpdateView):
+class ObjectEditView(LoginRequiredMixin, BaseHTMXView, UpdateView):
     """Base view for creating or editing an object."""
     model_form = None
     template_name = 'generic/object_edit.html'
@@ -338,7 +411,9 @@ class ObjectEditView(LoginRequiredMixin, UpdateView):
         context['breadcrumbs'] = getattr(self, 'get_breadcrumbs', lambda: base_breadcrumbs)()
         return context
 
-class ObjectDeleteView(LoginRequiredMixin, DeleteView):
+    # render_to_response is now handled by BaseHTMXView
+
+class ObjectDeleteView(LoginRequiredMixin, BaseHTMXView, DeleteView):
     """Base view for deleting an object."""
     template_name = 'generic/object_delete.html'
     form_class = ConfirmationForm
@@ -397,6 +472,8 @@ class ObjectDeleteView(LoginRequiredMixin, DeleteView):
         ]
         context['breadcrumbs'] = getattr(self, 'get_breadcrumbs', lambda: base_breadcrumbs)()
         return context 
+
+    # render_to_response is now handled by BaseHTMXView
 
 # =============================================================================
 # END Generic Object Views
@@ -466,7 +543,7 @@ class ObjectChangeListView(ObjectListView): # Inherit from ObjectListView
 
 
 @method_decorator(login_required, name='dispatch')
-class ObjectChangeView(DetailView):
+class ObjectChangeView(BaseHTMXView, DetailView):
     model = ObjectChange
     template_name = 'core/objectchange/objectchange.html'
 
@@ -519,12 +596,16 @@ class ObjectChangeView(DetailView):
         ]
         context['breadcrumbs'] = getattr(self, 'get_breadcrumbs', lambda: base_breadcrumbs)()
         # --- End Breadcrumbs --- 
-        return context 
+        # Add content_template_name for the wrapper
+        context['content_template_name'] = self.template_name
+        return context
+
+    # render_to_response is handled by BaseHTMXView
 
 
 # --- Search View ---
-class SearchView(LoginRequiredMixin, View):
-    template_name = 'core/search.html' 
+class SearchView(LoginRequiredMixin, BaseHTMXView, View):
+    template_name = 'core/search.html'
 
     def get(self, request):
         query = request.GET.get('q', '').strip()
@@ -572,7 +653,14 @@ class SearchView(LoginRequiredMixin, View):
                  (None, 'Search')
             ]
         }
-        return render(request, self.template_name, context)
+        # Manually call render_to_response logic for View base class
+        context['content_template_name'] = self.template_name # Needed by BaseHTMXView
+        return self.render_to_response(context) # Call the mixin's method
+
+    # Define render_to_response to bridge View and BaseHTMXView
+    def render_to_response(self, context, **response_kwargs):
+        # Leverage the mixin's render_to_response
+        return BaseHTMXView.render_to_response(self, context, **response_kwargs)
 
 
 # Generic Bulk Delete View

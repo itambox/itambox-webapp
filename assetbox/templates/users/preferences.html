@@ -5,6 +5,7 @@
 {% block title_tab %}{% trans "Preferences" %}{% endblock %}
 
 {% block content_tab %}
+{# This content is included inside the card body defined in users/inc/tabs.html #}
 <form method="post">
     {% csrf_token %}
     <div class="card-body">

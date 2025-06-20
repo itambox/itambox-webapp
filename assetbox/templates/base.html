@@ -47,7 +47,7 @@
             <div class="page-header d-print-none">
                 <div class="container-xl">
                     {# Render Breadcrumbs #}
-                    <div id="breadcrumbs-block" hx-swap-oob="true">
+                    <div id="breadcrumbs-block">
                     {% if breadcrumbs %}
                         <ol class="breadcrumb breadcrumb-arrows" aria-label="breadcrumbs">
                             {% for label, url in breadcrumbs %}
@@ -63,15 +63,15 @@
                     {# End Breadcrumbs #}
                     <div class="row g-2 align-items-center mt-2"> {# Add margin-top #}
                         <div class="col">
-                            {% block page_header %}<div id="page-header-block" hx-swap-oob="true">
-                            <!-- Page pre-title -->
-                            <div class="page-pretitle">
-                                Overview
+                            <div id="page-header-block">
+                                <!-- Default Page pre-title -->
+                                <div class="page-pretitle">
+                                    Overview
+                                </div>
+                                <h2 class="page-title">
+                                    Dashboard
+                                </h2>
                             </div>
-                            <h2 class="page-title">
-                                Dashboard
-                            </h2>
-                            </div>{% endblock %}
                         </div>
                         <!-- Page title actions -->
                         <div class="col-auto ms-auto d-print-none">
