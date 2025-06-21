@@ -1,0 +1,32 @@
+{% load crispy_forms_tags %}
+{% load partials %}
+<div class="modal modal-blur fade" id="consumable-checkout-modal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Consume / Debit Consumable: {{ consumable }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="consumable-checkout-form"
+                  hx-post="{% url 'assets:consumable_checkout' pk=consumable.pk %}"
+                  hx-target="#consumable-checkout-modal-form-container"
+                  hx-swap="innerHTML">
+                {% csrf_token %}
+                <div class="modal-body" id="consumable-checkout-modal-form-container">
+                    {% startpartial checkout-modal-form %}
+                        {% if form.errors %}
+                            <div class="alert alert-danger">
+                                Please correct the errors below.
+                            </div>
+                        {% endif %}
+                        {% crispy form %}
+                    {% endpartial %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Consume Item</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

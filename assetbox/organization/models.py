@@ -267,7 +267,7 @@ class AssetHolder(BaseModel, ChangeLoggingMixin):
         return reverse('organization:assetholder_detail', kwargs={'pk': self.pk})
 
 # +++ AssetHolderAssignment Model +++
-class AssetHolderAssignment(models.Model):
+class AssetHolderAssignment(BaseModel, ChangeLoggingMixin):
     asset_holder = models.ForeignKey(
         AssetHolder,
         on_delete=models.CASCADE,
@@ -277,8 +277,6 @@ class AssetHolderAssignment(models.Model):
     object_id = models.PositiveIntegerField()
     assigned_object = GenericForeignKey('content_type', 'object_id')
     tags = models.ManyToManyField('extras.Tag', blank=True, related_name='organization_assetholderassignments') # M2M to extras.Tag
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['asset_holder', 'content_type', 'object_id']
@@ -293,3 +291,84 @@ class AssetHolderAssignment(models.Model):
 
     def __str__(self):
         return f"Assignment for {self.asset_holder} to {self.assigned_object}"
+
+class ContactRole(BaseModel, ChangeLoggingMixin):
+    name = models.CharField(max_length=100, unique=True)
+    slug = models.SlugField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = "Contact Role"
+        verbose_name_plural = "Contact Roles"
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse('organization:contactrole_detail', kwargs={'pk': self.pk})
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+            base_slug = self.slug
+            counter = 1
+            while ContactRole.objects.filter(slug=self.slug).exists():
+                self.slug = f"{base_slug}-{counter}"
+                counter += 1
+        super().save(*args, **kwargs)
+
+
+class Contact(BaseModel, ChangeLoggingMixin):
+    name = models.CharField(max_length=100)
+    title = models.CharField(max_length=100, blank=True)
+    phone = models.CharField(max_length=50, blank=True)
+    email = models.EmailField(blank=True)
+    web_url = models.URLField(blank=True, verbose_name="Web URL")
+    description = models.TextField(blank=True)
+    comments = models.TextField(blank=True)
+    tags = models.ManyToManyField('extras.Tag', blank=True, related_name='organization_contacts')
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = "Contact"
+        verbose_name_plural = "Contacts"
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse('organization:contact_detail', kwargs={'pk': self.pk})
+
+
+class ContactAssignment(BaseModel, ChangeLoggingMixin):
+    contact = models.ForeignKey(Contact, on_delete=models.CASCADE, related_name='assignments')
+    role = models.ForeignKey(ContactRole, on_delete=models.PROTECT, related_name='assignments')
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    assigned_object = GenericForeignKey('content_type', 'object_id')
+    priority = models.CharField(
+        max_length=50,
+        choices=[
+            ('primary', 'Primary'),
+            ('secondary', 'Secondary'),
+            ('tertiary', 'Tertiary'),
+            ('inactive', 'Inactive'),
+        ],
+        blank=True,
+    )
+
+    class Meta:
+        ordering = ['contact', 'role', 'content_type', 'object_id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['contact', 'role', 'content_type', 'object_id'],
+                name='organization_contactassignment_unique'
+            )
+        ]
+        verbose_name = "Contact Assignment"
+        verbose_name_plural = "Contact Assignments"
+
+    def __str__(self):
+        return f"{self.contact} ({self.role}) assigned to {self.assigned_object}"
+

@@ -8,7 +8,7 @@
 <div id="breadcrumbs-block" hx-swap-oob="true">
     {% if breadcrumbs %}
         <ol class="breadcrumb breadcrumb-arrows" aria-label="breadcrumbs">
-            {% for label, url in breadcrumbs %}
+            {% for url, label in breadcrumbs %}
                 {% if url %}
                     <li class="breadcrumb-item"><a href="{{ url }}">{{ label }}</a></li>
                 {% else %}
@@ -47,7 +47,7 @@
 
 {# --- Main Target Content (Replaces innerHTML of #page-body-main) --- #}
 {# --- Replicates structure inside {% block content %} of generic/object_detail.html --- #}
-<div class="container-xl"> {# Add the container wrapper #}
+<div class="container-fluid"> {# Add the container wrapper #}
     <div class="row g-4">
 
         {# --- Left Column --- #}
@@ -118,5 +118,5 @@
             {% block full_width_content %}{% endblock full_width_content %}
         </div>
     </div>
-</div> {# End container-xl #}
+</div> {# End container-fluid #}
 {# Note: No script tags here #}

@@ -1,0 +1,48 @@
+{# templates/assets/custody/sign_error.html #}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+    <title>Link Validation Failure - AssetBox</title>
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet"/>
+    <style>
+        body {
+            background-color: #f4f6fa;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .error-card {
+            max-width: 480px;
+            width: 100%;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card error-card">
+        <div class="card-body p-5 text-center">
+            <span class="avatar avatar-xl bg-danger-lt text-danger rounded-circle mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-alert-triangle" width="32" height="32" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                    <path d="M12 9v4" />
+                    <path d="M12 17h.01" />
+                    <path d="M5 19h14a2 2 0 0 0 1.84 -2.75l-7.1 -12.25a2 2 0 0 0 -3.5 0l-7.1 12.25a2 2 0 0 0 1.75 2.75" />
+                </svg>
+            </span>
+            
+            <h2 class="text-danger mb-2">Custody Signoff Failed</h2>
+            <p class="text-muted">{{ error|default:"The EULA checkout link is invalid or has expired." }}</p>
+
+            <div class="mt-4">
+                <p class="text-muted small">EULA custody links expire automatically after 7 days to preserve organizational security. Please contact your IT administrator to request a fresh transfer link.</p>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

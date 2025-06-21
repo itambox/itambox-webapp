@@ -132,8 +132,49 @@
                     });
                 });
                 
-                // TODO: Implement Reset button logic (might involve fetching defaults or clearing prefs)
-                // btnReset.addEventListener('click', () => { ... });
+                // Reset button: clear saved preferences for this table
+                if (btnReset) {
+                    btnReset.addEventListener('click', () => {
+                        const apiUrl = form.dataset.url;
+                        const configRoot = form.dataset.configRoot;
+                        const csrfToken = form.querySelector('[name="csrfmiddlewaretoken"]').value;
+
+                        // Build same nested payload but with null (falsy) to clear config
+                        let payload = {};
+                        let currentLevel = payload;
+                        const keys = configRoot.split('.');
+                        keys.forEach((key, index) => {
+                            if (index === keys.length - 1) {
+                                currentLevel[key] = {}; // Empty config = reset to defaults
+                            } else {
+                                currentLevel[key] = currentLevel[key] || {};
+                                currentLevel = currentLevel[key];
+                            }
+                        });
+
+                        fetch(apiUrl, {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': csrfToken
+                            },
+                            body: JSON.stringify(payload)
+                        })
+                        .then(response => {
+                            if (!response.ok) throw new Error('Failed to reset configuration');
+                            return response.json();
+                        })
+                        .then(() => {
+                            const modalInstance = bootstrap.Modal.getInstance(modalElement);
+                            if (modalInstance) modalInstance.hide();
+                            window.location.reload();
+                        })
+                        .catch(error => {
+                            console.error('Error resetting table config:', error);
+                            alert('Error resetting configuration: ' + error.message);
+                        });
+                    });
+                }
 
             })();
             </script>

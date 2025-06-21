@@ -26,7 +26,7 @@ from django.conf.urls.static import static # Import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('accounts/', include('django.contrib.auth.urls')),
-    path('', asset_views.dashboard, name='dashboard'), # Root path for dashboard
+    path('', asset_views.DashboardView.as_view(), name='dashboard'), # Root path for dashboard
 
     # Search Path
     path('search/', core_views.SearchView.as_view(), name='search'),
@@ -36,6 +36,7 @@ urlpatterns = [
     path('organization/', include('organization.urls', namespace='organization')),
     path('extras/', include('extras.urls')),
     path('software/', include('software.urls', namespace='software')),
+    path('licenses/', include('licenses.urls', namespace='licenses')),
     path('tables/config/<str:model_name>/', core_views.table_config, name='table_config'),
     path('user/', include('users.urls')), # Include the users app URLs
 

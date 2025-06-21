@@ -5,92 +5,173 @@
 {# --- Page Title --- #}
 {% block title %}{{ object.name }} - Tenant Details - AssetBox{% endblock %}
 
-{# --- Page Header (from base) --- #}
+{# --- Page Header --- #}
 {% block page_pretitle %}Organization / Tenants{% endblock %}
 
-{# --- Page Actions (from base) --- #}
+{# --- Tabs Hook --- #}
+{% block extra_tabs %}
+    <li class="nav-item" role="presentation">
+        <a href="#sites" class="nav-link" data-bs-toggle="tab" role="tab">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-purple" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l18 0" /><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16" /></svg>
+            Sites <span class="badge bg-purple-lt ms-2">{{ sites_table.rows|length }}</span>
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a href="#locations" class="nav-link" data-bs-toggle="tab" role="tab">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-azure" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M3 21v-2a4 4 0 0 1 4 -4h10a4 4 0 0 1 4 4v2" /></svg>
+            Locations <span class="badge bg-azure-lt ms-2">{{ locations_table.rows|length }}</span>
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a href="#asset-holders" class="nav-link" data-bs-toggle="tab" role="tab">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-indigo" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /></svg>
+            Asset Holders <span class="badge bg-indigo-lt ms-2">{{ assetholders_table.rows|length }}</span>
+        </a>
+    </li>
+{% endblock extra_tabs %}
 
 {# --- Tenant Specific Details --- #}
 {% block object_details %}
-<dl class="row">
+<!-- Metrics Dashboard Row -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-4">
+        <div class="card card-sm bg-purple-lt border-0 shadow-none">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-purple text-white avatar rounded shadow-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l18 0" /><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16" /></svg>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium text-purple small uppercase font-sans">Sites</div>
+                        <div class="text-purple h1 mb-0 font-weight-bold">{{ sites_table.rows|length }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-4">
+        <div class="card card-sm bg-azure-lt border-0 shadow-none">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-azure text-white avatar rounded shadow-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M3 21v-2a4 4 0 0 1 4 -4h10a4 4 0 0 1 4 4v2" /></svg>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium text-azure small uppercase font-sans">Locations</div>
+                        <div class="text-azure h1 mb-0 font-weight-bold">{{ locations_table.rows|length }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-4">
+        <div class="card card-sm bg-indigo-lt border-0 shadow-none">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-indigo text-white avatar rounded shadow-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /></svg>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium text-indigo small uppercase font-sans">Asset Holders</div>
+                        <div class="text-indigo h1 mb-0 font-weight-bold">{{ assetholders_table.rows|length }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<dl class="row mb-0">
     <dt class="col-sm-3">Name:</dt>
-    <dd class="col-sm-9">{{ object.name }}</dd>
+    <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
 
     <dt class="col-sm-3">Slug:</dt>
-    <dd class="col-sm-9">{{ object.slug }}</dd>
+    <dd class="col-sm-9"><code>{{ object.slug }}</code></dd>
 
     <dt class="col-sm-3">Group:</dt>
     <dd class="col-sm-9">
         {% if object.group %}
             <a href="{% url 'organization:tenantgroup_detail' pk=object.group.pk %}">{{ object.group.name }}</a>
         {% else %}
-            <i>None</i>
+            <span class="text-muted"><i>None</i></span>
         {% endif %}
     </dd>
 
     <dt class="col-sm-3">Description:</dt>
-    <dd class="col-sm-9">{{ object.description|default:"<i>None</i>"|safe }}</dd>
+    <dd class="col-sm-9 text-secondary">{{ object.description|linebreaksbr|default:"<i>No description provided.</i>"|safe }}</dd>
 </dl>
 {% endblock object_details %}
 
 {# --- Related Objects (Sidebar) --- #}
 {% block related_objects %}
-    {# Base template uses related_objects_list context variable #}
+    {# Handled in the tabs #}
 {% endblock related_objects %}
 
-{# --- Full Width Content (Sites, Locations, AssetHolders Tables) --- #}
-{% block full_width_content %}
-    {# Render Sites table #}
-    {% if sites_table and sites_table.rows %}
-    <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">Sites ({{ sites_table.page.paginator.count }})</h3></div>
-        <div class="table-responsive">
-            {% render_table sites_table %}
+{# --- Extra Tab Panes --- #}
+{% block extra_tab_panes %}
+    {# Sites Tab Pane #}
+    <div class="tab-pane fade" id="sites" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">Associated Sites</h3>
+            </div>
+            {% if sites_table.rows %}
+                <div class="table-responsive">
+                    {% render_table sites_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=sites_table %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-building text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l18 0" /><path d="M9 8l1 0" /><path d="M9 12l1 0" /><path d="M9 16l1 0" /><path d="M14 8l1 0" /><path d="M14 12l1 0" /><path d="M14 16l1 0" /><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16" /></svg>
+                    <p class="mb-0">No sites found for this tenant.</p>
+                </div>
+            {% endif %}
         </div>
-        {% include 'generic/includes/table_pagination.html' with table=sites_table %}
     </div>
-     {% elif sites_table %}
-     <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">Sites (0)</h3></div>
-         <div class="card-body">
-            <p class="text-muted">No sites found for this tenant.</p>
-         </div>
-    </div>
-    {% endif %}
 
-    {# Render Locations table #}
-    {% if locations_table and locations_table.rows %}
-    <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">Locations ({{ locations_table.page.paginator.count }})</h3></div>
-        <div class="table-responsive">
-            {% render_table locations_table %}
+    {# Locations Tab Pane #}
+    <div class="tab-pane fade" id="locations" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">Associated Locations</h3>
+            </div>
+            {% if locations_table.rows %}
+                <div class="table-responsive">
+                    {% render_table locations_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=locations_table %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-map-pin text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" /><path d="M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0z" /></svg>
+                    <p class="mb-0">No locations found for this tenant.</p>
+                </div>
+            {% endif %}
         </div>
-         {% include 'generic/includes/table_pagination.html' with table=locations_table %}
     </div>
-     {% elif locations_table %}
-     <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">Locations (0)</h3></div>
-         <div class="card-body">
-            <p class="text-muted">No locations found for this tenant.</p>
-         </div>
-    </div>
-    {% endif %}
-    
-    {# Render Asset Holders table #}
-    {% if assetholders_table and assetholders_table.rows %}
-    <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">Asset Holders ({{ assetholders_table.page.paginator.count }})</h3></div>
-        <div class="table-responsive">
-            {% render_table assetholders_table %}
+
+    {# Asset Holders Tab Pane #}
+    <div class="tab-pane fade" id="asset-holders" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">Associated Asset Holders</h3>
+            </div>
+            {% if assetholders_table.rows %}
+                <div class="table-responsive">
+                    {% render_table assetholders_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=assetholders_table %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-users text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /></svg>
+                    <p class="mb-0">No asset holders found for this tenant.</p>
+                </div>
+            {% endif %}
         </div>
-         {% include 'generic/includes/table_pagination.html' with table=assetholders_table %}
     </div>
-     {% elif assetholders_table %}
-     <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">Asset Holders (0)</h3></div>
-         <div class="card-body">
-            <p class="text-muted">No asset holders found for this tenant.</p>
-         </div>
-    </div>
-    {% endif %}
-{% endblock full_width_content %} 
+{% endblock extra_tab_panes %}

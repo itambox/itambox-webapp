@@ -1,0 +1,115 @@
+{% extends base_template|default:"base.html" %}
+{% load static %}
+
+{% block title %}Kit: {{ object.name }} - AssetBox{% endblock %}
+
+{% block page_header %}
+    <h2 class="page-title">
+        Kit: {{ object.name }}
+    </h2>
+    <div class="text-muted mt-1">{{ object.description }}</div>
+{% endblock %}
+
+{% block page_actions %}
+    {% if all_available %}
+        <button type="button"
+                class="btn btn-success"
+                hx-get="{% url 'assets:kit_checkout_modal' pk=object.pk %}"
+                hx-target="#modal-placeholder"
+                hx-swap="innerHTML"
+                hx-on::after-request="new bootstrap.Modal(document.getElementById('kit-checkout-modal')).show()">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-circle-check" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M9 12l2 2l4 -4" /></svg>
+            Deploy / Checkout Kit
+        </button>
+    {% else %}
+        <button type="button" class="btn btn-secondary" disabled title="Some items are out of stock">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-alert-circle" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
+            Kit Unavailable (Out of Stock)
+        </button>
+    {% endif %}
+    <a href="{% url 'assets:kititem_create' %}?kit={{ object.pk }}" class="btn btn-outline-primary ms-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+        Add Item
+    </a>
+    <a href="{% url 'assets:kit_update' pk=object.pk %}" class="btn btn-outline-secondary ms-2">
+        Edit Kit
+    </a>
+    <a href="{% url 'assets:kit_delete' pk=object.pk %}" class="btn btn-outline-danger ms-2">
+        Delete
+    </a>
+{% endblock page_actions %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Kit Components</h3>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Item Type</th>
+                            <th>Target Model / Catalog Item</th>
+                            <th>Quantity Required</th>
+                            <th>In-Stock / Available</th>
+                            <th>Status</th>
+                            <th class="w-1">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item_info in items_with_availability %}
+                            <tr>
+                                <td>
+                                    {% if item_info.item.asset_type %}
+                                        <span class="badge bg-blue-lt">Hardware Asset</span>
+                                    {% elif item_info.item.accessory %}
+                                        <span class="badge bg-green-lt">Accessory</span>
+                                    {% elif item_info.item.license %}
+                                        <span class="badge bg-purple-lt">License</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if item_info.item.asset_type %}
+                                        <a href="{{ item_info.item.asset_type.get_absolute_url }}">{{ item_info.item.asset_type }}</a>
+                                    {% elif item_info.item.accessory %}
+                                        <a href="{{ item_info.item.accessory.get_absolute_url }}">{{ item_info.item.accessory }}</a>
+                                    {% elif item_info.item.license %}
+                                        <a href="{{ item_info.item.license.get_absolute_url }}">{{ item_info.item.license.software.name }} - {{ item_info.item.license.name }}</a>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ item_info.item.qty }}
+                                </td>
+                                <td>
+                                    {{ item_info.available_count }}
+                                </td>
+                                <td>
+                                    {% if item_info.is_available %}
+                                        <span class="badge bg-success-lt">Available</span>
+                                    {% else %}
+                                        <span class="badge bg-danger-lt">Unavailable</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group">
+                                        <a href="{% url 'assets:kititem_update' pk=item_info.item.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                        <a href="{% url 'assets:kititem_delete' pk=item_info.item.pk %}" class="btn btn-sm btn-outline-danger">Remove</a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4">
+                                    No components added to this kit yet. Click "Add Item" above to construct the bundle.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

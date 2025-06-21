@@ -35,16 +35,7 @@ class Software(ChangeLoggingMixin, BaseModel):
         verbose_name_plural = "Software"
 
     def __str__(self):
-        # Access manufacturer safely, might not be loaded if only string FK used
-        try:
-            mf_name = self.manufacturer.name if self.manufacturer else "Unknown Manufacturer"
-        except AttributeError: # Handle cases where manufacturer isn't loaded (less likely with __str__)
-            mf_name = "Unknown Manufacturer"
-        return f"{mf_name} - {self.name}"
+        return f"{self.manufacturer.name} - {self.name}"
 
     def get_absolute_url(self):
-        # Phase 2: Define actual detail/list views and URLs
-        # return reverse('software:software_detail', kwargs={'pk': self.pk})
-        # For now, return a placeholder or admin link
-        # return reverse('admin:software_software_change', args=[self.pk])
-        return "#" # Safest placeholder for now 
+        return reverse('software:software_detail', kwargs={'pk': self.pk}) 

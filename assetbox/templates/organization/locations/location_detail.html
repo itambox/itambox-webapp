@@ -1,10 +1,10 @@
 {% extends 'generic/object_detail.html' %}
 {% load render_table from django_tables2 %}
 {% load static %}
+{% load i18n %}
 
+{# --- Page Title and Header --- #}
 {% block title %}{{ object.name }} - Location Details - AssetBox{% endblock %}
-
-{% block page_pretitle %}Organization / Locations{% endblock %}
 
 {% block page_header %}
     <div class="page-pretitle">Organization / Locations</div>
@@ -13,27 +13,89 @@
     </h2>
 {% endblock %}
 
+{# --- Page Actions --- #}
 {% block page_actions %}
     <div class="btn-list">
-        <a href="{% url 'organization:location_update' pk=object.pk %}" class="btn">Edit</a>
-        <a href="{% url 'organization:location_delete' pk=object.pk %}" class="btn btn-danger">Delete</a>
+        <a href="{% url 'organization:location_update' pk=object.pk %}" class="btn">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-pencil" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" /><path d="M13.5 6.5l4 4" /></svg>
+            Edit
+        </a>
+        <a href="{% url 'organization:location_delete' pk=object.pk %}" class="btn btn-danger">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
+            Delete
+        </a>
     </div>
 {% endblock %}
 
+{# --- Tabs Hook --- #}
+{% block extra_tabs %}
+    <li class="nav-item" role="presentation">
+        <a href="#assets" class="nav-link" data-bs-toggle="tab" role="tab">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-green" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l18 0" /><path d="M9 8l1 0" /><path d="M9 12l1 0" /><path d="M9 16l1 0" /><path d="M14 8l1 0" /><path d="M14 12l1 0" /><path d="M14 16l1 0" /><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16" /></svg>
+            Assets <span class="badge bg-green-lt ms-2">{{ assets_table.rows|length }}</span>
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a href="#child-locations" class="nav-link" data-bs-toggle="tab" role="tab">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-azure" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M3 21v-2a4 4 0 0 1 4 -4h10a4 4 0 0 1 4 4v2" /></svg>
+            Child Locations <span class="badge bg-azure-lt ms-2">{{ object.children.count }}</span>
+        </a>
+    </li>
+{% endblock extra_tabs %}
+
+{# --- Main Location Details --- #}
 {% block object_details %}
-<dl class="row">
+<!-- Metrics Dashboard Row -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6">
+        <div class="card card-sm bg-green-lt border-0 shadow-none">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-green text-white avatar rounded shadow-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-device-laptop" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 19l18 0" /><path d="M5 6m0 1a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v8a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1z" /><path d="M12 16l0 3" /></svg>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium text-green small uppercase font-sans">Physical Assets</div>
+                        <div class="text-green h1 mb-0 font-weight-bold">{{ assets_table.rows|length }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6">
+        <div class="card card-sm bg-azure-lt border-0 shadow-none">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-azure text-white avatar rounded shadow-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M3 21v-2a4 4 0 0 1 4 -4h10a4 4 0 0 1 4 4v2" /></svg>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium text-azure small uppercase font-sans">Child Locations</div>
+                        <div class="text-azure h1 mb-0 font-weight-bold">{{ object.children.count }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<dl class="row mb-0">
     <dt class="col-sm-3">Name:</dt>
-    <dd class="col-sm-9">{{ object.name }}</dd>
+    <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
 
     <dt class="col-sm-3">Slug:</dt>
-    <dd class="col-sm-9">{{ object.slug }}</dd>
+    <dd class="col-sm-9"><code>{{ object.slug }}</code></dd>
 
     <dt class="col-sm-3">Site:</dt>
     <dd class="col-sm-9">
         {% if object.site %}
             <a href="{% url 'organization:site_detail' pk=object.site.pk %}">{{ object.site }}</a>
         {% else %}
-             <i>None</i> {# Site is mandatory, but handle display just in case #}
+             <span class="text-muted"><i>None</i></span>
         {% endif %}
     </dd>
 
@@ -42,7 +104,7 @@
         {% if object.parent %}
             <a href="{% url 'organization:location_detail' pk=object.parent.pk %}">{{ object.parent }}</a>
         {% else %}
-             <i>None</i>
+             <span class="text-muted"><i>None</i></span>
         {% endif %}
     </dd>
 
@@ -51,164 +113,71 @@
         {% if object.tenant %}
             <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant }}</a>
         {% else %}
-             <i>None</i>
+             <span class="text-muted"><i>None</i></span>
         {% endif %}
     </dd>
 
     <dt class="col-sm-3">Status:</dt>
-    <dd class="col-sm-9">{{ object.get_status_display }}</dd>
+    <dd class="col-sm-9">
+        <span class="badge {% if object.status == 'active' %}bg-success-lt text-success{% elif object.status == 'planned' %}bg-info-lt text-info{% else %}bg-secondary-lt text-secondary{% endif %} px-2.5 py-1 text-uppercase">
+            {{ object.get_status_display }}
+        </span>
+    </dd>
 
     <dt class="col-sm-3">Facility:</dt>
-    <dd class="col-sm-9">{{ object.facility|default:"<i>Not Set</i>"|safe }}</dd>
+    <dd class="col-sm-9">{{ object.facility|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
 
     <dt class="col-sm-3">Description:</dt>
-    <dd class="col-sm-9">{{ object.description|linebreaksbr|default:"<i>Not Set</i>"|safe }}</dd>
-
+    <dd class="col-sm-9 text-secondary">{{ object.description|linebreaksbr|default:"<span class='text-muted'><i>No description provided.</i></span>"|safe }}</dd>
 </dl>
 {% endblock object_details %}
 
-{% block related_objects %}
-    {# Base template uses related_objects_list context variable #}
-{% endblock related_objects %}
-
-{% block full_width_content %}
-    {% if assets_table and assets_table.rows %}
-    <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">Assets in this Location ({{ assets_table.page.paginator.count }})</h3></div>
-        <div class="table-responsive">
-            {% render_table assets_table %}
-        </div>
-        {% if assets_table.page %}
-             <div class="card-footer d-flex align-items-center">
-                 {% include 'global_includes/pagination_per_page.html' with paginator=assets_table.page.paginator %}
-                 <p class="m-0 text-secondary flex-grow-1">
-                    {% blocktrans with start=assets_table.page.start_index end=assets_table.page.end_index total=assets_table.page.paginator.count %}
-                    Showing <span>{{ start }}</span> to <span>{{ end }}</span> of <span>{{ total }}</span> entries
-                    {% endblocktrans %}
-                 </p>
-                 {% include 'global_includes/pagination_links.html' with page_obj=assets_table.page %}
-             </div>
-         {% endif %}
-    </div>
-    {% elif assets_table %}
-     <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">Assets in this Location (0)</h3></div>
-         <div class="card-body">
-            <p class="text-muted">No assets found in this location.</p>
-         </div>
-    </div>
-    {% endif %}
-    {# TODO: Add Child Locations card/table here later if needed #}
-{% endblock full_width_content %}
-
-{% block content %}
-<div class="row g-4">
-    {# Left Column - Details #}
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">Location Information</h3>
+{# --- Extra Tab Panes --- #}
+{% block extra_tab_panes %}
+    {# Assets Tab Pane #}
+    <div class="tab-pane fade" id="assets" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">Assets Located in this Specific Location</h3>
             </div>
-            <div class="card-body">
-                <dl class="row">
-                    <dt class="col-sm-3">Name:</dt>
-                    <dd class="col-sm-9">{{ object.name }}</dd>
-
-                    <dt class="col-sm-3">Slug:</dt>
-                    <dd class="col-sm-9">{{ object.slug }}</dd>
-
-                    <dt class="col-sm-3">Site:</dt>
-                    <dd class="col-sm-9">
-                        {% if object.site %}
-                            <a href="{% url 'organization:site_detail' pk=object.site.pk %}">{{ object.site }}</a>
-                        {% else %}
-                            <i>None</i>
-                        {% endif %}
-                    </dd>
-
-                    <dt class="col-sm-3">Parent:</dt>
-                    <dd class="col-sm-9">
-                        {% if object.parent %}
-                            <a href="{% url 'organization:location_detail' pk=object.parent.pk %}">{{ object.parent }}</a>
-                        {% else %}
-                            <i>None</i>
-                        {% endif %}
-                    </dd>
-
-                    <dt class="col-sm-3">Status:</dt>
-                    <dd class="col-sm-9">{{ object.get_status_display }}</dd>
-
-                    <dt class="col-sm-3">Tenant:</dt>
-                    <dd class="col-sm-9">
-                        {% if object.tenant %}
-                            <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant }}</a>
-                        {% else %}
-                            <i>None</i>
-                        {% endif %}
-                    </dd>
-
-                    <dt class="col-sm-3">Facility:</dt>
-                    <dd class="col-sm-9">{{ object.facility|default:"<i>Not Set</i>"|safe }}</dd>
-
-                    <dt class="col-sm-3">Description:</dt>
-                    <dd class="col-sm-9">{{ object.description|linebreaksbr|default:"<i>Not Set</i>"|safe }}</dd>
-                </dl>
-            </div>
-        </div>
-
-        {# TODO: Add Assets in this location section #}
-         <div class="card mt-4">
-            <div class="card-header">
-                <h3 class="card-title">Assets in this Location ({{ assets_table.rows|length }})</h3>
-            </div>
-            <div class="table-responsive">
-                {% render_table assets_table %}
-            </div>
-        </div>
-
-         <div class="card mt-4">
-            <div class="card-header">
-                <h3 class="card-title">Child Locations ({{ object.children.count }})</h3>
-            </div>
-            <div class="list-group list-group-flush">
-                {% for child_loc in object.children.all %}
-                    <a href="{% url 'organization:location_detail' pk=child_loc.pk %}" class="list-group-item list-group-item-action">
-                       {{ child_loc.name }}
-                       <span class="text-muted small ms-2">({{ child_loc.slug }})</span>
-                    </a>
-                {% empty %}
-                    <div class="list-group-item text-muted">No child locations defined.</div>
-                {% endfor %}
-            </div>
-        </div>
-
-    </div>
-
-    {# Right Column - Metadata & Tags #}
-    <div class="col-md-4">
-         <div class="card mb-4">
-             <div class="card-body">
-                 <h3 class="card-title">Metadata</h3>
-                 <p class="text-muted small">
-                     Created: {{ object.created_at|date:"Y-m-d H:i" }} <br>
-                     Updated: {{ object.updated_at|date:"Y-m-d H:i" }}
-                 </p>
-            </div>
-        </div>
-
-        <div class="card">
-             <div class="card-header">
-                <h3 class="card-title">Tags</h3>
-            </div>
-             <div class="card-body">
-                {% for tag in object.tags.all %}
-                    {# TODO: Link to tag view? Add color? #}
-                    <span class="badge bg-secondary">{{ tag.name }}</span>
-                {% empty %}
-                    <span class="text-muted"><i>No tags assigned.</i></span>
-                {% endfor %}
-            </div>
+            {% if assets_table.rows %}
+                <div class="table-responsive">
+                    {% render_table assets_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=assets_table %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-devices text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M13 9a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-6a1 1 0 0 1 -1 -1v-10z" /><path d="M18 8v-3a1 1 0 0 0 -1 -1h-13a1 1 0 0 0 -1 1v12a1 1 0 0 0 1 1h9" /><path d="M16 9h2" /></svg>
+                    <p class="mb-0">No assets assigned to this specific location.</p>
+                </div>
+            {% endif %}
         </div>
     </div>
-</div>
-{% endblock %} 
+
+    {# Child Locations Tab Pane #}
+    <div class="tab-pane fade" id="child-locations" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">Child Locations</h3>
+            </div>
+            {% if object.children.all %}
+                <div class="list-group list-group-flush list-group-hoverable">
+                    {% for child_loc in object.children.all %}
+                        <a href="{% url 'organization:location_detail' pk=child_loc.pk %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                           <div>
+                               <strong>{{ child_loc.name }}</strong>
+                               <span class="text-muted small ms-2">({{ child_loc.slug }})</span>
+                           </div>
+                           <span class="badge bg-azure-lt">View Detail</span>
+                        </a>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hierarchy-2 text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 3h4v4h-4z" /><path d="M3 17h4v4h-4z" /><path d="M17 17h4v4h-4z" /><path d="M7 17l5 -4l5 4" /><path d="M12 7l0 6" /></svg>
+                    <p class="mb-0">No child locations defined under this location.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock extra_tab_panes %}

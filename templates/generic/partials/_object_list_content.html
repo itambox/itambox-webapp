@@ -1,0 +1,55 @@
+{% load django_tables2 %}
+{% load helpers %}
+{% load static %}
+{% load django_htmx %}
+
+{# Constants now come from view context #}
+
+{# --- Quick Search and Table Config --- #}
+<div class="row mb-3">
+    <div class="col-md-6">
+        {# Quick Search Form #}
+        <form hx-get="{{ request.get_full_path }}" hx-target="#{{ RESULTS_PANE_CONTENT_ID }}" hx-swap="innerHTML" hx-push-url="true" hx-indicator=".htmx-indicator">
+            <div class="input-group">
+                <input type="text" name="q" class="form-control" value="{{ request.GET.q|default:'' }}" placeholder="Quick Search...">
+                <button class="btn btn-outline-secondary" type="submit">
+                    <i class="mdi mdi-magnify"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+    <div class="col-md-6 text-end">
+        {# Configure Table Button (Placeholder for Modal Trigger) #}
+        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#TableConfigModal"> {# TODO: Ensure modal ID exists #}
+            <i class="mdi mdi-cog"></i> Configure Table
+        </button>
+    </div>
+</div>
+{# --- End Quick Search and Table Config --- #}
+
+{# Render the django-tables2 table #}
+{% render_table table 'django-tables2/bootstrap5.html' %}
+
+{# Render pagination controls - Pass the target ID explicitly #}
+{% include 'global_includes/pagination_links.html' with page_obj=page_obj hx_target=RESULTS_PANE_CONTENT_ID %}
+
+{# --- Out-Of-Band Swaps --- #}
+{# These elements are included ONLY in the HTMX partial response #}
+
+{% if request.htmx %}
+  {# OOB swap for the results count badge on the tab #}
+  <span id="{{ RESULTS_TAB_COUNT_ID }}" hx-swap-oob="true" class="badge bg-secondary ms-1">
+    {{ page_obj.paginator.count|default:"0" }}
+  </span>
+
+  {# OOB swap for the applied filters count badge on the tab #}
+  <span id="{{ FILTERS_APPLIED_COUNT_ID }}" hx-swap-oob="true" class="badge bg-info ms-1" {% if not filter_params %}style="display: none;"{% endif %}>
+    {{ applied_filter_count|default:"0" }}
+  </span>
+
+  {# OOB Swap for Page Title #}
+   <span id="page-title-block" hx-swap-oob="true">
+    {% block title %}{{ title }}{% endblock %} - AssetBox
+   </span>
+
+{% endif %} 

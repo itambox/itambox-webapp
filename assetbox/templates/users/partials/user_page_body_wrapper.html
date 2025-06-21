@@ -15,7 +15,7 @@
 {% startpartial breadcrumbs-block hx-swap-oob="true" %}
     {% if breadcrumbs %}
         <ol class="breadcrumb breadcrumb-arrows" aria-label="breadcrumbs">
-            {% for label, url in breadcrumbs %}
+            {% for url, label in breadcrumbs %}
                 {% if url %}
                     <li class="breadcrumb-item"><a href="{{ url }}">{{ label }}</a></li>
                 {% else %}

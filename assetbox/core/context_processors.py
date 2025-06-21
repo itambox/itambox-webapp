@@ -18,7 +18,7 @@ def breadcrumbs(request):
 
     # Start with Home/Dashboard
     items = [
-        (_('Dashboard'), reverse('dashboard'))
+        (reverse('dashboard'), _('Dashboard'))
     ]
 
     # Basic app/model detection (can be expanded)
@@ -37,20 +37,20 @@ def breadcrumbs(request):
 
                 # Add App breadcrumb (linking to first model? or no link?)
                 # For simplicity, let's not link the app label for now.
-                items.append((app_label, None))
+                items.append((None, app_label))
 
                 # Add Model List breadcrumb
                 try:
                     list_url_name = f"{app_name}:{view_parts[0]}_list"
                     list_url = reverse(list_url_name)
-                    items.append((f"{model_name}s", list_url)) # Pluralize naively
+                    items.append((list_url, f"{model_name}s")) # Pluralize naively
                 except:
                     # Fallback if list view doesn't exist or naming fails
-                    items.append((f"{model_name}s", None))
+                    items.append((None, f"{model_name}s"))
 
                 # Add Action breadcrumb (Create/Edit/Delete)
                 if action in ('create', 'update', 'delete'):
-                    items.append((action.title(), request.path))
+                    items.append((request.path, action.title()))
                 # Handle detail view? Need object context from view.
                 # elif action == 'detail':
                 #    pass # Requires getting object from context
@@ -63,8 +63,25 @@ def breadcrumbs(request):
 
     # Remove items with None URL except potentially the last one
     final_items = []
-    for i, (label, url) in enumerate(items):
+    for i, (url, label) in enumerate(items):
         if url is not None or i == len(items) - 1:
-            final_items.append((label, url))
+            final_items.append((url, label))
 
-    return {'breadcrumbs': final_items} 
+    return {'breadcrumbs': final_items}
+
+
+def notifications_processor(request):
+    """Context processor providing unread notification counts and items globally."""
+    if request.user.is_authenticated:
+        from core.models import Notification
+        unread_qs = Notification.objects.filter(user=request.user, is_read=False)
+        unread_count = unread_qs.count()
+        recent_unread = unread_qs.order_by('-created_at')[:5]
+        return {
+            'unread_notifications_count': unread_count,
+            'recent_unread_notifications': recent_unread
+        }
+    return {
+        'unread_notifications_count': 0,
+        'recent_unread_notifications': []
+    }

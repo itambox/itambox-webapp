@@ -1,0 +1,90 @@
+{% extends 'users/base.html' %}
+{% load i18n %}
+
+{% block content_tab %}
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h3 class="card-title mb-0">{% trans "Notification Inbox" %}</h3>
+            <p class="text-muted small mb-0">{% trans "System operational logs, license expirations, and stock warnings." %}</p>
+        </div>
+        {% if unread_notifications_count > 0 %}
+            <form method="post" action="{% url 'users:mark_all_notifications_read' %}" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-secondary btn-sm d-flex align-items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l5 5l10 -10" /></svg>
+                    {% trans "Mark All as Read" %}
+                </button>
+            </form>
+        {% endif %}
+    </div>
+
+    {% if notifications %}
+        <div class="list-group list-group-flush list-group-hoverable border-top border-bottom">
+            {% for notif in notifications %}
+                <div class="list-group-item py-3 {% if not notif.is_read %}bg-light-lt{% endif %}">
+                    <div class="row align-items-center g-3">
+                        <div class="col-auto">
+                            <span class="status-dot status-dot-animated {% if notif.level == 'danger' %}bg-red{% elif notif.level == 'warning' %}bg-warning{% elif notif.level == 'success' %}bg-success{% else %}bg-blue{% endif %} d-block" style="width: 10px; height: 10px;"></span>
+                        </div>
+                        <div class="col">
+                            <div class="d-flex align-items-center mb-1">
+                                <span class="font-weight-bold text-dark d-block">
+                                    {% if not notif.is_read %}
+                                        <strong>{{ notif.subject }}</strong>
+                                    {% else %}
+                                        <span class="text-secondary">{{ notif.subject }}</span>
+                                    {% endif %}
+                                </span>
+                                <span class="ms-2 badge {% if notif.level == 'danger' %}bg-red-lt{% elif notif.level == 'warning' %}bg-warning-lt{% elif notif.level == 'success' %}bg-success-lt{% else %}bg-blue-lt{% endif %} text-uppercase px-2 py-0.5" style="font-size: 0.65rem;">
+                                    {{ notif.get_level_display }}
+                                </span>
+                            </div>
+                            <p class="text-secondary mb-0 small">{{ notif.message }}</p>
+                            <span class="text-muted d-block mt-1 font-monospace" style="font-size: 0.75rem;">
+                                {{ notif.created_at|date:"Y-m-d H:i" }}
+                            </span>
+                        </div>
+                        {% if not notif.is_read %}
+                            <div class="col-auto ms-auto">
+                                <form method="post" action="{% url 'users:mark_notification_read' pk=notif.pk %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-ghost-success border-0 px-2 py-1" title="{% trans 'Mark as Read' %}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                            <path d="M5 12l5 5l10 -10" />
+                                        </svg>
+                                        <span class="d-none d-sm-inline ms-1">{% trans "Mark Read" %}</span>
+                                    </button>
+                                </form>
+                            </div>
+                        {% else %}
+                            <div class="col-auto ms-auto text-muted">
+                                <span class="small text-muted font-weight-medium">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-eye me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                        <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+                                        <path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6" />
+                                    </svg>
+                                    {% trans "Read" %}
+                                </span>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="py-5 text-muted text-center card border-0 bg-transparent shadow-none">
+            <div class="card-body">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-bell-off text-muted mb-2" width="48" height="48" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                    <path d="M3 3l18 18" />
+                    <path d="M17 17h-13a4 4 0 0 0 2 -3v-3a7 7 0 0 1 1.279 -3.716m2.072 -1.934c.209 -.226 .425 -.44 .649 -.641" />
+                    <path d="M18 14v-3a7 7 0 0 0 -.13 -1.332m-1.74 -1.737a7 7 0 0 0 -2.13 -1.931" />
+                    <path d="M9 17v1a3 3 0 0 0 6 0v-1" />
+                </svg>
+                <p class="mb-0 small font-weight-medium">{% trans "You have no system notifications." %}</p>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}

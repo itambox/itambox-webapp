@@ -13,4 +13,9 @@ PAGINATE_COUNT_CHOICES = (
 )
 
 # Default per page count
-DEFAULT_PAGINATE_COUNT = 50 
+DEFAULT_PAGINATE_COUNT = 50
+
+# --- Tabbed List View HTMX IDs ---
+RESULTS_PANE_CONTENT_ID = 'object-list-dynamic-content'
+RESULTS_TAB_COUNT_ID = 'results-tab-count'
+FILTERS_APPLIED_COUNT_ID = 'filters-applied-count' 

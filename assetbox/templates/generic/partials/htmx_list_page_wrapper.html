@@ -42,24 +42,19 @@
     </div>
 </div>
 
-{# --- OOB Partial Definitions (These target elements OUTSIDE #object-list-dynamic-content) --- #}
-{% startpartial filters-tab-content hx-swap-oob="true" %}
+{# --- OOB Swaps (These target elements OUTSIDE #object-list-dynamic-content) --- #}
+<div id="filters-sidebar-content" hx-swap-oob="true">
     {% include 'generic/partials/filter_form_tab.html' %}
-{% endpartial %}
+</div>
 
-{% startpartial object-list-count hx-swap-oob="true" %}
-    {{ table.rows|length|default:"0" }}
-{% endpartial %}
-
-{% startpartial filters-applied-count hx-swap-oob="true" %}
+<span id="filters-applied-count" hx-swap-oob="true" class="badge bg-primary ms-2 {% if not filter_form.applied_filters %}d-none{% endif %}">
     {{ filter_form.applied_filters|length|default:"0" }}
-{% endpartial %}
+</span>
 
-{# --- OOB Partial Definition for Pagination --- #}
-{% startpartial object-list-pagination hx-swap-oob="true" %}
+<div id="object-list-pagination" hx-swap-oob="true">
     {% if table.page %}
     <div class="card-footer d-flex align-items-center">
-        {# Per Page Dropdown - Target remains the dynamic content area #}
+        {# Per Page Dropdown #}
         {% include 'global_includes/pagination_per_page.html' with paginator=table.page.paginator hx_target="#object-list-dynamic-content" %}
 
         {# Page Number Summary #}
@@ -69,27 +64,23 @@
             {% endblocktrans %}
         </p>
 
-        {# Page Links - Target remains the dynamic content area #}
+        {# Page Links #}
         {% include 'global_includes/pagination_links.html' with page_obj=table.page hx_target="#object-list-dynamic-content" %}
     </div>
-    {% else %}
-        {# Render empty if no pagination needed, to clear previous state #}
     {% endif %}
-{% endpartial %}
+</div>
 {# --- END OOB Pagination --- #}
-
-{# --- END OOB Definitions --- #}
 
 
 {# --- Main Content Area (Rendered directly, replaces innerHTML of #object-list-dynamic-content) --- #}
 
-{# Row for Search and Table Configure Button #}
+{# Row for Search and Action Buttons #}
 <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
     {# Quick Search Input Group #}
     {% if filter_form.q is not None %}
         <div class="quicksearch-results-tab" style="flex-grow: 1; max-width: 200px; margin-right: 1rem;">
             <form method="get" action="" class="filter-form-inline"
-                hx-get="{{ request.get_full_path }}"
+                hx-get="{{ request.path }}"
                 hx-target="#object-list-dynamic-content"
                 hx-swap="innerHTML"
                 hx-push-url="true">
@@ -116,18 +107,31 @@
         <div></div> {# Placeholder #}
     {% endif %}
 
-    {# Configure Table Button #}
-    {% if table_config_key %}
-        <div class="table-configure ms-auto">
-            <button type="button" class="btn btn-outline-secondary"
+    {# Action Buttons #}
+    <div class="ms-auto d-flex gap-2">
+        {% if table_config_key %}
+            <button type="button" class="btn btn-outline-secondary d-flex align-items-center"
                     hx-get="{% url 'table_config' model_name=table_config_key %}"
                     hx-target="#modal-placeholder"
                     hx-on::after-request="new bootstrap.Modal(document.getElementById('table-config-modal')).show()">
                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-settings me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" /><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" /></svg>
                 Configure Table
             </button>
-        </div>
-    {% endif %}
+        {% endif %}
+
+        {% if filter_form %}
+            <button type="button" class="btn btn-outline-secondary d-flex align-items-center" id="toggle-filters-btn" title="Toggle Filters">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-filter me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                    <path d="M5.5 5h13a1 1 0 0 1 .5 1.5l-5 5.5v5l-3 1.3v-6.3l-5 -5.5a1 1 0 0 1 .5 -1.5" />
+                </svg>
+                Filters
+                <span id="filters-applied-count" class="badge bg-primary ms-2 {% if not filter_form.applied_filters %}d-none{% endif %}">
+                    {{ filter_form.applied_filters|length|default:"0" }}
+                </span>
+            </button>
+        {% endif %}
+    </div>
 </div>
 
 {# Table Rendering Container #}
@@ -142,5 +146,3 @@
        {% endif %}
     </div>
 </div>
-
-{# --- END Main Content Area --- #}

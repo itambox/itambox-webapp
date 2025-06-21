@@ -1,6 +1,6 @@
 import django_tables2 as tables
 from django.utils.translation import gettext_lazy as _
-from assets.models import Manufacturer # Keep import for potential linking
+from assets.models import Manufacturer, InstalledSoftware # Keep import for potential linking
 # from core.tables import BaseTable, TagColumn, BooleanColumn # Remove old import
 from core.tables import BaseTable, BooleanColumn # Import only needed core components
 from extras.tables import TagColumn # Import TagColumn from extras
@@ -26,4 +26,27 @@ class SoftwareTable(BaseTable):
     class Meta(BaseTable.Meta):
         model = Software
         fields = ('pk', 'name', 'manufacturer', 'description', 'tags', 'created_at', 'updated_at')
-        default_columns = ('pk', 'name', 'manufacturer', 'description', 'tags') 
+        default_columns = ('pk', 'name', 'manufacturer', 'description', 'tags')
+
+class InstalledSoftwareTable(BaseTable):
+    """Table for displaying InstalledSoftware instances."""
+    asset = tables.LinkColumn(
+        viewname='assets:asset_detail',
+        args=[tables.A('asset__pk')],
+        accessor='asset.name',
+        verbose_name=_("Asset")
+    )
+    software = tables.LinkColumn(
+        viewname='software:software_detail',
+        args=[tables.A('software__pk')],
+        accessor='software.name',
+        verbose_name=_("Software")
+    )
+    version_detected = tables.Column(verbose_name=_("Version"))
+    install_date = tables.DateColumn(verbose_name=_("Install Date"), format='Y-m-d')
+    last_seen_date = tables.DateTimeColumn(verbose_name=_("Last Seen"), format='Y-m-d H:i')
+
+    class Meta(BaseTable.Meta):
+        model = InstalledSoftware
+        fields = ('asset', 'software', 'version_detected', 'install_date', 'last_seen_date')
+        default_columns = ('asset', 'software', 'version_detected', 'install_date', 'last_seen_date') 

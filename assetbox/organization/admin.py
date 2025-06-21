@@ -1,9 +1,8 @@
 from django.contrib import admin
 from .models import (
-    Region, SiteGroup, Tenant, Location, TenantGroup, Site
+    Region, SiteGroup, Tenant, Location, TenantGroup, Site, Contact, ContactRole, ContactAssignment
 )
 
-# Register your models here.
 
 # Define ModelAdmin classes first
 class SiteAdmin(admin.ModelAdmin):
@@ -38,6 +37,18 @@ class LocationAdmin(admin.ModelAdmin):
     search_fields = ('name', 'slug', 'facility', 'description')
     prepopulated_fields = {"slug": ("name",)}
 
+class ContactAdmin(admin.ModelAdmin):
+    list_display = ('name', 'title', 'phone', 'email', 'web_url')
+    search_fields = ('name', 'title', 'phone', 'email', 'description')
+
+class ContactRoleAdmin(admin.ModelAdmin):
+    list_display = ('name', 'slug', 'description')
+    prepopulated_fields = {"slug": ("name",)}
+
+class ContactAssignmentAdmin(admin.ModelAdmin):
+    list_display = ('contact', 'role', 'content_type', 'object_id', 'priority')
+    list_filter = ('role', 'priority')
+
 # Now register models using admin.site.register
 admin.site.register(Site, SiteAdmin)
 admin.site.register(Region, RegionAdmin)
@@ -45,5 +56,7 @@ admin.site.register(SiteGroup, SiteGroupAdmin)
 admin.site.register(TenantGroup, TenantGroupAdmin)
 admin.site.register(Tenant, TenantAdmin)
 admin.site.register(Location, LocationAdmin)
+admin.site.register(Contact, ContactAdmin)
+admin.site.register(ContactRole, ContactRoleAdmin)
+admin.site.register(ContactAssignment, ContactAssignmentAdmin)
 
-# Register any other organization-specific models here

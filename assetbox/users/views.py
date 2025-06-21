@@ -6,6 +6,9 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.views import PasswordChangeView as DjangoPasswordChangeView
 from django.views.generic.base import TemplateResponseMixin
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
+from django.shortcuts import get_object_or_404
 from .models import UserPreference
 from core.models import ObjectChange
 from core.tables import ObjectChangeTable
@@ -74,7 +77,7 @@ class UserPasswordView(LoginRequiredMixin, BaseHTMXView, DjangoPasswordChangeVie
 
     # render_to_response handled by BaseHTMXView
 
-class UserPreferencesView(LoginRequiredMixin, TemplateResponseMixin, BaseHTMXView, View):
+class UserPreferencesView(LoginRequiredMixin, BaseHTMXView, TemplateResponseMixin, View):
     form_class = UserPreferencesForm
     template_name = 'users/preferences.html'
     page_body_partial_name = "users/partials/user_page_body_wrapper.html" # Use User wrapper
@@ -147,7 +150,32 @@ class UserApiTokensView(UserGenericTabView):
 
 class UserNotificationsView(UserGenericTabView):
     active_tab = 'notifications'
-    tab_title = 'Notifications' # Specific title
+    tab_title = 'Notifications'
+    template_name = 'users/notifications.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from core.models import Notification
+        context['notifications'] = Notification.objects.filter(user=self.request.user).order_by('-created_at')
+        return context
+
+
+@login_required
+@require_POST
+def mark_notification_read(request, pk):
+    from core.models import Notification
+    notification = get_object_or_404(Notification, pk=pk, user=request.user)
+    notification.is_read = True
+    notification.save()
+    return redirect('users:user_notifications')
+
+
+@login_required
+@require_POST
+def mark_all_notifications_read(request):
+    from core.models import Notification
+    Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+    return redirect('users:user_notifications')
 
 class UserSubscriptionsView(UserGenericTabView):
     active_tab = 'subscriptions'

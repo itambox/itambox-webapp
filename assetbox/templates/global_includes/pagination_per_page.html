@@ -14,7 +14,6 @@
             <li>
                 <a class="dropdown-item{% if count == paginator.per_page %} active{% endif %}"
                    href="{% update_querystring request per_page=count page=1 %}"
-                   hx-trigger="change"
                    hx-get="{% update_querystring request per_page=count page=1 %}"
                    hx-target="{{ hx_target|default:'#object-list-dynamic-content' }}"
                    hx-swap="innerHTML"

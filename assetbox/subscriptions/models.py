@@ -1,5 +1,5 @@
 from django.db import models
-from django.urls import reverse
+from django.urls import reverse, NoReverseMatch
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import gettext_lazy as _
@@ -49,8 +49,10 @@ class Provider(ChangeLoggingMixin, BaseModel):
         return self.name
 
     def get_absolute_url(self):
-        # return reverse('subscriptions:provider_detail', kwargs={'pk': self.pk}) # Phase 2
-        return "#" # Placeholder for now
+        try:
+            return reverse('subscriptions:provider_detail', kwargs={'pk': self.pk})
+        except NoReverseMatch:
+            return reverse('admin:subscriptions_provider_change', args=[self.pk])
 
 
 class SubscriptionTypeChoices(models.TextChoices):
@@ -123,8 +125,10 @@ class Subscription(ChangeLoggingMixin, BaseModel):
         return f"{self.provider} - {self.name}"
 
     def get_absolute_url(self):
-        # return reverse('subscriptions:subscription_detail', kwargs={'pk': self.pk}) # Phase 2
-        return "#" # Placeholder for now
+        try:
+            return reverse('subscriptions:subscription_detail', kwargs={'pk': self.pk})
+        except NoReverseMatch:
+            return reverse('admin:subscriptions_subscription_change', args=[self.pk])
 
 
 class SubscriptionAssignment(ChangeLoggingMixin, BaseModel):
@@ -165,8 +169,9 @@ class SubscriptionAssignment(ChangeLoggingMixin, BaseModel):
         return f"Subscription {self.subscription} assignment (object missing)"
 
     def get_absolute_url(self):
-        # May not need a dedicated detail view for assignments
-        # return reverse('subscriptions:subscriptionassignment_detail', kwargs={'pk': self.pk}) # Phase 2?
         if self.subscription:
-            return self.subscription.get_absolute_url() # Link back to the subscription
-        return "#"
+            return self.subscription.get_absolute_url()
+        try:
+            return reverse('admin:subscriptions_subscriptionassignment_changelist')
+        except NoReverseMatch:
+            return "#"

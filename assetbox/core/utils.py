@@ -1,6 +1,7 @@
 from .constants import DEFAULT_PAGINATE_COUNT, PAGINATE_COUNT_CHOICES
 import datetime # Import datetime
 from decimal import Decimal # Import Decimal
+import logging
 from django.conf import settings
 from django.core.paginator import Paginator
 from django.contrib.contenttypes.models import ContentType # Import ContentType
@@ -9,6 +10,8 @@ from django.shortcuts import reverse
 from users.models import UserPreference # Import UserPreference
 from django.db.models import Model
 from django.forms.models import model_to_dict
+
+logger = logging.getLogger(__name__)
 
 def get_model_viewname(model, action):
     """
@@ -76,36 +79,38 @@ class ChoiceSet:
 from django.contrib.contenttypes.models import ContentType
 from .middleware import get_current_request_id, get_current_user
 
-def serialize_object(obj: Model, extra_fields=None) -> dict:
+def serialize_object(obj: Model, extra_fields=None, exclude_fields=None) -> dict:
     """
     Serialize a model instance into a dictionary suitable for change logging.
     Excludes certain fields like primary key and AutoFields by default.
     Includes fields specified in `extra_fields`.
+    Excludes fields specified in `exclude_fields`.
     Handles M2M fields by serializing their PKs.
     Converts date/datetime/Decimal to JSON-serializable formats.
     """
     if not obj:
         return None
     
+    if extra_fields is None:
+        extra_fields = set()
+    if exclude_fields is None:
+        exclude_fields = set()
+    
     data = {}
     m2m_fields = {f.name for f in obj._meta.many_to_many}
-    # Exclude primary key and specific extra fields if needed
-    excluded_field_names = {'pk', obj._meta.pk.name}
-    if extra_fields:
-         # Ensure extra_fields doesn't accidentally exclude fields we want (like FKs for logging)
-         # This logic assumes extra_fields lists fields *to be included* even if normally excluded
-         pass # Current exclusion logic handles this
-    else:
-        extra_fields = set()
 
     for field in obj._meta.get_fields():
+        field_name = field.name
+        
+        # Explicitly exclude fields listed in exclude_fields (e.g. updated_at)
+        if field_name in exclude_fields:
+            continue
+
         # Exclude auto-created fields, relations handled separately, and explicitly excluded fields
         # Keep concrete fields unless they are the PK
         if not field.concrete or field.name == obj._meta.pk.name:
              if field.name not in extra_fields:
-                 continue
-            
-        field_name = field.name
+                  continue
         
         try:
             field_value = getattr(obj, field_name)
@@ -134,6 +139,7 @@ def serialize_object(obj: Model, extra_fields=None) -> dict:
             # Assume other basic types are directly serializable
             else:
                 data[field_name] = field_value # Store directly
+
                  
     return data
 
@@ -158,19 +164,19 @@ def log_change(instance, action, prechange_data=None, postchange_data=None, user
     if request_id is None:
         request_id = get_current_request_id()
 
-    print(f"[LOG_CHANGE] User from middleware: {user}") # DEBUG
-    print(f"[LOG_CHANGE] Request ID from middleware: {request_id}") # DEBUG
+    logger.debug("User from middleware: %s", user)
+    logger.debug("Request ID from middleware: %s", request_id)
 
     # Ensure request_id is present (should always be set by middleware in a request)
     if not request_id:
         # Handle cases outside a request (e.g., management command, shell)
         # Or decide to raise an error if logging must happen within a request.
         # For now, let's skip logging if no request_id
-        print(f"[LOG_CHANGE] Warning: Skipping changelog for {instance} ({action}) - no request_id found.") # DEBUG
+        logger.debug("Skipping changelog for %s (%s) - no request_id found.", instance, action)
         return
 
     try:
-        print(f"[LOG_CHANGE] Attempting ObjectChange.objects.create for {instance}") # DEBUG
+        logger.debug("Attempting ObjectChange.objects.create for %s", instance)
         oc = ObjectChange.objects.create(
             user=user,
             user_name=user.username if user else 'System', # Handle anonymous/system changes
@@ -183,13 +189,11 @@ def log_change(instance, action, prechange_data=None, postchange_data=None, user
             prechange_data=prechange_data,
             postchange_data=postchange_data
         )
-        print(f"[LOG_CHANGE] ObjectChange created with PK: {oc.pk}") # DEBUG
-        print(f"Changelog: Logged {action} for {instance} (User: {user}, Request: {request_id})") # Debug
+        logger.debug("ObjectChange created with PK: %s", oc.pk)
+        logger.info("Changelog: Logged %s for %s (User: %s, Request: %s)", action, instance, user, request_id)
     except Exception as e:
         # Handle potential errors during logging (e.g., database error)
-        print(f"[LOG_CHANGE] Error logging change for {instance}: {e}") # DEBUG
-        import traceback
-        traceback.print_exc() # Print full traceback
+        logger.error("Error logging change for %s: %s", instance, e, exc_info=True)
 
 # --- Add Helper Function --- 
 def get_content_type_by_natural_key(natural_key):
@@ -219,7 +223,7 @@ def get_table_for_model(model):
         return getattr(tables_module, table_class_name)
     except (ImportError, AttributeError):
         # Log this? Could indicate missing tables.py or wrong naming convention
-        print(f"[get_table_for_model] Warning: Could not find {table_class_name} in {app_label}.tables")
+        logger.warning("Could not find %s in %s.tables", table_class_name, app_label)
         return None
 # --- End get_table_for_model ---
 

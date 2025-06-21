@@ -1,0 +1,6 @@
+<div class="d-flex align-items-center mt-3">
+    {% if table.page %}
+        {% include 'global_includes/pagination_per_page.html' with paginator=table.page.paginator %}
+        {% include 'global_includes/pagination_links.html' with page_obj=table.page %}
+    {% endif %}
+</div>

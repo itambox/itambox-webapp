@@ -1,0 +1,7 @@
+{% if tag %}
+<span class="badge shadow-sm" 
+      style="background-color: #{{ tag.color|default:'6c757d' }}; color: {% if tag.color == 'ffffff' or tag.color == 'FFFFFF' %}#1d273b; border: 1px solid #e6e8e9{% else %}#ffffff{% endif %}; margin-right: 0.25rem; font-weight: 600;" 
+      title="{{ tag.description|default:tag.name }}">
+    {{ tag.name }}
+</span>
+{% endif %}

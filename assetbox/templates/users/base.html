@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends base_template|default:"base.html" %}
 {% load i18n %}
 
 {% block title %}{% block title_tab %}{% trans "User Account" %}{% endblock %} - AssetBox{% endblock %}
@@ -21,7 +21,12 @@
                 <a href="{% url 'users:user_profile' %}" class="nav-link{% if active_tab == 'profile' %} active{% endif %}">{% trans "Profile" %}</a>
             </li>
             <li class="nav-item" role="presentation">
-                <a href="{% url 'users:user_notifications' %}" class="nav-link{% if active_tab == 'notifications' %} active{% endif %}">{% trans "Notifications" %} <span class="badge bg-secondary-lt ms-1">Dummy</span></a>
+                <a href="{% url 'users:user_notifications' %}" class="nav-link{% if active_tab == 'notifications' %} active{% endif %}">
+                    {% trans "Notifications" %}
+                    {% if unread_notifications_count > 0 %}
+                        <span class="badge bg-red-lt ms-1">{{ unread_notifications_count }}</span>
+                    {% endif %}
+                </a>
             </li>
             <li class="nav-item" role="presentation">
                 <a href="{% url 'users:user_subscriptions' %}" class="nav-link{% if active_tab == 'subscriptions' %} active{% endif %}">{% trans "Subscriptions" %} <span class="badge bg-secondary-lt ms-1">Dummy</span></a>

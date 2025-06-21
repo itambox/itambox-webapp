@@ -175,4 +175,35 @@ class FilterForm(BootstrapMixin, forms.Form):
             return self.filterset.qs
         return self.filterset.queryset # Return unfiltered queryset on invalid form
 
+    @property
+    def applied_filters(self):
+        """
+        Returns a dictionary of filters currently applied to the queryset,
+        excluding pagination ('page', 'per_page') and quick search ('q').
+        """
+        if not self.filterset or not self.filterset.data:
+            return {}
+
+        applied = {}
+        ignored_params = ['page', 'per_page', 'q']
+
+        for name, filter_field in self.filterset.filters.items():
+            if name in ignored_params:
+                continue
+
+            # Get list of values or single value depending on the field type
+            value = self.filterset.data.getlist(name) if hasattr(self.filterset.data, 'getlist') else self.filterset.data.get(name)
+
+            if value:
+                if isinstance(value, list):
+                    # Filter out empty strings from list filters (like multiple choice fields)
+                    value = [v for v in value if v != '']
+                    if value:
+                        applied[name] = value
+                elif value != '':
+                    applied[name] = value
+
+        return applied
+
+
 # You can add other core forms below if needed 

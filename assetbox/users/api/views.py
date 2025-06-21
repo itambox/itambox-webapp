@@ -1,4 +1,5 @@
 # assetbox/users/api/views.py
+import logging
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.db.models import Count
@@ -12,6 +13,7 @@ from users.models import UserPreference
 from .serializers import UserSerializer, GroupSerializer, UserConfigSerializer
 from collections import OrderedDict
 
+logger = logging.getLogger(__name__)
 User = get_user_model()
 
 class UserViewSet(viewsets.ReadOnlyModelViewSet):
@@ -47,11 +49,8 @@ class UserConfigView(RetrieveUpdateAPIView):
         preference = self.get_object()
         incoming_data = request.data
         current_data = preference.data if preference.data is not None else {} # Ensure dict
-
-        print(f"--- Received PATCH data in UserConfigView: ---") # Keep debug print
-        print(incoming_data)
-        print(f"--- Current data BEFORE merge: ---")
-        print(current_data)
+        logger.debug("Received PATCH data in UserConfigView: %s", incoming_data)
+        logger.debug("Current data BEFORE merge: %s", current_data)
 
         # --- Custom Deep Merge Logic --- 
         # This logic specifically merges the 'tables' structure
@@ -69,10 +68,7 @@ class UserConfigView(RetrieveUpdateAPIView):
         # Assign the merged data back and save
         preference.data = current_data
         preference.save()
-        
-        print(f"--- Current data AFTER merge & save: ---")
-        print(preference.data)
-        print(f"-------------------------------------------")
+        logger.debug("Current data AFTER merge & save: %s", preference.data)
 
         # Return the updated data using the serializer
         serializer = self.get_serializer(preference)

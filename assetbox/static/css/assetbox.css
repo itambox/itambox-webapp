@@ -10,25 +10,33 @@ pre.change-data>span {
 }
 
 pre.change-data>span.added {
-    background-color: #2fb344;
-    color: #ffffff;
+    background-color: rgba(47, 179, 68, 0.1);
+    color: #2fb344;
 }
 
 pre.change-data>span.removed {
-    background-color: #d63939;
-    color: #ffffff;
+    background-color: rgba(214, 57, 57, 0.1);
+    color: #d63939;
 }
 
 pre.change-diff {
-    border-color: transparent
+    border-radius: 4px;
+    padding: 12px;
+    font-family: var(--tblr-font-monospace);
+    font-size: 8.5pt;
+    line-height: 1.4;
 }
 
 pre.change-diff.change-added {
-    background-color: #2fb344
+    background-color: rgba(47, 179, 68, 0.08);
+    color: #2fb344;
+    border: 1px solid rgba(47, 179, 68, 0.15);
 }
 
 pre.change-diff.change-removed {
-    background-color: #d63939
+    background-color: rgba(214, 57, 57, 0.08);
+    color: #d63939;
+    border: 1px solid rgba(214, 57, 57, 0.15);
 }
 
 pre.block {
@@ -124,18 +132,17 @@ pre.block {
     color: var(--tblr-secondary);
 }
 
+/* Override Tabler core's scrollbar layout shift prevention to resolve the 15px layout gap between fixed sidebar and page-wrapper */
+html, :root {
+    margin-left: 0px !important;
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+/* Specs container inset block that perfectly respects light and dark modes */
+.specs-container {
+    background-color: #f6f8fb !important; /* Premium light grey-blue inset */
+    color: var(--tblr-body-color) !important;
+}
+[data-bs-theme="dark"] .specs-container {
+    background-color: #1a2538 !important; /* Premium dark navy-blue inset */
+    color: var(--tblr-body-color) !important;
+}

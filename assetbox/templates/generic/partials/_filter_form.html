@@ -1,0 +1,28 @@
+{% load helpers %}
+{% load django_htmx %}
+{% load crispy_forms_tags %}
+
+{# Constants now come from view context #}
+
+<form
+  method="get"
+  action="{{ request.path }}" {# Action points to the current list view URL #}
+  class="form form-horizontal p-3"
+  hx-get="{{ request.get_full_path }}" {# Use GET for filtering #}
+  hx-target="#{{ RESULTS_PANE_CONTENT_ID }}" {# *** Target the results pane's dynamic content area *** #}
+  hx-swap="innerHTML" {# Replace the content within the target #}
+  hx-push-url="true" {# Update the browser URL with filter params #}
+  hx-indicator=".htmx-indicator" {# Optional: Show a loading indicator #}
+>
+  {# Render the filter form fields using crispyforms #}
+  {% crispy form %}
+
+  <div class="mt-3">
+      <button type="submit" name="_apply" class="btn btn-primary">
+          <i class="mdi mdi-filter-variant"></i> Apply Filter
+      </button>
+      <a href="{{ request.path }}" class="btn btn-outline-secondary">
+          <i class="mdi mdi-close"></i> Clear Filters
+      </a>
+  </div>
+</form>

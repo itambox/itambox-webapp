@@ -6,10 +6,10 @@ app_name = 'extras'
 urlpatterns = [
     # Tags
     path('tags/', views.TagListView.as_view(), name='tag_list'),
-    path('tags/create/', views.tag_create, name='tag_create'),
-    path('tags/<int:pk>/', views.tag_detail, name='tag_detail'),
-    path('tags/<int:pk>/edit/', views.tag_update, name='tag_update'),
-    path('tags/<int:pk>/delete/', views.tag_delete, name='tag_delete'),
+    path('tags/create/', views.TagCreateView.as_view(), name='tag_create'),
+    path('tags/<int:pk>/', views.TagDetailView.as_view(), name='tag_detail'),
+    path('tags/<int:pk>/edit/', views.TagUpdateView.as_view(), name='tag_update'),
+    path('tags/<int:pk>/delete/', views.TagDeleteView.as_view(), name='tag_delete'),
     
     # Config Templates
     path('configtemplates/', views.ConfigTemplateListView.as_view(), name='configtemplate_list'),

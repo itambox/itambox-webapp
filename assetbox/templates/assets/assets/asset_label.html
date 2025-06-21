@@ -1,0 +1,147 @@
+{# templates/assets/assets/asset_label.html #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Print Asset Label: {{ asset.asset_tag }}</title>
+    <style>
+        /* CSS reset & thermal roll optimization */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #fff;
+            color: #000;
+        }
+        
+        .label-container {
+            width: 2.25in;
+            height: 1.25in;
+            box-sizing: border-box;
+            padding: 0.1in;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            overflow: hidden;
+            border: 1px dashed #ccc; /* Visual indicator for screen */
+            margin: 20px auto;
+            background: #fff;
+        }
+
+        .qr-code-box {
+            width: 1.05in;
+            height: 1.05in;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .qr-code-box svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .metadata-box {
+            width: 1.0in;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            font-size: 8pt;
+            line-height: 1.1;
+            font-weight: bold;
+            word-break: break-all;
+        }
+
+        .asset-title {
+            font-size: 9pt;
+            margin-bottom: 2px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .asset-tag {
+            font-family: monospace;
+            background: #000;
+            color: #fff;
+            padding: 1px 3px;
+            font-size: 7.5pt;
+            align-self: flex-start;
+            border-radius: 2px;
+            margin-bottom: 4px;
+        }
+
+        .asset-serial {
+            font-size: 6.5pt;
+            font-weight: normal;
+            color: #555;
+        }
+
+        /* Screen helper for printing */
+        .print-helper {
+            text-align: center;
+            margin: 40px auto;
+            max-width: 300px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        
+        .print-btn {
+            background: #206bc4;
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 10pt;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        /* Print Media Overrides */
+        @media print {
+            .print-helper {
+                display: none !important;
+            }
+            .label-container {
+                border: none !important;
+                margin: 0 !important;
+                page-break-inside: avoid;
+            }
+            @page {
+                size: 2.25in 1.25in;
+                margin: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="print-helper">
+        <h3>Thermal Label Preview</h3>
+        <p>Pre-formatted for <strong>2.25" x 1.25"</strong> thermal rolls. Clicking print will launch the print settings modal.</p>
+        <button class="print-btn" onclick="window.print()">Print Label</button>
+        <p style="font-size: 8pt; color: #777; margin-top: 10px;">Ensure margins are set to "None" in your print options.</p>
+    </div>
+
+    <div class="label-container">
+        <!-- Pure vector QR SVG from segno -->
+        <div class="qr-code-box">
+            {{ qr_svg|safe }}
+        </div>
+        <div class="metadata-box">
+            <span class="asset-tag">{{ asset.asset_tag }}</span>
+            <span class="asset-title">{{ asset.name }}</span>
+            {% if asset.serial_number %}
+                <span class="asset-serial">S/N: {{ asset.serial_number }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        // Trigger print automatically for seamless UX if requested (can be configured or left manual helper)
+        // window.onload = function() { window.print(); }
+    </script>
+</body>
+</html>

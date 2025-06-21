@@ -1,51 +1,107 @@
 {% extends 'generic/object_detail.html' %}
 {% load render_table from django_tables2 %}
+{% load static %}
+
+{# --- Page Title --- #}
+{% block title %}{{ object.first_name }} {{ object.last_name }} - Asset Holder - AssetBox{% endblock %}
+
+{# --- Page Header --- #}
+{% block page_pretitle %}Organization / Asset Holders{% endblock %}
+
+{# --- Tabs Hook --- #}
+{% block extra_tabs %}
+    <li class="nav-item" role="presentation">
+        <a href="#assignments" class="nav-link" data-bs-toggle="tab" role="tab">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-indigo" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 5H7a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2V7a2 2 0 0 0 -2 -2h-2" /><path d="M9 3m0 2a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2z" /><path d="M9 14l2 2l4 -4" /></svg>
+            Assignments <span class="badge bg-indigo-lt ms-2">{{ assignments_table.rows|length }}</span>
+        </a>
+     </li>
+{% endblock extra_tabs %}
 
 {# Define the specific details for an Asset Holder #}
 {% block object_details %}
-<dl class="row">
-    <dt class="col-sm-4">UPN:</dt>
-    <dd class="col-sm-8">{{ object.upn }}</dd>
+<!-- Metrics Dashboard Row -->
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card card-sm bg-indigo-lt border-0 shadow-none">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-indigo text-white avatar rounded shadow-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clipboard-check" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2" /><path d="M9 3m0 2a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2z" /><path d="M9 14l2 2l4 -4" /></svg>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium text-indigo small uppercase font-sans">Checked Out Assets Assigned</div>
+                        <div class="text-indigo h1 mb-0 font-weight-bold">{{ assignments_table.rows|length }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
-    <dt class="col-sm-4">First Name:</dt>
-    <dd class="col-sm-8">{{ object.first_name }}</dd>
+<dl class="row mb-0">
+    <dt class="col-sm-4">Full Name:</dt>
+    <dd class="col-sm-8"><strong>{{ object.first_name }} {{ object.last_name }}</strong></dd>
 
-    <dt class="col-sm-4">Last Name:</dt>
-    <dd class="col-sm-8">{{ object.last_name }}</dd>
+    <dt class="col-sm-4">User Principal Name (UPN):</dt>
+    <dd class="col-sm-8"><span class="badge bg-purple-lt px-2 py-1"><code>{{ object.upn }}</code></span></dd>
 
-    <dt class="col-sm-4">Email:</dt>
-    <dd class="col-sm-8">{{ object.email|default:"<i>Not Set</i>"|safe }}</dd>
+    <dt class="col-sm-4">Email Address:</dt>
+    <dd class="col-sm-8">
+        {% if object.email %}
+            <a href="mailto:{{ object.email }}">{{ object.email }}</a>
+        {% else %}
+            <span class="text-muted"><i>Not Set</i></span>
+        {% endif %}
+    </dd>
 
     <dt class="col-sm-4">Tenant:</dt>
     <dd class="col-sm-8">
         {% if object.tenant %}
             <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant }}</a>
         {% else %}
-             <i>Not Set</i>
+             <span class="text-muted"><i>None</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-4">Linked User:</dt>
-    <dd class="col-sm-8">{{ object.user.username|default:"<i>None</i>"|safe }}</dd>
+    <dt class="col-sm-4">Linked User account:</dt>
+    <dd class="col-sm-8">
+        {% if object.user %}
+            <span class="badge bg-blue-lt"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 7m-5.143 0a5.143 5.143 0 1 0 10.286 0a5.143 5.143 0 1 0 -10.286 0" /><path d="M6 21v-2a6 6 0 0 1 6 -6h0a6 6 0 0 1 6 6v2" /></svg>{{ object.user.username }}</span>
+        {% else %}
+            <span class="text-muted"><i>No linked user</i></span>
+        {% endif %}
+    </dd>
 
     <dt class="col-sm-4">Description:</dt>
-    <dd class="col-sm-8">{{ object.description|linebreaksbr|default:"<i>Not Set</i>"|safe }}</dd>
-
+    <dd class="col-sm-8 text-secondary">{{ object.description|linebreaksbr|default:"<span class='text-muted'><i>No description provided.</i></span>"|safe }}</dd>
 </dl>
 {% endblock object_details %}
 
 {# Leave related_objects empty for the sidebar #}
 {% block related_objects %}{% endblock related_objects %}
 
-{# Add the Assignments table to the full_width_content block #}
-{% block full_width_content %}
-    {% if assignments_table %}
-    <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">Current Assignments ({{ assignments_table.rows|length }})</h3></div>
-        <div class="table-responsive">
-            {% render_table assignments_table %}
+{# --- Extra Tab Panes --- #}
+{% block extra_tab_panes %}
+    {# Assignments Tab Pane #}
+    <div class="tab-pane fade" id="assignments" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">Checked Out Assets</h3>
+            </div>
+            {% if assignments_table.rows %}
+                <div class="table-responsive">
+                    {% render_table assignments_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=assignments_table %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clipboard-off text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5.575 5.579a2 2 0 0 0 -.575 1.421v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2m0 -4v-8a2 2 0 0 0 -2 -2h-2m-3.8 0h-2.2a2 2 0 0 0 -2 2v0a2 2 0 0 0 2 2h1.8" /><path d="M3 3l18 18" /></svg>
+                    <p class="mb-0">No checked out assets assigned to this holder.</p>
+                </div>
+            {% endif %}
         </div>
-        {# Optional: Add pagination if needed later #}
     </div>
-    {% endif %}
-{% endblock full_width_content %}
+{% endblock extra_tab_panes %}

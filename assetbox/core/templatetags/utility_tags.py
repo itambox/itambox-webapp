@@ -103,3 +103,27 @@ def update_querystring(request, **kwargs):
         return '?' + encoded_params
     else:
         return '' # Should ideally not be reached due to the dict check
+
+
+@register.filter
+def humanize_key(value):
+    """Replace underscores with spaces and capitalize words, capitalizing specific acronyms."""
+    if not value:
+        return ''
+    cleaned = str(value).replace('_', ' ').title()
+    words = []
+    for word in cleaned.split():
+        if word.lower() in ('sim', 'cpu', 'gpu', 'ram', 'vin', 'upn', 'sku', 'eol', 'tco'):
+            words.append(word.upper())
+        else:
+            words.append(word)
+    return ' '.join(words)
+
+
+@register.filter
+def content_type_id(obj):
+    """Return ContentType ID for the given model instance."""
+    if not obj:
+        return None
+    from django.contrib.contenttypes.models import ContentType
+    return ContentType.objects.get_for_model(obj).id

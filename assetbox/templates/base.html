@@ -31,8 +31,8 @@
         }
     </style>
 </head>
-<body class="layout-fluid layout-combo" hx-boost="true" hx-target="#page-body-main">
-    <script src="https://unpkg.com/htmx.org@1.9.10" integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC" crossorigin="anonymous"></script>
+<body class="layout-fluid layout-combo" hx-boost="true" hx-target="#page-content-wrapper">
+    <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
 
     <div class="page">
         {# Move Sidebar OUTSIDE page-wrapper #}
@@ -43,14 +43,16 @@
             <!-- Top Navbar -->
             {% include "global_includes/_topbar.html" %}
 
+            <div id="page-content-wrapper">
+
             <!-- Page header -->
             <div class="page-header d-print-none">
-                <div class="container-xl">
+                <div class="container-fluid">
                     {# Render Breadcrumbs #}
                     <div id="breadcrumbs-block">
                     {% if breadcrumbs %}
                         <ol class="breadcrumb breadcrumb-arrows" aria-label="breadcrumbs">
-                            {% for label, url in breadcrumbs %}
+                            {% for url, label in breadcrumbs %}
                                 {% if url %}
                                     <li class="breadcrumb-item"><a href="{{ url }}">{{ label }}</a></li>
                                 {% else %}
@@ -63,6 +65,7 @@
                     {# End Breadcrumbs #}
                     <div class="row g-2 align-items-center mt-2"> {# Add margin-top #}
                         <div class="col">
+                            {% block page_header %}
                             <div id="page-header-block">
                                 <!-- Default Page pre-title -->
                                 <div class="page-pretitle">
@@ -72,17 +75,22 @@
                                     Dashboard
                                 </h2>
                             </div>
+                            {% endblock %}
                         </div>
                         <!-- Page title actions -->
                         <div class="col-auto ms-auto d-print-none">
                             {% block page_actions %}<div id="page-actions-block"></div>{% endblock %}
                         </div>
                     </div>
+                    {# Tabs Block #}
+                    <div id="tabs-block" class="mt-3">
+                        {% block tabs %}{% endblock %}
+                    </div>
                 </div>
             </div>
             <!-- Page body -->
             <div class="page-body" id="page-body-main">
-                <div class="container-xl">
+                <div class="container-fluid">
                     {# --- Django Messages --- #}
                     {# {% if messages %} #} {# <-- Remove old message block #}
                     {#     {% for message in messages %} #}
@@ -99,9 +107,10 @@
                     {% endblock %}
                 </div>
             </div>
+            </div> {# End #page-content-wrapper #}
             {# --- Updated Footer --- #}
             <footer class="footer footer-transparent d-print-none py-2">
-                <div class="container-xl d-flex justify-content-between align-items-center">
+                <div class="container-fluid d-flex justify-content-between align-items-center">
                     
                     {# Left-aligned links (Icons) #}
                     <ul class="list-inline mb-0 fs-2">
@@ -146,7 +155,7 @@
             {# --- End Updated Footer --- #}
         </div> {# End page-wrapper #}
     </div> {# End page #}
-    <script src="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/js/tabler.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
     {% block extra_scripts %}
     <script>
@@ -259,6 +268,52 @@
              });
         }
       });
+
+      // Listen for custom HTMX triggers
+      document.body.addEventListener('closeModalEvent', function() {
+        const openModalEl = document.querySelector('.modal.show');
+        if (openModalEl) {
+          const modalInstance = bootstrap.Modal.getInstance(openModalEl) || new bootstrap.Modal(openModalEl);
+          modalInstance.hide();
+        }
+        // Force page reload to sync tables and display message
+        window.location.reload();
+      });
+
+      document.body.addEventListener('assetListUpdated', function() {
+        window.location.reload();
+      });
+
+      document.body.addEventListener('kitListUpdated', function() {
+        window.location.reload();
+      });
+
+      document.body.addEventListener('showMessage', function(evt) {
+        // Handle showing a toast message dynamically if no reload occurs
+        const message = evt.detail.value ? evt.detail.value.message : (evt.detail.message || '');
+        const level = evt.detail.value ? evt.detail.value.level : (evt.detail.level || 'info');
+        if (!message) return;
+        const container = document.getElementById('django-messages');
+        if (container) {
+          const toastEl = document.createElement('div');
+          toastEl.className = `toast align-items-center text-white bg-${level === 'success' ? 'success' : level === 'danger' ? 'danger' : 'primary'} border-0`;
+          toastEl.setAttribute('role', 'alert');
+          toastEl.setAttribute('aria-live', 'assertive');
+          toastEl.setAttribute('aria-atomic', 'true');
+          toastEl.innerHTML = `
+            <div class="d-flex">
+              <div class="toast-body">${message}</div>
+              <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+          `;
+          container.appendChild(toastEl);
+          const toast = new bootstrap.Toast(toastEl);
+          toast.show();
+          toastEl.addEventListener('hidden.bs.toast', () => {
+            toastEl.remove();
+          });
+        }
+      });
     </script>
 
     {# Slug handling script #}
@@ -268,6 +323,71 @@
     {% block javascript %}
     {# Page-specific javascript will be inserted here #}
     {% endblock javascript %}
+
+    {# --- Sidebar Active State Sync for HTMX Boosted Navigation --- #}
+    <script>
+    function updateSidebarActiveState() {
+        const currentPath = window.location.pathname;
+        const sidebar = document.querySelector('#sidebar-menu');
+        if (!sidebar) return;
+
+        // Clear all existing active states
+        sidebar.querySelectorAll('.nav-item.active').forEach(el => el.classList.remove('active'));
+        sidebar.querySelectorAll('.nav-link.active').forEach(el => el.classList.remove('active'));
+        sidebar.querySelectorAll('.dropdown-item.active').forEach(el => el.classList.remove('active'));
+        sidebar.querySelectorAll('.dropdown-menu.show').forEach(el => el.classList.remove('show'));
+
+        // Find the matching link and activate it
+        const allLinks = sidebar.querySelectorAll('a[href]');
+        let matchedDropdownItem = null;
+        let matchedNavItem = null;
+
+        for (const link of allLinks) {
+            const href = link.getAttribute('href');
+            if (!href || href === '#' || href.startsWith('#navbar-')) continue;
+
+            // Exact match or prefix match (for detail/edit/delete pages)
+            if (currentPath === href || (href !== '/' && currentPath.startsWith(href))) {
+                // Activate the dropdown-item wrapper if it exists
+                const dropdownItem = link.closest('.dropdown-item');
+                if (dropdownItem) {
+                    dropdownItem.classList.add('active');
+                    matchedDropdownItem = dropdownItem;
+                }
+
+                // Activate the parent nav-item (li.nav-item.dropdown)
+                const navItem = link.closest('.nav-item');
+                if (navItem) {
+                    navItem.classList.add('active');
+                    matchedNavItem = navItem;
+
+                    // Activate the nav-link toggle
+                    const navLink = navItem.querySelector(':scope > .nav-link');
+                    if (navLink) navLink.classList.add('active');
+
+                    // Expand the dropdown menu
+                    const dropdownMenu = navItem.querySelector(':scope > .dropdown-menu');
+                    if (dropdownMenu) dropdownMenu.classList.add('show');
+                }
+                break; // Use first match
+            }
+        }
+
+        // Special case: dashboard (root path "/")
+        if (!matchedNavItem && (currentPath === '/' || currentPath === '')) {
+            const dashboardItem = sidebar.querySelector('.nav-item:first-child');
+            if (dashboardItem) dashboardItem.classList.add('active');
+        }
+    }
+
+    // Run on HTMX boosted navigation and URL changes
+    document.body.addEventListener('htmx:pushedIntoHistory', function() {
+        updateSidebarActiveState();
+    });
+    document.body.addEventListener('htmx:afterSwap', function() {
+        updateSidebarActiveState();
+    });
+    </script>
 
 </body>
 </html> 

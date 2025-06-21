@@ -1,0 +1,110 @@
+{% extends 'generic/object_detail.html' %}
+{% load render_table from django_tables2 %}
+{% load static %}
+
+{# --- Page Title --- #}
+{% block title %}{{ object.name }} - Status Label Details - AssetBox{% endblock %}
+
+{# --- Page Header --- #}
+{% block page_pretitle %}Assets / Status Labels{% endblock %}
+
+{# --- Tabs Hook --- #}
+{% block extra_tabs %}
+    <li class="nav-item" role="presentation">
+        <a href="#assets" class="nav-link active" data-bs-toggle="tab" role="tab">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-green" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l18 0" /><path d="M9 8l1 0" /><path d="M9 12l1 0" /><path d="M9 16l1 0" /><path d="M14 8l1 0" /><path d="M14 12l1 0" /><path d="M14 16l1 0" /><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16" /></svg>
+            Assets <span class="badge bg-green-lt ms-2">{{ assets_table.rows|length }}</span>
+        </a>
+    </li>
+{% endblock extra_tabs %}
+
+{# Define the specific details for a Status Label object #}
+{% block object_details %}
+<!-- Metrics Dashboard Row -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6">
+        <div class="card card-sm bg-blue-lt border-0 shadow-none">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-blue text-white avatar rounded shadow-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-settings" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c.996 .608 2.296 .07 2.572 -1.065z" /><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" /></svg>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium text-blue small uppercase font-sans">Meta Type</div>
+                        <div class="text-blue h2 mb-0 font-weight-bold" style="line-height: 1.2;">{{ object.get_type_display }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6">
+        <div class="card card-sm bg-green-lt border-0 shadow-none">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-green text-white avatar rounded shadow-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-device-laptop" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 19l18 0" /><path d="M5 6m0 1a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v8a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1z" /><path d="M12 16l0 3" /></svg>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium text-green small uppercase font-sans">Total Assets Assigned</div>
+                        <div class="text-green h1 mb-0 font-weight-bold">{{ assets_table.rows|length }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<dl class="row mb-0">
+    <dt class="col-sm-3">Name:</dt>
+    <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
+
+    <dt class="col-sm-3">Slug:</dt>
+    <dd class="col-sm-9"><code>{{ object.slug }}</code></dd>
+
+    <dt class="col-sm-3">Meta Type:</dt>
+    <dd class="col-sm-9"><span class="badge bg-blue-lt text-blue text-uppercase">{{ object.get_type_display }}</span></dd>
+
+    <dt class="col-sm-3">Color Badge:</dt>
+    <dd class="col-sm-9">
+        {% if object.color %}
+            <span class="badge" style="background-color: #{{ object.color }};">&nbsp;</span> #{{ object.color }}
+        {% else %}
+            —
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">Description:</dt>
+    <dd class="col-sm-9 text-secondary">{{ object.description|linebreaksbr|default:"<i>No description provided.</i>"|safe }}</dd>
+</dl>
+{% endblock object_details %}
+
+{# Sidebar elements #}
+{% block related_objects %}
+{% endblock related_objects %}
+
+{# --- Extra Tab Panes --- #}
+{% block extra_tab_panes %}
+    {# Assets Tab Pane #}
+    <div class="tab-pane fade show active" id="assets" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">Assets / Devices with status "{{ object.name }}"</h3>
+            </div>
+            {% if assets_table.rows %}
+                <div class="table-responsive">
+                    {% render_table assets_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=assets_table %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-devices text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M13 9a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-6a1 1 0 0 1 -1 -1v-10z" /><path d="M18 8v-3a1 1 0 0 0 -1 -1h-13a1 1 0 0 0 -1 1v12a1 1 0 0 0 1 1h9" /><path d="M16 9h2" /></svg>
+                    <p class="mb-0">No assets found with this status label.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock extra_tab_panes %}

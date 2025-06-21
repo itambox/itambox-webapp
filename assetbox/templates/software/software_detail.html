@@ -1,35 +1,83 @@
 {% extends 'generic/object_detail.html' %}
-{% load helpers %}
+{% load static %}
+{% load utility_tags %}
+{% load render_table from django_tables2 %}
 
-{% block title %}{{ object }}{% endblock %}
+{# --- Page Title --- #}
+{% block title %}{{ object }} - Software Catalog - AssetBox{% endblock %}
 
-{% block content_left %}
-    <div class="card">
-        <h5 class="card-header">Software Details</h5>
-        <div class="card-body">
-            <table class="table table-hover attr-table">
-                <tr>
-                    <td>Name</td>
-                    <td>{{ object.name }}</td>
-                </tr>
-                <tr>
-                    <td>Manufacturer</td>
-                    <td><a href="{{ object.manufacturer.get_absolute_url }}">{{ object.manufacturer }}</a></td>
-                </tr>
-                <tr>
-                    <td>Description</td>
-                    <td>{{ object.description|default:"—" }}</td>
-                </tr>
-                 <tr>
-                    <td>Tags</td>
-                    <td>{% include 'inc/tags.html' with tags=object.tags.all url_name='software:software_list' %}</td>
-                </tr>
-            </table>
+{# --- Page Header --- #}
+{% block page_pretitle %}Software Catalog Details{% endblock %}
+
+{# --- Tabs Hook --- #}
+{% block extra_tabs %}
+    <li class="nav-item" role="presentation">
+        <a href="#installed-instances" class="nav-link" data-bs-toggle="tab" role="tab">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-purple" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" /><path d="M9 4v16" /><path d="M14 10l2 2l-2 2" /></svg>
+            Installed Instances <span class="badge bg-purple-lt ms-2">{{ instances_table.rows|length }}</span>
+        </a>
+    </li>
+{% endblock extra_tabs %}
+
+{# --- Object details override --- #}
+{% block object_details %}
+<!-- Metrics Dashboard Row -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-12">
+        <div class="card card-sm bg-purple-lt border-0 shadow-none">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-purple text-white avatar rounded shadow-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-components" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12l3 3l3 -3l-3 -3z" /><path d="M15 12l3 3l3 -3l-3 -3z" /><path d="M9 6l3 3l3 -3l-3 -3z" /><path d="M9 18l3 3l3 -3l-3 -3z" /></svg>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium text-purple small uppercase font-sans">Total Installations Detected</div>
+                        <div class="text-purple h1 mb-0 font-weight-bold">{{ instances_table.rows|length }}</div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
-{% endblock %}
+</div>
 
-{% block content_right %}
-    {% include 'inc/panels/tags.html' %}
-    {% include 'inc/panels/change_log.html' %}
-{% endblock %} 
+<dl class="row mb-0">
+    <dt class="col-sm-3">Name:</dt>
+    <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
+
+    <dt class="col-sm-3">Manufacturer:</dt>
+    <dd class="col-sm-9">
+         {% if object.manufacturer %}
+            <a href="{% url 'assets:manufacturer_detail' pk=object.manufacturer.pk %}">
+                <span class="badge bg-blue-lt">{{ object.manufacturer }}</span>
+            </a>
+         {% else %}
+             <span class="text-muted"><i>None</i></span>
+         {% endif %}
+    </dd>
+</dl>
+{% endblock object_details %}
+
+{# --- Extra Tab Panes --- #}
+{% block extra_tab_panes %}
+    {# Installed Instances Tab Pane #}
+    <div class="tab-pane fade" id="installed-instances" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">Installed Instances on Assets / Devices</h3>
+            </div>
+            {% if instances_table.rows %}
+                <div class="table-responsive">
+                    {% render_table instances_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=instances_table %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-checkbox text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 11l3 3l8 -8" /><path d="M20 12v6a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h9" /></svg>
+                    <p class="mb-0">This software catalog item is not currently installed on any asset.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock extra_tab_panes %}

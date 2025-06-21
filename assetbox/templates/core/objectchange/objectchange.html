@@ -5,7 +5,7 @@
 {% block title %}{{ object }}{% endblock %}
 
 {% block breadcrumbs %}
-  <li class="breadcrumb-item"><a href="{% url 'core:objectchange_list' %}">{% trans "Change Log" %}</a></li>
+  <li class="breadcrumb-item"><a href="{% url 'objectchange_list' %}">{% trans "Change Log" %}</a></li>
   {# Simplified breadcrumb logic #}
 {% endblock %}
 
@@ -66,9 +66,17 @@
             <div class="card-body">
                 {% if not diff_removed_json == '{}' or not diff_added_json == '{}' %}
                     {% if not diff_removed_json == '{}' %}
-                        <pre class="change-diff change-removed">{{ diff_removed_json }}</pre>
+                        <div class="text-danger small font-weight-bold mb-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-minus me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l14 0" /></svg>
+                            REMOVED OR ORIGINAL STATE
+                        </div>
+                        <pre class="change-diff change-removed mb-3">{{ diff_removed_json }}</pre>
                     {% endif %}
                     {% if not diff_added_json == '{}' %}
+                        <div class="text-success small font-weight-bold mb-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+                            ADDED OR MODIFIED STATE
+                        </div>
                         <pre class="change-diff change-added">{{ diff_added_json }}</pre>
                     {% endif %}
                 {% else %}

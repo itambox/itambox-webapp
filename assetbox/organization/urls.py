@@ -56,5 +56,22 @@ urlpatterns = [
     # Asset Holder Assignments (List only - Refactored to CBV)
     path('asset-holder-assignments/', views.AssetHolderAssignmentListView.as_view(), name='assetholderassignment_list'),
 
-    # TODO: Add URLs for Tag
-] 
+    # Contacts
+    path('contacts/', views.ContactListView.as_view(), name='contact_list'),
+    path('contacts/add/', views.ContactEditView.as_view(), name='contact_create'),
+    path('contacts/<int:pk>/', views.ContactDetailView.as_view(), name='contact_detail'),
+    path('contacts/<int:pk>/edit/', views.ContactEditView.as_view(), name='contact_update'),
+    path('contacts/<int:pk>/delete/', views.ContactDeleteView.as_view(), name='contact_delete'),
+
+    # Contact Roles
+    path('contact-roles/', views.ContactRoleListView.as_view(), name='contactrole_list'),
+    path('contact-roles/add/', views.ContactRoleEditView.as_view(), name='contactrole_create'),
+    path('contact-roles/<int:pk>/', views.ContactRoleDetailView.as_view(), name='contactrole_detail'),
+    path('contact-roles/<int:pk>/edit/', views.ContactRoleEditView.as_view(), name='contactrole_update'),
+    path('contact-roles/<int:pk>/delete/', views.ContactRoleDeleteView.as_view(), name='contactrole_delete'),
+
+    # Contact Assignments
+    path('contact-assignments/add/', views.ContactAssignmentCreateView.as_view(), name='contactassignment_create'),
+    path('contact-assignments/<int:pk>/delete/', views.ContactAssignmentDeleteView.as_view(), name='contactassignment_delete'),
+]
+ 

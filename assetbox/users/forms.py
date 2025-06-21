@@ -1,3 +1,4 @@
+import logging
 from django import forms
 from django.contrib.auth import get_user_model
 # Import UserPreference from this app's models
@@ -5,6 +6,7 @@ from .models import UserPreference
 from django.utils.translation import gettext_lazy as _
 from django.conf import settings # Import settings
 
+logger = logging.getLogger(__name__)
 User = get_user_model()
 
 class UserProfileForm(forms.ModelForm):
@@ -112,7 +114,7 @@ class TableConfigForm(forms.Form):
         user_config = kwargs.pop('user_config', {}) # e.g., {'columns': [...], 'ordering': [...]} or {}
         super().__init__(*args, **kwargs)
 
-        print(f"[TableConfigForm] Received user_config: {user_config}") # DEBUG
+        logger.debug("TableConfigForm received user_config: %s", user_config)
 
         # Determine initial selected columns (priority: user > table default > all)
         default_cols = getattr(table.Meta, 'default_columns', None)
@@ -126,7 +128,7 @@ class TableConfigForm(forms.Form):
                  exclude = getattr(table.Meta, 'exclude', ('pk', 'actions'))
                  initial_selected_names = [name for name in table.base_columns.keys() if name not in exclude]
         
-        print(f"[TableConfigForm] Initial selected names: {initial_selected_names}") # DEBUG
+        logger.debug("TableConfigForm initial selected names: %s", initial_selected_names)
 
         # Populate choices based on the table definition
         all_column_choices = {
@@ -158,8 +160,8 @@ class TableConfigForm(forms.Form):
         self.fields['available_columns'].choices = available_choices
         self.fields['columns'].choices = selected_choices
         
-        print(f"[TableConfigForm] Final available choices: {available_choices}") # DEBUG
-        print(f"[TableConfigForm] Final selected choices: {selected_choices}") # DEBUG
+        logger.debug("TableConfigForm final available choices: %s", available_choices)
+        logger.debug("TableConfigForm final selected choices: %s", selected_choices)
 
     @property
     def table_name(self):

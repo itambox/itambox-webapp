@@ -121,6 +121,35 @@
                                     </a>
                                     {# No button group here #}
                                 </div>
+                                
+                                <div class="dropdown-divider"></div>
+                                <span class="dropdown-header text-info">Contacts</span>
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if 'contact_list' in request.resolver_match.url_name or 'contact_detail' in request.resolver_match.url_name or 'contact_create' in request.resolver_match.url_name or 'contact_update' in request.resolver_match.url_name %}active{% endif %}">
+                                    <a href="{% url 'organization:contact_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Contacts</a>
+                                    <div class="btn-group ms-1">
+                                        <a href="{% url 'organization:contact_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Add Contact">
+                                             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-square-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                                <path d="M9 12h6"></path>
+                                                <path d="M12 9v6"></path>
+                                                <path d="M3 3m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path>
+                                             </svg>
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if 'contactrole_' in request.resolver_match.url_name or 'contactrole_list' in request.resolver_match.url_name or 'contactrole_detail' in request.resolver_match.url_name or 'contactrole_create' in request.resolver_match.url_name or 'contactrole_update' in request.resolver_match.url_name %}active{% endif %}">
+                                    <a href="{% url 'organization:contactrole_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Contact Roles</a>
+                                    <div class="btn-group ms-1">
+                                        <a href="{% url 'organization:contactrole_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Add Contact Role">
+                                             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-square-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                                <path d="M9 12h6"></path>
+                                                <path d="M12 9v6"></path>
+                                                <path d="M3 3m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path>
+                                             </svg>
+                                        </a>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -167,6 +196,20 @@
                                         </a>
                                     </div>
                                 </div>
+                                <!-- Status Labels -->
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'statuslabel_list' or request.resolver_match.url_name == 'statuslabel_detail' or request.resolver_match.url_name == 'statuslabel_create' or request.resolver_match.url_name == 'statuslabel_update' %}active{% endif %}">
+                                    <a href="{% url 'assets:statuslabel_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Status Labels</a>
+                                    <div class="btn-group ms-1">
+                                        <a href="{% url 'assets:statuslabel_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Add Status Label">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-square-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                               <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                               <path d="M9 12h6"></path>
+                                               <path d="M12 9v6"></path>
+                                               <path d="M3 3m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path>
+                                            </svg>
+                                        </a>
+                                    </div>
+                                </div>
 
                                 <div class="dropdown-divider"></div>
                                 <span class="dropdown-header text-info">Asset Types</span>
@@ -198,28 +241,121 @@
                                        </a>
                                    </div>
                                 </div>
+
+                                <div class="dropdown-divider"></div>
+                                <span class="dropdown-header text-info">Components</span>
+                                <!-- Component Types -->
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'componenttype_list' or request.resolver_match.url_name == 'componenttype_detail' or request.resolver_match.url_name == 'componenttype_create' or request.resolver_match.url_name == 'componenttype_update' %}active{% endif %}">
+                                   <a href="{% url 'assets:componenttype_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Component Types</a>
+                                   <div class="btn-group ms-1">
+                                       <a href="{% url 'assets:componenttype_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Add Component Type">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-square-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                               <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                               <path d="M9 12h6"></path>
+                                               <path d="M12 9v6"></path>
+                                               <path d="M3 3m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path>
+                                            </svg>
+                                       </a>
+                                   </div>
+                                </div>
+                                <!-- Component Instances -->
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'componentinstance_list' or request.resolver_match.url_name == 'componentinstance_detail' or request.resolver_match.url_name == 'componentinstance_create' or request.resolver_match.url_name == 'componentinstance_update' %}active{% endif %}">
+                                   <a href="{% url 'assets:componentinstance_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Components</a>
+                                   <div class="btn-group ms-1">
+                                       <a href="{% url 'assets:componentinstance_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Add Component">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-square-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                               <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                               <path d="M9 12h6"></path>
+                                               <path d="M12 9v6"></path>
+                                               <path d="M3 3m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path>
+                                            </svg>
+                                       </a>
+                                   </div>
+                                </div>
+
+                                <div class="dropdown-divider"></div>
+                                <span class="dropdown-header text-info">Non-Serialized Bulk</span>
+                                <!-- Accessories -->
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'accessory_list' or request.resolver_match.url_name == 'accessory_detail' or request.resolver_match.url_name == 'accessory_create' or request.resolver_match.url_name == 'accessory_update' %}active{% endif %}">
+                                   <a href="{% url 'assets:accessory_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Accessories</a>
+                                   <div class="btn-group ms-1">
+                                       <a href="{% url 'assets:accessory_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Add Accessory">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-square-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                               <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                               <path d="M9 12h6"></path>
+                                               <path d="M12 9v6"></path>
+                                               <path d="M3 3m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path>
+                                            </svg>
+                                       </a>
+                                   </div>
+                                </div>
+                                <!-- Consumables -->
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'consumable_list' or request.resolver_match.url_name == 'consumable_detail' or request.resolver_match.url_name == 'consumable_create' or request.resolver_match.url_name == 'consumable_update' %}active{% endif %}">
+                                   <a href="{% url 'assets:consumable_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Consumables</a>
+                                   <div class="btn-group ms-1">
+                                       <a href="{% url 'assets:consumable_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Add Consumable">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-square-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                               <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                               <path d="M9 12h6"></path>
+                                               <path d="M12 9v6"></path>
+                                               <path d="M3 3m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path>
+                                            </svg>
+                                       </a>
+                                   </div>
+                                </div>
+
+                                <div class="dropdown-divider"></div>
+                                <span class="dropdown-header text-info">Kits & Depreciation</span>
+                                <!-- Kits -->
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if 'kit' in request.resolver_match.url_name %}active{% endif %}">
+                                   <a href="{% url 'assets:kit_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Onboarding Kits</a>
+                                   <div class="btn-group ms-1">
+                                       <a href="{% url 'assets:kit_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Add Kit">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-square-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                               <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                               <path d="M9 12h6"></path>
+                                               <path d="M12 9v6"></path>
+                                               <path d="M3 3m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path>
+                                            </svg>
+                                       </a>
+                                   </div>
+                                </div>
+                                <!-- Depreciations -->
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if 'depreciation' in request.resolver_match.url_name %}active{% endif %}">
+                                   <a href="{% url 'assets:depreciation_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Depreciations</a>
+                                   <div class="btn-group ms-1">
+                                       <a href="{% url 'assets:depreciation_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Add Depreciation">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-square-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                               <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                               <path d="M9 12h6"></path>
+                                               <path d="M12 9v6"></path>
+                                               <path d="M3 3m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path>
+                                            </svg>
+                                       </a>
+                                   </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </li>
                 
-                <!-- Insert Software section after Assets -->
-                <li class="nav-item dropdown {% if request.resolver_match.app_name == 'software' %}active{% endif %}">
-                    <a class="nav-link dropdown-toggle {% if request.resolver_match.app_name == 'software' %}active{% endif %}" 
+                <!-- Insert Software & Licenses section after Assets -->
+                <li class="nav-item dropdown {% if request.resolver_match.app_name == 'software' or request.resolver_match.app_name == 'licenses' %}active{% endif %}">
+                    <a class="nav-link dropdown-toggle {% if request.resolver_match.app_name == 'software' or request.resolver_match.app_name == 'licenses' %}active{% endif %}" 
                        href="#navbar-software" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" 
-                       aria-expanded="{% if request.resolver_match.app_name == 'software' %}true{% else %}false{% endif %}" >
+                       aria-expanded="{% if request.resolver_match.app_name == 'software' or request.resolver_match.app_name == 'licenses' %}true{% else %}false{% endif %}" >
                         <span class="nav-link-icon d-md-none d-lg-inline-block">
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-apps" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 4m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" /><path d="M4 14m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" /><path d="M14 14m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" /><path d="M14 7l6 0" /><path d="M17 4l0 6" /></svg>
                         </span>
-                        <span class="nav-link-title">Software</span>
+                        <span class="nav-link-title">Software & Licenses</span>
                     </a>
-                    <div class="dropdown-menu {% if request.resolver_match.app_name == 'software' %}show{% endif %}">
+                    <div class="dropdown-menu {% if request.resolver_match.app_name == 'software' or request.resolver_match.app_name == 'licenses' %}show{% endif %}">
                         <div class="dropdown-menu-columns">
                             <div class="dropdown-menu-column">
                                 <span class="dropdown-header text-info">Software Catalog</span>
                                 <!-- Software -->
                                 <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'software_list' %}active{% endif %}">
-                                    <a href="{% url 'software:software_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Software</a>
+                                    <a href="{% url 'software:software_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Software Products</a>
                                     <div class="btn-group ms-1">
                                         <a href="{% url 'software:software_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Add Software">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-square-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
@@ -231,7 +367,23 @@
                                         </a>
                                     </div>
                                 </div>
-                                <!-- Add Licenses, Subscriptions etc. here later -->
+                                
+                                <div class="dropdown-divider"></div>
+                                <span class="dropdown-header text-info">Entitlements</span>
+                                <!-- Licenses -->
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'license_list' %}active{% endif %}">
+                                    <a href="{% url 'licenses:license_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Licenses</a>
+                                    <div class="btn-group ms-1">
+                                        <a href="{% url 'licenses:license_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Add License">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-square-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                               <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                               <path d="M9 12h6"></path>
+                                               <path d="M12 9v6"></path>
+                                               <path d="M3 3m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path>
+                                            </svg>
+                                        </a>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -283,34 +435,80 @@
                                     </div>
                                 </div>
                                 <!-- Add other extras like Custom Fields, etc. later -->
+                                <div class="dropdown-divider"></div>
+                                <span class="dropdown-header text-info">Custom Schemas</span>
+                                <!-- Custom Fields -->
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if 'customfield_' in request.resolver_match.url_name %}active{% endif %}">
+                                   <a href="{% url 'assets:customfield_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Custom Fields</a>
+                                   <div class="btn-group ms-1">
+                                       <a href="{% url 'assets:customfield_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Add Custom Field">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-square-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                               <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                               <path d="M9 12h6"></path>
+                                               <path d="M12 9v6"></path>
+                                               <path d="M3 3m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path>
+                                            </svg>
+                                       </a>
+                                   </div>
+                                </div>
+                                <!-- Custom Fieldsets -->
+                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if 'customfieldset_' in request.resolver_match.url_name %}active{% endif %}">
+                                   <a href="{% url 'assets:customfieldset_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Custom Fieldsets</a>
+                                   <div class="btn-group ms-1">
+                                       <a href="{% url 'assets:customfieldset_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Add Custom Fieldset">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-square-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                               <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                               <path d="M9 12h6"></path>
+                                               <path d="M12 9v6"></path>
+                                               <path d="M3 3m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path>
+                                            </svg>
+                                       </a>
+                                   </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </li>
 
-                 <li class="nav-item dropdown {% if request.resolver_match.app_name == 'core' and 'objectchange' in request.resolver_match.url_name %}active{% endif %}">
-                    <a class="nav-link dropdown-toggle {% if request.resolver_match.app_name == 'core' and 'objectchange' in request.resolver_match.url_name %}active{% endif %}"
+                  <li class="nav-item dropdown {% if request.resolver_match.app_name == 'core' and 'objectchange' in request.resolver_match.url_name or request.resolver_match.url_name == 'assetmaintenance_list' or request.resolver_match.url_name == 'assetmaintenance_detail' or request.resolver_match.url_name == 'assetmaintenance_create' or request.resolver_match.url_name == 'assetmaintenance_update' or request.resolver_match.url_name == 'assetmaintenance_delete' %}active{% endif %}">
+                    <a class="nav-link dropdown-toggle {% if request.resolver_match.app_name == 'core' and 'objectchange' in request.resolver_match.url_name or request.resolver_match.url_name == 'assetmaintenance_list' or request.resolver_match.url_name == 'assetmaintenance_detail' or request.resolver_match.url_name == 'assetmaintenance_create' or request.resolver_match.url_name == 'assetmaintenance_update' or request.resolver_match.url_name == 'assetmaintenance_delete' %}active{% endif %}"
                        href="#navbar-operations" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button"
-                       aria-expanded="{% if request.resolver_match.app_name == 'core' and 'objectchange' in request.resolver_match.url_name %}true{% else %}false{% endif %}" >
+                       aria-expanded="{% if request.resolver_match.app_name == 'core' and 'objectchange' in request.resolver_match.url_name or request.resolver_match.url_name == 'assetmaintenance_list' or request.resolver_match.url_name == 'assetmaintenance_detail' or request.resolver_match.url_name == 'assetmaintenance_create' or request.resolver_match.url_name == 'assetmaintenance_update' or request.resolver_match.url_name == 'assetmaintenance_delete' %}true{% else %}false{% endif %}" >
                         <span class="nav-link-icon d-md-none d-lg-inline-block">
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-history" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 8l0 4l2 2" /><path d="M3.05 11a9 9 0 1 1 .5 4m-1.55 -14v4h4" /></svg>
                         </span>
                         <span class="nav-link-title">Operations</span>
                     </a>
-                     <div class="dropdown-menu {% if request.resolver_match.app_name == 'core' and 'objectchange' in request.resolver_match.url_name %}show{% endif %}">
+                     <div class="dropdown-menu {% if request.resolver_match.app_name == 'core' and 'objectchange' in request.resolver_match.url_name or request.resolver_match.url_name == 'assetmaintenance_list' or request.resolver_match.url_name == 'assetmaintenance_detail' or request.resolver_match.url_name == 'assetmaintenance_create' or request.resolver_match.url_name == 'assetmaintenance_update' or request.resolver_match.url_name == 'assetmaintenance_delete' %}show{% endif %}">
                          <div class="dropdown-menu-columns">
-                            <div class="dropdown-menu-column">
-                                <span class="dropdown-header text-info">Logging</span>
-                                {# Wrap Changelog link #}
-                                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'objectchange_list' %}active{% endif %}">
-                                    <a href="{% url 'objectchange_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Changelog</a>
-                                    {# No button group here #}
-                                </div>
-                                {# Add other logging views here later if needed #}
-                            </div>
-                        </div>
-                    </div>
-                 </li>
+                             <div class="dropdown-menu-column">
+                                 <span class="dropdown-header text-info">Logging</span>
+                                 {# Wrap Changelog link #}
+                                 <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'objectchange_list' %}active{% endif %}">
+                                     <a href="{% url 'objectchange_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Changelog</a>
+                                     {# No button group here #}
+                                 </div>
+                                 
+                                 <div class="dropdown-divider"></div>
+                                 <span class="dropdown-header text-info">Maintenance</span>
+                                 <!-- Asset Maintenances -->
+                                 <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 {% if request.resolver_match.url_name == 'assetmaintenance_list' or request.resolver_match.url_name == 'assetmaintenance_detail' or request.resolver_match.url_name == 'assetmaintenance_create' or request.resolver_match.url_name == 'assetmaintenance_update' or request.resolver_match.url_name == 'assetmaintenance_delete' %}active{% endif %}">
+                                     <a href="{% url 'assets:assetmaintenance_list' %}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none">Maintenances</a>
+                                     <div class="btn-group ms-1">
+                                         <a href="{% url 'assets:assetmaintenance_create' %}" class="btn btn-sm btn-outline text-primary lh-1 px-2" title="Record Maintenance">
+                                             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-square-plus" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                                <path d="M9 12h6"></path>
+                                                <path d="M12 9v6"></path>
+                                                <path d="M3 3m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path>
+                                             </svg>
+                                         </a>
+                                     </div>
+                                 </div>
+                             </div>
+                         </div>
+                     </div>
+                  </li>
 
                 <li class="nav-item {% if request.resolver_match.app_name == 'admin' %}active{% endif %}">
                      <a class="nav-link" href="{% url 'admin:index' %}" hx-boost="false">

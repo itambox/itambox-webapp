@@ -12,24 +12,82 @@
     </h2>
 {% endblock %}
 
+{# --- Tabs Hook --- #}
+{% block extra_tabs %}
+    <li class="nav-item" role="presentation">
+        <a href="#locations" class="nav-link" data-bs-toggle="tab" role="tab">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-purple" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M3 21v-2a4 4 0 0 1 4 -4h10a4 4 0 0 1 4 4v2" /></svg>
+            Locations <span class="badge bg-purple-lt ms-2">{{ locations_table.rows|length }}</span>
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a href="#assets" class="nav-link" data-bs-toggle="tab" role="tab">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-green" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l18 0" /><path d="M9 8l1 0" /><path d="M9 12l1 0" /><path d="M9 16l1 0" /><path d="M14 8l1 0" /><path d="M14 12l1 0" /><path d="M14 16l1 0" /><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16" /></svg>
+            Assets <span class="badge bg-green-lt ms-2">{{ assets_table.rows|length }}</span>
+        </a>
+    </li>
+{% endblock extra_tabs %}
+
 {# --- Main Site Details --- #}
 {% block object_details %}
-<dl class="row">
+<!-- Metrics Dashboard Row -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6">
+        <div class="card card-sm bg-purple-lt border-0 shadow-none">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-purple text-white avatar rounded shadow-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M3 21v-2a4 4 0 0 1 4 -4h10a4 4 0 0 1 4 4v2" /></svg>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium text-purple small uppercase font-sans">Locations</div>
+                        <div class="text-purple h1 mb-0 font-weight-bold">{{ locations_table.rows|length }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6">
+        <div class="card card-sm bg-green-lt border-0 shadow-none">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-green text-white avatar rounded shadow-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-device-laptop" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 19l18 0" /><path d="M5 6m0 1a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v8a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1z" /><path d="M12 16l0 3" /></svg>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium text-green small uppercase font-sans">Total Physical Assets</div>
+                        <div class="text-green h1 mb-0 font-weight-bold">{{ assets_table.rows|length }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<dl class="row mb-0">
     <dt class="col-sm-3">Name:</dt>
-    <dd class="col-sm-9">{{ object.name }}</dd>
+    <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
 
     <dt class="col-sm-3">Slug:</dt>
-    <dd class="col-sm-9">{{ object.slug }}</dd>
+    <dd class="col-sm-9"><code>{{ object.slug }}</code></dd>
 
     <dt class="col-sm-3">Status:</dt>
-    <dd class="col-sm-9">{{ object.get_status_display }}</dd>
+    <dd class="col-sm-9">
+        <span class="badge {% if object.status == 'active' %}bg-success-lt text-success{% elif object.status == 'planned' %}bg-info-lt text-info{% else %}bg-secondary-lt text-secondary{% endif %} px-2.5 py-1 text-uppercase">
+            {{ object.get_status_display }}
+        </span>
+    </dd>
 
     <dt class="col-sm-3">Region:</dt>
     <dd class="col-sm-9">
         {% if object.region %}
             <a href="{% url 'organization:region_detail' pk=object.region.pk %}">{{ object.region }}</a>
         {% else %}
-             <i>None</i>
+             <span class="text-muted"><i>None</i></span>
         {% endif %}
     </dd>
 
@@ -38,7 +96,7 @@
         {% if object.group %}
             <a href="{% url 'organization:sitegroup_detail' pk=object.group.pk %}">{{ object.group }}</a>
         {% else %}
-             <i>None</i>
+             <span class="text-muted"><i>None</i></span>
         {% endif %}
     </dd>
 
@@ -47,46 +105,80 @@
         {% if object.tenant %}
             <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant }}</a>
         {% else %}
-             <i>None</i>
+             <span class="text-muted"><i>None</i></span>
         {% endif %}
     </dd>
 
     <dt class="col-sm-3">Facility:</dt>
-    <dd class="col-sm-9">{{ object.facility|default:"<i>Not Set</i>"|safe }}</dd>
+    <dd class="col-sm-9">{{ object.facility|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
 
     <dt class="col-sm-3">Time Zone:</dt>
-    <dd class="col-sm-9">{{ object.time_zone|default:"<i>Not Set</i>"|safe }}</dd>
+    <dd class="col-sm-9"><span class="badge bg-purple-lt">{{ object.time_zone|default:"UTC" }}</span></dd>
 
-    <dt class="col-sm-3">Description:</dt>
-    <dd class="col-sm-9">{{ object.description|linebreaksbr|default:"<i>Not Set</i>"|safe }}</dd>
-
-    {# Add address/GPS fields if needed #}
     <dt class="col-sm-3">Physical Address:</dt>
-    <dd class="col-sm-9">{{ object.physical_address|linebreaksbr|default:"<i>Not Set</i>"|safe }}</dd>
-     <dt class="col-sm-3">Shipping Address:</dt>
-    <dd class="col-sm-9">{{ object.shipping_address|linebreaksbr|default:"<i>Not Set</i>"|safe }}</dd>
+    <dd class="col-sm-9 text-secondary">{{ object.physical_address|linebreaksbr|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
+    
+    <dt class="col-sm-3">Shipping Address:</dt>
+    <dd class="col-sm-9 text-secondary">{{ object.shipping_address|linebreaksbr|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
+    
     <dt class="col-sm-3">GPS Coordinates:</dt>
-    <dd class="col-sm-9">{{ object.latitude|default:"?" }}, {{ object.longitude|default:"?" }}</dd>
-
+    <dd class="col-sm-9">
+        {% if object.latitude and object.longitude %}
+            <span class="badge bg-blue-lt">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-gps me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M12 17l0 -10l-3 5h3z" /></svg>
+                {{ object.latitude }}, {{ object.longitude }}
+            </span>
+        {% else %}
+            <span class="text-muted"><i>Not Set</i></span>
+        {% endif %}
+    </dd>
 </dl>
 {% endblock object_details %}
 
 {# --- Related Objects (Sidebar) --- #}
 {% block related_objects %}
-    {# This block is intentionally left empty for Sites. #}
-    {# Counts are shown in the dedicated 'Related Objects' card via context. #}
+    {# Handled elegantly in the tabs #}
 {% endblock related_objects %}
 
-
-{# --- Full Width Content (Locations Table) --- #}
-{% block full_width_content %}
-    {% if locations_table %}
-    <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">Locations in this Site ({{ locations_table.rows|length }})</h3></div>
-        <div class="table-responsive">
-            {% render_table locations_table %}
+{# --- Extra Tab Panes --- #}
+{% block extra_tab_panes %}
+    {# Locations Tab Pane #}
+    <div class="tab-pane fade" id="locations" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">Locations in this Site</h3>
+            </div>
+            {% if locations_table.rows %}
+                <div class="table-responsive">
+                    {% render_table locations_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=locations_table %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-map-pin text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" /><path d="M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0z" /></svg>
+                    <p class="mb-0">No locations defined under this site.</p>
+                </div>
+            {% endif %}
         </div>
-        {# Optional: Add pagination if needed later #}
     </div>
-    {% endif %}
-{% endblock full_width_content %}
+
+    {# Assets Tab Pane #}
+    <div class="tab-pane fade" id="assets" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">Assets Physical-Located inside this Site</h3>
+            </div>
+            {% if assets_table.rows %}
+                <div class="table-responsive">
+                    {% render_table assets_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=assets_table %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-devices text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M13 9a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-6a1 1 0 0 1 -1 -1v-10z" /><path d="M18 8v-3a1 1 0 0 0 -1 -1h-13a1 1 0 0 0 -1 1v12a1 1 0 0 0 1 1h9" /><path d="M16 9h2" /></svg>
+                    <p class="mb-0">No assets currently located at this site.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock extra_tab_panes %}

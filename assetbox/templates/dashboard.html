@@ -1,4 +1,6 @@
-{% extends 'base.html' %}
+{% extends base_template|default:"base.html" %}
+{% load i18n %}
+{% load utility_tags %}
 
 {% block title %}Dashboard - AssetBox{% endblock %}
 
@@ -12,15 +14,649 @@
     </h2>
 {% endblock %}
 
+{% block page_actions %}
+    <div class="dropdown">
+        <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-adjustments-horizontal me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 6m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M4 6l8 0" /><path d="M16 6l4 0" /><path d="M8 12m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M4 12l2 0" /><path d="M10 12l10 0" /><path d="M17 18m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M4 18l11 0" /><path d="M19 18l1 0" /></svg>
+            Customize Widgets
+        </button>
+        <div class="dropdown-menu dropdown-menu-end p-3" aria-labelledby="dropdownMenuButton" style="width: 260px;">
+            <h6 class="dropdown-header px-0 mb-2">Toggle Visible Modules</h6>
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input widget-toggle" type="checkbox" id="toggle-financials" checked data-widget="widget-financials">
+                <label class="form-check-label" for="toggle-financials">Financial Overview</label>
+            </div>
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input widget-toggle" type="checkbox" id="toggle-statuses" checked data-widget="widget-statuses">
+                <label class="form-check-label" for="toggle-statuses">Status Label Counts</label>
+            </div>
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input widget-toggle" type="checkbox" id="toggle-licenses" checked data-widget="widget-licenses">
+                <label class="form-check-label" for="toggle-licenses">License Utilization</label>
+            </div>
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input widget-toggle" type="checkbox" id="toggle-maintenances" checked data-widget="widget-maintenances">
+                <label class="form-check-label" for="toggle-maintenances">Active Repairs</label>
+            </div>
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input widget-toggle" type="checkbox" id="toggle-eol" checked data-widget="widget-eol">
+                <label class="form-check-label" for="toggle-eol">EOL Planning Alerts</label>
+            </div>
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input widget-toggle" type="checkbox" id="toggle-activity" checked data-widget="widget-activity">
+                <label class="form-check-label" for="toggle-activity">Recent Activity</label>
+            </div>
+            <hr class="dropdown-divider my-2">
+            <button class="btn btn-sm btn-outline-secondary w-100 mt-1" id="reset-widgets-btn">Reset Dashboard</button>
+        </div>
+    </div>
+{% endblock %}
+
 {% block content %}
-<div class="row row-deck row-cards">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                Welcome to AssetBox!
-                {# Add dashboard widgets here later #}
+<style>
+    /* Premium Drag & Drop Gripper Styles */
+    .dashboard-widget {
+        transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+    }
+    .dashboard-widget.dragging {
+        opacity: 0.3;
+        transform: scale(0.98);
+    }
+    .widget-grip-handle {
+        cursor: grab;
+        opacity: 0.4;
+        transition: opacity 0.2s ease;
+        padding: 2px;
+    }
+    .widget-grip-handle:hover {
+        opacity: 0.9;
+    }
+    .widget-grip-handle:active {
+        cursor: grabbing;
+    }
+    /* Dashed Placeholder Dropzone */
+    .dashboard-widget-placeholder {
+        transition: all 0.2s ease;
+    }
+</style>
+
+<div class="row row-deck row-cards" id="dashboard-widgets-container">
+    
+    <!-- 1. FINANCIAL OVERVIEW WIDGET -->
+    <div class="col-12 col-md-6 col-lg-4 dashboard-widget" id="widget-financials" draggable="true">
+        <div class="card card-sm">
+            <div class="card-header d-flex justify-content-between align-items-center py-2 px-3">
+                <h3 class="card-title text-uppercase font-weight-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">
+                    Financial Overview
+                </h3>
+                <div class="card-actions d-flex align-items-center">
+                    <!-- Size Selector -->
+                    <div class="btn-group btn-group-sm me-2" role="group">
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-resize-btn" data-size="S" title="Set to 1/3 Width">S</button>
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-resize-btn" data-size="M" title="Set to 1/2 Width">M</button>
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-resize-btn" data-size="L" title="Set to Full Width">L</button>
+                    </div>
+                    <!-- Reorder Arrows -->
+                    <div class="btn-group btn-group-sm me-2" role="group">
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-move-btn" data-dir="left" title="Move Left/Up">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-left" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 6l-6 6l6 6" /></svg>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-move-btn" data-dir="right" title="Move Right/Down">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-right" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 6l6 6l-6 6" /></svg>
+                        </button>
+                    </div>
+                    <!-- Grip Handle -->
+                    <span class="widget-grip-handle" title="Drag to reorder">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-grip-vertical" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M9 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M9 19m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M15 5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M15 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M15 19m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /></svg>
+                    </span>
+                </div>
+            </div>
+            <div class="card-body py-3">
+                <div class="d-flex align-items-center mb-3">
+                    <span class="bg-blue-lt p-2 rounded-circle me-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon text-blue" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M17 8v-3a1 1 0 0 0 -1 -1h-10a2 2 0 0 0 0 4h12a1 1 0 0 1 1 1v3a1 1 0 0 1 -1 1h-12a2 2 0 0 1 -2 -2v-12" /><path d="M20 12v4h-4a2 2 0 0 0 0 4h4a1 1 0 0 0 1 -1v-7" /><path d="M17 16h.01" /></svg>
+                    </span>
+                    <div>
+                        <div class="text-muted small">Total Cost of Ownership (TCO)</div>
+                        <div class="h2 mb-0 font-weight-bold">${{ total_tco|floatformat:2 }}</div>
+                    </div>
+                </div>
+                
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between small text-muted mb-1">
+                        <span>Original Purchase Cost</span>
+                        <span class="font-weight-bold">${{ total_purchase_cost|floatformat:2 }}</span>
+                    </div>
+                    <div class="progress progress-xs">
+                        <div class="progress-bar bg-primary" style="width: {% widthratio total_purchase_cost total_tco 100 %}%"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between small text-muted mb-1">
+                        <span>Maintenance Expenditures</span>
+                        <span class="font-weight-bold">${{ total_maintenance_cost|floatformat:2 }}</span>
+                    </div>
+                    <div class="progress progress-xs">
+                        <div class="progress-bar bg-orange" style="width: {% widthratio total_maintenance_cost total_tco 100 %}%"></div>
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="d-flex justify-content-between small text-muted mb-1">
+                        <span>Total Salvage Book Value</span>
+                        <span class="font-weight-bold text-success">${{ total_salvage_value|floatformat:2 }}</span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
+
+    <!-- 2. ASSET STATUS LABELS WIDGET -->
+    <div class="col-12 col-md-6 col-lg-4 dashboard-widget" id="widget-statuses" draggable="true">
+        <div class="card card-sm">
+            <div class="card-header d-flex justify-content-between align-items-center py-2 px-3">
+                <h3 class="card-title text-uppercase font-weight-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">
+                    Asset Status Labels
+                </h3>
+                <div class="card-actions d-flex align-items-center">
+                    <!-- Size Selector -->
+                    <div class="btn-group btn-group-sm me-2" role="group">
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-resize-btn" data-size="S" title="Set to 1/3 Width">S</button>
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-resize-btn" data-size="M" title="Set to 1/2 Width">M</button>
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-resize-btn" data-size="L" title="Set to Full Width">L</button>
+                    </div>
+                    <!-- Reorder Arrows -->
+                    <div class="btn-group btn-group-sm me-2" role="group">
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-move-btn" data-dir="left" title="Move Left/Up">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-left" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 6l-6 6l6 6" /></svg>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-move-btn" data-dir="right" title="Move Right/Down">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-right" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 6l6 6l-6 6" /></svg>
+                        </button>
+                    </div>
+                    <!-- Grip Handle -->
+                    <span class="widget-grip-handle" title="Drag to reorder">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-grip-vertical" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M9 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M9 19m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M15 5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M15 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M15 19m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /></svg>
+                    </span>
+                </div>
+            </div>
+            <div class="card-body py-3">
+                <div class="text-muted small mb-2">Total Managed Assets: <span class="h3 text-dark font-weight-bold ms-1">{{ total_assets }}</span></div>
+                
+                {% for status in status_stats %}
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="d-flex align-items-center">
+                            <span class="badge badge-dot me-2" style="background-color: #{{ status.color|default:'626976' }};"></span>
+                            <a href="{% url 'assets:statuslabel_detail' status.pk %}" class="text-reset font-weight-bold">{{ status.name }}</a>
+                        </span>
+                        <span class="text-muted">{{ status.asset_count }} ({{ status.get_type_display }})</span>
+                    </div>
+                    <div class="progress progress-xs">
+                        <div class="progress-bar" style="background-color: #{{ status.color|default:'626976' }}; width: {% widthratio status.asset_count total_assets 100 %}%"></div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-muted text-center py-4">No status labels configured.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. LICENSE UTILIZATION WIDGET -->
+    <div class="col-12 col-md-6 col-lg-4 dashboard-widget" id="widget-licenses" draggable="true">
+        <div class="card card-sm">
+            <div class="card-header d-flex justify-content-between align-items-center py-2 px-3">
+                <h3 class="card-title text-uppercase font-weight-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">
+                    Software License Seats
+                </h3>
+                <div class="card-actions d-flex align-items-center">
+                    <!-- Size Selector -->
+                    <div class="btn-group btn-group-sm me-2" role="group">
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-resize-btn" data-size="S" title="Set to 1/3 Width">S</button>
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-resize-btn" data-size="M" title="Set to 1/2 Width">M</button>
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-resize-btn" data-size="L" title="Set to Full Width">L</button>
+                    </div>
+                    <!-- Reorder Arrows -->
+                    <div class="btn-group btn-group-sm me-2" role="group">
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-move-btn" data-dir="left" title="Move Left/Up">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-left" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 6l-6 6l6 6" /></svg>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-move-btn" data-dir="right" title="Move Right/Down">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-right" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M9 6l6 6l-6 6" /></svg>
+                        </button>
+                    </div>
+                    <!-- Grip Handle -->
+                    <span class="widget-grip-handle" title="Drag to reorder">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-grip-vertical" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M9 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M9 19m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M15 5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M15 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M15 19m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /></svg>
+                    </span>
+                </div>
+            </div>
+            <div class="card-body py-3">
+                <div class="text-muted small mb-2">Highest Utilization Rates</div>
+                
+                {% for item in license_stats %}
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="font-weight-bold">
+                            <a href="{% url 'licenses:license_detail' item.license.pk %}" class="text-reset">{{ item.license.name }}</a>
+                        </span>
+                        <span class="text-muted">{{ item.allocated }}/{{ item.total }} seats ({{ item.util_pct }}%)</span>
+                    </div>
+                    <div class="progress progress-xs">
+                        <div class="progress-bar {% if item.util_pct >= 90 %}bg-danger{% elif item.util_pct >= 70 %}bg-warning{% else %}bg-green{% endif %}" style="width: {{ item.util_pct }}%"></div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-muted text-center py-4">No software licenses registered.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. ACTIVE MAINTENANCES WIDGET -->
+    <div class="col-12 col-md-6 col-lg-4 dashboard-widget" id="widget-maintenances" draggable="true">
+        <div class="card card-sm">
+            <div class="card-header d-flex justify-content-between align-items-center py-2 px-3">
+                <h3 class="card-title text-uppercase font-weight-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">
+                    Active Repairs & Maintenances
+                </h3>
+                <div class="card-actions d-flex align-items-center">
+                    <!-- Size Selector -->
+                    <div class="btn-group btn-group-sm me-2" role="group">
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-resize-btn" data-size="S" title="Set to 1/3 Width">S</button>
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-resize-btn" data-size="M" title="Set to 1/2 Width">M</button>
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-resize-btn" data-size="L" title="Set to Full Width">L</button>
+                    </div>
+                    <!-- Reorder Arrows -->
+                    <div class="btn-group btn-group-sm me-2" role="group">
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-move-btn" data-dir="left" title="Move Left/Up">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-left" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 6l-6 6l6 6" /></svg>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-move-btn" data-dir="right" title="Move Right/Down">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-right" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M9 6l6 6l-6 6" /></svg>
+                        </button>
+                    </div>
+                    <!-- Grip Handle -->
+                    <span class="widget-grip-handle" title="Drag to reorder">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-grip-vertical" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M9 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M9 19m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M15 5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M15 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M15 19m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /></svg>
+                    </span>
+                </div>
+            </div>
+            <div class="card-body py-3">
+                <div class="text-muted small mb-2">Ongoing Repairs (Downtime): <span class="h4 text-orange font-weight-bold ms-1">{{ active_maintenance_count }}</span></div>
+                
+                <div class="list-group list-group-flush" style="font-size: 0.85rem;">
+                    {% for maint in active_maintenances %}
+                    <div class="list-group-item px-0 py-2">
+                        <div class="d-flex justify-content-between font-weight-bold mb-1">
+                            <a href="{% url 'assets:asset_detail' maint.asset.pk %}" class="text-reset">{{ maint.asset.name }}</a>
+                            <span class="text-orange">${{ maint.cost|default:"0.00" }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between text-muted small">
+                            <span>{{ maint.get_maintenance_type_display }} ({{ maint.supplier|default:"Internal" }})</span>
+                            <span>Started: {{ maint.start_date|date:"Y-m-d" }}</span>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-muted text-center py-4">No active maintenance tasks recorded.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. EOL CRITICAL PLANNING ALERTS -->
+    <div class="col-12 col-md-6 col-lg-4 dashboard-widget" id="widget-eol" draggable="true">
+        <div class="card card-sm">
+            <div class="card-header d-flex justify-content-between align-items-center py-2 px-3">
+                <h3 class="card-title text-uppercase font-weight-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">
+                    EOL Planning Alerts
+                </h3>
+                <div class="card-actions d-flex align-items-center">
+                    <!-- Size Selector -->
+                    <div class="btn-group btn-group-sm me-2" role="group">
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-resize-btn" data-size="S" title="Set to 1/3 Width">S</button>
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-resize-btn" data-size="M" title="Set to 1/2 Width">M</button>
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-resize-btn" data-size="L" title="Set to Full Width">L</button>
+                    </div>
+                    <!-- Reorder Arrows -->
+                    <div class="btn-group btn-group-sm me-2" role="group">
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-move-btn" data-dir="left" title="Move Left/Up">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-left" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 6l-6 6l6 6" /></svg>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-move-btn" data-dir="right" title="Move Right/Down">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-right" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M9 6l6 6l-6 6" /></svg>
+                        </button>
+                    </div>
+                    <!-- Grip Handle -->
+                    <span class="widget-grip-handle" title="Drag to reorder">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-grip-vertical" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M9 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M9 19m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M15 5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M15 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M15 19m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /></svg>
+                    </span>
+                </div>
+            </div>
+            <div class="card-body py-3">
+                <div class="text-muted small mb-2">Hardware Expiring within 90 days</div>
+                
+                <div class="list-group list-group-flush" style="font-size: 0.85rem;">
+                    {% for alert in eol_alerts %}
+                    <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="font-weight-bold">
+                                <a href="{% url 'assets:asset_detail' alert.asset.pk %}" class="text-reset">{{ alert.asset.name }}</a>
+                            </div>
+                            <div class="text-muted small">{{ alert.asset.asset_type }} &middot; EOL: {{ alert.eol_date|date:"Y-m-d" }}</div>
+                        </div>
+                        <div>
+                            {% if alert.days_left < 0 %}
+                            <span class="badge bg-red-lt text-red">EXPIRED</span>
+                            {% else %}
+                            <span class="badge bg-yellow-lt text-yellow">{{ alert.days_left }} Days Left</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-muted text-center py-4">No assets approaching EOL limit.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. RECENT ACTIVITY LOG -->
+    <div class="col-12 col-md-6 col-lg-4 dashboard-widget" id="widget-activity" draggable="true">
+        <div class="card card-sm">
+            <div class="card-header d-flex justify-content-between align-items-center py-2 px-3">
+                <h3 class="card-title text-uppercase font-weight-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">
+                    Recent Activity Logs
+                </h3>
+                <div class="card-actions d-flex align-items-center">
+                    <!-- Size Selector -->
+                    <div class="btn-group btn-group-sm me-2" role="group">
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-resize-btn" data-size="S" title="Set to 1/3 Width">S</button>
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-resize-btn" data-size="M" title="Set to 1/2 Width">M</button>
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-resize-btn" data-size="L" title="Set to Full Width">L</button>
+                    </div>
+                    <!-- Reorder Arrows -->
+                    <div class="btn-group btn-group-sm me-2" role="group">
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-move-btn" data-dir="left" title="Move Left/Up">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-left" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 6l-6 6l6 6" /></svg>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-icon widget-move-btn" data-dir="right" title="Move Right/Down">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-right" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M9 6l6 6l-6 6" /></svg>
+                        </button>
+                    </div>
+                    <!-- Grip Handle -->
+                    <span class="widget-grip-handle" title="Drag to reorder">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-grip-vertical" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M9 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M9 19m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M15 5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M15 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M15 19m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /></svg>
+                    </span>
+                </div>
+            </div>
+            <div class="card-body py-3">
+                <div class="text-muted small mb-2">Audit trail actions</div>
+                
+                <div class="list-group list-group-flush" style="font-size: 0.85rem;">
+                    {% for act in recent_activity %}
+                    <div class="list-group-item px-0 py-2">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="font-weight-bold">{{ act.user.username|title }}</span>
+                            <span class="badge {% if act.action == 'checked_out' %}bg-blue-lt text-blue{% elif act.action == 'checked_in' %}bg-green-lt text-green{% else %}bg-purple-lt text-purple{% endif %}">
+                                {{ act.get_action_display }}
+                            </span>
+                        </div>
+                        <div class="text-reset font-weight-bold mb-1">
+                            <a href="{% url 'assets:asset_detail' act.asset.pk %}" class="text-reset">{{ act.asset.name }}</a>
+                        </div>
+                        <div class="d-flex justify-content-between text-muted small">
+                            <span>{{ act.notes|default:"No notes." }}</span>
+                            <span>{{ act.timestamp|timesince }} ago</span>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-muted text-center py-4">No recent activity logged.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
-{% endblock %} 
+
+{# --- Dynamic Customization Script --- #}
+<script>
+    (function() {
+        const container = document.getElementById('dashboard-widgets-container');
+        const toggles = document.querySelectorAll('.widget-toggle');
+        const resetBtn = document.getElementById('reset-widgets-btn');
+
+        // Helper to apply and retrieve widths
+        function getClassesForSize(size) {
+            if (size === 'S') return 'col-12 col-md-6 col-lg-4';
+            if (size === 'M') return 'col-12 col-md-6 col-lg-6';
+            if (size === 'L') return 'col-12 col-lg-12';
+            return 'col-12 col-md-6 col-lg-4'; // Default
+        }
+
+        // Load visibility, order, and custom widths from localStorage
+        function loadWidgetState() {
+            const storedOrder = localStorage.getItem('dashboard_widget_order');
+            const storedVisibility = localStorage.getItem('dashboard_widget_visibility');
+            const storedSizes = localStorage.getItem('dashboard_widget_sizes');
+
+            if (storedVisibility) {
+                const visibilityMap = JSON.parse(storedVisibility);
+                toggles.forEach(toggle => {
+                    const widgetId = toggle.getAttribute('data-widget');
+                    const isVisible = visibilityMap[widgetId] !== false;
+                    toggle.checked = isVisible;
+                    const widgetEl = document.getElementById(widgetId);
+                    if (widgetEl) {
+                        if (isVisible) {
+                            widgetEl.classList.remove('d-none');
+                        } else {
+                            widgetEl.classList.add('d-none');
+                        }
+                    }
+                });
+            }
+
+            if (storedSizes) {
+                const sizesMap = JSON.parse(storedSizes);
+                Object.keys(sizesMap).forEach(widgetId => {
+                    const widgetEl = document.getElementById(widgetId);
+                    if (widgetEl) {
+                        const size = sizesMap[widgetId];
+                        widgetEl.className = 'dashboard-widget ' + getClassesForSize(size);
+                        // Highlight active button
+                        const activeBtn = widgetEl.querySelector(`.widget-resize-btn[data-size="${size}"]`);
+                        if (activeBtn) {
+                            widgetEl.querySelectorAll('.widget-resize-btn').forEach(btn => btn.classList.remove('active', 'btn-primary'));
+                            activeBtn.classList.add('active', 'btn-primary');
+                        }
+                    }
+                });
+            }
+
+            if (storedOrder) {
+                const orderArr = JSON.parse(storedOrder);
+                const elementMap = {};
+                document.querySelectorAll('.dashboard-widget').forEach(el => {
+                    elementMap[el.id] = el;
+                });
+
+                orderArr.forEach(id => {
+                    if (elementMap[id] && container) {
+                        container.appendChild(elementMap[id]);
+                    }
+                });
+            }
+        }
+
+        function saveWidgetState() {
+            // Save Visibility
+            const visibilityMap = {};
+            toggles.forEach(toggle => {
+                visibilityMap[toggle.getAttribute('data-widget')] = toggle.checked;
+            });
+            localStorage.setItem('dashboard_widget_visibility', JSON.stringify(visibilityMap));
+
+            // Save Order
+            const orderArr = [];
+            document.querySelectorAll('.dashboard-widget').forEach(el => {
+                orderArr.push(el.id);
+            });
+            localStorage.setItem('dashboard_widget_order', JSON.stringify(orderArr));
+
+            // Save Sizes
+            const sizesMap = {};
+            document.querySelectorAll('.dashboard-widget').forEach(el => {
+                const activeBtn = el.querySelector('.widget-resize-btn.active');
+                if (activeBtn) {
+                    sizesMap[el.id] = activeBtn.getAttribute('data-size');
+                }
+            });
+            localStorage.setItem('dashboard_widget_sizes', JSON.stringify(sizesMap));
+        }
+
+        // 1. Toggle Visibility Event Handlers
+        toggles.forEach(toggle => {
+            toggle.addEventListener('change', () => {
+                const widgetId = toggle.getAttribute('data-widget');
+                const widgetEl = document.getElementById(widgetId);
+                if (widgetEl) {
+                    if (toggle.checked) {
+                        widgetEl.classList.remove('d-none');
+                    } else {
+                        widgetEl.classList.add('d-none');
+                    }
+                }
+                saveWidgetState();
+            });
+        });
+
+        // 2. Click-to-Resize Event Handlers
+        function initResizeButtons() {
+            document.querySelectorAll('.widget-resize-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const widgetEl = this.closest('.dashboard-widget');
+                    const size = this.getAttribute('data-size');
+                    if (widgetEl) {
+                        // Apply classes
+                        widgetEl.className = 'dashboard-widget ' + getClassesForSize(size);
+                        // Update active state in buttons
+                        widgetEl.querySelectorAll('.widget-resize-btn').forEach(b => b.classList.remove('active', 'btn-primary'));
+                        this.classList.add('active', 'btn-primary');
+                        saveWidgetState();
+                    }
+                });
+            });
+        }
+
+        // 3. Click-to-Move Event Handlers (Fail-Safe Reordering)
+        function initMoveButtons() {
+            document.querySelectorAll('.widget-move-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const widgetEl = this.closest('.dashboard-widget');
+                    const dir = this.getAttribute('data-dir');
+                    if (widgetEl && container) {
+                        if (dir === 'left') {
+                            const prev = widgetEl.previousElementSibling;
+                            if (prev && prev.classList.contains('dashboard-widget')) {
+                                container.insertBefore(widgetEl, prev);
+                            }
+                        } else if (dir === 'right') {
+                            const next = widgetEl.nextElementSibling;
+                            if (next && next.classList.contains('dashboard-widget')) {
+                                container.insertBefore(next, widgetEl);
+                            }
+                        }
+                        saveWidgetState();
+                    }
+                });
+            });
+        }
+
+        // 4. Drag & Drop Event Listeners with Placeholder Dropzones (HTML5 DnD)
+        let dragSrcEl = null;
+        let placeholder = document.createElement('div');
+        placeholder.className = 'dashboard-widget-placeholder';
+        placeholder.innerHTML = '<div class="card" style="border: 2px dashed #206bc4; min-height: 200px; background: rgba(32,107,196,0.05); margin-bottom: 24px;"></div>';
+
+        function handleDragStart(e) {
+            dragSrcEl = this;
+            this.style.opacity = '0.3';
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', this.id);
+            
+            // Sync placeholder columns class matching the dragged widget
+            placeholder.className = this.className + ' dashboard-widget-placeholder';
+        }
+
+        function handleDragOver(e) {
+            if (e.preventDefault) {
+                e.preventDefault(); 
+            }
+            e.dataTransfer.dropEffect = 'move';
+
+            const target = e.target.closest('.dashboard-widget');
+            if (target && target !== dragSrcEl) {
+                const rect = target.getBoundingClientRect();
+                const next = (e.clientX - rect.left) / (rect.right - rect.left) > 0.5;
+                container.insertBefore(placeholder, next ? target.nextSibling : target);
+            }
+            return false;
+        }
+
+        function handleDrop(e) {
+            if (e.stopPropagation) {
+                e.stopPropagation(); 
+            }
+
+            if (placeholder.parentNode) {
+                placeholder.parentNode.insertBefore(dragSrcEl, placeholder);
+            }
+            saveWidgetState();
+            return false;
+        }
+
+        function handleDragEnd(e) {
+            this.style.opacity = '1.0';
+            this.classList.remove('dragging');
+            if (placeholder.parentNode) {
+                placeholder.parentNode.removeChild(placeholder);
+            }
+        }
+
+        function initDragAndDrop() {
+            const widgets = document.querySelectorAll('.dashboard-widget');
+            widgets.forEach(widget => {
+                widget.addEventListener('dragstart', handleDragStart, false);
+                widget.addEventListener('dragenter', function(e) { e.preventDefault(); }, false);
+                widget.addEventListener('dragover', handleDragOver, false);
+                widget.addEventListener('drop', handleDrop, false);
+                widget.addEventListener('dragend', handleDragEnd, false);
+            });
+        }
+
+        // 5. Reset Button
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => {
+                localStorage.removeItem('dashboard_widget_order');
+                localStorage.removeItem('dashboard_widget_visibility');
+                localStorage.removeItem('dashboard_widget_sizes');
+                window.location.reload();
+            });
+        }
+
+        // Initial setup on standard load
+        loadWidgetState();
+        initResizeButtons();
+        initMoveButtons();
+        initDragAndDrop();
+    })();
+</script>
+{% endblock %}

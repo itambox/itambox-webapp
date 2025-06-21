@@ -1,3 +1,950 @@
 from django.test import TestCase
+from django.urls import reverse
+from django.contrib.auth import get_user_model
+from assets.models import Manufacturer, ComponentType, ComponentInstance, Asset, AssetType, AssetRole, Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, ActivityLog, CustodyReceipt, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, KitItem
+from core.models import Notification
+from django.contrib.contenttypes.models import ContentType
+from organization.models import Contact, ContactRole, ContactAssignment
 
-# Create your tests here.
+from decimal import Decimal
+
+User = get_user_model()
+
+class ComponentTrackingTestCase(TestCase):
+    def setUp(self):
+        # Create user
+        self.user = User.objects.create_user(username='testadmin', password='testpassword', is_staff=True, is_superuser=True)
+        self.client.login(username='testadmin', password='testpassword')
+        
+        # Create manufacturer
+        self.manufacturer = Manufacturer.objects.create(name="Dell", slug="dell")
+        
+        # Create component type
+        self.comp_type = ComponentType.objects.create(
+            manufacturer=self.manufacturer,
+            name="16GB DDR5 RAM",
+            slug="dell-16gb-ddr5-ram",
+            category=ComponentType.CATEGORY_RAM,
+            specs="16GB DDR5 4800MHz",
+            part_number="RAM-16G-D5"
+        )
+        
+        # Create asset role and type
+        self.role = AssetRole.objects.create(name="Server", slug="server")
+        self.asset_type = AssetType.objects.create(
+            manufacturer=self.manufacturer,
+            model="PowerEdge R750",
+            slug="dell-poweredge-r750"
+        )
+        
+        # Create asset
+        self.asset = Asset.objects.create(
+            name="Web Server 01",
+            asset_tag="SRV-001",
+            asset_type=self.asset_type,
+            asset_role=self.role
+        )
+        
+        # Create component instance
+        self.comp_instance = ComponentInstance.objects.create(
+            component_type=self.comp_type,
+            serial_number="SN-RAM-12345",
+            parent_asset=self.asset,
+            status=ComponentInstance.STATUS_INSTALLED,
+            purchase_cost=Decimal("150.00")
+        )
+
+    def test_component_type_detail_view(self):
+        response = self.client.get(reverse('assets:componenttype_detail', kwargs={'pk': self.comp_type.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "16GB DDR5 RAM")
+        self.assertContains(response, "Memory (RAM)")
+
+    def test_component_type_list_view(self):
+        response = self.client.get(reverse('assets:componenttype_list'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "16GB DDR5 RAM")
+
+    def test_component_type_create_view(self):
+        response = self.client.get(reverse('assets:componenttype_create'))
+        self.assertEqual(response.status_code, 200)
+        
+        post_data = {
+            'manufacturer': self.manufacturer.pk,
+            'name': '2TB NVMe SSD',
+            'slug': 'dell-2tb-nvme-ssd',
+            'category': ComponentType.CATEGORY_STORAGE,
+            'part_number': 'SSD-2TB-NVME',
+            'specs': '2TB PCIe Gen4',
+            'description': 'Samsung SSD for server storage'
+        }
+        response = self.client.post(reverse('assets:componenttype_create'), data=post_data)
+        self.assertEqual(response.status_code, 302) # Redirect to detail view
+        self.assertTrue(ComponentType.objects.filter(name='2TB NVMe SSD').exists())
+
+    def test_component_type_update_view(self):
+        response = self.client.get(reverse('assets:componenttype_update', kwargs={'pk': self.comp_type.pk}))
+        self.assertEqual(response.status_code, 200)
+        
+        post_data = {
+            'manufacturer': self.manufacturer.pk,
+            'name': '16GB DDR5 RAM (Updated)',
+            'slug': 'dell-16gb-ddr5-ram',
+            'category': ComponentType.CATEGORY_RAM,
+            'part_number': 'RAM-16G-D5-UPDATED',
+            'specs': '16GB DDR5 5200MHz',
+            'description': 'Updated spec RAM'
+        }
+        response = self.client.post(reverse('assets:componenttype_update', kwargs={'pk': self.comp_type.pk}), data=post_data)
+        self.assertEqual(response.status_code, 302)
+        self.comp_type.refresh_from_db()
+        self.assertEqual(self.comp_type.name, '16GB DDR5 RAM (Updated)')
+
+    def test_component_type_delete_view(self):
+        # Trying to delete with active physical instance should fail with error message/redirect
+        response = self.client.post(reverse('assets:componenttype_delete', kwargs={'pk': self.comp_type.pk}))
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(ComponentType.objects.filter(pk=self.comp_type.pk).exists())
+        
+        # Delete instance first
+        self.comp_instance.delete()
+        response = self.client.post(reverse('assets:componenttype_delete', kwargs={'pk': self.comp_type.pk}))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(ComponentType.objects.filter(pk=self.comp_type.pk).exists())
+
+    def test_component_instance_detail_view(self):
+        response = self.client.get(reverse('assets:componentinstance_detail', kwargs={'pk': self.comp_instance.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "SN-RAM-12345")
+        self.assertContains(response, "Installed")
+
+    def test_component_instance_list_view(self):
+        response = self.client.get(reverse('assets:componentinstance_list'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "SN-RAM-12345")
+
+    def test_component_instance_create_view(self):
+        response = self.client.get(reverse('assets:componentinstance_create'))
+        self.assertEqual(response.status_code, 200)
+        
+        post_data = {
+            'component_type': self.comp_type.pk,
+            'serial_number': 'SN-RAM-99999',
+            'parent_asset': self.asset.pk,
+            'status': ComponentInstance.STATUS_INSTALLED,
+            'purchase_cost': '145.50',
+            'notes': 'New secondary RAM stick'
+        }
+        response = self.client.post(reverse('assets:componentinstance_create'), data=post_data)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(ComponentInstance.objects.filter(serial_number='SN-RAM-99999').exists())
+
+    def test_component_instance_update_view(self):
+        response = self.client.get(reverse('assets:componentinstance_update', kwargs={'pk': self.comp_instance.pk}))
+        self.assertEqual(response.status_code, 200)
+        
+        post_data = {
+            'component_type': self.comp_type.pk,
+            'serial_number': 'SN-RAM-12345-UPDATED',
+            'parent_asset': '',
+            'status': ComponentInstance.STATUS_IN_STOCK,
+            'purchase_cost': '120.00',
+            'notes': 'Uninstalled RAM stick'
+        }
+        response = self.client.post(reverse('assets:componentinstance_update', kwargs={'pk': self.comp_instance.pk}), data=post_data)
+        self.assertEqual(response.status_code, 302)
+        self.comp_instance.refresh_from_db()
+        self.assertEqual(self.comp_instance.serial_number, 'SN-RAM-12345-UPDATED')
+        self.assertEqual(self.comp_instance.status, ComponentInstance.STATUS_IN_STOCK)
+        self.assertIsNone(self.comp_instance.parent_asset)
+
+    def test_component_instance_delete_view(self):
+        response = self.client.post(reverse('assets:componentinstance_delete', kwargs={'pk': self.comp_instance.pk}))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(ComponentInstance.objects.filter(pk=self.comp_instance.pk).exists())
+
+    def test_asset_detail_view_components_integration(self):
+        response = self.client.get(reverse('assets:asset_detail', kwargs={'pk': self.asset.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "SN-RAM-12345")
+        self.assertContains(response, "Installed Physical Modules / Components")
+        
+        self.assertIn('components_table', response.context)
+        comp_table = response.context['components_table']
+        self.assertEqual(len(comp_table.rows), 1)
+
+    def test_accessory_crud_and_checkout_views(self):
+        # Create Accessory
+        acc = Accessory.objects.create(
+            manufacturer=self.manufacturer,
+            name="Wired Keyboard KB216",
+            slug="dell-wired-keyboard-kb216",
+            category=Accessory.CATEGORY_KEYBOARD,
+            qty=10,
+            min_qty=2,
+            allow_overallocate=False
+        )
+
+        # 1. List View
+        response = self.client.get(reverse('assets:accessory_list'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Wired Keyboard KB216")
+
+        # 2. Detail View
+        response = self.client.get(reverse('assets:accessory_detail', kwargs={'pk': acc.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Wired Keyboard KB216")
+
+        # 3. Create View
+        post_data = {
+            'manufacturer': self.manufacturer.pk,
+            'name': 'Wireless Mouse WM126',
+            'slug': 'dell-wireless-mouse-wm126',
+            'category': Accessory.CATEGORY_MOUSE,
+            'part_number': 'MS-WM126',
+            'qty': 15,
+            'min_qty': 3,
+            'allow_overallocate': True,
+            'notes': 'Office standard mouse'
+        }
+        response = self.client.post(reverse('assets:accessory_create'), data=post_data)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Accessory.objects.filter(name='Wireless Mouse WM126').exists())
+
+        # 4. Strict Checkout Limit Validation (qty=11 > remaining=10, overallocate=False)
+        from organization.models import AssetHolder
+        holder = AssetHolder.objects.create(first_name="John", last_name="Doe", email="john@example.com")
+        
+        checkout_data = {
+            'assigned_holder': holder.pk,
+            'assigned_location': '',
+            'qty': 11,
+            'notes': 'Over-allocate attempt'
+        }
+        response = self.client.post(reverse('assets:accessory_checkout', kwargs={'pk': acc.pk}), data=checkout_data)
+        self.assertEqual(AccessoryAssignment.objects.filter(accessory=acc).count(), 0)
+
+        # 5. Successful Checkout (qty=5 <= 10)
+        checkout_data['qty'] = 5
+        response = self.client.post(reverse('assets:accessory_checkout', kwargs={'pk': acc.pk}), data=checkout_data)
+        self.assertEqual(response.status_code, 204) # 204 No Content for success HTMX modal
+        self.assertEqual(AccessoryAssignment.objects.filter(accessory=acc).count(), 1)
+        self.assertEqual(acc.remaining_qty, 5)
+
+        # 6. Check In (Checkin Assignment deletes it)
+        assignment = AccessoryAssignment.objects.get(accessory=acc)
+        response = self.client.post(reverse('assets:accessory_checkin', kwargs={'pk': assignment.pk}))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(AccessoryAssignment.objects.filter(accessory=acc).count(), 0)
+        self.assertEqual(acc.remaining_qty, 10)
+
+    def test_consumable_stock_and_alert_signals(self):
+        # Create Consumable with min_qty safety limit
+        con = Consumable.objects.create(
+            manufacturer=self.manufacturer,
+            name="Thermal Paste MX-4",
+            slug="dell-thermal-paste-mx-4",
+            category=Consumable.CATEGORY_THERMAL_PASTE,
+            qty=5,
+            min_qty=3,
+            allow_overallocate=False
+        )
+
+        from organization.models import AssetHolder
+        holder = AssetHolder.objects.create(first_name="Jane", last_name="Smith", email="jane@example.com")
+
+        # Checkout 1 unit (remaining = 4, which is >= min_qty 3) -> No Notification generated
+        con_assign = ConsumableAssignment.objects.create(
+            consumable=con,
+            assigned_holder=holder,
+            qty=1
+        )
+        self.assertEqual(con.remaining_qty, 4)
+        # Verify no notification created for con yet
+        self.assertFalse(Notification.objects.filter(subject__contains="Thermal Paste MX-4").exists())
+
+        # Checkout 2 more units (remaining = 2, which is < min_qty 3) -> Triggers Notification!
+        con_assign_2 = ConsumableAssignment.objects.create(
+            consumable=con,
+            assigned_holder=holder,
+            qty=2
+        )
+        self.assertEqual(con.remaining_qty, 2)
+        # Check that notification was triggered by the post_save signal
+        self.assertTrue(Notification.objects.filter(subject__contains="Thermal Paste MX-4", level=Notification.LEVEL_WARNING).exists())
+
+        # Checkout 3 more units (overallocated, remaining = -1) -> Triggers LEVEL_DANGER notification!
+        con.allow_overallocate = True
+        con.save()
+        con_assign_3 = ConsumableAssignment.objects.create(
+            consumable=con,
+            assigned_holder=holder,
+            qty=3
+        )
+        self.assertEqual(con.remaining_qty, -1)
+        self.assertTrue(Notification.objects.filter(subject__contains="Thermal Paste MX-4", level=Notification.LEVEL_DANGER).exists())
+
+        # Test Notification Center UI / mark read
+        notif = Notification.objects.filter(user=self.user, is_read=False).first()
+        if notif:
+            response = self.client.post(reverse('users:mark_notification_read', kwargs={'pk': notif.pk}))
+            self.assertEqual(response.status_code, 302)
+            notif.refresh_from_db()
+            self.assertTrue(notif.is_read)
+
+    def test_asset_audit_view(self):
+        response = self.client.post(reverse('assets:asset_audit', kwargs={'pk': self.asset.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Audited")
+        
+        self.asset.refresh_from_db()
+        self.assertIsNotNone(self.asset.last_audited)
+        self.assertEqual(self.asset.last_audited_by, self.user)
+        self.assertTrue(ActivityLog.objects.filter(asset=self.asset, action='audited').exists())
+
+    def test_asset_label_print_view(self):
+        response = self.client.get(reverse('assets:asset_label_print', kwargs={'pk': self.asset.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Thermal Label Preview")
+        self.assertContains(response, "<svg") # Pure vector QR code SVG
+
+    def test_custody_receipt_signoff(self):
+        from organization.models import AssetHolder
+        holder = AssetHolder.objects.create(first_name="Alice", last_name="Wonder", upn="alice@example.com")
+        
+        # 1. Generate EULA checkout token
+        from django.core import signing
+        token = signing.dumps({
+            'asset_id': self.asset.pk,
+            'holder_id': holder.pk
+        })
+        
+        # 2. Open EULA portal view
+        sign_url = reverse('assets:custody_eula_sign', kwargs={'token': token})
+        response = self.client.get(sign_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "custody-sign-form")
+        
+        # 3. Invalid token EULA sign
+        invalid_url = reverse('assets:custody_eula_sign', kwargs={'token': "invalid-token-value"})
+        response = self.client.get(invalid_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Validation Failure")
+        
+        # 4. Successful EULA signing upload
+        post_data = {
+            'signature_canvas': 'data:image/png;base64,drawingdata123'
+        }
+        response = self.client.post(sign_url, data=post_data)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Secured")
+        
+        # Verify custody receipt committed to database
+        self.assertTrue(CustodyReceipt.objects.filter(asset=self.asset, holder=holder).exists())
+        receipt = CustodyReceipt.objects.get(asset=self.asset, holder=holder)
+        self.assertEqual(receipt.signature_canvas, 'data:image/png;base64,drawingdata123')
+        self.assertEqual(len(receipt.verification_hash), 64) # SHA-256 hash length
+
+
+class AssetProcurementTestCase(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='testadmin', password='testpassword', is_staff=True, is_superuser=True)
+        self.client.login(username='testadmin', password='testpassword')
+        
+        self.manufacturer = Manufacturer.objects.create(name="Lenovo", slug="lenovo")
+        self.role = AssetRole.objects.create(name="Laptop", slug="laptop")
+        self.asset_type = AssetType.objects.create(
+            manufacturer=self.manufacturer,
+            model="ThinkPad T14",
+            slug="lenovo-thinkpad-t14"
+        )
+
+    def test_asset_procurement_fields_save_and_display(self):
+        # Create asset with procurement details
+        asset = Asset.objects.create(
+            name="Developer ThinkPad",
+            asset_tag="LAP-001",
+            asset_type=self.asset_type,
+            asset_role=self.role,
+            purchase_cost=Decimal("1249.99"),
+            order_number="PO-998877",
+            supplier="Lenovo Germany GmbH"
+        )
+        
+        # Verify saved correctly in DB
+        asset.refresh_from_db()
+        self.assertEqual(asset.purchase_cost, Decimal("1249.99"))
+        self.assertEqual(asset.order_number, "PO-998877")
+        self.assertEqual(asset.supplier, "Lenovo Germany GmbH")
+
+        # Verify detail page displays them
+        response = self.client.get(reverse('assets:asset_detail', kwargs={'pk': asset.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "$1249.99")
+        self.assertContains(response, "PO-998877")
+        self.assertContains(response, "Lenovo Germany GmbH")
+
+    def test_asset_form_procurement_fields(self):
+        # Test creating new asset via POST
+        post_data = {
+            'name': 'Sales ThinkPad',
+            'asset_tag': 'LAP-002',
+            'asset_type': self.asset_type.pk,
+            'asset_role': self.role.pk,
+            'status': Asset.STATUS_AVAILABLE,
+            'purchase_cost': '999.50',
+            'order_number': 'PO-112233',
+            'supplier': 'Bechtle AG',
+            'notes': 'Sales laptop standard spec',
+            'tags': []
+        }
+        response = self.client.post(reverse('assets:asset_create'), data=post_data)
+        self.assertEqual(response.status_code, 302) # Redirects on success
+        
+        # Verify created asset
+        new_asset = Asset.objects.get(asset_tag='LAP-002')
+        self.assertEqual(new_asset.name, 'Sales ThinkPad')
+        self.assertEqual(new_asset.purchase_cost, Decimal('999.50'))
+        self.assertEqual(new_asset.order_number, 'PO-112233')
+        self.assertEqual(new_asset.supplier, 'Bechtle AG')
+
+        # Test fields are optional
+        post_data_optional = {
+            'name': 'Minimal ThinkPad',
+            'asset_tag': 'LAP-003',
+            'asset_type': self.asset_type.pk,
+            'asset_role': self.role.pk,
+            'status': Asset.STATUS_AVAILABLE,
+            'purchase_cost': '',
+            'order_number': '',
+            'supplier': '',
+            'notes': '',
+            'tags': []
+        }
+        response = self.client.post(reverse('assets:asset_create'), data=post_data_optional)
+        self.assertEqual(response.status_code, 302)
+        
+        minimal_asset = Asset.objects.get(asset_tag='LAP-003')
+        self.assertIsNone(minimal_asset.purchase_cost)
+        self.assertEqual(minimal_asset.order_number, '')
+        self.assertEqual(minimal_asset.supplier, '')
+
+
+class StatusLabelTestCase(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='testadmin', password='testpassword', is_staff=True, is_superuser=True)
+        self.client.login(username='testadmin', password='testpassword')
+        
+    def test_status_label_defaults_exist(self):
+        # Default labels created by migration should exist
+        self.assertTrue(StatusLabel.objects.filter(slug='available').exists())
+        self.assertTrue(StatusLabel.objects.filter(slug='in-use').exists())
+        self.assertTrue(StatusLabel.objects.filter(slug='pending-repair').exists())
+        self.assertTrue(StatusLabel.objects.filter(slug='retired').exists())
+
+    def test_status_label_crud_views(self):
+        # 1. List View
+        response = self.client.get(reverse('assets:statuslabel_list'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Available")
+        self.assertContains(response, "In Use")
+
+        # 2. Detail View
+        label = StatusLabel.objects.get(slug='available')
+        response = self.client.get(reverse('assets:statuslabel_detail', kwargs={'pk': label.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Available")
+
+        # 3. Create View
+        post_data = {
+            'name': 'Archived (Awaiting Disposal)',
+            'slug': 'archived-awaiting-disposal',
+            'type': StatusLabel.TYPE_ARCHIVED,
+            'description': 'Out of service assets waiting for disposal',
+            'color': '333333'
+        }
+        response = self.client.post(reverse('assets:statuslabel_create'), data=post_data)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(StatusLabel.objects.filter(slug='archived-awaiting-disposal').exists())
+
+        # 4. Update View
+        new_label = StatusLabel.objects.get(slug='archived-awaiting-disposal')
+        update_data = {
+            'name': 'Archived (Awaiting Disposal) Updated',
+            'slug': 'archived-awaiting-disposal',
+            'type': StatusLabel.TYPE_ARCHIVED,
+            'description': 'Updated description',
+            'color': '444444'
+        }
+        response = self.client.post(reverse('assets:statuslabel_update', kwargs={'pk': new_label.pk}), data=update_data)
+        self.assertEqual(response.status_code, 302)
+        new_label.refresh_from_db()
+        self.assertEqual(new_label.name, 'Archived (Awaiting Disposal) Updated')
+        self.assertEqual(new_label.color, '444444')
+
+        # 5. Delete View
+        response = self.client.post(reverse('assets:statuslabel_delete', kwargs={'pk': new_label.pk}))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(StatusLabel.objects.filter(slug='archived-awaiting-disposal').exists())
+
+
+class AssetMaintenanceAndLifecycleTestCase(TestCase):
+    def setUp(self):
+        # Create user
+        self.user = User.objects.create_user(username='testadmin', password='testpassword', is_staff=True, is_superuser=True)
+        self.client.login(username='testadmin', password='testpassword')
+        
+        # Create manufacturer and role
+        self.manufacturer = Manufacturer.objects.create(name="Lenovo", slug="lenovo")
+        self.role = AssetRole.objects.create(name="Laptop", slug="laptop")
+        self.status = StatusLabel.objects.get(slug="available")
+        
+        # Create asset type with 24 months EOL
+        self.asset_type = AssetType.objects.create(
+            manufacturer=self.manufacturer,
+            model="ThinkPad T14",
+            slug="lenovo-thinkpad-t14",
+            eol_months=24
+        )
+
+        # Create asset type with no EOL
+        self.asset_type_no_eol = AssetType.objects.create(
+            manufacturer=self.manufacturer,
+            model="ThinkPad T15",
+            slug="lenovo-thinkpad-t15"
+        )
+
+    def test_eol_date_calculations(self):
+        import datetime
+        
+        # 1. Standard calculation: Purchase today + 24 months = today + 2 years
+        today = datetime.date.today()
+        asset = Asset.objects.create(
+            name="Developer ThinkPad",
+            asset_tag="LAP-101",
+            asset_type=self.asset_type,
+            asset_role=self.role,
+            purchase_date=today,
+            status=self.status
+        )
+        # Expected EOL year is today.year + 2. To avoid potential leap-year day offset errors:
+        # We can calculate eol_date manually using standard logic
+        expected_year = today.year + 2
+        try:
+            expected_eol = datetime.date(expected_year, today.month, today.day)
+        except ValueError:
+            expected_eol = datetime.date(expected_year, today.month + 1, 1) - datetime.timedelta(days=1)
+            
+        self.assertEqual(asset.eol_date, expected_eol)
+        self.assertIn("2 year", asset.time_to_eol)
+        
+        # 2. Month-end overflow calculation: Purchase Aug 31 2025 + 6 months -> Feb 31 -> Feb 28 2026 (non-leap)
+        self.asset_type.eol_months = 6
+        self.asset_type.save()
+        asset.purchase_date = datetime.date(2025, 8, 31)
+        asset.save()
+        self.assertEqual(asset.eol_date, datetime.date(2026, 2, 28))
+        
+        # 3. Leap year overflow: Purchase Aug 31 2023 + 6 months -> Feb 29 2024 (leap year)
+        asset.purchase_date = datetime.date(2023, 8, 31)
+        asset.save()
+        self.assertEqual(asset.eol_date, datetime.date(2024, 2, 29))
+
+        # 4. No EOL months defined
+        asset_no_eol = Asset.objects.create(
+            name="Developer ThinkPad No EOL",
+            asset_tag="LAP-102",
+            asset_type=self.asset_type_no_eol,
+            asset_role=self.role,
+            purchase_date=datetime.date(2025, 1, 15),
+            status=self.status
+        )
+        self.assertIsNone(asset_no_eol.eol_date)
+        self.assertEqual(asset_no_eol.time_to_eol, "—")
+
+    def test_total_cost_of_ownership_aggregation(self):
+        import datetime
+        asset = Asset.objects.create(
+            name="Developer ThinkPad",
+            asset_tag="LAP-201",
+            asset_type=self.asset_type,
+            asset_role=self.role,
+            purchase_cost=Decimal("1200.00"),
+            purchase_date=datetime.date(2025, 1, 15),
+            status=self.status
+        )
+        
+        # Initial TCO should be purchase cost
+        self.assertEqual(asset.total_cost_of_ownership, Decimal("1200.00"))
+        
+        # Record maintenance 1 costing $150.00
+        AssetMaintenance.objects.create(
+            asset=asset,
+            supplier="Lenovo Support",
+            maintenance_type=AssetMaintenance.MAINTENANCE_TYPE_REPAIR,
+            cost=Decimal("150.00"),
+            start_date=datetime.date(2025, 3, 1),
+            completion_date=datetime.date(2025, 3, 5),
+            notes="Screen replacement"
+        )
+        
+        # Record maintenance 2 costing $50.00
+        AssetMaintenance.objects.create(
+            asset=asset,
+            supplier="Lenovo Support",
+            maintenance_type=AssetMaintenance.MAINTENANCE_TYPE_UPGRADE,
+            cost=Decimal("50.00"),
+            start_date=datetime.date(2025, 4, 1),
+            completion_date=datetime.date(2025, 4, 2),
+            notes="RAM upgrade"
+        )
+        
+        # Recalculate TCO: 1200 + 150 + 50 = 1400.00
+        self.assertEqual(asset.total_cost_of_ownership, Decimal("1400.00"))
+
+    def test_asset_maintenance_crud_views(self):
+        import datetime
+        from assets.models import AssetMaintenance
+        
+        asset = Asset.objects.create(
+            name="Developer ThinkPad",
+            asset_tag="LAP-301",
+            asset_type=self.asset_type,
+            asset_role=self.role,
+            purchase_cost=Decimal("1200.00"),
+            purchase_date=datetime.date(2025, 1, 15),
+            status=self.status
+        )
+
+        # 1. Create maintenance via View POST
+        post_data = {
+            'asset': asset.pk,
+            'supplier': 'Local Repair Shop',
+            'maintenance_type': AssetMaintenance.MAINTENANCE_TYPE_REPAIR,
+            'cost': '250.00',
+            'start_date': '2025-05-10',
+            'completion_date': '2025-05-15',
+            'notes': 'Fixed motherboard logic board issue'
+        }
+        
+        response = self.client.post(reverse('assets:assetmaintenance_create'), data=post_data)
+        self.assertEqual(response.status_code, 302)
+        
+        # Verify created
+        maint = AssetMaintenance.objects.get(supplier='Local Repair Shop')
+        self.assertEqual(maint.cost, Decimal('250.00'))
+        self.assertEqual(maint.downtime_days, 5)
+        
+        # 2. List View
+        response = self.client.get(reverse('assets:assetmaintenance_list'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Local Repair Shop")
+        self.assertContains(response, "Repair")
+        self.assertContains(response, "$250.00")
+        
+        # 3. Detail View
+        response = self.client.get(reverse('assets:assetmaintenance_detail', kwargs={'pk': maint.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Local Repair Shop")
+        self.assertContains(response, "Fixed motherboard logic board issue")
+        self.assertContains(response, "5 Days")
+
+        # 4. Update View
+        update_data = {
+            'asset': asset.pk,
+            'supplier': 'Local Repair Shop (Premium Center)',
+            'maintenance_type': AssetMaintenance.MAINTENANCE_TYPE_REPAIR,
+            'cost': '280.00',
+            'start_date': '2025-05-10',
+            'completion_date': '2025-05-16',
+            'notes': 'Fixed motherboard logic board issue and cleaned thermal paste'
+        }
+        response = self.client.post(reverse('assets:assetmaintenance_update', kwargs={'pk': maint.pk}), data=update_data)
+        self.assertEqual(response.status_code, 302)
+        maint.refresh_from_db()
+        self.assertEqual(maint.supplier, 'Local Repair Shop (Premium Center)')
+        self.assertEqual(maint.cost, Decimal('280.00'))
+        self.assertEqual(maint.downtime_days, 6)
+
+        # 5. Delete View
+        response = self.client.post(reverse('assets:assetmaintenance_delete', kwargs={'pk': maint.pk}))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(AssetMaintenance.objects.filter(pk=maint.pk).exists())
+
+    def test_manufacturer_support_contacts(self):
+        # 1. Create a Manufacturer via the CRUD views
+        post_data = {
+            'name': 'Dell Technologies',
+            'slug': 'dell-technologies',
+            'description': 'Premium enterprise servers and hardware supplier',
+        }
+        
+        response = self.client.post(reverse('assets:manufacturer_create'), data=post_data)
+        self.assertEqual(response.status_code, 302)
+        
+        # Verify created in DB
+        dell = Manufacturer.objects.get(slug='dell-technologies')
+        
+        # Create dynamic support contact and role and assignment
+        support_role = ContactRole.objects.create(name='Technical Support')
+        contact = Contact.objects.create(
+            name='Dell Enterprise Support',
+            phone='+1 (800) 456-3355',
+            email='enterprise_support@dell.com',
+            web_url='https://support.dell.com'
+        )
+        ContactAssignment.objects.create(
+            contact=contact,
+            role=support_role,
+            content_type=ContentType.objects.get_for_model(dell),
+            object_id=dell.pk,
+            priority='primary'
+        )
+
+        # 2. View details in ManufacturerDetailView
+        response = self.client.get(reverse('assets:manufacturer_detail', kwargs={'pk': dell.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'dell-technologies')
+        self.assertContains(response, '+1 (800) 456-3355')
+        self.assertContains(response, 'enterprise_support@dell.com')
+        self.assertContains(response, 'https://support.dell.com')
+
+        # 3. Create an asset under this manufacturer and view AssetDetailView
+        optiplex_type = AssetType.objects.create(
+            manufacturer=dell,
+            model="OptiPlex 7090",
+            slug="dell-optiplex-7090"
+        )
+        
+        asset = Asset.objects.create(
+            name="Reception Desk Desktop",
+            asset_tag="TAG-DELL-99",
+            asset_type=optiplex_type,
+            serial_number="DELL-SN-12345",
+            status=self.status
+        )
+
+        # Retrieve the details page to ensure support card is visible and mailto links are rendered correctly
+        response = self.client.get(reverse('assets:asset_detail', kwargs={'pk': asset.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Support & Warranty Details')
+        self.assertContains(response, 'enterprise_support@dell.com')
+        self.assertContains(response, 'DELL-SN-12345')
+        self.assertContains(response, 'Dell Technologies')
+
+
+class EnterpriseITAMTestCase(TestCase):
+    def setUp(self):
+        # Create superuser to bypass permission checks in CBVs
+        self.user = User.objects.create_user(username='testadmin', password='testpassword', is_staff=True, is_superuser=True)
+        self.client.login(username='testadmin', password='testpassword')
+
+        # Retrieve default status labels populated by migrations
+        self.available_status = StatusLabel.objects.get(slug='available')
+        self.in_use_status = StatusLabel.objects.get(slug='in-use')
+
+        # Create basic manufacturer and roles
+        self.manufacturer = Manufacturer.objects.create(name="Apple", slug="apple")
+        self.role = AssetRole.objects.create(name="Mobile Phone", slug="mobile-phone")
+
+    def test_dynamic_custom_fieldsets_and_form_saving(self):
+        # 1. Create custom fields
+        sim_field = CustomField.objects.create(
+            name="sim_number",
+            label="SIM Number",
+            field_type=CustomField.FIELD_TYPE_TEXT,
+            required=True
+        )
+        screen_field = CustomField.objects.create(
+            name="screen_size",
+            label="Screen Size",
+            field_type=CustomField.FIELD_TYPE_NUMBER,
+            required=False
+        )
+
+        # 2. Create fieldset and link fields
+        fieldset = CustomFieldset.objects.create(name="Phone Specs")
+        fieldset.fields.add(sim_field, screen_field)
+
+        # 3. Create asset type with fieldset
+        asset_type = AssetType.objects.create(
+            manufacturer=self.manufacturer,
+            model="iPhone 15",
+            slug="apple-iphone-15",
+            custom_fieldset=fieldset
+        )
+
+        # 4. Bind and save AssetForm with custom fields
+        form_data = {
+            'name': 'CEO Phone',
+            'asset_tag': 'PHN-001',
+            'asset_type': asset_type.pk,
+            'asset_role': self.role.pk,
+            'status': self.available_status.pk,
+            'cf_sim_number': '8904903200001234567',
+            'cf_screen_size': '6.1',
+            'notes': 'Dynamic specs test',
+            'tags': []
+        }
+
+        # POST via view
+        response = self.client.post(reverse('assets:asset_create'), data=form_data)
+        self.assertEqual(response.status_code, 302)
+
+        # Verify custom values JSON saved correctly in DB
+        asset = Asset.objects.get(asset_tag='PHN-001')
+        self.assertEqual(asset.custom_values.get('sim_number'), '8904903200001234567')
+        self.assertEqual(asset.custom_values.get('screen_size'), '6.1')
+
+        # Verify values display on the detail page
+        detail_url = reverse('assets:asset_detail', kwargs={'pk': asset.pk})
+        response = self.client.get(detail_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "SIM Number")
+        self.assertContains(response, "8904903200001234567")
+        self.assertContains(response, "Screen Size")
+        self.assertContains(response, "6.1")
+
+    def test_straight_line_depreciation_math(self):
+        import datetime
+        from decimal import Decimal
+
+        # 1. Create a depreciation lifespan of 10 months
+        deprec = Depreciation.objects.create(name="10 Months Schedule", months=10)
+
+        asset_type = AssetType.objects.create(
+            manufacturer=self.manufacturer,
+            model="MacBook Air",
+            slug="apple-macbook-air",
+            depreciation=deprec
+        )
+
+        today = datetime.date.today()
+        # Purchase date 4 months ago
+        purchase_date_4m = today - datetime.timedelta(days=4 * 30)
+
+        # 2. Create asset with $1,000 cost, $0 salvage value
+        asset_mid = Asset.objects.create(
+            name="Developer MacBook",
+            asset_tag="MAC-001",
+            asset_type=asset_type,
+            purchase_cost=Decimal("1000.00"),
+            salvage_value=Decimal("0.00"),
+            purchase_date=purchase_date_4m,
+            status=self.available_status
+        )
+
+        # Math: 1000 - ((1000 - 0) / 10 * 4) = 600
+        # Since months calculation uses calendar years/months, let's check it:
+        months_held = (today.year - purchase_date_4m.year) * 12 + today.month - purchase_date_4m.month
+        expected_val = Decimal("1000.00") - (Decimal("100.00") * Decimal(str(months_held)))
+        self.assertEqual(asset_mid.current_value, expected_val)
+
+        # 3. Create asset purchased 12 months ago (expired depreciation)
+        purchase_date_12m = today - datetime.timedelta(days=12 * 30)
+        asset_expired = Asset.objects.create(
+            name="Old MacBook",
+            asset_tag="MAC-002",
+            asset_type=asset_type,
+            purchase_cost=Decimal("1000.00"),
+            salvage_value=Decimal("100.00"),
+            purchase_date=purchase_date_12m,
+            status=self.available_status
+        )
+        # Should cap at salvage value ($100.00)
+        self.assertEqual(asset_expired.current_value, Decimal("100.00"))
+
+        # 4. Nil purchase cost returns None
+        asset_free = Asset.objects.create(
+            name="Free MacBook",
+            asset_tag="MAC-003",
+            asset_type=asset_type,
+            status=self.available_status
+        )
+        self.assertIsNone(asset_free.current_value)
+
+        # 5. Detail page displays depreciated book value
+        response = self.client.get(reverse('assets:asset_detail', kwargs={'pk': asset_mid.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Depreciated Book Value")
+
+    def test_atomic_kit_checkout_flow(self):
+        from organization.models import AssetHolder
+        from software.models import Software
+        from licenses.models import License
+
+        # 1. Setup kit components
+        laptop_type = AssetType.objects.create(
+            manufacturer=self.manufacturer,
+            model="MacBook Pro",
+            slug="apple-macbook-pro"
+        )
+        
+        # Accessory
+        charger = Accessory.objects.create(
+            manufacturer=self.manufacturer,
+            name="USB-C 96W Charger",
+            slug="apple-usb-c-96w-charger",
+            qty=5
+        )
+
+        # License
+        sw = Software.objects.create(manufacturer=self.manufacturer, name="Office 365")
+        license_obj = License.objects.create(software=sw, name="O365 Enterprise Seat", seats=2)
+
+        # Create Kit
+        kit = Kit.objects.create(name="Developer Onboarding Kit", description="MacBook, Charger, and O365")
+        
+        # Add KitItems
+        KitItem.objects.create(kit=kit, asset_type=laptop_type)
+        KitItem.objects.create(kit=kit, accessory=charger, qty=1)
+        KitItem.objects.create(kit=kit, license=license_obj)
+
+        holder = AssetHolder.objects.create(first_name="René", last_name="Rettig", upn="rene@example.com")
+
+        # 2. Checkout should FAIL/rollback initially because laptop_type has NO available assets
+        checkout_data = {
+            'assigned_holder': holder.pk,
+            'assigned_location': '',
+            'notes': 'Onboarding René'
+        }
+        
+        response = self.client.post(reverse('assets:kit_checkout_modal', kwargs={'pk': kit.pk}), data=checkout_data, HTTP_HX_REQUEST='true')
+        # Should re-render form with errors
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No available assets of type")
+
+        # Confirm rollback: NO accessory assignments or license assignments created
+        self.assertEqual(AccessoryAssignment.objects.filter(accessory=charger).count(), 0)
+        self.assertEqual(license_obj.assignments.count(), 0)
+
+        # 3. Supply a laptop asset of laptop_type to make checkout SUCCESSFUL
+        Asset.objects.create(
+            name="René MacBook Pro 16",
+            asset_tag="LT-PRO-001",
+            asset_type=laptop_type,
+            status=self.available_status
+        )
+
+        response = self.client.post(reverse('assets:kit_checkout_modal', kwargs={'pk': kit.pk}), data=checkout_data, HTTP_HX_REQUEST='true')
+        # Returns 204 No Content for successful HTMX close
+        self.assertEqual(response.status_code, 204)
+
+        # Verify all assets checked out under transaction
+        # Hardware asset is now 'in-use' (assigned)
+        asset = Asset.objects.get(asset_tag="LT-PRO-001")
+        self.assertEqual(asset.status, self.in_use_status)
+        
+        # Accessory assignment created
+        self.assertEqual(AccessoryAssignment.objects.filter(accessory=charger).count(), 1)
+        self.assertEqual(charger.remaining_qty, 4)
+
+        # License seat assigned
+        self.assertEqual(license_obj.assignments.count(), 1)
+        self.assertEqual(license_obj.available_seats, 1)
+
+        # ActivityLog created
+        self.assertTrue(ActivityLog.objects.filter(asset=asset, action='checked_out').exists())
+
+
+

@@ -1,3 +1,4 @@
+import logging
 import django_tables2 as tables
 from django_tables2.utils import A # Ensure A is imported
 from .models import ObjectChange
@@ -7,6 +8,8 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from .utils import get_model_viewname # Import the utility function
 from django.contrib.contenttypes.models import ContentType # Ensure ContentType is imported
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Custom Columns
@@ -40,12 +43,65 @@ class BaseTable(tables.Table):
     
     # Ensure __init__ is outside Meta
     def __init__(self, *args, **kwargs):
-        # Remove default exclude tuple
-        # default_exclude = ('pk', 'actions')
-        # explicit_exclude = set(kwargs.get('exclude', ()))
-        # exclude_cols = tuple(explicit_exclude.union(default_exclude))
-        # kwargs['exclude'] = exclude_cols
+        # Extract request if present in kwargs to load user preferences
+        request = kwargs.get('request', None)
+        
+        # Call super() FIRST to initialize self.columns
         super().__init__(*args, **kwargs)
+
+        # Get the full set of defined column names *before* hiding
+        base_column_names = set(self.columns.names())
+
+        model = getattr(self.Meta, 'model', None)
+        user_columns = None
+
+        # Get user preferences if available
+        if model is not None and request and request.user.is_authenticated:
+            try:
+                from django.apps import apps
+                UserPreference = apps.get_model('users', 'UserPreference')
+                prefs = UserPreference.objects.filter(user=request.user).first()
+                if prefs and prefs.data:
+                    app_label = model._meta.app_label
+                    table_class_name = self.__class__.__name__
+                    user_config = prefs.data.get('tables', {}).get(app_label, {}).get(table_class_name, {})
+                    user_columns = user_config.get('columns')
+                    logger.debug("Found user columns for %s.%s: %s", app_label, table_class_name, user_columns)
+            except Exception as e:
+                logger.error("Error getting user table prefs: %s", e)
+                pass
+
+        # Determine the effective list of columns to show
+        if user_columns is not None:
+            columns_to_show = user_columns
+        else:
+            columns_to_show = getattr(self.Meta, 'default_columns', ())
+
+        # Define columns that should *always* be visible
+        exempt_columns = ('pk', 'actions')
+
+        # Hide columns NOT in columns_to_show and NOT exempt
+        for name, column in self.columns.items():
+            if name not in columns_to_show and name not in exempt_columns:
+                self.columns.hide(name)
+            elif name in exempt_columns and hasattr(column, 'visible') and not column.visible:
+                 self.columns.show(name)
+
+        # Rearrange sequence
+        final_sequence_list = [
+            *[c for c in columns_to_show if c in base_column_names],
+            *[c for c in base_column_names if c not in columns_to_show]
+        ]
+
+        if 'pk' in final_sequence_list:
+            final_sequence_list.remove('pk')
+            final_sequence_list.insert(0, 'pk')
+
+        if 'actions' in final_sequence_list:
+            final_sequence_list.remove('actions')
+            final_sequence_list.append('actions')
+
+        self.sequence = tuple(final_sequence_list)
 
 class ObjectChangeTable(tables.Table):
     """

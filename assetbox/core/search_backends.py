@@ -1,7 +1,12 @@
 # core/search_backends.py
+import logging
 from django.db.models import F, Value, Q
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import FieldError
+
+logger = logging.getLogger(__name__)
 from .utils import get_content_type_by_natural_key # Assuming this exists
+
 
 from .search import SEARCH_INDEXES
 
@@ -73,9 +78,8 @@ class DatabaseBackend:
                 try:
                     q_objects |= Q(**{f'{field_name}__{lookup}': query})
                 except FieldError:
-                    # Handle cases where lookup isn't valid for a field type (e.g., regex on non-char)
-                    print(f"[Search] Warning: Lookup '{lookup}' not valid for field '{field_name}' on {model.__name__}. Skipping.")
-                    continue 
+                    logger.warning("Lookup '%s' not valid for field '%s' on %s. Skipping.", lookup, field_name, model.__name__)
+                    continue
 
             # Apply query
             queryset = model.objects.filter(q_objects)

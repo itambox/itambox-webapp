@@ -1,0 +1,36 @@
+{% load crispy_forms_tags %}
+{% load partials %}
+<div class="modal modal-blur fade" id="kit-checkout-modal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Checkout Kit: {{ kit.name }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="kit-checkout-form"
+                  hx-post="{% url 'assets:kit_checkout_modal' pk=kit.pk %}"
+                  hx-target="#kit-checkout-modal-form-container"
+                  hx-swap="innerHTML">
+                {% csrf_token %}
+                <div class="modal-body" id="kit-checkout-modal-form-container">
+                    {% startpartial checkout-modal-form %}
+                        {% if form.errors %}
+                            <div class="alert alert-danger">
+                                {% for error in form.non_field_errors %}
+                                    <div>{{ error }}</div>
+                                {% empty %}
+                                    Please correct the errors below.
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        {% crispy form %}
+                    {% endpartial %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Checkout Kit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

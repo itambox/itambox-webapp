@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends base_template|default:"base.html" %}
 {% load static %}
 {% load i18n %}
 {% load helpers %}
@@ -63,7 +63,7 @@
                             <div class="table-responsive">
                                 {% render_table data.table 'django_tables2/bootstrap5-responsive.html' %}
                             </div>
-                            {% if data.count > data.table.page.paginator.per_page %}
+                            {% if data.count > 10 %}
                             <div class="card-footer">
                                 <a href="{{ data.list_url }}?q={{ query|urlencode }}">View all {{ data.count }} {{ data.verbose_name_plural }}</a>
                             </div>
@@ -85,20 +85,26 @@
     {# Add script block to initialize Tom Select #}
     {{ block.super }}
     <script>
-      document.addEventListener("DOMContentLoaded", function() {
-        var el = document.getElementById('id_obj_type_select');
-        if(el){
-          new TomSelect(el, {
-            plugins: {
-				remove_button:{
-					title:'Remove this item',
-				}
-			},
-            // Add other Tom Select options if needed
-            // persist: false,
-            // create: true
-          });
+      (function() {
+        function initSearchTomSelect() {
+          var el = document.getElementById('id_obj_type_select');
+          if (el && !el.tomselect) {
+            new TomSelect(el, {
+              plugins: {
+                remove_button: {
+                  title: 'Remove this item',
+                }
+              }
+            });
+          }
         }
-      });
+
+        // Run immediately if DOM is already loaded
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', initSearchTomSelect);
+        } else {
+          initSearchTomSelect();
+        }
+      })();
     </script>
 {% endblock extra_scripts %}

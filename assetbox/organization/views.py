@@ -1,11 +1,14 @@
 # --- START OF FILE views.py ---
 
 from django.shortcuts import render, redirect, get_object_or_404
+from django.http import HttpResponseBadRequest
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse, reverse_lazy
 from django.views.generic import View
 from django.contrib.auth import get_user_model
 from django.contrib import messages
+
 
 from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView # Import base CBVs
 from core.utils import get_paginate_count, get_model_viewname # Import the utility function and get_model_viewname
@@ -14,26 +17,27 @@ from assets.models import Asset # Import Asset model
 
 
 # Import models from the organization app
-from .models import Site, Region, SiteGroup, Tenant, Location, TenantGroup, AssetHolder, AssetHolderAssignment
+from .models import Site, Region, SiteGroup, Tenant, Location, TenantGroup, AssetHolder, AssetHolderAssignment, Contact, ContactRole, ContactAssignment
 # Import models from the extras app
 from extras.models import Tag # Added import for Tag from extras
 # Import forms from the organization app
 from .forms import (
     SiteForm, RegionForm, SiteGroupForm, LocationForm, TenantGroupForm, TenantForm, AssetHolderForm,
     SiteFilterForm, RegionFilterForm, SiteGroupFilterForm, LocationFilterForm, TenantFilterForm,
-    TenantGroupFilterForm, AssetHolderFilterForm # Placeholder imports - will create forms next
+    TenantGroupFilterForm, AssetHolderFilterForm, ContactForm, ContactRoleForm, ContactAssignmentForm,
+    ContactFilterForm, ContactRoleFilterForm
 )
 from django_tables2 import RequestConfig
 from .tables import ( # Import the tables
     SiteTable, RegionTable, SiteGroupTable, LocationTable, TenantTable, TenantGroupTable,
-    AssetHolderTable, AssetHolderAssignmentTable
+    AssetHolderTable, AssetHolderAssignmentTable, ContactTable, ContactRoleTable, ContactAssignmentTable
 )
 
 
 # Import filters
 from .filters import (
     SiteFilterSet, RegionFilterSet, SiteGroupFilterSet, LocationFilterSet,
-    TenantFilterSet, TenantGroupFilterSet, AssetHolderFilterSet
+    TenantFilterSet, TenantGroupFilterSet, AssetHolderFilterSet, ContactFilterSet, ContactRoleFilterSet
 )
 from users.models import UserPreference # Import UserPreference
 
@@ -42,6 +46,7 @@ from django.db.models import Count
 from django.contrib.contenttypes.models import ContentType
 
 User = get_user_model()
+
 
 # Create your views here.
 
@@ -67,8 +72,12 @@ class SiteDetailView(ObjectDetailView):
 
         # Prepare Locations table
         locations_table = LocationTable(site.locations.all(), request=self.request)
-        # Use RequestConfig from self.request
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(locations_table)
+
+        # Prepare Assets table for Site
+        site_assets = Asset.objects.filter(location__site=site).select_related('asset_role', 'asset_type', 'asset_type__manufacturer', 'location')
+        assets_table = AssetTable(site_assets, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assets_table)
 
         # Prepare Related Objects List
         related_objects_list = []
@@ -79,7 +88,7 @@ class SiteDetailView(ObjectDetailView):
                 'count': location_count,
                 'url': f"{reverse('organization:location_list')}?site={site.slug}" # Filter link
             })
-        asset_count = Asset.objects.filter(location__site=site).count()
+        asset_count = site_assets.count()
         if asset_count:
             related_objects_list.append({
                 'label': 'Assets',
@@ -89,6 +98,7 @@ class SiteDetailView(ObjectDetailView):
 
         # *** INDENTATION FIX START ***
         context['locations_table'] = locations_table
+        context['assets_table'] = assets_table
         context['related_objects_list'] = related_objects_list
         # Base view already adds common context like title, object_type, etc.
         # Base view provides edit/delete URLs in context['action_urls'] based on get_model_viewname
@@ -626,3 +636,173 @@ class AssetHolderAssignmentListView(ObjectListView):
         context['title'] = 'Asset Holder Assignments' # Set specific title
         # Base class handles table, filter_form, model_name_str, table_config_key etc.
         return context
+
+
+# --- Contact Views ---
+
+class ContactListView(ObjectListView):
+    queryset = Contact.objects.prefetch_related('tags')
+    filterset = ContactFilterSet
+    filterset_form = ContactFilterForm
+    table = ContactTable
+    action_buttons = ('add',)
+
+
+class ContactDetailView(ObjectDetailView):
+    queryset = Contact.objects.prefetch_related('tags', 'assignments')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        contact = self.get_object()
+
+        # Prepare Assignments table for this contact
+        assignments_table = ContactAssignmentTable(contact.assignments.all(), request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assignments_table)
+
+        context['assignments_table'] = assignments_table
+        return context
+
+
+class ContactEditView(ObjectEditView):
+    queryset = Contact.objects.all()
+    model = Contact
+    model_form = ContactForm
+    template_name = 'generic/object_edit.html'
+
+
+class ContactDeleteView(ObjectDeleteView):
+    queryset = Contact.objects.all()
+    model = Contact
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('organization:contact_list')
+
+    def post(self, request, *args, **kwargs):
+        contact = self.get_object()
+        assignment_count = contact.assignments.count()
+
+        if assignment_count > 0:
+            messages.error(
+                request,
+                f"Cannot delete contact '{contact}': It has {assignment_count} assignment{'s' if assignment_count != 1 else ''}."
+            )
+            return redirect(contact.get_absolute_url())
+
+        return super().post(request, *args, **kwargs)
+
+
+# --- ContactRole Views ---
+
+class ContactRoleListView(ObjectListView):
+    queryset = ContactRole.objects.all()
+    filterset = ContactRoleFilterSet
+    filterset_form = ContactRoleFilterForm
+    table = ContactRoleTable
+    action_buttons = ('add',)
+
+
+class ContactRoleDetailView(ObjectDetailView):
+    queryset = ContactRole.objects.prefetch_related('assignments')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        role = self.get_object()
+
+        # Prepare Assignments table for this role
+        assignments_table = ContactAssignmentTable(role.assignments.all(), request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assignments_table)
+
+        context['assignments_table'] = assignments_table
+        return context
+
+
+class ContactRoleEditView(ObjectEditView):
+    queryset = ContactRole.objects.all()
+    model = ContactRole
+    model_form = ContactRoleForm
+    template_name = 'generic/object_edit.html'
+
+
+class ContactRoleDeleteView(ObjectDeleteView):
+    queryset = ContactRole.objects.all()
+    model = ContactRole
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('organization:contactrole_list')
+
+    def post(self, request, *args, **kwargs):
+        role = self.get_object()
+        assignment_count = role.assignments.count()
+
+        if assignment_count > 0:
+            messages.error(
+                request,
+                f"Cannot delete role '{role}': It is associated with {assignment_count} contact assignment{'s' if assignment_count != 1 else ''}."
+            )
+            return redirect(role.get_absolute_url())
+
+        return super().post(request, *args, **kwargs)
+
+
+# --- ContactAssignment Views ---
+
+class ContactAssignmentCreateView(LoginRequiredMixin, View):
+    """View to handle dynamic creation of ContactAssignments via a modal form."""
+    template_name = 'organization/contactassignments/contactassignment_form.html'
+
+    def get(self, request, *args, **kwargs):
+        content_type_id = request.GET.get('content_type')
+        object_id = request.GET.get('object_id')
+        
+        if not content_type_id or not object_id:
+            return HttpResponseBadRequest("Missing content_type or object_id")
+            
+        content_type = get_object_or_404(ContentType, id=content_type_id)
+        target_obj = get_object_or_404(content_type.model_class(), id=object_id)
+        
+        form = ContactAssignmentForm(content_type=content_type, object_id=object_id)
+        context = {
+            'form': form,
+            'target_obj': target_obj,
+            'content_type': content_type,
+            'object_id': object_id,
+        }
+        return render(request, self.template_name, context)
+
+    def post(self, request, *args, **kwargs):
+        content_type_id = request.POST.get('content_type') or request.GET.get('content_type')
+        object_id = request.POST.get('object_id') or request.GET.get('object_id')
+        
+        if not content_type_id or not object_id:
+            return HttpResponseBadRequest("Missing content_type or object_id")
+            
+        content_type = get_object_or_404(ContentType, id=content_type_id)
+        target_obj = get_object_or_404(content_type.model_class(), id=object_id)
+        
+        form = ContactAssignmentForm(request.POST, content_type=content_type, object_id=object_id)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Assigned contact successfully to {target_obj}.")
+            return redirect(target_obj.get_absolute_url())
+            
+        context = {
+            'form': form,
+            'target_obj': target_obj,
+            'content_type': content_type,
+            'object_id': object_id,
+        }
+        return render(request, self.template_name, context)
+
+
+class ContactAssignmentDeleteView(ObjectDeleteView):
+    queryset = ContactAssignment.objects.all()
+    model = ContactAssignment
+    template_name = 'generic/object_confirm_delete.html'
+
+    def get_success_url(self):
+        # Redirect back to the assigned object after deletion
+        return_url = self.request.GET.get('return_url') or self.request.POST.get('return_url')
+        if return_url:
+            return return_url
+        obj = self.object
+        if obj and obj.assigned_object and hasattr(obj.assigned_object, 'get_absolute_url'):
+            return obj.assigned_object.get_absolute_url()
+        return reverse('dashboard')

@@ -1,34 +1,40 @@
 {# assetbox/templates/assets/includes/asset_checkout_modal.html #}
 {% load crispy_forms_tags %}
-{% load partials %} {# Added partials tag library #}
+{% load partials %}
 
-{# Define the form partial #}
-{% startpartial checkout-modal-form request form asset %}
-    {# The hx-post etc. stay on the form tag itself #}
-    <form
-        hx-post="{% url 'assets:asset_checkout_modal' pk=asset.pk %}"
-        hx-target="#asset-checkout-modal .modal-content" {# Target modal content for replacement #}
-        hx-swap="outerHTML" {# Replace the whole content on submit #}
-        >
-        {% csrf_token %}
-        <div class="modal-header">
-            <h5 class="modal-title" id="assetCheckOutModalLabel">Check Out Asset: {{ asset.name }}</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+{# Define the form partial (used for both initial render and error re-render) #}
+{% startpartial checkout-modal-form %}
+    {% if form.non_field_errors %}
+        <div class="alert alert-danger mb-3">
+            {% for error in form.non_field_errors %}
+                <div>{{ error }}</div>
+            {% endfor %}
         </div>
-        <div class="modal-body">
-            <p>Select either an Asset Holder or a Location to check this asset out to.</p>
-            {% crispy form %}
-        </div>
-        <div class="modal-footer justify-content-start">
-            <button type="submit" class="btn btn-primary">Assign Asset</button>
-            <button type="button" class="btn btn-secondary ms-2" data-bs-dismiss="modal">Cancel</button>
-        </div>
-    </form>
+    {% endif %}
+    {% crispy form %}
 {% endpartial %}
 
-{# Render the form partial within the base modal structure #}
-{% include 'global_includes/_modal_base.html' with modal_id='asset-checkout-modal' %}
-    {% block modal_content %}
-        {% partial checkout-modal-form request=request form=form asset=asset %}
-    {% endblock %}
-{% endinclude %} 
+{# Self-contained modal — no _modal_base.html to avoid nested <form> bug #}
+<div class="modal modal-blur fade" id="asset-checkout-modal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <form id="asset-checkout-form"
+                  hx-post="{% url 'assets:asset_checkout_modal' pk=asset.pk %}"
+                  hx-target="#asset-checkout-modal-body"
+                  hx-swap="innerHTML">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title" id="assetCheckOutModalLabel">Check Out Asset: {{ asset.name }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="asset-checkout-modal-body">
+                    {% partial checkout-modal-form %}
+                </div>
+                <div class="modal-footer justify-content-start">
+                    <button type="submit" class="btn btn-primary">Assign Asset</button>
+                    <button type="button" class="btn btn-secondary ms-2" data-bs-dismiss="modal">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

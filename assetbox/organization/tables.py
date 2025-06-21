@@ -1,8 +1,9 @@
 # assetbox/organization/tables.py
 import django_tables2 as tables
 from django_tables2.utils import A
-from .models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, AssetHolderAssignment
+from .models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, AssetHolderAssignment, Contact, ContactRole, ContactAssignment
 from core.tables import ActionsColumn, BaseTable
+
 from assets.models import Asset
 from django.urls import reverse
 
@@ -137,4 +138,67 @@ class AssetHolderAssignmentTable(BaseTable):
         default_columns = ('asset_holder', 'assigned_object_type', 'assigned_object')
 
     def render_assigned_object_type(self, record):
-        return record.content_type.model_class()._meta.verbose_name.title() 
+        return record.content_type.model_class()._meta.verbose_name.title()
+
+
+# --- Contact Table ---
+class ContactTable(BaseTable):
+    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    name = tables.LinkColumn('organization:contact_detail', args=[A('pk')], verbose_name='Name')
+    title = tables.Column()
+    phone = tables.Column()
+    email = tables.EmailColumn()
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = Contact
+        fields = ('pk', 'name', 'title', 'phone', 'email', 'web_url', 'description', 'actions')
+        default_columns = ('pk', 'name', 'title', 'phone', 'email', 'actions')
+
+
+# --- ContactRole Table ---
+class ContactRoleTable(BaseTable):
+    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    name = tables.LinkColumn('organization:contactrole_detail', args=[A('pk')], verbose_name='Name')
+    slug = tables.Column()
+    description = tables.Column()
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = ContactRole
+        fields = ('pk', 'name', 'slug', 'description', 'actions')
+        default_columns = ('pk', 'name', 'slug', 'description', 'actions')
+
+
+# --- ContactAssignment Table ---
+class ContactAssignmentTable(BaseTable):
+    contact = tables.LinkColumn('organization:contact_detail', args=[A('contact.pk')], accessor='contact')
+    role = tables.Column()
+    assigned_object_type = tables.Column(accessor='content_type', verbose_name='Object Type')
+    assigned_object = tables.Column(linkify=True, verbose_name='Assigned Object')
+    priority = tables.Column()
+    actions = tables.TemplateColumn(
+        template_code='''
+        <a href="{% url 'organization:contactassignment_delete' record.pk %}?return_url={{ request.path }}" class="btn btn-sm btn-danger px-2" title="Delete">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash m-0" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                <path d="M4 7l16 0"></path>
+                <path d="M10 11l0 6"></path>
+                <path d="M14 11l0 6"></path>
+                <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"></path>
+                <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"></path>
+            </svg>
+        </a>
+        ''',
+        verbose_name='Actions',
+        orderable=False
+    )
+
+    class Meta(BaseTable.Meta):
+        model = ContactAssignment
+        fields = ('contact', 'role', 'assigned_object_type', 'assigned_object', 'priority', 'actions')
+        default_columns = ('contact', 'role', 'assigned_object_type', 'assigned_object', 'priority', 'actions')
+
+    def render_assigned_object_type(self, record):
+        return record.content_type.model_class()._meta.verbose_name.title()
+ 

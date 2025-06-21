@@ -1,0 +1,221 @@
+{# templates/assets/custody/sign_portal.html #}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+    <title>Custody Signoff & EULA Acceptance - AssetBox</title>
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet"/>
+    <style>
+        body {
+            background-color: #f4f6fa;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .signature-container {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            background: #fff;
+            position: relative;
+            cursor: crosshair;
+            touch-action: none; /* Prevent scrolling when signing on mobile */
+        }
+        #signature-canvas {
+            width: 100%;
+            height: 180px;
+            display: block;
+            border-radius: 6px;
+        }
+        .sign-card {
+            max-width: 580px;
+            width: 100%;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card sign-card">
+        <div class="card-header bg-primary text-white py-3">
+            <div>
+                <h3 class="card-title text-white mb-1">Equipment Transfer & Custody Agreement</h3>
+                <p class="card-subtitle text-white-50 mb-0">EULA Acceptance Portal</p>
+            </div>
+        </div>
+        <div class="card-body">
+            {% if error %}
+                <div class="alert alert-danger" role="alert">
+                    <div class="d-flex">
+                        <div>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
+                        </div>
+                        <div>{{ error }}</div>
+                    </div>
+                </div>
+            {% endif %}
+
+            <div class="mb-4">
+                <label class="form-label text-muted">Asset Assigned for Custody</label>
+                <div class="bg-light p-3 rounded d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="mb-1 text-dark">{{ asset.name }}</h4>
+                        <span class="text-muted small">S/N: {{ asset.serial_number|default:"N/A" }}</span>
+                    </div>
+                    <span class="badge bg-purple-lt font-weight-bold">{{ asset.asset_tag }}</span>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label text-muted">Custodian / Asset Holder</label>
+                <div class="bg-light p-3 rounded">
+                    <h4 class="mb-1 text-dark">{{ holder.first_name }} {{ holder.last_name }}</h4>
+                    <span class="text-muted small">{{ holder.upn }} | {{ holder.email|default:"No Email" }}</span>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label text-muted">Custody Terms & Conditions (EULA)</label>
+                <div class="border p-3 rounded bg-white text-muted" style="height: 120px; overflow-y: auto; font-size: 8.5pt; line-height: 1.4;">
+                    <p><strong>1. Custody & Care:</strong> The Custodian agrees to maintain and operate the assigned equipment in a safe, secure, and responsible manner, in compliance with organizational policies.</p>
+                    <p><strong>2. Return Policy:</strong> The equipment remains the sole property of the organization and must be returned in good condition upon request, termination of service, or transfer of role.</p>
+                    <p><strong>3. Reporting Incidents:</strong> Any physical damage, technical failure, loss, or theft of the assigned equipment must be reported to the IT department within 24 hours of occurrence.</p>
+                    <p><strong>4. Modification Prohibited:</strong> No physical modifications, hardware upgrades, or unapproved firmware changes may be made to the equipment without written authorization.</p>
+                </div>
+            </div>
+
+            <form method="post" id="custody-sign-form">
+                {% csrf_token %}
+                <input type="hidden" name="signature_canvas" id="signature-input" value="empty">
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label mb-0">Draw Signature Below</label>
+                        <button type="button" class="btn btn-sm btn-link link-secondary text-decoration-none" id="clear-canvas-btn">
+                            Clear Pad
+                        </button>
+                    </div>
+                    <div class="signature-container">
+                        <canvas id="signature-canvas"></canvas>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <button type="submit" class="btn btn-primary px-4" id="submit-sign-btn">
+                        I Agree & Accept Custody
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const canvas = document.getElementById("signature-canvas");
+            const ctx = canvas.getContext("2d");
+            const clearBtn = document.getElementById("clear-canvas-btn");
+            const form = document.getElementById("custody-sign-form");
+            const signatureInput = document.getElementById("signature-input");
+
+            // Setup high-resolution canvas backing
+            function resizeCanvas() {
+                const rect = canvas.getBoundingClientRect();
+                canvas.width = rect.width;
+                canvas.height = rect.height;
+                ctx.strokeStyle = "#000000";
+                ctx.lineWidth = 3;
+                ctx.lineCap = "round";
+                ctx.lineJoin = "round";
+            }
+            
+            // Initial call and timeout delay to capture correct viewport bounds
+            resizeCanvas();
+            window.addEventListener("resize", resizeCanvas);
+
+            let isDrawing = false;
+            let lastX = 0;
+            let lastY = 0;
+            let pathDrawn = false;
+
+            function startDrawing(e) {
+                isDrawing = true;
+                const coords = getCoords(e);
+                lastX = coords.x;
+                lastY = coords.y;
+                pathDrawn = true;
+            }
+
+            function draw(e) {
+                if (!isDrawing) return;
+                const coords = getCoords(e);
+                
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+                ctx.lineTo(coords.x, coords.y);
+                ctx.stroke();
+                
+                lastX = coords.x;
+                lastY = coords.y;
+            }
+
+            function stopDrawing() {
+                isDrawing = false;
+            }
+
+            function getCoords(e) {
+                const rect = canvas.getBoundingClientRect();
+                if (e.touches && e.touches.length > 0) {
+                    return {
+                        x: e.touches[0].clientX - rect.left,
+                        y: e.touches[0].clientY - rect.top
+                    };
+                }
+                return {
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top
+                };
+            }
+
+            // Mouse Events
+            canvas.addEventListener("mousedown", startDrawing);
+            canvas.addEventListener("mousemove", draw);
+            canvas.addEventListener("mouseup", stopDrawing);
+            canvas.addEventListener("mouseleave", stopDrawing);
+
+            // Touch Events
+            canvas.addEventListener("touchstart", function (e) {
+                e.preventDefault();
+                startDrawing(e);
+            });
+            canvas.addEventListener("touchmove", function (e) {
+                e.preventDefault();
+                draw(e);
+            });
+            canvas.addEventListener("touchend", function (e) {
+                e.preventDefault();
+                stopDrawing();
+            });
+
+            // Clear Pad Button
+            clearBtn.addEventListener("click", function () {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                signatureInput.value = "empty";
+                pathDrawn = false;
+            });
+
+            // Form Submit validation
+            form.addEventListener("submit", function (e) {
+                if (!pathDrawn) {
+                    e.preventDefault();
+                    alert("Please draw your signature to accept the custody agreement.");
+                    return;
+                }
+                // Save canvas content as base64 string
+                signatureInput.value = canvas.toDataURL("image/png");
+            });
+        });
+    </script>
+</body>
+</html>

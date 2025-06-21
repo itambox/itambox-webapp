@@ -1,6 +1,6 @@
 from django.db import models
 from django.db.models import Q, CheckConstraint
-from django.urls import reverse
+from django.urls import reverse, NoReverseMatch
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
@@ -9,11 +9,17 @@ from extras.models import Tag
 from software.models import Software
 from assets.models import Asset
 from organization.models import AssetHolder
+from core.crypto import encrypt_string, decrypt_string
 
 class LicenseTypeChoices(models.TextChoices):
     PERPETUAL_SEAT = 'perpetual_seat', _('Perpetual Seat')
     SUBSCRIPTION_SEAT = 'subscription_seat', _('Subscription Seat')
     # Add others like 'Device', 'User CAL', 'Processor', 'Core' if needed later
+
+class LicenseQuerySet(models.QuerySet):
+    def with_counts(self):
+        from django.db.models import Count
+        return self.annotate(assigned_count=Count('assignments'))
 
 class License(ChangeLoggingMixin, BaseModel):
     """Represents the specific entitlement/purchase record for software."""
@@ -46,6 +52,8 @@ class License(ChangeLoggingMixin, BaseModel):
     notes = models.TextField(blank=True)
     tags = models.ManyToManyField(Tag, blank=True, related_name='licenses')
 
+    objects = LicenseQuerySet.as_manager()
+
     class Meta:
         ordering = ('software__manufacturer', 'software__name', 'name')
         verbose_name = "License"
@@ -55,13 +63,29 @@ class License(ChangeLoggingMixin, BaseModel):
         return f"{self.software.name} - {self.name} ({self.seats} seats)"
 
     def get_absolute_url(self):
-        # return reverse('licenses:license_detail', kwargs={'pk': self.pk}) # Phase 2
-        return "#" # Placeholder for now
+        try:
+            return reverse('licenses:license_detail', kwargs={'pk': self.pk})
+        except NoReverseMatch:
+            # Fallback to Django admin change view if front-end view is not yet defined
+            return reverse('admin:licenses_license_change', args=[self.pk])
+
+    @property
+    def decrypted_product_key(self):
+        """Returns the decrypted product key value, handling plaintext fallback transparently."""
+        return decrypt_string(self.product_key)
+
+    def save(self, *args, **kwargs):
+        """Symmetrically encrypt product key before saving to the database."""
+        if self.product_key and not self.product_key.startswith("enc$"):
+            self.product_key = encrypt_string(self.product_key)
+        super().save(*args, **kwargs)
 
     @property
     def available_seats(self):
-        """Calculate the number of unassigned seats."""
-        assigned_count = self.assignments.count()
+        """Calculate the number of unassigned seats, using annotation if available to avoid N+1 queries."""
+        assigned_count = getattr(self, 'assigned_count', None)
+        if assigned_count is None:
+            assigned_count = self.assignments.count()
         return max(0, self.seats - assigned_count)
 
 class LicenseSeatAssignment(ChangeLoggingMixin, BaseModel):

@@ -28,84 +28,42 @@ from . import tables
 #     return render(request, 'generic/object_list.html', context)
 # End removal of tag_list
 
-@login_required
-def tag_detail(request, pk):
-    tag = get_object_or_404(Tag, pk=pk)
-    model = Tag # Get the model class
+class TagDetailView(ObjectDetailView):
+    queryset = Tag.objects.all()
+    template_name = 'extras/tags/tag_detail.html'
 
-    # Fetch related assets using the related_name from Asset.tags
-    related_assets = tag.assets.all().prefetch_related(
-        'asset_role', 'asset_type__manufacturer', 'location', 'location__site' # Prefetch for efficiency
-    )
-    
-    # Create and configure the assets table
-    assets_table = AssetTable(related_assets, request=request)
-    # Disable pagination for related table or set a smaller page size
-    RequestConfig(request, paginate=False).configure(assets_table) 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        tag = self.object
 
-    # TODO: Fetch related objects for the sidebar list (locations, etc.)
-    # related_objects_list = [] 
+        # Fetch related assets using the related_name from Asset.tags
+        related_assets = tag.assets.all().prefetch_related(
+            'asset_role', 'asset_type__manufacturer', 'location', 'location__site'
+        )
 
-    context = {
-        'object': tag, # Pass object with standard key
-        'title': str(tag), # Use tag name as title
-        'object_type': model._meta.verbose_name.title(), # Pass verbose name
-        'assets_table': assets_table, # Add assets table to context
-        'update_url_name': get_model_viewname(model, 'update'),
-        'delete_url_name': get_model_viewname(model, 'delete'),
-        'view_options': ['update', 'delete'], # Enable buttons
-        # 'related_objects_list': related_objects_list, # Add related items later
-    }
-    # Use the standard detail template path
-    return render(request, 'extras/tags/tag_detail.html', context)
+        # Create and configure the assets table
+        assets_table = AssetTable(related_assets, request=self.request)
+        # Disable pagination for related table
+        RequestConfig(self.request, paginate=False).configure(assets_table)
 
-@login_required
-def tag_create(request):
-    if request.method == 'POST':
-        form = TagForm(request.POST)
-        if form.is_valid():
-            form.save()
-            # TODO: Message
-            return redirect('extras:tag_list')
-    else:
-        form = TagForm()
-    context = {'form': form, 'title': 'Create Tag', 'return_url': 'extras:tag_list'}
-    return render(request, 'generic/object_edit.html', context)
+        context['assets_table'] = assets_table
+        return context
 
-@login_required
-def tag_update(request, pk):
-    tag = get_object_or_404(Tag, pk=pk)
-    if request.method == 'POST':
-        form = TagForm(request.POST, instance=tag)
-        if form.is_valid():
-            form.save()
-            # TODO: Message
-            return redirect('extras:tag_list')
-    else:
-        form = TagForm(instance=tag)
-    context = {'form': form, 'object': tag, 'title': f'Update Tag: {tag.name}', 'return_url': 'extras:tag_list'}
-    return render(request, 'generic/object_edit.html', context)
+class TagCreateView(ObjectEditView):
+    model_form = TagForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'extras:tag_list'
 
-@login_required
-def tag_delete(request, pk):
-    tag = get_object_or_404(Tag, pk=pk)
-    # How to count related items depends on how tags are implemented (e.g., GenericRelation)
-    # related_count = tag.taggit_taggeditem_items.count() # Example for django-taggit
-    related_count = 0 # Placeholder: Implement actual check if needed
-    if request.method == 'POST':
-        if related_count > 0:
-            # TODO: Add error message - cannot delete tag in use
-            return redirect('extras:tag_list')
-        tag.delete()
-        # TODO: Message
-        return redirect('extras:tag_list')
+class TagUpdateView(ObjectEditView):
+    queryset = Tag.objects.all()
+    model_form = TagForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'extras:tag_list'
 
-    context = {
-        'object': tag,
-        'related_objects_count': related_count, # Pass count to template
-        'list_url_name': 'extras:tag_list'
-    }
-    return render(request, 'generic/object_confirm_delete.html', context)
+class TagDeleteView(ObjectDeleteView):
+    queryset = Tag.objects.all()
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('extras:tag_list')
 
 # --- ConfigTemplate Views ---
 

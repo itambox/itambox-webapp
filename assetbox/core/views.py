@@ -1,4 +1,5 @@
 # assetbox/core/views.py
+import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, HttpResponseRedirect
@@ -7,7 +8,7 @@ from django.urls import reverse
 from importlib import import_module
 from django.http import Http404
 from django.views.generic import DetailView
-from django_tables2 import SingleTableView
+from django_tables2 import SingleTableView, RequestConfig
 from django.utils.decorators import method_decorator
 import json
 from django.core.serializers.json import DjangoJSONEncoder
@@ -17,6 +18,9 @@ from django.contrib.auth import get_user_model # Import get_user_model
 from users.forms import TableConfigForm # Correct import
 from users.models import UserPreference # Import UserPreference from users
 from django.template.loader import get_template # Import get_template
+from django.template import TemplateDoesNotExist
+
+logger = logging.getLogger(__name__)
 
 # --- New Imports for SearchView ---
 from django.views.generic import View  # Add View
@@ -65,8 +69,10 @@ class BaseHTMXView: # No Django View inheritance needed here, it's a mixin
     page_body_partial_name = "generic/partials/page_body_content_wrapper.html" # Partial for #page-body-main swaps (hx-boost)
 
     def get_template_names(self):
-        # Ensure subclasses provide template_name or override this
+        # Ensure subclasses provide template_name or delegate to superclass inference
         if not hasattr(self, 'template_name') or not self.template_name:
+            if hasattr(super(), 'get_template_names'):
+                return super().get_template_names()
             raise ImproperlyConfigured(
                 f"{self.__class__.__name__} needs a template_name attribute defined."
             )
@@ -75,27 +81,25 @@ class BaseHTMXView: # No Django View inheritance needed here, it's a mixin
     def render_to_response(self, context, **response_kwargs):
         """
         Override render_to_response to handle HTMX requests.
-        - Renders page body partial for boosted navigation targeting the main body.
+        - Sets dynamic base template to base_htmx.html for boosted main-body swaps.
         - Falls back to standard rendering otherwise.
         """
         request = self.request # Get request from the view instance
 
         if getattr(request, 'htmx', False):
-            context['request'] = request # Ensure request is always in context for partials
+            context['request'] = request # Ensure request is always in context for templates
 
+            target = getattr(request.htmx, 'target', '') or ''
             is_boosted_main_swap = getattr(request.htmx, 'boosted', False) or \
-                                   (getattr(request.htmx, 'target', None) and request.htmx.target == '#page-body-main')
+                                   target in ('page-content-wrapper', '#page-content-wrapper', 'page-body-main', '#page-body-main')
 
             if is_boosted_main_swap:
-                # Render the PAGE BODY partial when boosting/swapping main content.
-                # It expects 'content_template_name', 'breadcrumbs', 'title', 'page_actions' in context.
-                context['content_template_name'] = self.get_template_names()[0] # Pass the view's specific template
-                # Ensure common context variables expected by the wrapper are present
+                # Dynamic base template swap
+                context['base_template'] = 'base_htmx.html'
+                # Ensure common context variables expected by base_htmx.html are present
                 context.setdefault('title', 'AssetBox') # Provide a default title
                 context.setdefault('breadcrumbs', [(reverse('dashboard'), 'Dashboard'), (None, context['title'])])
                 context.setdefault('page_actions', None) # e.g., buttons, passed via context
-
-                return render(request, self.page_body_partial_name, context)
 
         # Standard rendering for non-HTMX requests or non-main-body swaps
         # This relies on the base Django view's render_to_response (e.g., TemplateView.render_to_response)
@@ -135,20 +139,19 @@ class ObjectListView(LoginRequiredMixin, ListView):
     def render_to_response(self, context, **response_kwargs):
         """
         Override render_to_response to handle HTMX requests.
-        - Renders page body partial for boosted navigation targeting the main body.
+        - Sets dynamic base template to base_htmx.html for boosted main-body swaps.
         - Renders list content partial for specific content updates (pagination, filters).
         """
         if self.request.htmx:
             context['request'] = self.request # Ensure request is always in context for HTMX partials/templates
             
+            target = getattr(self.request.htmx, 'target', '') or ''
             is_boosted_main_swap = self.request.htmx.boosted or \
-                                   (self.request.htmx.target and self.request.htmx.target == '#page-body-main')
+                                   target in ('page-content-wrapper', '#page-content-wrapper', 'page-body-main', '#page-body-main')
 
             if is_boosted_main_swap:
-                 # Render the PAGE BODY partial when boosting/swapping main content.
-                 # This includes the necessary card/tab structure and OOB blocks for header/etc.
-                 # but does NOT extend base.html.
-                 return render(self.request, self.page_body_partial_name, context)
+                 context['base_template'] = 'base_htmx.html'
+                 return super().render_to_response(context, **response_kwargs)
             else:
                  # Render ONLY the LIST CONTENT partial for specific dynamic content swaps
                  # (e.g., pagination, filtering targeting #object-list-dynamic-content).
@@ -241,10 +244,38 @@ class ObjectListView(LoginRequiredMixin, ListView):
         context['breadcrumbs'] = getattr(self, 'get_breadcrumbs', lambda: base_breadcrumbs)()
         return context
 
-class ObjectDetailView(LoginRequiredMixin, DetailView):
+class ObjectDetailView(LoginRequiredMixin, BaseHTMXView, DetailView):
     """Base view for displaying a single object."""
     template_name = 'generic/object_detail.html'
     detail_page_body_partial_name = "generic/partials/htmx_detail_page_wrapper.html" # Specific wrapper for detail views
+
+    def get_template_names(self):
+        # If a specific template_name is defined on the subclass (i.e. not 'generic/object_detail.html')
+        if self.template_name and self.template_name != 'generic/object_detail.html':
+            return [self.template_name]
+
+        # Otherwise, dynamically search by convention
+        obj = self.get_object()
+        if obj:
+            app_label = obj._meta.app_label
+            model_name = obj._meta.model_name
+            # Plural name (e.g. assetroles, assets)
+            plural_name = obj._meta.verbose_name_plural.lower().replace(" ", "")
+
+            templates_to_try = [
+                f"{app_label}/{plural_name}/{model_name}_detail.html",
+                f"{app_label}/{model_name}_detail.html",
+                'generic/object_detail.html'
+            ]
+
+            for template_name in templates_to_try:
+                try:
+                    get_template(template_name)
+                    return [template_name]
+                except TemplateDoesNotExist:
+                    continue
+
+        return ['generic/object_detail.html']
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -259,8 +290,27 @@ class ObjectDetailView(LoginRequiredMixin, DetailView):
         can_delete = self.request.user.has_perm(f'{app_label}.delete_{model_name}')
         context['can_change'] = can_change
         context['can_delete'] = can_delete
-        context['edit_url'] = reverse(f'{app_label}:{model_name}_update', kwargs={'pk': obj.pk}) if can_change else None
-        context['delete_url'] = reverse(f'{app_label}:{model_name}_delete', kwargs={'pk': obj.pk}) if can_delete else None
+        context['edit_url'] = None
+        if can_change:
+            try:
+                context['edit_url'] = reverse(f'{app_label}:{model_name}_update', kwargs={'pk': obj.pk})
+            except NoReverseMatch:
+                if hasattr(obj, 'slug') and obj.slug:
+                    try:
+                        context['edit_url'] = reverse(f'{app_label}:{model_name}_update', kwargs={'slug': obj.slug})
+                    except NoReverseMatch:
+                        pass
+        
+        context['delete_url'] = None
+        if can_delete:
+            try:
+                context['delete_url'] = reverse(f'{app_label}:{model_name}_delete', kwargs={'pk': obj.pk})
+            except NoReverseMatch:
+                if hasattr(obj, 'slug') and obj.slug:
+                    try:
+                        context['delete_url'] = reverse(f'{app_label}:{model_name}_delete', kwargs={'slug': obj.slug})
+                    except NoReverseMatch:
+                        pass
         
         # Title and Breadcrumbs
         context['title'] = str(obj) # Default title is the object string representation
@@ -279,32 +329,30 @@ class ObjectDetailView(LoginRequiredMixin, DetailView):
             changelog_url = reverse('objectchange_list') + '?' + urlencode({'changed_object_type': obj_type.pk, 'changed_object_id': obj.pk})
             context['changelog_url'] = changelog_url
 
+        # Build dynamic changelog_table for all models
+        if ContentType.objects.filter(app_label='core', model='objectchange').exists():
+            obj_type = ContentType.objects.get_for_model(obj)
+            changelog_qs = ObjectChange.objects.filter(
+                changed_object_type=obj_type,
+                changed_object_id=obj.pk
+            ).order_by('-time')[:50]
+            changelog_table = ObjectChangeTable(list(changelog_qs))
+            RequestConfig(self.request, paginate={'per_page': 10}).configure(changelog_table)
+            context['changelog_table'] = changelog_table
+
         # Action buttons/URLs for the wrapper template
         context['page_actions'] = {
             'edit_url': context.get('edit_url'),
             'delete_url': context.get('delete_url'),
         }
+        context['action_urls'] = {
+            'edit': context.get('edit_url'),
+            'delete': context.get('delete_url'),
+        }
         # Pass the main template name to the wrapper
-        context['content_template_name'] = self.template_name
+        context['content_template_name'] = self.get_template_names()[0]
 
         return context
-
-    def render_to_response(self, context, **response_kwargs):
-        request = self.request
-        if getattr(request, 'htmx', False):
-            context['request'] = request # Ensure request is always in context for partials
-
-            is_boosted_main_swap = getattr(request.htmx, 'boosted', False) or \
-                                   (getattr(request.htmx, 'target', None) and request.htmx.target == '#page-body-main')
-
-            if is_boosted_main_swap:
-                 # Render the DETAIL PAGE BODY partial when boosting/swapping main content.
-                 # This includes the necessary structure and OOB blocks for header/etc.
-                 # It includes the specific object detail template via context['content_template_name']
-                 return render(request, self.detail_page_body_partial_name, context)
-
-        # Standard rendering for non-HTMX requests (renders self.template_name)
-        return super().render_to_response(context, **response_kwargs)
 
 class ObjectEditView(LoginRequiredMixin, BaseHTMXView, UpdateView):
     """Base view for creating or editing an object."""
@@ -329,7 +377,7 @@ class ObjectEditView(LoginRequiredMixin, BaseHTMXView, UpdateView):
         return super().get_form_class()
     
     def get_object(self, queryset=None):
-        if 'pk' not in self.kwargs:
+        if 'pk' not in self.kwargs and 'slug' not in self.kwargs:
             return None # Create view
         return super().get_object(queryset)
 
@@ -374,7 +422,12 @@ class ObjectEditView(LoginRequiredMixin, BaseHTMXView, UpdateView):
         elif self.request.POST.get('_continue') and _model:
             try:
                 edit_view_name = get_model_viewname(_model, 'edit') 
-                return redirect(reverse(edit_view_name, kwargs={'pk': self.object.pk}))
+                try:
+                    return redirect(reverse(edit_view_name, kwargs={'pk': self.object.pk}))
+                except NoReverseMatch:
+                    if hasattr(self.object, 'slug') and self.object.slug:
+                        return redirect(reverse(edit_view_name, kwargs={'slug': self.object.slug}))
+                    raise
             except NoReverseMatch:
                 pass # Fall through to default redirect
             
@@ -415,7 +468,7 @@ class ObjectEditView(LoginRequiredMixin, BaseHTMXView, UpdateView):
 
 class ObjectDeleteView(LoginRequiredMixin, BaseHTMXView, DeleteView):
     """Base view for deleting an object."""
-    template_name = 'generic/object_delete.html'
+    template_name = 'generic/object_confirm_delete.html'
     form_class = ConfirmationForm
 
     def get_success_url(self):
@@ -503,7 +556,7 @@ def table_config(request, model_name):
     # Use the app_label and table_part separately to access nested dict
     table_key_for_form = f'{app_label}.{table_part}' # Key for the form/JS
     user_config = prefs.data.get('tables', {}).get(app_label, {}).get(table_part, {}) # Get nested config
-    print(f"[table_config] Fetched user_config for {app_label}.{table_part}: {user_config}") # DEBUG
+    logger.debug("Fetched user_config for %s.%s: %s", app_label, table_part, user_config)
     # --- End Load --- 
 
     # Pass user_config to the form constructor
@@ -635,8 +688,13 @@ class SearchView(LoginRequiredMixin, BaseHTMXView, View):
                 if table_class:
                     # Limit results shown on search page (e.g., first 10)
                     data['table'] = table_class(data['queryset'][:10], request=request) 
-                    # Add list URL (replace with actual logic if needed)
-                    data['list_url'] = f'/{model._meta.app_label}/{model._meta.model_name}s/' 
+                    # Add list URL using view name helper
+                    try:
+                        from django.urls import reverse
+                        from core.utils import get_model_viewname
+                        data['list_url'] = reverse(get_model_viewname(model, 'list'))
+                    except Exception:
+                        data['list_url'] = f'/{model._meta.app_label}/{model._meta.model_name}s/'
                 else:
                     data['table'] = None
 
@@ -699,13 +757,16 @@ def bulk_delete(request):
     # Handle the two POST scenarios
     if '_confirm' in request.POST:
         # --- User has confirmed deletion --- 
+        from django.db import transaction
         try:
             count = len(objects_to_delete)
-            model.objects.filter(pk__in=object_pks).delete() # Perform bulk delete
+            with transaction.atomic():
+                for obj in objects_to_delete:
+                    obj.delete() # Triggers ChangeLoggingMixin audit logging
             messages.success(request, f"Successfully deleted {count} {model._meta.verbose_name_plural}.")
             return redirect(return_url)
         except ProtectedError as e:
-            # Handle protected objects (optional, basic message for now)
+            # Handle protected objects
             messages.error(request, f"Could not delete objects due to protected relationships: {e}")
             return redirect(return_url)
             

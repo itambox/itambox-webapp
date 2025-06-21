@@ -21,8 +21,10 @@ VERSION = '0.1.0'
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
+import os
+
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-7&re8o6pow!b5aakt7ox#n$8_%)$qs@b9^@dnsi@h0e5j&&*sz'
+SECRET_KEY = os.environ.get('ASSETBOX_SECRET_KEY', 'django-insecure-7&re8o6pow!b5aakt7ox#n$8_%)$qs@b9^@dnsi@h0e5j&&*sz')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -97,6 +99,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'core.context_processors.breadcrumbs',
+                'core.context_processors.notifications_processor',
                  # Add any custom ones AssetBox needs
             ],
             # Ensure 'loaders' is set correctly: - REMOVED partial_loaders

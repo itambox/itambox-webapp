@@ -1,36 +1,35 @@
 import uuid
-from threading import local
+import contextvars
 from django.utils.deprecation import MiddlewareMixin
 
-_thread_locals = local()
+_current_user = contextvars.ContextVar('current_user', default=None)
+_request_id = contextvars.ContextVar('request_id', default=None)
 
 def get_current_request_id():
-    return getattr(_thread_locals, 'request_id', None)
+    return _request_id.get()
 
 def get_current_user():
-    return getattr(_thread_locals, 'user', None)
+    return _current_user.get()
 
 class CurrentUserMiddleware(MiddlewareMixin):
     """
-    Middleware to store the current user and a unique request ID in thread locals.
+    Middleware to store the current user and a unique request ID in context variables.
     This makes them easily accessible throughout the request lifecycle, especially
-    for logging changes.
+    for logging changes, and is fully thread-safe and async-safe.
     """
     def process_request(self, request):
-        _thread_locals.user = request.user if hasattr(request, 'user') and request.user.is_authenticated else None
-        _thread_locals.request_id = uuid.uuid4()
+        user = request.user if hasattr(request, 'user') and request.user.is_authenticated else None
+        _current_user.set(user)
+        _request_id.set(uuid.uuid4())
 
     def process_response(self, request, response):
-        # Clean up thread locals after the request is done
-        if hasattr(_thread_locals, 'user'):
-            del _thread_locals.user
-        if hasattr(_thread_locals, 'request_id'):
-            del _thread_locals.request_id
+        # Clean up context vars after the request is done by resetting to default/None
+        _current_user.set(None)
+        _request_id.set(None)
         return response
 
     def process_exception(self, request, exception):
         # Ensure cleanup even if an exception occurs
-        if hasattr(_thread_locals, 'user'):
-            del _thread_locals.user
-        if hasattr(_thread_locals, 'request_id'):
-            del _thread_locals.request_id 
+        _current_user.set(None)
+        _request_id.set(None)
+ 

@@ -1,0 +1,60 @@
+{% extends 'generic/object_detail.html' %}
+{% load render_table from django_tables2 %}
+{% load static %}
+
+{# --- Page Title --- #}
+{% block title %}{{ object.name }} - Contact Role Details - AssetBox{% endblock %}
+
+{# --- Page Header --- #}
+{% block page_pretitle %}Organization / Contact Roles{% endblock %}
+
+{# --- Tabs Hook --- #}
+{% block extra_tabs %}
+    <li class="nav-item" role="presentation">
+        <a href="#assignments" class="nav-link" data-bs-toggle="tab" role="tab">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-purple" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M6.168 18.849a4 4 0 0 1 3.832 -2.849h4a4 4 0 0 1 3.834 2.855" /></svg>
+            Contact Assignments <span class="badge bg-purple-lt ms-2">{{ assignments_table.rows|length }}</span>
+        </a>
+    </li>
+{% endblock extra_tabs %}
+
+{# --- Role Specific Details --- #}
+{% block object_details %}
+<dl class="row mb-0">
+    <dt class="col-sm-3">Name:</dt>
+    <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
+
+    <dt class="col-sm-3">Slug:</dt>
+    <dd class="col-sm-9"><code>{{ object.slug }}</code></dd>
+
+    <dt class="col-sm-3">Description:</dt>
+    <dd class="col-sm-9 text-secondary">{{ object.description|linebreaksbr|default:"<i>No description provided.</i>"|safe }}</dd>
+</dl>
+{% endblock object_details %}
+
+{# --- Related Objects (Sidebar) --- #}
+{% block related_objects %}
+{% endblock related_objects %}
+
+{# --- Extra Tab Panes --- #}
+{% block extra_tab_panes %}
+    {# Assignments Tab Pane #}
+    <div class="tab-pane fade" id="assignments" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">Associated Contacts</h3>
+            </div>
+            {% if assignments_table.rows %}
+                <div class="table-responsive">
+                    {% render_table assignments_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=assignments_table %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-users text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /></svg>
+                    <p class="mb-0">No contacts are assigned to this role yet.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock extra_tab_panes %}

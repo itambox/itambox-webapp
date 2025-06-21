@@ -2,7 +2,8 @@ import django_filters
 from django import forms
 from django.db.models import Q
 from assets.models import Manufacturer, AssetType
-from organization.models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder
+from organization.models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, Contact, ContactRole
+
 from extras.models import Tag # Import Tag
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML # Import Helper, Layout, Submit
@@ -211,4 +212,42 @@ class AssetTypeFilterSet(BaseOrgFilterSet):
             Q(gpu__icontains=value) |
             Q(manufacturer__name__icontains=value)
         ).distinct()
+
+
+# --- Contact Filter ---
+class ContactFilterSet(BaseOrgFilterSet):
+    class Meta:
+        model = Contact
+        fields = ['name', 'title', 'phone', 'email']
+
+    # Override default search for Contact
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(title__icontains=value) |
+            Q(phone__icontains=value) |
+            Q(email__icontains=value) |
+            Q(description__icontains=value) |
+            Q(comments__icontains=value)
+        ).distinct()
+
+
+# --- ContactRole Filter ---
+class ContactRoleFilterSet(BaseOrgFilterSet):
+    class Meta:
+        model = ContactRole
+        fields = ['name']
+
+    # Override default search for ContactRole
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(slug__icontains=value) |
+            Q(description__icontains=value)
+        ).distinct()
+
     

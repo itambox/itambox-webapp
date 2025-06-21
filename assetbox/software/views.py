@@ -30,6 +30,21 @@ class SoftwareDetailView(ObjectDetailView):
     queryset = Software.objects.select_related('manufacturer').prefetch_related('tags')
     template_name = 'software/software_detail.html' # Use a specific template or generic one
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        software = self.get_object()
+        
+        from assets.models import InstalledSoftware
+        from .tables import InstalledSoftwareTable
+        from django_tables2 import RequestConfig
+
+        instances_qs = InstalledSoftware.objects.filter(software=software).select_related('asset', 'asset__asset_type', 'asset__asset_type__manufacturer')
+        instances_table = InstalledSoftwareTable(instances_qs)
+        RequestConfig(self.request, paginate={'per_page': 10}).configure(instances_table)
+        context['instances_table'] = instances_table
+        
+        return context
+
 class SoftwareEditView(ObjectEditView):
     queryset = Software.objects.all()
     model_form = forms.SoftwareForm

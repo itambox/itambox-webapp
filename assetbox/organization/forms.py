@@ -1,6 +1,6 @@
 from django import forms
 # Import models from this app
-from .models import Site, Region, SiteGroup, Tenant, Location, TenantGroup, AssetHolder
+from .models import Site, Region, SiteGroup, Tenant, Location, TenantGroup, AssetHolder, Contact, ContactRole, ContactAssignment
 # Import models from other apps
 from extras.models import Tag # UPDATED: Import Tag from extras
 from django.contrib.auth import get_user_model
@@ -10,8 +10,9 @@ from django.urls import reverse
 from core.forms import FilterForm # Import the base FilterForm
 from .filters import ( # Import the FilterSet classes
     SiteFilterSet, RegionFilterSet, SiteGroupFilterSet, LocationFilterSet,
-    TenantFilterSet, TenantGroupFilterSet, AssetHolderFilterSet
+    TenantFilterSet, TenantGroupFilterSet, AssetHolderFilterSet, ContactFilterSet, ContactRoleFilterSet
 )
+
 
 User = get_user_model()
 
@@ -392,4 +393,138 @@ class TenantGroupFilterForm(FilterForm):
 class AssetHolderFilterForm(FilterForm):
     filterset_class = AssetHolderFilterSet
 
-# TODO: Add TagForm 
+class ContactForm(forms.ModelForm):
+    tags = forms.ModelMultipleChoiceField(
+        queryset=Tag.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
+    )
+
+    class Meta:
+        model = Contact
+        fields = ['name', 'title', 'phone', 'email', 'web_url', 'description', 'comments', 'tags']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. Sales Director'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. +1 (555) 019-2834'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'e.g. contact@example.com'}),
+            'web_url': forms.URLInput(attrs={'class': 'form-control', 'placeholder': 'e.g. https://support.example.com'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'comments': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+        self.helper.layout = Layout(
+            Row(
+                Column('name', css_class='form-group col-md-6 mb-0'),
+                Column('title', css_class='form-group col-md-6 mb-0'),
+                css_class='mb-3'
+            ),
+            Row(
+                Column('phone', css_class='form-group col-md-4 mb-0'),
+                Column('email', css_class='form-group col-md-4 mb-0'),
+                Column('web_url', css_class='form-group col-md-4 mb-0'),
+                css_class='mb-3'
+            ),
+            'description',
+            'comments',
+            'tags'
+        )
+        add_standard_buttons(self.helper, self.instance, 'organization:contact_list')
+
+
+class ContactRoleForm(forms.ModelForm):
+    class Meta:
+        model = ContactRole
+        fields = ['name', 'slug', 'description']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'slug': forms.TextInput(attrs={'class': 'form-control', 'slugify': 'name'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+        self.helper.layout = Layout(
+            'name',
+            'slug',
+            'description'
+        )
+        add_standard_buttons(self.helper, self.instance, 'organization:contactrole_list')
+
+
+class ContactAssignmentForm(forms.ModelForm):
+    contact = forms.ModelChoiceField(
+        queryset=Contact.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    role = forms.ModelChoiceField(
+        queryset=ContactRole.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    priority = forms.ChoiceField(
+        choices=[
+            ('', '---------'),
+            ('primary', 'Primary'),
+            ('secondary', 'Secondary'),
+            ('tertiary', 'Tertiary'),
+            ('inactive', 'Inactive'),
+        ],
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    class Meta:
+        model = ContactAssignment
+        fields = ['contact', 'role', 'priority']
+
+    def __init__(self, *args, **kwargs):
+        content_type = kwargs.pop('content_type', None)
+        object_id = kwargs.pop('object_id', None)
+        super().__init__(*args, **kwargs)
+        self.content_type = content_type
+        self.object_id = object_id
+
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+        self.helper.layout = Layout(
+            'contact',
+            'role',
+            'priority',
+        )
+        button_text = 'Assign'
+        self.helper.layout.append(
+            HTML('<div class="mt-4"></div>')
+        )
+        self.helper.layout.append(
+            Submit('submit', button_text, css_class='btn btn-primary')
+        )
+        self.helper.layout.append(
+            HTML('<button type="button" class="btn btn-outline-secondary ms-2" data-bs-dismiss="modal">Cancel</button>')
+        )
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if self.content_type and self.object_id:
+            instance.content_type = self.content_type
+            instance.object_id = self.object_id
+        if commit:
+            instance.save()
+        return instance
+
+
+class ContactFilterForm(FilterForm):
+    filterset_class = ContactFilterSet
+
+
+class ContactRoleFilterForm(FilterForm):
+    filterset_class = ContactRoleFilterSet
+ 
