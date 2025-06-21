@@ -10,7 +10,7 @@
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
     <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
-    <title>{% block title %}<span id="page-title-block">AssetBox</span>{% endblock %}</title>
+    <title>{% block title %}AssetBox{% endblock %}</title>
     <!-- CSS files -->
     <link href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet"/>
     <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.1.0/dist/css/tabler-flags.min.css" rel="stylesheet"/>
@@ -18,6 +18,7 @@
     <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.1.0/dist/css/tabler-vendors.min.css" rel="stylesheet"/>
     <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.css" rel="stylesheet">
     <link href="{% static 'css/assetbox.css' %}" rel="stylesheet"/> {# Load our custom CSS #}
+    <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
     {% block extra_head %}{% endblock %}
     <style>
         /* Optional: Add custom styles here */
@@ -31,9 +32,14 @@
         }
     </style>
 </head>
-<body class="layout-fluid layout-combo" hx-boost="true" hx-target="#page-content-wrapper">
-    <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
+<body class="layout-fluid layout-combo" hx-boost="true" hx-target="#page-content-wrapper" hx-indicator="#htmx-loading-indicator">
 
+    {# Global loading indicator #}
+    <div id="htmx-loading-indicator" class="htmx-indicator" style="position:fixed;top:0;left:0;width:100%;z-index:9999;pointer-events:none;">
+        <div class="progress" style="height:3px;background:transparent;">
+            <div class="progress-bar progress-bar-animated progress-bar-striped bg-primary" style="width:100%;"></div>
+        </div>
+    </div>
     <div class="page">
         {# Move Sidebar OUTSIDE page-wrapper #}
         {% include "global_includes/_sidebar.html" %}
@@ -43,7 +49,7 @@
             <!-- Top Navbar -->
             {% include "global_includes/_topbar.html" %}
 
-            <div id="page-content-wrapper">
+            <div id="page-content-wrapper" hx-history-elt>
 
             <!-- Page header -->
             <div class="page-header d-print-none">
@@ -246,46 +252,50 @@
 
       // If using HTMX OOB swaps for messages, initialize new toasts after swap
       document.body.addEventListener('htmx:afterSwap', function(evt) {
-        const toastElList = evt.detail.elt.querySelectorAll('.toast');
-        if (toastElList.length > 0) {
-             toastElList.forEach(toastEl => {
+        // Path A: OOB swap targeted #django-messages directly
+        if (evt.detail.target && evt.detail.target.id === 'django-messages') {
+            const toasts = evt.detail.target.querySelectorAll('.toast');
+            toasts.forEach(toastEl => {
                 const toast = new bootstrap.Toast(toastEl);
                 toast.show();
-                toastEl.addEventListener('hidden.bs.toast', () => {
-                    toastEl.remove();
-                });
+                toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
             });
+            return;
         }
-        // Also check if the target *is* the toast container for OOB swaps
-        if (evt.detail.target.id === 'django-messages') {
-             const containerToasts = evt.detail.target.querySelectorAll('.toast');
-             containerToasts.forEach(toastEl => {
-                const toast = new bootstrap.Toast(toastEl);
-                toast.show();
-                toastEl.addEventListener('hidden.bs.toast', () => {
-                    toastEl.remove();
-                });
-             });
-        }
+        // Path B: content swap — toasts came inline within the swapped body
+        const toasts = evt.detail.elt.querySelectorAll('.toast');
+        toasts.forEach(toastEl => {
+            const toast = new bootstrap.Toast(toastEl);
+            toast.show();
+            toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+        });
       });
 
       // Listen for custom HTMX triggers
+
+      // Helper: targeted HTMX re-fetch of current page content (no full reload)
+      function refreshCurrentPage() {
+          htmx.ajax('GET', window.location.pathname + window.location.search, {
+              target: '#page-content-wrapper',
+              swap: 'innerHTML'
+          });
+      }
+
       document.body.addEventListener('closeModalEvent', function() {
         const openModalEl = document.querySelector('.modal.show');
         if (openModalEl) {
           const modalInstance = bootstrap.Modal.getInstance(openModalEl) || new bootstrap.Modal(openModalEl);
           modalInstance.hide();
+          refreshCurrentPage();
         }
-        // Force page reload to sync tables and display message
-        window.location.reload();
       });
 
       document.body.addEventListener('assetListUpdated', function() {
-        window.location.reload();
+        refreshCurrentPage();
       });
 
       document.body.addEventListener('kitListUpdated', function() {
-        window.location.reload();
+        refreshCurrentPage();
       });
 
       document.body.addEventListener('showMessage', function(evt) {
@@ -381,13 +391,24 @@
     }
 
     // Run on HTMX boosted navigation and URL changes
-    document.body.addEventListener('htmx:pushedIntoHistory', function() {
+    document.body.addEventListener('htmx:historyRestore', function() {
         updateSidebarActiveState();
     });
     document.body.addEventListener('htmx:afterSwap', function() {
         updateSidebarActiveState();
     });
+    // Re-apply filter panel visibility after content fully settles (boosted navigation)
+    document.body.addEventListener('htmx:afterSettle', function() {
+        setTimeout(function() {
+            if (typeof window.initFiltersToggle === 'function') {
+                window.initFiltersToggle();
+            }
+        }, 0);
+    });
     </script>
+
+{# Standalone OOB target for dynamic title swaps (not inside <title> tag) #}
+<span id="page-title-block" style="display:none" aria-hidden="true">AssetBox</span>
 
 </body>
 </html> 

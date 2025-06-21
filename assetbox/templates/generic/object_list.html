@@ -261,7 +261,7 @@ if (!window.hasFiltersToggleEventBound) {
 
     // Re-initialize when body content transitions or dynamic content loads
     document.body.addEventListener('htmx:afterOnLoad', function(event) {
-        if (event.detail.target && (event.detail.target.id === 'page-body-main' || event.detail.target.id === 'object-list-dynamic-content')) {
+        if (event.detail.target && (event.detail.target.id === 'page-body-main' || event.detail.target.id === 'object-list-dynamic-content' || event.detail.target.id === 'page-content-wrapper')) {
             window.initFiltersToggle();
         }
     });

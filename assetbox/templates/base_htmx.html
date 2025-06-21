@@ -67,8 +67,10 @@
             {% endblock %}
         </div>
     </div>
+    {# --- Scripts (must be inside #page-content-wrapper so HTMX processes them during swaps) --- #}
+    {% block javascript %}{% endblock %}
+    {% block extra_scripts %}{% endblock %}
 </div>
 
-{# --- Scripts --- #}
-{% block javascript %}{% endblock %}
-{% block extra_scripts %}{% endblock %}
+{# --- Out-of-band target for page scripts that need to persist --- #}
+{% block javascript_oob %}{% endblock %}

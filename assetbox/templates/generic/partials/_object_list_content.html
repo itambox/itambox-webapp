@@ -9,29 +9,7 @@
     {# Quick Search Input Group #}
     {% if filter_form.q is not None %}
         <div class="quicksearch-results-tab" style="flex-grow: 1; max-width: 200px; margin-right: 1rem;">
-            <form method="get" action="" class="filter-form-inline"
-                hx-get="{{ request.get_full_path }}"
-                hx-target="#object-list-dynamic-content"
-                hx-swap="innerHTML"
-                hx-push-url="true">
-                <div class="input-group input-group-flat">
-                    <input type="search" name="q" class="form-control" placeholder="Search..."
-                           value="{{ request.GET.q|default:"" }}"
-                           hx-trigger="keyup changed delay:500ms, search">
-                    <span class="input-group-text">
-                        <a href="#" class="link-secondary {% if not request.GET.q %}d-none{% endif %}" title="Clear search" data-bs-toggle="tooltip"
-                           onclick="this.closest('form').querySelector('input[name=q]').value=''; this.closest('form').dispatchEvent(new Event('submit', { bubbles: true })); return false;">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-x" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
-                        </a>
-                    </span>
-                </div>
-                {# Hidden fields from filter form #}
-                {% for field in filter_form %}
-                    {% if field.name != 'q' and field.value %}
-                        <input type="hidden" name="{{ field.name }}" value="{{ field.value }}">
-                    {% endif %}
-                {% endfor %}
-           </form>
+            {% include "generic/partials/_quick_search.html" %}
         </div>
     {% else %}
         <div></div> {# Placeholder #}
