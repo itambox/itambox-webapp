@@ -1,0 +1,130 @@
+{% extends 'generic/object_detail.html' %}
+{% load static %}
+{% load render_table from django_tables2 %}
+
+{% block title %}{{ object.name }} — Provider — AssetBox{% endblock %}
+
+{% block page_pretitle %}Provider Details{% endblock %}
+
+{% block object_details %}
+<dl class="row mb-0">
+    {% if object.is_active %}
+    <dt class="col-sm-3">Status:</dt>
+    <dd class="col-sm-9"><span class="badge bg-success">Active</span></dd>
+    {% else %}
+    <dt class="col-sm-3">Status:</dt>
+    <dd class="col-sm-9"><span class="badge bg-secondary">Inactive</span></dd>
+    {% endif %}
+
+    {% if object.account_id %}
+    <dt class="col-sm-3">Account ID:</dt>
+    <dd class="col-sm-9"><code>{{ object.account_id }}</code></dd>
+    {% endif %}
+
+    {% if object.website %}
+    <dt class="col-sm-3">Website:</dt>
+    <dd class="col-sm-9"><a href="{{ object.website }}" target="_blank" rel="noopener">{{ object.website }}</a></dd>
+    {% endif %}
+
+    {% if object.portal_url %}
+    <dt class="col-sm-3">Admin Portal:</dt>
+    <dd class="col-sm-9"><a href="{{ object.portal_url }}" target="_blank" rel="noopener">{{ object.portal_url }}</a></dd>
+    {% endif %}
+</dl>
+
+{% if object.contact_email or object.contact_phone or object.support_contact %}
+<div class="card mt-4 border-0 shadow-sm">
+    <div class="card-header border-0 bg-transparent">
+        <h3 class="card-title d-flex align-items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-2 text-azure" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 4h4l2 5l-2.5 1.5a11 11 0 0 0 5 5l1.5 -2.5l5 2v4a2 2 0 0 1 -2 2a16 16 0 0 1 -15 -15a2 2 0 0 1 2 -2" />
+                <path d="M15 7a2 2 0 0 1 2 2" />
+                <path d="M15 3a6 6 0 0 1 6 6" />
+            </svg>
+            Contact Information
+        </h3>
+    </div>
+    <div class="card-body">
+        <dl class="row mb-0">
+            {% if object.contact_email %}
+            <dt class="col-sm-4">Email:</dt>
+            <dd class="col-sm-8"><a href="mailto:{{ object.contact_email }}">{{ object.contact_email }}</a></dd>
+            {% endif %}
+            {% if object.contact_phone %}
+            <dt class="col-sm-4">Phone:</dt>
+            <dd class="col-sm-8"><a href="tel:{{ object.contact_phone }}">{{ object.contact_phone }}</a></dd>
+            {% endif %}
+            {% if object.support_contact %}
+            <dt class="col-sm-4">Support:</dt>
+            <dd class="col-sm-8"><small class="text-muted">{{ object.support_contact|linebreaksbr }}</small></dd>
+            {% endif %}
+        </dl>
+    </div>
+</div>
+{% endif %}
+{% endblock object_details %}
+
+{% block extra_cards_right %}
+<div class="card mb-4 border-0 bg-indigo-lt shadow-none">
+    <div class="card-body">
+        <h4 class="card-title text-indigo mb-3 d-flex align-items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-2 text-indigo" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" />
+                <path d="M4 17v2a2 2 0 0 0 2 2h2" />
+                <path d="M16 3h2a2 2 0 0 1 2 2v2" />
+                <path d="M16 21h2a2 2 0 0 0 2 -2v-2" />
+            </svg>
+            Summary
+        </h4>
+        <dl class="row mb-0">
+            <dt class="col-6">Subscriptions:</dt>
+            <dd class="col-6"><strong>{{ subscription_count }}</strong></dd>
+            {% if active_subscription_count %}
+            <dt class="col-6">Active:</dt>
+            <dd class="col-6"><strong>{{ active_subscription_count }}</strong></dd>
+            {% endif %}
+        </dl>
+    </div>
+</div>
+
+{% if object.portal_url %}
+<a href="{{ object.portal_url }}" class="btn btn-outline-primary d-inline-flex align-items-center w-100 justify-content-center mb-3" target="_blank" rel="noopener">
+    <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6" />
+        <path d="M11 13l9 -9" />
+        <path d="M15 4h5v5" />
+    </svg>
+    Open Admin Portal
+</a>
+{% endif %}
+{% endblock extra_cards_right %}
+
+{% block full_width_content %}
+{% if subscriptions_table %}
+<div class="card mt-4 border-0 shadow-sm">
+    <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
+        <h3 class="card-title d-flex align-items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-2 text-green" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+                <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" />
+                <path d="M9 7l1 0" />
+                <path d="M9 13l6 0" />
+                <path d="M13 17l2 0" />
+            </svg>
+            Subscriptions
+        </h3>
+        <span class="badge bg-green-lt">{{ subscription_count }}</span>
+    </div>
+    {% if subscriptions_table.rows %}
+    <div class="table-responsive">
+        {% render_table subscriptions_table %}
+    </div>
+    {% include 'generic/includes/table_pagination.html' with table=subscriptions_table %}
+    {% else %}
+    <div class="card-body py-5 text-muted text-center">
+        <p class="mb-0">No subscriptions linked to this provider yet.</p>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock full_width_content %}

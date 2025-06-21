@@ -1,0 +1,20 @@
+from django.urls import path
+from . import views
+
+app_name = 'subscriptions'
+
+urlpatterns = [
+    # Providers
+    path('providers/', views.ProviderListView.as_view(), name='provider_list'),
+    path('providers/add/', views.ProviderEditView.as_view(), name='provider_create'),
+    path('providers/<int:pk>/', views.ProviderDetailView.as_view(), name='provider_detail'),
+    path('providers/<int:pk>/edit/', views.ProviderEditView.as_view(), name='provider_update'),
+    path('providers/<int:pk>/delete/', views.ProviderDeleteView.as_view(), name='provider_delete'),
+
+    # Subscriptions
+    path('subscriptions/', views.SubscriptionListView.as_view(), name='subscription_list'),
+    path('subscriptions/add/', views.SubscriptionEditView.as_view(), name='subscription_create'),
+    path('subscriptions/<int:pk>/', views.SubscriptionDetailView.as_view(), name='subscription_detail'),
+    path('subscriptions/<int:pk>/edit/', views.SubscriptionEditView.as_view(), name='subscription_update'),
+    path('subscriptions/<int:pk>/delete/', views.SubscriptionDeleteView.as_view(), name='subscription_delete'),
+]

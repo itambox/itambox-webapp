@@ -37,6 +37,7 @@ urlpatterns = [
     path('extras/', include('extras.urls')),
     path('software/', include('software.urls', namespace='software')),
     path('licenses/', include('licenses.urls', namespace='licenses')),
+    path('subscriptions/', include('subscriptions.urls', namespace='subscriptions')),
     path('tables/config/<str:model_name>/', core_views.table_config, name='table_config'),
     path('user/', include('users.urls')), # Include the users app URLs
 

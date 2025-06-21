@@ -1,0 +1,162 @@
+{% extends 'generic/object_detail.html' %}
+{% load static %}
+{% load render_table from django_tables2 %}
+
+{% block title %}{{ object.name }} — Subscription — AssetBox{% endblock %}
+
+{% block page_pretitle %}Subscription Details{% endblock %}
+
+{% block object_details %}
+<dl class="row mb-0">
+    <dt class="col-sm-3">Provider:</dt>
+    <dd class="col-sm-9">
+        <a href="{% url 'subscriptions:provider_detail' object.provider.pk %}">{{ object.provider.name }}</a>
+    </dd>
+
+    <dt class="col-sm-3">Type:</dt>
+    <dd class="col-sm-9">{{ object.get_type_display }}</dd>
+
+    <dt class="col-sm-3">Status:</dt>
+    <dd class="col-sm-9">
+        <span class="badge {% if object.status == 'active' %}bg-success{% elif object.status == 'expired' %}bg-danger{% elif object.status == 'cancelled' %}bg-secondary{% elif object.status == 'pending' %}bg-warning{% elif object.status == 'suspended' %}bg-dark{% elif object.status == 'renewing' %}bg-info{% endif %}">
+            {{ object.get_status_display }}
+        </span>
+        {% if object.auto_renewal %}<span class="badge bg-info ms-1">Auto-Renewal</span>{% endif %}
+    </dd>
+
+    {% if object.tenant %}
+    <dt class="col-sm-3">Tenant:</dt>
+    <dd class="col-sm-9">{{ object.tenant.name }}</dd>
+    {% endif %}
+
+    {% if object.owner %}
+    <dt class="col-sm-3">Owner:</dt>
+    <dd class="col-sm-9">{{ object.owner.get_full_name|default:object.owner.username }}</dd>
+    {% endif %}
+
+    <dt class="col-sm-3">Start Date:</dt>
+    <dd class="col-sm-9 text-secondary">{{ object.start_date|date:"Y-m-d"|default:"—" }}</dd>
+
+    <dt class="col-sm-3">Term:</dt>
+    <dd class="col-sm-9 text-secondary">{{ object.term_months|default:"—" }} months{% if object.billing_cycle %} &middot; {{ object.get_billing_cycle_display }}{% endif %}</dd>
+
+    <dt class="col-sm-3">Next Renewal:</dt>
+    <dd class="col-sm-9">
+        {{ object.renewal_date|date:"Y-m-d"|default:"—" }}
+        {% if object.days_until_renewal is not None %}
+            <span class="badge {% if object.days_until_renewal < 0 %}bg-danger{% elif object.days_until_renewal <= 30 %}bg-warning{% elif object.days_until_renewal <= 90 %}bg-info{% else %}bg-success{% endif %} ms-1">
+                {% if object.days_until_renewal < 0 %}
+                    {{ object.days_until_renewal|stringformat:"+d"|slice:"1:" }} days overdue
+                {% elif object.days_until_renewal == 0 %}
+                    Today
+                {% else %}
+                    {{ object.days_until_renewal }} days
+                {% endif %}
+            </span>
+        {% endif %}
+    </dd>
+
+    {% if object.cancellation_date %}
+    <dt class="col-sm-3">Cancelled:</dt>
+    <dd class="col-sm-9 text-secondary">{{ object.cancellation_date|date:"Y-m-d" }}</dd>
+    {% endif %}
+
+    {% if object.contract_reference %}
+    <dt class="col-sm-3">Contract Ref:</dt>
+    <dd class="col-sm-9"><code>{{ object.contract_reference }}</code></dd>
+    {% endif %}
+
+    {% if object.cost_center %}
+    <dt class="col-sm-3">Cost Center:</dt>
+    <dd class="col-sm-9">{{ object.cost_center }}</dd>
+    {% endif %}
+</dl>
+{% endblock object_details %}
+
+{% block extra_cards_right %}
+<div class="card mb-4 border-0 shadow-sm">
+    <div class="card-header border-0 bg-transparent">
+        <h3 class="card-title d-flex align-items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-2 text-green" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M14.8 9A2 2 0 0 0 13 8h-2a2 2 0 0 0 0 4h2a2 2 0 0 1 0 4h-2a2 2 0 0 1 -1.8 -1" />
+                <path d="M12 6v2m0 8v2" />
+            </svg>
+            Financial Details
+        </h3>
+    </div>
+    <div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-5">Renewal Cost:</dt>
+            <dd class="col-7">
+                {% if object.renewal_cost %}
+                    <strong>{{ object.renewal_cost|floatformat:2 }} {{ object.currency }}</strong>
+                {% else %}—{% endif %}
+            </dd>
+
+            <dt class="col-5">Billing Cycle:</dt>
+            <dd class="col-7 text-secondary">{{ object.get_billing_cycle_display|default:"—" }}</dd>
+
+            {% if object.annual_cost %}
+            <dt class="col-5">Est. Annual:</dt>
+            <dd class="col-7"><strong>{{ object.annual_cost|floatformat:2 }} {{ object.currency }}</strong></dd>
+            {% endif %}
+
+            {% if object.licensed_quantity %}
+            <dt class="col-5">Licensed Qty:</dt>
+            <dd class="col-7{% if object.licensed_quantity < 10 %} text-warning{% endif %}"><strong>{{ object.licensed_quantity }}</strong></dd>
+            {% endif %}
+
+            {% if object.licensed_quantity and assignment_count %}
+            <dt class="col-5">Assigned:</dt>
+            <dd class="col-7">
+                <span class="badge bg-primary">{{ assignment_count }}</span>
+            </dd>
+            {% endif %}
+        </dl>
+    </div>
+</div>
+
+{% if object.provider.portal_url %}
+<a href="{{ object.provider.portal_url }}" class="btn btn-outline-primary d-inline-flex align-items-center w-100 justify-content-center mb-3" target="_blank" rel="noopener">
+    <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6" />
+        <path d="M11 13l9 -9" />
+        <path d="M15 4h5v5" />
+    </svg>
+    Open Provider Portal
+</a>
+{% endif %}
+{% endblock extra_cards_right %}
+
+{% block full_width_content %}
+{% if assignments_table %}
+<div class="card mt-4 border-0 shadow-sm">
+    <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
+        <h3 class="card-title d-flex align-items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-2 text-indigo" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" />
+                <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+                <path d="M16 11l2 2l4 -4" />
+            </svg>
+            Assignments
+        </h3>
+        <span class="badge bg-indigo-lt">{{ assignment_count }}</span>
+    </div>
+    {% if assignments_table.rows %}
+    <div class="table-responsive">
+        {% render_table assignments_table %}
+    </div>
+    {% include 'generic/includes/table_pagination.html' with table=assignments_table %}
+    {% else %}
+    <div class="card-body py-5 text-muted text-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link-off text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 14a3.5 3.5 0 0 1 -5 -4l4 -4a3.5 3.5 0 0 1 5 4m-4 4l-4 4a3.5 3.5 0 0 0 5 4l4 -4" />
+            <path d="M16 16l3 3" />
+        </svg>
+        <p class="mb-0">No assets, holders, or locations are currently assigned to this subscription.</p>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock full_width_content %}
