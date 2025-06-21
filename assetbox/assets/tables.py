@@ -15,7 +15,8 @@ class AssetTable(BaseTable): # Inherit from BaseTable
     name = tables.LinkColumn('assets:asset_detail', args=[A('pk')], verbose_name='Name')
     manufacturer = tables.Column(accessor='asset_type.manufacturer', linkify=True, verbose_name='Manufacturer')
     model = tables.Column(accessor='asset_type.model', linkify=True, verbose_name='Model')
-    assignee = tables.Column(verbose_name='Assignee', orderable=False)
+    assignee = tables.Column(accessor='_assignee_display', verbose_name='Assignee', orderable=False)
+    tenant = tables.Column(accessor='tenant.name', verbose_name='Tenant', orderable=True)
     salvage_value = tables.Column(verbose_name='Salvage Value')
     actions = ActionsColumn()
 
@@ -23,40 +24,16 @@ class AssetTable(BaseTable): # Inherit from BaseTable
         model = Asset
         fields = (
             'pk', 'name', 'asset_tag', 'serial_number', 'asset_type', 'asset_type__manufacturer', 'asset_type__model', 'asset_role', 
-            'status', 'assignee', 'location', 'purchase_date', 'purchase_cost', 'salvage_value', 'order_number', 'supplier', 'actions',
+            'status', 'assignee', 'tenant', 'location', 'purchase_date', 'purchase_cost', 'salvage_value', 'order_number', 'supplier', 'actions',
         )
-        # Define default columns (adjust as desired)
         default_columns = (
             'pk', 'name', 'asset_tag', 'asset_type', 'asset_type__manufacturer', 'asset_type__model', 'asset_role', 
-            'status', 'assignee', 'location', 'salvage_value', 'actions',
+            'status', 'assignee', 'tenant', 'location', 'salvage_value', 'actions',
         )
-        # *** Explicitly set default order_by for AssetTable ***
         order_by = ('name',)
-        # Remove template_name and attrs, inherited from BaseTable
 
-    def render_assignee(self, record):
-        # Remove check for record.assigned_to
-        # Directly check for AssetHolderAssignment
-        assignment = AssetHolderAssignment.objects.filter(
-            content_type=ContentType.objects.get_for_model(Asset),
-            object_id=record.pk
-        ).select_related('asset_holder').first()
-        
-        if assignment and assignment.asset_holder:
-            holder = assignment.asset_holder
-            try:
-                # Link to asset holder detail view
-                url = reverse('organization:assetholder_detail', kwargs={'pk': holder.pk})
-                return mark_safe(f'<a href="{url}">{holder}</a>')
-            except NoReverseMatch:
-                # Fallback if detail view URL fails for some reason
-                return str(holder)
-        
-        # If no assignment, check if there's a location
-        if record.location:
-             return f"Location: {record.location}" # Display location info
-             
-        return "—" # Em dash for empty/unassigned
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def render_serial_number(self, value):
         return value or "—"
@@ -109,6 +86,8 @@ class StatusLabelTable(BaseTable):
         return value.title() if value else "—"
 
     def render_asset_count(self, record):
+        if hasattr(record, 'asset_count_annotated'):
+            return record.asset_count_annotated
         return record.assets.count()
 
 class AssetRoleTable(BaseTable): # Inherit from BaseTable
@@ -124,8 +103,9 @@ class AssetRoleTable(BaseTable): # Inherit from BaseTable
         default_columns = ('pk', 'name', 'color', 'asset_count', 'description', 'actions')
 
     def render_asset_count(self, record):
-        # Calculate count dynamically or pass via annotation in view
-        return record.asset_set.count() # Simple count query
+        if hasattr(record, 'asset_count_annotated'):
+            return record.asset_count_annotated
+        return record.asset_set.count()
         
     def render_color(self, value):
         if value:
@@ -153,9 +133,9 @@ class ManufacturerTable(BaseTable):
     # It's now handled by the asset_type_count column using accessor
 
     def render_asset_count(self, record):
-        # This method counts Assets related via AssetType
+        if hasattr(record, 'asset_count_annotated'):
+            return record.asset_count_annotated
         asset_count = Asset.objects.filter(asset_type__manufacturer=record).count()
-        # TODO: Consider annotating this count in the view for performance.
         return asset_count
 
     def render_asset_type_count(self, value, record):
@@ -238,12 +218,13 @@ class AccessoryTable(BaseTable):
     qty = tables.Column(verbose_name='Total Stock')
     checked_out_qty = tables.Column(accessor='checked_out_qty', verbose_name='Checked Out')
     remaining_qty = tables.Column(accessor='remaining_qty', verbose_name='Available')
+    tenant = tables.Column(accessor='tenant.name', verbose_name='Tenant', orderable=True)
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = Accessory
-        fields = ('pk', 'name', 'manufacturer', 'category', 'part_number', 'qty', 'checked_out_qty', 'remaining_qty', 'actions')
-        default_columns = ('pk', 'name', 'manufacturer', 'category', 'qty', 'checked_out_qty', 'remaining_qty', 'actions')
+        fields = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'part_number', 'qty', 'checked_out_qty', 'remaining_qty', 'actions')
+        default_columns = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'qty', 'checked_out_qty', 'remaining_qty', 'actions')
 
     def render_remaining_qty(self, value, record):
         if value <= 0:
@@ -285,12 +266,13 @@ class ConsumableTable(BaseTable):
     qty = tables.Column(verbose_name='Total Qty')
     consumed_qty = tables.Column(accessor='consumed_qty', verbose_name='Consumed')
     remaining_qty = tables.Column(accessor='remaining_qty', verbose_name='Available')
+    tenant = tables.Column(accessor='tenant.name', verbose_name='Tenant', orderable=True)
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = Consumable
-        fields = ('pk', 'name', 'manufacturer', 'category', 'part_number', 'qty', 'consumed_qty', 'remaining_qty', 'actions')
-        default_columns = ('pk', 'name', 'manufacturer', 'category', 'qty', 'consumed_qty', 'remaining_qty', 'actions')
+        fields = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'part_number', 'qty', 'consumed_qty', 'remaining_qty', 'actions')
+        default_columns = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'qty', 'consumed_qty', 'remaining_qty', 'actions')
 
     def render_remaining_qty(self, value, record):
         if value <= 0:
@@ -384,6 +366,8 @@ class CustomFieldsetTable(BaseTable):
         default_columns = ('pk', 'name', 'fields_count', 'actions')
 
     def render_fields_count(self, record):
+        if hasattr(record, 'fields_count_annotated'):
+            return record.fields_count_annotated
         return record.fields.count()
 
 
@@ -404,13 +388,11 @@ class KitTable(BaseTable):
     name = tables.LinkColumn('assets:kit_detail', args=[A('pk')], verbose_name='Name')
     description = tables.Column(verbose_name='Description')
     item_count = tables.Column(accessor='item_count', verbose_name='Items Count', orderable=False)
+    tenant = tables.Column(accessor='tenant.name', verbose_name='Tenant', orderable=True)
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = Kit
-        fields = ('pk', 'name', 'description', 'item_count', 'actions')
-        default_columns = ('pk', 'name', 'description', 'item_count', 'actions')
-
-    def render_item_count(self, record):
-        return record.items.count()
+        fields = ('pk', 'name', 'tenant', 'description', 'item_count', 'actions')
+        default_columns = ('pk', 'name', 'tenant', 'description', 'item_count', 'actions')
 

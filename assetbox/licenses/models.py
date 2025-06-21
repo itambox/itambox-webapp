@@ -51,6 +51,7 @@ class License(ChangeLoggingMixin, BaseModel):
     expiration_date = models.DateField(blank=True, null=True, help_text="For term licenses or maintenance")
     notes = models.TextField(blank=True)
     tags = models.ManyToManyField(Tag, blank=True, related_name='licenses')
+    tenant = models.ForeignKey('organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='licenses', db_index=True)
 
     objects = LicenseQuerySet.as_manager()
 
@@ -93,21 +94,24 @@ class LicenseSeatAssignment(ChangeLoggingMixin, BaseModel):
     license = models.ForeignKey(
         to=License,
         on_delete=models.CASCADE,
-        related_name='assignments'
+        related_name='assignments',
+        db_index=True
     )
     asset = models.ForeignKey(
         to=Asset,
         on_delete=models.CASCADE,
         null=True, 
         blank=True,
-        related_name='license_assignments'
+        related_name='license_assignments',
+        db_index=True
     )
     assigned_holder = models.ForeignKey(
         to=AssetHolder,
         on_delete=models.CASCADE,
         null=True,
         blank=True,
-        related_name='license_assignments'
+        related_name='license_assignments',
+        db_index=True
     )
     assigned_date = models.DateTimeField(auto_now_add=True, editable=False)
     notes = models.TextField(blank=True)

@@ -1,10 +1,10 @@
 # assets/api/serializers.py
 from rest_framework import serializers
 from assets.models import Asset, AssetRole, Manufacturer, ActivityLog, AssetType, InstalledSoftware
-from organization.models import Location
+from organization.models import Location, Tenant
 from software.models import Software # Import Software model
 # Correct imports for nested serializers
-from organization.api.serializers import NestedLocationSerializer # Assuming this is defined in org
+from organization.api.serializers import NestedLocationSerializer, NestedTenantSerializer
 from extras.api.serializers import TagSerializer # Assuming this is defined in extras
 from software.api.serializers import SoftwareSerializer # Assuming this is defined in software
 from core.api.nested_serializers import (
@@ -30,7 +30,7 @@ class AssetRoleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AssetRole
-        fields = ['id', 'name', 'slug', 'description', 'color', 'asset_count', 'created', 'updated_at']
+        fields = ['id', 'name', 'slug', 'description', 'color', 'asset_count', 'created_at', 'updated_at']
 
 class ManufacturerSerializer(serializers.ModelSerializer):
     # url = serializers.HyperlinkedIdentityField(view_name='api:assets_api:manufacturer-detail')
@@ -40,7 +40,7 @@ class ManufacturerSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Manufacturer
-        fields = ['id', 'name', 'slug', 'description', 'asset_count', 'created', 'updated_at']
+        fields = ['id', 'name', 'slug', 'description', 'asset_count', 'created_at', 'updated_at']
 
 class AssetTypeSerializer(serializers.ModelSerializer):
     # url = serializers.HyperlinkedIdentityField(view_name='api:assets_api:assettype-detail')
@@ -53,7 +53,7 @@ class AssetTypeSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'model', 'slug', 'manufacturer', 'part_number', 
             'cpu', 'ram_gb', 'storage_capacity_gb', 'storage_type', 'gpu',
-            'description', 'comments', 'created', 'updated_at'
+            'description', 'comments', 'created_at', 'updated_at'
             # Add tags if needed: 'tags'
         ]
 
@@ -71,6 +71,10 @@ class AssetSerializer(serializers.ModelSerializer):
     location_id = serializers.PrimaryKeyRelatedField(
         queryset=Location.objects.all(), source='location', write_only=True, required=False, allow_null=True
     )
+    tenant = NestedTenantSerializer(read_only=True)
+    tenant_id = serializers.PrimaryKeyRelatedField(
+        queryset=Tenant.objects.all(), source='tenant', write_only=True, required=False, allow_null=True
+    )
     # TODO: Add assigned_to (AssetHolderAssignment) representation?
     tags = TagSerializer(many=True, read_only=True) # Show assigned tags
 
@@ -79,8 +83,9 @@ class AssetSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'asset_tag', 'serial_number', 'status',
             'asset_type', 'asset_type_id', 'asset_role', 'assetrole_id',
-            'location', 'location_id', 'purchase_date', 'warranty_expiration',
-            'notes', 'tags', 'created', 'updated_at'
+            'location', 'location_id', 'tenant', 'tenant_id',
+            'purchase_date', 'warranty_expiration',
+            'notes', 'tags', 'created_at', 'updated_at'
         ]
 
 class InstalledSoftwareSerializer(serializers.ModelSerializer):
@@ -105,8 +110,8 @@ class InstalledSoftwareSerializer(serializers.ModelSerializer):
             'id', 'asset', 'asset_id', 'software', 'software_id', 'software_name', 'software_manufacturer', 
             'version_detected', 'install_date', 'discovered_by_agent', 
             'last_seen_date', 'notes',
-            'created', 'updated_at' # Assuming BaseModel provides these
+            'created_at', 'updated_at'
         )
-        read_only_fields = ('created', 'updated_at')
+        read_only_fields = ('created_at', 'updated_at')
 
 # TODO: ActivityLog serializer? Usually not needed via REST API, more for internal logging. 

@@ -79,7 +79,7 @@ class AssetForm(forms.ModelForm):
         model = Asset
         fields = [
             'name', 'asset_tag', 'serial_number', 'asset_type',
-            'asset_role', 'status', 'location',
+            'asset_role', 'status', 'location', 'tenant',
             'purchase_date', 'warranty_expiration',
             'purchase_cost', 'salvage_value', 'order_number', 'supplier',
             'notes', 'tags'
@@ -219,11 +219,15 @@ class AssetForm(forms.ModelForm):
             ),
             Div(
                 Div('location', css_class='col-md-6'),
-                Div('purchase_date', css_class='col-md-6'),
+                Div('tenant', css_class='col-md-6'),
                 css_class='row'
             ),
             Div(
+                Div('purchase_date', css_class='col-md-6'),
                 Div('warranty_expiration', css_class='col-md-6'),
+                css_class='row'
+            ),
+            Div(
                 Div('tags', css_class='col-md-6'),
                 css_class='row'
             ),
@@ -761,7 +765,7 @@ class AccessoryForm(SlugModelForm):
 
     class Meta:
         model = Accessory
-        fields = ['manufacturer', 'name', 'slug', 'category', 'part_number', 'qty', 'min_qty', 'allow_overallocate', 'notes', 'tags']
+        fields = ['manufacturer', 'name', 'slug', 'category', 'part_number', 'qty', 'min_qty', 'allow_overallocate', 'notes', 'tags', 'tenant']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'slug': forms.TextInput(attrs={'class': 'form-control', 'slugify': 'name'}),
@@ -795,6 +799,10 @@ class AccessoryForm(SlugModelForm):
                 Column('category', css_class='col-md-4'),
                 Column('qty', css_class='col-md-4'),
                 Column('min_qty', css_class='col-md-4')
+            ),
+            Row(
+                Column('tenant', css_class='col-md-6'),
+                Column('tags', css_class='col-md-6')
             ),
             Div(
                 'allow_overallocate',
@@ -880,7 +888,7 @@ class ConsumableForm(SlugModelForm):
 
     class Meta:
         model = Consumable
-        fields = ['manufacturer', 'name', 'slug', 'category', 'part_number', 'qty', 'min_qty', 'allow_overallocate', 'notes', 'tags']
+        fields = ['manufacturer', 'name', 'slug', 'category', 'part_number', 'qty', 'min_qty', 'allow_overallocate', 'notes', 'tags', 'tenant']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'slug': forms.TextInput(attrs={'class': 'form-control', 'slugify': 'name'}),
@@ -914,6 +922,10 @@ class ConsumableForm(SlugModelForm):
                 Column('category', css_class='col-md-4'),
                 Column('qty', css_class='col-md-4'),
                 Column('min_qty', css_class='col-md-4')
+            ),
+            Row(
+                Column('tenant', css_class='col-md-6'),
+                Column('tags', css_class='col-md-6')
             ),
             Div(
                 'allow_overallocate',
@@ -1158,7 +1170,7 @@ class DepreciationForm(forms.ModelForm):
 class KitForm(forms.ModelForm):
     class Meta:
         model = Kit
-        fields = ['name', 'description']
+        fields = ['name', 'description', 'tenant']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
@@ -1176,6 +1188,7 @@ class KitForm(forms.ModelForm):
         self.helper.layout = Layout(
             'name',
             'description',
+            'tenant',
             HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),

@@ -34,9 +34,9 @@ class AssetTypeAdmin(admin.ModelAdmin):
 
 @admin.register(Asset)
 class AssetAdmin(admin.ModelAdmin):
-    list_display = ('name', 'asset_tag', 'status', 'manufacturer', 'model', 'asset_role', 'location')
-    list_filter = ('status', 'asset_role', 'asset_type__manufacturer', 'location', 'asset_type')
-    search_fields = ('name', 'asset_tag', 'serial_number', 'asset_type__model')
+    list_display = ('name', 'asset_tag', 'status', 'tenant', 'manufacturer', 'model', 'asset_role', 'location')
+    list_filter = ('status', 'asset_role', 'asset_type__manufacturer', 'location', 'asset_type', 'tenant')
+    search_fields = ('name', 'asset_tag', 'serial_number', 'asset_type__model', 'tenant__name')
 
 @admin.register(ActivityLog)
 class ActivityLogAdmin(admin.ModelAdmin):

@@ -3,9 +3,9 @@ from .models import License, LicenseSeatAssignment
 
 @admin.register(License)
 class LicenseAdmin(admin.ModelAdmin):
-    list_display = ('name', 'software', 'license_type', 'seats', 'available_seats', 'get_renewal_date', 'expiration_date')
-    list_filter = ('software__manufacturer', 'license_type', 'software')
-    search_fields = ('name', 'software__name', 'product_key', 'notes', 'order_number')
+    list_display = ('name', 'software', 'tenant', 'license_type', 'seats', 'available_seats', 'get_renewal_date', 'expiration_date')
+    list_filter = ('software__manufacturer', 'license_type', 'software', 'tenant')
+    search_fields = ('name', 'software__name', 'product_key', 'notes', 'order_number', 'tenant__name')
     readonly_fields = ('available_seats',)
     filter_horizontal = ('tags',)
 

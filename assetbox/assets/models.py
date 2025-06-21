@@ -8,6 +8,9 @@ from django.utils import timezone # Added import for timezone default fields
 from software.models import Software # Import Software model
 from core.models import BaseModel, ChangeLoggingMixin # Added import
 from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 
 # Create your models here.
@@ -271,9 +274,9 @@ class Asset(BaseModel, ChangeLoggingMixin):
     name = models.CharField(max_length=255)
     asset_tag = models.CharField(max_length=50, unique=True)
     serial_number = models.CharField(max_length=100, blank=True, null=True)
-    asset_type = models.ForeignKey(AssetType, on_delete=models.PROTECT, related_name='assets', null=True, blank=True)
-    asset_role = models.ForeignKey(AssetRole, on_delete=models.SET_NULL, blank=True, null=True)
-    purchase_date = models.DateField(blank=True, null=True)
+    asset_type = models.ForeignKey(AssetType, on_delete=models.PROTECT, related_name='assets', null=True, blank=True, db_index=True)
+    asset_role = models.ForeignKey(AssetRole, on_delete=models.SET_NULL, blank=True, null=True, db_index=True)
+    purchase_date = models.DateField(blank=True, null=True, db_index=True)
     warranty_expiration = models.DateField(blank=True, null=True)
     
     # Procurement Metadata (Maturity Phase 1)
@@ -301,11 +304,12 @@ class Asset(BaseModel, ChangeLoggingMixin):
         blank=True,
         verbose_name="Salvage Value"
     )
-    status = models.ForeignKey(StatusLabel, on_delete=models.PROTECT, related_name='assets', null=True, blank=True)
-    location = models.ForeignKey('organization.Location', on_delete=models.SET_NULL, blank=True, null=True, related_name='assets')
+    status = models.ForeignKey(StatusLabel, on_delete=models.PROTECT, related_name='assets', null=True, blank=True, db_index=True)
+    location = models.ForeignKey('organization.Location', on_delete=models.SET_NULL, blank=True, null=True, related_name='assets', db_index=True)
+    tenant = models.ForeignKey('organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='assets', db_index=True)
     notes = models.TextField(blank=True, null=True)
     tags = models.ManyToManyField('extras.Tag', related_name="assets", blank=True)
-    last_audited = models.DateTimeField(null=True, blank=True, verbose_name="Last Audited")
+    last_audited = models.DateTimeField(null=True, blank=True, verbose_name="Last Audited", db_index=True)
     last_audited_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -453,9 +457,9 @@ class ActivityLog(models.Model):
         ('audited', 'Audited'),
     ]
 
-    asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='logs')
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
-    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='logs', db_index=True)
+    action = models.CharField(max_length=50, choices=ACTION_CHOICES)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, db_index=True)
     timestamp = models.DateTimeField(auto_now_add=True)
     notes = models.TextField(blank=True, null=True)
 
@@ -473,7 +477,8 @@ class InstalledSoftware(BaseModel):
     asset = models.ForeignKey(
         to=Asset,
         on_delete=models.CASCADE, # If Asset is deleted, remove its inventory
-        related_name='installed_software'
+        related_name='installed_software',
+        db_index=True
     )
     software = models.ForeignKey(
         to=Software,
@@ -585,7 +590,7 @@ class ComponentInstance(BaseModel, ChangeLoggingMixin):
 
     component_type = models.ForeignKey(ComponentType, on_delete=models.PROTECT, related_name='instances')
     serial_number = models.CharField(max_length=100, blank=True, help_text="Physical serial number of the part")
-    parent_asset = models.ForeignKey(Asset, on_delete=models.SET_NULL, null=True, blank=True, related_name='components')
+    parent_asset = models.ForeignKey(Asset, on_delete=models.SET_NULL, null=True, blank=True, related_name='components', db_index=True)
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default=STATUS_IN_STOCK)
     purchase_date = models.DateField(blank=True, null=True)
     purchase_cost = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
@@ -635,6 +640,7 @@ class Accessory(BaseModel, ChangeLoggingMixin):
     allow_overallocate = models.BooleanField(default=False, verbose_name="Allow Over-allocation", help_text="Allow checkout count to exceed stock capacity")
     notes = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', related_name='accessories', blank=True)
+    tenant = models.ForeignKey('organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='accessories', db_index=True)
 
     class Meta:
         ordering = ('manufacturer', 'name')
@@ -670,9 +676,9 @@ class Accessory(BaseModel, ChangeLoggingMixin):
 
 class AccessoryAssignment(BaseModel, ChangeLoggingMixin):
     """Checkout allocation mapping for physical accessories assigned to users or locations."""
-    accessory = models.ForeignKey(Accessory, on_delete=models.CASCADE, related_name='assignments')
-    assigned_holder = models.ForeignKey('organization.AssetHolder', on_delete=models.SET_NULL, null=True, blank=True, related_name='accessory_assignments')
-    assigned_location = models.ForeignKey('organization.Location', on_delete=models.SET_NULL, null=True, blank=True, related_name='accessory_assignments')
+    accessory = models.ForeignKey(Accessory, on_delete=models.CASCADE, related_name='assignments', db_index=True)
+    assigned_holder = models.ForeignKey('organization.AssetHolder', on_delete=models.SET_NULL, null=True, blank=True, related_name='accessory_assignments', db_index=True)
+    assigned_location = models.ForeignKey('organization.Location', on_delete=models.SET_NULL, null=True, blank=True, related_name='accessory_assignments', db_index=True)
     qty = models.PositiveIntegerField(default=1, verbose_name="Checkout Quantity")
     assigned_date = models.DateTimeField(default=timezone.now)
     notes = models.TextField(blank=True)
@@ -681,6 +687,15 @@ class AccessoryAssignment(BaseModel, ChangeLoggingMixin):
         ordering = ('-assigned_date',)
         verbose_name = "Accessory Assignment"
         verbose_name_plural = "Accessory Assignments"
+        constraints = [
+            CheckConstraint(
+                check=(
+                    Q(assigned_holder__isnull=False, assigned_location__isnull=True) |
+                    Q(assigned_holder__isnull=True, assigned_location__isnull=False)
+                ),
+                name='chk_accessory_assignment_single_target'
+            )
+        ]
 
     def __str__(self):
         recipient = self.assigned_holder or self.assigned_location or "Unknown"
@@ -715,6 +730,7 @@ class Consumable(BaseModel, ChangeLoggingMixin):
     allow_overallocate = models.BooleanField(default=False, verbose_name="Allow Over-allocation", help_text="Allow consumption count to exceed stock capacity")
     notes = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', related_name='consumables', blank=True)
+    tenant = models.ForeignKey('organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='consumables', db_index=True)
 
     class Meta:
         ordering = ('manufacturer', 'name')
@@ -749,9 +765,9 @@ class Consumable(BaseModel, ChangeLoggingMixin):
 
 class ConsumableAssignment(BaseModel, ChangeLoggingMixin):
     """Permanent consumption payout record mapping for bulk consumables debited from stock."""
-    consumable = models.ForeignKey(Consumable, on_delete=models.CASCADE, related_name='consumptions')
-    assigned_holder = models.ForeignKey('organization.AssetHolder', on_delete=models.SET_NULL, null=True, blank=True, related_name='consumable_consumptions')
-    assigned_location = models.ForeignKey('organization.Location', on_delete=models.SET_NULL, null=True, blank=True, related_name='consumable_consumptions')
+    consumable = models.ForeignKey(Consumable, on_delete=models.CASCADE, related_name='consumptions', db_index=True)
+    assigned_holder = models.ForeignKey('organization.AssetHolder', on_delete=models.SET_NULL, null=True, blank=True, related_name='consumable_consumptions', db_index=True)
+    assigned_location = models.ForeignKey('organization.Location', on_delete=models.SET_NULL, null=True, blank=True, related_name='consumable_consumptions', db_index=True)
     qty = models.PositiveIntegerField(default=1, verbose_name="Consumed Quantity")
     assigned_date = models.DateTimeField(default=timezone.now)
     notes = models.TextField(blank=True)
@@ -760,6 +776,15 @@ class ConsumableAssignment(BaseModel, ChangeLoggingMixin):
         ordering = ('-assigned_date',)
         verbose_name = "Consumable Consumption"
         verbose_name_plural = "Consumable Consumptions"
+        constraints = [
+            CheckConstraint(
+                check=(
+                    Q(assigned_holder__isnull=False, assigned_location__isnull=True) |
+                    Q(assigned_holder__isnull=True, assigned_location__isnull=False)
+                ),
+                name='chk_consumable_assignment_single_target'
+            )
+        ]
 
     def __str__(self):
         recipient = self.assigned_holder or self.assigned_location or "Unknown"
@@ -768,7 +793,7 @@ class ConsumableAssignment(BaseModel, ChangeLoggingMixin):
 
 class CustodyReceipt(BaseModel, ChangeLoggingMixin):
     """Immutable digital custody sign-off ledger receipt binding checked-out assets to Asset Holders."""
-    asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='custody_receipts')
+    asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='custody_receipts', db_index=True)
     holder = models.ForeignKey('organization.AssetHolder', on_delete=models.CASCADE, related_name='custody_receipts')
     verification_hash = models.CharField(max_length=64, unique=True)
     signature_canvas = models.TextField(help_text="Base64 canvas stroke vector string representation")
@@ -798,7 +823,7 @@ class AssetMaintenance(BaseModel, ChangeLoggingMixin):
         (MAINTENANCE_TYPE_HARDWARE_SUPPORT, 'Hardware Support'),
     ]
 
-    asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='maintenances')
+    asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='maintenances', db_index=True)
     supplier = models.CharField(max_length=100, blank=True, verbose_name="Supplier/Vendor")
     maintenance_type = models.CharField(
         max_length=50,
@@ -838,6 +863,7 @@ class AssetMaintenance(BaseModel, ChangeLoggingMixin):
 class Kit(BaseModel, ChangeLoggingMixin):
     name = models.CharField(max_length=100, unique=True, verbose_name="Kit Name")
     description = models.TextField(blank=True, verbose_name="Description")
+    tenant = models.ForeignKey('organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='kits', db_index=True)
 
     class Meta:
         ordering = ['name']
@@ -852,7 +878,7 @@ class Kit(BaseModel, ChangeLoggingMixin):
 
 
 class KitItem(BaseModel, ChangeLoggingMixin):
-    kit = models.ForeignKey(Kit, on_delete=models.CASCADE, related_name='items', verbose_name="Kit")
+    kit = models.ForeignKey(Kit, on_delete=models.CASCADE, related_name='items', verbose_name="Kit", db_index=True)
     asset_type = models.ForeignKey(AssetType, on_delete=models.PROTECT, null=True, blank=True, related_name='kit_items', verbose_name="Asset Type / Model")
     accessory = models.ForeignKey(Accessory, on_delete=models.PROTECT, null=True, blank=True, related_name='kit_items', verbose_name="Accessory Catalog Item")
     license = models.ForeignKey('licenses.License', on_delete=models.PROTECT, null=True, blank=True, related_name='kit_items', verbose_name="Software License")
@@ -861,6 +887,16 @@ class KitItem(BaseModel, ChangeLoggingMixin):
     class Meta:
         verbose_name = "Kit Item"
         verbose_name_plural = "Kit Items"
+        constraints = [
+            CheckConstraint(
+                check=(
+                    Q(asset_type__isnull=False, accessory__isnull=True, license__isnull=True) |
+                    Q(asset_type__isnull=True, accessory__isnull=False, license__isnull=True) |
+                    Q(asset_type__isnull=True, accessory__isnull=True, license__isnull=False)
+                ),
+                name='chk_kit_item_single_target'
+            )
+        ]
 
     def __str__(self):
         if self.asset_type:

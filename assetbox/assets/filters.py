@@ -1,6 +1,6 @@
 import django_filters
 from .models import Asset, AssetRole, Manufacturer, AssetType, ComponentType, ComponentInstance, Accessory, Consumable, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit
-from organization.models import Location
+from organization.models import Location, Tenant
 from django import forms
 from django.db.models import Q
 from crispy_forms.helper import FormHelper
@@ -32,6 +32,11 @@ class AssetFilterSet(django_filters.FilterSet):
     location = django_filters.ModelChoiceFilter(
         queryset=Location.objects.all().select_related('site'), # Optimize choices
         widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    tenant = django_filters.ModelChoiceFilter(
+        queryset=Tenant.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Tenant'
     )
 
     class Meta:
@@ -182,6 +187,11 @@ class AccessoryFilterSet(django_filters.FilterSet):
         label='Manufacturer',
         widget=forms.Select(attrs={'class': 'form-select'})
     )
+    tenant = django_filters.ModelChoiceFilter(
+        queryset=Tenant.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Tenant'
+    )
 
     class Meta:
         model = Accessory
@@ -207,6 +217,11 @@ class ConsumableFilterSet(django_filters.FilterSet):
         queryset=Manufacturer.objects.all(),
         label='Manufacturer',
         widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    tenant = django_filters.ModelChoiceFilter(
+        queryset=Tenant.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Tenant'
     )
 
     class Meta:
@@ -325,6 +340,11 @@ class DepreciationFilterSet(django_filters.FilterSet):
 
 class KitFilterSet(django_filters.FilterSet):
     q = django_filters.CharFilter(method='search', label='Search')
+    tenant = django_filters.ModelChoiceFilter(
+        queryset=Tenant.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Tenant'
+    )
 
     class Meta:
         model = Kit

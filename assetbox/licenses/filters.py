@@ -3,6 +3,7 @@ from django.db.models import Q
 from django import forms
 from extras.models import Tag
 from software.models import Software
+from organization.models import Tenant
 from .models import License, LicenseTypeChoices
 
 class LicenseFilterSet(django_filters.FilterSet):
@@ -29,6 +30,11 @@ class LicenseFilterSet(django_filters.FilterSet):
         queryset=Tag.objects.all(),
         label='Tags',
         widget=forms.SelectMultiple(attrs={'class': 'form-select'})
+    )
+    tenant = django_filters.ModelChoiceFilter(
+        queryset=Tenant.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Tenant'
     )
 
     class Meta:

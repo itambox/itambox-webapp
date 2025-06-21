@@ -20,14 +20,15 @@ class LicenseTable(BaseTable):
     license_type = tables.Column(verbose_name=_("Type"))
     seats = tables.Column(verbose_name=_("Total Seats"))
     available_seats = tables.Column(verbose_name=_("Available Seats"), orderable=False)
+    tenant = tables.Column(accessor='tenant.name', verbose_name=_("Tenant"), orderable=True)
     expiration_date = tables.DateColumn(verbose_name=_("Expiration Date"), format='Y-m-d')
     tags = TagColumn(url_name='licenses:license_list')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = License
-        fields = ('pk', 'name', 'software', 'license_type', 'seats', 'available_seats', 'purchase_date', 'expiration_date', 'tags', 'actions')
-        default_columns = ('pk', 'name', 'software', 'license_type', 'seats', 'available_seats', 'expiration_date', 'actions')
+        fields = ('pk', 'name', 'software', 'tenant', 'license_type', 'seats', 'available_seats', 'purchase_date', 'expiration_date', 'tags', 'actions')
+        default_columns = ('pk', 'name', 'software', 'tenant', 'license_type', 'seats', 'available_seats', 'expiration_date', 'actions')
 
 class LicenseSeatAssignmentTable(BaseTable):
     """Table for displaying individual License Seat Assignments."""

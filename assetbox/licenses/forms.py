@@ -23,7 +23,7 @@ class LicenseForm(BootstrapMixin, forms.ModelForm):
 
     class Meta:
         model = License
-        fields = ('name', 'software', 'license_type', 'product_key', 'seats', 'purchase_date', 'purchase_cost', 'order_number', 'expiration_date', 'notes', 'tags')
+        fields = ('name', 'software', 'license_type', 'product_key', 'seats', 'purchase_date', 'purchase_cost', 'order_number', 'expiration_date', 'notes', 'tags', 'tenant')
         widgets = {
             'product_key': forms.Textarea(attrs={'rows': 2}),
             'purchase_date': forms.DateInput(attrs={'type': 'date'}),
@@ -62,6 +62,7 @@ class LicenseForm(BootstrapMixin, forms.ModelForm):
                 'purchase_cost',
                 'order_number',
                 'expiration_date',
+                'tenant',
                 'notes',
                 'tags',
                 css_class='mb-3'

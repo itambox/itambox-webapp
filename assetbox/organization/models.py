@@ -25,7 +25,8 @@ class Location(BaseModel, ChangeLoggingMixin):
     site = models.ForeignKey(
         'Site', # Use string reference
         on_delete=models.CASCADE, # Or PROTECT if locations shouldn't be deleted when site is
-        related_name='locations'
+        related_name='locations',
+        db_index=True
         # null=True # REMOVED temporary null
         # No blank=True as per requirements
     )
@@ -48,7 +49,8 @@ class Location(BaseModel, ChangeLoggingMixin):
         on_delete=models.SET_NULL, # Or PROTECT
         related_name='locations',
         blank=True,
-        null=True
+        null=True,
+        db_index=True
     )
     facility = models.CharField(max_length=100, blank=True)
     description = models.TextField(blank=True) # Using TextField for potentially longer descriptions
@@ -81,11 +83,12 @@ class Region(BaseModel, ChangeLoggingMixin):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     parent = models.ForeignKey(
-        'self', # Keep self for now, Django should handle it across apps in migrations
+        'self',
         on_delete=models.SET_NULL,
         related_name='children',
         blank=True,
-        null=True
+        null=True,
+        db_index=True
     )
     description = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', related_name="regions", blank=True)
@@ -200,9 +203,9 @@ class Site(BaseModel, ChangeLoggingMixin):
     slug = models.SlugField(max_length=100, unique=True)
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default=STATUS_ACTIVE)
     # Use local models for FKs within the app
-    region = models.ForeignKey(Region, on_delete=models.SET_NULL, related_name='sites', blank=True, null=True)
-    group = models.ForeignKey(SiteGroup, on_delete=models.SET_NULL, related_name='sites', blank=True, null=True)
-    tenant = models.ForeignKey(Tenant, on_delete=models.SET_NULL, related_name='sites', blank=True, null=True)
+    region = models.ForeignKey(Region, on_delete=models.SET_NULL, related_name='sites', blank=True, null=True, db_index=True)
+    group = models.ForeignKey(SiteGroup, on_delete=models.SET_NULL, related_name='sites', blank=True, null=True, db_index=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.SET_NULL, related_name='sites', blank=True, null=True, db_index=True)
     facility = models.CharField(max_length=100, blank=True)
     time_zone = models.CharField(max_length=63, blank=True) # Consider using timezone_field package later
     description = models.CharField(max_length=200, blank=True)
@@ -243,7 +246,8 @@ class AssetHolder(BaseModel, ChangeLoggingMixin):
         on_delete=models.SET_NULL,
         blank=True,
         null=True,
-        related_name='asset_holders'
+        related_name='asset_holders',
+        db_index=True
     )
     description = models.TextField(blank=True)
     comments = models.TextField(blank=True)
