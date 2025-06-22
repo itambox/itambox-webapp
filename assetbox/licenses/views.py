@@ -18,7 +18,7 @@ from . import filters
 # =============================================================================
 
 class LicenseListView(ObjectListView):
-    queryset = License.objects.select_related('software', 'software__manufacturer').prefetch_related('tags')
+    queryset = License.objects.select_related('software', 'software__manufacturer', 'tenant').prefetch_related('tags')
     filterset = filters.LicenseFilterSet
     filterset_form = forms.LicenseFilterForm
     table = tables.LicenseTable
@@ -26,7 +26,7 @@ class LicenseListView(ObjectListView):
     action_buttons = ('add', 'import', 'export')
 
 class LicenseDetailView(ObjectDetailView):
-    queryset = License.objects.select_related('software', 'software__manufacturer').prefetch_related('tags')
+    queryset = License.objects.select_related('software', 'software__manufacturer', 'tenant').prefetch_related('tags')
     template_name = 'licenses/license_detail.html'
 
     def get_context_data(self, **kwargs):

@@ -208,6 +208,8 @@ class ObjectListView(LoginRequiredMixin, ListView):
         self.model = _model # Ensure self.model is set for get_table
 
         table = self.get_table()
+        # Apply pagination via RequestConfig (critical for list view performance)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(table)
         filter_form = self.filterset_form(self.request.GET) if self.filterset_form else None
         context['table'] = table
         context['filter_form'] = filter_form

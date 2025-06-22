@@ -85,11 +85,11 @@ class DashboardView(LoginRequiredMixin, BaseHTMXView, TemplateView):
         ).count()
 
         # 4. Software Licenses Utilization
-        licenses_qs = License.objects.all()
+        licenses_qs = License.objects.with_counts()
         license_stats = []
         for lic in licenses_qs:
             total_seats = lic.seats
-            allocated = lic.assignments.count()
+            allocated = lic.assigned_count
             remaining = total_seats - allocated
             util_pct = int((allocated / total_seats) * 100) if total_seats > 0 else 0
             license_stats.append({
@@ -127,6 +127,24 @@ class DashboardView(LoginRequiredMixin, BaseHTMXView, TemplateView):
             'asset', 'user'
         ).order_by('-id')[:6]
 
+        # 7. Subscription Upcoming Renewals
+        from subscriptions.models import Subscription, SubscriptionStatusChoices
+        today = date.today()
+        upcoming_renewals = Subscription.objects.filter(
+            status=SubscriptionStatusChoices.ACTIVE,
+            renewal_date__isnull=False,
+            renewal_date__gte=today,
+            renewal_date__lte=today + date.resolution * 90,
+        ).select_related('provider', 'tenant').order_by('renewal_date')[:10]
+
+        total_subscription_spend = Subscription.objects.filter(
+            status=SubscriptionStatusChoices.ACTIVE
+        ).aggregate(total=Sum('renewal_cost'))['total'] or Decimal('0.00')
+
+        subscription_status_counts = Subscription.objects.values('status').annotate(
+            count=Count('id')
+        ).order_by('status')
+
         # Injects metrics into template context
         context.update({
             'total_assets': total_assets,
@@ -140,6 +158,9 @@ class DashboardView(LoginRequiredMixin, BaseHTMXView, TemplateView):
             'license_stats': license_stats,
             'eol_alerts': eol_alerts,
             'recent_activity': recent_activity,
+            'upcoming_renewals': upcoming_renewals,
+            'total_subscription_spend': total_subscription_spend,
+            'subscription_status_counts': subscription_status_counts,
         })
         return context
 
@@ -224,12 +245,46 @@ class DashboardView(LoginRequiredMixin, BaseHTMXView, TemplateView):
 
 # --- Asset Views ---
 class AssetListView(ObjectListView):
-    queryset = Asset.objects.all().select_related(
+    queryset = Asset.objects.select_related(
         'asset_role',
         'asset_type',
         'asset_type__manufacturer',
-        'location'
+        'location',
+        'tenant',
+        'status',
     ).prefetch_related('tags')
+
+    def get_table(self):
+        queryset = self.get_queryset()
+        # Patch objects with _assignee_display BEFORE table consumes them (1 query)
+        objects = list(queryset)
+        if objects:
+            pks = [obj.pk for obj in objects]
+            ct = ContentType.objects.get_for_model(Asset)
+            assignments = AssetHolderAssignment.objects.filter(
+                content_type=ct, object_id__in=pks
+            ).select_related('asset_holder')
+            assignee_map = {
+                a.object_id: a.asset_holder for a in assignments if a.asset_holder
+            }
+            from django.urls import reverse
+            from django.utils.safestring import mark_safe
+            for obj in objects:
+                holder = assignee_map.get(obj.pk)
+                if holder:
+                    try:
+                        url = reverse('organization:assetholder_detail', kwargs={'pk': holder.pk})
+                        obj._assignee_display = mark_safe(f'<a href="{url}">{holder}</a>')
+                    except Exception:
+                        obj._assignee_display = str(holder)
+                elif obj.location:
+                    obj._assignee_display = f"Location: {obj.location}"
+                else:
+                    obj._assignee_display = "—"
+
+        table_class = self.table
+        table = table_class(objects, request=self.request)
+        return table
     filterset = filters.AssetFilterSet
     filterset_form = forms.AssetFilterForm
     table = tables.AssetTable
@@ -328,7 +383,7 @@ def asset_checkout_modal(request, pk):
     asset = get_object_or_404(Asset, pk=pk)
     
     # Ensure asset is available before proceeding
-    if asset.status and asset.status.slug != 'available':
+    if not asset.status or asset.status.slug != 'available':
         # Returning a simple message inside the modal might be better UX
         # For now, returning a basic forbidden response
         return HttpResponse("Asset is not available for assignment.", status=403)
@@ -336,61 +391,63 @@ def asset_checkout_modal(request, pk):
     if request.method == 'POST':
         form = AssetCheckOutForm(request.POST)
         if form.is_valid():
-            selected_holder = form.cleaned_data.get('asset_holder')
-            selected_location = form.cleaned_data.get('location')
-            
-            # --- Checkout Logic --- 
-            assignee = None
-            if selected_holder:
-                assignee = selected_holder
-                asset.location = None # Clear location if assigned to holder
-            elif selected_location:
-                assignee = selected_location
-                asset.location = selected_location # Set location
+            from django.db import transaction
+            with transaction.atomic():
+                selected_holder = form.cleaned_data.get('asset_holder')
+                selected_location = form.cleaned_data.get('location')
+                
+                # --- Checkout Logic --- 
+                assignee = None
+                if selected_holder:
+                    assignee = selected_holder
+                    asset.location = None # Clear location if assigned to holder
+                elif selected_location:
+                    assignee = selected_location
+                    asset.location = selected_location # Set location
 
-            # Update asset status
-            in_use_status = StatusLabel.objects.filter(slug='in-use').first()
-            if in_use_status:
-                asset.status = in_use_status
-            asset.save(update_fields=['status', 'location'])
+                # Update asset status
+                in_use_status = StatusLabel.objects.filter(slug='in-use').first()
+                if in_use_status:
+                    asset.status = in_use_status
+                asset.save(update_fields=['status', 'location'])
 
-            # Create/update assignment record
-            if selected_holder:
-                AssetHolderAssignment.objects.update_or_create(
-                    content_type=ContentType.objects.get_for_model(Asset),
-                    object_id=asset.pk,
-                    defaults={
-                        'asset_holder': selected_holder,
-                    }
+                # Create/update assignment record
+                if selected_holder:
+                    AssetHolderAssignment.objects.update_or_create(
+                        content_type=ContentType.objects.get_for_model(Asset),
+                        object_id=asset.pk,
+                        defaults={
+                            'asset_holder': selected_holder,
+                        }
+                    )
+                else:
+                    # If assigned to location, clear any existing holder assignment
+                    AssetHolderAssignment.objects.filter(
+                        content_type=ContentType.objects.get_for_model(Asset),
+                        object_id=asset.pk
+                    ).delete()
+
+                # Create Activity Log
+                ActivityLog.objects.create(
+                    asset=asset,
+                    action='checked_out',
+                    user=request.user,
+                    notes=f"Checked out to {'Holder' if selected_holder else 'Location'}: {assignee}"
                 )
-            else:
-                # If assigned to location, clear any existing holder assignment
-                AssetHolderAssignment.objects.filter(
-                    content_type=ContentType.objects.get_for_model(Asset),
-                    object_id=asset.pk
-                ).delete()
 
-            # Create Activity Log
-            ActivityLog.objects.create(
-                asset=asset,
-                action='checked_out',
-                user=request.user,
-                notes=f"Checked out to {'Holder' if selected_holder else 'Location'}: {assignee}"
-            )
+                messages.success(request, f"Asset '{asset}' checked out successfully to {assignee}.")
+                # --- End Checkout Logic ---
 
-            messages.success(request, f"Asset '{asset}' checked out successfully to {assignee}.")
-            # --- End Checkout Logic ---
-
-            # --- HTMX Response for Success --- 
-            import json
-            response = HttpResponse(status=204) # No Content
-            # Trigger events for JS to close modal and potentially refresh list
-            response['HX-Trigger'] = json.dumps({
-                "closeModalEvent": None, 
-                "assetListUpdated": None, # Trigger list refresh
-                "showMessage": {"message": f"Asset '{asset}' checked out to {assignee}.", "level": "success"} # Send message via trigger
-            }) 
-            return response
+                # --- HTMX Response for Success --- 
+                import json
+                response = HttpResponse(status=204) # No Content
+                # Trigger events for JS to close modal and potentially refresh list
+                response['HX-Trigger'] = json.dumps({
+                    "closeModalEvent": None, 
+                    "assetListUpdated": None, # Trigger list refresh
+                    "showMessage": {"message": f"Asset '{asset}' checked out to {assignee}.", "level": "success"} # Send message via trigger
+                }) 
+                return response
             # --- End HTMX Response --- 
         else:
             # --- HTMX Response for Validation Error ---
@@ -420,41 +477,45 @@ def asset_checkin(request, pk):
     
     # Check if the asset has an assignment record first
     if assignment:
-        # Check in from Asset Holder
-        checked_in_from = assignment.asset_holder
-        from_str = str(checked_in_from) if checked_in_from else 'N/A'
-        
-        assignment.delete()
-        available_status = StatusLabel.objects.filter(slug='available').first()
-        if available_status:
-            asset.status = available_status
-        asset.save()
-        
-        ActivityLog.objects.create(
-            asset=asset, 
-            user=request.user, 
-            action='checked_in',
-            notes=f"Checked in from Asset Holder: {from_str}" 
-        )
+        from django.db import transaction
+        with transaction.atomic():
+            # Check in from Asset Holder
+            checked_in_from = assignment.asset_holder
+            from_str = str(checked_in_from) if checked_in_from else 'N/A'
+            
+            assignment.delete()
+            available_status = StatusLabel.objects.filter(slug='available').first()
+            if available_status:
+                asset.status = available_status
+            asset.save()
+            
+            ActivityLog.objects.create(
+                asset=asset, 
+                user=request.user, 
+                action='checked_in',
+                notes=f"Checked in from Asset Holder: {from_str}" 
+            )
         messages.success(request, f"Asset '{asset}' successfully checked in from Asset Holder: {from_str}.")
     elif asset.location:
-        # Check in (clear) from Location
-        checked_in_from = asset.location
-        from_str = str(checked_in_from) if checked_in_from else 'N/A'
-        
-        asset.location = None
-        # Set status back to available
-        available_status = StatusLabel.objects.filter(slug='available').first()
-        if available_status:
-            asset.status = available_status
-        asset.save()
-        
-        ActivityLog.objects.create(
-            asset=asset, 
-            user=request.user, 
-            action='checked_in', # Still log as checked_in
-            notes=f"Checked in from Location: {from_str}" 
-        )
+        from django.db import transaction
+        with transaction.atomic():
+            # Check in (clear) from Location
+            checked_in_from = asset.location
+            from_str = str(checked_in_from) if checked_in_from else 'N/A'
+            
+            asset.location = None
+            # Set status back to available
+            available_status = StatusLabel.objects.filter(slug='available').first()
+            if available_status:
+                asset.status = available_status
+            asset.save()
+            
+            ActivityLog.objects.create(
+                asset=asset, 
+                user=request.user, 
+                action='checked_in', # Still log as checked_in
+                notes=f"Checked in from Location: {from_str}" 
+            )
         messages.success(request, f"Asset '{asset}' successfully checked in from Location: {from_str}.")
     else:
         # Asset was not assigned to a holder or location
@@ -465,7 +526,7 @@ def asset_checkin(request, pk):
 # --- AssetRole (Asset Role) Views (Refactored to CBV) ---
 
 class AssetRoleListView(ObjectListView):
-    queryset = AssetRole.objects.all()
+    queryset = AssetRole.objects.annotate(asset_count_annotated=Count('asset'))
     filterset = filters.AssetRoleFilterSet
     filterset_form = forms.AssetRoleFilterForm # Corrected: Point to AssetRoleFilterForm
     table = tables.AssetRoleTable
@@ -527,7 +588,7 @@ class AssetRoleDeleteView(ObjectDeleteView):
 # --- StatusLabel Views ---
 
 class StatusLabelListView(ObjectListView):
-    queryset = StatusLabel.objects.all()
+    queryset = StatusLabel.objects.annotate(asset_count_annotated=Count('assets'))
     filterset = filters.StatusLabelFilterSet
     filterset_form = forms.StatusLabelFilterForm
     table = tables.StatusLabelTable
@@ -588,7 +649,7 @@ class StatusLabelDeleteView(ObjectDeleteView):
 
 class ManufacturerListView(ObjectListView):
     queryset = Manufacturer.objects.annotate(
-        asset_count=Count('asset_types__assets') # Count assets through AssetType
+        asset_count_annotated=Count('asset_types__assets') # Count assets through AssetType
     )
     filterset = filters.ManufacturerFilterSet
     filterset_form = forms.ManufacturerFilterForm
@@ -1178,7 +1239,7 @@ class CustomFieldDeleteView(ObjectDeleteView):
 
 # Custom Fieldsets
 class CustomFieldsetListView(ObjectListView):
-    queryset = CustomFieldset.objects.all().prefetch_related('fields')
+    queryset = CustomFieldset.objects.annotate(fields_count_annotated=Count('fields'))
     filterset = filters.CustomFieldsetFilterSet
     filterset_form = forms.CustomFieldsetFilterForm
     table = tables.CustomFieldsetTable
