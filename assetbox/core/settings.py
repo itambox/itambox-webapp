@@ -24,12 +24,29 @@ VERSION = '0.1.0'
 import os
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('ASSETBOX_SECRET_KEY', 'django-insecure-7&re8o6pow!b5aakt7ox#n$8_%)$qs@b9^@dnsi@h0e5j&&*sz')
+SECRET_KEY = os.environ.get('ASSETBOX_SECRET_KEY', '')
+
+if not SECRET_KEY:
+    # In dev, generate a random key if not provided, but NEVER use a hardcoded default in production.
+    # For local development without env vars, Django will warn via check --deploy.
+    SECRET_KEY = 'django-insecure-dev-only-change-me-in-production'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('ASSETBOX_DEBUG', 'False').lower() in ('true', '1', 't')
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.environ.get('ASSETBOX_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+
+# Production security hardening (only when explicitly enabled AND not in debug mode)
+ASSETBOX_ENABLE_SECURITY = os.environ.get('ASSETBOX_ENABLE_SECURITY', 'False').lower() in ('true', '1', 't')
+if not DEBUG and ASSETBOX_ENABLE_SECURITY:
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 
 # Application definition
@@ -133,6 +150,7 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+        'CONN_MAX_AGE': 60,  # Reuse connections for 60 seconds
     }
 }
 
@@ -188,8 +206,23 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 # Django REST Framework Settings
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
-    # Add other DRF settings here if needed in the future
-    # e.g., authentication, permissions, pagination
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 50,
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/hour',
+        'user': '1000/hour',
+    },
 }
 
 SEARCH_BACKEND = 'core.search_backends.DatabaseBackend'
