@@ -18,3 +18,15 @@ db.sqlite3
 
 # Project Specific
 inspiration/*
+
+# Kilo
+.kilo/
+
+# Playwright browser artifacts
+.playwright-mcp/
+
+# Temp output files
+test_output*.txt
+
+# Seed data management command (one-off utility)
+assetbox/core/management/
