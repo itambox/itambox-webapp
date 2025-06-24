@@ -492,9 +492,10 @@ class ObjectDeleteView(LoginRequiredMixin, BaseHTMXView, DeleteView):
 
     def form_valid(self, form):
         obj_repr = str(self.object)
+        model = self.object.__class__
         try:
             self.object.delete()
-            messages.success(self.request, f"Deleted {self.model._meta.verbose_name} {obj_repr}.")
+            messages.success(self.request, f"Deleted {model._meta.verbose_name} {obj_repr}.")
             return HttpResponseRedirect(self.get_success_url())
         except ProtectedError as e:
             messages.error(self.request, f"Unable to delete {obj_repr}. Objects are protected: {e}")
@@ -504,8 +505,11 @@ class ObjectDeleteView(LoginRequiredMixin, BaseHTMXView, DeleteView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['model'] = self.model
-        context['verbose_name'] = self.model._meta.verbose_name
+        model = self.object.__class__ if self.object else (self.model or None)
+        if model is None:
+            raise ValueError("Cannot determine model for delete view.")
+        context['model'] = self.model or model
+        context['verbose_name'] = model._meta.verbose_name
         context['title'] = f"Delete {context['verbose_name']}: {self.object}"
         
         # Cancel URL
@@ -513,7 +517,7 @@ class ObjectDeleteView(LoginRequiredMixin, BaseHTMXView, DeleteView):
             context['cancel_url'] = self.object.get_absolute_url()
         else:
             try:
-                list_view_name = get_model_viewname(self.model, 'list')
+                list_view_name = get_model_viewname(model, 'list')
                 context['cancel_url'] = reverse(list_view_name)
             except NoReverseMatch:
                 context['cancel_url'] = reverse('dashboard')
@@ -522,7 +526,7 @@ class ObjectDeleteView(LoginRequiredMixin, BaseHTMXView, DeleteView):
         # Breadcrumbs
         base_breadcrumbs = [
             (reverse('dashboard'), 'Dashboard'),
-            (context['cancel_url'], self.model._meta.verbose_name_plural.title()), # Link to List or Detail
+            (context['cancel_url'], model._meta.verbose_name_plural.title()), # Link to List or Detail
             (None, f"Delete {self.object}") # Current action
         ]
         context['breadcrumbs'] = getattr(self, 'get_breadcrumbs', lambda: base_breadcrumbs)()
