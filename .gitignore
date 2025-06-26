@@ -28,5 +28,4 @@ inspiration/*
 # Temp output files
 test_output*.txt
 
-# Seed data management command (one-off utility)
-assetbox/core/management/
+
