@@ -80,6 +80,29 @@
 
                 {# Table Rendering Container #}
                 <div id="object-list-table-container">
+
+                    {# Batch Actions Bar #}
+                    <div id="batch-actions-bar" class="d-none">
+                        <div class="d-flex align-items-center gap-2 px-3 py-2 bg-light border-bottom">
+                            <span id="batch-selected-count" class="fw-bold me-2">0 selected</span>
+                            <button type="button" class="btn btn-sm btn-primary" id="btn-bulk-assign"
+                                    data-bs-toggle="modal" data-bs-target="#bulk-assign-modal"
+                                    title="Assign selected assets to a holder">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user-plus me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M16 19h6" /><path d="M19 16v6" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4" /></svg>
+                                Assign Selected
+                            </button>
+                            <form id="bulk-delete-form" method="post" action="{% url 'bulk_delete' %}" class="d-inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="model_name" value="{{ model_name_str }}">
+                                <input type="hidden" name="pk" value="" id="bulk-delete-pks">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete selected items? This cannot be undone.')">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
+                                    Delete Selected
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
                     <div class="table-responsive">
                        {% if table %}
                            {% render_table table "global_includes/htmx_table.html" %}
@@ -271,5 +294,106 @@ if (!window.hasFiltersToggleEventBound) {
 
 // Initial initialization
 window.initFiltersToggle();
+
+// === Batch Actions: Checkbox Tracking & Bulk Assign ===
+(function() {
+    var bar = document.getElementById('batch-actions-bar');
+    var countEl = document.getElementById('batch-selected-count');
+    var deleteForm = document.getElementById('bulk-delete-form');
+    var deletePksInput = document.getElementById('bulk-delete-pks');
+
+    function updateBatchBar() {
+        var checkboxes = document.querySelectorAll('#object-list-table-container input[type="checkbox"][name="pk"]');
+        var selected = [];
+        checkboxes.forEach(function(cb) { if (cb.checked) selected.push(cb); });
+        var count = selected.length;
+
+        if (countEl) countEl.textContent = count + ' selected';
+        if (bar) bar.classList.toggle('d-none', count === 0);
+        if (deletePksInput && deleteForm) {
+            deletePksInput.value = selected.map(function(cb) { return cb.value; }).join(',');
+        }
+    }
+
+    // Delegate checkbox clicks via event listener
+    document.addEventListener('change', function(event) {
+        if (event.target.type === 'checkbox' && event.target.name === 'pk' && event.target.closest('#object-list-table-container')) {
+            updateBatchBar();
+        }
+    });
+
+    // Run on HTMX content swap when a new table loads
+    document.body.addEventListener('htmx:afterSettle', function() {
+        updateBatchBar();
+    });
+
+    // Handle "Select All" checkbox
+    var selectAllCb = document.querySelector('input[type="checkbox"][name="select_all"]');
+    if (selectAllCb) {
+        selectAllCb.addEventListener('change', function() {
+            var checkboxes = document.querySelectorAll('#object-list-table-container input[type="checkbox"][name="selection"]');
+            var checkboxes = document.querySelectorAll('#object-list-table-container input[type="checkbox"][name="pk"]');
+            checkboxes.forEach(function(cb) { cb.checked = selectAllCb.checked; });
+            updateBatchBar();
+        });
+    }
+
+    // Initial run
+    updateBatchBar();
+
+    // Bulk Assign modal submit handler
+    var assignForm = document.getElementById('bulk-assign-form');
+    if (assignForm) {
+        assignForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            var checkboxes = document.querySelectorAll('#object-list-table-container input[type="checkbox"][name="pk"]');
+            if (pks.length === 0) return;
+
+            // Build hidden PK inputs
+            var container = assignForm.querySelector('#bulk-assign-pks');
+            if (!container) { container = document.createElement('div'); container.id = 'bulk-assign-pks'; assignForm.appendChild(container); }
+            container.innerHTML = '';
+            pks.forEach(function(pk) {
+                var input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'pk';
+                input.value = pk;
+                container.appendChild(input);
+            });
+            assignForm.submit();
+        });
+    }
+})();
 </script>
 {% endblock javascript %}
+
+{# Bulk Assign Modal #}
+<div class="modal modal-blur fade" id="bulk-assign-modal" tabindex="-1" aria-labelledby="bulkAssignModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="bulk-assign-form" method="post" action="{% url 'assets:asset_bulk_assign' %}">
+                {% csrf_token %}
+                {% if model_name_str == 'assets.asset' %}
+                <div class="modal-header">
+                    <h5 class="modal-title" id="bulkAssignModalLabel">Bulk Assign Assets</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted">Select an Asset Holder to assign the selected assets to:</p>
+                    <label for="bulk-assign-holder" class="form-label">Asset Holder</label>
+                    <select name="holder_id" id="bulk-assign-holder" class="form-select" required>
+                        <option value="">— Select an Asset Holder —</option>
+                        {% for holder in asset_holders %}
+                        <option value="{{ holder.pk }}">{{ holder }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Assign</button>
+                </div>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+</div>

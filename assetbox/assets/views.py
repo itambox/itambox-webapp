@@ -285,7 +285,10 @@ class AssetListView(ObjectListView):
         table_class = self.table
         table = table_class(objects, request=self.request)
         return table
-    filterset = filters.AssetFilterSet
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['asset_holders'] = AssetHolder.objects.all().order_by('last_name', 'first_name')
+        return context
     filterset_form = forms.AssetFilterForm
     table = tables.AssetTable
     action_buttons = ('add',)
@@ -1528,3 +1531,75 @@ def kit_checkout_modal(request, pk):
     return render(request, 'assets/includes/kit_checkout_modal.html', context)
 
 
+@login_required
+def bulk_assign_assets(request):
+    """Assign multiple selected assets to a single AssetHolder."""
+    if request.method != 'POST':
+        return HttpResponse(status=405)
+
+    import json
+    object_pks = request.POST.getlist('pk')
+    holder_id = request.POST.get('holder_id')
+
+    if not object_pks or not holder_id:
+        messages.error(request, "No assets selected or no holder specified.")
+        return HttpResponseRedirect(request.META.get('HTTP_REFERER', reverse('assets:asset_list')))
+
+    holder = get_object_or_404(AssetHolder, pk=holder_id)
+    assets = Asset.objects.filter(pk__in=object_pks).select_related('status')
+    ct = ContentType.objects.get_for_model(Asset)
+    in_use_status = StatusLabel.objects.filter(slug='in-use').first()
+
+    from django.db import transaction
+    assigned = 0
+    skipped = 0
+
+    with transaction.atomic():
+        for asset in assets:
+            # Skip assets that are already assigned to this holder
+            existing = AssetHolderAssignment.objects.filter(
+                content_type=ct, object_id=asset.pk
+            ).first()
+            if existing and existing.asset_holder_id == int(holder_id):
+                skipped += 1
+                continue
+
+            # Update or create assignment
+            AssetHolderAssignment.objects.update_or_create(
+                content_type=ct,
+                object_id=asset.pk,
+                defaults={'asset_holder': holder}
+            )
+
+            # Set status to in-use
+            if in_use_status:
+                asset.status = in_use_status
+                asset.save(update_fields=['status'])
+
+            # Log activity
+            ActivityLog.objects.create(
+                asset=asset,
+                action='checked_out',
+                user=request.user,
+                notes=f'Bulk assigned to {holder}'
+            )
+            assigned += 1
+
+    messages.success(
+        request,
+        f"{assigned} asset(s) assigned to {holder}. {skipped} already assigned (skipped)."
+    )
+
+    # Return HTMX-triggered refresh if requested, otherwise redirect
+    if request.htmx:
+        response = HttpResponse(status=204)
+        response['HX-Trigger'] = json.dumps({
+            "assetListUpdated": None,
+            "showMessage": {
+                "message": f"{assigned} asset(s) assigned to {holder}.",
+                "level": "success"
+            }
+        })
+        return response
+
+    return HttpResponseRedirect(request.META.get('HTTP_REFERER', reverse('assets:asset_list')))

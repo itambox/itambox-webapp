@@ -5,7 +5,8 @@ app_name = 'assets' # Namespace for URLs
 
 urlpatterns = [
     # Dashboard path removed, handled in core.urls
-    
+    path('assets/bulk-assign/', views.bulk_assign_assets, name='asset_bulk_assign'),
+
     # Asset specific URLs (no 'assets/' prefix needed here anymore)
     path('assets/', views.AssetListView.as_view(), name='asset_list'),
     path('assets/add/', views.AssetEditView.as_view(), name='asset_create'),
