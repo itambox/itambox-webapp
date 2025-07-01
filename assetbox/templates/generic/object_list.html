@@ -81,16 +81,19 @@
                 {# Table Rendering Container #}
                 <div id="object-list-table-container">
 
-                    {# Batch Actions Bar #}
+                    {# Batch Actions Bar (Delete only for all models, Assign only for Assets) #}
                     <div id="batch-actions-bar" class="d-none">
                         <div class="d-flex align-items-center gap-2 px-3 py-2 bg-light border-bottom">
                             <span id="batch-selected-count" class="fw-bold me-2">0 selected</span>
+                            {# Bulk Assign — only for Asset model #}
+                            {% if model_name_str == 'assets.asset' %}
                             <button type="button" class="btn btn-sm btn-primary" id="btn-bulk-assign"
                                     data-bs-toggle="modal" data-bs-target="#bulk-assign-modal"
                                     title="Assign selected assets to a holder">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user-plus me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M16 19h6" /><path d="M19 16v6" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4" /></svg>
                                 Assign Selected
                             </button>
+                            {% endif %}
                             <form id="bulk-delete-form" method="post" action="{% url 'bulk_delete' %}" class="d-inline">
                                 {% csrf_token %}
                                 <input type="hidden" name="model_name" value="{{ model_name_str }}">
@@ -341,15 +344,16 @@ window.initFiltersToggle();
     // Initial run
     updateBatchBar();
 
-    // Bulk Assign modal submit handler
+    // Bulk Assign modal submit handler (only wired when present)
     var assignForm = document.getElementById('bulk-assign-form');
     if (assignForm) {
         assignForm.addEventListener('submit', function(e) {
             e.preventDefault();
             var checkboxes = document.querySelectorAll('#object-list-table-container input[type="checkbox"][name="pk"]');
-            if (pks.length === 0) return;
+            var pks = [];
+            checkboxes.forEach(function(cb) { if (cb.checked) pks.push(cb.value); });
+            if (pks.length === 0) { alert('No assets selected.'); return; }
 
-            // Build hidden PK inputs
             var container = assignForm.querySelector('#bulk-assign-pks');
             if (!container) { container = document.createElement('div'); container.id = 'bulk-assign-pks'; assignForm.appendChild(container); }
             container.innerHTML = '';
@@ -367,13 +371,13 @@ window.initFiltersToggle();
 </script>
 {% endblock javascript %}
 
-{# Bulk Assign Modal #}
+{# Bulk Assign Modal — only rendered on Asset list page #}
+{% if model_name_str == 'assets.asset' %}
 <div class="modal modal-blur fade" id="bulk-assign-modal" tabindex="-1" aria-labelledby="bulkAssignModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <form id="bulk-assign-form" method="post" action="{% url 'assets:asset_bulk_assign' %}">
                 {% csrf_token %}
-                {% if model_name_str == 'assets.asset' %}
                 <div class="modal-header">
                     <h5 class="modal-title" id="bulkAssignModalLabel">Bulk Assign Assets</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -392,8 +396,8 @@ window.initFiltersToggle();
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary">Assign</button>
                 </div>
-                {% endif %}
             </form>
         </div>
     </div>
 </div>
+{% endif %}
