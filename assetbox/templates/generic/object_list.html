@@ -82,8 +82,8 @@
                 <div id="object-list-table-container">
 
                     {# Batch Actions Bar (Delete only for all models, Assign only for Assets) #}
-                    <div id="batch-actions-bar" class="d-none">
-                        <div class="d-flex align-items-center gap-2 px-3 py-2 bg-light border-bottom">
+                    <div id="batch-actions-bar-top" class="batch-actions-bar d-none">
+                        <div class="d-flex align-items-center gap-2 px-3 py-2 bg-body-tertiary border-bottom">
                             <span id="batch-selected-count" class="fw-bold me-2">0 selected</span>
                             {# Bulk Assign — only for Asset model #}
                             {% if model_name_str == 'assets.asset' %}
@@ -117,6 +117,26 @@
                     </div>
                 </div>
             </div> {# End #object-list-dynamic-content #}
+
+            {# Batch Actions Bar — Bottom #}
+            <div id="batch-actions-bar-bottom" class="batch-actions-bar d-none">
+                <div class="d-flex align-items-center gap-2 px-3 py-2 bg-body-tertiary border-top">
+                    <span class="batch-selected-count-bottom fw-bold me-2">0 selected</span>
+                    {% if model_name_str == 'assets.asset' %}
+                    <button type="button" class="btn btn-sm btn-primary btn-bulk-assign-bottom"
+                            data-bs-toggle="modal" data-bs-target="#bulk-assign-modal"
+                            title="Assign selected assets to a holder">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user-plus me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M16 19h6" /><path d="M19 16v6" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4" /></svg>
+                        Assign Selected
+                    </button>
+                    {% endif %}
+                    <button type="button" class="btn btn-sm btn-outline-danger btn-bulk-delete-bottom"
+                            onclick="var form=document.getElementById('bulk-delete-form'); if(!confirm('Delete selected items? This cannot be undone.'))return false; form.querySelector('#bulk-delete-pks').value=Array.from(document.querySelectorAll('#object-list-table-container input[type=checkbox][name=pk]:checked')).map(function(cb){return cb.value;}).join(','); form.submit();">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
+                        Delete Selected
+                    </button>
+                </div>
+            </div>
 
             {# Pagination Controls Container (Persistently outside dynamic content) #}
             <div id="object-list-pagination">
@@ -300,9 +320,7 @@ window.initFiltersToggle();
 
 // === Batch Actions: Checkbox Tracking & Bulk Assign ===
 (function() {
-    var bar = document.getElementById('batch-actions-bar');
-    var countEl = document.getElementById('batch-selected-count');
-    var deleteForm = document.getElementById('bulk-delete-form');
+    var bars = document.querySelectorAll('.batch-actions-bar');
     var deletePksInput = document.getElementById('bulk-delete-pks');
 
     function updateBatchBar() {
@@ -311,9 +329,14 @@ window.initFiltersToggle();
         checkboxes.forEach(function(cb) { if (cb.checked) selected.push(cb); });
         var count = selected.length;
 
-        if (countEl) countEl.textContent = count + ' selected';
-        if (bar) bar.classList.toggle('d-none', count === 0);
-        if (deletePksInput && deleteForm) {
+        // Sync both top and bottom bars
+        bars.forEach(function(bar) {
+            bar.classList.toggle('d-none', count === 0);
+            var cnt = bar.querySelector('.fw-bold');
+            if (cnt) cnt.textContent = count + ' selected';
+        });
+
+        if (deletePksInput) {
             deletePksInput.value = selected.map(function(cb) { return cb.value; }).join(',');
         }
     }
