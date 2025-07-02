@@ -11,8 +11,8 @@
 
 {# --- Page Actions --- #}
 {% block extra_page_actions %}
-    {# Check Out Button (Show if Available AND not assigned to Holder AND no Location set) #}
-    {% if object.status.slug == 'available' and not assignment and not object.location %}
+    {# Check Out Button (Show if Available AND not assigned to a Holder — location doesn't block checkout) #}
+    {% if object.status.slug == 'available' and not assignment %}
         <button type="button" class="btn btn-info"
                 hx-get="{% url 'assets:asset_checkout_modal' pk=object.pk %}"
                 hx-target="#modal-placeholder"
@@ -24,8 +24,8 @@
         </button>
     {% endif %}
 
-    {# Check In Button (Show if assigned to Holder OR has a Location) #}
-    {% if assignment or object.location %}
+    {# Check In Button (Show ONLY if assigned to a Holder) #}
+    {% if assignment and assignment.asset_holder %}
         <form method="post" action="{% url 'assets:asset_checkin' pk=object.pk %}" class="d-inline">
             {% csrf_token %}
             <button type="submit" class="btn btn-success">
@@ -74,7 +74,7 @@
 <!-- Metrics Dashboard Row -->
 <div class="row g-3 mb-4">
     <div class="col-sm-6">
-        {% if assignment or object.location %}
+        {% if assignment and assignment.asset_holder %}
             <div class="card card-sm bg-blue-lt border-0 shadow-none">
                 <div class="card-body">
                     <div class="row align-items-center">
@@ -127,7 +127,7 @@
     </div>
 </div>
 
-{% if object.status.slug == 'available' and not assignment and not object.location %}
+{% if object.status.slug == 'available' and not assignment %}
 <div class="alert alert-important alert-info alert-dismissible shadow-sm mb-4" role="alert">
     <div class="d-flex">
         <div>

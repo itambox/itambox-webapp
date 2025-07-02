@@ -116,7 +116,7 @@ class AssetHolderTable(BaseTable):
     upn = tables.LinkColumn('organization:assetholder_detail', args=[A('pk')], verbose_name='UPN')
     first_name = tables.Column()
     last_name = tables.Column()
-    tenant = tables.LinkColumn('organization:tenant_update', args=[A('tenant.pk')], accessor='tenant')
+    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant', verbose_name='Tenant')
     assignment_count = tables.Column(verbose_name='Assignments', orderable=False, accessor='assignments.count')
     actions = ActionsColumn()
 
