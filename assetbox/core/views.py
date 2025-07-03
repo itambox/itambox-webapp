@@ -167,10 +167,14 @@ class ObjectListView(LoginRequiredMixin, ListView):
         if self.filterset:
             self.filter = self.filterset(self.request.GET, queryset)
             if not self.filter.is_valid():
-                # Handle invalid filter data if necessary (e.g., log or message)
-                # For now, just return the unfiltered queryset or apply default filters
-                pass 
-            return self.filter.qs
+                # Log invalid filter params but still return unfiltered queryset
+                # to avoid a blank page. In production, this should be monitored.
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning('Invalid filter params for %s: %s', self.__class__.__name__, self.filter.errors)
+                self.filter = None  # prevent further invalid access
+            else:
+                return self.filter.qs
         return queryset
 
     def get_paginate_by(self, queryset):

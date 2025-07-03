@@ -16,9 +16,10 @@ class AssetFilterSet(django_filters.FilterSet):
         widget=forms.TextInput(attrs={'placeholder': 'Name, Tag, Serial...'})
     )
 
-    status = django_filters.ModelMultipleChoiceFilter(
+    status = django_filters.ModelChoiceFilter(
         queryset=StatusLabel.objects.all(),
-        widget=forms.SelectMultiple(attrs={'class': 'form-select'})
+        label='Status',
+        widget=forms.Select(attrs={'class': 'form-select'})
     )
     asset_role = django_filters.ModelChoiceFilter(
         queryset=AssetRole.objects.all(),
@@ -27,6 +28,7 @@ class AssetFilterSet(django_filters.FilterSet):
     )
     manufacturer = django_filters.ModelChoiceFilter(
         queryset=Manufacturer.objects.all(),
+        label='Manufacturer',
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     location = django_filters.ModelChoiceFilter(
@@ -41,8 +43,8 @@ class AssetFilterSet(django_filters.FilterSet):
 
     class Meta:
         model = Asset
-        # Define fields that can be filtered directly (in addition to custom ones above)
-        fields = ['status', 'asset_role', 'manufacturer', 'location'] # Keep this minimal if defining explicitly
+        # All filters defined explicitly above — no auto-generated fields needed
+        fields = []
 
     def search(self, queryset, name, value):
         """Perform basic search across designated fields."""
@@ -195,7 +197,7 @@ class AccessoryFilterSet(django_filters.FilterSet):
 
     class Meta:
         model = Accessory
-        fields = ['manufacturer', 'category']
+        fields = []  # All defined explicitly above
 
     def search(self, queryset, name, value):
         if not value.strip():
