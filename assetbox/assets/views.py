@@ -255,35 +255,35 @@ class AssetListView(ObjectListView):
     ).prefetch_related('tags')
 
     def get_table(self):
-        queryset = self.get_queryset()
-        # Patch objects with _assignee_display BEFORE table consumes them (1 query)
-        objects = list(queryset)
-        if objects:
-            pks = [obj.pk for obj in objects]
-            ct = ContentType.objects.get_for_model(Asset)
-            assignments = AssetHolderAssignment.objects.filter(
-                content_type=ct, object_id__in=pks
-            ).select_related('asset_holder')
-            assignee_map = {
-                a.object_id: a.asset_holder for a in assignments if a.asset_holder
-            }
-            from django.urls import reverse
-            from django.utils.safestring import mark_safe
-            for obj in objects:
-                holder = assignee_map.get(obj.pk)
-                if holder:
-                    try:
-                        url = reverse('organization:assetholder_detail', kwargs={'pk': holder.pk})
-                        obj._assignee_display = mark_safe(f'<a href="{url}">{holder}</a>')
-                    except Exception:
-                        obj._assignee_display = str(holder)
-                elif obj.location:
-                    obj._assignee_display = f"Location: {obj.location}"
-                else:
-                    obj._assignee_display = "—"
-
-        table_class = self.table
-        table = table_class(objects, request=self.request)
+        table = super().get_table()
+        # Patch objects with _assignee_display AFTER table is built (1 query)
+        if hasattr(table, 'data') and table.data is not None:
+            try:
+                pks = [obj.pk for obj in table.data[:500]]
+            except Exception:
+                pks = []
+            if pks:
+                ct = ContentType.objects.get_for_model(Asset)
+                assignments = AssetHolderAssignment.objects.filter(
+                    content_type=ct, object_id__in=pks
+                ).select_related('asset_holder')
+                assignee_map = {
+                    a.object_id: a.asset_holder for a in assignments if a.asset_holder
+                }
+                from django.urls import reverse
+                from django.utils.safestring import mark_safe
+                for obj in table.data:
+                    holder = assignee_map.get(obj.pk)
+                    if holder:
+                        try:
+                            url = reverse('organization:assetholder_detail', kwargs={'pk': holder.pk})
+                            obj._assignee_display = mark_safe(f'<a href="{url}">{holder}</a>')
+                        except Exception:
+                            obj._assignee_display = str(holder)
+                    elif obj.location:
+                        obj._assignee_display = f"Location: {obj.location}"
+                    else:
+                        obj._assignee_display = "—"
         return table
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
