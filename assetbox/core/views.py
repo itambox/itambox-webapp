@@ -40,6 +40,7 @@ from .tables import SearchResultTable # Add SearchResultTable
 from assets.models import AssetRole, Manufacturer
 
 from django.views.generic import View, ListView, DetailView, UpdateView, DeleteView
+from django.views.generic.base import TemplateResponseMixin
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.urls import reverse_lazy, reverse, NoReverseMatch
 from django.contrib import messages
@@ -667,7 +668,7 @@ class ObjectChangeView(BaseHTMXView, DetailView):
 
 
 # --- Search View ---
-class SearchView(LoginRequiredMixin, BaseHTMXView, View):
+class SearchView(LoginRequiredMixin, TemplateResponseMixin, BaseHTMXView, View):
     template_name = 'core/search.html'
 
     def get(self, request):
@@ -724,11 +725,6 @@ class SearchView(LoginRequiredMixin, BaseHTMXView, View):
         # Manually call render_to_response logic for View base class
         context['content_template_name'] = self.template_name # Needed by BaseHTMXView
         return self.render_to_response(context) # Call the mixin's method
-
-    # Define render_to_response to bridge View and BaseHTMXView
-    def render_to_response(self, context, **response_kwargs):
-        # Leverage the mixin's render_to_response
-        return BaseHTMXView.render_to_response(self, context, **response_kwargs)
 
 
 # Generic Bulk Delete View
