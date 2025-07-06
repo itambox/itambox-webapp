@@ -20,7 +20,7 @@ class LicenseTable(BaseTable):
     license_type = tables.Column(verbose_name=_("Type"))
     seats = tables.Column(verbose_name=_("Total Seats"))
     available_seats = tables.Column(verbose_name=_("Available Seats"), orderable=False)
-    tenant = tables.Column(accessor='tenant.name', verbose_name=_("Tenant"), orderable=True)
+    tenant = tables.LinkColumn('organization:tenant_detail', args=[tables.A('tenant.pk')], accessor='tenant.name', verbose_name=_("Tenant"))
     expiration_date = tables.DateColumn(verbose_name=_("Expiration Date"), format='Y-m-d')
     tags = TagColumn(url_name='licenses:license_list')
     actions = ActionsColumn()

@@ -15,19 +15,20 @@ class AssetTable(BaseTable): # Inherit from BaseTable
     name = tables.LinkColumn('assets:asset_detail', args=[A('pk')], verbose_name='Name')
     manufacturer = tables.Column(accessor='asset_type.manufacturer', linkify=True, verbose_name='Manufacturer')
     model = tables.Column(accessor='asset_type.model', linkify=True, verbose_name='Model')
+    asset_type = tables.LinkColumn('assets:assettype_detail', args=[A('asset_type.pk')], verbose_name='Asset Type')
     assignee = tables.Column(accessor='_assignee_display', verbose_name='Assignee', orderable=False)
-    tenant = tables.Column(accessor='tenant.name', verbose_name='Tenant', orderable=True)
-    salvage_value = tables.Column(verbose_name='Salvage Value')
+    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name='Tenant')
+    location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], accessor='location.name', verbose_name='Location')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta): # Inherit Meta from BaseTable
         model = Asset
         fields = (
-            'pk', 'name', 'asset_tag', 'serial_number', 'asset_type', 'asset_type__manufacturer', 'asset_type__model', 'asset_role', 
+            'pk', 'name', 'asset_tag', 'serial_number', 'asset_type', 'asset_role', 
             'status', 'assignee', 'tenant', 'location', 'purchase_date', 'purchase_cost', 'salvage_value', 'order_number', 'supplier', 'actions',
         )
         default_columns = (
-            'pk', 'name', 'asset_tag', 'asset_type', 'asset_type__manufacturer', 'asset_type__model', 'asset_role', 
+            'pk', 'name', 'asset_tag', 'asset_type', 'asset_role', 
             'status', 'assignee', 'tenant', 'location', 'salvage_value', 'actions',
         )
         order_by = ('name',)
@@ -48,9 +49,6 @@ class AssetTable(BaseTable): # Inherit from BaseTable
                 value.color or '6c757d', value.color or '6c757d', value.color or '6c757d', value.name
             )
         return "—"
-
-    def render_location(self, value):
-        return value.name if value else "—"
 
     def render_salvage_value(self, value):
         if value is not None:
@@ -218,7 +216,7 @@ class AccessoryTable(BaseTable):
     qty = tables.Column(verbose_name='Total Stock')
     checked_out_qty = tables.Column(accessor='checked_out_qty', verbose_name='Checked Out')
     remaining_qty = tables.Column(accessor='remaining_qty', verbose_name='Available')
-    tenant = tables.Column(accessor='tenant.name', verbose_name='Tenant', orderable=True)
+    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name='Tenant')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
@@ -266,7 +264,7 @@ class ConsumableTable(BaseTable):
     qty = tables.Column(verbose_name='Total Qty')
     consumed_qty = tables.Column(accessor='consumed_qty', verbose_name='Consumed')
     remaining_qty = tables.Column(accessor='remaining_qty', verbose_name='Available')
-    tenant = tables.Column(accessor='tenant.name', verbose_name='Tenant', orderable=True)
+    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name='Tenant')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
@@ -388,7 +386,7 @@ class KitTable(BaseTable):
     name = tables.LinkColumn('assets:kit_detail', args=[A('pk')], verbose_name='Name')
     description = tables.Column(verbose_name='Description')
     item_count = tables.Column(accessor='item_count', verbose_name='Items Count', orderable=False)
-    tenant = tables.Column(accessor='tenant.name', verbose_name='Tenant', orderable=True)
+    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name='Tenant')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
