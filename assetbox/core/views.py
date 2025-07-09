@@ -668,7 +668,7 @@ class ObjectChangeView(BaseHTMXView, DetailView):
 
 
 # --- Search View ---
-class SearchView(LoginRequiredMixin, TemplateResponseMixin, BaseHTMXView, View):
+class SearchView(LoginRequiredMixin, BaseHTMXView, TemplateResponseMixin, View):
     template_name = 'core/search.html'
 
     def get(self, request):
