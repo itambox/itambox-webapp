@@ -3,8 +3,11 @@
 
 {# --- Out-of-Band (OOB) Swaps --- #}
 
-{# 1. Page Title #}
-<span id="page-title-block" hx-swap-oob="true">{% block title %}AssetBox{% endblock %}</span>
+{# 1. Browser Title #}
+<title hx-swap-oob="true">{% block title %}AssetBox{% endblock %}</title>
+
+{# 2. Page Title (hidden span target — uses same value via context) #}
+<span id="page-title-block" hx-swap-oob="true" style="display:none" aria-hidden="true">{{ title|default:"AssetBox" }}</span>
 
 {# 2. Django Messages / Toasts #}
 <div id="django-messages" hx-swap-oob="true">

@@ -698,7 +698,7 @@ class SearchView(LoginRequiredMixin, BaseHTMXView, TemplateResponseMixin, View):
                 table_class = get_table_for_model(model)
                 if table_class:
                     # Limit results shown on search page (e.g., first 10)
-                    data['table'] = table_class(data['queryset'][:10], request=request) 
+                    data['table'] = table_class(list(data['queryset'][:10]), request=request) 
                     # Add list URL using view name helper
                     try:
                         from django.urls import reverse
