@@ -74,4 +74,4 @@ class ConfigTemplateTable(BaseTable):
         default_columns = ('pk', 'name', 'description', 'asset_roles_count', 'actions')
     
     def render_asset_roles_count(self, record):
-        return record.asset_roles.count() 
+        return getattr(record, 'asset_roles_count', 0)

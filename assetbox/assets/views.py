@@ -652,7 +652,8 @@ class StatusLabelDeleteView(ObjectDeleteView):
 
 class ManufacturerListView(ObjectListView):
     queryset = Manufacturer.objects.annotate(
-        asset_count_annotated=Count('asset_types__assets') # Count assets through AssetType
+        asset_count_annotated=Count('asset_types__assets'), # Count assets through AssetType
+        asset_type_count=Count('asset_types'), # Count asset types
     )
     filterset = filters.ManufacturerFilterSet
     filterset_form = forms.ManufacturerFilterForm

@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Count
 from .models import Tag, ConfigTemplate
 from .forms import TagForm, ConfigTemplateForm, TagFilterForm # Added TagFilterForm
 from django_tables2 import RequestConfig
@@ -69,7 +70,7 @@ class TagDeleteView(ObjectDeleteView):
 
 # Refactor ConfigTemplateListView to use ObjectListView
 class ConfigTemplateListView(ObjectListView): # Inherit from ObjectListView
-    queryset = ConfigTemplate.objects.all() # Base queryset
+    queryset = ConfigTemplate.objects.annotate(asset_roles_count=Count('asset_roles'))
     filterset = filters.ConfigTemplateFilter # Set the filterset
     filterset_form = forms.ConfigTemplateFilterForm # Set the filter form
     table = tables.ConfigTemplateTable # Set the table

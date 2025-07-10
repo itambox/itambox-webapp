@@ -15,11 +15,25 @@ class RegionTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = Region
-        fields = ('pk', 'name', 'slug', 'description', 'site_count', 'actions')
+        fields = ('pk', 'name', 'site_count', 'description', 'actions')
         default_columns = ('pk', 'name', 'site_count', 'description', 'actions')
 
     def render_site_count(self, record):
-        return record.sites.count()
+        return getattr(record, 'site_count', 0)
+
+class SiteGroupTable(BaseTable):
+    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    name = tables.LinkColumn('organization:sitegroup_detail', args=[A('pk')], verbose_name='Name')
+    site_count = tables.Column(verbose_name='Sites', orderable=False)
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = SiteGroup
+        fields = ('pk', 'name', 'site_count', 'description', 'actions')
+        default_columns = ('pk', 'name', 'site_count', 'description', 'actions')
+
+    def render_site_count(self, record):
+        return getattr(record, 'site_count', 0)
 
 class SiteGroupTable(BaseTable):
     pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
@@ -51,11 +65,10 @@ class SiteTable(BaseTable):
         default_columns = ('pk', 'name', 'status', 'region', 'group', 'tenant', 'location_count', 'asset_count', 'actions')
 
     def render_location_count(self, record):
-        return record.locations.count()
+        return getattr(record, 'location_count', 0)
 
     def render_asset_count(self, record):
-        # Might be slow, consider annotating in view
-        return Asset.objects.filter(location__site=record).count()
+        return getattr(record, 'asset_count', 0)
 
 class LocationTable(BaseTable):
     pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
@@ -71,7 +84,7 @@ class LocationTable(BaseTable):
         default_columns = ('pk', 'name', 'status', 'site', 'tenant', 'asset_count', 'actions')
 
     def render_asset_count(self, record):
-        return record.assets.count() # Uses related name
+        return getattr(record, 'asset_count', 0)
 
 class TenantGroupTable(BaseTable):
     pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
@@ -85,7 +98,7 @@ class TenantGroupTable(BaseTable):
         default_columns = ('pk', 'name', 'tenant_count', 'description', 'actions')
 
     def render_tenant_count(self, record):
-        return record.tenants.count()
+        return getattr(record, 'tenant_count', 0)
 
 class TenantTable(BaseTable):
     pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
@@ -102,13 +115,11 @@ class TenantTable(BaseTable):
         default_columns = ('pk', 'name', 'group', 'site_count', 'location_count', 'actions')
 
     def render_site_count(self, record):
-        return record.sites.count()
+        return getattr(record, 'site_count', 0)
 
     def render_location_count(self, record):
-        return record.locations.count()
+        return getattr(record, 'location_count', 0)
 
-# We need Asset imported for SiteTable.render_asset_count
-from assets.models import Asset
 
 # --- AssetHolder Table ---
 class AssetHolderTable(BaseTable):
@@ -117,7 +128,7 @@ class AssetHolderTable(BaseTable):
     first_name = tables.Column()
     last_name = tables.Column()
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant', verbose_name='Tenant')
-    assignment_count = tables.Column(verbose_name='Assignments', orderable=False, accessor='assignments.count')
+    assignment_count = tables.Column(verbose_name='Assignments', orderable=False, accessor='assignment_count')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):

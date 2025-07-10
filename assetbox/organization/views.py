@@ -53,7 +53,10 @@ User = get_user_model()
 # --- Site Views ---
 
 class SiteListView(ObjectListView):
-    queryset = Site.objects.select_related('region', 'group', 'tenant').prefetch_related('tags')
+    queryset = Site.objects.select_related('region', 'group', 'tenant').prefetch_related('tags').annotate(
+        location_count=Count('locations'),
+        asset_count=Count('locations__assets'),
+    )
     filterset = SiteFilterSet
     filterset_form = SiteFilterForm # Use the dedicated form
     table = SiteTable
@@ -299,7 +302,9 @@ class SiteGroupDeleteView(ObjectDeleteView):
 # --- Location Views ---
 
 class LocationListView(ObjectListView):
-    queryset = Location.objects.select_related('site', 'site__region', 'tenant').prefetch_related('tags') # Add site__region prefetch
+    queryset = Location.objects.select_related('site', 'site__region', 'tenant').prefetch_related('tags').annotate(
+        asset_count=Count('assets'),
+    )
     filterset = LocationFilterSet
     filterset_form = LocationFilterForm # Use the dedicated form
     table = LocationTable
@@ -451,7 +456,10 @@ class TenantGroupDeleteView(ObjectDeleteView):
 # --- Tenant Views ---
 
 class TenantListView(ObjectListView):
-    queryset = Tenant.objects.select_related('group').prefetch_related('tags')
+    queryset = Tenant.objects.select_related('group').prefetch_related('tags').annotate(
+        site_count=Count('sites'),
+        location_count=Count('locations'),
+    )
     filterset = TenantFilterSet
     filterset_form = TenantFilterForm # Use the dedicated form
     table = TenantTable
@@ -548,7 +556,9 @@ class TenantDeleteView(ObjectDeleteView):
 # --- AssetHolder Views ---
 
 class AssetHolderListView(ObjectListView):
-    queryset = AssetHolder.objects.prefetch_related('tags', 'assignments')
+    queryset = AssetHolder.objects.prefetch_related('tags').annotate(
+        assignment_count=Count('assignments'),
+    )
     filterset = AssetHolderFilterSet
     filterset_form = AssetHolderFilterForm # Use the dedicated form
     table = AssetHolderTable

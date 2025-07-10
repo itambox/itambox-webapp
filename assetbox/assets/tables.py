@@ -116,7 +116,7 @@ class ManufacturerTable(BaseTable):
     asset_type_count = tables.Column(
         verbose_name='Asset Types',
         linkify=True,
-        accessor='asset_types.count' # Directly access the count using the related name
+        accessor='asset_type_count'
     )
     asset_count = tables.Column(
         accessor='pk', # Use pk temporarily, will be replaced by render method
