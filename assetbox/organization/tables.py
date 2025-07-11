@@ -15,39 +15,25 @@ class RegionTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = Region
-        fields = ('pk', 'name', 'site_count', 'description', 'actions')
-        default_columns = ('pk', 'name', 'site_count', 'description', 'actions')
-
-    def render_site_count(self, record):
-        return getattr(record, 'site_count', 0)
-
-class SiteGroupTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
-    name = tables.LinkColumn('organization:sitegroup_detail', args=[A('pk')], verbose_name='Name')
-    site_count = tables.Column(verbose_name='Sites', orderable=False)
-    actions = ActionsColumn()
-
-    class Meta(BaseTable.Meta):
-        model = SiteGroup
-        fields = ('pk', 'name', 'site_count', 'description', 'actions')
-        default_columns = ('pk', 'name', 'site_count', 'description', 'actions')
-
-    def render_site_count(self, record):
-        return getattr(record, 'site_count', 0)
-
-class SiteGroupTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
-    name = tables.LinkColumn('organization:sitegroup_detail', args=[A('pk')], verbose_name='Name')
-    site_count = tables.Column(verbose_name='Sites', orderable=False)
-    actions = ActionsColumn()
-
-    class Meta(BaseTable.Meta):
-        model = SiteGroup
         fields = ('pk', 'name', 'slug', 'description', 'site_count', 'actions')
         default_columns = ('pk', 'name', 'site_count', 'description', 'actions')
 
-    def render_site_count(self, record):
-        return record.sites.count()
+    def render_site_count(self, value, record=None):
+        return value or 0
+
+class SiteGroupTable(BaseTable):
+    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    name = tables.LinkColumn('organization:sitegroup_detail', args=[A('pk')], verbose_name='Name')
+    site_count = tables.Column(verbose_name='Sites', orderable=False)
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = SiteGroup
+        fields = ('pk', 'name', 'site_count', 'description', 'actions')
+        default_columns = ('pk', 'name', 'site_count', 'description', 'actions')
+
+    def render_site_count(self, value, record=None):
+        return value or 0
 
 class SiteTable(BaseTable):
     pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
@@ -64,11 +50,11 @@ class SiteTable(BaseTable):
         fields = ('pk', 'name', 'slug', 'status', 'region', 'group', 'tenant', 'description', 'location_count', 'asset_count', 'actions')
         default_columns = ('pk', 'name', 'status', 'region', 'group', 'tenant', 'location_count', 'asset_count', 'actions')
 
-    def render_location_count(self, record):
-        return getattr(record, 'location_count', 0)
+    def render_location_count(self, value, record=None):
+        return value or 0
 
-    def render_asset_count(self, record):
-        return getattr(record, 'asset_count', 0)
+    def render_asset_count(self, value, record=None):
+        return value or 0
 
 class LocationTable(BaseTable):
     pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
@@ -83,8 +69,8 @@ class LocationTable(BaseTable):
         fields = ('pk', 'name', 'slug', 'status', 'site', 'tenant', 'description', 'asset_count', 'actions')
         default_columns = ('pk', 'name', 'status', 'site', 'tenant', 'asset_count', 'actions')
 
-    def render_asset_count(self, record):
-        return getattr(record, 'asset_count', 0)
+    def render_asset_count(self, value, record=None):
+        return value or 0
 
 class TenantGroupTable(BaseTable):
     pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
@@ -97,8 +83,8 @@ class TenantGroupTable(BaseTable):
         fields = ('pk', 'name', 'slug', 'description', 'tenant_count', 'actions')
         default_columns = ('pk', 'name', 'tenant_count', 'description', 'actions')
 
-    def render_tenant_count(self, record):
-        return getattr(record, 'tenant_count', 0)
+    def render_tenant_count(self, value, record=None):
+        return value or 0
 
 class TenantTable(BaseTable):
     pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
@@ -114,11 +100,11 @@ class TenantTable(BaseTable):
         fields = ('pk', 'name', 'slug', 'group', 'description', 'site_count', 'location_count', 'actions')
         default_columns = ('pk', 'name', 'group', 'site_count', 'location_count', 'actions')
 
-    def render_site_count(self, record):
-        return getattr(record, 'site_count', 0)
+    def render_site_count(self, value, record=None):
+        return value or 0
 
-    def render_location_count(self, record):
-        return getattr(record, 'location_count', 0)
+    def render_location_count(self, value, record=None):
+        return value or 0
 
 
 # --- AssetHolder Table ---

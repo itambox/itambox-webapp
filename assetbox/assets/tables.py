@@ -83,12 +83,12 @@ class StatusLabelTable(BaseTable):
     def render_type(self, value):
         return value.title() if value else "—"
 
-    def render_asset_count(self, record):
-        if hasattr(record, 'asset_count_annotated'):
-            return record.asset_count_annotated
-        return record.assets.count()
+    def render_asset_count(self, value, record=None):
+        if record is None:
+            return str(value) if value else "—"
+        return getattr(record, 'asset_count_annotated', record.assets.count())
 
-class AssetRoleTable(BaseTable): # Inherit from BaseTable
+class AssetRoleTable(BaseTable):
     pk = tables.CheckBoxColumn(accessor='pk', attrs = { "th__input": {"title": "Select all rows"}})
     name = tables.LinkColumn('assets:assetrole_detail', args=[A('pk')], verbose_name='Name')
     color = tables.Column(verbose_name='Color', orderable=False)
@@ -100,10 +100,10 @@ class AssetRoleTable(BaseTable): # Inherit from BaseTable
         fields = ('pk', 'name', 'color', 'description', 'asset_count', 'actions')
         default_columns = ('pk', 'name', 'color', 'asset_count', 'description', 'actions')
 
-    def render_asset_count(self, record):
-        if hasattr(record, 'asset_count_annotated'):
-            return record.asset_count_annotated
-        return record.asset_set.count()
+    def render_asset_count(self, value, record=None):
+        if record is None:
+            return str(value) if value else "—"
+        return getattr(record, 'asset_count_annotated', record.asset_set.count())
         
     def render_color(self, value):
         if value:
@@ -130,11 +130,10 @@ class ManufacturerTable(BaseTable):
     # Removed the problematic render_asset_count method
     # It's now handled by the asset_type_count column using accessor
 
-    def render_asset_count(self, record):
-        if hasattr(record, 'asset_count_annotated'):
-            return record.asset_count_annotated
-        asset_count = Asset.objects.filter(asset_type__manufacturer=record).count()
-        return asset_count
+    def render_asset_count(self, value, record=None):
+        if record is None:
+            return str(value) if value else "—"
+        return getattr(record, 'asset_count_annotated', 0)
 
     def render_asset_type_count(self, value, record):
         # Customize the link for asset_type_count
@@ -363,10 +362,8 @@ class CustomFieldsetTable(BaseTable):
         fields = ('pk', 'name', 'fields_count', 'actions')
         default_columns = ('pk', 'name', 'fields_count', 'actions')
 
-    def render_fields_count(self, record):
-        if hasattr(record, 'fields_count_annotated'):
-            return record.fields_count_annotated
-        return record.fields.count()
+    def render_fields_count(self, value, record=None):
+        return value or 0
 
 
 class DepreciationTable(BaseTable):
