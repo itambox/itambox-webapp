@@ -209,3 +209,11 @@ html, :root {
     background: linear-gradient(to left, rgba(0,0,0,0.08), transparent);
     pointer-events: none;
 }
+
+/* GridStack grid fills full content width ? override Bootstrap row constraints */
+#dashboard-grid.grid-stack {
+    max-width: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}

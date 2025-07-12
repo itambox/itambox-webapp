@@ -115,16 +115,23 @@
         var el = document.getElementById('dashboard-grid');
         if (!el) return;
 
+        // Collect Bootstrap cols BEFORE removing classes
         var cols = [];
         Array.from(el.children).forEach(function(child) {
             if (child.className && /col-lg-\d+/.test(child.className)) cols.push(child);
         });
+
+        // Remove Bootstrap grid classes from container ? GridStack needs full control
+        el.classList.remove('row', 'row-cards');
 
         cols.forEach(function(col, i) {
             var card = col.querySelector('.card');
             if (!card) return;
             var cls = col.className.split(' ').find(function(c) { return c.startsWith('col-lg-'); });
             var w = cls ? parseInt(cls.replace('col-lg-', '')) : 4;
+
+            // Remove ALL Bootstrap column classes ? GridStack handles sizing
+            col.className = col.className.replace(/col\S+/g, '').trim();
             col.classList.add('grid-stack-item');
             col.setAttribute('gs-w', w);
             col.setAttribute('gs-h', '2');
@@ -152,6 +159,22 @@
             grid = null;
             gsLoaded = false;
             window.__gsInitialized = false;
+
+            // Restore Bootstrap grid fallback classes
+            var el = document.getElementById('dashboard-grid');
+            if (el) {
+                el.classList.add('row', 'row-cards');
+                el.querySelectorAll('.grid-stack-item').forEach(function(item) {
+                    var w = item.getAttribute('gs-w') || '4';
+                    item.classList.remove('grid-stack-item');
+                    item.removeAttribute('gs-w');
+                    item.removeAttribute('gs-h');
+                    item.removeAttribute('gs-id');
+                    item.className = 'col-lg-' + w + ' col-md-6 col-12';
+                    var card = item.querySelector('.grid-stack-item-content');
+                    if (card) card.classList.remove('grid-stack-item-content');
+                });
+            }
         }
     }
 
