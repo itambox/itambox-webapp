@@ -106,15 +106,15 @@
     var grid = null;
     var gsLoaded = false;
 
-        function initGridStack() {
+    function initGridStack() {
         if (typeof GridStack === 'undefined') {
             console.warn('GridStack not loaded - using Bootstrap grid fallback');
             return;
         }
+        if (window.__gsInitialized) return;
         var el = document.getElementById('dashboard-grid');
         if (!el) return;
 
-        // Read Bootstrap cols and add grid-stack markup for auto-detection
         var cols = [];
         Array.from(el.children).forEach(function(child) {
             if (child.className && /col-lg-\d+/.test(child.className)) cols.push(child);
@@ -132,7 +132,6 @@
             card.classList.add('grid-stack-item-content');
         });
 
-        // Init GridStack (auto-detects .grid-stack-item children)
         grid = GridStack.init({
             column: 12,
             cellHeight: 100,
@@ -144,6 +143,16 @@
         }, el);
 
         gsLoaded = true;
+        window.__gsInitialized = true;
+    }
+
+    function destroyGridStack() {
+        if (grid && gsLoaded) {
+            grid.destroy(false);
+            grid = null;
+            gsLoaded = false;
+            window.__gsInitialized = false;
+        }
     }
 
     function toggleLock() {
@@ -153,8 +162,10 @@
         grid.enableMove(wasLocked);
         grid.enableResize(wasLocked);
 
-        document.getElementById('dashboard-locked-controls').style.display = wasLocked ? '' : 'none';
-        document.getElementById('dashboard-unlocked-controls').style.display = wasLocked ? 'none' : '';
+        var lockedEl = document.getElementById('dashboard-locked-controls');
+        var unlockedEl = document.getElementById('dashboard-unlocked-controls');
+        if (lockedEl) lockedEl.style.display = wasLocked ? '' : 'none';
+        if (unlockedEl) unlockedEl.style.display = wasLocked ? 'none' : '';
 
         document.querySelectorAll('#dashboard-grid .card').forEach(function(card) {
             card.style.outline = wasLocked ? '' : '2px dashed var(--tblr-primary)';
@@ -186,20 +197,35 @@
         });
     }
 
-    // Init when DOM ready
+    // --- Delegated click handler (survives DOM swaps) ---
+    document.addEventListener('click', function(evt) {
+        var btn = evt.target.closest('button');
+        if (!btn) return;
+        switch (btn.id) {
+            case 'unlock-dashboard': toggleLock(); break;
+            case 'lock-dashboard':   toggleLock(); saveLayout(); break;
+            case 'save-dashboard':   saveLayout(); break;
+        }
+    });
+
+    // --- Init when DOM ready ---
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
-            initGridStack();
-            document.getElementById('unlock-dashboard')?.addEventListener('click', toggleLock);
-            document.getElementById('lock-dashboard')?.addEventListener('click', function() { toggleLock(); saveLayout(); });
-            document.getElementById('save-dashboard')?.addEventListener('click', saveLayout);
-        });
+        document.addEventListener('DOMContentLoaded', initGridStack);
     } else {
         initGridStack();
-        document.getElementById('unlock-dashboard')?.addEventListener('click', toggleLock);
-        document.getElementById('lock-dashboard')?.addEventListener('click', function() { toggleLock(); saveLayout(); });
-        document.getElementById('save-dashboard')?.addEventListener('click', saveLayout);
     }
+
+    // --- HTMX lifecycle: destroy GridStack before navigating away ---
+    document.body.addEventListener('htmx:beforeSwap', function(evt) {
+        destroyGridStack();
+    });
+
+    // --- HTMX lifecycle: reinitialize after history restore or content swap ---
+    document.body.addEventListener('htmx:afterSettle', function(evt) {
+        if (document.getElementById('dashboard-grid')) {
+            initGridStack();
+        }
+    });
 })();
 </script>
 
