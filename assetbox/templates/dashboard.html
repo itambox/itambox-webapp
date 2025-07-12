@@ -162,13 +162,16 @@
         grid.enableMove(wasLocked);
         grid.enableResize(wasLocked);
 
+        // enableMove(wasLocked) toggles the state: now isLocked = !wasLocked
+        var isNowLocked = !wasLocked;
+
         var lockedEl = document.getElementById('dashboard-locked-controls');
         var unlockedEl = document.getElementById('dashboard-unlocked-controls');
-        if (lockedEl) lockedEl.style.display = wasLocked ? '' : 'none';
-        if (unlockedEl) unlockedEl.style.display = wasLocked ? 'none' : '';
+        if (lockedEl) lockedEl.style.display = isNowLocked ? '' : 'none';
+        if (unlockedEl) unlockedEl.style.display = isNowLocked ? 'none' : '';
 
         document.querySelectorAll('#dashboard-grid .card').forEach(function(card) {
-            card.style.outline = wasLocked ? '' : '2px dashed var(--tblr-primary)';
+            card.style.outline = isNowLocked ? '' : '2px dashed var(--tblr-primary)';
         });
     }
 
