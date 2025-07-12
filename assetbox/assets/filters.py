@@ -1,6 +1,7 @@
 import django_filters
 from .models import Asset, AssetRole, Manufacturer, AssetType, ComponentType, ComponentInstance, Accessory, Consumable, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit
 from organization.models import Location, Tenant
+from extras.models import Tag
 from django import forms
 from django.db.models import Q
 from crispy_forms.helper import FormHelper
@@ -8,8 +9,6 @@ from crispy_forms.layout import Layout, Submit, HTML
 from django.contrib.contenttypes.models import ContentType
 
 class AssetFilterSet(django_filters.FilterSet):
-    # Add filters for specific fields
-    # Q filter for searching across multiple fields (like NetBox)
     q = django_filters.CharFilter(
         method='search',
         label='Search',
@@ -26,19 +25,50 @@ class AssetFilterSet(django_filters.FilterSet):
         label='Asset Role',
         widget=forms.Select(attrs={'class': 'form-select'})
     )
+    asset_type = django_filters.ModelChoiceFilter(
+        queryset=AssetType.objects.all().select_related('manufacturer'),
+        label='Asset Type',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
     manufacturer = django_filters.ModelChoiceFilter(
+        field_name='asset_type__manufacturer',
         queryset=Manufacturer.objects.all(),
         label='Manufacturer',
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     location = django_filters.ModelChoiceFilter(
-        queryset=Location.objects.all().select_related('site'), # Optimize choices
+        queryset=Location.objects.all().select_related('site'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     tenant = django_filters.ModelChoiceFilter(
         queryset=Tenant.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'}),
         label='Tenant'
+    )
+    supplier = django_filters.CharFilter(
+        lookup_expr='icontains',
+        label='Supplier',
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Supplier name'})
+    )
+    tags = django_filters.ModelMultipleChoiceFilter(
+        field_name='tags__slug',
+        queryset=Tag.objects.all(),
+        to_field_name='slug',
+        label='Tags',
+        conjoined=True,
+        widget=forms.SelectMultiple(attrs={'class': 'form-select'})
+    )
+    purchase_date_after = django_filters.DateFilter(
+        field_name='purchase_date',
+        lookup_expr='gte',
+        label='Purchased After',
+        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
+    )
+    purchase_date_before = django_filters.DateFilter(
+        field_name='purchase_date',
+        lookup_expr='lte',
+        label='Purchased Before',
+        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
     )
 
     class Meta:

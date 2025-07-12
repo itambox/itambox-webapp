@@ -236,6 +236,8 @@ class ContactFilterSet(BaseOrgFilterSet):
 
 # --- ContactRole Filter ---
 class ContactRoleFilterSet(BaseOrgFilterSet):
+    tag = None  # ContactRole has no tags field — disable inherited filter
+
     class Meta:
         model = ContactRole
         fields = ['name']
