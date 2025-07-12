@@ -529,7 +529,7 @@ def asset_checkin(request, pk):
 # --- AssetRole (Asset Role) Views (Refactored to CBV) ---
 
 class AssetRoleListView(ObjectListView):
-    queryset = AssetRole.objects.annotate(asset_count_annotated=Count('asset'))
+    queryset = AssetRole.objects.annotate(asset_count=Count('asset'))
     filterset = filters.AssetRoleFilterSet
     filterset_form = forms.AssetRoleFilterForm # Corrected: Point to AssetRoleFilterForm
     table = tables.AssetRoleTable
@@ -591,7 +591,7 @@ class AssetRoleDeleteView(ObjectDeleteView):
 # --- StatusLabel Views ---
 
 class StatusLabelListView(ObjectListView):
-    queryset = StatusLabel.objects.annotate(asset_count_annotated=Count('assets'))
+    queryset = StatusLabel.objects.annotate(asset_count=Count('assets'))
     filterset = filters.StatusLabelFilterSet
     filterset_form = forms.StatusLabelFilterForm
     table = tables.StatusLabelTable
@@ -652,7 +652,7 @@ class StatusLabelDeleteView(ObjectDeleteView):
 
 class ManufacturerListView(ObjectListView):
     queryset = Manufacturer.objects.annotate(
-        asset_count_annotated=Count('asset_types__assets'), # Count assets through AssetType
+        asset_count=Count('asset_types__assets'), # Count assets through AssetType
         asset_type_count=Count('asset_types'), # Count asset types
     )
     filterset = filters.ManufacturerFilterSet
@@ -1243,7 +1243,7 @@ class CustomFieldDeleteView(ObjectDeleteView):
 
 # Custom Fieldsets
 class CustomFieldsetListView(ObjectListView):
-    queryset = CustomFieldset.objects.annotate(fields_count_annotated=Count('fields'))
+    queryset = CustomFieldset.objects.annotate(fields_count=Count('fields'))
     filterset = filters.CustomFieldsetFilterSet
     filterset_form = forms.CustomFieldsetFilterForm
     table = tables.CustomFieldsetTable

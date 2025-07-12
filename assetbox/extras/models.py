@@ -5,7 +5,7 @@ from core.models import BaseModel, ChangeLoggingMixin
 
 # Create your models here.
 
-class Tag(BaseModel, ChangeLoggingMixin):
+class Tag(ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     color = models.CharField(max_length=6, blank=True) # Store hex color without #

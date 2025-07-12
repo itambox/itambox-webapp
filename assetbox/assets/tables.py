@@ -84,9 +84,7 @@ class StatusLabelTable(BaseTable):
         return value.title() if value else "—"
 
     def render_asset_count(self, value, record=None):
-        if record is None:
-            return str(value) if value else "—"
-        return getattr(record, 'asset_count_annotated', record.assets.count())
+        return value or 0
 
 class AssetRoleTable(BaseTable):
     pk = tables.CheckBoxColumn(accessor='pk', attrs = { "th__input": {"title": "Select all rows"}})
@@ -101,9 +99,7 @@ class AssetRoleTable(BaseTable):
         default_columns = ('pk', 'name', 'color', 'asset_count', 'description', 'actions')
 
     def render_asset_count(self, value, record=None):
-        if record is None:
-            return str(value) if value else "—"
-        return getattr(record, 'asset_count_annotated', record.asset_set.count())
+        return value or 0
         
     def render_color(self, value):
         if value:
@@ -119,7 +115,6 @@ class ManufacturerTable(BaseTable):
         accessor='asset_type_count'
     )
     asset_count = tables.Column(
-        accessor='pk', # Use pk temporarily, will be replaced by render method
         verbose_name='Assets'
     )
     # description = tables.Column()
@@ -127,13 +122,8 @@ class ManufacturerTable(BaseTable):
     tags = TagColumn(url_name='assets:manufacturer_list')
     actions = ActionsColumn()
 
-    # Removed the problematic render_asset_count method
-    # It's now handled by the asset_type_count column using accessor
-
     def render_asset_count(self, value, record=None):
-        if record is None:
-            return str(value) if value else "—"
-        return getattr(record, 'asset_count_annotated', 0)
+        return value or 0
 
     def render_asset_type_count(self, value, record):
         # Customize the link for asset_type_count

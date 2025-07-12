@@ -44,12 +44,13 @@
         {# Move Sidebar OUTSIDE page-wrapper #}
         {% include "global_includes/_sidebar.html" %}
 
-        {# page-wrapper now contains the topbar and the rest - REMOVE ID #}
+        {# page-wrapper now contains the rest - REMOVE ID #}
         <div class="page-wrapper">
-            <!-- Top Navbar -->
-            {% include "global_includes/_topbar.html" %}
 
             <div id="page-content-wrapper" hx-history-elt>
+
+            <!-- Top Navbar -->
+            {% include "global_includes/_topbar.html" %}
 
             <!-- Page header -->
             <div class="page-header d-print-none">

@@ -8,7 +8,7 @@ from core.models import BaseModel, ChangeLoggingMixin # Added import
 
 # Create your models here.
 
-class Location(BaseModel, ChangeLoggingMixin):
+class Location(ChangeLoggingMixin, BaseModel):
     STATUS_PLANNED = 'planned'
     STATUS_STAGING = 'staging'
     STATUS_ACTIVE = 'active'
@@ -79,7 +79,7 @@ class Location(BaseModel, ChangeLoggingMixin):
         # TODO: Verify URL name
         return reverse('organization:location_detail', kwargs={'pk': self.pk})
 
-class Region(BaseModel, ChangeLoggingMixin):
+class Region(ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     parent = models.ForeignKey(
@@ -105,7 +105,7 @@ class Region(BaseModel, ChangeLoggingMixin):
         # TODO: Verify URL name
         return reverse('organization:region_detail', kwargs={'pk': self.pk})
 
-class SiteGroup(BaseModel, ChangeLoggingMixin):
+class SiteGroup(ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     parent = models.ForeignKey(
@@ -132,7 +132,7 @@ class SiteGroup(BaseModel, ChangeLoggingMixin):
         # TODO: Verify URL name
         return reverse('organization:sitegroup_detail', kwargs={'pk': self.pk})
 
-class TenantGroup(BaseModel, ChangeLoggingMixin):
+class TenantGroup(ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     parent = models.ForeignKey(
@@ -159,7 +159,7 @@ class TenantGroup(BaseModel, ChangeLoggingMixin):
         # TODO: Verify URL name
         return reverse('organization:tenantgroup_detail', kwargs={'pk': self.pk})
 
-class Tenant(BaseModel, ChangeLoggingMixin):
+class Tenant(ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     group = models.ForeignKey(
@@ -185,7 +185,7 @@ class Tenant(BaseModel, ChangeLoggingMixin):
     def __str__(self):
         return self.name
 
-class Site(BaseModel, ChangeLoggingMixin):
+class Site(ChangeLoggingMixin, BaseModel):
     STATUS_PLANNED = 'planned'
     STATUS_STAGING = 'staging'
     STATUS_ACTIVE = 'active'
@@ -229,7 +229,7 @@ class Site(BaseModel, ChangeLoggingMixin):
         return reverse('organization:site_detail', kwargs={'pk': self.pk})
 
 # +++ AssetHolder Model +++
-class AssetHolder(BaseModel, ChangeLoggingMixin):
+class AssetHolder(ChangeLoggingMixin, BaseModel):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL, # Keep holder if user is deleted, set user link to null
@@ -271,7 +271,7 @@ class AssetHolder(BaseModel, ChangeLoggingMixin):
         return reverse('organization:assetholder_detail', kwargs={'pk': self.pk})
 
 # +++ AssetHolderAssignment Model +++
-class AssetHolderAssignment(BaseModel, ChangeLoggingMixin):
+class AssetHolderAssignment(ChangeLoggingMixin, BaseModel):
     asset_holder = models.ForeignKey(
         AssetHolder,
         on_delete=models.CASCADE,
@@ -296,7 +296,7 @@ class AssetHolderAssignment(BaseModel, ChangeLoggingMixin):
     def __str__(self):
         return f"Assignment for {self.asset_holder} to {self.assigned_object}"
 
-class ContactRole(BaseModel, ChangeLoggingMixin):
+class ContactRole(ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     description = models.TextField(blank=True)
@@ -323,7 +323,7 @@ class ContactRole(BaseModel, ChangeLoggingMixin):
         super().save(*args, **kwargs)
 
 
-class Contact(BaseModel, ChangeLoggingMixin):
+class Contact(ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=100)
     title = models.CharField(max_length=100, blank=True)
     phone = models.CharField(max_length=50, blank=True)
@@ -345,7 +345,7 @@ class Contact(BaseModel, ChangeLoggingMixin):
         return reverse('organization:contact_detail', kwargs={'pk': self.pk})
 
 
-class ContactAssignment(BaseModel, ChangeLoggingMixin):
+class ContactAssignment(ChangeLoggingMixin, BaseModel):
     contact = models.ForeignKey(Contact, on_delete=models.CASCADE, related_name='assignments')
     role = models.ForeignKey(ContactRole, on_delete=models.PROTECT, related_name='assignments')
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)

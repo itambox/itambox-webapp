@@ -15,7 +15,7 @@ User = get_user_model()
 
 # Create your models here.
 
-class StatusLabel(BaseModel, ChangeLoggingMixin):
+class StatusLabel(ChangeLoggingMixin, BaseModel):
     TYPE_DEPLOYABLE = 'deployable'
     TYPE_PENDING = 'pending'
     TYPE_UNDEPLOYABLE = 'undeployable'
@@ -54,7 +54,7 @@ class StatusLabel(BaseModel, ChangeLoggingMixin):
                 counter += 1
         super().save(*args, **kwargs)
 
-class AssetRole(BaseModel, ChangeLoggingMixin):
+class AssetRole(ChangeLoggingMixin, BaseModel):
     """Categorizes assets based on their functional role (e.g., Laptop, Monitor, Server)."""
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
@@ -81,7 +81,7 @@ class AssetRole(BaseModel, ChangeLoggingMixin):
         # Use standardized URL name
         return reverse('assets:assetrole_detail', args=[self.pk])
 
-class Manufacturer(BaseModel, ChangeLoggingMixin):
+class Manufacturer(ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=255, unique=True)
     slug = models.SlugField(max_length=255, unique=True)  # Re-add unique=True
     description = models.TextField(blank=True, null=True)
@@ -112,7 +112,7 @@ class Manufacturer(BaseModel, ChangeLoggingMixin):
         return assignment.contact if assignment else None
 
 
-class CustomField(BaseModel, ChangeLoggingMixin):
+class CustomField(ChangeLoggingMixin, BaseModel):
     FIELD_TYPE_TEXT = 'text'
     FIELD_TYPE_NUMBER = 'number'
     FIELD_TYPE_DATE = 'date'
@@ -144,7 +144,7 @@ class CustomField(BaseModel, ChangeLoggingMixin):
         return reverse('assets:customfield_detail', kwargs={'pk': self.pk})
 
 
-class CustomFieldset(BaseModel, ChangeLoggingMixin):
+class CustomFieldset(ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=100, unique=True, verbose_name="Fieldset Name")
     fields = models.ManyToManyField(CustomField, related_name='fieldsets', blank=True, verbose_name="Custom Fields")
 
@@ -160,7 +160,7 @@ class CustomFieldset(BaseModel, ChangeLoggingMixin):
         return reverse('assets:customfieldset_detail', kwargs={'pk': self.pk})
 
 
-class Depreciation(BaseModel, ChangeLoggingMixin):
+class Depreciation(ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=100, unique=True, verbose_name="Depreciation Name")
     months = models.PositiveIntegerField(verbose_name="Lifespan (Months)", help_text="Useful lifespan in months for straight-line calculations")
 
@@ -176,7 +176,7 @@ class Depreciation(BaseModel, ChangeLoggingMixin):
         return reverse('assets:depreciation_detail', kwargs={'pk': self.pk})
 
 
-class AssetType(BaseModel, ChangeLoggingMixin):
+class AssetType(ChangeLoggingMixin, BaseModel):
     """Defines a specific type of asset (e.g., a specific laptop model)."""
     STORAGE_SSD = 'ssd'
     STORAGE_NVME = 'nvme'
@@ -257,7 +257,7 @@ class AssetType(BaseModel, ChangeLoggingMixin):
                  counter += 1
         super().save(*args, **kwargs)
 
-class Asset(BaseModel, ChangeLoggingMixin):
+class Asset(ChangeLoggingMixin, BaseModel):
     # --- Define choices as class attributes --- 
     STATUS_IN_USE = 'in_use'
     STATUS_AVAILABLE = 'available'
@@ -526,7 +526,7 @@ class InstalledSoftware(BaseModel):
         return self.asset.get_absolute_url()
 
 
-class ComponentType(BaseModel, ChangeLoggingMixin):
+class ComponentType(ChangeLoggingMixin, BaseModel):
     """Catalog of physical hardware component models (e.g. Samsung 990 Pro 2TB SSD)."""
     CATEGORY_RAM = 'ram'
     CATEGORY_STORAGE = 'storage'
@@ -576,7 +576,7 @@ class ComponentType(BaseModel, ChangeLoggingMixin):
         super().save(*args, **kwargs)
 
 
-class ComponentInstance(BaseModel, ChangeLoggingMixin):
+class ComponentInstance(ChangeLoggingMixin, BaseModel):
     """A physical component unit (e.g., a specific NVMe SSD with serial number) installed inside an Asset."""
     STATUS_INSTALLED = 'installed'
     STATUS_IN_STOCK = 'in_stock'
@@ -610,7 +610,7 @@ class ComponentInstance(BaseModel, ChangeLoggingMixin):
         return reverse('assets:componentinstance_detail', kwargs={'pk': self.pk})
 
 
-class Accessory(BaseModel, ChangeLoggingMixin):
+class Accessory(ChangeLoggingMixin, BaseModel):
     """Bulk non-serialized returnable peripherals tracked in inventory (e.g. Dell Keyboard)."""
     CATEGORY_KEYBOARD = 'keyboard'
     CATEGORY_MOUSE = 'mouse'
@@ -674,7 +674,7 @@ class Accessory(BaseModel, ChangeLoggingMixin):
         super().save(*args, **kwargs)
 
 
-class AccessoryAssignment(BaseModel, ChangeLoggingMixin):
+class AccessoryAssignment(ChangeLoggingMixin, BaseModel):
     """Checkout allocation mapping for physical accessories assigned to users or locations."""
     accessory = models.ForeignKey(Accessory, on_delete=models.CASCADE, related_name='assignments', db_index=True)
     assigned_holder = models.ForeignKey('organization.AssetHolder', on_delete=models.SET_NULL, null=True, blank=True, related_name='accessory_assignments', db_index=True)
@@ -702,7 +702,7 @@ class AccessoryAssignment(BaseModel, ChangeLoggingMixin):
         return f"{self.qty}x {self.accessory} assigned to {recipient}"
 
 
-class Consumable(BaseModel, ChangeLoggingMixin):
+class Consumable(ChangeLoggingMixin, BaseModel):
     """Non-returnable bulk items that are permanently consumed (e.g. thermal paste, printer toner)."""
     CATEGORY_TONER = 'toner'
     CATEGORY_INK = 'ink'
@@ -763,7 +763,7 @@ class Consumable(BaseModel, ChangeLoggingMixin):
         super().save(*args, **kwargs)
 
 
-class ConsumableAssignment(BaseModel, ChangeLoggingMixin):
+class ConsumableAssignment(ChangeLoggingMixin, BaseModel):
     """Permanent consumption payout record mapping for bulk consumables debited from stock."""
     consumable = models.ForeignKey(Consumable, on_delete=models.CASCADE, related_name='consumptions', db_index=True)
     assigned_holder = models.ForeignKey('organization.AssetHolder', on_delete=models.SET_NULL, null=True, blank=True, related_name='consumable_consumptions', db_index=True)
@@ -791,7 +791,7 @@ class ConsumableAssignment(BaseModel, ChangeLoggingMixin):
         return f"{self.qty}x {self.consumable} consumed by {recipient}"
 
 
-class CustodyReceipt(BaseModel, ChangeLoggingMixin):
+class CustodyReceipt(ChangeLoggingMixin, BaseModel):
     """Immutable digital custody sign-off ledger receipt binding checked-out assets to Asset Holders."""
     asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='custody_receipts', db_index=True)
     holder = models.ForeignKey('organization.AssetHolder', on_delete=models.CASCADE, related_name='custody_receipts')
@@ -809,7 +809,7 @@ class CustodyReceipt(BaseModel, ChangeLoggingMixin):
         return f"Custody Receipt for {self.asset} signed by {self.holder} (EULA v{self.eula_version})"
 
 
-class AssetMaintenance(BaseModel, ChangeLoggingMixin):
+class AssetMaintenance(ChangeLoggingMixin, BaseModel):
     MAINTENANCE_TYPE_UPGRADE = 'upgrade'
     MAINTENANCE_TYPE_REPAIR = 'repair'
     MAINTENANCE_TYPE_CALIBRATION = 'calibration'
@@ -860,7 +860,7 @@ class AssetMaintenance(BaseModel, ChangeLoggingMixin):
         return None
 
 
-class Kit(BaseModel, ChangeLoggingMixin):
+class Kit(ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=100, unique=True, verbose_name="Kit Name")
     description = models.TextField(blank=True, verbose_name="Description")
     tenant = models.ForeignKey('organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='kits', db_index=True)
@@ -877,7 +877,7 @@ class Kit(BaseModel, ChangeLoggingMixin):
         return reverse('assets:kit_detail', kwargs={'pk': self.pk})
 
 
-class KitItem(BaseModel, ChangeLoggingMixin):
+class KitItem(ChangeLoggingMixin, BaseModel):
     kit = models.ForeignKey(Kit, on_delete=models.CASCADE, related_name='items', verbose_name="Kit", db_index=True)
     asset_type = models.ForeignKey(AssetType, on_delete=models.PROTECT, null=True, blank=True, related_name='kit_items', verbose_name="Asset Type / Model")
     accessory = models.ForeignKey(Accessory, on_delete=models.PROTECT, null=True, blank=True, related_name='kit_items', verbose_name="Accessory Catalog Item")
