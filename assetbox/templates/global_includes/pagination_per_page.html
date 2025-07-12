@@ -1,26 +1,52 @@
 {% load utility_tags %}
+{% load i18n %}
 {% load core_constants %}
-{% load django_tables2 %}
 
-{% get_pagination_choices as choices %}
-
-{# Per Page Dropdown #}
-<div class="dropdown me-3 d-none d-sm-block">
-    <button class="btn btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-        {{ paginator.per_page }} Per Page
-    </button>
-    <ul class="dropdown-menu" style="max-height: 200px; overflow-y: auto;">
-        {% for count, label in choices %}
+{% if paginator.get_page_lengths %}
+{% with paginator.get_page_lengths as page_lengths %}
+<nav aria-label="{% trans "Pagination options" %}">
+    <div class="dropdown dropdown-menu-end">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+            {% trans "Per Page" %}
+        </button>
+        <ul class="dropdown-menu">
+            {% for n in page_lengths %}
             <li>
-                <a class="dropdown-item{% if count == paginator.per_page %} active{% endif %}"
-                   href="{% update_querystring request per_page=count page=1 %}"
-                   hx-get="{% update_querystring request per_page=count page=1 %}"
-                   hx-target="{{ hx_target|default:'#object-list-dynamic-content' }}"
+                <a href="#"
+                   hx-get="{% update_querystring request per_page=n page=1 %}"
+                   hx-target="#object-list-dynamic-content"
                    hx-swap="innerHTML"
-                   hx-push-url="true">
-                    {{ label }} 
+                   hx-push-url="true"
+                   class="dropdown-item{% if n == paginator.per_page %} active{% endif %}">
+                    {{ n }}
                 </a>
             </li>
-        {% endfor %}
-    </ul>
-</div> 
+            {% endfor %}
+        </ul>
+    </div>
+</nav>
+{% endwith %}
+{% else %}
+{% get_pagination_choices as choices %}
+<nav aria-label="{% trans "Pagination options" %}">
+    <div class="dropdown dropdown-menu-end">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+            {% trans "Per Page" %}
+        </button>
+        <ul class="dropdown-menu">
+            {% for count, label in choices %}
+            <li>
+                <a href="#"
+                   hx-get="{% update_querystring request per_page=count page=1 %}"
+                   hx-target="#object-list-dynamic-content"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   class="dropdown-item{% if count == paginator.per_page %} active{% endif %}">
+                    {{ label }}
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</nav>
+{% endif %}

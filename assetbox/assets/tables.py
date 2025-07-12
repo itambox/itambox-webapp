@@ -2,7 +2,7 @@
 import django_tables2 as tables
 from django_tables2.utils import A  # Alias for Accessor
 from .models import Asset, AssetRole, Manufacturer, AssetType, ComponentType, ComponentInstance, Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit
-from core.tables import ActionsColumn, BaseTable
+from core.tables import ActionsColumn, BaseTable, ToggleColumn
 from extras.tables import TagColumn # Import TagColumn
 from django.urls import reverse, NoReverseMatch
 from django.utils.safestring import mark_safe
@@ -11,7 +11,7 @@ from organization.models import AssetHolderAssignment
 from django.utils.html import format_html
 
 class AssetTable(BaseTable): # Inherit from BaseTable
-    pk = tables.CheckBoxColumn(accessor='pk', attrs = { "th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('assets:asset_detail', args=[A('pk')], verbose_name='Name')
     manufacturer = tables.Column(accessor='asset_type.manufacturer', linkify=True, verbose_name='Manufacturer')
     model = tables.Column(accessor='asset_type.model', linkify=True, verbose_name='Model')
@@ -60,7 +60,7 @@ class AssetTable(BaseTable): # Inherit from BaseTable
         return value.strftime("%Y-%m-%d") if value else "—"
 
 class StatusLabelTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('assets:statuslabel_detail', args=[A('pk')], verbose_name='Name')
     type = tables.Column(verbose_name='Meta Type')
     color = tables.Column(verbose_name='Color', orderable=False)
@@ -87,7 +87,7 @@ class StatusLabelTable(BaseTable):
         return value or 0
 
 class AssetRoleTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs = { "th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('assets:assetrole_detail', args=[A('pk')], verbose_name='Name')
     color = tables.Column(verbose_name='Color', orderable=False)
     asset_count = tables.Column(verbose_name='Asset Count', orderable=False)
@@ -107,7 +107,7 @@ class AssetRoleTable(BaseTable):
         return "—"
 
 class ManufacturerTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"onclick": "toggle(this)"}})
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn()
     asset_type_count = tables.Column(
         verbose_name='Asset Types',
@@ -140,7 +140,7 @@ class ManufacturerTable(BaseTable):
         )
 
 class AssetTypeTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk')
+    pk = ToggleColumn(accessor='pk')
     manufacturer = tables.Column(linkify=True) # Linkify using default get_absolute_url
     model = tables.LinkColumn('assets:assettype_detail', args=[A('slug')], verbose_name='Model')
     eol_months = tables.Column(verbose_name='EOL (Months)')
@@ -168,7 +168,7 @@ class AssetTypeTable(BaseTable):
 
 
 class ComponentTypeTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('assets:componenttype_detail', args=[A('pk')], verbose_name='Name')
     manufacturer = tables.Column(linkify=True)
     category = tables.Column(verbose_name='Category')
@@ -183,7 +183,7 @@ class ComponentTypeTable(BaseTable):
 
 
 class ComponentInstanceTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     component_type = tables.LinkColumn('assets:componentinstance_detail', args=[A('pk')], verbose_name='Component')
     serial_number = tables.Column(verbose_name='Serial Number')
     parent_asset = tables.LinkColumn('assets:asset_detail', args=[A('parent_asset__pk')], verbose_name='Asset Installed In')
@@ -197,7 +197,7 @@ class ComponentInstanceTable(BaseTable):
 
 
 class AccessoryTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('assets:accessory_detail', args=[A('pk')], verbose_name='Name')
     manufacturer = tables.Column(linkify=True)
     category = tables.Column(verbose_name='Category')
@@ -222,7 +222,7 @@ class AccessoryTable(BaseTable):
 
 
 class AccessoryAssignmentTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk')
+    pk = ToggleColumn(accessor='pk')
     accessory = tables.LinkColumn('assets:accessory_detail', args=[A('accessory__pk')], verbose_name='Accessory')
     assigned_to = tables.Column(verbose_name='Assigned To', orderable=False)
     qty = tables.Column(verbose_name='Qty')
@@ -245,7 +245,7 @@ class AccessoryAssignmentTable(BaseTable):
 
 
 class ConsumableTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('assets:consumable_detail', args=[A('pk')], verbose_name='Name')
     manufacturer = tables.Column(linkify=True)
     category = tables.Column(verbose_name='Category')
@@ -270,7 +270,7 @@ class ConsumableTable(BaseTable):
 
 
 class ConsumableAssignmentTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk')
+    pk = ToggleColumn(accessor='pk')
     consumable = tables.LinkColumn('assets:consumable_detail', args=[A('consumable__pk')], verbose_name='Consumable')
     assigned_to = tables.Column(verbose_name='Assigned To', orderable=False)
     qty = tables.Column(verbose_name='Qty')
@@ -293,7 +293,7 @@ class ConsumableAssignmentTable(BaseTable):
 
 
 class AssetMaintenanceTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     asset = tables.LinkColumn('assets:asset_detail', args=[A('asset__pk')], accessor='asset', verbose_name='Asset')
     maintenance_type = tables.Column(verbose_name='Type')
     supplier = tables.Column(verbose_name='Supplier')
@@ -328,7 +328,7 @@ class AssetMaintenanceTable(BaseTable):
 
 
 class CustomFieldTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('assets:customfield_detail', args=[A('pk')], verbose_name='Name')
     label = tables.Column(verbose_name='Label')
     field_type = tables.Column(verbose_name='Field Type')
@@ -342,7 +342,7 @@ class CustomFieldTable(BaseTable):
 
 
 class CustomFieldsetTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('assets:customfieldset_detail', args=[A('pk')], verbose_name='Name')
     fields_count = tables.Column(verbose_name='Fields Count', orderable=False)
     actions = ActionsColumn()
@@ -357,7 +357,7 @@ class CustomFieldsetTable(BaseTable):
 
 
 class DepreciationTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('assets:depreciation_detail', args=[A('pk')], verbose_name='Name')
     months = tables.Column(verbose_name='Lifespan (Months)')
     actions = ActionsColumn()
@@ -369,7 +369,7 @@ class DepreciationTable(BaseTable):
 
 
 class KitTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('assets:kit_detail', args=[A('pk')], verbose_name='Name')
     description = tables.Column(verbose_name='Description')
     item_count = tables.Column(accessor='item_count', verbose_name='Items Count', orderable=False)

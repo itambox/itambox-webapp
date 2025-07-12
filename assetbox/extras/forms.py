@@ -1,10 +1,10 @@
 from django import forms
-from .models import Tag, ConfigTemplate
+from .models import Tag
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Div, Field
 from django.urls import reverse
 from core.forms import FilterForm
-from .filters import TagFilter, ConfigTemplateFilter
+from .filters import TagFilter
 
 class TagForm(forms.ModelForm):
     # Explicitly define color field to allow '#' prefix initially
@@ -68,37 +68,6 @@ class TagForm(forms.ModelForm):
         else:
              raise forms.ValidationError("Ensure the color hex code is 6 characters long.")
 
-class ConfigTemplateForm(forms.ModelForm):
-    class Meta:
-        model = ConfigTemplate
-        fields = ['name', 'description', 'template_content']
-        widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'template_content': forms.Textarea(attrs={'class': 'form-control', 'rows': 15}),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helper = FormHelper(self)
-        self.helper.form_method = 'post'
-        self.helper.form_tag = True
-        button_text = 'Update' if self.instance.pk else 'Create'
-        cancel_url = reverse('extras:configtemplate_list')
-        self.helper.layout = Layout(
-            'name',
-            'description',
-            'template_content',
-            HTML('<div class="mt-3">'),
-            Submit('submit', button_text, css_class='btn btn-primary'),
-            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
-            HTML('</div>')
-        )
-
 # --- Tag Filter Form --- 
 class TagFilterForm(FilterForm):
     filterset_class = TagFilter
-
-# --- ConfigTemplate Filter Form --- 
-class ConfigTemplateFilterForm(FilterForm):
-    filterset_class = ConfigTemplateFilter 

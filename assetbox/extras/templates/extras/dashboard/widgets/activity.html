@@ -1,0 +1,32 @@
+{% load i18n %}{% load utility_tags %}
+{% if recent_changes %}
+<table class="table table-vcenter table-nowrap mb-0" style="font-size: 0.78rem;">
+    <tbody>
+        {% for change in recent_changes|slice:":8" %}
+        <tr>
+            <td class="text-muted text-nowrap ps-0" style="width: 1%;">{{ change.time|date:"Y-m-d H:i" }}</td>
+            <td class="text-nowrap" style="width: 1%;">
+                {% if change.action == 'create' %}
+                <span class="badge bg-success-lt">{{ change.get_action_display }}</span>
+                {% elif change.action == 'update' %}
+                <span class="badge bg-info-lt">{{ change.get_action_display }}</span>
+                {% else %}
+                <span class="badge bg-danger-lt">{{ change.get_action_display }}</span>
+                {% endif %}
+            </td>
+            <td class="text-muted text-nowrap" style="width: 1%;">{{ change.changed_object_type.name|title }}</td>
+            <td class="text-nowrap" style="width: 1%;">{{ change.user_name }}</td>
+            <td class="text-nowrap text-truncate pe-0" style="max-width: 200px;">
+                {% if change.changed_object and change.get_changed_object_url %}
+                <a href="{{ change.get_changed_object_url }}" class="text-reset">{{ change.object_repr }}</a>
+                {% else %}
+                <span class="text-muted">{{ change.object_repr }}</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="text-muted text-center py-4">{% trans "No recent changes recorded." %}</div>
+{% endif %}

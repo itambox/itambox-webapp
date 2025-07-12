@@ -104,7 +104,6 @@ class Command(BaseCommand):
             ('assets', 'CustomField'),
             ('assets', 'Depreciation'),
             ('extras', 'Tag'),
-            ('extras', 'ConfigTemplate'),
         ]
         for app_label, model_name in models_to_clear:
             try:
@@ -185,12 +184,12 @@ class Command(BaseCommand):
             self._seed_phase6()
 
     # ─────────────────────────────────────────
-    # Phase 0: Users, Tags, StatusLabels, ConfigTemplates
+    # Phase 0: Users, Tags, StatusLabels
     # ─────────────────────────────────────────
 
     def _seed_phase0(self):
         from assets.models import StatusLabel
-        from extras.models import Tag, ConfigTemplate
+        from extras.models import Tag
         from assets.models import AssetRole, Manufacturer, CustomField, CustomFieldset, Depreciation
         from users.models import UserPreference
 
@@ -262,16 +261,6 @@ class Command(BaseCommand):
         for name, slug, color in tag_data:
             obj, _ = Tag.objects.get_or_create(slug=slug, defaults={'name': name, 'color': color})
             self._tags[slug] = obj
-
-        # ConfigTemplates
-        ct_data = [
-            ('Laptop Standard', 'Default configuration for corporate laptops. OS: Windows 11, Encryption: BitLocker, AV: Defender'),
-            ('Developer Workstation', 'Linux or macOS dev setup with Docker, Node.js, Python, and IDE tools.'),
-            ('Server Baseline', 'Production server baseline: Ubuntu 22.04, SSH hardened, monitoring agents installed.'),
-            ('Mobile Device MDM', 'Intune-enrolled iOS/Android profile with mandatory PIN, remote wipe enabled.'),
-        ]
-        for name, content in ct_data:
-            ConfigTemplate.objects.get_or_create(name=name, defaults={'template_content': content})
 
         # AssetRoles
         role_data = [

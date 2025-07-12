@@ -49,119 +49,17 @@ class DashboardView(LoginRequiredMixin, BaseHTMXView, TemplateView):
         context['title'] = 'Dashboard'
         context['breadcrumbs'] = [(None, 'Dashboard')]
 
-        # Live Database Metrics & Stats
-        from django.db.models import Sum, Count
-        from decimal import Decimal
-        from datetime import date
+        from extras.dashboard.utils import get_dashboard
+        dashboard = get_dashboard(self.request.user)
 
-        # 1. Total Assets & Status Label Breakdown
-        total_assets = Asset.objects.count()
-        status_stats = StatusLabel.objects.annotate(
-            asset_count=Count('assets')
-        ).order_by('-asset_count')
+        # Build list of visible widget configs with rendered content
+        widget_list = []
+        for idx, config in enumerate(dashboard.layout):
+            if not config.get('visible', True):
+                continue
+            widget_list.append({'index': idx, 'config': config})
 
-        # 2. Financial Overview
-        total_purchase_cost = Asset.objects.aggregate(
-            total=Sum('purchase_cost')
-        )['total'] or Decimal('0.00')
-        
-        total_salvage_value = Asset.objects.aggregate(
-            total=Sum('salvage_value')
-        )['total'] or Decimal('0.00')
-
-        total_maintenance_cost = AssetMaintenance.objects.aggregate(
-            total=Sum('cost')
-        )['total'] or Decimal('0.00')
-
-        total_tco = total_purchase_cost + total_maintenance_cost
-
-        # 3. Active Maintenances & Recent Repair Ledger
-        active_maintenances = AssetMaintenance.objects.filter(
-            completion_date__isnull=True
-        ).select_related('asset')[:5]
-        
-        active_maintenance_count = AssetMaintenance.objects.filter(
-            completion_date__isnull=True
-        ).count()
-
-        # 4. Software Licenses Utilization
-        licenses_qs = License.objects.with_counts()
-        license_stats = []
-        for lic in licenses_qs:
-            total_seats = lic.seats
-            allocated = lic.assigned_count
-            remaining = total_seats - allocated
-            util_pct = int((allocated / total_seats) * 100) if total_seats > 0 else 0
-            license_stats.append({
-                'license': lic,
-                'total': total_seats,
-                'allocated': allocated,
-                'remaining': remaining,
-                'util_pct': util_pct
-            })
-        license_stats = sorted(license_stats, key=lambda x: x['util_pct'], reverse=True)[:5]
-
-        # 5. Asset EOL Alerts (past or within 90 days)
-        assets_list = Asset.objects.filter(
-            purchase_date__isnull=False,
-            asset_type__isnull=False,
-            asset_type__eol_months__isnull=False
-        ).select_related('asset_type', 'asset_type__manufacturer')
-        
-        eol_alerts = []
-        today = date.today()
-        for asset in assets_list:
-            eol = asset.eol_date
-            if eol:
-                days_left = (eol - today).days
-                if days_left <= 90:
-                    eol_alerts.append({
-                        'asset': asset,
-                        'eol_date': eol,
-                        'days_left': days_left
-                    })
-        eol_alerts = sorted(eol_alerts, key=lambda x: x['days_left'])[:5]
-
-        # 6. Recent Activity Log
-        recent_activity = ActivityLog.objects.select_related(
-            'asset', 'user'
-        ).order_by('-id')[:6]
-
-        # 7. Subscription Upcoming Renewals
-        from subscriptions.models import Subscription, SubscriptionStatusChoices
-        today = date.today()
-        upcoming_renewals = Subscription.objects.filter(
-            status=SubscriptionStatusChoices.ACTIVE,
-            renewal_date__isnull=False,
-            renewal_date__gte=today,
-            renewal_date__lte=today + date.resolution * 90,
-        ).select_related('provider', 'tenant').order_by('renewal_date')[:10]
-
-        total_subscription_spend = Subscription.objects.filter(
-            status=SubscriptionStatusChoices.ACTIVE
-        ).aggregate(total=Sum('renewal_cost'))['total'] or Decimal('0.00')
-
-        subscription_status_counts = Subscription.objects.values('status').annotate(
-            count=Count('id')
-        ).order_by('status')
-
-        # Injects metrics into template context
-        context.update({
-            'total_assets': total_assets,
-            'status_stats': status_stats,
-            'total_purchase_cost': total_purchase_cost,
-            'total_salvage_value': total_salvage_value,
-            'total_maintenance_cost': total_maintenance_cost,
-            'total_tco': total_tco,
-            'active_maintenances': active_maintenances,
-            'active_maintenance_count': active_maintenance_count,
-            'license_stats': license_stats,
-            'eol_alerts': eol_alerts,
-            'recent_activity': recent_activity,
-            'upcoming_renewals': upcoming_renewals,
-            'total_subscription_spend': total_subscription_spend,
-            'subscription_status_counts': subscription_status_counts,
-        })
+        context['dashboard_widgets'] = widget_list
         return context
 
 # @login_required

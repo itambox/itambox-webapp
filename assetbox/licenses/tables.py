@@ -1,12 +1,12 @@
 import django_tables2 as tables
 from django.utils.translation import gettext_lazy as _
-from core.tables import BaseTable, ActionsColumn
+from core.tables import BaseTable, ActionsColumn, ToggleColumn
 from extras.tables import TagColumn
 from .models import License, LicenseSeatAssignment
 
 class LicenseTable(BaseTable):
     """Table for displaying License entitlements."""
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn(
         viewname='licenses:license_detail',
         args=[tables.A('pk')]
@@ -32,7 +32,7 @@ class LicenseTable(BaseTable):
 
 class LicenseSeatAssignmentTable(BaseTable):
     """Table for displaying individual License Seat Assignments."""
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     license = tables.LinkColumn(
         viewname='licenses:license_detail',
         args=[tables.A('license__pk')],

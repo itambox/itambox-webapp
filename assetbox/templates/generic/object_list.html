@@ -81,11 +81,10 @@
                 {# Table Rendering Container #}
                 <div id="object-list-table-container">
 
-                    {# Batch Actions Bar (Delete only for all models, Assign only for Assets) #}
+                    {# Batch Actions Bar — Top #}
                     <div id="batch-actions-bar-top" class="batch-actions-bar d-none">
                         <div class="d-flex align-items-center gap-2 px-3 py-2 bg-body-tertiary border-bottom">
                             <span id="batch-selected-count" class="fw-bold me-2">0 selected</span>
-                            {# Bulk Assign — only for Asset model #}
                             {% if model_name_str == 'assets.asset' %}
                             <button type="button" class="btn btn-sm btn-primary" id="btn-bulk-assign"
                                     data-bs-toggle="modal" data-bs-target="#bulk-assign-modal"
@@ -141,15 +140,7 @@
             {# Pagination Controls Container (Persistently outside dynamic content) #}
             <div id="object-list-pagination">
                 {% if table.page %}
-                <div class="card-footer d-flex align-items-center">
-                    {% include 'global_includes/pagination_per_page.html' with paginator=table.page.paginator hx_target="#object-list-dynamic-content" %}
-                    <p class="m-0 text-secondary flex-grow-1 text-center">
-                        {% blocktrans with start=table.page.start_index end=table.page.end_index total=table.page.paginator.count %}
-                            Showing <span>{{ start }}</span> to <span>{{ end }}</span> of <span>{{ total }}</span> {{ table.Meta.model|verbose_name_plural }}
-                        {% endblocktrans %}
-                    </p>
-                    {% include 'global_includes/pagination_links.html' with page_obj=table.page hx_target="#object-list-dynamic-content" %}
-                </div>
+                    {% include 'global_includes/pagination_links.html' with page_obj=table.page %}
                 {% endif %}
             </div> {# End #object-list-pagination #}
         </div>
@@ -320,10 +311,9 @@ window.initFiltersToggle();
 
 // === Batch Actions: Checkbox Tracking & Bulk Assign ===
 (function() {
-    var bars = document.querySelectorAll('.batch-actions-bar');
-    var deletePksInput = document.getElementById('bulk-delete-pks');
-
     function updateBatchBar() {
+        var bars = document.querySelectorAll('.batch-actions-bar');
+        var deletePksInput = document.getElementById('bulk-delete-pks');
         var checkboxes = document.querySelectorAll('#object-list-table-container input[type="checkbox"][name="pk"]');
         var selected = [];
         checkboxes.forEach(function(cb) { if (cb.checked) selected.push(cb); });
@@ -339,11 +329,28 @@ window.initFiltersToggle();
         if (deletePksInput) {
             deletePksInput.value = selected.map(function(cb) { return cb.value; }).join(',');
         }
+
+        // Sync "select all" checkbox state with individual checkboxes
+        var selectAllCb = document.querySelector('#object-list-table-container input[type="checkbox"][name="select_all"]');
+        if (selectAllCb) {
+            var allCbs = document.querySelectorAll('#object-list-table-container input[type="checkbox"][name="pk"]');
+            selectAllCb.checked = allCbs.length > 0 && selected.length === allCbs.length;
+        }
     }
 
-    // Delegate checkbox clicks via event listener
+    // Delegated listener: handle ALL checkbox changes (pk + select_all) at document level
     document.addEventListener('change', function(event) {
-        if (event.target.type === 'checkbox' && event.target.name === 'pk' && event.target.closest('#object-list-table-container')) {
+        var target = event.target;
+        if (target.type !== 'checkbox') return;
+        if (!target.closest('#object-list-table-container')) return;
+
+        if (target.name === 'pk') {
+            // Individual checkbox toggled — update batch bar + sync select-all
+            updateBatchBar();
+        } else if (target.name === 'select_all') {
+            // Select-all toggled — sync all individual checkboxes
+            var checkboxes = document.querySelectorAll('#object-list-table-container input[type="checkbox"][name="pk"]');
+            checkboxes.forEach(function(cb) { cb.checked = target.checked; });
             updateBatchBar();
         }
     });
@@ -352,17 +359,6 @@ window.initFiltersToggle();
     document.body.addEventListener('htmx:afterSettle', function() {
         updateBatchBar();
     });
-
-    // Handle "Select All" checkbox
-    var selectAllCb = document.querySelector('input[type="checkbox"][name="select_all"]');
-    if (selectAllCb) {
-        selectAllCb.addEventListener('change', function() {
-            var checkboxes = document.querySelectorAll('#object-list-table-container input[type="checkbox"][name="selection"]');
-            var checkboxes = document.querySelectorAll('#object-list-table-container input[type="checkbox"][name="pk"]');
-            checkboxes.forEach(function(cb) { cb.checked = selectAllCb.checked; });
-            updateBatchBar();
-        });
-    }
 
     // Initial run
     updateBatchBar();

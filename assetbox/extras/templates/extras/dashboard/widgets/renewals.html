@@ -1,0 +1,25 @@
+{% load i18n %}
+<div class="text-muted small mb-2">Active subscriptions renewing within 90 days</div>
+{% if upcoming_renewals %}
+<div class="list-group list-group-flush" style="font-size: 0.85rem;">
+    {% for sub in upcoming_renewals %}
+    <div class="list-group-item px-0 py-2">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <a href="{% url 'subscriptions:subscription_detail' sub.pk %}" class="text-reset">{{ sub.name }}</a>
+            <span class="badge {% if sub.days_until_renewal <= 7 %}bg-danger{% elif sub.days_until_renewal <= 30 %}bg-warning{% else %}bg-info{% endif %}">
+                {{ sub.days_until_renewal }}d
+            </span>
+        </div>
+        <div class="d-flex justify-content-between text-muted small">
+            <span>{{ sub.provider.name }}</span>
+            <span>{% if sub.renewal_cost %}{{ sub.renewal_cost|floatformat:0 }} {{ sub.currency }}{% else %}&mdash;{% endif %}</span>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+<div class="text-muted small mt-2">
+    Active subscription spend: <strong>{{ total_subscription_spend|floatformat:0 }}</strong>
+</div>
+{% else %}
+<div class="text-muted text-center py-4">No upcoming renewals within 90 days.</div>
+{% endif %}

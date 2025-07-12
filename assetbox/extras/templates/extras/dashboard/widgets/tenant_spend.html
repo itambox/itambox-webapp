@@ -1,0 +1,21 @@
+{% load i18n %}
+{% if tenant_spend %}
+{% with max=tenant_spend.0.total %}
+<div class="text-muted small mb-2">{% trans "Purchase cost by tenant" %}</div>
+<div class="progress progress-sm mb-2">
+    {% for t in tenant_spend %}
+    <div class="progress-bar bg-{% cycle 'blue' 'purple' 'green' 'orange' 'red' 'teal' 'yellow' 'cyan' as bar_color %}" style="width: {% widthratio t.total max 100 %}%;" role="progressbar" aria-label="{{ t.tenant__name|default:'Unassigned' }}">&nbsp;</div>
+    {% endfor %}
+</div>
+<div class="d-flex flex-wrap gap-x-3 gap-y-1" style="font-size: 0.72rem;">
+    {% for t in tenant_spend %}
+    <span class="d-inline-flex align-items-center gap-1">
+        <span class="badge badge-dot" style="background-color:{% cycle '#206bc4' '#7c3aed' '#2fb344' '#f59f00' '#d63939' '#0ca678' '#f1c40f' '#17a2b8' as dot_color %}"></span>
+        <span class="text-truncate" style="max-width: 110px;" title="{{ t.tenant__name|default:'Unassigned' }}">{{ t.tenant__name|default:"Unassigned"|truncatechars:14 }}</span>
+    </span>
+    {% endfor %}
+</div>
+{% endwith %}
+{% else %}
+<div class="text-muted text-center py-4">{% trans "No tenant data available." %}</div>
+{% endif %}

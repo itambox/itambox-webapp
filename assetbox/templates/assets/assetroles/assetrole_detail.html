@@ -9,76 +9,7 @@
 {# --- Page Header (from base) --- #}
 {% block page_pretitle %}Assets / Asset Roles{% endblock %}
 
-{# --- Tabs Hook --- #}
-{% block extra_tabs %}
-    <li class="nav-item" role="presentation">
-        <a href="#assets-tab" class="nav-link" data-bs-toggle="tab" role="tab">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-purple" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l18 0" /><path d="M9 8l1 0" /><path d="M9 12l1 0" /><path d="M9 16l1 0" /><path d="M14 8l1 0" /><path d="M14 12l1 0" /><path d="M14 16l1 0" /><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16" /></svg>
-            Assets <span class="badge bg-purple-lt ms-2">{{ assets_table.rows|length }}</span>
-        </a>
-    </li>
-{% endblock extra_tabs %}
-
-{# --- Asset Role Specific Details --- #}
-{% block object_details %}
-<!-- Metrics Dashboard Row -->
-<div class="row g-3 mb-4">
-    <div class="col-sm-6">
-        <div class="card card-sm bg-purple-lt border-0 shadow-none">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-purple text-white avatar rounded shadow-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-tag" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" /></svg>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-purple small uppercase font-sans">Total Assets Assigned</div>
-                        <div class="text-purple h1 mb-0 font-weight-bold">{{ assets_table.rows|length }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6">
-        <div class="card card-sm border-0 shadow-none" style="background-color: {% if object.color %}#{{ object.color }}15{% else %}#6c757d15{% endif %};">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="avatar rounded shadow-sm text-white" style="background-color: {% if object.color %}#{{ object.color }}{% else %}#6c757d{% endif %};">
-                            &nbsp;
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium small uppercase font-sans" style="color: {% if object.color %}#{{ object.color }}{% else %}#6c757d{% endif %};">Role Hex Theme</div>
-                        <div class="h1 mb-0 font-weight-bold" style="color: {% if object.color %}#{{ object.color }}{% else %}#6c757d{% endif %};">
-                            {% if object.color %}#{{ object.color }}{% else %}Default{% endif %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<dl class="row mb-0">
-    <dt class="col-sm-3">Name:</dt>
-    <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
-
-    <dt class="col-sm-3">Slug:</dt>
-    <dd class="col-sm-9"><code>{{ object.slug }}</code></dd>
-
-    <dt class="col-sm-3">Description:</dt>
-    <dd class="col-sm-9 text-secondary">{{ object.description|linebreaksbr|default:"<i>No description provided for this role.</i>"|safe }}</dd>
-    
-    {% if object.config_template %}
-    <dt class="col-sm-3">Config Template:</dt>
-    <dd class="col-sm-9">
-        <a href="{% url 'extras:configtemplate_detail' pk=object.config_template.pk %}">
-            <span class="badge bg-secondary-lt">{{ object.config_template.name }}</span>
-        </a>
-    </dd>
-    {% endif %}
+        </dd>
 </dl>
 {% endblock object_details %}
 

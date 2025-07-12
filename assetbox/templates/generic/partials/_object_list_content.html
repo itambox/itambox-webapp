@@ -32,9 +32,10 @@
 {# Render the django-tables2 table #}
 {% render_table table "global_includes/htmx_table.html" %}
 
-{# Render pagination controls - Pass the target ID explicitly #}
-{# The view context provides RESULTS_PANE_CONTENT_ID #}
-{% include 'global_includes/pagination_links.html' with page_obj=page_obj hx_target=RESULTS_PANE_CONTENT_ID %}
+{# Render pagination controls #}
+{% if table.page %}
+    {% include 'global_includes/pagination_links.html' with page_obj=table.page %}
+{% endif %}
 
 {# --- Out-Of-Band Swaps --- #}
 {# These elements are included ONLY in the HTMX partial response #}

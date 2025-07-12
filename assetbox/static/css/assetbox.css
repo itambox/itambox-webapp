@@ -146,3 +146,66 @@ html, :root {
     background-color: #1a2538 !important; /* Premium dark navy-blue inset */
     color: var(--tblr-body-color) !important;
 }
+
+/* ============================================================
+   Table Column Width Stabilization
+   Prevents layout shifting and jitter during view transitions
+   ============================================================ */
+
+/* 1. Enforce fixed table layout for predictable column widths.
+   Browsers auto-layout recalculates on every render — fixed
+   layout uses the first row's widths as the column template,
+   preventing width reflow during content changes or HTMX swaps. */
+.card-table {
+    table-layout: fixed;
+    width: 100%;
+    min-width: calc(var(--table-col-count, 6) * 5rem);
+}
+
+/* 2. Prevent body cells from wrapping — keeps column widths
+   stable between header and body rows. */
+.card-table tbody td {
+    white-space: nowrap;
+}
+
+/* 3. Sticky first column (checkbox/pk) — pinned left */
+.card-table th:first-child,
+.card-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background-color: inherit;
+}
+.card-table thead th:first-child {
+    z-index: 4;
+}
+
+/* 4. Sticky last column (actions) — pinned right */
+.card-table th:last-child,
+.card-table td:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    background-color: inherit;
+}
+.card-table thead th:last-child {
+    z-index: 4;
+}
+
+/* 5. Edge shadow on sticky cells to hint at scrollable content */
+.card-table td:first-child::after {
+    content: "";
+    position: absolute;
+    top: 0; right: -6px; bottom: 0;
+    width: 6px;
+    background: linear-gradient(to right, rgba(0,0,0,0.08), transparent);
+    pointer-events: none;
+}
+.card-table td:last-child::before {
+    content: "";
+    position: absolute;
+    top: 0; left: -6px; bottom: 0;
+    width: 6px;
+    background: linear-gradient(to left, rgba(0,0,0,0.08), transparent);
+    pointer-events: none;
+}

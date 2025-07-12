@@ -1,68 +1,58 @@
 {% load utility_tags %}
+{% load i18n %}
 
-{# Pagination Links #}
-<ul class="pagination m-0 ms-auto">
-    {# Previous page #}
-    {% if page_obj.has_previous %}
-        <li class="page-item">
-            <a class="page-link"
-               href="{% update_querystring request page=1 %}"
-               hx-get="{% update_querystring request page=1 %}"
-               hx-target="{{ hx_target|default:'#object-list-dynamic-content' }}"
-               hx-swap="innerHTML"
-               hx-push-url="true">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevrons-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M11 7l-5 5l5 5" /><path d="M17 7l-5 5l5 5" /></svg>
-                Prev
-            </a>
-        </li>
-    {% else %}
-        <li class="page-item disabled">
-            <a class="page-link" href="#" tabindex="-1" aria-disabled="true">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 6l-6 6l6 6" /></svg>
-                Prev
-            </a>
-        </li>
-    {% endif %}
+{% if page_obj %}
+<div class="d-flex justify-content-between align-items-center border-top p-2"
+     hx-target="#object-list-dynamic-content"
+     hx-swap="innerHTML"
+     hx-push-url="true">
 
-    {# Page numbers #}
-    {% for i in page_obj.paginator.page_range %}
-        {% if i == page_obj.number %}
-            <li class="page-item active"><a class="page-link" href="#" tabindex="-1">{{ i }}</a></li>
-        {% elif i > page_obj.number|add:'-3' and i < page_obj.number|add:'3' %}
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav aria-label="{% trans "Page selection" %}">
+        <ul class="pagination mb-0">
+            {% if page_obj.has_previous %}
             <li class="page-item">
-                <a class="page-link {% if i == page_obj.number %}active{% endif %}"
-                   href="{% update_querystring request page=i %}"
-                   hx-get="{% update_querystring request page=i %}"
-                   hx-target="{{ hx_target|default:'#object-list-dynamic-content' }}"
-                   hx-swap="innerHTML"
-                   hx-push-url="true">
-                    {{ i }}
+                <a href="#"
+                   hx-get="{% update_querystring request page=page_obj.previous_page_number %}"
+                   class="page-link" aria-label="{% trans "Previous page" %}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-left" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 6l-6 6l6 6" /></svg>
                 </a>
             </li>
-        {% elif i == page_obj.number|add:'-3' or i == page_obj.number|add:'3' %}
-             <li class="page-item disabled"><span class="page-link">…</span></li>
-        {% endif %}
-    {% endfor %}
+            {% endif %}
 
-    {# Next page #}
-    {% if page_obj.has_next %}
-        <li class="page-item">
-            <a class="page-link"
-               href="{% update_querystring request page=page_obj.next_page_number %}"
-               hx-get="{% update_querystring request page=page_obj.next_page_number %}"
-               hx-target="{{ hx_target|default:'#object-list-dynamic-content' }}"
-               hx-swap="innerHTML"
-               hx-push-url="true">
-                Next
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 6l6 6l-6 6" /></svg>
-            </a>
-        </li>
-    {% else %}
-        <li class="page-item disabled">
-            <a class="page-link" href="#" tabindex="-1" aria-disabled="true">
-                Next
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 6l-6 6l6 6" /></svg>
-            </a>
-        </li>
+            {% for p in page_obj.smart_pages|default:page_obj.paginator.page_range %}
+            <li class="page-item{% if page_obj.number == p %} active{% endif %}"{% if page_obj.number == p %} aria-current="page"{% endif %}>
+                {% if p %}
+                <a href="#"
+                   hx-get="{% update_querystring request page=p %}"
+                   class="page-link" aria-label="{% blocktrans with num=p %}Page {{ num }}{% endblocktrans %}">
+                    {{ p }}
+                </a>
+                {% else %}
+                <span class="page-link" disabled aria-hidden="true">&hellip;</span>
+                {% endif %}
+            </li>
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a href="#"
+                   hx-get="{% update_querystring request page=page_obj.next_page_number %}"
+                   class="page-link" aria-label="{% trans "Next page" %}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-right" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 6l6 6l-6 6" /></svg>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
     {% endif %}
-</ul> 
+
+    <small class="text-muted">
+        {% blocktrans trimmed with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
+            Showing {{ start }}-{{ end }} of {{ total }}
+        {% endblocktrans %}
+    </small>
+
+    {% include 'global_includes/pagination_per_page.html' with paginator=page_obj.paginator %}
+</div>
+{% endif %}

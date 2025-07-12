@@ -32,7 +32,7 @@ if not SECRET_KEY:
     SECRET_KEY = 'django-insecure-dev-only-change-me-in-production'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('ASSETBOX_DEBUG', 'False').lower() in ('true', '1', 't')
+DEBUG = os.environ.get('ASSETBOX_DEBUG', 'True').lower() in ('true', '1', 't')
 
 ALLOWED_HOSTS = os.environ.get('ASSETBOX_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
@@ -189,7 +189,7 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]

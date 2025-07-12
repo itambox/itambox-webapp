@@ -2,13 +2,13 @@
 import django_tables2 as tables
 from django_tables2.utils import A
 from .models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, AssetHolderAssignment, Contact, ContactRole, ContactAssignment
-from core.tables import ActionsColumn, BaseTable
+from core.tables import ActionsColumn, BaseTable, ToggleColumn
 
 from assets.models import Asset
 from django.urls import reverse
 
 class RegionTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:region_detail', args=[A('pk')], verbose_name='Name')
     site_count = tables.Column(verbose_name='Sites', orderable=False)
     actions = ActionsColumn()
@@ -22,7 +22,7 @@ class RegionTable(BaseTable):
         return value or 0
 
 class SiteGroupTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:sitegroup_detail', args=[A('pk')], verbose_name='Name')
     site_count = tables.Column(verbose_name='Sites', orderable=False)
     actions = ActionsColumn()
@@ -36,7 +36,7 @@ class SiteGroupTable(BaseTable):
         return value or 0
 
 class SiteTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:site_detail', args=[A('pk')], verbose_name='Name')
     region = tables.LinkColumn('organization:region_detail', args=[A('region.pk')], accessor='region')
     group = tables.LinkColumn('organization:sitegroup_detail', args=[A('group.pk')], accessor='group')
@@ -57,7 +57,7 @@ class SiteTable(BaseTable):
         return value or 0
 
 class LocationTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:location_detail', args=[A('pk')], verbose_name='Name')
     site = tables.LinkColumn('organization:site_detail', args=[A('site.pk')], accessor='site')
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant')
@@ -73,7 +73,7 @@ class LocationTable(BaseTable):
         return value or 0
 
 class TenantGroupTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:tenantgroup_update', args=[A('pk')], verbose_name='Name')
     tenant_count = tables.Column(verbose_name='Tenants', orderable=False)
     actions = ActionsColumn()
@@ -87,7 +87,7 @@ class TenantGroupTable(BaseTable):
         return value or 0
 
 class TenantTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:tenant_detail', args=[A('pk')], verbose_name='Name')
     group = tables.LinkColumn('organization:tenantgroup_detail', args=[A('group.pk')], accessor='group')
     site_count = tables.Column(verbose_name='Sites', orderable=False)
@@ -109,7 +109,7 @@ class TenantTable(BaseTable):
 
 # --- AssetHolder Table ---
 class AssetHolderTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     upn = tables.LinkColumn('organization:assetholder_detail', args=[A('pk')], verbose_name='UPN')
     first_name = tables.Column()
     last_name = tables.Column()
@@ -140,7 +140,7 @@ class AssetHolderAssignmentTable(BaseTable):
 
 # --- Contact Table ---
 class ContactTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:contact_detail', args=[A('pk')], verbose_name='Name')
     title = tables.Column()
     phone = tables.Column()
@@ -155,7 +155,7 @@ class ContactTable(BaseTable):
 
 # --- ContactRole Table ---
 class ContactRoleTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:contactrole_detail', args=[A('pk')], verbose_name='Name')
     slug = tables.Column()
     description = tables.Column()

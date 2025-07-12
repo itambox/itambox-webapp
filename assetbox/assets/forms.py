@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError # Import ValidationError
 from .models import Asset, AssetRole, Manufacturer, AssetType, ComponentType, ComponentInstance, Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, KitItem
 # Import models from other apps
 from organization.models import Location, AssetHolder, Region, Site # Import Location, AssetHolder, Region, Site
-from extras.models import ConfigTemplate, Tag # Import ConfigTemplate
+from extras.models import Tag # Import Tag
 from django.contrib.auth import get_user_model
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Button, Div, Fieldset, Row, Column
@@ -294,7 +294,7 @@ class AssetForm(forms.ModelForm):
 class AssetRoleForm(forms.ModelForm):
     class Meta:
         model = AssetRole
-        fields = ['name', 'slug', 'description', 'color', 'config_template', 'tags']
+        fields = ['name', 'slug', 'description', 'color', 'tags']
         
     color = forms.CharField(
         max_length=7, 
@@ -306,12 +306,6 @@ class AssetRoleForm(forms.ModelForm):
         help_text="Choose a color for this Asset Role"
     )
     
-    config_template = forms.ModelChoiceField(
-        queryset=ConfigTemplate.objects.all(),
-        required=False,
-        widget=forms.Select(attrs={'class': 'form-select'})
-    )
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
@@ -325,7 +319,6 @@ class AssetRoleForm(forms.ModelForm):
                 'slug',
                 'description',
                 'color',
-                'config_template',
                 'tags'
             ),
             Row(

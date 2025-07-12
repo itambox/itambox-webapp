@@ -1,0 +1,23 @@
+{% load i18n %}
+<div class="text-muted small mb-2">Hardware Expiring within 90 days</div>
+{% if eol_alerts %}
+<div class="list-group list-group-flush" style="font-size: 0.80rem;">
+    {% for alert in eol_alerts|slice:":3" %}
+    <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
+        <div>
+            <div><a href="{% url 'assets:asset_detail' alert.asset.pk %}" class="text-reset">{{ alert.asset.name }}</a></div>
+            <div class="text-muted small">{{ alert.asset.asset_type }} &middot; EOL: {{ alert.eol_date|date:"Y-m-d" }}</div>
+        </div>
+        <div>
+            {% if alert.days_left < 0 %}
+            <span class="badge bg-red-lt text-red">EXPIRED</span>
+            {% else %}
+            <span class="badge bg-yellow-lt text-yellow">{{ alert.days_left }} Days Left</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-muted text-center py-4">No assets approaching EOL limit.</div>
+{% endif %}

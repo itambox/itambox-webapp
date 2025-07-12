@@ -1,13 +1,18 @@
 import logging
 import django_tables2 as tables
-from django_tables2.utils import A # Ensure A is imported
+from django_tables2.utils import A
+from django_tables2.data import TableQuerysetData
 from .models import ObjectChange
 from django.utils.html import format_html, escape
 from django.urls import reverse, NoReverseMatch
 from django.utils.safestring import mark_safe
+from django.utils.text import format_lazy
 from django.utils.translation import gettext_lazy as _
-from .utils import get_model_viewname # Import the utility function
-from django.contrib.contenttypes.models import ContentType # Ensure ContentType is imported
+from .utils import get_model_viewname
+from django.contrib.contenttypes.models import ContentType
+from django.conf import settings
+
+from core.paginator import EnhancedPaginator, get_paginate_count
 
 logger = logging.getLogger(__name__)
 
@@ -16,97 +21,313 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 class BooleanColumn(tables.Column):
-    """
-    Custom column for rendering boolean values as icons (check/cross).
-    """
-    def render(self, value, record, bound_column):
+    TRUE_MARK = mark_safe(
+        '<span class="text-success">'
+        '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-circle-check" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">'
+        '<path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M9 12l2 2l4 -4" /></svg>'
+        '</span>'
+    )
+    FALSE_MARK = mark_safe(
+        '<span class="text-danger">'
+        '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-circle-x" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">'
+        '<path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M10 10l4 4m0 -4l-4 4" /></svg>'
+        '</span>'
+    )
+    EMPTY_MARK = mark_safe('<span class="text-muted">&mdash;</span>')
+
+    def __init__(self, *args, true_mark=None, false_mark=None, **kwargs):
+        if true_mark is not None:
+            self.true_mark = true_mark
+        if false_mark is not None:
+            self.false_mark = false_mark
+        super().__init__(*args, **kwargs)
+
+    def render(self, value):
         if value is True:
-            return mark_safe('<span class="text-success"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-circle-check" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M9 12l2 2l4 -4" /></svg></span>')
+            return self.true_mark
         elif value is False:
-            return mark_safe('<span class="text-danger"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-circle-x" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M10 10l4 4m0 -4l-4 4" /></svg></span>')
-        else:
-            return "—" # Render dash for None or other values
+            return self.false_mark
+        return self.EMPTY_MARK
+
+
+class ToggleColumn(tables.CheckBoxColumn):
+    def __init__(self, *args, **kwargs):
+        default = kwargs.pop('default', '')
+        visible = kwargs.pop('visible', True)
+        if 'attrs' not in kwargs:
+            kwargs['attrs'] = {
+                'th': {
+                    'class': 'w-1',
+                    'aria-label': _('Select all'),
+                },
+                'td': {
+                    'class': 'w-1',
+                },
+                'input': {
+                    'class': 'form-check-input',
+                }
+            }
+        super().__init__(*args, default=default, visible=visible, **kwargs)
+
+    @property
+    def header(self):
+        title_text = _('Toggle all')
+        return format_html(
+            '<input type="checkbox" class="toggle form-check-input" name="select_all" title="{}" aria-label="{}" />',
+            title_text, title_text,
+        )
+
+
+class ActionsColumn(tables.Column):
+    attrs = {
+        'td': {
+            'class': 'text-end text-nowrap noprint p-1'
+        }
+    }
+    empty_values = ()
+    verbose_name = ''
+    orderable = False
+
+    actions = {
+        'edit': {'title': 'Edit', 'icon': 'pencil', 'css_class': 'primary'},
+        'delete': {'title': 'Delete', 'icon': 'trash', 'css_class': 'danger'},
+    }
+
+    def __init__(self, *args, actions=('edit', 'delete'), extra_buttons='', split_actions=True, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.extra_buttons = extra_buttons
+        self.split_actions = split_actions
+        self.actions = {
+            name: self.actions[name] for name in actions if name in self.actions
+        }
+
+    def render(self, record, table, **kwargs):
+        if not self.actions and not self.extra_buttons:
+            return ''
+        if not getattr(record, 'pk', None):
+            return ''
+
+        model = type(record)
+
+        icon_edit = '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-pencil" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h4l10.5 -10.5a1.5 1.5 0 0 0 -4 -4l-10.5 10.5v4" /><path d="M13.5 6.5l4 4" /></svg>'
+        icon_delete = '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>'
+
+        icons = {
+            'edit': icon_edit,
+            'delete': icon_delete,
+        }
+
+        html = ''
+        button = None
+        dropdown_class = 'secondary'
+        dropdown_links = []
+
+        for idx, (action, attrs) in enumerate(self.actions.items()):
+            css_class = attrs['css_class']
+            icon = icons.get(action, '')
+            viewname = get_model_viewname(model, 'update' if action == 'edit' else 'delete')
+            url = None
+            for kwargs in ({'pk': record.pk}, {'slug': getattr(record, 'slug', None)}):
+                if None in kwargs.values():
+                    continue
+                try:
+                    url = reverse(viewname, kwargs=kwargs)
+                    break
+                except NoReverseMatch:
+                    continue
+            if url is None:
+                continue
+
+            if len(self.actions) == 1 or (self.split_actions and idx == 0):
+                dropdown_class = css_class
+                button = (
+                    f'<a class="btn btn-sm btn-{css_class}" href="{url}" type="button" '
+                    f'aria-label="{attrs["title"]}">{icon}</a>'
+                )
+            else:
+                dropdown_links.append(
+                    f'<li><a class="dropdown-item" href="{url}">{icon} {attrs["title"]}</a></li>'
+                )
+
+        toggle_text = _('Toggle Dropdown')
+        if button and dropdown_links:
+            html += (
+                f'<span class="btn-group dropdown">'
+                f'  {button}'
+                f'  <a class="btn btn-sm btn-{dropdown_class} dropdown-toggle" type="button" data-bs-toggle="dropdown" '
+                f'style="padding-left: 2px">'
+                f'  <span class="visually-hidden">{toggle_text}</span></a>'
+                f'  <ul class="dropdown-menu">{"".join(dropdown_links)}</ul>'
+                f'</span>'
+            )
+        elif button:
+            html += button
+        elif dropdown_links:
+            html += (
+                f'<span class="btn-group dropdown">'
+                f'  <a class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">'
+                f'  <span class="visually-hidden">{toggle_text}</span></a>'
+                f'  <ul class="dropdown-menu">{"".join(dropdown_links)}</ul>'
+                f'</span>'
+            )
+
+        return mark_safe(html)
+
 
 # Base Table for common settings
 class BaseTable(tables.Table):
+    exempt_columns = ('pk', 'actions')
+
     class Meta:
-        model = None # Should be overridden by subclasses
-        # Use tuple for attributes
+        model = None
         attrs = {
-            'class': 'table table-hover table-vcenter card-table', 
+            'class': 'table table-hover table-vcenter card-table',
             'thead': {
+                'class': 'text-nowrap'
+            },
+            'td': {
                 'class': 'text-nowrap'
             }
         }
-        # Define default columns to exclude from configuration modal
         exclude_from_config = ('pk', 'actions')
-    
-    # Ensure __init__ is outside Meta
+
     def __init__(self, *args, **kwargs):
-        # Extract request if present in kwargs to load user preferences
-        request = kwargs.get('request', None)
-        
-        # Call super() FIRST to initialize self.columns
         super().__init__(*args, **kwargs)
 
-        # Get the full set of defined column names *before* hiding
+        if self.empty_text is None:
+            model = getattr(self.Meta, 'model', None)
+            if model:
+                self.empty_text = _("No {model_name} found").format(
+                    model_name=model._meta.verbose_name_plural
+                )
+            else:
+                self.empty_text = _('No results found')
+
+    def _get_columns(self, visible=True):
+        columns = []
+        for name, column in self.columns.items():
+            if column.visible == visible and name not in self.exempt_columns:
+                columns.append((name, column.verbose_name))
+        return columns
+
+    @property
+    def name(self):
+        return self.__class__.__name__
+
+    @property
+    def available_columns(self):
+        return sorted(self._get_columns(visible=False))
+
+    @property
+    def selected_columns(self):
+        return self._get_columns(visible=True)
+
+    def _set_columns(self, selected_columns):
+        for column in self.columns:
+            if column.name not in [*selected_columns, *self.exempt_columns]:
+                self.columns.hide(column.name)
+            elif column.name in self.exempt_columns and not column.visible:
+                self.columns.show(column.name)
+
         base_column_names = set(self.columns.names())
+        self.sequence = [
+            *[c for c in selected_columns if c in base_column_names],
+            *[c for c in base_column_names if c not in selected_columns]
+        ]
 
-        model = getattr(self.Meta, 'model', None)
-        user_columns = None
+        if 'pk' in self.sequence:
+            self.sequence.remove('pk')
+            self.sequence.insert(0, 'pk')
 
-        # Get user preferences if available
-        if model is not None and request and request.user.is_authenticated:
+        if 'actions' in self.sequence:
+            self.sequence.remove('actions')
+            self.sequence.append('actions')
+
+    def _apply_prefetching(self, columns=None):
+        if not isinstance(self.data, TableQuerysetData):
+            return
+
+        prefetch_fields = []
+        for column in self.columns.iterall():
+            if columns is not None:
+                if column.name not in columns:
+                    continue
+            elif not column.visible:
+                continue
+            model = getattr(self.Meta, 'model', None)
+            if model is None:
+                continue
+            accessor = column.accessor
+            if accessor.startswith('custom_field_data__'):
+                continue
+            prefetch_path = []
+            for field_name in accessor.split(accessor.SEPARATOR):
+                try:
+                    field = model._meta.get_field(field_name)
+                except Exception:
+                    break
+                if hasattr(field, 'remote_field') and field.remote_field:
+                    prefetch_path.append(field_name)
+                    model = field.remote_field.model
+                else:
+                    break
+            if prefetch_path:
+                prefetch_fields.append('__'.join(prefetch_path))
+        if prefetch_fields:
+            self.data.data = self.data.data.prefetch_related(*prefetch_fields)
+
+    def configure(self, request):
+        columns = None
+        ordering = None
+
+        if request.user.is_authenticated and self.prefixed_order_by_field in request.GET:
+            if request.GET[self.prefixed_order_by_field]:
+                ordering = request.GET.getlist(self.prefixed_order_by_field)
+            else:
+                ordering = None
+
+        if request.user.is_authenticated:
             try:
                 from django.apps import apps
                 UserPreference = apps.get_model('users', 'UserPreference')
                 prefs = UserPreference.objects.filter(user=request.user).first()
                 if prefs and prefs.data:
-                    app_label = model._meta.app_label
-                    table_class_name = self.__class__.__name__
-                    user_config = prefs.data.get('tables', {}).get(app_label, {}).get(table_class_name, {})
-                    user_columns = user_config.get('columns')
-                    logger.debug("Found user columns for %s.%s: %s", app_label, table_class_name, user_columns)
-            except Exception as e:
-                logger.error("Error getting user table prefs: %s", e)
+                    model = getattr(self.Meta, 'model', None)
+                    if model:
+                        app_label = model._meta.app_label
+                        user_config = prefs.data.get('tables', {}).get(app_label, {}).get(self.name, {})
+                        if columns is None:
+                            columns = user_config.get('columns')
+            except Exception:
                 pass
 
-        # Determine the effective list of columns to show
-        if user_columns is not None:
-            columns_to_show = user_columns
-        else:
-            columns_to_show = getattr(self.Meta, 'default_columns', ())
+        if columns is None:
+            columns = getattr(self.Meta, 'default_columns', self.Meta.fields)
 
-        # Define columns that should *always* be visible
-        exempt_columns = ('pk', 'actions')
+        self._set_columns(columns)
 
-        # Hide columns NOT in columns_to_show and NOT exempt
-        for name, column in self.columns.items():
-            if name not in columns_to_show and name not in exempt_columns:
-                self.columns.hide(name)
-            elif name in exempt_columns and hasattr(column, 'visible') and not column.visible:
-                 self.columns.show(name)
+        if columns_param := request.GET.get('include_columns'):
+            for column_name in columns_param.split(','):
+                if column_name in self.columns.names():
+                    self.columns.show(column_name)
+        if exclude_columns := request.GET.get('exclude_columns'):
+            exclude_columns = exclude_columns.split(',')
+            for column_name in exclude_columns:
+                if column_name in self.columns.names() and column_name not in self.exempt_columns:
+                    self.columns.hide(column_name)
 
-        # Rearrange sequence
-        final_sequence_list = [
-            *[c for c in columns_to_show if c in base_column_names],
-            *[c for c in base_column_names if c not in columns_to_show]
-        ]
+        self._apply_prefetching()
+        if ordering is not None:
+            self.order_by = ordering
 
-        if 'pk' in final_sequence_list:
-            final_sequence_list.remove('pk')
-            final_sequence_list.insert(0, 'pk')
+        paginate = {
+            'paginator_class': EnhancedPaginator,
+            'per_page': get_paginate_count(request)
+        }
+        tables.RequestConfig(request, paginate).configure(self)
 
-        if 'actions' in final_sequence_list:
-            final_sequence_list.remove('actions')
-            final_sequence_list.append('actions')
 
-        self.sequence = tuple(final_sequence_list)
-
-class ObjectChangeTable(tables.Table):
-    """
-    Table for displaying ObjectChange entries.
-    """
+class ObjectChangeTable(BaseTable):
     time = tables.DateTimeColumn(linkify=True, format='Y-m-d H:i:s')
     user_name = tables.Column(verbose_name='User')
     action = tables.Column(verbose_name='Action')
@@ -114,130 +335,43 @@ class ObjectChangeTable(tables.Table):
     object_repr = tables.Column(linkify=False, verbose_name='Object')
     request_id = tables.Column(linkify=False, verbose_name='Request ID')
 
-    # Custom column to linkify the changed object if possible
     changed_object = tables.Column(
         linkify=lambda record: record.get_changed_object_url(),
         verbose_name='Changed Object',
-        accessor='object_repr' # Display the object_repr in the column
+        accessor='object_repr'
     )
 
-    class Meta:
+    class Meta(BaseTable.Meta):
         model = ObjectChange
         fields = (
             'time', 'user_name', 'action', 'changed_object_type', 'changed_object',
             'request_id',
         )
-        attrs = {
-            'class': 'table table-hover object-list'
-        }
-        # Define default sequence if needed, otherwise follows fields
-        # sequence = ('time', 'user_name', 'action', 'changed_object_type', 'changed_object', 'request_id') 
 
-class ActionsColumn(tables.Column):
-    """
-    Renders a dropdown menu with edit and delete links for an object.
-    Derives URL names based on the model.
-    """
-    attrs = {'td': {'class': 'text-end text-nowrap noprint'}} # Mimic NetBox attrs
-    empty_values = ()
-    verbose_name = '' # No header text
-    orderable = False
 
-    def render(self, record, table, **kwargs):
-        # Ensure we have a record with a pk
-        if not record or not getattr(record, 'pk', None):
-            return self.default
-
-        # Get URLs dynamically
-        model = type(record)
-        try:
-            url_edit = reverse(get_model_viewname(model, 'update'), kwargs={'pk': record.pk})
-        except:
-            url_edit = None # Handle case where update view doesn't exist
-
-        try:
-            url_delete = reverse(get_model_viewname(model, 'delete'), kwargs={'pk': record.pk})
-        except:
-            url_delete = None # Handle case where delete view doesn't exist
-
-        # Add other URLs like changelog later if needed
-
-        # Use Tabler icons SVG markup
-        icon_edit = '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-pencil" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h4l10.5 -10.5a1.5 1.5 0 0 0 -4 -4l-10.5 10.5v4" /><path d="M13.5 6.5l4 4" /></svg>'
-        icon_delete = '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>'
-
-        # Build the split button dropdown HTML
-        html_parts = [
-            f'''<div class="btn-group dropdown">'''
-        ]
-
-        # Edit button (if URL exists)
-        if url_edit:
-            html_parts.append(f'''<a href="{url_edit}" class="btn btn-sm btn-primary" title="{_('Edit')}">{icon_edit}</a>''')
-
-        # Only show toggle and menu if there are other actions (delete for now)
-        if url_delete: # Add conditions for other actions here later
-            # Use primary color for toggle if edit exists, else secondary
-            toggle_color = 'primary' if url_edit else 'secondary'
-            html_parts.append(f'''<button class="btn btn-sm btn-{toggle_color} dropdown-toggle dropdown-toggle-split" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                   <span class="visually-hidden">{_('Toggle Dropdown')}</span>
-                               </button>
-                               <ul class="dropdown-menu dropdown-menu-end" data-bs-strategy="fixed">''')
-            if url_delete:
-                html_parts.append(f'''<li><a class="dropdown-item text-danger" href="{url_delete}">{icon_delete} {_("Delete")}</a></li>''')
-            # Add other actions here
-            html_parts.append('''   </ul>''')
-
-        html_parts.append('''</div>''')
-
-        # Don't render empty div if no actions are available
-        if not url_edit and not url_delete:
-            return self.default
-
-        return mark_safe("\n".join(html_parts))
-
-# --- Search Results Table (Aligned with NetBox approach) ---
+# --- Search Results Table ---
 class SearchResultTable(tables.Table):
-    """
-    Table for displaying heterogeneous search results (aligned with NetBox).
-    The data passed to this table should be a list of objects/dicts,
-    each having an '_object_type_id' and an 'object' attribute holding the actual model instance.
-    """
-    # Use accessor for the ContentType ID stored on the wrapper object
     object_type = tables.Column(
-        accessor='_object_type_id', 
+        accessor='_object_type_id',
         verbose_name='Type',
         orderable=False
     )
-    # Use 'object' as column name, accessing the model instance on the wrapper
     object = tables.Column(
-        accessor='object', # Access the 'object' attribute of the wrapper
-        linkify=True,     # Restore linkify
+        accessor='object',
+        linkify=True,
         verbose_name='Result',
-        orderable=False # Ordering by str representation might be unreliable
+        orderable=False
     )
 
     class Meta:
-        # No specific model - it handles multiple types
         attrs = {
-            'class': 'table table-hover object-list'
+            'class': 'table table-hover table-vcenter card-table'
         }
-        # Use the new field names
-        fields = ('object_type', 'object', ) 
-        # sequence = (...) # Define order if needed
+        fields = ('object_type', 'object',)
 
-    # Simplified render_object_type, expects ContentType ID as value
     def render_object_type(self, value):
         try:
             ct = ContentType.objects.get_for_id(value)
-            # Format similar to NetBox
             return ct.name.capitalize()
         except ContentType.DoesNotExist:
             return "Unknown Type"
-
-    # Optional: Implement render_parent if needed
-    # def render_parent(self, record):
-    #     if hasattr(record, 'site'): # Example for Location
-    #         return record.site
-    #     # Add checks for other parent relationships
-    #     return "—" 

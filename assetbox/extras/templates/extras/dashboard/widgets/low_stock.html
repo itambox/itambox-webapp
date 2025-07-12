@@ -1,0 +1,25 @@
+{% load i18n %}
+{% with low_count=low_stock_accessory_count|add:low_stock_consumable_count %}
+<div class="text-muted small mb-2">Items below minimum quantity: <span class="text-danger fw-bold">{{ low_count }}</span></div>
+{% endwith %}
+{% if low_stock_accessories %}
+<div class="text-muted small mb-1 fw-bold">Accessories</div>
+{% for acc in low_stock_accessories %}
+<div class="d-flex justify-content-between small py-1">
+    <a href="{% url 'assets:accessory_detail' acc.pk %}" class="text-reset">{{ acc.name }}</a>
+    <span class="badge bg-red-lt text-red">{{ acc.remaining_qty }}/{{ acc.min_qty }}</span>
+</div>
+{% endfor %}
+{% endif %}
+{% if low_stock_consumables %}
+<div class="text-muted small mb-1 mt-2 fw-bold">Consumables</div>
+{% for con in low_stock_consumables %}
+<div class="d-flex justify-content-between small py-1">
+    <a href="{% url 'assets:consumable_detail' con.pk %}" class="text-reset">{{ con.name }}</a>
+    <span class="badge bg-red-lt text-red">{{ con.remaining_qty }}/{{ con.min_qty }}</span>
+</div>
+{% endfor %}
+{% endif %}
+{% if not low_stock_accessories and not low_stock_consumables %}
+<div class="text-muted text-center py-4">All stock levels are healthy.</div>
+{% endif %}

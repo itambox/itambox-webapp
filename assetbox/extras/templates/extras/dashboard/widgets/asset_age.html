@@ -1,0 +1,23 @@
+{% load i18n %}
+{% if age_buckets %}
+{% with total=age_buckets.lt1y|add:age_buckets.1_3y|add:age_buckets.3_5y|add:age_buckets.5_7y|add:age_buckets.gt7y %}
+<div class="d-flex align-items-baseline mb-2">
+    <span class="h3 mb-0">{{ avg_asset_age_years }}y</span>
+    <span class="text-muted small ms-2">{% trans "average asset age" %}</span>
+</div>
+<div class="progress progress-sm mb-2">
+    <div class="progress-bar" style="width: {% widthratio age_buckets.lt1y total 100 %}%; background-color:#2fb344;" aria-label="<1y">{% if age_buckets.lt1y %}{{ age_buckets.lt1y }}{% endif %}</div>
+    <div class="progress-bar" style="width: {% widthratio age_buckets.1_3y total 100 %}%; background-color:#206bc4;" aria-label="1-3y">{% if age_buckets.1_3y %}{{ age_buckets.1_3y }}{% endif %}</div>
+    <div class="progress-bar" style="width: {% widthratio age_buckets.3_5y|add:age_buckets.5_7y total 100 %}%; background-color:#f59f00;" aria-label="3-7y">{% if age_buckets.3_5y|add:age_buckets.5_7y %}{{ age_buckets.3_5y|add:age_buckets.5_7y }}{% endif %}</div>
+    <div class="progress-bar" style="width: {% widthratio age_buckets.gt7y total 100 %}%; background-color:#d63939;" aria-label="7y+">{% if age_buckets.gt7y %}{{ age_buckets.gt7y }}{% endif %}</div>
+</div>
+<div class="d-flex flex-wrap gap-2" style="font-size: 0.7rem;">
+    <span class="d-inline-flex align-items-center gap-1"><span class="badge badge-dot" style="background-color:#2fb344"></span>&lt;1y <span class="text-muted">{{ age_buckets.lt1y }}</span></span>
+    <span class="d-inline-flex align-items-center gap-1"><span class="badge badge-dot" style="background-color:#206bc4"></span>1-3y <span class="text-muted">{{ age_buckets.1_3y }}</span></span>
+    <span class="d-inline-flex align-items-center gap-1"><span class="badge badge-dot" style="background-color:#f59f00"></span>3-7y <span class="text-muted">{{ age_buckets.3_5y|add:age_buckets.5_7y }}</span></span>
+    <span class="d-inline-flex align-items-center gap-1"><span class="badge badge-dot" style="background-color:#d63939"></span>7y+ <span class="text-muted">{{ age_buckets.gt7y }}</span></span>
+</div>
+{% endwith %}
+{% else %}
+<div class="text-muted text-center py-4">{% trans "No asset purchase dates recorded." %}</div>
+{% endif %}

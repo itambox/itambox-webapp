@@ -1,0 +1,33 @@
+<div class="d-flex align-items-center mb-3">
+    <span class="bg-blue-lt p-2 rounded-circle me-3">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon text-blue" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M17 8v-3a1 1 0 0 0 -1 -1h-10a2 2 0 0 0 0 4h12a1 1 0 0 1 1 1v3a1 1 0 0 1 -1 1h-12a2 2 0 0 1 -2 -2v-12"/><path d="M20 12v4h-4a2 2 0 0 0 0 4h4a1 1 0 0 0 1 -1v-7"/><path d="M17 16h.01"/></svg>
+    </span>
+    <div>
+        <div class="text-muted small">Total Cost of Ownership (TCO)</div>
+        <div class="h2 mb-0">${{ total_tco|floatformat:2 }}</div>
+    </div>
+</div>
+<div class="mb-2">
+    <div class="d-flex justify-content-between small text-muted mb-1">
+        <span>Original Purchase Cost</span>
+        <span>${{ total_purchase_cost|floatformat:2 }}</span>
+    </div>
+    <div class="progress progress-xs">
+        <div class="progress-bar bg-primary" style="width: {% widthratio total_purchase_cost total_tco 100 %}%"></div>
+    </div>
+</div>
+<div class="mb-2">
+    <div class="d-flex justify-content-between small text-muted mb-1">
+        <span>Maintenance Expenditures</span>
+        <span>${{ total_maintenance_cost|floatformat:2 }}</span>
+    </div>
+    <div class="progress progress-xs">
+        <div class="progress-bar bg-orange" style="width: {% widthratio total_maintenance_cost total_tco 100 %}%"></div>
+    </div>
+</div>
+<div>
+    <div class="d-flex justify-content-between small text-muted mb-1">
+        <span>Total Salvage Book Value</span>
+        <span class="text-success">${{ total_salvage_value|floatformat:2 }}</span>
+    </div>
+</div>

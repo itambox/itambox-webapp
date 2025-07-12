@@ -1,0 +1,27 @@
+{% load i18n %}
+{% if status_stats %}
+{% with total=total_assets %}
+<div class="d-flex align-items-baseline mb-2">
+    <span class="h2 mb-0">{{ total_assets }}</span>
+    <span class="text-muted small ms-2">{% trans "Total Managed Assets" %}</span>
+</div>
+<div class="progress progress-sm mb-3">
+    {% for status in status_stats %}
+    <div class="progress-bar" style="width: {% widthratio status.asset_count total 100 %}%; background-color: #{{ status.color|default:'626976' }};" role="progressbar" aria-label="{{ status.name }}">&nbsp;</div>
+    {% endfor %}
+</div>
+<div class="row g-1" style="font-size: 0.75rem;">
+    {% for status in status_stats %}
+    <div class="col-6">
+        <a href="{% url 'assets:statuslabel_detail' status.pk %}" class="d-flex align-items-center text-reset text-decoration-none gap-1">
+            <span class="badge badge-dot" style="background-color: #{{ status.color|default:'626976' }};"></span>
+            <span class="text-truncate">{{ status.name }}</span>
+            <span class="ms-auto text-muted">{{ status.asset_count }}</span>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+{% endwith %}
+{% else %}
+<div class="text-muted text-center py-4">{% trans "No status labels configured." %}</div>
+{% endif %}

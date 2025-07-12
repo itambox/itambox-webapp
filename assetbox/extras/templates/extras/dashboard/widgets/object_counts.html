@@ -1,0 +1,20 @@
+{% load i18n %}
+{% if has_data %}
+<div class="list-group list-group-flush" style="font-size: 0.85rem;">
+    {% for item in counts %}
+    <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
+        <span>{{ item.label }}</span>
+        {% if item.url %}
+        <a href="{{ item.url }}" class="badge bg-blue-lt text-blue text-decoration-none">{{ item.count }}</a>
+        {% else %}
+        <span class="badge bg-blue-lt text-blue">{{ item.count }}</span>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-muted text-center py-3">
+    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chart-bar mb-2" width="32" height="32" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z"/><path d="M9 8m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z"/><path d="M15 4m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z"/></svg>
+    <p class="small">{% trans 'Configure this widget to select which object types to count.' %}</p>
+</div>
+{% endif %}

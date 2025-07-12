@@ -2,13 +2,13 @@ import django_tables2 as tables
 from django.utils.translation import gettext_lazy as _
 from assets.models import Manufacturer, InstalledSoftware # Keep import for potential linking
 # from core.tables import BaseTable, TagColumn, BooleanColumn # Remove old import
-from core.tables import BaseTable, BooleanColumn # Import only needed core components
+from core.tables import BaseTable, BooleanColumn, ToggleColumn
 from extras.tables import TagColumn # Import TagColumn from extras
 from .models import Software
 
 class SoftwareTable(BaseTable):
     """Table for displaying Software instances."""
-    pk = tables.CheckBoxColumn(accessor='pk', attrs = { "th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn(
         viewname='software:software_detail', # Use the correct viewname once URLs are set
         args=[tables.A('pk')] 

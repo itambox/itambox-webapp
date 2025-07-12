@@ -1,12 +1,12 @@
 import django_tables2 as tables
 from django.utils.html import format_html
 from django_tables2.utils import A
-from core.tables import ActionsColumn, BaseTable
+from core.tables import ActionsColumn, BaseTable, ToggleColumn
 from .models import Provider, Subscription, SubscriptionAssignment, SubscriptionStatusChoices
 
 
 class ProviderTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('subscriptions:provider_detail', args=[A('pk')], verbose_name='Name')
     is_active = tables.BooleanColumn(verbose_name='Active', yesno='✓,✗')
     subscription_count = tables.Column(accessor='subscription_count', verbose_name='Subscriptions', orderable=False)
@@ -19,7 +19,7 @@ class ProviderTable(BaseTable):
 
 
 class SubscriptionTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('subscriptions:subscription_detail', args=[A('pk')], verbose_name='Name')
     provider = tables.Column(linkify=True, verbose_name='Provider')
     status = tables.Column(verbose_name='Status')
@@ -78,7 +78,7 @@ class SubscriptionTable(BaseTable):
 
 
 class SubscriptionAssignmentTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk', attrs={"th__input": {"title": "Select all rows"}})
+    pk = ToggleColumn(accessor='pk')
     subscription = tables.LinkColumn(
         'subscriptions:subscription_detail', args=[A('subscription.pk')],
         accessor='subscription.name', verbose_name='Subscription'

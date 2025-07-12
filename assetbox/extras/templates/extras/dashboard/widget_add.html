@@ -1,0 +1,37 @@
+{% load i18n %}
+<div id="modal-placeholder">
+    <div class="modal modal-blur fade" id="widget-add-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form method="post" action="{% url 'extras:dashboard_widget_add' %}">
+                {% csrf_token %}
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">{% trans "Add Widget" %}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ form.widget.id_for_label }}">{% trans "Widget" %}</label>
+                            {{ form.widget }}
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ form.title.id_for_label }}">{% trans "Title" %}</label>
+                            {{ form.title }}
+                            <div class="form-text">{% trans "Leave blank to use the default title." %}</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+                        <button type="submit" class="btn btn-primary ms-auto">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14"/><path d="M5 12l14 0"/></svg>
+                            {% trans "Add Widget" %}
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+    new bootstrap.Modal(document.getElementById('widget-add-modal')).show();
+</script>

@@ -61,13 +61,6 @@ class AssetRole(ChangeLoggingMixin, BaseModel):
     description = models.TextField(blank=True)
     # Add new fields
     color = models.CharField(max_length=6, blank=True, help_text="RGB color in hexadecimal (e.g. 00ff00)")
-    config_template = models.ForeignKey(
-        to='extras.ConfigTemplate',
-        on_delete=models.SET_NULL,
-        related_name='asset_roles',
-        blank=True,
-        null=True
-    )
     tags = models.ManyToManyField(
         to='extras.Tag',
         related_name='asset_roles',

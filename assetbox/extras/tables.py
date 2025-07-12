@@ -4,8 +4,8 @@ from django_tables2.utils import A
 from django.utils.safestring import mark_safe
 from django.urls import reverse
 from django.utils.html import escape, format_html_join
-from .models import Tag, ConfigTemplate
-from core.tables import ActionsColumn, BaseTable
+from .models import Tag
+from core.tables import ActionsColumn, BaseTable, ToggleColumn
 
 # =============================================================================
 # Custom Columns
@@ -39,7 +39,7 @@ A table column which renders linked tags for an object.
 # =============================================================================
 
 class TagTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk')
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('extras:tag_detail', args=[A('pk')], verbose_name='Name')
     # You might want a column to show count of items tagged with this tag.
     # This can be complex depending on how Tags are related (GenericForeignKey?).
@@ -61,17 +61,3 @@ class TagTable(BaseTable):
     # def render_item_count(self, record):
     #     # Implement counting logic here if needed
     #     return record.taggit_taggeditem_items.count() # Example if using django-taggit's default related name 
-
-class ConfigTemplateTable(BaseTable):
-    pk = tables.CheckBoxColumn(accessor='pk')
-    name = tables.LinkColumn('extras:configtemplate_detail', args=[A('pk')], verbose_name='Name')
-    asset_roles_count = tables.Column(verbose_name='Asset Roles', orderable=False)
-    actions = ActionsColumn()
-
-    class Meta(BaseTable.Meta):
-        model = ConfigTemplate
-        fields = ('pk', 'name', 'description', 'asset_roles_count', 'actions')
-        default_columns = ('pk', 'name', 'description', 'asset_roles_count', 'actions')
-    
-    def render_asset_roles_count(self, value, record=None):
-        return value or 0

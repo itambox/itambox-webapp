@@ -9,6 +9,7 @@ from importlib import import_module
 from django.http import Http404
 from django.views.generic import DetailView
 from django_tables2 import SingleTableView, RequestConfig
+from .paginator import EnhancedPaginator, get_paginate_count
 from django.utils.decorators import method_decorator
 import json
 from django.core.serializers.json import DjangoJSONEncoder
@@ -48,7 +49,7 @@ from django.contrib.auth.views import PasswordChangeView as DjangoPasswordChange
 from .models import ObjectChange
 from .tables import ObjectChangeTable
 # from .filters import ObjectChangeFilterSet # Comment out unused import
-from .utils import get_model_viewname, get_paginate_count, get_table_for_model # Import the new helper
+from .utils import get_model_viewname, get_table_for_model
 from django.contrib.contenttypes.models import ContentType # Add ContentType
 from django.utils.http import urlencode
 from django.views.decorators.http import require_POST # Add require_POST
@@ -213,8 +214,7 @@ class ObjectListView(LoginRequiredMixin, ListView):
         self.model = _model # Ensure self.model is set for get_table
 
         table = self.get_table()
-        # Apply pagination via RequestConfig (critical for list view performance)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(table)
+        table.configure(self.request)
         filter_form = self.filterset_form(self.request.GET) if self.filterset_form else None
         context['table'] = table
         context['filter_form'] = filter_form
@@ -236,12 +236,8 @@ class ObjectListView(LoginRequiredMixin, ListView):
 
         # Add action buttons to context IF they are defined in the tuple AND the corresponding URL exists
         context['action_buttons'] = self.action_buttons # Pass the tuple itself
-        # Example: Check if 'add' is requested and if the create_url actually exists
         if 'add' in self.action_buttons and not context['create_url_name']:
-             # Remove 'add' if URL doesn't exist to prevent button rendering issues
-             # This assumes action_buttons is mutable; might need list conversion if tuple
-             pass # Or handle more explicitly if needed
-        # Similar checks for import/export if implemented
+             pass
 
         # Breadcrumbs
         base_breadcrumbs = [
