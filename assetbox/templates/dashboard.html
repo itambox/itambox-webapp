@@ -50,7 +50,12 @@
 
 <div class="row row-cards" id="dashboard-grid">
     {% for entry in dashboard_widgets %}
-    <div class="col-lg-{{ entry.config.w|default:4 }} col-md-6 col-12" id="widget-{{ entry.index }}">
+    <div class="col-lg-{{ entry.config.w|default:4 }} col-md-6 col-12"
+         id="widget-{{ entry.index }}"
+         data-gs-w="{{ entry.config.w|default:4 }}"
+         data-gs-h="{{ entry.config.h|default:2 }}"
+         {% if entry.config.x is not None %}data-gs-x="{{ entry.config.x }}"{% endif %}
+         {% if entry.config.y is not None %}data-gs-y="{{ entry.config.y }}"{% endif %}>
         <div class="card card-sm">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h3 class="card-title">{{ entry.config.title }}</h3>
@@ -121,21 +126,32 @@
             if (child.className && /col-lg-\d+/.test(child.className)) cols.push(child);
         });
 
-        // Remove Bootstrap grid classes from container ? GridStack needs full control
+        // Remove Bootstrap grid classes from container
         el.classList.remove('row', 'row-cards');
 
         cols.forEach(function(col, i) {
             var card = col.querySelector('.card');
             if (!card) return;
-            var cls = col.className.split(' ').find(function(c) { return c.startsWith('col-lg-'); });
-            var w = cls ? parseInt(cls.replace('col-lg-', '')) : 4;
 
-            // Remove ALL Bootstrap column classes ? GridStack handles sizing
+            // Read saved positions from data attributes
+            var savedW = col.getAttribute('data-gs-w');
+            var savedH = col.getAttribute('data-gs-h');
+            var savedX = col.getAttribute('data-gs-x');
+            var savedY = col.getAttribute('data-gs-y');
+
+            // Remove ALL Bootstrap column classes
             col.className = col.className.replace(/col\S+/g, '').trim();
             col.classList.add('grid-stack-item');
-            col.setAttribute('gs-w', w);
-            col.setAttribute('gs-h', '2');
+
+            // Apply saved sizes (or defaults)
+            col.setAttribute('gs-w', savedW || '4');
+            col.setAttribute('gs-h', savedH || '2');
             col.setAttribute('gs-id', 'widget-' + i);
+
+            // Apply saved position (only if previously saved ? omit for auto-flow)
+            if (savedX !== null && savedX !== 'None') col.setAttribute('gs-x', savedX);
+            if (savedY !== null && savedY !== 'None') col.setAttribute('gs-y', savedY);
+
             card.classList.add('grid-stack-item-content');
         });
 
