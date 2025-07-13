@@ -59,8 +59,8 @@
         <div class="card card-sm">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h3 class="card-title">{{ entry.config.title }}</h3>
-                <div class="card-actions">
-                    <button class="btn btn-icon btn-sm btn-ghost-secondary me-1"
+                <div class="card-actions d-flex gap-1">
+                    <button class="btn btn-icon btn-sm btn-ghost-secondary"
                             hx-get="{% url 'extras:dashboard_widget_config' index=entry.index %}"
                             hx-target="#modal-placeholder"
                             hx-swap="innerHTML"
@@ -211,6 +211,9 @@
 
         document.querySelectorAll('#dashboard-grid .card').forEach(function(card) {
             card.style.outline = isNowLocked ? '' : '2px dashed var(--tblr-primary)';
+        });
+        document.querySelectorAll('.dashboard-manage-btn').forEach(function(btn) {
+            btn.style.display = isNowLocked ? 'none' : '';
         });
     }
 

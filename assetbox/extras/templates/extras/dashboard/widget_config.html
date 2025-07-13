@@ -1,7 +1,7 @@
 {% load i18n %}
 <div id="modal-placeholder">
     <div class="modal modal-blur fade" id="widget-config-modal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
             <form method="post" action="{% url 'extras:dashboard_widget_config' index=index %}">
                 {% csrf_token %}
                 <div class="modal-content">
