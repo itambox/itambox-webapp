@@ -213,7 +213,7 @@
             card.style.outline = isNowLocked ? '' : '2px dashed var(--tblr-primary)';
         });
         document.querySelectorAll('.dashboard-manage-btn').forEach(function(btn) {
-            btn.style.display = isNowLocked ? 'none' : '';
+            btn.classList.toggle('d-none', isNowLocked);
         });
     }
 
