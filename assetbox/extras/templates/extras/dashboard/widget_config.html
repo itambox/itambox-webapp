@@ -1,6 +1,6 @@
 {% load i18n %}
 <div id="modal-placeholder">
-    <div class="modal modal-blur fade" id="widget-config-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal modal-blur fade" id="widget-config-modal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-centered">
             <form method="post" action="{% url 'extras:dashboard_widget_config' index=index %}">
                 {% csrf_token %}
@@ -48,5 +48,18 @@
     </div>
 </div>
 <script>
-    new bootstrap.Modal(document.getElementById('widget-config-modal')).show();
+    var modalEl = document.getElementById('widget-config-modal');
+    var modal = new bootstrap.Modal(modalEl);
+    modal.show();
+    // Clean up after hide to allow re-opening via HTMX
+    modalEl.addEventListener('hidden.bs.modal', function() {
+        modal.dispose();
+        var placeholder = document.getElementById('modal-placeholder');
+        if (placeholder) placeholder.innerHTML = '';
+        // Clean up leftover backdrops
+        document.querySelectorAll('.modal-backdrop').forEach(function(bd) { bd.remove(); });
+        document.body.classList.remove('modal-open');
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+    });
 </script>
