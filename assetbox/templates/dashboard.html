@@ -112,6 +112,7 @@
     var gsLoaded = false;
 
     function initGridStack() {
+        try {
         if (typeof GridStack === 'undefined') {
             console.warn('GridStack not loaded - using Bootstrap grid fallback');
             return;
@@ -167,31 +168,18 @@
 
         gsLoaded = true;
         window.__gsInitialized = true;
+        } catch(e) { console.warn('GridStack init error:', e); window.__gsInitialized = false; }
     }
 
     function destroyGridStack() {
-        if (grid && gsLoaded) {
-            grid.destroy(false);
+        // Only reset references ? DON'T mutate DOM during HTMX swap.
+        // The old DOM is about to be replaced; the browser will GC listeners.
+        if (grid) {
+            try { grid.destroy(false); } catch(e) {}
             grid = null;
-            gsLoaded = false;
-            window.__gsInitialized = false;
-
-            // Restore Bootstrap grid fallback classes
-            var el = document.getElementById('dashboard-grid');
-            if (el) {
-                el.classList.add('row', 'row-cards');
-                el.querySelectorAll('.grid-stack-item').forEach(function(item) {
-                    var w = item.getAttribute('gs-w') || '4';
-                    item.classList.remove('grid-stack-item');
-                    item.removeAttribute('gs-w');
-                    item.removeAttribute('gs-h');
-                    item.removeAttribute('gs-id');
-                    item.className = 'col-lg-' + w + ' col-md-6 col-12';
-                    var card = item.querySelector('.grid-stack-item-content');
-                    if (card) card.classList.remove('grid-stack-item-content');
-                });
-            }
         }
+        gsLoaded = false;
+        window.__gsInitialized = false;
     }
 
     function toggleLock() {
@@ -267,7 +255,7 @@
 
     // --- HTMX lifecycle: reinitialize after history restore or content swap ---
     document.body.addEventListener('htmx:afterSettle', function(evt) {
-        if (document.getElementById('dashboard-grid')) {
+        if (document.getElementById('dashboard-grid') && !window.__gsInitialized) {
             initGridStack();
         }
     });
