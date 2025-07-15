@@ -250,12 +250,22 @@
 
     // --- HTMX lifecycle: destroy GridStack before navigating away ---
     document.body.addEventListener('htmx:beforeSwap', function(evt) {
-        destroyGridStack();
+        // Always reset: HTMX is about to nuke the DOM, clear all state
+        grid = null;
+        gsLoaded = false;
+        window.__gsInitialized = false;
     });
 
     // --- HTMX lifecycle: reinitialize after history restore or content swap ---
     document.body.addEventListener('htmx:afterSettle', function(evt) {
-        if (document.getElementById('dashboard-grid') && !window.__gsInitialized) {
+        var gridEl = document.getElementById('dashboard-grid');
+        if (!gridEl) return;
+        // GridStack adds 'grid-stack' class during init. If missing, GridStack
+        // never initialized on this element (e.g. same-URL HTMX swap skipped
+        // inline script re-execution). Force reinit regardless of __gsInitialized.
+        if (!gridEl.classList.contains('grid-stack')) {
+            window.__gsInitialized = false;
+            gsLoaded = false;
             initGridStack();
         }
     });
