@@ -29,7 +29,7 @@ class DashboardWidgetAddView(LoginRequiredMixin, View):
             title = form.cleaned_data['title']
             widget_cls = get_widget(widget_id)
             if widget_cls:
-                dashboard = get_dashboard(request.user)
+                dashboard = get_dashboard(request.user, for_update=True)
                 dashboard.add_widget(widget_id, title=title or widget_cls.title)
         return redirect('dashboard')
 
@@ -56,7 +56,7 @@ class DashboardWidgetConfigView(LoginRequiredMixin, View):
         return HttpResponse(html)
 
     def post(self, request, index):
-        dashboard = get_dashboard(request.user)
+        dashboard = get_dashboard(request.user, for_update=True)
         if not (0 <= index < len(dashboard.layout)):
             return redirect('dashboard')
         config = dashboard.layout[index]
@@ -93,7 +93,7 @@ class DashboardWidgetDeleteView(LoginRequiredMixin, View):
         return HttpResponse(html)
 
     def post(self, request, index):
-        dashboard = get_dashboard(request.user)
+        dashboard = get_dashboard(request.user, for_update=True)
         dashboard.remove_widget(index)
         return redirect('dashboard')
 
@@ -102,7 +102,7 @@ class DashboardResetView(LoginRequiredMixin, View):
     """Reset dashboard to default layout."""
 
     def post(self, request):
-        dashboard = get_dashboard(request.user)
+        dashboard = get_dashboard(request.user, for_update=True)
         dashboard.layout = get_default_dashboard()
         dashboard.save(update_fields=['layout'])
         return redirect('dashboard')
@@ -113,7 +113,7 @@ class DashboardSaveLayoutView(LoginRequiredMixin, View):
 
     def post(self, request):
         import json
-        dashboard = get_dashboard(request.user)
+        dashboard = get_dashboard(request.user, for_update=True)
         try:
             data = json.loads(request.body)
             widgets = data.get('widgets', [])

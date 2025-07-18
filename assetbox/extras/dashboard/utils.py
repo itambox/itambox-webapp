@@ -26,9 +26,19 @@ def get_default_dashboard():
         {'widget': 'recent-activity', 'title': 'Change Log', 'visible': True, 'w': 12, 'h': 3, 'config': {}},
     ]
 
-def get_dashboard(user):
-    """Get or create a dashboard for the given user."""
-    dashboard, created = Dashboard.objects.get_or_create(user=user)
+
+def get_dashboard(user, for_update=False):
+    """Get or create a dashboard for the given user.
+
+    Args:
+        user: The user whose dashboard to fetch.
+        for_update: If True, locks the row with SELECT ... FOR UPDATE
+                    to prevent concurrent mutation race conditions.
+    """
+    qs = Dashboard.objects.all()
+    if for_update:
+        qs = qs.select_for_update()
+    dashboard, created = qs.get_or_create(user=user)
     if created or not dashboard.layout:
         dashboard.layout = get_default_dashboard()
         dashboard.save(update_fields=['layout'])

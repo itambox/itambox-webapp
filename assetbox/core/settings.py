@@ -34,7 +34,7 @@ if not SECRET_KEY:
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('ASSETBOX_DEBUG', 'True').lower() in ('true', '1', 't')
 
-ALLOWED_HOSTS = os.environ.get('ASSETBOX_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = os.environ.get('ASSETBOX_ALLOWED_HOSTS', 'localhost,127.0.0.1,192.168.50.54').split(',')
 
 # Production security hardening (only when explicitly enabled AND not in debug mode)
 ASSETBOX_ENABLE_SECURITY = os.environ.get('ASSETBOX_ENABLE_SECURITY', 'False').lower() in ('true', '1', 't')

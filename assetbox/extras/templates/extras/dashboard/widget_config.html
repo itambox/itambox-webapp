@@ -1,65 +1,41 @@
 {% load i18n %}
-<div id="modal-placeholder">
-    <div class="modal modal-blur fade" id="widget-config-modal" tabindex="-1">
-        <div class="modal-dialog modal-xl modal-dialog-centered">
-            <form method="post" action="{% url 'extras:dashboard_widget_config' index=index %}">
-                {% csrf_token %}
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">{% trans "Configure Widget" %}: {{ config.title }}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label" for="{{ form.title.id_for_label }}">{% trans "Title" %}</label>
-                            {{ form.title }}
-                        </div>
-                        <div class="mb-3">
-                            <div class="form-check form-switch">
-                                {{ form.visible }}
-                                <label class="form-check-label" for="{{ form.visible.id_for_label }}">{% trans "Visible" %}</label>
-                            </div>
-                        </div>
-
-                        {% if widget_config_form and widget_config_form.declared_fields %}
-                        <hr class="my-3">
-                        <h6 class="mb-3">{% trans "Widget Settings" %}</h6>
-                        {% for field in widget_config_form %}
-                        <div class="mb-3">
-                            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                            {{ field }}
-                            {% if field.help_text %}
-                            <div class="form-text">{{ field.help_text }}</div>
-                            {% endif %}
-                            {% if field.errors %}
-                            <div class="invalid-feedback d-block">{{ field.errors|join:", " }}</div>
-                            {% endif %}
-                        </div>
-                        {% endfor %}
-                        {% endif %}
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
-                        <button type="submit" class="btn btn-primary ms-auto">{% trans "Save" %}</button>
-                    </div>
-                </div>
-            </form>
-        </div>
+<form method="post" action="{% url 'extras:dashboard_widget_config' index=index %}">
+    {% csrf_token %}
+    <div class="modal-header">
+        <h5 class="modal-title">{% trans "Configure Widget" %}: {{ config.title }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
     </div>
-</div>
-<script>
-    var modalEl = document.getElementById('widget-config-modal');
-    var modal = new bootstrap.Modal(modalEl);
-    modal.show();
-    // Clean up after hide to allow re-opening via HTMX
-    modalEl.addEventListener('hidden.bs.modal', function() {
-        modal.dispose();
-        var placeholder = document.getElementById('modal-placeholder');
-        if (placeholder) placeholder.innerHTML = '';
-        // Clean up leftover backdrops
-        document.querySelectorAll('.modal-backdrop').forEach(function(bd) { bd.remove(); });
-        document.body.classList.remove('modal-open');
-        document.body.style.overflow = '';
-        document.body.style.paddingRight = '';
-    });
-</script>
+    <div class="modal-body">
+        <div class="mb-3">
+            <label class="form-label" for="{{ form.title.id_for_label }}">{% trans "Title" %}</label>
+            {{ form.title }}
+        </div>
+        <div class="mb-3">
+            <div class="form-check form-switch">
+                {{ form.visible }}
+                <label class="form-check-label" for="{{ form.visible.id_for_label }}">{% trans "Visible" %}</label>
+            </div>
+        </div>
+
+        {% if widget_config_form and widget_config_form.declared_fields %}
+        <hr class="my-3">
+        <h6 class="mb-3">{% trans "Widget Settings" %}</h6>
+        {% for field in widget_config_form %}
+        <div class="mb-3">
+            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}
+            <div class="form-text">{{ field.help_text }}</div>
+            {% endif %}
+            {% if field.errors %}
+            <div class="invalid-feedback d-block">{{ field.errors|join:", " }}</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+        <button type="submit" class="btn btn-primary ms-auto">{% trans "Save" %}</button>
+    </div>
+</form>

@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 from django import forms
-from django.db.models import Sum, Count, Q, Avg, F
+from django.db.models import Sum, Count, Q, Avg, F, Case, When, Value, IntegerField
+from django.db.models.functions import Extract
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django.template.loader import render_to_string
@@ -169,8 +170,7 @@ class ObjectCountsWidget(DashboardWidget):
                 continue
             model_cls, url_name = info
             try:
-                qs = model_cls.objects.all()
-                count = qs.count()
+                count = model_cls.objects.count()
                 label = self._get_model_label(key)
                 url = reverse(url_name)
                 counts.append({'label': label, 'count': count, 'url': url})
@@ -267,12 +267,14 @@ class EOLAlertsWidget(DashboardWidget):
 
     def get_context(self, request):
         today = date.today()
+        cutoff = today + timedelta(days=90)
         alerts = []
-        assets = Asset.objects.filter(
+        queryset = Asset.objects.filter(
             purchase_date__isnull=False,
             asset_type__eol_months__isnull=False
         ).select_related('asset_type')
-        for asset in assets:
+
+        for asset in queryset.iterator(chunk_size=500):
             eol = asset.eol_date
             if eol is None:
                 continue
@@ -280,6 +282,7 @@ class EOLAlertsWidget(DashboardWidget):
             if days_left > 90:
                 continue
             alerts.append({'asset': asset, 'days_left': days_left, 'eol_date': eol})
+
         return {'eol_alerts': sorted(alerts, key=lambda a: a['days_left'])}
 
 
@@ -370,12 +373,11 @@ class AssetAgeWidget(DashboardWidget):
     def get_context(self, request):
         today = date.today()
         assets = Asset.objects.filter(purchase_date__isnull=False)
-
-        buckets = {'lt1y': 0, '1_3y': 0, '3_5y': 0, '5_7y': 0, 'gt7y': 0}
         total_age = 0
         count = 0
+        buckets = {'lt1y': 0, '1_3y': 0, '3_5y': 0, '5_7y': 0, 'gt7y': 0}
 
-        for asset in assets:
+        for asset in assets.only('purchase_date').iterator(chunk_size=1000):
             age_years = (today - asset.purchase_date).days / 365.25
             total_age += age_years
             count += 1

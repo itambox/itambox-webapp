@@ -13,7 +13,7 @@
     <title>{% block title %}AssetBox{% endblock %}</title>
     <!-- CSS files -->
     <link href="https://cdn.jsdelivr.net/npm/gridstack@10.3.0/dist/gridstack.min.css" rel="stylesheet"/>
-    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet"/>
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.1.0/dist/css/tabler.min.css" rel="stylesheet"/>
     <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.1.0/dist/css/tabler-flags.min.css" rel="stylesheet"/>
     <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.1.0/dist/css/tabler-payments.min.css" rel="stylesheet"/>
     <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.1.0/dist/css/tabler-vendors.min.css" rel="stylesheet"/>
@@ -225,8 +225,10 @@
     </script>
     {% endblock %}
 
+    {% block modals %}
     {# Placeholder for dynamically loaded modals #}
     <div id="modal-placeholder"></div>
+    {% endblock modals %}
 
     {# --- NetBox-style Toast Messages Container --- #}
     <div id="django-messages" class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100"> {# Increased z-index #}
