@@ -6,7 +6,5 @@ class ExtrasConfig(AppConfig):
     name = 'extras'
 
     def ready(self):
-        # Import signals
-        # import extras.signals # Removed signal import
         # Import search indexes to register them
         import extras.search

@@ -99,14 +99,12 @@ class SiteDetailView(ObjectDetailView):
                 'url': f"{reverse('assets:asset_list')}?site={site.slug}" # Filter link
             })
 
-        # *** INDENTATION FIX START ***
         context['locations_table'] = locations_table
         context['assets_table'] = assets_table
         context['related_objects_list'] = related_objects_list
         # Base view already adds common context like title, object_type, etc.
         # Base view provides edit/delete URLs in context['action_urls'] based on get_model_viewname
         return context
-        # *** INDENTATION FIX END ***
 
 class SiteEditView(ObjectEditView):
     queryset = Site.objects.all() # Required by base view
@@ -128,7 +126,6 @@ class SiteDeleteView(ObjectDeleteView):
         location_count = site.locations.count()
         asset_count = Asset.objects.filter(location__site=site).count()
 
-        # *** INDENTATION FIX START ***
         if location_count > 0 or asset_count > 0:
             related_object_details = []
             if location_count > 0:
@@ -145,7 +142,6 @@ class SiteDeleteView(ObjectDeleteView):
 
         # If no related objects, proceed with deletion using superclass method
         return super().post(request, *args, **kwargs)
-        # *** INDENTATION FIX END ***
 
 # --- Region Views ---
 
@@ -189,11 +185,14 @@ class RegionDetailView(ObjectDetailView):
                 'url': f"{reverse('organization:region_list')}?parent={region.slug}" # Filter link
             })
 
-        # *** INDENTATION FIX START ***
         context['sites_table'] = sites_table
         context['related_objects_list'] = related_objects_list
+
+        children = region.children.all()
+        if children.exists():
+            context['children_table'] = RegionTable(children, request=self.request)
+
         return context
-        # *** INDENTATION FIX END ***
 
 class RegionEditView(ObjectEditView):
     queryset = Region.objects.all()
@@ -212,7 +211,6 @@ class RegionDeleteView(ObjectDeleteView):
         region = self.get_object()
         site_count = region.sites.count()
 
-        # *** INDENTATION FIX START ***
         if site_count > 0:
             messages.error(
                 request,
@@ -221,7 +219,6 @@ class RegionDeleteView(ObjectDeleteView):
             return redirect(region.get_absolute_url())
 
         return super().post(request, *args, **kwargs)
-        # *** INDENTATION FIX END ***
 
 # --- Site Group Views ---
 
@@ -265,11 +262,14 @@ class SiteGroupDetailView(ObjectDetailView):
                 'url': f"{reverse('organization:sitegroup_list')}?parent={sitegroup.slug}" # Filter link
             })
 
-        # *** INDENTATION FIX START ***
         context['sites_table'] = sites_table
         context['related_objects_list'] = related_objects_list
+
+        children = sitegroup.children.all()
+        if children.exists():
+            context['children_table'] = SiteGroupTable(children, request=self.request)
+
         return context
-        # *** INDENTATION FIX END ***
 
 class SiteGroupEditView(ObjectEditView):
     queryset = SiteGroup.objects.all()
@@ -288,7 +288,6 @@ class SiteGroupDeleteView(ObjectDeleteView):
         sitegroup = self.get_object()
         site_count = sitegroup.sites.count()
 
-        # *** INDENTATION FIX START ***
         if site_count > 0:
             messages.error(
                 request,
@@ -297,7 +296,6 @@ class SiteGroupDeleteView(ObjectDeleteView):
             return redirect(sitegroup.get_absolute_url())
 
         return super().post(request, *args, **kwargs)
-        # *** INDENTATION FIX END ***
 
 # --- Location Views ---
 
@@ -343,11 +341,9 @@ class LocationDetailView(ObjectDetailView):
                 'url': f"{reverse('organization:location_list')}?parent={location.slug}" # Filter link
             })
 
-        # *** INDENTATION FIX START ***
         context['assets_table'] = assets_table
         context['related_objects_list'] = related_objects_list
         return context
-        # *** INDENTATION FIX END ***
 
 class LocationEditView(ObjectEditView):
     queryset = Location.objects.all()
@@ -366,7 +362,6 @@ class LocationDeleteView(ObjectDeleteView):
         location = self.get_object()
         asset_count = location.assets.count()
 
-        # *** INDENTATION FIX START ***
         if asset_count > 0:
             messages.error(
                 request,
@@ -375,7 +370,6 @@ class LocationDeleteView(ObjectDeleteView):
             return redirect(location.get_absolute_url())
 
         return super().post(request, *args, **kwargs)
-        # *** INDENTATION FIX END ***
 
 # --- Tenant Group Views ---
 
@@ -419,11 +413,14 @@ class TenantGroupDetailView(ObjectDetailView):
                 'url': f"{reverse('organization:tenantgroup_list')}?parent={tenantgroup.slug}" # Filter link
             })
 
-        # *** INDENTATION FIX START ***
         context['tenants_table'] = tenants_table
         context['related_objects_list'] = related_objects_list
+
+        children = tenantgroup.children.all()
+        if children.exists():
+            context['children_table'] = TenantGroupTable(children, request=self.request)
+
         return context
-        # *** INDENTATION FIX END ***
 
 class TenantGroupEditView(ObjectEditView):
     queryset = TenantGroup.objects.all()
@@ -442,7 +439,6 @@ class TenantGroupDeleteView(ObjectDeleteView):
         tenantgroup = self.get_object()
         tenant_count = tenantgroup.tenants.count()
 
-        # *** INDENTATION FIX START ***
         if tenant_count > 0:
             messages.error(
                 request,
@@ -451,7 +447,6 @@ class TenantGroupDeleteView(ObjectDeleteView):
             return redirect(tenantgroup.get_absolute_url())
 
         return super().post(request, *args, **kwargs)
-        # *** INDENTATION FIX END ***
 
 # --- Tenant Views ---
 
@@ -511,13 +506,11 @@ class TenantDetailView(ObjectDetailView):
                 'url': f"{reverse('organization:assetholder_list')}?tenant={tenant.slug}" # Filter link
             })
 
-        # *** INDENTATION FIX START ***
         context['sites_table'] = sites_table
         context['locations_table'] = locations_table
         context['assetholders_table'] = assetholders_table
         context['related_objects_list'] = related_objects_list
         return context
-        # *** INDENTATION FIX END ***
 
 class TenantEditView(ObjectEditView):
     queryset = Tenant.objects.all()
@@ -536,7 +529,6 @@ class TenantDeleteView(ObjectDeleteView):
         tenant = self.get_object()
         related_count = tenant.sites.count() + tenant.locations.count() + tenant.asset_holders.count()
 
-        # *** INDENTATION FIX START ***
         if related_count > 0:
             related_details = []
             if tenant.sites.exists(): related_details.append(f"{tenant.sites.count()} sites")
@@ -549,9 +541,6 @@ class TenantDeleteView(ObjectDeleteView):
             return redirect(tenant.get_absolute_url())
 
         return super().post(request, *args, **kwargs)
-        # *** INDENTATION FIX END ***
-
-# TODO: Add views for Tag
 
 # --- AssetHolder Views ---
 
@@ -589,11 +578,9 @@ class AssetHolderDetailView(ObjectDetailView):
                 'url': f"{reverse('organization:assetholderassignment_list')}?asset_holder={assetholder.pk}" # Filter link
             })
 
-        # *** INDENTATION FIX START ***
         context['assignments_table'] = assignments_table
         context['related_objects_list'] = related_objects_list
         return context
-        # *** INDENTATION FIX END ***
 
 class AssetHolderEditView(ObjectEditView):
     queryset = AssetHolder.objects.all()
@@ -612,7 +599,6 @@ class AssetHolderDeleteView(ObjectDeleteView):
         assetholder = self.get_object()
         assignment_count = assetholder.assignments.count()
 
-        # *** INDENTATION FIX START ***
         if assignment_count > 0:
             messages.error(
                 request,
@@ -621,7 +607,6 @@ class AssetHolderDeleteView(ObjectDeleteView):
             return redirect(assetholder.get_absolute_url())
 
         return super().post(request, *args, **kwargs)
-        # *** INDENTATION FIX END ***
 
 # --- AssetHolderAssignment Views ---
 

@@ -43,8 +43,7 @@ class BaseTable(tables.Table):
                 else:
                     logger.debug("No UserPreference object found")
             except Exception as e:
-                logger.error("Error getting user prefs: %s", e)
-                pass
+                logger.error("Error getting user column preferences: %s", e)
 
         # Determine the effective list of columns to show
         if user_columns is not None:

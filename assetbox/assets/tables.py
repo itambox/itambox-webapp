@@ -154,17 +154,12 @@ class AssetTypeTable(BaseTable):
         fields = ('pk', 'manufacturer', 'model', 'part_number', 'eol_months', 'created', 'last_updated', 'actions') 
         # Keep default columns as before, or add created/last_updated if desired
         default_columns = ('pk', 'manufacturer', 'model', 'part_number', 'eol_months', 'actions')
-        # *** Explicitly set default order_by ***
         order_by = ('manufacturer', 'model')
 
     def render_eol_months(self, value):
         if value is not None:
             return f"{value} month{'s' if value != 1 else ''}"
         return "—"
-
-    # def render_asset_count(self, record):
-    #    return Asset.objects.filter(asset_type=record).count() # Example if Asset links to AssetType
-    #    return Asset.objects.filter(asset_type=record).count() # Example if Asset links to AssetType
 
 
 class ComponentTypeTable(BaseTable):

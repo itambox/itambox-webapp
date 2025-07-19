@@ -1,3 +1,4 @@
+import re
 from django import forms
 from .models import Tag
 from crispy_forms.helper import FormHelper
@@ -49,22 +50,21 @@ class TagForm(forms.ModelForm):
     def clean_color(self):
         color = self.cleaned_data.get('color')
         if color and color.startswith('#'):
-            # Strip the '#' and validate length
             cleaned_color = color[1:]
             if len(cleaned_color) == 6:
-                # TODO: Add validation to ensure it's a valid hex code?
+                if not re.match(r'^[0-9a-fA-F]{6}$', cleaned_color):
+                    raise forms.ValidationError("Enter a valid 6-character hex color code (without '#').")
                 return cleaned_color
             else:
                 raise forms.ValidationError("Ensure the color hex code is 6 characters long (after removing '#').")
         elif not color:
-             # Allow empty color
             return ''
-        # Handle case where color doesn't start with # but might be valid/invalid
         if len(color) == 6:
-             # TODO: Add validation to ensure it's a valid hex code?
+            if not re.match(r'^[0-9a-fA-F]{6}$', color):
+                raise forms.ValidationError("Enter a valid 6-character hex color code.")
             return color
         elif len(color) == 0:
-            return '' # Allow empty
+            return ''
         else:
              raise forms.ValidationError("Ensure the color hex code is 6 characters long.")
 

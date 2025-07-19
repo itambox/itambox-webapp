@@ -25,10 +25,7 @@
 </dl>
 {% endblock object_details %}
 
-{# Leave related_objects empty for the sidebar #}
-{% block related_objects %}{% endblock related_objects %}
-
-{# Add the Sites table to the full_width_content block #}
+{# Add the Sites table and Children table to the full_width_content block #}
 {% block full_width_content %}
     {% if sites_table %}
     <div class="card mb-4">
@@ -39,5 +36,12 @@
         {# Optional: Add pagination if needed later #}
     </div>
     {% endif %}
-    {# TODO: Add Child Regions card/table here? #}
+    {% if children_table and children_table.rows %}
+    <div class="card mb-4">
+        <div class="card-header"><h3 class="card-title">Child Regions ({{ children_table.rows|length }})</h3></div>
+        <div class="table-responsive">
+            {% render_table children_table %}
+        </div>
+    </div>
+    {% endif %}
 {% endblock full_width_content %}

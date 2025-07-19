@@ -21,13 +21,12 @@ class CustomQuerySet(models.QuerySet):
                         *Note: Cumulative functionality is NOT implemented yet.*
         """
         if cumulative:
-            # TODO: Implement cumulative counting logic if MPTT is used.
-            # This typically involves filtering related_model where its 'lft'/'rght'
-            # falls within the parent's 'lft'/'rght'.
-            # For now, raise an error or default to non-cumulative.
-            # raise NotImplementedError("Cumulative related count not yet implemented.")
-            # Defaulting to non-cumulative for now:
-            pass # Fall through to standard annotation
+            # Cumulative counting logic requires MPTT fields (lft/rght) on the model.
+            # Raise NotImplementedError until we have a model hierarchy that needs this.
+            raise NotImplementedError(
+                "Cumulative related count requires MPTT support. "
+                "Pass cumulative=False or use MPTT on the relevant model."
+            )
 
         # Standard non-cumulative annotation using Subquery
         subquery = Subquery(
@@ -44,4 +43,8 @@ class CustomQuerySet(models.QuerySet):
             **{count_attr: subquery}
         ).annotate(
             **{count_attr: models.functions.Coalesce(count_attr, 0)} # Replace None with 0
-        ) 
+        )
+
+
+def count_related(model, field_name):
+    return models.Count(field_name)

@@ -10,7 +10,4 @@ urlpatterns = [
     path('software/<int:pk>/', views.SoftwareDetailView.as_view(), name='software_detail'),
     path('software/<int:pk>/edit/', views.SoftwareEditView.as_view(), name='software_update'),
     path('software/<int:pk>/delete/', views.SoftwareDeleteView.as_view(), name='software_delete'),
-    # Add bulk edit/delete later if needed
-    # path('software/edit/', views.SoftwareBulkEditView.as_view(), name='software_bulk_edit'),
-    # path('software/delete/', views.SoftwareBulkDeleteView.as_view(), name='software_bulk_delete'),
 ] 

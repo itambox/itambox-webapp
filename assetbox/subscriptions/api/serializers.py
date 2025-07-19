@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 
+from core.api.base import BaseModelSerializer
 from subscriptions.models import Provider, Subscription, SubscriptionAssignment
 from organization.api.serializers import NestedTenantSerializer
 from organization.models import Tenant
@@ -10,7 +11,7 @@ from extras.api.serializers import TagSerializer
 User = get_user_model()
 
 
-class ProviderSerializer(serializers.ModelSerializer):
+class ProviderSerializer(BaseModelSerializer):
     tags = TagSerializer(many=True, read_only=True)
     subscription_count = serializers.IntegerField(read_only=True)
     slug = serializers.SlugField(required=False, allow_blank=True)
@@ -23,9 +24,10 @@ class ProviderSerializer(serializers.ModelSerializer):
             'is_active', 'subscription_count', 'tags', 'created_at', 'updated_at'
         )
         read_only_fields = ('created_at', 'updated_at')
+        brief_fields = ('id', 'name', 'slug', 'is_active', 'subscription_count')
 
 
-class SubscriptionSerializer(serializers.ModelSerializer):
+class SubscriptionSerializer(BaseModelSerializer):
     provider = ProviderSerializer(read_only=True)
     provider_id = serializers.PrimaryKeyRelatedField(
         queryset=Provider.objects.all(), source='provider', write_only=True
@@ -59,9 +61,10 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             'description', 'notes', 'tags', 'created_at', 'updated_at'
         )
         read_only_fields = ('created_at', 'updated_at', 'days_until_renewal', 'annual_cost')
+        brief_fields = ('id', 'name', 'slug', 'provider', 'status', 'status_display', 'days_until_renewal')
 
 
-class SubscriptionAssignmentSerializer(serializers.ModelSerializer):
+class SubscriptionAssignmentSerializer(BaseModelSerializer):
     subscription = SubscriptionSerializer(read_only=True)
     subscription_id = serializers.PrimaryKeyRelatedField(
         queryset=Subscription.objects.all(), source='subscription', write_only=True
@@ -82,6 +85,7 @@ class SubscriptionAssignmentSerializer(serializers.ModelSerializer):
             'assigned_date', 'notes', 'created_at', 'updated_at'
         )
         read_only_fields = ('created_at', 'updated_at', 'assigned_date')
+        brief_fields = ('id', 'subscription', 'assigned_object')
 
     def get_assigned_object(self, obj):
         if obj.assigned_object:

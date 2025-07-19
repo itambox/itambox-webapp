@@ -61,12 +61,6 @@
             Software <span class="badge bg-purple-lt ms-2">{{ object.installed_software.count }}</span>
         </a>
     </li>
-    <li class="nav-item" role="presentation">
-        <a href="#activity-log" class="nav-link" data-bs-toggle="tab" role="tab">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-azure" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 8l0 4l2 2" /><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5" /></svg>
-            Activity Log <span class="badge bg-azure-lt ms-2">{{ logs|length }}</span>
-        </a>
-    </li>
 {% endblock extra_tabs %}
 
 {# --- Asset Specific Details --- #}
@@ -620,39 +614,6 @@
         </div>
     </div>
 
-    {# Activity Log Tab Pane #}
-    <div class="tab-pane fade" id="activity-log" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">Asset Deployment & Check Activity Log</h3>
-            </div>
-            {% if logs %}
-                <div class="list-group list-group-flush list-group-hoverable" style="max-height: 500px; overflow-y: auto;">
-                    {% for log in logs %}
-                        <div class="list-group-item">
-                            <div class="row align-items-center">
-                                <div class="col-auto">
-                                    <span class="badge bg-blue-lt">{{ forloop.revindex }}</span>
-                                </div>
-                                <div class="col text-truncate">
-                                    <span class="text-body d-block font-weight-bold">{{ log.get_action_display }}</span>
-                                    <small class="text-muted text-truncate mt-n1">{{ log.notes|default:"-" }}</small>
-                                </div>
-                                <div class="col-auto text-muted text-end">
-                                    <small>{{ log.timestamp|date:"Y-m-d H:i" }}<br>by {{ log.user.username|default:"System" }}</small>
-                                </div>
-                            </div>
-                        </div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-history text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 8l0 4l2 2" /><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5" /></svg>
-                    <p class="mb-0">No deployment or check actions recorded yet.</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
 {% endblock extra_tab_panes %}
 
 

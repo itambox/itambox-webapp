@@ -4,10 +4,9 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, HttpResponseRedirect
 from django.apps import apps # To find models/tables dynamically
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy, NoReverseMatch
 from importlib import import_module
 from django.http import Http404
-from django.views.generic import DetailView
 from django_tables2 import SingleTableView, RequestConfig
 from .paginator import EnhancedPaginator, get_paginate_count
 from django.utils.decorators import method_decorator
@@ -23,17 +22,9 @@ from django.template import TemplateDoesNotExist
 
 logger = logging.getLogger(__name__)
 
-# --- New Imports for SearchView ---
-from django.views.generic import View  # Add View
-from django.utils.module_loading import import_string # Add import_string
+from django.utils.module_loading import import_string
 
-# Only import ObjectChange from core models now
-from .models import ObjectChange
-from .tables import ObjectChangeTable
-# from .tables.base import SESSION_KEY_PREFIX # No longer needed
-
-# --- New Form/Table Imports for SearchView ---
-from .forms import SearchForm # Add SearchForm
+from .forms import SearchForm
 from .tables import SearchResultTable # Add SearchResultTable
 
 # --- Model Imports for Debugging ---
@@ -43,12 +34,10 @@ from assets.models import AssetRole, Manufacturer
 from django.views.generic import View, ListView, DetailView, UpdateView, DeleteView
 from django.views.generic.base import TemplateResponseMixin
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.urls import reverse_lazy, reverse, NoReverseMatch
 from django.contrib import messages
 from django.contrib.auth.views import PasswordChangeView as DjangoPasswordChangeView
 from .models import ObjectChange
 from .tables import ObjectChangeTable
-# from .filters import ObjectChangeFilterSet # Comment out unused import
 from .utils import get_model_viewname, get_table_for_model
 from django.contrib.contenttypes.models import ContentType # Add ContentType
 from django.utils.http import urlencode
@@ -237,7 +226,7 @@ class ObjectListView(LoginRequiredMixin, ListView):
         # Add action buttons to context IF they are defined in the tuple AND the corresponding URL exists
         context['action_buttons'] = self.action_buttons # Pass the tuple itself
         if 'add' in self.action_buttons and not context['create_url_name']:
-             pass
+            logger.debug("'add' action button enabled but create URL not resolvable for %s", self.model)
 
         # Breadcrumbs
         base_breadcrumbs = [
@@ -302,7 +291,7 @@ class ObjectDetailView(LoginRequiredMixin, BaseHTMXView, DetailView):
                     try:
                         context['edit_url'] = reverse(f'{app_label}:{model_name}_update', kwargs={'slug': obj.slug})
                     except NoReverseMatch:
-                        pass
+                        logger.debug("Edit URL not resolvable for %s obj=%s slug=%s", model_name, obj.pk, obj.slug)
         
         context['delete_url'] = None
         if can_delete:
@@ -313,7 +302,7 @@ class ObjectDetailView(LoginRequiredMixin, BaseHTMXView, DetailView):
                     try:
                         context['delete_url'] = reverse(f'{app_label}:{model_name}_delete', kwargs={'slug': obj.slug})
                     except NoReverseMatch:
-                        pass
+                        logger.debug("Delete URL not resolvable for %s obj=%s slug=%s", model_name, obj.pk, obj.slug)
         
         # Title and Breadcrumbs
         context['title'] = str(obj) # Default title is the object string representation
@@ -405,7 +394,7 @@ class ObjectEditView(LoginRequiredMixin, BaseHTMXView, UpdateView):
                 list_view_name = get_model_viewname(_model, 'list')
                 return reverse(list_view_name)
             except NoReverseMatch:
-                pass
+                logger.debug("List view URL fallback failed for model %s", _model)
         return reverse('dashboard') # Ultimate fallback
 
     def form_valid(self, form):

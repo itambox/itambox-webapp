@@ -1,37 +1,32 @@
-from rest_framework import serializers
-
-# Import models needed for nested serializers
+from core.api.base import BaseModelSerializer
 from assets.models import Asset, AssetRole, Manufacturer, AssetType
-# Import other models as needed (e.g., from organization, extras)
 
-class NestedAssetRoleSerializer(serializers.ModelSerializer):
-    # If using HyperlinkedIdentityField, ensure the view name is correct
-    # url = serializers.HyperlinkedIdentityField(view_name='api:assets_api:assetrole-detail')
 
+class NestedAssetRoleSerializer(BaseModelSerializer):
     class Meta:
         model = AssetRole
-        fields = ['id', 'name', 'color'] # Add color or other useful fields
+        fields = ['id', 'name', 'color']
+        brief_fields = ['id', 'name']
 
-class NestedManufacturerSerializer(serializers.ModelSerializer):
-    # url = serializers.HyperlinkedIdentityField(view_name='api:assets_api:manufacturer-detail')
 
+class NestedManufacturerSerializer(BaseModelSerializer):
     class Meta:
         model = Manufacturer
         fields = ['id', 'name']
+        brief_fields = ['id', 'name']
 
-class NestedAssetTypeSerializer(serializers.ModelSerializer):
-     # url = serializers.HyperlinkedIdentityField(view_name='api:assets_api:assettype-detail')
-     manufacturer = NestedManufacturerSerializer(read_only=True) # Nest manufacturer here
 
-     class Meta:
-         model = AssetType
-         fields = ['id', 'model', 'manufacturer'] # Include nested manufacturer
-
-class NestedAssetSerializer(serializers.ModelSerializer):
-    # url = serializers.HyperlinkedIdentityField(view_name='api:assets_api:asset-detail')
+class NestedAssetTypeSerializer(BaseModelSerializer):
+    manufacturer = NestedManufacturerSerializer(read_only=True)
 
     class Meta:
-        model = Asset
-        fields = ['id', 'name', 'asset_tag'] # Keep minimal
+        model = AssetType
+        fields = ['id', 'model', 'manufacturer']
+        brief_fields = ['id', 'model']
 
-# Add other common nested serializers here (e.g., NestedSite, NestedLocation, NestedTag) as needed 
+
+class NestedAssetSerializer(BaseModelSerializer):
+    class Meta:
+        model = Asset
+        fields = ['id', 'name', 'asset_tag']
+        brief_fields = ['id', 'name']

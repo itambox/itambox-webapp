@@ -1,64 +1,51 @@
-# assets/api/serializers.py
 from rest_framework import serializers
-from assets.models import Asset, AssetRole, Manufacturer, ActivityLog, AssetType, InstalledSoftware
-from organization.models import Location, Tenant
-from software.models import Software # Import Software model
-# Correct imports for nested serializers
-from organization.api.serializers import NestedLocationSerializer, NestedTenantSerializer
-from extras.api.serializers import TagSerializer # Assuming this is defined in extras
-from software.api.serializers import SoftwareSerializer # Assuming this is defined in software
+from core.api.base import BaseModelSerializer
+from core.api.fields import RelatedObjectCountField
 from core.api.nested_serializers import (
     NestedAssetRoleSerializer,
     NestedManufacturerSerializer,
     NestedAssetSerializer,
     NestedAssetTypeSerializer
 )
+from assets.models import Asset, AssetRole, Manufacturer, ActivityLog, AssetType, InstalledSoftware
+from organization.models import Location, Tenant
+from software.models import Software
+from organization.api.serializers import NestedLocationSerializer, NestedTenantSerializer
+from extras.api.serializers import TagSerializer
 
-# Inspired by NetBox API serializers
 
-#
-# Remove Nested Serializer definitions from here
-#
-
-#
-# Main Serializers
-#
-
-class AssetRoleSerializer(serializers.ModelSerializer):
-    # url = serializers.HyperlinkedIdentityField(view_name='api:assets_api:assetrole-detail')
+class AssetRoleSerializer(BaseModelSerializer):
     asset_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = AssetRole
         fields = ['id', 'name', 'slug', 'description', 'color', 'asset_count', 'created_at', 'updated_at']
+        brief_fields = ['id', 'name', 'slug', 'color']
 
-class ManufacturerSerializer(serializers.ModelSerializer):
-    # url = serializers.HyperlinkedIdentityField(view_name='api:assets_api:manufacturer-detail')
+
+class ManufacturerSerializer(BaseModelSerializer):
     asset_count = serializers.IntegerField(read_only=True)
-    # Add count for related software? Requires annotation in viewset
-    # software_product_count = serializers.IntegerField(read_only=True) 
 
     class Meta:
         model = Manufacturer
         fields = ['id', 'name', 'slug', 'description', 'asset_count', 'created_at', 'updated_at']
+        brief_fields = ['id', 'name', 'slug']
 
-class AssetTypeSerializer(serializers.ModelSerializer):
-    # url = serializers.HyperlinkedIdentityField(view_name='api:assets_api:assettype-detail')
+
+class AssetTypeSerializer(BaseModelSerializer):
     manufacturer = NestedManufacturerSerializer(read_only=True)
-    # Add count for related assets? Requires annotation in viewset
-    # asset_count = serializers.IntegerField(read_only=True) 
 
     class Meta:
         model = AssetType
         fields = [
-            'id', 'model', 'slug', 'manufacturer', 'part_number', 
+            'id', 'model', 'slug', 'manufacturer', 'part_number',
             'cpu', 'ram_gb', 'storage_capacity_gb', 'storage_type', 'gpu',
             'description', 'comments', 'created_at', 'updated_at'
-            # Add tags if needed: 'tags'
         ]
+        brief_fields = ['id', 'model', 'slug', 'manufacturer']
 
-class AssetSerializer(serializers.ModelSerializer):
-    # url = serializers.HyperlinkedIdentityField(view_name='api:assets_api:asset-detail')
+
+class AssetSerializer(BaseModelSerializer):
     asset_type = NestedAssetTypeSerializer(read_only=True)
     asset_type_id = serializers.PrimaryKeyRelatedField(
         queryset=AssetType.objects.all(), source='asset_type', write_only=True
@@ -67,7 +54,7 @@ class AssetSerializer(serializers.ModelSerializer):
     assetrole_id = serializers.PrimaryKeyRelatedField(
         queryset=AssetRole.objects.all(), source='asset_role', write_only=True, required=False, allow_null=True
     )
-    location = NestedLocationSerializer(read_only=True) # From organization app
+    location = NestedLocationSerializer(read_only=True)
     location_id = serializers.PrimaryKeyRelatedField(
         queryset=Location.objects.all(), source='location', write_only=True, required=False, allow_null=True
     )
@@ -75,8 +62,7 @@ class AssetSerializer(serializers.ModelSerializer):
     tenant_id = serializers.PrimaryKeyRelatedField(
         queryset=Tenant.objects.all(), source='tenant', write_only=True, required=False, allow_null=True
     )
-    # TODO: Add assigned_to (AssetHolderAssignment) representation?
-    tags = TagSerializer(many=True, read_only=True) # Show assigned tags
+    tags = TagSerializer(many=True, read_only=True)
 
     class Meta:
         model = Asset
@@ -87,17 +73,14 @@ class AssetSerializer(serializers.ModelSerializer):
             'purchase_date', 'warranty_expiration',
             'notes', 'tags', 'created_at', 'updated_at'
         ]
+        brief_fields = ['id', 'name', 'asset_tag', 'serial_number', 'status']
 
-class InstalledSoftwareSerializer(serializers.ModelSerializer):
-    """Serializer for the InstalledSoftware model."""
-    # Use NestedAssetSerializer for the asset field
+
+class InstalledSoftwareSerializer(BaseModelSerializer):
     asset = NestedAssetSerializer(read_only=True)
     asset_id = serializers.PrimaryKeyRelatedField(
         queryset=Asset.objects.all(), source='asset', write_only=True
     )
-    # Use nested SoftwareSerializer (if simple) or create NestedSoftwareSerializer
-    # For now, keep software PK and add basic fields
-    # software = SoftwareSerializer(read_only=True) 
     software_id = serializers.PrimaryKeyRelatedField(
         queryset=Software.objects.all(), source='software', write_only=True
     )
@@ -107,11 +90,10 @@ class InstalledSoftwareSerializer(serializers.ModelSerializer):
     class Meta:
         model = InstalledSoftware
         fields = (
-            'id', 'asset', 'asset_id', 'software', 'software_id', 'software_name', 'software_manufacturer', 
-            'version_detected', 'install_date', 'discovered_by_agent', 
+            'id', 'asset', 'asset_id', 'software', 'software_id', 'software_name', 'software_manufacturer',
+            'version_detected', 'install_date', 'discovered_by_agent',
             'last_seen_date', 'notes',
             'created_at', 'updated_at'
         )
         read_only_fields = ('created_at', 'updated_at')
-
-# TODO: ActivityLog serializer? Usually not needed via REST API, more for internal logging. 
+        brief_fields = ['id', 'software_name', 'version_detected']

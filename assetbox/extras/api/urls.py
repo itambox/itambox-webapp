@@ -1,9 +1,9 @@
-from rest_framework import routers
-from .views import TagViewSet 
+from core.api.routers import AssetBoxRouter
+from .views import TagViewSet
 
-app_name = 'extras_api' # Define the app_name for namespacing
+app_name = 'extras_api'
 
-router = routers.DefaultRouter()
+router = AssetBoxRouter()
 router.register(r'tags', TagViewSet)
 
 urlpatterns = router.urls

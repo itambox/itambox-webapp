@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
-from .models import Asset, ActivityLog, AssetRole, Manufacturer, AssetType, InstalledSoftware, ComponentType, ComponentInstance, Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, KitItem
+from .models import Asset, AssetRole, Manufacturer, AssetType, InstalledSoftware, ComponentType, ComponentInstance, Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, KitItem
 from licenses.models import License, LicenseSeatAssignment
 from .forms import AssetForm, AssetRoleForm, ManufacturerForm, AssetCheckOutForm, AssetTypeForm # Keep only Asset forms
 from django.contrib.auth import get_user_model
@@ -62,85 +62,6 @@ class DashboardView(LoginRequiredMixin, BaseHTMXView, TemplateView):
         context['dashboard_widgets'] = widget_list
         return context
 
-# @login_required
-# def asset_list(request):
-#     queryset = Asset.objects.all().select_related(
-#         'asset_role', 
-#         'asset_type',  # Select the related asset_type
-#         'asset_type__manufacturer', # Select the manufacturer via asset_type
-#         'location'
-#     )
-#     filterset = AssetFilterSet(request.GET, queryset=queryset)
-#     queryset = filterset.qs 
-# 
-#     # --- Determine Columns to Show/Exclude --- 
-#     TableClass = AssetTable # Get the table class
-#     all_available_columns = list(TableClass.base_columns.keys()) # List of all columns defined on the table
-#     
-#     prefs, created_at = UserPreference.objects.get_or_create(user=request.user)
-#     
-#     app_label = TableClass._meta.model._meta.app_label
-#     table_class_name = TableClass.__name__
-# 
-#     user_config = prefs.data.get('tables', {}).get(app_label, {}).get(table_class_name, {}) 
-#     
-#     saved_visible_columns = user_config.get('columns', None) 
-# 
-#     # --- Determine Final Visible Column Sequence --- 
-#     final_sequence = []
-#     if saved_visible_columns is not None:
-#         # User has preferences: Use their saved list, ensuring columns still exist
-#         final_sequence = [col for col in saved_visible_columns if col in all_available_columns]
-#     else:
-#         # No user preference: use table defaults
-#         meta = getattr(TableClass, 'Meta', None)
-#         if hasattr(meta, 'default_columns'):
-#              final_sequence = [col for col in meta.default_columns if col in all_available_columns]
-#         elif hasattr(meta, 'fields'):
-#             final_sequence = [col for col in meta.fields if col in all_available_columns]
-#         else:
-#             # Fallback: Show all available columns if no defaults defined
-#             final_sequence = all_available_columns
-#     
-#     # --- Ensure pk and actions are correctly positioned --- 
-#     # Remove them first to avoid duplicates and control position
-#     if 'pk' in final_sequence: final_sequence.remove('pk')
-#     if 'actions' in final_sequence: final_sequence.remove('actions')
-#     
-#     # Add them back in desired positions (if they exist on the table class)
-#     if 'pk' in all_available_columns:
-#         final_sequence.insert(0, 'pk')
-#     if 'actions' in all_available_columns:
-#         final_sequence.append('actions')
-# 
-#     # Instantiate table using BOTH sequence and exclude for maximum explicitness
-#     table = TableClass(
-#         queryset, 
-#         request=request, 
-#         sequence=tuple(final_sequence), 
-#         exclude=tuple(col for col in all_available_columns if col not in final_sequence)
-#     )
-# 
-#     # Configure pagination (and sorting if needed)
-#     RequestConfig(request, paginate={'per_page': get_paginate_count(request)}).configure(table)
-# 
-#     model = table.Meta.model
-#     # --- Revert model_name_str and add table_config_key --- 
-#     model_name_str = f"{model._meta.app_label}.{model._meta.model_name}" # For bulk delete form
-#     table_config_key = f"{model._meta.app_label}.{table.__class__.__name__}" # For config modal URL
-# 
-#     context = {
-#         'table': table,
-#         'title': 'Assets',
-#         'object_type': 'Asset',
-#         'create_url_name': 'assets:asset_create',
-#         'model_name_str': model_name_str, # Pass the app_label.modelname
-#         'table_config_key': table_config_key, # Pass the app_label.TableName
-#         'filter_form': filterset.form,
-#     }
-#     
-#     return render(request, 'generic/object_list.html', context)
-
 # --- Asset Views ---
 class AssetListView(ObjectListView):
     queryset = Asset.objects.select_related(
@@ -195,7 +116,7 @@ class AssetDetailView(ObjectDetailView):
     queryset = Asset.objects.select_related(
         'asset_role', 'location', 'asset_type', 'asset_type__manufacturer'
     ).prefetch_related(
-        'logs__user', 'tags', 'maintenances' # Prefetch user for logs, tags, and maintenances
+        'tags', 'maintenances'
     )
     # template_name = 'assets/assets/asset_detail.html' # Can be inferred
 
@@ -209,9 +130,8 @@ class AssetDetailView(ObjectDetailView):
             object_id=asset.pk
         ).select_related('asset_holder').first()
 
-        # Add assignment and logs to context
+        # Add assignment to context
         context['assignment'] = assignment
-        context['logs'] = asset.logs.all() # Logs are prefetched
 
         # Fetch installed software and build software_table
         sw_qs = InstalledSoftware.objects.filter(asset=asset).select_related('software', 'software__manufacturer')
@@ -310,6 +230,8 @@ def asset_checkout_modal(request, pk):
                 in_use_status = StatusLabel.objects.filter(slug='in-use').first()
                 if in_use_status:
                     asset.status = in_use_status
+                asset._changelog_action = 'checkout'
+                asset._changelog_message = f"Checked out to {'Holder' if selected_holder else 'Location'}: {assignee}"
                 asset.save(update_fields=['status', 'location'])
 
                 # Create/update assignment record
@@ -327,14 +249,6 @@ def asset_checkout_modal(request, pk):
                         content_type=ContentType.objects.get_for_model(Asset),
                         object_id=asset.pk
                     ).delete()
-
-                # Create Activity Log
-                ActivityLog.objects.create(
-                    asset=asset,
-                    action='checked_out',
-                    user=request.user,
-                    notes=f"Checked out to {'Holder' if selected_holder else 'Location'}: {assignee}"
-                )
 
                 messages.success(request, f"Asset '{asset}' checked out successfully to {assignee}.")
                 # --- End Checkout Logic ---
@@ -388,14 +302,9 @@ def asset_checkin(request, pk):
             available_status = StatusLabel.objects.filter(slug='available').first()
             if available_status:
                 asset.status = available_status
+            asset._changelog_action = 'checkin'
+            asset._changelog_message = f"Checked in from Asset Holder: {from_str}"
             asset.save()
-            
-            ActivityLog.objects.create(
-                asset=asset, 
-                user=request.user, 
-                action='checked_in',
-                notes=f"Checked in from Asset Holder: {from_str}" 
-            )
         messages.success(request, f"Asset '{asset}' successfully checked in from Asset Holder: {from_str}.")
     elif asset.location:
         from django.db import transaction
@@ -405,18 +314,12 @@ def asset_checkin(request, pk):
             from_str = str(checked_in_from) if checked_in_from else 'N/A'
             
             asset.location = None
-            # Set status back to available
             available_status = StatusLabel.objects.filter(slug='available').first()
             if available_status:
                 asset.status = available_status
+            asset._changelog_action = 'checkin'
+            asset._changelog_message = f"Checked in from Location: {from_str}"
             asset.save()
-            
-            ActivityLog.objects.create(
-                asset=asset, 
-                user=request.user, 
-                action='checked_in', # Still log as checked_in
-                notes=f"Checked in from Location: {from_str}" 
-            )
         messages.success(request, f"Asset '{asset}' successfully checked in from Location: {from_str}.")
     else:
         # Asset was not assigned to a holder or location
@@ -1019,16 +922,9 @@ def asset_audit(request, pk):
     asset = get_object_or_404(Asset, pk=pk)
     asset.last_audited = timezone.now()
     asset.last_audited_by = request.user
+    asset._changelog_action = 'audit'
+    asset._changelog_message = f"Physical presence verified by {request.user.get_full_name() or request.user.username}."
     asset.save(update_fields=['last_audited', 'last_audited_by'])
-    
-    # Log to ActivityLog
-    ActivityLog.objects.create(
-        asset=asset,
-        action='audited',
-        user=request.user,
-        notes=f"Physical presence verified by {request.user.get_full_name() or request.user.username}."
-    )
-    
     response = render(request, "assets/includes/asset_audit_badge.html", {'asset': asset})
     response['HX-Trigger'] = json.dumps({
         "playAuditSound": None,
@@ -1094,13 +990,10 @@ def custody_eula_sign(request, token):
             eula_version="1.0"
         )
         
-        # Log check out event as audited / custody secured
-        ActivityLog.objects.create(
-            asset=asset,
-            action='updated_at',
-            user=None, # System signed
-            notes=f"EULA digital custody receipt created. SHA-256 Hash: {verification_hash[:16]}..."
-        )
+        # Log EULA custody event via changelog
+        asset._changelog_action = 'audit'
+        asset._changelog_message = f"EULA digital custody receipt created. SHA-256 Hash: {verification_hash[:16]}..."
+        asset.save()
         
         return render(request, "assets/custody/receipt_success.html", {"receipt": receipt, "asset": asset, "holder": holder})
         
@@ -1342,7 +1235,9 @@ class KitCheckoutView(LoginRequiredMixin, View):
                         else:
                             asset.location = location
                             assignee = location
-                            
+                        
+                        asset._changelog_action = 'checkout'
+                        asset._changelog_message = f"Checked out via Kit '{kit.name}'. {notes}"
                         asset.save(update_fields=['status', 'location'])
                         
                         if holder:
@@ -1359,12 +1254,6 @@ class KitCheckoutView(LoginRequiredMixin, View):
                                 object_id=asset.pk
                             ).delete()
                         
-                        ActivityLog.objects.create(
-                            asset=asset,
-                            action='checked_out',
-                            user=request.user,
-                            notes=f"Checked out via Kit '{kit.name}'. {notes}"
-                        )
                     elif item.accessory:
                         AccessoryAssignment.objects.create(
                             accessory=item.accessory,
@@ -1473,15 +1362,9 @@ def bulk_assign_assets(request):
             # Set status to in-use
             if in_use_status:
                 asset.status = in_use_status
+                asset._changelog_action = 'checkout'
+                asset._changelog_message = f'Bulk assigned to {holder}'
                 asset.save(update_fields=['status'])
-
-            # Log activity
-            ActivityLog.objects.create(
-                asset=asset,
-                action='checked_out',
-                user=request.user,
-                notes=f'Bulk assigned to {holder}'
-            )
             assigned += 1
 
     messages.success(

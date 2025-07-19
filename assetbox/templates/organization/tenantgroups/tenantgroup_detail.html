@@ -68,5 +68,12 @@
          </div>
     </div>
     {% endif %}
-    {# TODO: Add Child Groups table here later if needed #}
+    {% if children_table and children_table.rows %}
+    <div class="card mb-4">
+        <div class="card-header"><h3 class="card-title">Child Groups ({{ children_table.rows|length }})</h3></div>
+        <div class="table-responsive">
+            {% render_table children_table %}
+        </div>
+    </div>
+    {% endif %}
 {% endblock full_width_content %} 

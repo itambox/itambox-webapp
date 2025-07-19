@@ -5,11 +5,17 @@ class ObjectChangeActionChoices(ChoiceSet):
     ACTION_CREATE = 'create'
     ACTION_UPDATE = 'update'
     ACTION_DELETE = 'delete'
+    ACTION_CHECKOUT = 'checkout'
+    ACTION_CHECKIN = 'checkin'
+    ACTION_AUDIT = 'audit'
 
     CHOICES = (
         (ACTION_CREATE, 'Created', 'success'),
         (ACTION_UPDATE, 'Updated', 'info'),
         (ACTION_DELETE, 'Deleted', 'danger'),
+        (ACTION_CHECKOUT, 'Checked Out', 'warning'),
+        (ACTION_CHECKIN, 'Checked In', 'primary'),
+        (ACTION_AUDIT, 'Audited', 'purple'),
     )
 
     LEGACY_MAP = {

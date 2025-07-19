@@ -1,9 +1,9 @@
-from rest_framework import routers
+from core.api.routers import AssetBoxRouter
 from .views import SoftwareViewSet
 
-app_name = 'software_api' # Define the app_name for namespacing
+app_name = 'software_api'
 
-router = routers.DefaultRouter()
+router = AssetBoxRouter()
 router.register(r'software', SoftwareViewSet)
 
-urlpatterns = router.urls 
+urlpatterns = router.urls

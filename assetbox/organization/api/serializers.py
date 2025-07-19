@@ -1,67 +1,68 @@
-# organization/api/serializers.py
 from rest_framework import serializers
-# Use app-relative imports for models within the same Django project
-from organization.models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, AssetHolderAssignment
 from django.contrib.contenttypes.models import ContentType
-# Correct the import paths for core API components
+
+from core.api.base import BaseModelSerializer
 from core.api.fields import ContentTypeField
-from core.api.serializers import GenericObjectSerializer # Assuming GenericObjectSerializer lives in core
+from assetbox.api.serializers import GenericObjectSerializer
+from organization.models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, AssetHolderAssignment
 
-# Inspired by NetBox API serializers
 
-#
-# Nested Serializers (for read-only representations)
-#
-
-class NestedRegionSerializer(serializers.ModelSerializer):
+class NestedRegionSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:region-detail')
 
     class Meta:
         model = Region
         fields = ['id', 'url', 'name', 'slug']
+        brief_fields = ['id', 'name']
 
-class NestedSiteGroupSerializer(serializers.ModelSerializer):
+
+class NestedSiteGroupSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:sitegroup-detail')
 
     class Meta:
         model = SiteGroup
         fields = ['id', 'url', 'name', 'slug']
+        brief_fields = ['id', 'name']
 
-class NestedTenantSerializer(serializers.ModelSerializer):
+
+class NestedTenantSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:tenant-detail')
 
     class Meta:
         model = Tenant
         fields = ['id', 'url', 'name', 'slug']
+        brief_fields = ['id', 'name']
 
-class NestedTenantGroupSerializer(serializers.ModelSerializer):
+
+class NestedTenantGroupSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:tenantgroup-detail')
 
     class Meta:
         model = TenantGroup
         fields = ['id', 'url', 'name', 'slug']
+        brief_fields = ['id', 'name']
 
-class NestedSiteSerializer(serializers.ModelSerializer):
+
+class NestedSiteSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:site-detail')
 
     class Meta:
         model = Site
         fields = ['id', 'url', 'name', 'slug']
+        brief_fields = ['id', 'name']
 
-class NestedLocationSerializer(serializers.ModelSerializer):
+
+class NestedLocationSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:location-detail')
 
     class Meta:
         model = Location
         fields = ['id', 'url', 'name', 'slug']
+        brief_fields = ['id', 'name']
 
-#
-# Main Serializers (for list/detail views)
-#
 
-class SiteSerializer(serializers.ModelSerializer):
+class SiteSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:site-detail')
-    # Use nested serializers for read, allow writing via PK
     region = NestedRegionSerializer(read_only=True)
     region_id = serializers.PrimaryKeyRelatedField(
         queryset=Region.objects.all(), source='region', write_only=True, required=False, allow_null=True
@@ -77,14 +78,15 @@ class SiteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Site
-        # Include fields relevant for API representation, add nested and writeable PK fields
         fields = [
             'id', 'url', 'name', 'slug',
             'region', 'region_id', 'group', 'group_id', 'tenant', 'tenant_id',
             'description', 'created_at', 'updated_at'
         ]
+        brief_fields = ['id', 'url', 'name', 'slug']
 
-class RegionSerializer(serializers.ModelSerializer):
+
+class RegionSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:region-detail')
     parent = NestedRegionSerializer(read_only=True)
     parent_id = serializers.PrimaryKeyRelatedField(
@@ -99,8 +101,10 @@ class RegionSerializer(serializers.ModelSerializer):
             'parent', 'parent_id', 'description', 'site_count',
             'created_at', 'updated_at'
         ]
+        brief_fields = ['id', 'url', 'name', 'slug', 'site_count']
 
-class SiteGroupSerializer(serializers.ModelSerializer):
+
+class SiteGroupSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:sitegroup-detail')
     parent = NestedSiteGroupSerializer(read_only=True)
     parent_id = serializers.PrimaryKeyRelatedField(
@@ -115,12 +119,14 @@ class SiteGroupSerializer(serializers.ModelSerializer):
             'parent', 'parent_id', 'description', 'site_count',
             'created_at', 'updated_at'
         ]
+        brief_fields = ['id', 'url', 'name', 'slug', 'site_count']
 
-class LocationSerializer(serializers.ModelSerializer):
+
+class LocationSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:location-detail')
     site = NestedSiteSerializer(read_only=True)
     site_id = serializers.PrimaryKeyRelatedField(
-        queryset=Site.objects.all(), source='site', write_only=True # Site is required for Location
+        queryset=Site.objects.all(), source='site', write_only=True
     )
     parent = NestedLocationSerializer(read_only=True)
     parent_id = serializers.PrimaryKeyRelatedField(
@@ -139,8 +145,10 @@ class LocationSerializer(serializers.ModelSerializer):
             'site', 'site_id', 'parent', 'parent_id', 'tenant', 'tenant_id',
             'description', 'asset_count', 'created_at', 'updated_at'
         ]
+        brief_fields = ['id', 'url', 'name', 'slug', 'asset_count']
 
-class TenantGroupSerializer(serializers.ModelSerializer):
+
+class TenantGroupSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:tenantgroup-detail')
     parent = NestedTenantGroupSerializer(read_only=True)
     parent_id = serializers.PrimaryKeyRelatedField(
@@ -155,8 +163,10 @@ class TenantGroupSerializer(serializers.ModelSerializer):
             'parent', 'parent_id', 'description', 'tenant_count',
             'created_at', 'updated_at'
         ]
+        brief_fields = ['id', 'url', 'name', 'slug', 'tenant_count']
 
-class TenantSerializer(serializers.ModelSerializer):
+
+class TenantSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:tenant-detail')
     group = NestedTenantGroupSerializer(read_only=True)
     group_id = serializers.PrimaryKeyRelatedField(
@@ -169,8 +179,10 @@ class TenantSerializer(serializers.ModelSerializer):
             'id', 'url', 'name', 'slug',
             'group', 'group_id', 'description', 'created_at', 'updated_at'
         ]
+        brief_fields = ['id', 'url', 'name', 'slug']
 
-class AssetHolderSerializer(serializers.ModelSerializer):
+
+class AssetHolderSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:assetholder-detail')
     tenant = NestedTenantSerializer(read_only=True)
     tenant_id = serializers.PrimaryKeyRelatedField(
@@ -185,8 +197,10 @@ class AssetHolderSerializer(serializers.ModelSerializer):
             'tenant', 'tenant_id', 'assignment_count',
             'created_at', 'updated_at'
         ]
+        brief_fields = ['id', 'url', 'upn', 'email']
 
-class AssetHolderAssignmentSerializer(serializers.ModelSerializer):
+
+class AssetHolderAssignmentSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:assetholderassignment-detail')
     asset_holder = AssetHolderSerializer(read_only=True)
     assigned_object_type = ContentTypeField(
@@ -201,5 +215,4 @@ class AssetHolderAssignmentSerializer(serializers.ModelSerializer):
             'assigned_object', 'created_at', 'updated_at'
         ]
         read_only_fields = fields
-
-# Add serializers for SiteGroup, Location, Tenant, TenantGroup, AssetHolder below... 
+        brief_fields = ['id', 'url', 'asset_holder']

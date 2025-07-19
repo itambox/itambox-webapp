@@ -1,6 +1,9 @@
 from django.core.paginator import Page, Paginator
+import logging
 
 from .constants import DEFAULT_PAGINATE_COUNT
+
+logger = logging.getLogger(__name__)
 
 __all__ = (
     'EnhancedPage',
@@ -63,7 +66,7 @@ def get_paginate_count(request):
             per_page = int(request.GET.get('per_page'))
             return per_page
         except (ValueError, TypeError):
-            pass
+            logger.debug("Invalid per_page URL parameter: '%s'", request.GET.get('per_page'))
 
     if request.user.is_authenticated:
         try:
@@ -72,6 +75,6 @@ def get_paginate_count(request):
                 per_page = prefs.data.get('pagination', {}).get('per_page', DEFAULT_PAGINATE_COUNT)
                 return int(per_page)
         except (ValueError, TypeError, AttributeError):
-            pass
+            logger.debug("Invalid user preference pagination value")
 
     return DEFAULT_PAGINATE_COUNT

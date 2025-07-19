@@ -299,7 +299,7 @@ class BaseTable(tables.Table):
                         if columns is None:
                             columns = user_config.get('columns')
             except Exception:
-                pass
+                logger.debug("Error reading user column preferences for table %s", self.name)
 
         if columns is None:
             columns = getattr(self.Meta, 'default_columns', self.Meta.fields)
@@ -346,6 +346,19 @@ class ObjectChangeTable(BaseTable):
         fields = (
             'time', 'user_name', 'action', 'changed_object_type', 'changed_object',
             'request_id',
+        )
+
+    def render_action(self, value, record):
+        from core.choices import ObjectChangeActionChoices
+        color = 'secondary'
+        for val, label, c in ObjectChangeActionChoices.CHOICES:
+            if val == value:
+                color = c
+                break
+        return format_html(
+            '<span class="badge bg-{0}">{1}</span>',
+            color,
+            record.get_action_display(),
         )
 
 

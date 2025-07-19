@@ -53,13 +53,4 @@ urlpatterns = [
 
     # Bulk Actions
     path('bulk-delete/', core_views.bulk_delete, name='bulk_delete'),
-    # path('bulk-edit/', core_views.bulk_edit, name='bulk_edit'), # Placeholder for future bulk edit
-
-    # Remove individual user paths from core
-    # path('user/profile/', core_views.UserProfileView.as_view(), name='user_profile'),
-    # ... (remove other core user paths) ...
 ]
-
-# # Serve static files during development - Removed as we use CDN for now
-# if settings.DEBUG:
-#     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT if hasattr(settings, 'STATIC_ROOT') else settings.STATICFILES_DIRS[0])

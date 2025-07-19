@@ -1,7 +1,6 @@
 import django_tables2 as tables
 from django.utils.translation import gettext_lazy as _
 from assets.models import Manufacturer, InstalledSoftware # Keep import for potential linking
-# from core.tables import BaseTable, TagColumn, BooleanColumn # Remove old import
 from core.tables import BaseTable, BooleanColumn, ToggleColumn
 from extras.tables import TagColumn # Import TagColumn from extras
 from .models import Software

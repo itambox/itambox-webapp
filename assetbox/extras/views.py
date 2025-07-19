@@ -14,17 +14,6 @@ from django.views.generic import ListView, DetailView, CreateView, UpdateView, D
 from django.contrib import messages
 from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
 
-# Create your views here.
-
-# --- Tag Views ---
-
-# Remove the function-based tag_list view below
-# @login_required
-# def tag_list(request):
-#     ...
-#     return render(request, 'generic/object_list.html', context)
-# End removal of tag_list
-
 class TagDetailView(ObjectDetailView):
     queryset = Tag.objects.all()
     template_name = 'extras/tags/tag_detail.html'

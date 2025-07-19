@@ -1,10 +1,10 @@
-from rest_framework import routers
+from core.api.routers import AssetBoxRouter
 from .views import LicenseViewSet, LicenseSeatAssignmentViewSet
 
-app_name = 'licenses_api' # Define app_name
+app_name = 'licenses_api'
 
-router = routers.DefaultRouter()
+router = AssetBoxRouter()
 router.register(r'licenses', LicenseViewSet)
 router.register(r'assignments', LicenseSeatAssignmentViewSet, basename='licenseseatassignment')
 
-urlpatterns = router.urls 
+urlpatterns = router.urls

@@ -33,10 +33,6 @@
 </dl>
 {% endblock object_details %}
 
-{% block related_objects %}
-    {# TODO: Add Child Groups Card/Table Here if needed #}
-{% endblock related_objects %}
-
 {% block full_width_content %}
     {% if sites_table %}
     <div class="card mb-4">
@@ -45,6 +41,14 @@
             {% render_table sites_table %}
         </div>
         {# Optional: Add pagination if needed later #}
+    </div>
+    {% endif %}
+    {% if children_table and children_table.rows %}
+    <div class="card mb-4">
+        <div class="card-header"><h3 class="card-title">Child Groups ({{ children_table.rows|length }})</h3></div>
+        <div class="table-responsive">
+            {% render_table children_table %}
+        </div>
     </div>
     {% endif %}
 {% endblock full_width_content %} 

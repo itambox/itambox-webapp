@@ -113,7 +113,6 @@ class RegionForm(forms.ModelForm):
         queryset=Region.objects.all(),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'})
-        # TODO: Consider filtering queryset to prevent selecting self/descendants?
     )
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
@@ -143,13 +142,18 @@ class RegionForm(forms.ModelForm):
         )
         add_standard_buttons(self.helper, self.instance, 'organization:region_list')
 
+    def clean_parent(self):
+        parent = self.cleaned_data.get('parent')
+        if parent and self.instance and self.instance.pk and parent.pk == self.instance.pk:
+            raise forms.ValidationError("A region cannot be its own parent.")
+        return parent
+
 # --- Site Group Form ---
 class SiteGroupForm(forms.ModelForm):
     parent = forms.ModelChoiceField(
         queryset=SiteGroup.objects.all(),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'})
-        # TODO: Filter queryset to prevent self/descendants?
     )
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
@@ -179,6 +183,12 @@ class SiteGroupForm(forms.ModelForm):
         )
         add_standard_buttons(self.helper, self.instance, 'organization:sitegroup_list')
 
+    def clean_parent(self):
+        parent = self.cleaned_data.get('parent')
+        if parent and self.instance and self.instance.pk and parent.pk == self.instance.pk:
+            raise forms.ValidationError("A site group cannot be its own parent.")
+        return parent
+
 # --- Location Form ---
 class LocationForm(forms.ModelForm):
     site = forms.ModelChoiceField(
@@ -187,10 +197,9 @@ class LocationForm(forms.ModelForm):
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     parent = forms.ModelChoiceField(
-        queryset=Location.objects.all(), # Allow selecting any location as parent
+        queryset=Location.objects.all(),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'})
-        # TODO: Filter queryset to prevent selecting self/descendants or locations from different sites?
     )
     tenant = forms.ModelChoiceField(
         queryset=Tenant.objects.all(),
@@ -232,18 +241,12 @@ class LocationForm(forms.ModelForm):
         )
         add_standard_buttons(self.helper, self.instance, 'organization:location_list')
 
-    # Optional: Add validation to prevent selecting self/descendant as parent
-    # def clean_parent(self):
-    #     parent = self.cleaned_data.get('parent')
-    #     if parent and self.instance and self.instance.pk:
-    #         # Check if parent is self
-    #         if parent.pk == self.instance.pk:
-    #             raise forms.ValidationError("A location cannot be its own parent.")
-    #         # Check if parent is a descendant (more complex)
-    #         # ... logic to traverse down the tree from self.instance ...
-    #         # if parent is in descendants:
-    #         #     raise forms.ValidationError("Cannot set a descendant as a parent.")
-    #     return parent
+    def clean_parent(self):
+        parent = self.cleaned_data.get('parent')
+        if parent and self.instance and self.instance.pk:
+            if parent.pk == self.instance.pk:
+                raise forms.ValidationError("A location cannot be its own parent.")
+        return parent
 
 # --- TenantGroup Form ---
 class TenantGroupForm(forms.ModelForm):
@@ -251,7 +254,6 @@ class TenantGroupForm(forms.ModelForm):
         queryset=TenantGroup.objects.all(),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'})
-        # TODO: Filter queryset to prevent self/descendants?
     )
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
@@ -280,6 +282,12 @@ class TenantGroupForm(forms.ModelForm):
             'name', 'slug', 'parent', 'description', 'tags'
         )
         add_standard_buttons(self.helper, self.instance, 'organization:tenantgroup_list')
+
+    def clean_parent(self):
+        parent = self.cleaned_data.get('parent')
+        if parent and self.instance and self.instance.pk and parent.pk == self.instance.pk:
+            raise forms.ValidationError("A tenant group cannot be its own parent.")
+        return parent
 
 # --- Tenant Form ---
 class TenantForm(forms.ModelForm):

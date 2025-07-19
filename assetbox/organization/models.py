@@ -55,8 +55,6 @@ class Location(ChangeLoggingMixin, BaseModel):
     facility = models.CharField(max_length=100, blank=True)
     description = models.TextField(blank=True) # Using TextField for potentially longer descriptions
     tags = models.ManyToManyField('extras.Tag', related_name="locations", blank=True)
-    # created_at = models.DateTimeField(auto_now_add=True, editable=False) # Removed
-    # updated_at = models.DateTimeField(auto_now=True, editable=False) # Removed
 
     class Meta:
         ordering = ['site', 'name']
@@ -76,7 +74,6 @@ class Location(ChangeLoggingMixin, BaseModel):
         return self.name
 
     def get_absolute_url(self):
-        # TODO: Verify URL name
         return reverse('organization:location_detail', kwargs={'pk': self.pk})
 
 class Region(ChangeLoggingMixin, BaseModel):
@@ -92,8 +89,6 @@ class Region(ChangeLoggingMixin, BaseModel):
     )
     description = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', related_name="regions", blank=True)
-    # created_at = models.DateTimeField(auto_now_add=True) # Removed
-    # updated_at = models.DateTimeField(auto_now=True) # Removed
 
     class Meta:
         ordering = ['name']
@@ -102,7 +97,6 @@ class Region(ChangeLoggingMixin, BaseModel):
         return self.name
 
     def get_absolute_url(self):
-        # TODO: Verify URL name
         return reverse('organization:region_detail', kwargs={'pk': self.pk})
 
 class SiteGroup(ChangeLoggingMixin, BaseModel):
@@ -117,8 +111,6 @@ class SiteGroup(ChangeLoggingMixin, BaseModel):
     )
     description = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', related_name="sitegroups", blank=True)
-    # created_at = models.DateTimeField(auto_now_add=True) # Removed
-    # updated_at = models.DateTimeField(auto_now=True) # Removed
 
     class Meta:
         ordering = ['name']
@@ -129,7 +121,6 @@ class SiteGroup(ChangeLoggingMixin, BaseModel):
         return self.name
 
     def get_absolute_url(self):
-        # TODO: Verify URL name
         return reverse('organization:sitegroup_detail', kwargs={'pk': self.pk})
 
 class TenantGroup(ChangeLoggingMixin, BaseModel):
@@ -144,8 +135,6 @@ class TenantGroup(ChangeLoggingMixin, BaseModel):
     )
     description = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', related_name="tenantgroups", blank=True)
-    # created_at = models.DateTimeField(auto_now_add=True, editable=False) # Removed
-    # updated_at = models.DateTimeField(auto_now=True, editable=False) # Removed
 
     class Meta:
         ordering = ['name']
@@ -156,7 +145,6 @@ class TenantGroup(ChangeLoggingMixin, BaseModel):
         return self.name
 
     def get_absolute_url(self):
-        # TODO: Verify URL name
         return reverse('organization:tenantgroup_detail', kwargs={'pk': self.pk})
 
 class Tenant(ChangeLoggingMixin, BaseModel):
@@ -172,14 +160,11 @@ class Tenant(ChangeLoggingMixin, BaseModel):
     description = models.TextField(blank=True)
     comments = models.TextField(blank=True) # Added comments
     tags = models.ManyToManyField('extras.Tag', related_name="tenants", blank=True)
-    # created_at = models.DateTimeField(auto_now_add=True, editable=False) # Removed
-    # updated_at = models.DateTimeField(auto_now=True, editable=False) # Removed
 
     class Meta:
         ordering = ['name']
 
     def get_absolute_url(self):
-        # TODO: Verify URL name
         return reverse('organization:tenant_detail', kwargs={'pk': self.pk})
 
     def __str__(self):
@@ -215,8 +200,6 @@ class Site(ChangeLoggingMixin, BaseModel):
     longitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
     comments = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', related_name="sites", blank=True)
-    # created_at = models.DateTimeField(auto_now_add=True) # Removed
-    # updated_at = models.DateTimeField(auto_now=True) # Removed
 
     class Meta:
         ordering = ['name']
@@ -225,7 +208,6 @@ class Site(ChangeLoggingMixin, BaseModel):
         return self.name
 
     def get_absolute_url(self):
-        # TODO: Verify URL name
         return reverse('organization:site_detail', kwargs={'pk': self.pk})
 
 # +++ AssetHolder Model +++
@@ -252,8 +234,6 @@ class AssetHolder(ChangeLoggingMixin, BaseModel):
     description = models.TextField(blank=True)
     comments = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', blank=True, related_name='organization_assetholders') # M2M to extras.Tag
-    # created_at = models.DateTimeField(auto_now_add=True) # Removed
-    # updated_at = models.DateTimeField(auto_now=True) # Removed
 
     class Meta:
         ordering = ['last_name', 'first_name', 'upn']

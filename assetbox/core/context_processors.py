@@ -57,9 +57,6 @@ def breadcrumbs(request):
 
     # Add current page if not already last item
     # last_label = items[-1][0]
-    # current_label = # Need a way to get current page title? View context again.
-    # if request.path != items[-1][1]:
-    #     items.append(("Current Page", request.path))
 
     # Remove items with None URL except potentially the last one
     final_items = []

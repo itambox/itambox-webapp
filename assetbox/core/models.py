@@ -142,19 +142,21 @@ class ChangeLoggingMixin:
     """
 
     # Define fields to be ignored in the change log
-    # Often includes 'updated_at' or other auto-updated fields
     _change_logging_excluded_fields = ['updated_at']
 
-    def _log_change(self, action, prechange_data=None, postchange_data=None):
+    def __init__(self, *args, **kwargs):
+        self._changelog_action = None
+        self._changelog_message = ''
+        super().__init__(*args, **kwargs)
+
+    def _log_change(self, action, prechange_data=None, postchange_data=None, message=''):
         """Helper method to create an ObjectChange record."""
         user = get_current_user()
         request_id = get_current_request_id()
 
         if not request_id:
-            # Cannot log change if request ID is not available
             return
 
-        # Get ContentType for the instance's class
         ct = ContentType.objects.get_for_model(self.__class__)
 
         ObjectChange.objects.create(
@@ -164,8 +166,8 @@ class ChangeLoggingMixin:
             action=action,
             changed_object_type=ct,
             changed_object_id=self.pk,
-            object_repr=str(self)[:200], # Truncate representation
-            object_type_repr=f"{ct.app_label} | {ct.model}", # Store denormalized type
+            object_repr=str(self)[:200],
+            object_type_repr=f"{ct.app_label} | {ct.model}",
             prechange_data=prechange_data,
             postchange_data=postchange_data,
         )
@@ -176,39 +178,32 @@ class ChangeLoggingMixin:
         prechange_data = None
 
         if not is_creation:
-            # Fetch the original state from DB for comparison
             try:
                 original_instance = self.__class__.objects.get(pk=self.pk)
-                # Serialize original state, excluding specified fields
                 prechange_data = serialize_object(original_instance, exclude_fields=self._change_logging_excluded_fields)
             except self.__class__.DoesNotExist:
-                # Should not happen on update, but handle defensively
+                # Object is new; proceed without prechange data
                 pass
         
-        # Perform the actual save operation first
         super().save(*args, **kwargs)
 
-        # Now log the change
-        action = ObjectChangeActionChoices.ACTION_CREATE if is_creation else ObjectChangeActionChoices.ACTION_UPDATE
-        # Serialize current state, excluding specified fields
+        action = self._changelog_action or (
+            ObjectChangeActionChoices.ACTION_CREATE if is_creation else ObjectChangeActionChoices.ACTION_UPDATE
+        )
         postchange_data = serialize_object(self, exclude_fields=self._change_logging_excluded_fields)
         
-        # Only log update if data actually changed
         if action == ObjectChangeActionChoices.ACTION_UPDATE and prechange_data == postchange_data:
             return
             
-        self._log_change(action=action, prechange_data=prechange_data, postchange_data=postchange_data)
+        self._log_change(action=action, prechange_data=prechange_data, postchange_data=postchange_data, message=self._changelog_message)
 
     def delete(self, *args, **kwargs):
         """Override delete() to log deletion."""
-        # Serialize current state before deleting
         prechange_data = serialize_object(self, exclude_fields=self._change_logging_excluded_fields)
-        action = ObjectChangeActionChoices.ACTION_DELETE
+        action = self._changelog_action or ObjectChangeActionChoices.ACTION_DELETE
         
-        # Log the change *before* performing delete, passing prechange_data
-        self._log_change(action=action, prechange_data=prechange_data)
+        self._log_change(action=action, prechange_data=prechange_data, message=self._changelog_message)
         
-        # Perform the actual delete operation
         super().delete(*args, **kwargs)
 
 

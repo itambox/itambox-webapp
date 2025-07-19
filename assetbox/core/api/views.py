@@ -1,44 +1,67 @@
-# core/api/views.py
-from rest_framework import viewsets, status
+import platform
+
+from django import __version__ as DJANGO_VERSION
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
-from collections import OrderedDict
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 
+from core.api.permissions import IsAuthenticatedOrLoginNotRequired
+from core.api.viewsets import AssetBoxReadOnlyModelViewSet
+from core.api.serializers import ObjectChangeSerializer
 from core.models import ObjectChange
-from .serializers import ObjectChangeSerializer
+
+User = get_user_model()
+
 
 class APIRootView(APIView):
-    """The root view for the AssetBox API."""
     _ignore_model_permissions = True
-    exclude_from_schema = True
-    swagger_schema = None # Do not include in schema
 
     def get_view_name(self):
         return "API Root"
 
+    @extend_schema(exclude=True)
     def get(self, request, format=None):
-        # Prepare an ordered dictionary of API endpoints
-        # The order determines how they appear in the browsable API root
-        # Use the full namespace path: <main_api_namespace>:<app_api_namespace>:api-root
-        api_root_dict = OrderedDict()
-        api_root_dict['assets'] = reverse('api:assets_api:api-root', request=request, format=format)
-        api_root_dict['organization'] = reverse('api:organization_api:api-root', request=request, format=format)
-        api_root_dict['software'] = reverse('api:software_api:api-root', request=request, format=format)
-        api_root_dict['subscriptions'] = reverse('api:subscriptions_api:api-root', request=request, format=format)
-        api_root_dict['licenses'] = reverse('api:licenses_api:api-root', request=request, format=format)
-        api_root_dict['extras'] = reverse('api:extras_api:api-root', request=request, format=format)
-        api_root_dict['core'] = reverse('api:core_api:api-root', request=request, format=format)
-        api_root_dict['users'] = reverse('api:users_api:api-root', request=request, format=format) # Assuming users API exists
+        return Response({
+            'assets': reverse('api:assets_api:api-root', request=request, format=format),
+            'core': reverse('api:core_api:api-root', request=request, format=format),
+            'extras': reverse('api:extras_api:api-root', request=request, format=format),
+            'licenses': reverse('api:licenses_api:api-root', request=request, format=format),
+            'organization': reverse('api:organization_api:api-root', request=request, format=format),
+            'software': reverse('api:software_api:api-root', request=request, format=format),
+            'status': reverse('api:api-status', request=request, format=format),
+            'subscriptions': reverse('api:subscriptions_api:api-root', request=request, format=format),
+            'users': reverse('api:users_api:api-root', request=request, format=format),
+        })
 
-        return Response(api_root_dict)
 
-class ObjectChangeViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    Read-only API endpoint for viewing ObjectChanges (changelog).
-    """
+class StatusView(APIView):
+    permission_classes = [IsAuthenticatedOrLoginNotRequired]
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def get(self, request):
+        return Response({
+            'django-version': DJANGO_VERSION,
+            'assetbox-version': getattr(settings, 'VERSION', 'unknown'),
+            'python-version': platform.python_version(),
+        })
+
+
+class AuthenticationCheckView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def get(self, request):
+        from users.api.serializers import UserSerializer
+        serializer = UserSerializer(request.user, context={'request': request})
+        return Response(serializer.data)
+
+
+class ObjectChangeViewSet(AssetBoxReadOnlyModelViewSet):
     queryset = ObjectChange.objects.select_related('user', 'changed_object_type').all()
     serializer_class = ObjectChangeSerializer
     filterset_fields = ['user_id', 'action', 'changed_object_type_id', 'changed_object_id']
-    permission_classes = [IsAdminUser] # Adjust permissions as needed

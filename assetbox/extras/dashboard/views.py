@@ -1,3 +1,5 @@
+import json
+import logging
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect
@@ -113,6 +115,7 @@ class DashboardSaveLayoutView(LoginRequiredMixin, View):
 
     def post(self, request):
         import json
+        logger = logging.getLogger(__name__)
         dashboard = get_dashboard(request.user, for_update=True)
         try:
             data = json.loads(request.body)
@@ -126,6 +129,6 @@ class DashboardSaveLayoutView(LoginRequiredMixin, View):
                         dashboard.layout[index]['x'] = w.get('x')
                         dashboard.layout[index]['y'] = w.get('y')
                 dashboard.save(update_fields=['layout'])
-        except (json.JSONDecodeError, KeyError):
-            pass
+        except (json.JSONDecodeError, KeyError) as e:
+            logger.warning("Failed to parse dashboard layout JSON: %s", e)
         return HttpResponse('ok')

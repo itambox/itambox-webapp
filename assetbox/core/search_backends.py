@@ -19,10 +19,6 @@ class SearchResult:
     def __str__(self):
         return str(self.object)
 
-    # Delegate attribute access to the underlying object if needed
-    # def __getattr__(self, name):
-    #     return getattr(self.object, name)
-
 class DatabaseBackend:
     """
     A simple search backend that queries the database directly using
@@ -93,8 +89,6 @@ class DatabaseBackend:
                     'count': count,
                     'verbose_name': model._meta.verbose_name,
                     'verbose_name_plural': model._meta.verbose_name_plural,
-                    # Add list URL if available
-                    # 'list_url': reverse(f"{model._meta.app_label}:{model._meta.model_name}_list"),
                 }
 
         return results

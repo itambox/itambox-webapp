@@ -59,12 +59,3 @@ class SearchIndex:
         For now, just calls search.
         """
         return self.search(term, queryset)
-
-# Example Usage (will be defined in each app's search.py later):
-# from assets.models import Asset
-#
-# @register_search()
-# class AssetIndex(SearchIndex):
-#     model = Asset
-#     fields = ('name', 'asset_tag', 'serial_number', 'comments') # Add relevant fields
-#     order_by = ('name',)

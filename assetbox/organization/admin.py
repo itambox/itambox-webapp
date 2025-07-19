@@ -11,12 +11,12 @@ class SiteAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ("name",)}
 
 class RegionAdmin(admin.ModelAdmin):
+    list_display = ('name', 'parent', 'description')
     prepopulated_fields = {"slug": ("name",)}
-    # TODO: Consider list_display for parent, description, tags?
 
 class SiteGroupAdmin(admin.ModelAdmin):
+    list_display = ('name', 'parent', 'description')
     prepopulated_fields = {"slug": ("name",)}
-    # TODO: Consider list_display for parent, description, tags?
 
 class TenantGroupAdmin(admin.ModelAdmin):
     list_display = ('name', 'parent')
@@ -27,7 +27,6 @@ class TenantAdmin(admin.ModelAdmin):
     list_filter = ('group',)
     search_fields = ('name', 'slug', 'description', 'comments')
     prepopulated_fields = {"slug": ("name",)}
-    # TODO: Consider list_display for description, tags?
 
 # TagAdmin moved to extras/admin.py
 

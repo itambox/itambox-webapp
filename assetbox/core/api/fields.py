@@ -1,72 +1,118 @@
 from collections import OrderedDict
 
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ObjectDoesNotExist
+from django.utils.translation import gettext_lazy as _
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
+from rest_framework.relations import PrimaryKeyRelatedField, RelatedField
 
-# Based on NetBox utilities.api.fields
 
-class ChoiceField(serializers.ChoiceField):
+class ChoiceField(serializers.Field):
     """
-    Represent a ChoiceSet field using its value/label pairs.
-    Includes a representation for the display label.
+    Represent a ChoiceField as {'value': <DB value>, 'label': <string>}. Accepts a single value on write.
     """
-    def __init__(self, choices, **kwargs):
-        self.choiceset = choices # Expecting an instance of a ChoiceSet subclass
-        # Initialize with the actual choices (value, label) from the ChoiceSet iterator
-        super().__init__(choices=list(self.choiceset), **kwargs)
+    def __init__(self, choices, allow_blank=False, **kwargs):
+        self.choiceset = choices
+        self.allow_blank = allow_blank
+        self._choices = dict(list(self.choiceset))
 
-    def to_representation(self, value):
-        # Get the display label using the underlying ChoiceSet's dictionary
-        # This assumes ChoiceSet has a .get(value) method or similar, which we might need to add.
-        # For now, let's access the internal choices dictionary directly.
+        super().__init__(**kwargs)
+
+    def validate_empty_values(self, data):
+        if data is None:
+            if self.allow_null:
+                return True, None
+            data = ''
+        return super().validate_empty_values(data)
+
+    def to_representation(self, obj):
+        if obj != '':
+            return {
+                'value': obj,
+                'label': self._choices.get(obj, ''),
+            }
+        return None
+
+    def to_internal_value(self, data):
+        if data == '':
+            if self.allow_blank:
+                return data
+            raise ValidationError(_("This field may not be blank."))
+
+        if isinstance(data, (dict, list)):
+            raise ValidationError(
+                _('Value must be passed directly (e.g. "foo": 123); do not use a dictionary or list.')
+            )
+
+        if hasattr(data, 'lower'):
+            if data.lower() == 'true':
+                data = True
+            elif data.lower() == 'false':
+                data = False
+            else:
+                try:
+                    data = int(data)
+                except ValueError:
+                    pass
+
         try:
-            choices_dict = OrderedDict(self.choices)
-            label = choices_dict[value]
-        except KeyError:
-            # Handle cases where the value might not be in choices (e.g., old data)
-            label = str(value) # Fallback to the raw value
+            if data in self._choices:
+                return data
+        except TypeError:
+            pass
 
-        return {
-            'value': value,
-            'label': label
-        }
+        raise ValidationError(_("{value} is not a valid choice.").format(value=data))
 
-class ContentTypeField(serializers.RelatedField):
+    @property
+    def choices(self):
+        return self._choices
+
+
+@extend_schema_field(OpenApiTypes.STR)
+class ContentTypeField(RelatedField):
     """
-    Represent a ContentType for API serializers.
+    Represent a ContentType as '<app_label>.<model>'
     """
-    # queryset = ContentType.objects.all() # Moved to __init__
-
     default_error_messages = {
-        'invalid_format': 'Invalid ContentType format. Use "app_label.model".',
-        'does_not_exist': 'Invalid ContentType: {value}',
+        "does_not_exist": _("Invalid content type: {content_type}"),
+        "invalid": _("Invalid value. Specify a content type as '<app_label>.<model_name>'."),
     }
 
-    def __init__(self, **kwargs):
-        # Set queryset only if the field is writable
-        if not kwargs.get('read_only', False):
-            self.queryset = ContentType.objects.all()
-        else:
-            self.queryset = None # No queryset needed for read_only
+    def to_internal_value(self, data):
+        try:
+            app_label, model = data.split('.')
+            return ContentType.objects.get_by_natural_key(app_label=app_label, model=model)
+        except ObjectDoesNotExist:
+            self.fail('does_not_exist', content_type=data)
+        except (AttributeError, TypeError, ValueError):
+            self.fail('invalid')
+
+    def to_representation(self, obj):
+        return f"{obj.app_label}.{obj.model}"
+
+
+class SerializedPKRelatedField(PrimaryKeyRelatedField):
+    """
+    Extends PrimaryKeyRelatedField to return a serialized object on read.
+    """
+    def __init__(self, serializer, nested=False, **kwargs):
+        self.serializer = serializer
+        self.nested = nested
+        self.pk_field = kwargs.pop('pk_field', None)
         super().__init__(**kwargs)
 
     def to_representation(self, value):
-        return f'{value.app_label}.{value.model}'
+        return self.serializer(value, nested=self.nested, context={'request': self.context['request']}).data
 
-    def to_internal_value(self, data):
-        if not isinstance(data, str):
-            self.fail('invalid_format')
-        try:
-            app_label, model = data.split('.')
-        except ValueError:
-            self.fail('invalid_format')
 
-        try:
-            # Use self.get_queryset() which is standard for RelatedField
-            return self.get_queryset().get(app_label=app_label, model=model)
-        except ContentType.DoesNotExist:
-            self.fail('does_not_exist', value=data)
-        except AttributeError: # Handle case where queryset is None (read_only=True)
-             # This path shouldn't be reached if read_only=True, but handle defensively
-             # Or raise a different error? For now, rely on DRF preventing writes to read_only fields.
-             pass 
+@extend_schema_field(OpenApiTypes.INT64)
+class RelatedObjectCountField(serializers.ReadOnlyField):
+    """
+    Represents a read-only integer count of related objects.
+    """
+    def __init__(self, relation, **kwargs):
+        self.relation = relation
+        super().__init__(**kwargs)

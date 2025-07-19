@@ -1,11 +1,11 @@
-from rest_framework import routers
+from core.api.routers import AssetBoxRouter
 from .views import ProviderViewSet, SubscriptionViewSet, SubscriptionAssignmentViewSet
 
-app_name = 'subscriptions_api' # Define app_name
+app_name = 'subscriptions_api'
 
-router = routers.DefaultRouter()
+router = AssetBoxRouter()
 router.register(r'providers', ProviderViewSet)
 router.register(r'subscriptions', SubscriptionViewSet)
-router.register(r'assignments', SubscriptionAssignmentViewSet, basename='subscriptionassignment')
+router.register(r'assignments', SubscriptionAssignmentViewSet)
 
-urlpatterns = router.urls 
+urlpatterns = router.urls

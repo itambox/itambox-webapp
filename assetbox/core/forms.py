@@ -46,19 +46,6 @@ class SearchForm(forms.Form):
     )
     # --- End Lookup Field --- 
 
-    # Remove __init__ method if not using Crispy Helper
-    # def __init__(self, *args, **kwargs):
-    #     super().__init__(*args, **kwargs)
-    #     self.helper = FormHelper()
-    #     ...
-
-# Remove TableConfigForm definition
-# class TableConfigForm(forms.Form): ...
-
-# Remove UserProfileForm and UserPreferencesForm definitions
-# class UserProfileForm(forms.ModelForm): ...
-# class UserPreferencesForm(forms.Form): ... 
-
 class BootstrapMixin(forms.Form):
     """
     Adds the base Bootstrap CSS classes to form elements.

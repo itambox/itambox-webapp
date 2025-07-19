@@ -37,7 +37,7 @@ def get_paginate_count(request):
                 # print(f"[get_paginate_count] Using per_page from query param: {per_page}") # DEBUG
                 return per_page
     except (ValueError, TypeError): # Catch potential int conversion error or None
-        pass
+        logger.debug("Invalid per_page query parameter: '%s'", request.GET.get('per_page'))
 
     # 2. Check user preferences (if logged in)
     if request.user.is_authenticated:
@@ -53,11 +53,9 @@ def get_paginate_count(request):
                             # print(f"[get_paginate_count] Using per_page from user prefs: {user_pref}") # DEBUG
                             return user_pref
                     except (ValueError, TypeError):
-                         pass # Ignore invalid preference value
+                         logger.debug("Invalid user preference pagination value: '%s'", user_pref_val)
         except Exception as e:
-            # Log error maybe? For now, just ignore preference errors and fallback
-            # print(f"[get_paginate_count] Error checking user prefs: {e}") # DEBUG
-            pass
+            logger.debug("Error reading user pagination preferences: %s", e)
 
     # 3. Fallback to default
     # print(f"[get_paginate_count] Using default per_page: {DEFAULT_PAGINATE_COUNT}") # DEBUG
@@ -263,8 +261,7 @@ def build_breadcrumbs(request, obj=None):
             list_url = reverse(list_view_name)
             breadcrumbs.append({'url': list_url, 'name': model_meta.verbose_name_plural.capitalize()})
         except Exception:
-            # Fallback if list view doesn't exist by that name
-            pass 
+            logger.debug("List view URL not found for %s, skipping list breadcrumb", list_view_name)
         breadcrumbs.append({'url': obj.get_absolute_url(), 'name': str(obj)})
     elif len(path_parts) > 1:
         # If no object, but more path parts, assume the last part is the current page title

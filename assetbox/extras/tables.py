@@ -58,6 +58,3 @@ class TagTable(BaseTable):
             return mark_safe(f'<span class="badge" style="background-color: #{value};">&nbsp;</span> #{value}')
         return "—"
 
-    # def render_item_count(self, record):
-    #     # Implement counting logic here if needed
-    #     return record.taggit_taggeditem_items.count() # Example if using django-taggit's default related name 

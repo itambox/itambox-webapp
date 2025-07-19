@@ -1,7 +1,5 @@
 from django.db import models
 from django.urls import reverse
-# Remove direct import of Manufacturer
-# from assets.models import Manufacturer 
 from extras.models import Tag
 from core.models import BaseModel, ChangeLoggingMixin # Import the mixin
 
