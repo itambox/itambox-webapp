@@ -44,10 +44,11 @@ class CSPMiddleware(MiddlewareMixin):
     def process_response(self, request, response):
         response['Content-Security-Policy'] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://rsms.me; "
             "img-src 'self' data:; "
-            "font-src 'self' https://cdnjs.cloudflare.com; "
+            "font-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+            "media-src 'self' data:; "
             "connect-src 'self'; "
             "frame-ancestors 'self'"
         )

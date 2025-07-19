@@ -8,6 +8,7 @@ from extras.models import Tag # Import Tag
 from django.contrib.auth import get_user_model
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Button, Div, Fieldset, Row, Column
+from django.template.loader import render_to_string
 from django.urls import reverse
 # --- Import FilterForm and FilterSets --- 
 from core.forms import SlugModelForm, BootstrapMixin, FilterForm 
@@ -41,6 +42,7 @@ class AssetForm(forms.ModelForm):
         required=True,
         widget=forms.Select(attrs={
             'class': 'form-select',
+            'data-tom-select': '',
             'hx-post': '',
             'hx-trigger': 'change',
             'hx-target': 'closest form',
@@ -53,18 +55,18 @@ class AssetForm(forms.ModelForm):
         queryset=AssetRole.objects.all(), 
         label="Asset Role",
         required=False, 
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''})
     )
     status = StatusModelChoiceField(
         queryset=StatusLabel.objects.all(),
         label="Status",
         required=True,
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''})
     )
     location = forms.ModelChoiceField(
         queryset=Location.objects.all(), 
         required=False, 
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''})
     )
     purchase_date = forms.DateField(
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}), 
@@ -93,6 +95,8 @@ class AssetForm(forms.ModelForm):
             'order_number': forms.TextInput(attrs={'class': 'form-control'}),
             'supplier': forms.TextInput(attrs={'class': 'form-control'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'tenant': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+            'tags': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
         }
 
     def clean_status(self):
@@ -208,8 +212,24 @@ class AssetForm(forms.ModelForm):
                 css_class='row'
             ),
             Div(
-                Div('asset_type', css_class='col-md-6'),
-                Div('asset_role', css_class='col-md-6'),
+                Div(
+                    HTML(render_to_string('generic/includes/quick_add_button.html', {
+                        'model_label': 'Asset Type',
+                        'quick_add_url': 'assets:assettype_create',
+                        'target_select_id': 'id_asset_type',
+                    })),
+                    'asset_type',
+                    css_class='col-md-6'
+                ),
+                Div(
+                    HTML(render_to_string('generic/includes/quick_add_button.html', {
+                        'model_label': 'Asset Role',
+                        'quick_add_url': 'assets:assetrole_create',
+                        'target_select_id': 'id_asset_role',
+                    })),
+                    'asset_role',
+                    css_class='col-md-6'
+                ),
                 css_class='row'
             ),
             Div(
@@ -218,7 +238,15 @@ class AssetForm(forms.ModelForm):
                 css_class='row'
             ),
             Div(
-                Div('location', css_class='col-md-6'),
+                Div(
+                    HTML(render_to_string('generic/includes/quick_add_button.html', {
+                        'model_label': 'Location',
+                        'quick_add_url': 'organization:location_create',
+                        'target_select_id': 'id_location',
+                    })),
+                    'location',
+                    css_class='col-md-6'
+                ),
                 Div('tenant', css_class='col-md-6'),
                 css_class='row'
             ),
