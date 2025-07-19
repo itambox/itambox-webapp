@@ -121,11 +121,9 @@ TEMPLATES = [
             ],
             # Ensure 'loaders' is set correctly: - REMOVED partial_loaders
             'loaders': partial_loaders,
-            # Explicitly register libraries if auto-discovery fails - REMOVED
-            # 'libraries': {
-            #     'htmx_tags': 'django_htmx.templatetags.htmx_tags',
-            #     # Add other potentially problematic libraries here if needed
-            # },
+            'libraries': {
+                'navigation': 'core.templatetags.navigation',
+            },
             # Add 'builtins' if not already present for template_partials tags
             # 'builtins': [ # REMOVED builtins as APP_DIRS handles discovery
             #     # 'template_partials.templatetags.partials', # Removed - Loader should handle this

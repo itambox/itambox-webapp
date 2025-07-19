@@ -1,0 +1,52 @@
+{% load i18n %}
+
+<ul class="navbar-nav pt-lg-3">
+  {# Dashboard - always visible #}
+  <li class="nav-item">
+    <a class="nav-link" href="{% url 'dashboard' %}">
+      <span class="nav-link-icon d-md-none d-lg-inline-block">
+        <i class="mdi mdi-home" aria-hidden="true"></i>
+      </span>
+      <span class="nav-link-title">{% trans "Home" %}</span>
+    </a>
+  </li>
+
+  {% for menu, groups in nav_items %}
+    <li class="nav-item dropdown">
+      <a class="nav-link dropdown-toggle" href="#"
+         data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
+        <span class="nav-link-icon d-md-none d-lg-inline-block">
+          <i class="{{ menu.icon_class }}" aria-hidden="true"></i>
+        </span>
+        <span class="nav-link-title">{{ menu.label }}</span>
+      </a>
+      <div class="dropdown-menu">
+        <div class="dropdown-menu-columns">
+          <div class="dropdown-menu-column">
+            {% for group, items in groups %}
+              <span class="dropdown-header text-info">{{ group.label }}</span>
+              {% for item, buttons in items %}
+                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0">
+                  <a href="{{ item.url }}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none"
+                     {% if '/admin/' in item.url %}hx-boost="false"{% endif %}>
+                    {{ item.link_text }}
+                  </a>
+                  {% if buttons %}
+                    <div class="btn-group ms-1">
+                      {% for button in buttons %}
+                        <a href="{{ button.url }}" class="btn btn-sm btn-{{ button.color|default:'outline' }} text-primary lh-1 px-2"
+                           title="{{ button.title }}" aria-label="{{ button.title }}">
+                          <i class="{{ button.icon_class }}" aria-hidden="true"></i>
+                        </a>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </li>
+  {% endfor %}
+</ul>

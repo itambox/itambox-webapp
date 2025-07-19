@@ -4,6 +4,7 @@
 {% load core_constants %}
 {% load partials %}
 {% load django_htmx %}
+{% load navigation %}
 <!doctype html>
 <html lang="en">
 <head>
@@ -18,6 +19,7 @@
     <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.1.0/dist/css/tabler-payments.min.css" rel="stylesheet"/>
     <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.1.0/dist/css/tabler-vendors.min.css" rel="stylesheet"/>
     <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet"/>
     <link href="{% static 'css/assetbox.css' %}" rel="stylesheet"/> {# Load our custom CSS #}
     <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
     {% block extra_head %}{% endblock %}
@@ -42,8 +44,22 @@
         </div>
     </div>
     <div class="page">
-        {# Move Sidebar OUTSIDE page-wrapper #}
-        {% include "global_includes/_sidebar.html" %}
+        {# Sidebar #}
+        <aside class="navbar navbar-vertical navbar-expand-lg">
+            <div class="container-fluid">
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu" aria-controls="sidebar-menu" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <h1 class="navbar-brand navbar-brand-autodark">
+                     <a href="{% url 'dashboard' %}">
+                         AssetBox
+                     </a>
+                </h1>
+                <div class="collapse navbar-collapse" id="sidebar-menu">
+                    {% nav %}
+                </div>
+            </div>
+        </aside>
 
         {# page-wrapper now contains the rest - REMOVE ID #}
         <div class="page-wrapper">
@@ -339,70 +355,11 @@
     {# Page-specific javascript will be inserted here #}
     {% endblock javascript %}
 
-    {# --- Sidebar Active State Sync for HTMX Boosted Navigation --- #}
+    {# Sidebar active state JS #}
+    <script src="{% static 'js/sidebar.js' %}"></script>
+
+    {# Re-apply filter panel visibility after content fully settles (boosted navigation) #}
     <script>
-    function updateSidebarActiveState() {
-        const currentPath = window.location.pathname;
-        const sidebar = document.querySelector('#sidebar-menu');
-        if (!sidebar) return;
-
-        // Clear all existing active states
-        sidebar.querySelectorAll('.nav-item.active').forEach(el => el.classList.remove('active'));
-        sidebar.querySelectorAll('.nav-link.active').forEach(el => el.classList.remove('active'));
-        sidebar.querySelectorAll('.dropdown-item.active').forEach(el => el.classList.remove('active'));
-        sidebar.querySelectorAll('.dropdown-menu.show').forEach(el => el.classList.remove('show'));
-
-        // Find the matching link and activate it
-        const allLinks = sidebar.querySelectorAll('a[href]');
-        let matchedDropdownItem = null;
-        let matchedNavItem = null;
-
-        for (const link of allLinks) {
-            const href = link.getAttribute('href');
-            if (!href || href === '#' || href.startsWith('#navbar-')) continue;
-
-            // Exact match or prefix match (for detail/edit/delete pages)
-            if (currentPath === href || (href !== '/' && currentPath.startsWith(href))) {
-                // Activate the dropdown-item wrapper if it exists
-                const dropdownItem = link.closest('.dropdown-item');
-                if (dropdownItem) {
-                    dropdownItem.classList.add('active');
-                    matchedDropdownItem = dropdownItem;
-                }
-
-                // Activate the parent nav-item (li.nav-item.dropdown)
-                const navItem = link.closest('.nav-item');
-                if (navItem) {
-                    navItem.classList.add('active');
-                    matchedNavItem = navItem;
-
-                    // Activate the nav-link toggle
-                    const navLink = navItem.querySelector(':scope > .nav-link');
-                    if (navLink) navLink.classList.add('active');
-
-                    // Expand the dropdown menu
-                    const dropdownMenu = navItem.querySelector(':scope > .dropdown-menu');
-                    if (dropdownMenu) dropdownMenu.classList.add('show');
-                }
-                break; // Use first match
-            }
-        }
-
-        // Special case: dashboard (root path "/")
-        if (!matchedNavItem && (currentPath === '/' || currentPath === '')) {
-            const dashboardItem = sidebar.querySelector('.nav-item:first-child');
-            if (dashboardItem) dashboardItem.classList.add('active');
-        }
-    }
-
-    // Run on HTMX boosted navigation and URL changes
-    document.body.addEventListener('htmx:historyRestore', function() {
-        updateSidebarActiveState();
-    });
-    document.body.addEventListener('htmx:afterSwap', function() {
-        updateSidebarActiveState();
-    });
-    // Re-apply filter panel visibility after content fully settles (boosted navigation)
     document.body.addEventListener('htmx:afterSettle', function() {
         setTimeout(function() {
             if (typeof window.initFiltersToggle === 'function') {
