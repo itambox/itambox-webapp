@@ -1,3 +1,51 @@
+/* ============================================================
+   AssetBox Design Tokens & CSS Variable Reference
+   ============================================================
+
+   Core Tokens (inherited from Tabler UI)
+   --------------------------------------
+   --tblr-primary            #206bc4    Primary accent (buttons, links, active states)
+   --tblr-secondary          #6e7e91    Secondary accent (muted elements, badges)
+   --tblr-body-color         #1d273b    Default text color
+   --tblr-body-bg            #f6f8fb    Page background
+   --tblr-bg-surface         #ffffff    Card and dropdown surface
+   --tblr-border-color       #dadcde    Border color (cards, inputs, tables)
+   --tblr-font-monospace     ui-monospace  Monospace font stack
+   --tblr-border-radius-sm   4px        Small rounded corners
+   --tblr-box-shadow-lg      0 1rem 3rem rgba(0,0,0,.175)  Dropdown/modal shadow
+
+   AssetBox Custom Tokens
+   ----------------------
+   --assetbox-primary        #206bc4    (light) Primary accent
+   --assetbox-primary-dark   #4e8cdb    (dark)  Primary accent for dark mode
+   --assetbox-sidebar-width  250px      Vertical sidebar width
+
+   Status / Severity Colors (Tabler native)
+   ----------------------------------------
+   Success  --tblr-success / bg-success  #2fb344
+   Danger   --tblr-danger  / bg-danger   #d63939
+   Warning  --tblr-warning / bg-warning  #f59f00
+   Info     --tblr-info    / bg-blue     #206bc4
+
+   Spacing Scale (Tabler native)
+   -----------------------------
+   0.25rem  0.5rem  0.75rem  1rem  1.5rem  2rem  3rem  4rem
+   (Spacing follows 8px base grid: 4, 8, 12, 16, 24, 32, 48, 64)
+
+   Typography
+   ----------
+   Body:   var(--tblr-body-font-family), 0.875rem, 1.5 line-height
+   Headings: inherit font-family with varying weights (600-700)
+   Monospace: var(--tblr-font-monospace) for changelog diffs, code blocks
+
+   Dark Mode
+   ---------
+   Toggle via data-bs-theme="dark" on <html>. Tabler provides full
+   dark-mode coverage. Custom dark overrides use:
+     [data-bs-theme="dark"] .selector { ... }
+
+   ============================================================ */
+
 pre.change-data {
     border-radius: 0;
     padding: 0

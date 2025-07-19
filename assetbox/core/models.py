@@ -147,7 +147,18 @@ class ChangeLoggingMixin:
     def __init__(self, *args, **kwargs):
         self._changelog_action = None
         self._changelog_message = ''
+        self._prechange_snapshot = None
         super().__init__(*args, **kwargs)
+
+    def snapshot(self):
+        """
+        Capture the current state of the object as pre-change data.
+        Called by API viewsets before performing updates/deletes to ensure
+        accurate change logging without an extra DB round-trip.
+        """
+        self._prechange_snapshot = serialize_object(
+            self, exclude_fields=self._change_logging_excluded_fields
+        )
 
     def _log_change(self, action, prechange_data=None, postchange_data=None, message=''):
         """Helper method to create an ObjectChange record."""
@@ -178,12 +189,14 @@ class ChangeLoggingMixin:
         prechange_data = None
 
         if not is_creation:
-            try:
-                original_instance = self.__class__.objects.get(pk=self.pk)
-                prechange_data = serialize_object(original_instance, exclude_fields=self._change_logging_excluded_fields)
-            except self.__class__.DoesNotExist:
-                # Object is new; proceed without prechange data
-                pass
+            if self._prechange_snapshot is not None:
+                prechange_data = self._prechange_snapshot
+            else:
+                try:
+                    original_instance = self.__class__.objects.get(pk=self.pk)
+                    prechange_data = serialize_object(original_instance, exclude_fields=self._change_logging_excluded_fields)
+                except self.__class__.DoesNotExist:
+                    pass
         
         super().save(*args, **kwargs)
 
@@ -199,7 +212,10 @@ class ChangeLoggingMixin:
 
     def delete(self, *args, **kwargs):
         """Override delete() to log deletion."""
-        prechange_data = serialize_object(self, exclude_fields=self._change_logging_excluded_fields)
+        if self._prechange_snapshot is not None:
+            prechange_data = self._prechange_snapshot
+        else:
+            prechange_data = serialize_object(self, exclude_fields=self._change_logging_excluded_fields)
         action = self._changelog_action or ObjectChangeActionChoices.ACTION_DELETE
         
         self._log_change(action=action, prechange_data=prechange_data, message=self._changelog_message)
@@ -239,6 +255,9 @@ class Notification(models.Model):
         ordering = ('-created_at',)
         verbose_name = "Notification"
         verbose_name_plural = "Notifications"
+        indexes = [
+            models.Index(fields=['user', 'is_read']),
+        ]
 
     def __str__(self):
         return f"{self.subject} ({self.get_level_display()})" 

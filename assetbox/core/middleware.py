@@ -23,13 +23,32 @@ class CurrentUserMiddleware(MiddlewareMixin):
         _request_id.set(uuid.uuid4())
 
     def process_response(self, request, response):
-        # Clean up context vars after the request is done by resetting to default/None
         _current_user.set(None)
         _request_id.set(None)
         return response
 
     def process_exception(self, request, exception):
-        # Ensure cleanup even if an exception occurs
         _current_user.set(None)
         _request_id.set(None)
- 
+
+
+class CSPMiddleware(MiddlewareMixin):
+    """
+    Adds Content-Security-Policy headers to all responses.
+    
+    'unsafe-inline' is required because the FOUC-prevention theme script
+    in base.html must run before any external JS/CSS loads. Once that
+    inline script is replaced with a CSP nonce-based approach, the
+    'unsafe-inline' allowance can be removed from script-src.
+    """
+    def process_response(self, request, response):
+        response['Content-Security-Policy'] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+            "img-src 'self' data:; "
+            "font-src 'self' https://cdnjs.cloudflare.com; "
+            "connect-src 'self'; "
+            "frame-ancestors 'self'"
+        )
+        return response

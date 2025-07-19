@@ -15,7 +15,7 @@ User = get_user_model()
 class CoreRefactoringTestCase(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
-        self.user = User.objects.create_user(username='testuser', password='password123')
+        self.user = User.objects.create_user(username='testuser', password='password123', is_superuser=True)
         self.manufacturer = Manufacturer.objects.create(name='Microsoft', slug='microsoft')
         self.software = Software.objects.create(name='Windows 11', manufacturer=self.manufacturer)
 

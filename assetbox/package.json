@@ -1,0 +1,24 @@
+{
+  "name": "assetbox",
+  "version": "0.1.0",
+  "private": true,
+  "description": "IT Asset Management System — static assets build pipeline",
+  "scripts": {
+    "build": "node bundle.mjs",
+    "build:css": "sass static/src/styles/assetbox.scss:static/dist/assetbox.css --style=compressed",
+    "build:all": "npm run build:css && npm run build",
+    "watch": "node bundle.mjs --watch",
+    "watch:css": "sass --watch static/src/styles/assetbox.scss:static/dist/assetbox.css"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "sass": "^1.80.0",
+    "eslint": "^9.0.0",
+    "globals": "^15.0.0"
+  },
+  "dependencies": {
+    "@tabler/core": "^1.1.0",
+    "bootstrap": "^5.3.3",
+    "tom-select": "^2.3.1"
+  }
+}

@@ -322,7 +322,7 @@ class SubscriptionViewTests(TestCase):
     def setUp(self):
         self.client = Client()
         self.user = get_user_model().objects.create_user(
-            username="testuser", password="testpass", is_staff=True
+            username="testuser", password="testpass", is_staff=True, is_superuser=True
         )
         self.client.login(username="testuser", password="testpass")
         self.provider = Provider.objects.create(name="Test Provider")
@@ -406,7 +406,7 @@ class ProviderViewTests(TestCase):
     def setUp(self):
         self.client = Client()
         self.user = get_user_model().objects.create_user(
-            username="testuser", password="testpass", is_staff=True
+            username="testuser", password="testpass", is_staff=True, is_superuser=True
         )
         self.client.login(username="testuser", password="testpass")
         self.provider = Provider.objects.create(

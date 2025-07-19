@@ -24,7 +24,13 @@ class ETagMixin:
             return [e.strip() for e in if_match.split(',')]
         return []
 
+    def _require_etag(self, request, instance):
+        if not self._get_if_match(request):
+            from core.api.exceptions import PreconditionFailed
+            raise PreconditionFailed(etag='*', detail='If-Match header is required for mutating requests.')
+
     def _validate_etag(self, request, instance):
+        self._require_etag(request, instance)
         if provided := self._get_if_match(request):
             current_etag = self._get_etag(instance)
             if current_etag and current_etag not in provided:

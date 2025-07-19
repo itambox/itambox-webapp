@@ -1,4 +1,4 @@
-{% extends base_template|default:"base.html" %}
+{% extends base_template|default:"layout.html" %}
 {% load django_tables2 %}
 {% load helpers %}
 {% load static %}
@@ -58,12 +58,12 @@
       <div class="tab-content">
         <div class="tab-pane fade show active" id="results-pane" role="tabpanel" aria-labelledby="results-tab">
           <div id="{{ RESULTS_PANE_CONTENT_ID }}">
-            {% include 'generic/partials/_object_list_content.html' %}
+            {% include 'htmx/object_list_content.html' %}
           </div>
         </div>
 
         <div class="tab-pane fade" id="filters-pane" role="tabpanel" aria-labelledby="filters-tab">
-          {% include 'generic/partials/_filter_form.html' with form=filter_form %}
+          {% include 'htmx/filter_form.html' with form=filter_form %}
         </div>
       </div>
     </div>

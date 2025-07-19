@@ -1,6 +1,7 @@
 {% load render_table from django_tables2 %}
 {% load utility_tags %}
 {% load i18n %}
+{% load panels %}
 
 {# --- OOB Swaps (Must be outside the main target) --- #}
 <span id="page-title-block" hx-swap-oob="true">{{ object }} - {{ title|default:"Detail View" }} - AssetBox</span>
@@ -48,6 +49,19 @@
 {# --- Main Target Content (Replaces innerHTML of #page-body-main) --- #}
 {# --- Replicates structure inside {% block content %} of generic/object_detail.html --- #}
 <div class="container-fluid"> {# Add the container wrapper #}
+    {% if layout %}
+        {% for row in layout %}
+        <div class="row g-4">
+            {% for column in row %}
+            <div class="col-md-{% widthratio 12 row|length 1 %}">
+                {% for panel in column %}
+                    {% render_panel panel %}
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    {% else %}
     <div class="row g-4">
 
         {# --- Left Column --- #}
@@ -118,5 +132,6 @@
             {% block full_width_content %}{% endblock full_width_content %}
         </div>
     </div>
+    {% endif %}
 </div> {# End container-fluid #}
 {# Note: No script tags here #}

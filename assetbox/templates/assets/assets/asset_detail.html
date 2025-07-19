@@ -672,33 +672,5 @@
 <!-- Embedded Base64 Mechanical Audio Cue (Satisfying mechanical tick) -->
 <audio id="audit-success-audio" src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQQAAAAAAACWAA=="></audio>
 
-<script>
-    // Listen for the audit success event from the server HX-Trigger header.
-    // Must NOT be wrapped in DOMContentLoaded — under HTMX boosted navigation,
-    // DOMContentLoaded fires only on the very first full page load, not on
-    // subsequent HTMX swaps. Attaching directly to document.body works always.
-    (function() {
-        if (window.hasAuditSoundListener) return;
-        window.hasAuditSoundListener = true;
-
-        function handleAuditSuccess() {
-            const audio = document.getElementById("audit-success-audio");
-            if (audio) {
-                audio.play().catch(e => console.log("Audio play blocked by browser autoplay restrictions: ", e));
-            }
-            // Spring tactile animation on the verify button
-            const btn = document.getElementById("audit-verify-btn");
-            if (btn) {
-                btn.style.transform = "scale(0.95)";
-                setTimeout(() => {
-                    btn.style.transform = "scale(1.05)";
-                    setTimeout(() => {
-                        btn.style.transform = "scale(1)";
-                    }, 100);
-                }, 80);
-            }
-        }
-        document.body.addEventListener("playAuditSound", handleAuditSuccess);
-    })();
-</script>
+<script src="{% static 'js/audit.js' %}"></script>
 {% endblock %}

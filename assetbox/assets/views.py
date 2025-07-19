@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
-from .models import Asset, AssetRole, Manufacturer, AssetType, InstalledSoftware, ComponentType, ComponentInstance, Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, KitItem
+from .models import Asset, AssetRole, Manufacturer, AssetType, InstalledSoftware, ComponentType, ComponentInstance, Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, KitItem, ActivityLog
 from licenses.models import License, LicenseSeatAssignment
 from .forms import AssetForm, AssetRoleForm, ManufacturerForm, AssetCheckOutForm, AssetTypeForm # Keep only Asset forms
 from django.contrib.auth import get_user_model
@@ -187,7 +187,7 @@ class AssetEditView(ObjectEditView):
         if request.headers.get('HX-Request') and '_reload' in request.POST:
             self.object = self.get_object()
             form = self.get_form()
-            return render(request, 'generic/partials/crispy_form.html', {'form': form})
+            return render(request, 'htmx/crispy_form.html', {'form': form})
         return super().post(request, *args, **kwargs)
     # Default success_url goes to object detail view
 
@@ -925,6 +925,12 @@ def asset_audit(request, pk):
     asset._changelog_action = 'audit'
     asset._changelog_message = f"Physical presence verified by {request.user.get_full_name() or request.user.username}."
     asset.save(update_fields=['last_audited', 'last_audited_by'])
+    ActivityLog.objects.create(
+        asset=asset,
+        action='audited',
+        user=request.user,
+        notes=asset._changelog_message
+    )
     response = render(request, "assets/includes/asset_audit_badge.html", {'asset': asset})
     response['HX-Trigger'] = json.dumps({
         "playAuditSound": None,
@@ -1239,6 +1245,12 @@ class KitCheckoutView(LoginRequiredMixin, View):
                         asset._changelog_action = 'checkout'
                         asset._changelog_message = f"Checked out via Kit '{kit.name}'. {notes}"
                         asset.save(update_fields=['status', 'location'])
+                        ActivityLog.objects.create(
+                            asset=asset,
+                            action='checked_out',
+                            user=request.user,
+                            notes=f"Checked out via Kit '{kit.name}'. {notes}"
+                        )
                         
                         if holder:
                             AssetHolderAssignment.objects.update_or_create(

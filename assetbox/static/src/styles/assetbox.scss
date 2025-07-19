@@ -1,0 +1,65 @@
+// AssetBox SCSS entry point
+// 
+// Extends Tabler UI with custom AssetBox-specific styles.
+// Tabler provides Bootstrap 5 under the hood, so Bootstrap
+// is already included via Tabler's CSS bundle.
+
+// Custom CSS variables and theme overrides
+// (move content from static/css/assetbox.css here incrementally)
+
+:root {
+  --assetbox-primary: #206bc4;
+  --assetbox-sidebar-width: 250px;
+}
+
+// Dark mode refinements
+[data-bs-theme="dark"] {
+  --assetbox-primary: #4e8cdb;
+}
+
+// Layout fixes for the dual sidebar + content layout
+.page-wrapper {
+  flex-grow: 1;
+}
+
+// Transition for theme changes
+html {
+  transition: background-color 0.2s ease;
+}
+
+// Batch action bar styles
+.batch-actions-bar {
+  transition: opacity 0.15s ease;
+}
+
+// Table improvements
+.table-responsive {
+  .table {
+    margin-bottom: 0;
+  }
+}
+
+// Panel cards (for declarative panel layout)
+.panel-card {
+  .card-header {
+    background: transparent;
+    border-bottom: 1px solid var(--tblr-border-color, #e6e7e9);
+  }
+}
+
+// Tom Select overrides for AssetBox theme
+.ts-wrapper {
+  .ts-control {
+    border-color: var(--tblr-border-color, #dadcde);
+  }
+}
+
+// Notification dot animation
+.status-dot-animated {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}

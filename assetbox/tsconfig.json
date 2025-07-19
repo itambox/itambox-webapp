@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ES2020",
+    "moduleResolution": "bundler",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "outDir": "static/dist",
+    "rootDir": "static/src",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "sourceMap": true,
+    "declaration": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["static/src/**/*.ts"],
+  "exclude": ["static/dist", "node_modules"]
+}

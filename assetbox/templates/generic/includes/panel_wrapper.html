@@ -1,0 +1,17 @@
+<div class="card mb-4">
+    {% if panel.display_label %}
+    <div class="card-header">
+        <h3 class="card-title">{{ panel.display_label }}</h3>
+        {% if panel.description %}
+        <div class="text-muted small">{{ panel.description }}</div>
+        {% endif %}
+    </div>
+    {% endif %}
+    <div class="card-body">
+        {% if panel_template %}
+            {% include panel_template %}
+        {% else %}
+            <p class="text-muted"><em>No template found for panel "{{ panel.name }}".</em></p>
+        {% endif %}
+    </div>
+</div>

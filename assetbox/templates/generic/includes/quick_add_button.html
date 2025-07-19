@@ -1,0 +1,26 @@
+{% comment %}
+Quick-Add button for FK/M2M select fields.
+
+Usage in a form template:
+  {% include "generic/includes/quick_add_button.html" with
+      model_label="Manufacturer"
+      quick_add_url="assets:manufacturer_add"
+      target_select_id="id_manufacturer"
+  %}
+
+The button opens a modal with a creation form. On successful creation,
+the modal closes and the new object is prepended to the target select.
+{% endcomment %}
+<button type="button"
+        class="btn btn-outline-secondary btn-sm btn-icon ms-1"
+        title="Add new {{ model_label }}"
+        hx-get="{% url quick_add_url %}{% if quick_add_url_params %}?{{ quick_add_url_params }}{% endif %}"
+        hx-target="#modal-placeholder"
+        hx-on::after-request="setTimeout(function(){ var m=document.getElementById('quick-add-modal'); if(m) new bootstrap.Modal(m).show(); }, 100)"
+        aria-label="Quick-add {{ model_label }}">
+    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+        <path d="M12 5l0 14"/>
+        <path d="M5 12l14 0"/>
+    </svg>
+</button>

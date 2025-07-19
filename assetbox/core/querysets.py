@@ -7,7 +7,7 @@ class CustomQuerySet(models.QuerySet):
     Inspired by NetBox patterns.
     """
 
-    def add_related_count(self, related_model, related_field, count_attr, cumulative=False):
+    def add_related_count(self, related_model, related_field, count_attr):
         """
         Annotate the count of related objects onto the queryset.
 
@@ -16,33 +16,21 @@ class CustomQuerySet(models.QuerySet):
             related_field: The name of the ForeignKey field on the related model
                            that points back to this queryset's model.
             count_attr: The name of the attribute to store the count annotation.
-            cumulative: If True, include counts from descendant objects (requires
-                        the model to have MPTT fields like 'lft', 'rght').
-                        *Note: Cumulative functionality is NOT implemented yet.*
         """
-        if cumulative:
-            # Cumulative counting logic requires MPTT fields (lft/rght) on the model.
-            # Raise NotImplementedError until we have a model hierarchy that needs this.
-            raise NotImplementedError(
-                "Cumulative related count requires MPTT support. "
-                "Pass cumulative=False or use MPTT on the relevant model."
-            )
-
-        # Standard non-cumulative annotation using Subquery
         subquery = Subquery(
             related_model.objects.filter(
                 **{f'{related_field}_id': OuterRef('pk')}
             ).values(
-                related_field # Group by the foreign key
+                related_field
             ).annotate(
-                _count=Count('pk') # Count related objects for this FK
-            ).values('_count')[:1] # Select only the count
+                _count=Count('pk')
+            ).values('_count')[:1]
         )
 
         return self.annotate(
             **{count_attr: subquery}
         ).annotate(
-            **{count_attr: models.functions.Coalesce(count_attr, 0)} # Replace None with 0
+            **{count_attr: models.functions.Coalesce(count_attr, 0)}
         )
 
 

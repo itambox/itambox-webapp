@@ -27,26 +27,30 @@ import os
 SECRET_KEY = os.environ.get('ASSETBOX_SECRET_KEY', '')
 
 if not SECRET_KEY:
-    # In dev, generate a random key if not provided, but NEVER use a hardcoded default in production.
-    # For local development without env vars, Django will warn via check --deploy.
     SECRET_KEY = 'django-insecure-dev-only-change-me-in-production'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('ASSETBOX_DEBUG', 'True').lower() in ('true', '1', 't')
 
-ALLOWED_HOSTS = os.environ.get('ASSETBOX_ALLOWED_HOSTS', 'localhost,127.0.0.1,192.168.50.54').split(',')
+if not DEBUG and SECRET_KEY == 'django-insecure-dev-only-change-me-in-production':
+    raise RuntimeError(
+        'SECRET_KEY environment variable must be set to a secure random value '
+        'when DEBUG=False (production mode).'
+    )
 
-# Production security hardening (only when explicitly enabled AND not in debug mode)
-ASSETBOX_ENABLE_SECURITY = os.environ.get('ASSETBOX_ENABLE_SECURITY', 'False').lower() in ('true', '1', 't')
-if not DEBUG and ASSETBOX_ENABLE_SECURITY:
-    SECURE_SSL_REDIRECT = True
-    SECURE_HSTS_SECONDS = 31536000
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
+ALLOWED_HOSTS = os.environ.get('ASSETBOX_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+
+# Production security hardening (enabled unconditionally when DEBUG=False)
+if not DEBUG:
+    SECURE_SSL_REDIRECT = os.environ.get('ASSETBOX_SECURE_SSL_REDIRECT', 'True').lower() in ('true', '1', 't')
+    SECURE_HSTS_SECONDS = int(os.environ.get('ASSETBOX_HSTS_SECONDS', '31536000'))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get('ASSETBOX_HSTS_INCLUDE_SUBDOMAINS', 'True').lower() in ('true', '1', 't')
+    SECURE_HSTS_PRELOAD = os.environ.get('ASSETBOX_HSTS_PRELOAD', 'True').lower() in ('true', '1', 't')
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 
 # Application definition
@@ -85,6 +89,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_htmx.middleware.HtmxMiddleware',
+    'core.middleware.CSPMiddleware',
     'core.middleware.CurrentUserMiddleware',
 ]
 
@@ -146,11 +151,25 @@ WSGI_APPLICATION = 'core.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-        'CONN_MAX_AGE': 60,  # Reuse connections for 60 seconds
+        'ENGINE': os.environ.get('ASSETBOX_DB_ENGINE', 'django.db.backends.sqlite3'),
+        'NAME': os.environ.get('ASSETBOX_DB_NAME', BASE_DIR / 'db.sqlite3'),
     }
 }
+
+# PostgreSQL-specific settings when using PostgreSQL backend
+if DATABASES['default']['ENGINE'] == 'django.db.backends.postgresql':
+    DATABASES['default'].update({
+        'USER': os.environ.get('ASSETBOX_DB_USER', ''),
+        'PASSWORD': os.environ.get('ASSETBOX_DB_PASSWORD', ''),
+        'HOST': os.environ.get('ASSETBOX_DB_HOST', 'localhost'),
+        'PORT': os.environ.get('ASSETBOX_DB_PORT', '5432'),
+        'CONN_MAX_AGE': int(os.environ.get('ASSETBOX_DB_CONN_MAX_AGE', '300')),
+        'OPTIONS': {
+            'sslmode': os.environ.get('ASSETBOX_DB_SSLMODE', 'prefer'),
+        },
+    })
+else:
+    DATABASES['default']['CONN_MAX_AGE'] = 60  # Reuse connections for 60 seconds (SQLite)
 
 
 # Password validation
@@ -210,7 +229,7 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.BasicAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'core.api.permissions.TokenPermissions',
     ],
     'DEFAULT_PAGINATION_CLASS': 'core.api.pagination.AssetBoxPagination',
     'DEFAULT_THROTTLE_CLASSES': [
@@ -226,6 +245,27 @@ REST_FRAMEWORK = {
 
 PAGINATE_COUNT = 50
 MAX_PAGE_SIZE = 1000
+
+# Cache configuration
+CACHE_BACKEND = os.environ.get('ASSETBOX_CACHE_BACKEND', 'locmem')
+if CACHE_BACKEND == 'redis':
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': os.environ.get('ASSETBOX_REDIS_URL', 'redis://127.0.0.1:6379/1'),
+            'TIMEOUT': int(os.environ.get('ASSETBOX_CACHE_TIMEOUT', '300')),
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            },
+        }
+    }
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'assetbox-cache',
+        }
+    }
 
 SEARCH_BACKEND = 'core.search_backends.DatabaseBackend'
 

@@ -12,10 +12,7 @@
     var gsLoaded = false;
 
     function getCSRFToken() {
-        var el = document.querySelector('[name=csrfmiddlewaretoken]');
-        if (el && el.value) return el.value;
-        var match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/);
-        return match ? match[1] : '';
+        return AssetBoxState.getCSRFToken();
     }
 
     function initGridStack() {

@@ -11,7 +11,7 @@ class LicenseViewTests(TestCase):
     def setUp(self):
         self.client = Client()
         # Create user and log in
-        self.user = User.objects.create_user(username='testadmin', password='testpassword', is_staff=True)
+        self.user = User.objects.create_user(username='testadmin', password='testpassword', is_staff=True, is_superuser=True)
         self.client.login(username='testadmin', password='testpassword')
 
         # Create prerequisite models

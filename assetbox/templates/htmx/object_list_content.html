@@ -9,7 +9,7 @@
     {# Quick Search Input Group #}
     {% if filter_form.q is not None %}
         <div class="quicksearch-results-tab" style="flex-grow: 1; max-width: 200px; margin-right: 1rem;">
-            {% include "generic/partials/_quick_search.html" %}
+            {% include "htmx/quick_search.html" %}
         </div>
     {% else %}
         <div></div> {# Placeholder #}
@@ -61,4 +61,4 @@
 
    {# Add other OOB swaps as needed (breadcrumbs, action buttons if they change) #}
 
-{% endif %} 
+{% endif %}

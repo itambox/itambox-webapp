@@ -186,7 +186,7 @@ class AssetType(ChangeLoggingMixin, BaseModel):
     manufacturer = models.ForeignKey(Manufacturer, on_delete=models.PROTECT, related_name='asset_types')
     model = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True)
-    part_number = models.CharField(max_length=100, blank=True, help_text="Manufacturer part number or SKU")
+    part_number = models.CharField(max_length=100, blank=True, db_index=True, help_text="Manufacturer part number or SKU")
 
     # Specs
     cpu = models.CharField(max_length=100, blank=True, verbose_name="Processor (CPU)")
@@ -266,7 +266,7 @@ class Asset(ChangeLoggingMixin, BaseModel):
 
     name = models.CharField(max_length=255)
     asset_tag = models.CharField(max_length=50, unique=True)
-    serial_number = models.CharField(max_length=100, blank=True, null=True)
+    serial_number = models.CharField(max_length=100, blank=True, null=True, db_index=True)
     asset_type = models.ForeignKey(AssetType, on_delete=models.PROTECT, related_name='assets', null=True, blank=True, db_index=True)
     asset_role = models.ForeignKey(AssetRole, on_delete=models.SET_NULL, blank=True, null=True, db_index=True)
     purchase_date = models.DateField(blank=True, null=True, db_index=True)
@@ -541,7 +541,7 @@ class ComponentType(ChangeLoggingMixin, BaseModel):
     slug = models.SlugField(max_length=255, unique=True)
     manufacturer = models.ForeignKey(Manufacturer, on_delete=models.PROTECT, related_name='component_types')
     category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default=CATEGORY_OTHER)
-    part_number = models.CharField(max_length=100, blank=True, help_text="SKU or part number")
+    part_number = models.CharField(max_length=100, blank=True, db_index=True, help_text="SKU or part number")
     specs = models.CharField(max_length=255, blank=True, help_text="Specific capacity/speed details (e.g. 16GB DDR5 5600MHz)")
     description = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', related_name='component_types', blank=True)
@@ -582,7 +582,7 @@ class ComponentInstance(ChangeLoggingMixin, BaseModel):
     ]
 
     component_type = models.ForeignKey(ComponentType, on_delete=models.PROTECT, related_name='instances')
-    serial_number = models.CharField(max_length=100, blank=True, help_text="Physical serial number of the part")
+    serial_number = models.CharField(max_length=100, blank=True, db_index=True, help_text="Physical serial number of the part")
     parent_asset = models.ForeignKey(Asset, on_delete=models.SET_NULL, null=True, blank=True, related_name='components', db_index=True)
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default=STATUS_IN_STOCK)
     purchase_date = models.DateField(blank=True, null=True)
@@ -627,7 +627,7 @@ class Accessory(ChangeLoggingMixin, BaseModel):
     slug = models.SlugField(max_length=255, unique=True)
     manufacturer = models.ForeignKey(Manufacturer, on_delete=models.PROTECT, related_name='accessories')
     category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default=CATEGORY_OTHER)
-    part_number = models.CharField(max_length=100, blank=True, help_text="SKU or manufacturer part number")
+    part_number = models.CharField(max_length=100, blank=True, db_index=True, help_text="SKU or manufacturer part number")
     qty = models.PositiveIntegerField(default=0, verbose_name="Total Stock")
     min_qty = models.PositiveIntegerField(default=0, verbose_name="Safety Threshold", help_text="Alert threshold quantity")
     allow_overallocate = models.BooleanField(default=False, verbose_name="Allow Over-allocation", help_text="Allow checkout count to exceed stock capacity")
@@ -717,7 +717,7 @@ class Consumable(ChangeLoggingMixin, BaseModel):
     slug = models.SlugField(max_length=255, unique=True)
     manufacturer = models.ForeignKey(Manufacturer, on_delete=models.PROTECT, related_name='consumables')
     category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default=CATEGORY_OTHER)
-    part_number = models.CharField(max_length=100, blank=True, help_text="SKU or manufacturer part number")
+    part_number = models.CharField(max_length=100, blank=True, db_index=True, help_text="SKU or manufacturer part number")
     qty = models.PositiveIntegerField(default=0, verbose_name="Total Quantity")
     min_qty = models.PositiveIntegerField(default=0, verbose_name="Safety Threshold", help_text="Alert threshold quantity")
     allow_overallocate = models.BooleanField(default=False, verbose_name="Allow Over-allocation", help_text="Allow consumption count to exceed stock capacity")

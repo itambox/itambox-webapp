@@ -1,0 +1,51 @@
+[project]
+name = "assetbox"
+version = "0.1.0"
+description = "IT Asset Management System inspired by NetBox"
+requires-python = ">=3.11"
+dependencies = [
+    "Django>=5.2,<5.3",
+    "djangorestframework>=3.16,<3.17",
+    "django-tables2>=2.7,<2.8",
+    "django-filter>=25.2,<25.3",
+    "django-htmx>=1.21,<1.28",
+    "django-template-partials>=25.3,<25.4",
+    "django-crispy-forms>=2.6,<2.7",
+    "crispy-bootstrap5>=2026.3,<2027",
+    "django-taggit>=6.1,<6.2",
+    "drf-spectacular>=0.29,<0.30",
+    "Pillow>=10.0,<12.0",
+]
+
+[project.optional-dependencies]
+postgres = [
+    "psycopg2-binary>=2.9,<3.0",
+]
+redis = [
+    "django-redis>=5.4,<6.0",
+    "redis>=5.2,<6.0",
+]
+dev = [
+    "pytest>=8.0,<9.0",
+    "pytest-django>=4.8,<5.0",
+    "factory_boy>=3.3,<4.0",
+    "tblib>=3.0,<4.0",
+    "django-debug-toolbar>=4.4,<5.0",
+]
+celery = [
+    "celery>=5.4,<5.7",
+    "redis>=5.2,<6.0",
+]
+
+[build-system]
+requires = ["setuptools>=69.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["assetbox*"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "core.settings"
+python_files = ["tests.py", "test_*.py"]
+addopts = ["--tb=short", "-p", "no:warnings"]

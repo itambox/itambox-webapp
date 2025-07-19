@@ -3,21 +3,16 @@ import logging
 from django.db.models import F, Value, Q
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import FieldError
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
-from .utils import get_content_type_by_natural_key # Assuming this exists
-
+from .utils import get_content_type_by_natural_key
 
 from .search import SEARCH_INDEXES
 
-# Simple wrapper class to hold search results consistently
-class SearchResult:
-    def __init__(self, obj, object_type_id):
-        self.object = obj
-        self._object_type_id = object_type_id
+MAX_SEARCH_RESULTS_PER_MODEL = getattr(settings, 'MAX_SEARCH_RESULTS_PER_MODEL', 1000)
+MAX_SEARCH_COUNT_PER_MODEL = getattr(settings, 'MAX_SEARCH_COUNT_PER_MODEL', 10000)
 
-    def __str__(self):
-        return str(self.object)
 
 class DatabaseBackend:
     """
@@ -25,20 +20,10 @@ class DatabaseBackend:
     registered SearchIndex classes.
     """
     def search(self, query, user=None, obj_types=None, lookup='icontains'):
-        """
-        Search registered models for the given query.
-        
-        Args:
-            query (str): The search term.
-            user: The current user (optional, for permissions).
-            obj_types (list): Optional list of natural keys of object types (e.g., ["assets.asset", "organization.site"]).
-            lookup (str): The Django ORM lookup type (e.g., 'icontains', 'iexact').
-        """
         results = {}
         if not query:
             return results
 
-        # Determine target models
         target_models = SEARCH_INDEXES.keys()
         if obj_types:
             filtered_models = []
@@ -47,45 +32,39 @@ class DatabaseBackend:
                 if ct and ct.model_class() in target_models:
                     filtered_models.append(ct.model_class())
             if not filtered_models:
-                return {} # No valid types selected
+                return {}
             target_models = filtered_models
 
         for model in target_models:
-            search_fields = set() # Use a set to collect unique fields
-            index_classes = SEARCH_INDEXES.get(model, []) # Get the list of index classes
+            search_fields = set()
+            index_classes = SEARCH_INDEXES.get(model, [])
             
             if not index_classes:
                 continue
                 
-            # Collect fields from all index classes for this model
             for index_class in index_classes:
-                # Assuming index classes have a 'fields' attribute or similar
-                # If the structure is different (e.g., a method get_search_fields()), adjust this line
                 fields_to_add = getattr(index_class, 'fields', []) 
                 search_fields.update(fields_to_add)
 
             if not search_fields:
                 continue
 
-            # Construct Q object using the specified lookup and collected fields
             q_objects = Q()
             for field_name in search_fields:
-                # Add check for valid lookup type for the field if necessary
                 try:
                     q_objects |= Q(**{f'{field_name}__{lookup}': query})
                 except FieldError:
                     logger.warning("Lookup '%s' not valid for field '%s' on %s. Skipping.", lookup, field_name, model.__name__)
                     continue
 
-            # Apply query
             queryset = model.objects.filter(q_objects)
-            count = queryset.count()
+            
+            capped_queryset = queryset[:MAX_SEARCH_RESULTS_PER_MODEL]
+            count = min(queryset[:MAX_SEARCH_COUNT_PER_MODEL].count(), MAX_SEARCH_COUNT_PER_MODEL)
 
             if count > 0:
-                # TODO: Consider permissions filtering here if needed
-                # queryset = queryset.restrict(user, 'view') # If using a permissions manager
                 results[model] = {
-                    'queryset': queryset,
+                    'queryset': capped_queryset,
                     'count': count,
                     'verbose_name': model._meta.verbose_name,
                     'verbose_name_plural': model._meta.verbose_name_plural,
@@ -93,5 +72,5 @@ class DatabaseBackend:
 
         return results
 
-# Instantiate the default backend
+
 search_backend = DatabaseBackend()

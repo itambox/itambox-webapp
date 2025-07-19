@@ -1,0 +1,29 @@
+{% comment %}
+Quick-Add success response — injected as inline HTML in the form response.
+Closes the quick-add modal and prepends the new object to the target select.
+
+Context variables:
+  target_id  — the ID of the parent <select> element to update
+  value      — the display text of the new object
+  pk         — the primary key value of the new object
+{% endcomment %}
+{{ quick_add_form.errors|default:"" }}
+<script>
+    (function() {
+        var targetSelect = document.getElementById('{{ target_id }}');
+        if (targetSelect) {
+            var opt = document.createElement('option');
+            opt.value = '{{ pk }}';
+            opt.textContent = '{{ value }}';
+            opt.selected = true;
+            targetSelect.insertBefore(opt, targetSelect.firstChild);
+            targetSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        var modal = document.getElementById('quick-add-modal');
+        if (modal) {
+            var inst = bootstrap.Modal.getInstance(modal);
+            if (inst) inst.hide();
+        }
+    })();
+</script>

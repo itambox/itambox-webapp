@@ -1,0 +1,19 @@
+{% load crispy_forms_tags %}
+<div class="modal modal-blur fade" id="quick-add-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form hx-post="{{ request.path }}"
+                  hx-target="#quick-add-modal-content"
+                  hx-swap="innerHTML">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">Add {{ model_label }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="quick-add-modal-content">
+                    {% crispy quick_add_form %}
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

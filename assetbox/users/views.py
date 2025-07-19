@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect
+from django.http import HttpResponse
 from django.views.generic import View, UpdateView, TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
@@ -176,6 +177,27 @@ def mark_all_notifications_read(request):
     from core.models import Notification
     Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
     return redirect('users:user_notifications')
+
+
+@login_required
+def notification_poll(request):
+    """HTMX polling endpoint returning notification dropdown content.
+    
+    Returns the notification bell dropdown HTML and an OOB badge update.
+    Polled every 30 seconds by the topbar notification bell.
+    Returns 204 No Content for non-HTMX requests.
+    """
+    if not getattr(request, 'htmx', False):
+        return HttpResponse(status=204)
+
+    from core.models import Notification
+    unread_qs = Notification.objects.filter(user=request.user, is_read=False)
+    context = {
+        'unread_notifications_count': unread_qs.count(),
+        'recent_unread_notifications': unread_qs.order_by('-created_at')[:5],
+    }
+    return render(request, 'htmx/notification_dropdown.html', context)
+
 
 class UserSubscriptionsView(UserGenericTabView):
     active_tab = 'subscriptions'

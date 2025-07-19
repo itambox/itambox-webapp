@@ -2,8 +2,6 @@
 {% load django_htmx %}
 {% load crispy_forms_tags %}
 
-{# Constants now come from view context #}
-
 <form
   method="get"
   action="{{ request.path }}" {# Action points to the current list view URL #}

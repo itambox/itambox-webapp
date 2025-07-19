@@ -164,9 +164,8 @@ class AssetBoxModelViewSet(
 
         try:
             with transaction.atomic(using=router.db_for_write(model)):
-                if self._get_if_match(self.request):
-                    locked = model.objects.select_for_update().get(pk=serializer.instance.pk)
-                    self._validate_etag(self.request, locked)
+                locked = model.objects.select_for_update().get(pk=serializer.instance.pk)
+                self._validate_etag(self.request, locked)
                 instance = serializer.save()
                 self._validate_objects(instance)
         except ObjectDoesNotExist:
@@ -191,9 +190,8 @@ class AssetBoxModelViewSet(
 
         try:
             with transaction.atomic(using=router.db_for_write(model)):
-                if self._get_if_match(self.request):
-                    locked = model.objects.select_for_update().get(pk=instance.pk)
-                    self._validate_etag(self.request, locked)
+                locked = model.objects.select_for_update().get(pk=instance.pk)
+                self._validate_etag(self.request, locked)
                 super().perform_destroy(instance)
         except ObjectDoesNotExist:
             raise PermissionDenied()

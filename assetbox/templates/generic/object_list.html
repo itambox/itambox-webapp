@@ -1,4 +1,4 @@
-{% extends base_template|default:"base.html" %}
+{% extends base_template|default:"layout.html" %}
 {% load helpers %}
 {% load partials %}
 {% load static %}
@@ -164,7 +164,7 @@
             </div>
             <div class="card-body p-3">
                 <div id="filters-sidebar-content">
-                    {% include 'generic/partials/filter_form_tab.html' %}
+                    {% include 'htmx/filter_form_tab.html' %}
                 </div>
             </div>
         </div>
@@ -212,182 +212,7 @@
 {% endblock page_actions %}
 
 {% block javascript %}
-<script>
-window.toggleFilters = function() {
-    const mainCol = document.getElementById('object-list-main-col');
-    const filterCol = document.getElementById('object-list-filter-col');
-    const toggleBtn = document.getElementById('toggle-filters-btn');
-    
-    if (!filterCol || !mainCol) return;
-    
-    const isHidden = filterCol.classList.contains('d-none');
-    if (isHidden) {
-        // Show filters
-        filterCol.classList.remove('d-none');
-        mainCol.classList.remove('col-md-12');
-        mainCol.classList.add('col-md-9');
-        if (toggleBtn) {
-            toggleBtn.classList.add('active');
-            toggleBtn.classList.remove('btn-outline-secondary');
-            toggleBtn.classList.add('btn-outline-primary');
-        }
-        localStorage.setItem('assetbox-show-filters', 'true');
-    } else {
-        // Hide filters
-        filterCol.classList.add('d-none');
-        mainCol.classList.remove('col-md-9');
-        mainCol.classList.add('col-md-12');
-        if (toggleBtn) {
-            toggleBtn.classList.remove('active');
-            toggleBtn.classList.remove('btn-outline-primary');
-            toggleBtn.classList.add('btn-outline-secondary');
-        }
-        localStorage.setItem('assetbox-show-filters', 'false');
-    }
-};
-
-window.initFiltersToggle = function() {
-    const mainCol = document.getElementById('object-list-main-col');
-    const filterCol = document.getElementById('object-list-filter-col');
-    const toggleBtn = document.getElementById('toggle-filters-btn');
-    
-    if (!filterCol || !mainCol) return;
-    
-    const storedPreference = localStorage.getItem('assetbox-show-filters');
-    const isMobile = window.innerWidth < 768;
-    
-    let showFilters = true;
-    if (storedPreference === 'false') {
-        showFilters = false;
-    } else if (storedPreference === 'true') {
-        showFilters = true;
-    } else if (isMobile) {
-        showFilters = false; // Collapse by default on mobile viewports
-    }
-    
-    if (showFilters) {
-        filterCol.classList.remove('d-none');
-        mainCol.classList.remove('col-md-12');
-        mainCol.classList.add('col-md-9');
-        if (toggleBtn) {
-            toggleBtn.classList.add('active');
-            toggleBtn.classList.remove('btn-outline-secondary');
-            toggleBtn.classList.add('btn-outline-primary');
-        }
-    } else {
-        filterCol.classList.add('d-none');
-        mainCol.classList.remove('col-md-9');
-        mainCol.classList.add('col-md-12');
-        if (toggleBtn) {
-            toggleBtn.classList.remove('active');
-            toggleBtn.classList.remove('btn-outline-primary');
-            toggleBtn.classList.add('btn-outline-secondary');
-        }
-    }
-};
-
-// Bind document-level event delegation once
-if (!window.hasFiltersToggleEventBound) {
-    document.addEventListener('click', function(event) {
-        const toggleBtn = event.target.closest('#toggle-filters-btn');
-        if (toggleBtn) {
-            event.preventDefault();
-            window.toggleFilters();
-        }
-    });
-
-    // Re-initialize when body content transitions or dynamic content loads
-    document.body.addEventListener('htmx:afterOnLoad', function(event) {
-        if (event.detail.target && (event.detail.target.id === 'page-body-main' || event.detail.target.id === 'object-list-dynamic-content' || event.detail.target.id === 'page-content-wrapper')) {
-            window.initFiltersToggle();
-        }
-    });
-
-    window.hasFiltersToggleEventBound = true;
-}
-
-// Initial initialization
-window.initFiltersToggle();
-
-// === Batch Actions: Checkbox Tracking & Bulk Assign ===
-(function() {
-    function updateBatchBar() {
-        var bars = document.querySelectorAll('.batch-actions-bar');
-        var deletePksInput = document.getElementById('bulk-delete-pks');
-        var checkboxes = document.querySelectorAll('#object-list-table-container input[type="checkbox"][name="pk"]');
-        var selected = [];
-        checkboxes.forEach(function(cb) { if (cb.checked) selected.push(cb); });
-        var count = selected.length;
-
-        // Sync both top and bottom bars
-        bars.forEach(function(bar) {
-            bar.classList.toggle('d-none', count === 0);
-            var cnt = bar.querySelector('.fw-bold');
-            if (cnt) cnt.textContent = count + ' selected';
-        });
-
-        if (deletePksInput) {
-            deletePksInput.value = selected.map(function(cb) { return cb.value; }).join(',');
-        }
-
-        // Sync "select all" checkbox state with individual checkboxes
-        var selectAllCb = document.querySelector('#object-list-table-container input[type="checkbox"][name="select_all"]');
-        if (selectAllCb) {
-            var allCbs = document.querySelectorAll('#object-list-table-container input[type="checkbox"][name="pk"]');
-            selectAllCb.checked = allCbs.length > 0 && selected.length === allCbs.length;
-        }
-    }
-
-    // Delegated listener: handle ALL checkbox changes (pk + select_all) at document level
-    document.addEventListener('change', function(event) {
-        var target = event.target;
-        if (target.type !== 'checkbox') return;
-        if (!target.closest('#object-list-table-container')) return;
-
-        if (target.name === 'pk') {
-            // Individual checkbox toggled — update batch bar + sync select-all
-            updateBatchBar();
-        } else if (target.name === 'select_all') {
-            // Select-all toggled — sync all individual checkboxes
-            var checkboxes = document.querySelectorAll('#object-list-table-container input[type="checkbox"][name="pk"]');
-            checkboxes.forEach(function(cb) { cb.checked = target.checked; });
-            updateBatchBar();
-        }
-    });
-
-    // Run on HTMX content swap when a new table loads
-    document.body.addEventListener('htmx:afterSettle', function() {
-        updateBatchBar();
-    });
-
-    // Initial run
-    updateBatchBar();
-
-    // Bulk Assign modal submit handler (only wired when present)
-    var assignForm = document.getElementById('bulk-assign-form');
-    if (assignForm) {
-        assignForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            var checkboxes = document.querySelectorAll('#object-list-table-container input[type="checkbox"][name="pk"]');
-            var pks = [];
-            checkboxes.forEach(function(cb) { if (cb.checked) pks.push(cb.value); });
-            if (pks.length === 0) { alert('No assets selected.'); return; }
-
-            var container = assignForm.querySelector('#bulk-assign-pks');
-            if (!container) { container = document.createElement('div'); container.id = 'bulk-assign-pks'; assignForm.appendChild(container); }
-            container.innerHTML = '';
-            pks.forEach(function(pk) {
-                var input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'pk';
-                input.value = pk;
-                container.appendChild(input);
-            });
-            assignForm.submit();
-        });
-    }
-})();
-</script>
+<script src="{% static 'js/batch-actions.js' %}"></script>
 {% endblock javascript %}
 
 {# Bulk Assign Modal — only rendered on Asset list page #}

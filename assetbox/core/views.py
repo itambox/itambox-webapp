@@ -51,16 +51,16 @@ User = get_user_model() # Get the User model
 # =============================================================================
 # NEW Base HTMX View
 # =============================================================================
-class BaseHTMXView: # No Django View inheritance needed here, it's a mixin
+class BaseHTMXView:
     """
     Mixin to handle HTMX request rendering, specifically for boosted main-body swaps.
     Views using this should ensure their templates do *not* extend base.html.
     They should also define breadcrumbs and title in get_context_data.
     """
-    page_body_partial_name = "generic/partials/page_body_content_wrapper.html" # Partial for #page-body-main swaps (hx-boost)
+    page_body_partial_name = "htmx/page_body_content_wrapper.html"
+    content_partial_name = None
 
     def get_template_names(self):
-        # Ensure subclasses provide template_name or delegate to superclass inference
         if not hasattr(self, 'template_name') or not self.template_name:
             if hasattr(super(), 'get_template_names'):
                 return super().get_template_names()
@@ -70,36 +70,26 @@ class BaseHTMXView: # No Django View inheritance needed here, it's a mixin
         return [self.template_name]
 
     def render_to_response(self, context, **response_kwargs):
-        """
-        Override render_to_response to handle HTMX requests.
-        - Sets dynamic base template to base_htmx.html for boosted main-body swaps.
-        - Falls back to standard rendering otherwise.
-        """
-        request = self.request # Get request from the view instance
+        request = self.request
 
         if getattr(request, 'htmx', False):
-            context['request'] = request # Ensure request is always in context for templates
+            context['request'] = request
 
             target = getattr(request.htmx, 'target', '') or ''
             is_boosted_main_swap = getattr(request.htmx, 'boosted', False) or \
                                    target in ('page-content-wrapper', '#page-content-wrapper', 'page-body-main', '#page-body-main')
 
             if is_boosted_main_swap:
-                # Dynamic base template swap
                 context['base_template'] = 'base_htmx.html'
-                # Ensure common context variables expected by base_htmx.html are present
-                context.setdefault('title', 'AssetBox') # Provide a default title
+                context.setdefault('title', 'AssetBox')
                 context.setdefault('breadcrumbs', [(reverse('dashboard'), 'Dashboard'), (None, context['title'])])
-                context.setdefault('page_actions', None) # e.g., buttons, passed via context
+                context.setdefault('page_actions', None)
+            elif self.content_partial_name:
+                return render(request, self.content_partial_name, context)
 
-        # Standard rendering for non-HTMX requests or non-main-body swaps
-        # This relies on the base Django view's render_to_response (e.g., TemplateView.render_to_response)
-        # Ensure the method we call exists in the MRO
         if hasattr(super(), 'render_to_response'):
             return super().render_to_response(context, **response_kwargs)
         else:
-            # Fallback if super().render_to_response is not available (e.g., mixing with raw View)
-            # This requires TemplateResponseMixin or similar to be in the MRO
             if hasattr(self, 'response_class') and hasattr(self, 'get_template_names'):
                  return self.response_class(
                     request=request,
@@ -116,52 +106,60 @@ class BaseHTMXView: # No Django View inheritance needed here, it's a mixin
 # Generic Object Views (NetBox-inspired base classes)
 # =============================================================================
 
-class ObjectListView(LoginRequiredMixin, ListView):
+class ObjectListView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, ListView):
     """Base view for listing objects."""
     filterset = None
     filterset_form = None
     table = None
-    template_name = 'generic/object_list.html' # Default template (Full page)
-    list_content_partial_name = "generic/partials/htmx_list_page_wrapper.html" # Partial for #object-list-dynamic-content swaps
-    page_body_partial_name = "generic/partials/page_body_content_wrapper.html" # Partial for #page-body-main swaps (hx-boost)
-    action_buttons = () # Tuple of actions ('add', 'import', 'export') - Default empty
+    template_name = 'generic/object_list.html'
+    content_partial_name = "htmx/list_page_wrapper.html"
+    action_buttons = ()
 
-    # --- Add render_to_response to handle HTMX requests ---
-    def render_to_response(self, context, **response_kwargs):
-        """
-        Override render_to_response to handle HTMX requests.
-        - Sets dynamic base template to base_htmx.html for boosted main-body swaps.
-        - Renders list content partial for specific content updates (pagination, filters).
-        """
-        if self.request.htmx:
-            context['request'] = self.request # Ensure request is always in context for HTMX partials/templates
-            
-            target = getattr(self.request.htmx, 'target', '') or ''
-            is_boosted_main_swap = self.request.htmx.boosted or \
-                                   target in ('page-content-wrapper', '#page-content-wrapper', 'page-body-main', '#page-body-main')
+    def get_permission_required(self):
+        model = getattr(self, 'model', None)
+        if model is None and hasattr(self, 'queryset') and self.queryset is not None:
+            model = self.queryset.model
+        if model:
+            app_label = model._meta.app_label
+            model_name = model._meta.model_name
+            return (f'{app_label}.view_{model_name}',)
+        return ('',)
 
-            if is_boosted_main_swap:
-                 context['base_template'] = 'base_htmx.html'
-                 return super().render_to_response(context, **response_kwargs)
-            else:
-                 # Render ONLY the LIST CONTENT partial for specific dynamic content swaps
-                 # (e.g., pagination, filtering targeting #object-list-dynamic-content).
-                 # This wrapper handles OOB swaps for elements outside the dynamic content.
-                 return render(self.request, self.list_content_partial_name, context)
+    # render_to_response is handled by BaseHTMXView
 
-        # Standard rendering for non-HTMX requests (renders self.template_name)
-        return super().render_to_response(context, **response_kwargs)
-    # --- End render_to_response ---
+    def get_template_names(self):
+        if self.template_name and self.template_name != 'generic/object_list.html':
+            return [self.template_name]
+
+        model = getattr(self, 'model', None)
+        if model is None and hasattr(self, 'queryset') and self.queryset is not None:
+            model = self.queryset.model
+
+        if model:
+            app_label = model._meta.app_label
+            model_name = model._meta.model_name
+            plural_name = model._meta.verbose_name_plural.lower().replace(' ', '')
+
+            templates_to_try = [
+                f'{app_label}/{plural_name}/{model_name}_list.html',
+                f'{app_label}/{model_name}_list.html',
+                'generic/object_list.html',
+            ]
+
+            for template_name in templates_to_try:
+                try:
+                    get_template(template_name)
+                    return [template_name]
+                except TemplateDoesNotExist:
+                    continue
+
+        return ['generic/object_list.html']
 
     def get_queryset(self):
         queryset = super().get_queryset()
         if self.filterset:
             self.filter = self.filterset(self.request.GET, queryset)
             if not self.filter.is_valid():
-                # Log invalid filter params but still return unfiltered queryset
-                # to avoid a blank page. In production, this should be monitored.
-                import logging
-                logger = logging.getLogger(__name__)
                 logger.warning('Invalid filter params for %s: %s', self.__class__.__name__, self.filter.errors)
                 self.filter = None  # prevent further invalid access
             else:
@@ -239,7 +237,8 @@ class ObjectListView(LoginRequiredMixin, ListView):
 class ObjectDetailView(LoginRequiredMixin, BaseHTMXView, DetailView):
     """Base view for displaying a single object."""
     template_name = 'generic/object_detail.html'
-    detail_page_body_partial_name = "generic/partials/htmx_detail_page_wrapper.html" # Specific wrapper for detail views
+    detail_page_body_partial_name = "htmx/detail_page_wrapper.html"
+    layout = None  # Override with tuple-of-tuple-of-tuple of Panel objects for declarative layout
 
     def get_template_names(self):
         # If a specific template_name is defined on the subclass (i.e. not 'generic/object_detail.html')
@@ -276,6 +275,11 @@ class ObjectDetailView(LoginRequiredMixin, BaseHTMXView, DetailView):
         model_name = obj._meta.model_name
         verbose_name = obj._meta.verbose_name.title()
         verbose_name_plural = obj._meta.verbose_name_plural.title()
+
+        context['model'] = obj.__class__
+
+        # Declarative panel layout (NetBox pattern)
+        context['layout'] = self.layout
 
         # Permissions & URLs
         can_change = self.request.user.has_perm(f'{app_label}.change_{model_name}')
@@ -346,10 +350,20 @@ class ObjectDetailView(LoginRequiredMixin, BaseHTMXView, DetailView):
 
         return context
 
-class ObjectEditView(LoginRequiredMixin, BaseHTMXView, UpdateView):
+class ObjectEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, UpdateView):
     """Base view for creating or editing an object."""
     model_form = None
     template_name = 'generic/object_edit.html'
+
+    def get_permission_required(self):
+        model = self._get_model()
+        if model:
+            app_label = model._meta.app_label
+            model_name = model._meta.model_name
+            if self.get_object():
+                return (f'{app_label}.change_{model_name}',)
+            return (f'{app_label}.add_{model_name}',)
+        return ('',)
 
     def _get_model(self):
         # Helper to reliably get model class
@@ -458,10 +472,22 @@ class ObjectEditView(LoginRequiredMixin, BaseHTMXView, UpdateView):
 
     # render_to_response is now handled by BaseHTMXView
 
-class ObjectDeleteView(LoginRequiredMixin, BaseHTMXView, DeleteView):
+class ObjectDeleteView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, DeleteView):
     """Base view for deleting an object."""
     template_name = 'generic/object_confirm_delete.html'
     form_class = ConfirmationForm
+
+    def get_permission_required(self):
+        if self.model:
+            app_label = self.model._meta.app_label
+            model_name = self.model._meta.model_name
+            return (f'{app_label}.delete_{model_name}',)
+        if hasattr(self, 'queryset') and self.queryset is not None:
+            model = self.queryset.model
+            app_label = model._meta.app_label
+            model_name = model._meta.model_name
+            return (f'{app_label}.delete_{model_name}',)
+        return ('',)
 
     def get_success_url(self):
         if self.request.POST.get('return_url'):
