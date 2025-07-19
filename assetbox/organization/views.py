@@ -11,6 +11,7 @@ from django.contrib import messages
 
 
 from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView # Import base CBVs
+from core.quick_add import QuickAddMixin
 from core.utils import get_paginate_count, get_model_viewname # Import the utility function and get_model_viewname
 from assets.tables import AssetTable # Import AssetTable
 from assets.models import Asset # Import Asset model
@@ -345,11 +346,12 @@ class LocationDetailView(ObjectDetailView):
         context['related_objects_list'] = related_objects_list
         return context
 
-class LocationEditView(ObjectEditView):
+class LocationEditView(QuickAddMixin, ObjectEditView):
     queryset = Location.objects.all()
     model = Location
     model_form = LocationForm
     template_name = 'generic/object_edit.html'
+    quick_add_target = 'id_location'
     # Default success_url goes to object detail view
 
 class LocationDeleteView(ObjectDeleteView):

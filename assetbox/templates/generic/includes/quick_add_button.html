@@ -16,7 +16,6 @@ the modal closes and the new object is prepended to the target select.
         title="Add new {{ model_label }}"
         hx-get="{% url quick_add_url %}{% if quick_add_url_params %}?{{ quick_add_url_params }}{% endif %}"
         hx-target="#modal-placeholder"
-        hx-on::after-request="setTimeout(function(){ var m=document.getElementById('quick-add-modal'); if(m) new bootstrap.Modal(m).show(); }, 100)"
         aria-label="Quick-add {{ model_label }}">
     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
         <path stroke="none" d="M0 0h24v24H0z" fill="none"/>

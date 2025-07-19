@@ -217,6 +217,7 @@ class AssetForm(forms.ModelForm):
                         'model_label': 'Asset Type',
                         'quick_add_url': 'assets:assettype_create',
                         'target_select_id': 'id_asset_type',
+                        'quick_add_url_params': '_quickadd=1',
                     })),
                     'asset_type',
                     css_class='col-md-6'
@@ -226,6 +227,7 @@ class AssetForm(forms.ModelForm):
                         'model_label': 'Asset Role',
                         'quick_add_url': 'assets:assetrole_create',
                         'target_select_id': 'id_asset_role',
+                        'quick_add_url_params': '_quickadd=1',
                     })),
                     'asset_role',
                     css_class='col-md-6'
@@ -243,6 +245,7 @@ class AssetForm(forms.ModelForm):
                         'model_label': 'Location',
                         'quick_add_url': 'organization:location_create',
                         'target_select_id': 'id_location',
+                        'quick_add_url_params': '_quickadd=1',
                     })),
                     'location',
                     css_class='col-md-6'

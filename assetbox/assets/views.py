@@ -25,6 +25,7 @@ from users.models import UserPreference # Import UserPreference
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, BaseHTMXView
+from core.quick_add import QuickAddMixin
 from django.db.models import Count
 import json
 from django.utils import timezone
@@ -363,11 +364,12 @@ class AssetRoleDetailView(ObjectDetailView):
         context['related_objects_list'] = related_objects_list
         return context
 
-class AssetRoleEditView(ObjectEditView):
+class AssetRoleEditView(QuickAddMixin, ObjectEditView):
     queryset = AssetRole.objects.all()
     model = AssetRole
     model_form = AssetRoleForm
     template_name = 'generic/object_edit.html'
+    quick_add_target = 'id_asset_role'
     # Default success_url goes to object detail view
 
 class AssetRoleDeleteView(ObjectDeleteView):
@@ -567,11 +569,12 @@ class AssetTypeDetailView(ObjectDetailView): # Inherit from ObjectDetailView
         context['related_objects_list'] = related_objects_list
         return context
 
-class AssetTypeEditView(ObjectEditView): # Consolidate Create and Update
+class AssetTypeEditView(QuickAddMixin, ObjectEditView): # Consolidate Create and Update
     queryset = AssetType.objects.all() # Base queryset for edit view
     model = AssetType
     model_form = AssetTypeForm
     template_name = 'generic/object_edit.html' # Use generic template
+    quick_add_target = 'id_asset_type'
     # Need to handle slug lookup for the update case
     slug_field = 'slug'
     slug_url_kwarg = 'slug'
