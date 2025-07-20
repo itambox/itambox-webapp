@@ -1,11 +1,12 @@
 {# templates/assets/custody/sign_error.html #}
+{% load static %}
 <!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
     <title>Link Validation Failure - AssetBox</title>
-    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet"/>
+    <link href="{% static 'dist/vendor/tabler/css/tabler.min.css' %}" rel="stylesheet"/>
     <style>
         body {
             background-color: #f4f6fa;

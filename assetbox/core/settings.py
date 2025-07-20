@@ -130,14 +130,9 @@ TEMPLATES = [
                 'navigation': 'core.templatetags.navigation',
             },
             # Add 'builtins' if not already present for template_partials tags
-            # 'builtins': [ # REMOVED builtins as APP_DIRS handles discovery
-            #     # 'template_partials.templatetags.partials', # Removed - Loader should handle this
-            #     # Add other custom builtins if needed
-            #     'django_tables2.templatetags.django_tables2', # Ensure tables2 tags are loaded if needed globally
-            #     'django.templatetags.static', # Common builtin
-            #     'crispy_forms.templatetags.crispy_forms_tags', # Common builtin
-            #     # 'django_htmx', # Removed - htmx tags should be loaded explicitly
-            # ],
+            'builtins': [
+                'core.templatetags.panels',
+            ],
             # 'debug': DEBUG, # Link to your project's DEBUG setting - Handled by Django automatically based on DEBUG setting
         },
     },

@@ -33,7 +33,10 @@ def render_panel(context, panel):
             except TemplateDoesNotExist:
                 continue
 
-    return {
-        'panel': panel,
-        'panel_template': panel_template,
-    }
+    # Pass through the full context so panel includes can access variables
+    # like object, assignment, eol_date, etc.  Django 5.2's Context.new()
+    # discards parent context; we must flatten everything into the return dict.
+    result = dict(context.flatten())
+    result['panel'] = panel
+    result['panel_template'] = panel_template
+    return result

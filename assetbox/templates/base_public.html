@@ -6,7 +6,8 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
     <title>{% block title %}AssetBox{% endblock %}</title>
     {# <!-- CSS files --> #}
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css">
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'dist/vendor/tabler/css/tabler.min.css' %}">
     <style>
       /* Optional: Keep font import or remove if default is fine */
       @import url('https://rsms.me/inter/inter.css');
@@ -19,12 +20,11 @@
     </style>
   </head>
   <body class="d-flex flex-column">
-    <script src="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/js/demo-theme.min.js"></script>
+    <script src="{% static 'dist/assetbox.js' %}"></script>
     <div class="page page-center">
       {% block content %}
       {% endblock %}
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/js/tabler.min.js" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/js/demo.js" defer></script>
+    {# JS bundled via assetbox.js above #}
   </body>
 </html> 

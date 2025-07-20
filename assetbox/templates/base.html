@@ -16,26 +16,17 @@
         (function(){try{var t=localStorage.getItem('assetbox.theme');if(t)document.documentElement.setAttribute('data-bs-theme',t);else if(window.matchMedia('(prefers-color-scheme:dark)').matches)document.documentElement.setAttribute('data-bs-theme','dark');}catch(e){}})();
     </script>
     <!-- CSS files -->
-    <link href="https://cdn.jsdelivr.net/npm/gridstack@10.3.0/dist/gridstack.min.css" rel="stylesheet"/>
-    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.1.0/dist/css/tabler.min.css" rel="stylesheet"/>
-    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.1.0/dist/css/tabler-flags.min.css" rel="stylesheet"/>
-    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.1.0/dist/css/tabler-payments.min.css" rel="stylesheet"/>
-    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.1.0/dist/css/tabler-vendors.min.css" rel="stylesheet"/>
-    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet"/>
-    <link href="{% static 'css/assetbox.css' %}" rel="stylesheet"/>
-    <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
+    <link href="{% static 'dist/vendor/tabler/css/tabler.min.css' %}" rel="stylesheet"/>
+    <link href="{% static 'dist/vendor/tabler/css/tabler-flags.min.css' %}" rel="stylesheet"/>
+    <link href="{% static 'dist/vendor/tabler/css/tabler-payments.min.css' %}" rel="stylesheet"/>
+    <link href="{% static 'dist/vendor/tabler/css/tabler-vendors.min.css' %}" rel="stylesheet"/>
+    <link href="{% static 'dist/vendor/tom-select/css/tom-select.bootstrap5.css' %}" rel="stylesheet">
+    <link href="{% static 'dist/vendor/mdi/css/materialdesignicons.min.css' %}" rel="stylesheet"/>
+    <link href="{% static 'dist/vendor/gridstack/gridstack.min.css' %}" rel="stylesheet"/>
+    <link href="{% static 'dist/assetbox.css' %}" rel="stylesheet"/>
+    {# HTMX (in head for early hx-* processing) #}
+    <script src="{% static 'dist/vendor/htmx.min.js' %}"></script>
     {% block extra_head %}{% endblock %}
-    <style>
-        body {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-        .page-wrapper {
-            flex-grow: 1;
-        }
-    </style>
 </head>
 <body class="layout-fluid layout-combo" hx-boost="true" hx-target="#page-content-wrapper" hx-indicator="#htmx-loading-indicator">
 
@@ -47,14 +38,6 @@
     </div>
 
     {% block layout %}{% endblock %}
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/gridstack@10.3.0/dist/gridstack-all.js" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
-
-    {% block extra_scripts %}
-    <script src="{% static 'js/theme.js' %}"></script>
-    {% endblock %}
 
     {% block modals %}
     <div id="modal-placeholder"></div>
@@ -69,18 +52,14 @@
       {% endif %}
     </div>
 
-    <script src="{% static 'js/toasts.js' %}"></script>
-    <script src="{% static 'js/slug-handling.js' %}"></script>
-    <script src="{% static 'js/state.js' %}"></script>
-    <script src="{% static 'js/form-dirty.js' %}"></script>
+    {# Vendor JS (preserves global assignments — bootstrap, GridStack, TomSelect) #}
+    <script src="{% static 'dist/vendor/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'dist/vendor/gridstack-all.js' %}"></script>
+    <script src="{% static 'dist/vendor/tom-select.complete.min.js' %}"></script>
+    {# Application modules bundle #}
+    <script src="{% static 'dist/assetbox.js' %}"></script>
 
     {% block javascript %}{% endblock javascript %}
-
-    <script src="{% static 'js/sidebar.js' %}"></script>
-    <script src="{% static 'js/filter-toggle.js' %}"></script>
-    <script src="{% static 'js/object-selector.js' %}"></script>
-    <script src="{% static 'js/table-config.js' %}"></script>
-    <script src="{% static 'js/modal-handler.js' %}"></script>
 
     {# Standalone OOB target for dynamic title swaps #}
     <span id="page-title-block" style="display:none" aria-hidden="true">AssetBox</span>

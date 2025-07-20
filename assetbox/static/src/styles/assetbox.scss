@@ -1,65 +1,349 @@
-// AssetBox SCSS entry point
-// 
-// Extends Tabler UI with custom AssetBox-specific styles.
-// Tabler provides Bootstrap 5 under the hood, so Bootstrap
-// is already included via Tabler's CSS bundle.
+// ============================================================
+//  AssetBox Design Tokens & CSS Variable Reference
+// ============================================================
+//
+//  Core Tokens (inherited from Tabler UI)
+//  --------------------------------------
+//  --tblr-primary            #206bc4    Primary accent (buttons, links, active states)
+//  --tblr-secondary          #6e7e91    Secondary accent (muted elements, badges)
+//  --tblr-body-color         #1d273b    Default text color
+//  --tblr-body-bg            #f6f8fb    Page background
+//  --tblr-bg-surface         #ffffff    Card and dropdown surface
+//  --tblr-border-color       #dadcde    Border color (cards, inputs, tables)
+//  --tblr-font-monospace     ui-monospace  Monospace font stack
+//  --tblr-border-radius-sm   4px        Small rounded corners
+//  --tblr-box-shadow-lg      0 1rem 3rem rgba(0,0,0,.175)  Dropdown/modal shadow
+//
+//  AssetBox Custom Tokens
+//  ----------------------
+//  --assetbox-primary        #206bc4    (light) Primary accent
+//  --assetbox-primary-dark   #4e8cdb    (dark)  Primary accent for dark mode
+//  --assetbox-sidebar-width  250px      Vertical sidebar width
+//
+//  Status / Severity Colors (Tabler native)
+//  ----------------------------------------
+//  Success  --tblr-success / bg-success  #2fb344
+//  Danger   --tblr-danger  / bg-danger   #d63939
+//  Warning  --tblr-warning / bg-warning  #f59f00
+//  Info     --tblr-info    / bg-blue     #206bc4
+//
+//  Spacing Scale (Tabler native)
+//  -----------------------------
+//  0.25rem  0.5rem  0.75rem  1rem  1.5rem  2rem  3rem  4rem
+//  (Spacing follows 8px base grid: 4, 8, 12, 16, 24, 32, 48, 64)
+//
+//  Typography
+//  ----------
+//  Body:   var(--tblr-body-font-family), 0.875rem, 1.5 line-height
+//  Headings: inherit font-family with varying weights (600-700)
+//  Monospace: var(--tblr-font-monospace) for changelog diffs, code blocks
+//
+//  Dark Mode
+//  ---------
+//  Toggle via data-bs-theme="dark" on <html>. Tabler provides full
+//  dark-mode coverage. Custom dark overrides use:
+//    [data-bs-theme="dark"] .selector { ... }
+//
+// ============================================================
 
-// Custom CSS variables and theme overrides
-// (move content from static/css/assetbox.css here incrementally)
+// ---- Changelog diff styles ----
 
-:root {
-  --assetbox-primary: #206bc4;
-  --assetbox-sidebar-width: 250px;
+pre.change-data {
+    border-radius: 0;
+    padding: 0;
+
+    > span {
+        display: block;
+        padding-right: 1rem;
+        padding-left: 1rem;
+    }
+
+    > span.added {
+        background-color: rgba(47, 179, 68, 0.1);
+        color: #2fb344;
+    }
+
+    > span.removed {
+        background-color: rgba(214, 57, 57, 0.1);
+        color: #d63939;
+    }
 }
 
-// Dark mode refinements
+pre.change-diff {
+    border-radius: 4px;
+    padding: 12px;
+    font-family: var(--tblr-font-monospace);
+    font-size: 8.5pt;
+    line-height: 1.4;
+
+    &.change-added {
+        background-color: rgba(47, 179, 68, 0.08);
+        color: #2fb344;
+        border: 1px solid rgba(47, 179, 68, 0.15);
+    }
+
+    &.change-removed {
+        background-color: rgba(214, 57, 57, 0.08);
+        color: #d63939;
+        border: 1px solid rgba(214, 57, 57, 0.15);
+    }
+}
+
+pre.block {
+    padding: 1rem;
+    border: 1px solid #dce1e7;
+    border-radius: 4px;
+}
+
+// ---- Card spacing ----
+
+.page-body .card {
+    margin-bottom: 1rem;
+}
+
+// ---- Tom Select Customizations ----
+
+.ts-wrapper {
+    &.form-select {
+        border: none;
+        padding: 0;
+        height: auto;
+    }
+
+    &.multi .ts-control > div {
+        background: var(--tblr-primary);
+        color: var(--tblr-primary-fg);
+        border-radius: var(--tblr-border-radius-sm);
+        padding: 0.15rem 0.5rem;
+        margin: 0.125rem 0.25rem 0.125rem 0;
+
+        .remove {
+            border-left: 1px solid var(--tblr-secondary-fg);
+            margin-left: 0.25rem;
+            padding-left: 0.25rem;
+            opacity: 0.7;
+
+            &:hover {
+                opacity: 1;
+            }
+        }
+    }
+}
+
+.ts-control {
+    border-color: var(--tblr-border-color);
+    background-color: var(--tblr-bg-surface);
+    color: var(--tblr-body-color);
+    box-shadow: none !important;
+    padding: 0.5rem 0.75rem;
+    min-height: calc(1.5em + 1rem + 2px);
+    align-items: center;
+}
+
+.ts-dropdown {
+    background: var(--tblr-bg-surface);
+    border: 1px solid var(--tblr-border-color);
+    box-shadow: var(--tblr-box-shadow-lg);
+    color: var(--tblr-body-color);
+
+    .ts-dropdown-content {
+        max-height: 200px;
+    }
+
+    .active {
+        background-color: var(--tblr-secondary);
+        color: var(--tblr-primary-fg);
+    }
+
+    .option {
+        padding: 0.5rem 0.75rem;
+    }
+
+    .optgroup-header {
+        color: var(--tblr-secondary);
+        font-weight: bold;
+        padding: 0.5rem 0.75rem 0.25rem;
+    }
+}
+
+// Dark mode overrides for Tom Select
 [data-bs-theme="dark"] {
-  --assetbox-primary: #4e8cdb;
+    .ts-control {
+        border-color: var(--tblr-border-color);
+        background-color: var(--tblr-bg-surface);
+        color: var(--tblr-body-color);
+    }
+
+    .ts-wrapper.multi .ts-control > div {
+        background: var(--tblr-secondary);
+        color: var(--tblr-secondary-fg);
+
+        .remove {
+            border-left-color: var(--tblr-secondary-fg);
+        }
+    }
+
+    .ts-dropdown {
+        background: var(--tblr-bg-surface);
+        border-color: var(--tblr-border-color);
+        color: var(--tblr-body-color);
+
+        .active {
+            background-color: var(--tblr-secondary);
+            color: var(--tblr-secondary-fg);
+        }
+
+        .optgroup-header {
+            color: var(--tblr-secondary);
+        }
+    }
 }
 
-// Layout fixes for the dual sidebar + content layout
+// Override Tabler core's scrollbar layout shift prevention
+// to resolve the 15px layout gap between fixed sidebar and page-wrapper
+html,
+:root {
+    margin-left: 0px !important;
+}
+
+// ---- Specs container ----
+.specs-container {
+    background-color: #f6f8fb !important;
+    color: var(--tblr-body-color) !important;
+}
+
+[data-bs-theme="dark"] .specs-container {
+    background-color: #1a2538 !important;
+    color: var(--tblr-body-color) !important;
+}
+
+// ---- Table Column Width Stabilization ----
+
+// 1. Enforce fixed table layout for predictable column widths
+.card-table {
+    table-layout: fixed;
+    width: 100%;
+    min-width: calc(var(--table-col-count, 6) * 5rem);
+
+    // 2. Prevent body cells from wrapping
+    tbody td {
+        white-space: nowrap;
+    }
+
+    // 3. Sticky first column (checkbox/pk) — pinned left
+    th:first-child,
+    td:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 2;
+        background-color: inherit;
+    }
+    thead th:first-child {
+        z-index: 4;
+    }
+
+    // 4. Sticky last column (actions) — pinned right
+    th:last-child,
+    td:last-child {
+        position: sticky;
+        right: 0;
+        z-index: 2;
+        background-color: inherit;
+    }
+    thead th:last-child {
+        z-index: 4;
+    }
+
+    // 5. Edge shadow on sticky cells to hint at scrollable content
+    td:first-child::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: -6px;
+        bottom: 0;
+        width: 6px;
+        background: linear-gradient(to right, rgba(0, 0, 0, 0.08), transparent);
+        pointer-events: none;
+    }
+    td:last-child::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: -6px;
+        bottom: 0;
+        width: 6px;
+        background: linear-gradient(to left, rgba(0, 0, 0, 0.08), transparent);
+        pointer-events: none;
+    }
+}
+
+// ---- GridStack ----
+
+#dashboard-grid.grid-stack {
+    max-width: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+// ---- Modal layout fixes ----
+
+.modal-open {
+    overflow: hidden;
+
+    .page {
+        padding-right: 0 !important;
+    }
+}
+
+@supports (scrollbar-gutter: stable) {
+    html {
+        scrollbar-gutter: stable;
+    }
+    .modal-open {
+        overflow: auto;
+    }
+}
+
+// ---- Batch action bar ----
+.batch-actions-bar {
+    transition: opacity 0.15s ease;
+}
+
+// ---- Panel cards ----
+.panel-card {
+    .card-header {
+        background: transparent;
+        border-bottom: 1px solid var(--tblr-border-color, #e6e7e9);
+    }
+}
+
+// ---- Notification dot animation ----
+.status-dot-animated {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+// ---- Layout utility ----
 .page-wrapper {
-  flex-grow: 1;
+    flex-grow: 1;
 }
 
 // Transition for theme changes
 html {
-  transition: background-color 0.2s ease;
+    transition: background-color 0.2s ease;
 }
 
-// Batch action bar styles
-.batch-actions-bar {
-  transition: opacity 0.15s ease;
-}
-
-// Table improvements
-.table-responsive {
-  .table {
+// Table responsive base
+.table-responsive .table {
     margin-bottom: 0;
-  }
-}
-
-// Panel cards (for declarative panel layout)
-.panel-card {
-  .card-header {
-    background: transparent;
-    border-bottom: 1px solid var(--tblr-border-color, #e6e7e9);
-  }
-}
-
-// Tom Select overrides for AssetBox theme
-.ts-wrapper {
-  .ts-control {
-    border-color: var(--tblr-border-color, #dadcde);
-  }
-}
-
-// Notification dot animation
-.status-dot-animated {
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
 }

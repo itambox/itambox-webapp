@@ -210,9 +210,7 @@
     </div>
 {% endblock page_actions %}
 
-{% block javascript %}
-<script src="{% static 'js/batch-actions.js' %}"></script>
-{% endblock javascript %}
+{# batch-actions.js is now bundled in assetbox.js via base.html #}
 
 {# Bulk Assign Modal — only rendered on Asset list page #}
 {% if model_name_str == 'assets.asset' %}
