@@ -1,0 +1,216 @@
+import json
+import hmac
+import hashlib
+import logging
+
+import requests
+from django.contrib.contenttypes.models import ContentType
+
+from core.models import ChangeLoggingMixin, Event, EventRule, Job
+
+logger = logging.getLogger(__name__)
+
+
+def dispatch_event(sender, instance, action, created=None):
+    """Dispatch an event when a ChangeLoggingMixin model is created, updated, or deleted."""
+
+    if not issubclass(sender, ChangeLoggingMixin):
+        return
+
+    ct = ContentType.objects.get_for_model(sender)
+
+    event = Event.objects.create(
+        model=ct,
+        object_id=instance.pk,
+        action=action,
+        data={'app_label': ct.app_label, 'model_name': ct.model},
+    )
+
+    process_event_rules(event)
+
+
+def process_event_rules(event):
+    """Match and execute event rules for the given event."""
+
+    rules = EventRule.objects.filter(
+        model=event.model,
+        enabled=True,
+    )
+
+    if not rules.exists():
+        return
+
+    for rule in rules:
+        events_list = rule.events or []
+        if event.action not in events_list:
+            continue
+
+        if not _check_conditions(rule.conditions, event):
+            continue
+
+        _execute_event_action(rule, event)
+
+    event.processed = True
+    event.save(update_fields=['processed'])
+
+
+def _check_conditions(conditions, event):
+    """Evaluate optional JSON conditions on the event."""
+
+    if not conditions:
+        return True
+
+    condition_type = conditions.get('type', 'and')
+    rules = conditions.get('rules', [])
+
+    if not rules:
+        return True
+
+    results = []
+    for rule in rules:
+        if 'and' in rule or 'or' in rule:
+            results.append(_check_conditions(rule, event))
+        else:
+            results.append(_evaluate_condition(rule, event))
+
+    if condition_type == 'or':
+        return any(results)
+    return all(results)
+
+
+def _evaluate_condition(rule, event):
+    """Evaluate a single condition rule against the event."""
+
+    field = rule.get('field')
+    op = rule.get('op')
+    value = rule.get('value')
+
+    if not field or not op:
+        return True
+
+    data = event.data or {}
+    actual = data.get(field)
+
+    if op == 'eq':
+        return actual == value
+    elif op == 'neq':
+        return actual != value
+    elif op == 'contains':
+        return str(value) in str(actual) if actual else False
+    elif op == 'in':
+        return actual in (value if isinstance(value, list) else [value])
+    elif op == 'gt':
+        try:
+            return float(actual) > float(value)
+        except (TypeError, ValueError):
+            return False
+    elif op == 'lt':
+        try:
+            return float(actual) < float(value)
+        except (TypeError, ValueError):
+            return False
+
+    return True
+
+
+def _execute_event_action(rule, event):
+    """Execute the action specified by an event rule."""
+
+    if rule.action_type == EventRule.ACTION_WEBHOOK:
+        _send_webhook(rule, event)
+    elif rule.action_type == EventRule.ACTION_NOTIFICATION:
+        _send_notification(rule, event)
+    elif rule.action_type == EventRule.ACTION_SCRIPT:
+        _run_script_job(rule, event)
+
+
+def _send_webhook(rule, event):
+    """Send a webhook request based on the rule's action_config."""
+
+    config = rule.action_config or {}
+    url = config.get('url')
+    if not url:
+        return
+
+    method = config.get('method', 'POST').upper()
+    headers = config.get('headers', {})
+    secret = config.get('secret', '')
+
+    payload = {
+        'event': event.action,
+        'model': f"{event.model.app_label}.{event.model.model}",
+        'object_id': event.object_id,
+        'timestamp': event.timestamp.isoformat(),
+        'data': event.data,
+    }
+
+    body = json.dumps(payload, default=str)
+
+    if secret:
+        signature = hmac.new(
+            secret.encode('utf-8'),
+            body.encode('utf-8'),
+            hashlib.sha256,
+        ).hexdigest()
+        headers['X-Hub-Signature-256'] = f'sha256={signature}'
+
+    headers.setdefault('Content-Type', 'application/json')
+
+    try:
+        response = requests.request(
+            method=method,
+            url=url,
+            headers=headers,
+            data=body,
+            timeout=10,
+        )
+        response.raise_for_status()
+        logger.info("Webhook sent to %s — status %s", url, response.status_code)
+    except requests.RequestException as e:
+        logger.error("Webhook to %s failed: %s", url, e)
+
+
+def _send_notification(rule, event):
+    """Create an in-app notification based on the rule's action_config."""
+
+    from core.models import Notification
+
+    config = rule.action_config or {}
+    level = config.get('level', 'info')
+    subject = config.get('subject', f"Event: {event.action} on {event.model.model}")
+    body = config.get('body', str(event.data))
+
+    try:
+        subject = subject.format(event=event, data=event.data)
+        body = body.format(event=event, data=event.data)
+    except (KeyError, ValueError):
+        pass
+
+    Notification.objects.create(
+        user=None,
+        subject=subject,
+        message=body,
+        level=level,
+    )
+
+
+def _run_script_job(rule, event):
+    """Create a background job to run a custom script."""
+
+    config = rule.action_config or {}
+    script_name = config.get('script', 'unknown')
+
+    Job.objects.create(
+        name=f"Script: {script_name}",
+        model=event.model,
+        object_id=event.object_id,
+        status=Job.STATUS_PENDING,
+        data={
+            'script': script_name,
+            'event_action': event.action,
+            'event_data': event.data,
+        },
+    )
+
+
+

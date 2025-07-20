@@ -1,6 +1,6 @@
 from .utils import ChoiceSet
 
-# Define choices for ObjectChange actions
+
 class ObjectChangeActionChoices(ChoiceSet):
     ACTION_CREATE = 'create'
     ACTION_UPDATE = 'update'
@@ -24,4 +24,28 @@ class ObjectChangeActionChoices(ChoiceSet):
         ACTION_DELETE: 3,
     }
 
-# Add other choice sets for the core app here as needed 
+
+class EventActionChoices(ChoiceSet):
+    ACTION_CREATE = 'create'
+    ACTION_UPDATE = 'update'
+    ACTION_DELETE = 'delete'
+
+    CHOICES = (
+        (ACTION_CREATE, 'Create', 'success'),
+        (ACTION_UPDATE, 'Update', 'info'),
+        (ACTION_DELETE, 'Delete', 'danger'),
+    )
+
+
+class JobStatusChoices(ChoiceSet):
+    STATUS_PENDING = 'pending'
+    STATUS_RUNNING = 'running'
+    STATUS_COMPLETED = 'completed'
+    STATUS_FAILED = 'failed'
+
+    CHOICES = (
+        (STATUS_PENDING, 'Pending', 'secondary'),
+        (STATUS_RUNNING, 'Running', 'warning'),
+        (STATUS_COMPLETED, 'Completed', 'success'),
+        (STATUS_FAILED, 'Failed', 'danger'),
+    )

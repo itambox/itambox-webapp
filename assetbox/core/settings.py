@@ -73,7 +73,7 @@ INSTALLED_APPS = [
     'django_filters',
     'crispy_forms',
     'crispy_bootstrap5',
-    'core',
+    'core.apps.CoreConfig',
     'extras.apps.ExtrasConfig',
     'rest_framework',
     'drf_spectacular',
