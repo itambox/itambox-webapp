@@ -1,0 +1,22 @@
+<dl class="row mb-0">
+    <dt class="col-sm-3">Name:</dt>
+    <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
+
+    <dt class="col-sm-3">Slug:</dt>
+    <dd class="col-sm-9"><code>{{ object.slug }}</code></dd>
+
+    <dt class="col-sm-3">Meta Type:</dt>
+    <dd class="col-sm-9"><span class="badge bg-blue-lt text-blue text-uppercase">{{ object.get_type_display }}</span></dd>
+
+    <dt class="col-sm-3">Color Badge:</dt>
+    <dd class="col-sm-9">
+        {% if object.color %}
+            <span class="badge" style="background-color: #{{ object.color }};">&nbsp;</span> #{{ object.color }}
+        {% else %}
+            &mdash;
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">Description:</dt>
+    <dd class="col-sm-9 text-secondary">{{ object.description|linebreaksbr|default:"<i>No description provided.</i>"|safe }}</dd>
+</dl>

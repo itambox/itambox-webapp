@@ -9,6 +9,7 @@ from core.views import (
     # BulkEditView,  # Add later if needed
     # BulkDeleteView # Add later if needed
 )
+from core.panels import Panel
 from .models import Software
 from . import forms
 from . import tables
@@ -29,6 +30,11 @@ class SoftwareListView(ObjectListView):
 class SoftwareDetailView(ObjectDetailView):
     queryset = Software.objects.select_related('manufacturer').prefetch_related('tags')
     template_name = 'software/software_detail.html' # Use a specific template or generic one
+
+    layout = (
+        ((Panel('metrics', 'Software Overview'),),),
+        ((Panel('info', 'Software Details'),),),
+    )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

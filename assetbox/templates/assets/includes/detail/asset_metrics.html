@@ -1,0 +1,55 @@
+{# Panel: Asset metrics overview (assignment status + software count) #}
+<div class="row g-3 mb-4">
+    <div class="col-sm-6">
+        {% if assignment and assignment.asset_holder %}
+            <div class="card card-sm bg-blue-lt border-0 shadow-none">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-auto">
+                            <span class="bg-blue text-white avatar rounded shadow-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user-check" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /><path d="M16 11l2 2l4 -4" /></svg>
+                            </span>
+                        </div>
+                        <div class="col">
+                            <div class="font-weight-medium text-blue small uppercase font-sans">Assignment Status</div>
+                            <div class="text-blue h2 mb-0 font-weight-bold">Deployed / Checked Out</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <div class="card card-sm bg-green-lt border-0 shadow-none">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-auto">
+                            <span class="bg-green text-white avatar rounded shadow-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l5 5l10 -10" /></svg>
+                            </span>
+                        </div>
+                        <div class="col">
+                            <div class="font-weight-medium text-green small uppercase font-sans">Assignment Status</div>
+                            <div class="text-green h2 mb-0 font-weight-bold">Available in Inventory</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+    <div class="col-sm-6">
+        <div class="card card-sm bg-purple-lt border-0 shadow-none">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-purple text-white avatar rounded shadow-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" /><path d="M9 4v16" /><path d="M14 10l2 2l-2 2" /></svg>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium text-purple small uppercase font-sans">Software Inventory</div>
+                        <div class="text-purple h2 mb-0 font-weight-bold">{{ object.installed_software.count }} Items Logged</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

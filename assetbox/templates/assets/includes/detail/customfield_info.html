@@ -1,0 +1,19 @@
+<dl class="row mb-0">
+    <dt class="col-sm-3">Name:</dt>
+    <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
+
+    <dt class="col-sm-3">Label:</dt>
+    <dd class="col-sm-9">{{ object.label }}</dd>
+
+    <dt class="col-sm-3">Type:</dt>
+    <dd class="col-sm-9"><span class="badge bg-blue-lt">{{ object.get_type_display }}</span></dd>
+
+    <dt class="col-sm-3">Weight:</dt>
+    <dd class="col-sm-9">{{ object.weight }}</dd>
+
+    <dt class="col-sm-3">Required:</dt>
+    <dd class="col-sm-9">{% if object.required %}<span class="badge bg-success-lt text-success">Yes</span>{% else %}<span class="badge bg-secondary-lt text-secondary">No</span>{% endif %}</dd>
+
+    <dt class="col-sm-3">Description:</dt>
+    <dd class="col-sm-9 text-secondary">{{ object.description|linebreaksbr|default:"<i>No description.</i>"|safe }}</dd>
+</dl>

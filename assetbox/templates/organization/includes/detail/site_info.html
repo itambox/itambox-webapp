@@ -1,0 +1,81 @@
+{# Panel: Site basic information #}
+<dl class="row mb-0">
+    <dt class="col-sm-3">Name:</dt>
+    <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
+
+    <dt class="col-sm-3">Slug:</dt>
+    <dd class="col-sm-9"><code>{{ object.slug }}</code></dd>
+
+    <dt class="col-sm-3">Status:</dt>
+    <dd class="col-sm-9">
+        <span class="badge {% if object.status == 'active' %}bg-success-lt text-success{% elif object.status == 'planned' %}bg-info-lt text-info{% else %}bg-secondary-lt text-secondary{% endif %} px-2.5 py-1 text-uppercase">
+            {{ object.get_status_display }}
+        </span>
+    </dd>
+
+    <dt class="col-sm-3">Region:</dt>
+    <dd class="col-sm-9">
+        {% if object.region %}
+            <a href="{% url 'organization:region_detail' pk=object.region.pk %}">{{ object.region }}</a>
+        {% else %}
+             <span class="text-muted"><i>None</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">Site Group:</dt>
+    <dd class="col-sm-9">
+        {% if object.group %}
+            <a href="{% url 'organization:sitegroup_detail' pk=object.group.pk %}">{{ object.group }}</a>
+        {% else %}
+             <span class="text-muted"><i>None</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">Tenant:</dt>
+    <dd class="col-sm-9">
+        {% if object.tenant %}
+            <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant }}</a>
+        {% else %}
+             <span class="text-muted"><i>None</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">Description:</dt>
+    <dd class="col-sm-9 text-secondary">{{ object.description|linebreaksbr|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
+
+    <dt class="col-sm-3">Facility:</dt>
+    <dd class="col-sm-9">{{ object.facility|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
+
+    <dt class="col-sm-3">Time Zone:</dt>
+    <dd class="col-sm-9"><span class="badge bg-purple-lt">{{ object.time_zone|default:"UTC" }}</span></dd>
+
+    <dt class="col-sm-3">Physical Address:</dt>
+    <dd class="col-sm-9 text-secondary">{{ object.physical_address|linebreaksbr|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
+
+    <dt class="col-sm-3">Shipping Address:</dt>
+    <dd class="col-sm-9 text-secondary">{{ object.shipping_address|linebreaksbr|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
+
+    <dt class="col-sm-3">GPS Coordinates:</dt>
+    <dd class="col-sm-9">
+        {% if object.latitude and object.longitude %}
+            <span class="badge bg-blue-lt">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-gps me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M12 17l0 -10l-3 5h3z" /></svg>
+                {{ object.latitude }}, {{ object.longitude }}
+            </span>
+        {% else %}
+            <span class="text-muted"><i>Not Set</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">Comments:</dt>
+    <dd class="col-sm-9 text-secondary">{{ object.comments|linebreaksbr|default:"<span class='text-muted'><i>None</i></span>"|safe }}</dd>
+
+    {% if object.tags.all %}
+    <dt class="col-sm-3">Tags:</dt>
+    <dd class="col-sm-9">
+        {% for tag in object.tags.all %}
+            {% include 'inc/tags.html' with tag=tag %}
+        {% endfor %}
+    </dd>
+    {% endif %}
+</dl>

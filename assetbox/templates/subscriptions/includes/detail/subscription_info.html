@@ -1,0 +1,68 @@
+<dl class="row mb-0">
+    <dt class="col-sm-3">Provider:</dt>
+    <dd class="col-sm-9">
+        {% if object.provider %}
+        <a href="{% url 'subscriptions:provider_detail' object.provider.pk %}">{{ object.provider.name }}</a>
+        {% else %}
+        <span class="text-muted"><i>None</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">Type:</dt>
+    <dd class="col-sm-9">{{ object.get_type_display }}</dd>
+
+    <dt class="col-sm-3">Status:</dt>
+    <dd class="col-sm-9">
+        <span class="badge {% if object.status == 'active' %}bg-success{% elif object.status == 'expired' %}bg-danger{% elif object.status == 'cancelled' %}bg-secondary{% elif object.status == 'pending' %}bg-warning{% elif object.status == 'suspended' %}bg-dark{% elif object.status == 'renewing' %}bg-info{% endif %}">
+            {{ object.get_status_display }}
+        </span>
+        {% if object.auto_renewal %}<span class="badge bg-info ms-1">Auto-Renewal</span>{% endif %}
+    </dd>
+
+    {% if object.tenant %}
+    <dt class="col-sm-3">Tenant:</dt>
+    <dd class="col-sm-9">{{ object.tenant.name }}</dd>
+    {% endif %}
+
+    {% if object.owner %}
+    <dt class="col-sm-3">Owner:</dt>
+    <dd class="col-sm-9">{{ object.owner.get_full_name|default:object.owner.username }}</dd>
+    {% endif %}
+
+    <dt class="col-sm-3">Start Date:</dt>
+    <dd class="col-sm-9 text-secondary">{{ object.start_date|date:"Y-m-d"|default:"&mdash;" }}</dd>
+
+    <dt class="col-sm-3">Term:</dt>
+    <dd class="col-sm-9 text-secondary">{{ object.term_months|default:"&mdash;" }} months{% if object.billing_cycle %} &middot; {{ object.get_billing_cycle_display }}{% endif %}</dd>
+
+    <dt class="col-sm-3">Next Renewal:</dt>
+    <dd class="col-sm-9">
+        {{ object.renewal_date|date:"Y-m-d"|default:"&mdash;" }}
+        {% if object.days_until_renewal is not None %}
+            <span class="badge {% if object.days_until_renewal < 0 %}bg-danger{% elif object.days_until_renewal <= 30 %}bg-warning{% elif object.days_until_renewal <= 90 %}bg-info{% else %}bg-success{% endif %} ms-1">
+                {% if object.days_until_renewal < 0 %}
+                    {{ object.days_until_renewal|stringformat:"+d"|slice:"1:" }} days overdue
+                {% elif object.days_until_renewal == 0 %}
+                    Today
+                {% else %}
+                    {{ object.days_until_renewal }} days
+                {% endif %}
+            </span>
+        {% endif %}
+    </dd>
+
+    {% if object.cancellation_date %}
+    <dt class="col-sm-3">Cancelled:</dt>
+    <dd class="col-sm-9 text-secondary">{{ object.cancellation_date|date:"Y-m-d" }}</dd>
+    {% endif %}
+
+    {% if object.contract_reference %}
+    <dt class="col-sm-3">Contract Ref:</dt>
+    <dd class="col-sm-9"><code>{{ object.contract_reference }}</code></dd>
+    {% endif %}
+
+    {% if object.cost_center %}
+    <dt class="col-sm-3">Cost Center:</dt>
+    <dd class="col-sm-9">{{ object.cost_center }}</dd>
+    {% endif %}
+</dl>

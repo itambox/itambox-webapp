@@ -1,0 +1,65 @@
+{# Panel: Financial & Lifecycle details #}
+<dl class="row mb-0">
+    <dt class="col-sm-4">Purchase Cost:</dt>
+    <dd class="col-sm-8">
+        {% if object.purchase_cost %}
+            ${{ object.purchase_cost|floatformat:2 }}
+        {% else %}
+            <span class="text-muted"><i>Not Set</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">Salvage Value:</dt>
+    <dd class="col-sm-8">
+        {% if object.salvage_value %}
+            ${{ object.salvage_value|floatformat:2 }}
+        {% else %}
+            <span class="text-muted"><i>Not Set</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">Depreciated Book Value:</dt>
+    <dd class="col-sm-8">
+        {% if object.current_value is not None %}
+            <span class="h3 font-weight-bold text-success">
+                ${{ object.current_value|floatformat:2 }}
+            </span>
+            {% if object.asset_type.depreciation %}
+                <br>
+                <small class="text-muted">Depreciated over {{ object.asset_type.depreciation.months }} months ({{ object.asset_type.depreciation.name }})</small>
+            {% endif %}
+        {% else %}
+            <span class="text-muted"><i>N/A (No Purchase Cost)</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">Estimated EOL Date:</dt>
+    <dd class="col-sm-8">
+        {% if eol_date %}
+            {{ eol_date|date:"Y-m-d" }} 
+            <span class="badge bg-secondary-lt ms-1">{{ object.asset_type.eol_months }} months</span>
+        {% else %}
+            <span class="text-muted"><i>N/A</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">Remaining Lifespan:</dt>
+    <dd class="col-sm-8">
+        {% if time_to_eol == 'Expired' %}
+            <span class="badge bg-danger-lt text-danger font-weight-bold text-uppercase">Expired (EOL Reached)</span>
+        {% elif time_to_eol != '—' %}
+            <span class="badge bg-success-lt text-success font-weight-bold">{{ time_to_eol }}</span>
+        {% else %}
+            <span class="text-muted"><i>N/A</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">Total Cost of Ownership (TCO):</dt>
+    <dd class="col-sm-8">
+        <span class="h3 font-weight-bold text-success">
+            ${{ total_cost_of_ownership|floatformat:2 }}
+        </span>
+        <br>
+        <small class="text-muted">Purchase + {{ object.maintenances.count }} repair/maintenance item{{ object.maintenances.count|pluralize }}</small>
+    </dd>
+</dl>

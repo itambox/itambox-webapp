@@ -15,6 +15,7 @@ from . import forms
 from . import tables
 # --- End imports ---
 from core.utils import get_paginate_count, get_model_viewname
+from core.panels import Panel
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.contrib.contenttypes.models import ContentType
 from organization.models import AssetHolderAssignment, AssetHolder, Location
@@ -120,6 +121,14 @@ class AssetDetailView(ObjectDetailView):
         'tags', 'maintenances'
     )
     # template_name = 'assets/assets/asset_detail.html' # Can be inferred
+
+    layout = (
+        ((Panel('metrics', 'Asset Overview'),),),
+        (
+            (Panel('asset_info', 'Asset Details'), Panel('specs', 'Hardware Specifications'), Panel('custom_fields', 'Custom Fields')),
+            (Panel('assignment', 'Deployment & Custody'), Panel('financial', 'Financial & Lifecycle'), Panel('audit', 'Audit & Compliance')),
+        ),
+    )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -342,6 +351,10 @@ class AssetRoleDetailView(ObjectDetailView):
     queryset = AssetRole.objects.prefetch_related('tags', 'asset_set') # Use related_name 'asset_set'
     # template_name = 'assets/assetroles/assetrole_detail.html' # Can be inferred
 
+    layout = (
+        ((Panel('info', 'Asset Role Details'),),),
+    )
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         assetrole = self.get_object()
@@ -402,6 +415,11 @@ class StatusLabelListView(ObjectListView):
 
 class StatusLabelDetailView(ObjectDetailView):
     queryset = StatusLabel.objects.prefetch_related('assets')
+
+    layout = (
+        ((Panel('metrics', 'Status Label Overview'),),),
+        ((Panel('info', 'Status Label Details'),),),
+    )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -468,6 +486,11 @@ class ManufacturerDetailView(ObjectDetailView):
         'asset_types', 'asset_types__assets' # Prefetch asset types and their assets
     )
     # template_name = 'assets/manufacturers/manufacturer_detail.html' # Can be inferred
+
+    layout = (
+        ((Panel('metrics', 'Manufacturer Overview'),),),
+        ((Panel('info', 'Manufacturer Details'),),),
+    )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -547,6 +570,11 @@ class AssetTypeDetailView(ObjectDetailView): # Inherit from ObjectDetailView
     slug_field = 'slug' # Still need this if lookup is by slug
     slug_url_kwarg = 'slug' # Still need this if lookup is by slug
 
+    layout = (
+        ((Panel('metrics', 'Asset Type Overview'),),),
+        ((Panel('info', 'Asset Type Details'), Panel('specs', 'Hardware Specifications')),),
+    )
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         assettype = self.get_object()
@@ -614,6 +642,11 @@ class ComponentTypeDetailView(ObjectDetailView):
     queryset = ComponentType.objects.select_related('manufacturer').prefetch_related('tags', 'instances')
     template_name = 'assets/componenttypes/componenttype_detail.html'
 
+    layout = (
+        ((Panel('metrics', 'Component Type Overview'),),),
+        ((Panel('info', 'Component Type Details'),),),
+    )
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         componenttype = self.get_object()
@@ -662,6 +695,11 @@ class ComponentInstanceDetailView(ObjectDetailView):
     queryset = ComponentInstance.objects.select_related('component_type', 'component_type__manufacturer', 'parent_asset').prefetch_related('tags')
     template_name = 'assets/componentinstances/componentinstance_detail.html'
 
+    layout = (
+        ((Panel('metrics', 'Component Status'),),),
+        ((Panel('info', 'Component Details'),),),
+    )
+
 class ComponentInstanceEditView(ObjectEditView):
     queryset = ComponentInstance.objects.all()
     model = ComponentInstance
@@ -688,6 +726,11 @@ class AccessoryListView(ObjectListView):
 class AccessoryDetailView(ObjectDetailView):
     queryset = Accessory.objects.select_related('manufacturer').prefetch_related('tags', 'assignments__assigned_holder', 'assignments__assigned_location')
     template_name = 'assets/accessories/accessory_detail.html'
+
+    layout = (
+        ((Panel('metrics', 'Inventory Overview'),),),
+        ((Panel('info', 'Accessory Details'),),),
+    )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -795,6 +838,11 @@ class ConsumableDetailView(ObjectDetailView):
     queryset = Consumable.objects.select_related('manufacturer').prefetch_related('tags', 'consumptions__assigned_holder', 'consumptions__assigned_location')
     template_name = 'assets/consumables/consumable_detail.html'
 
+    layout = (
+        ((Panel('metrics', 'Inventory Overview'),),),
+        ((Panel('info', 'Consumable Details'),),),
+    )
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         consumable = self.get_object()
@@ -887,6 +935,11 @@ class AssetMaintenanceListView(ObjectListView):
 class AssetMaintenanceDetailView(ObjectDetailView):
     queryset = AssetMaintenance.objects.select_related('asset')
     template_name = 'assets/assetmaintenances/assetmaintenance_detail.html'
+
+    layout = (
+        ((Panel('metrics', 'Maintenance Overview'),),),
+        ((Panel('info', 'Maintenance Details'),),),
+    )
 
 
 class AssetMaintenanceEditView(ObjectEditView):
@@ -1025,6 +1078,10 @@ class CustomFieldListView(ObjectListView):
 class CustomFieldDetailView(ObjectDetailView):
     queryset = CustomField.objects.all()
 
+    layout = (
+        ((Panel('info', 'Custom Field Details'),),),
+    )
+
 
 class CustomFieldEditView(ObjectEditView):
     queryset = CustomField.objects.all()
@@ -1052,6 +1109,10 @@ class CustomFieldsetListView(ObjectListView):
 
 class CustomFieldsetDetailView(ObjectDetailView):
     queryset = CustomFieldset.objects.all().prefetch_related('fields', 'asset_types')
+
+    layout = (
+        ((Panel('info', 'Custom Field Set Details'),),),
+    )
 
 
 class CustomFieldsetEditView(ObjectEditView):
@@ -1081,6 +1142,10 @@ class DepreciationListView(ObjectListView):
 class DepreciationDetailView(ObjectDetailView):
     queryset = Depreciation.objects.all().prefetch_related('asset_types')
 
+    layout = (
+        ((Panel('info', 'Depreciation Rule Details'),),),
+    )
+
 
 class DepreciationEditView(ObjectEditView):
     queryset = Depreciation.objects.all()
@@ -1109,6 +1174,10 @@ class KitListView(ObjectListView):
 class KitDetailView(ObjectDetailView):
     queryset = Kit.objects.all().prefetch_related('items__asset_type', 'items__accessory', 'items__license__software')
     template_name = 'assets/kits/kit_detail.html'
+
+    layout = (
+        ((Panel('info', 'Kit Details'),),),
+    )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

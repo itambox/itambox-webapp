@@ -1,0 +1,28 @@
+<dl class="row mb-0">
+    <dt class="col-sm-3">Name:</dt>
+    <dd class="col-sm-9">{{ object.name }}</dd>
+
+    <dt class="col-sm-3">Slug:</dt>
+    <dd class="col-sm-9">{{ object.slug }}</dd>
+
+    <dt class="col-sm-3">Parent Group:</dt>
+    <dd class="col-sm-9">
+        {% if object.parent %}
+            <a href="{% url 'organization:sitegroup_detail' pk=object.parent.pk %}">{{ object.parent }}</a>
+        {% else %}
+             <i>None</i>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">Description:</dt>
+    <dd class="col-sm-9">{{ object.description|linebreaksbr|default:"<i>Not Set</i>"|safe }}</dd>
+
+    {% if object.tags.all %}
+    <dt class="col-sm-3">Tags:</dt>
+    <dd class="col-sm-9">
+        {% for tag in object.tags.all %}
+            {% include 'inc/tags.html' with tag=tag %}
+        {% endfor %}
+    </dd>
+    {% endif %}
+</dl>

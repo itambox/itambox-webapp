@@ -1,0 +1,53 @@
+<dl class="row mb-0">
+    <dt class="col-sm-3">Name:</dt>
+    <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
+
+    <dt class="col-sm-3">Slug:</dt>
+    <dd class="col-sm-9"><code>{{ object.slug }}</code></dd>
+
+    <dt class="col-sm-3">Description:</dt>
+    <dd class="col-sm-9 text-secondary mb-3">{{ object.description|linebreaksbr|default:"<i>No description provided.</i>"|safe }}</dd>
+
+    <hr class="my-3 text-muted">
+    <h4 class="text-secondary mb-2 uppercase font-sans small font-weight-bold" style="letter-spacing: 0.05em;">Support &amp; Contracts</h4>
+
+    {% with support_contact=object.get_support_contact %}
+    {% if support_contact %}
+        <dt class="col-sm-3">Support Contact:</dt>
+        <dd class="col-sm-9"><a href="{{ support_contact.get_absolute_url }}"><strong>{{ support_contact.name }}</strong></a>{% if support_contact.title %} ({{ support_contact.title }}){% endif %}</dd>
+
+        <dt class="col-sm-3">Support Phone:</dt>
+        <dd class="col-sm-9">
+            {% if support_contact.phone %}
+                <a href="tel:{{ support_contact.phone }}" class="text-secondary font-weight-medium">{{ support_contact.phone }}</a>
+            {% else %}
+                <span class="text-muted small"><i>Not configured</i></span>
+            {% endif %}
+        </dd>
+
+        <dt class="col-sm-3">Support Email:</dt>
+        <dd class="col-sm-9">
+            {% if support_contact.email %}
+                <a href="mailto:{{ support_contact.email }}" class="text-secondary font-weight-medium">{{ support_contact.email }}</a>
+            {% else %}
+                <span class="text-muted small"><i>Not configured</i></span>
+            {% endif %}
+        </dd>
+
+        <dt class="col-sm-3">Support Portal:</dt>
+        <dd class="col-sm-9">
+            {% if support_contact.web_url %}
+                <a href="{{ support_contact.web_url }}" target="_blank" class="link-primary font-weight-medium d-inline-flex align-items-center">
+                    {{ support_contact.web_url }}
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-external-link ms-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6" /><path d="M11 13l9 -9" /><path d="M15 4h5v5" /></svg>
+                </a>
+            {% else %}
+                <span class="text-muted small"><i>Not configured</i></span>
+            {% endif %}
+        </dd>
+    {% else %}
+        <dd class="col-sm-12 text-muted small"><i>No active support contact configured.</i></dd>
+    {% endif %}
+    {% endwith %}
+
+</dl>

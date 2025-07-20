@@ -1,0 +1,70 @@
+<div class="row g-3 mb-4">
+    <div class="col-sm-6">
+        <div class="card card-sm bg-blue-lt border-0 shadow-none">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-blue text-white avatar rounded shadow-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-coin" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                <circle cx="12" cy="12" r="9" />
+                                <path d="M14.8 9A2 2 0 0 0 13 8h-2a2 2 0 0 0 0 4h2a2 2 0 0 1 0 4h-2a2 2 0 0 1 -1.8 -1" />
+                                <path d="M12 6v2m0 8v2" />
+                            </svg>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium text-blue small uppercase font-sans">Maintenance Cost</div>
+                        <div class="text-blue h1 mb-0 font-weight-bold">
+                            {% if object.cost %}
+                                ${{ object.cost|floatformat:2 }}
+                            {% else %}
+                                $0.00
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-6">
+        <div class="card card-sm {% if object.completion_date %}bg-success-lt{% else %}bg-warning-lt{% endif %} border-0 shadow-none">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="{% if object.completion_date %}bg-success{% else %}bg-warning{% endif %} text-white avatar rounded shadow-sm">
+                            {% if object.completion_date %}
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-circle-check" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                    <circle cx="12" cy="12" r="9" />
+                                    <path d="M9 12l2 2l4 -4" />
+                                </svg>
+                            {% else %}
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                    <circle cx="12" cy="12" r="9" />
+                                    <polyline points="12 7 12 12 15 15" />
+                                </svg>
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium {% if object.completion_date %}text-success{% else %}text-warning{% endif %} small uppercase font-sans">Downtime Duration</div>
+                        <div class="{% if object.completion_date %}text-success{% else %}text-warning{% endif %} h1 mb-0 font-weight-bold">
+                            {% if object.completion_date %}
+                                {% if object.downtime_days == 0 %}
+                                    Same Day Service
+                                {% else %}
+                                    {{ object.downtime_days }} Day{{ object.downtime_days|pluralize }}
+                                {% endif %}
+                            {% else %}
+                                In Progress (Out of Service)
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

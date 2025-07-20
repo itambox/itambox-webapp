@@ -19,45 +19,7 @@
     </li>
 {% endblock extra_tabs %}
 
-{# --- Object details override --- #}
-{% block object_details %}
-<!-- Metrics Dashboard Row -->
-<div class="row g-3 mb-4">
-    <div class="col-sm-12">
-        <div class="card card-sm bg-purple-lt border-0 shadow-none">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-purple text-white avatar rounded shadow-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-components" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12l3 3l3 -3l-3 -3z" /><path d="M15 12l3 3l3 -3l-3 -3z" /><path d="M9 6l3 3l3 -3l-3 -3z" /><path d="M9 18l3 3l3 -3l-3 -3z" /></svg>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-purple small uppercase font-sans">Total Installations Detected</div>
-                        <div class="text-purple h1 mb-0 font-weight-bold">{{ instances_table.rows|length }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<dl class="row mb-0">
-    <dt class="col-sm-3">Name:</dt>
-    <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
-
-    <dt class="col-sm-3">Manufacturer:</dt>
-    <dd class="col-sm-9">
-         {% if object.manufacturer %}
-            <a href="{% url 'assets:manufacturer_detail' pk=object.manufacturer.pk %}">
-                <span class="badge bg-blue-lt">{{ object.manufacturer }}</span>
-            </a>
-         {% else %}
-             <span class="text-muted"><i>None</i></span>
-         {% endif %}
-    </dd>
-</dl>
-{% endblock object_details %}
+{# Object details rendered via panel layout #}
 
 {# --- Extra Tab Panes --- #}
 {% block extra_tab_panes %}

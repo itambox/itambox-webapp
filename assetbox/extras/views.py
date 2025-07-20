@@ -13,10 +13,15 @@ from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.contrib import messages
 from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
+from core.panels import Panel
 
 class TagDetailView(ObjectDetailView):
     queryset = Tag.objects.all()
     template_name = 'extras/tags/tag_detail.html'
+
+    layout = (
+        ((Panel('info', 'Tag Details'),),),
+    )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

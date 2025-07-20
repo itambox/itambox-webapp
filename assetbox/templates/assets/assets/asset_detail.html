@@ -1,29 +1,27 @@
 {% extends 'generic/object_detail.html' %}
 {% load static %}
-{% load utility_tags %}
 {% load render_table from django_tables2 %}
 
 {# --- Page Title --- #}
 {% block title %}{{ object.name }} ({{ object.asset_tag }}) - AssetBox{% endblock %}
 
-{# --- Page Header (from base) --- #}
+{# --- Page Header --- #}
 {% block page_pretitle %}Asset Details{% endblock %}
 
 {# --- Page Actions --- #}
 {% block extra_page_actions %}
-    {# Check Out Button (Show if Available AND not assigned to a Holder — location doesn't block checkout) #}
+    {# Check Out Button (if available and not assigned) #}
     {% if object.status.slug == 'available' and not assignment %}
         <button type="button" class="btn btn-info"
                 hx-get="{% url 'assets:asset_checkout_modal' pk=object.pk %}"
                 hx-target="#modal-placeholder"
-                hx-swap="innerHTML"
-                >
+                hx-swap="innerHTML">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-upload" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" /><path d="M7 9l5 -5l5 5" /><path d="M12 4l0 12" /></svg>
             Check Out...
         </button>
     {% endif %}
 
-    {# Check In Button (Show ONLY if assigned to a Holder) #}
+    {# Check In Button (if assigned to a holder) #}
     {% if assignment and assignment.asset_holder %}
         <form method="post" action="{% url 'assets:asset_checkin' pk=object.pk %}" class="d-inline">
             {% csrf_token %}
@@ -35,7 +33,7 @@
     {% endif %}
 {% endblock extra_page_actions %}
 
-{# --- Tabs Hook --- #}
+{# --- Tabs --- #}
 {% block extra_tabs %}
     {% if object.is_modular %}
     <li class="nav-item" role="presentation">
@@ -62,476 +60,10 @@
     </li>
 {% endblock extra_tabs %}
 
-{# --- Asset Specific Details --- #}
-{% block object_details %}
-<!-- Metrics Dashboard Row -->
-<div class="row g-3 mb-4">
-    <div class="col-sm-6">
-        {% if assignment and assignment.asset_holder %}
-            <div class="card card-sm bg-blue-lt border-0 shadow-none">
-                <div class="card-body">
-                    <div class="row align-items-center">
-                        <div class="col-auto">
-                            <span class="bg-blue text-white avatar rounded shadow-sm">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user-check" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /><path d="M16 11l2 2l4 -4" /></svg>
-                            </span>
-                        </div>
-                        <div class="col">
-                            <div class="font-weight-medium text-blue small uppercase font-sans">Assignment Status</div>
-                            <div class="text-blue h2 mb-0 font-weight-bold">Deployed / Checked Out</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        {% else %}
-            <div class="card card-sm bg-green-lt border-0 shadow-none">
-                <div class="card-body">
-                    <div class="row align-items-center">
-                        <div class="col-auto">
-                            <span class="bg-green text-white avatar rounded shadow-sm">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l5 5l10 -10" /></svg>
-                            </span>
-                        </div>
-                        <div class="col">
-                            <div class="font-weight-medium text-green small uppercase font-sans">Assignment Status</div>
-                            <div class="text-green h2 mb-0 font-weight-bold">Available in Inventory</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        {% endif %}
-    </div>
-    <div class="col-sm-6">
-        <div class="card card-sm bg-purple-lt border-0 shadow-none">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-purple text-white avatar rounded shadow-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" /><path d="M9 4v16" /><path d="M14 10l2 2l-2 2" /></svg>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-purple small uppercase font-sans">Software Inventory</div>
-                        <div class="text-purple h2 mb-0 font-weight-bold">{{ object.installed_software.count }} Items Logged</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+{# --- Content panels are rendered via the declarative layout on the view class --- #}
 
-{% if object.status.slug == 'available' and not assignment %}
-<div class="alert alert-important alert-info alert-dismissible shadow-sm mb-4" role="alert">
-    <div class="d-flex">
-        <div>
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9v2m0 4v.01m-6.938 2.002a9 9 0 1 1 13.876 0" /></svg>
-        </div>
-        <div>
-            <strong>Ready for Deployment:</strong> This physical asset is currently unassigned. Click the <strong>Check Out...</strong> action button above to assign it to an asset holder or designate a deployed location.
-        </div>
-    </div>
-</div>
-{% endif %}
-
-<dl class="row mb-0">
-    <dt class="col-sm-3">Asset Tag:</dt>
-    <dd class="col-sm-9"><span class="badge bg-blue-lt px-2.5 py-1"><strong>{{ object.asset_tag }}</strong></span></dd>
-
-    <dt class="col-sm-3">Serial Number:</dt>
-    <dd class="col-sm-9"><code>{{ object.serial_number|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</code></dd>
-    
-    <dt class="col-sm-3">Asset Type / Model:</dt>
-    <dd class="col-sm-9">
-        {% if object.asset_type %}
-            <a href="{% url 'assets:assettype_detail' slug=object.asset_type.slug %}">{{ object.asset_type }}</a>
-        {% else %}
-             <span class="text-muted"><i>Not Set</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">Manufacturer:</dt>
-    <dd class="col-sm-9">
-         {% if object.manufacturer %}
-            <a href="{% url 'assets:manufacturer_detail' pk=object.manufacturer.pk %}">{{ object.manufacturer }}</a>
-        {% else %}
-             <span class="text-muted"><i>N/A</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">Asset Role:</dt>
-    <dd class="col-sm-9">
-        {% if object.asset_role %}
-            <a href="{% url 'assets:assetrole_detail' pk=object.asset_role.pk %}">{{ object.asset_role }}</a>
-        {% else %}
-             <span class="text-muted"><i>Not Set</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">Status:</dt>
-    <dd class="col-sm-9">
-        {% if object.status %}
-            <a href="{% url 'assets:statuslabel_detail' pk=object.status.pk %}" class="text-decoration-none">
-                <span class="badge px-2.5 py-1 text-uppercase" style="background-color: #{{ object.status.color }}1a; color: #{{ object.status.color }}; border: 1px solid #{{ object.status.color }}33;">
-                    {{ object.status.name }}
-                </span>
-            </a>
-        {% else %}
-            —
-        {% endif %}
-    </dd>
-    
-    <dt class="col-sm-3">Purchase Date:</dt>
-    <dd class="col-sm-9 text-secondary">{{ object.purchase_date|date:"Y-m-d"|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
-
-    <dt class="col-sm-3">Warranty Expiration:</dt>
-    <dd class="col-sm-9 text-secondary">{{ object.warranty_expiration|date:"Y-m-d"|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
-
-    <dt class="col-sm-3">Purchase Cost:</dt>
-    <dd class="col-sm-9 text-secondary">
-        {% if object.purchase_cost %}
-            ${{ object.purchase_cost|floatformat:2 }}
-        {% else %}
-            <span class="text-muted"><i>Not Set</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">Supplier:</dt>
-    <dd class="col-sm-9 text-secondary">{{ object.supplier|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
-
-    <dt class="col-sm-3">Order Number:</dt>
-    <dd class="col-sm-9 text-secondary">
-        {% if object.order_number %}
-            <code>{{ object.order_number }}</code>
-        {% else %}
-            <span class="text-muted"><i>Not Set</i></span>
-        {% endif %}
-    </dd>
-</dl>
-
-{% if object.asset_type and object.asset_type.cpu or object.asset_type.ram_gb or object.asset_type.storage_capacity_gb or object.asset_type.gpu %}
-<div class="card mt-4 border-0 specs-container shadow-none">
-    <div class="card-body">
-        <h4 class="card-title text-secondary mb-3 d-flex align-items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-2 text-primary" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 5m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" /><path d="M6 13h12" /><path d="M12 9v8" /></svg>
-            Assigned System Hardware Specifications
-        </h4>
-        <div class="row g-3">
-            {% if object.asset_type.cpu %}
-            <div class="col-md-6">
-                <div class="d-flex align-items-center mb-1">
-                    <span class="badge bg-blue-lt me-2 p-1.5"><svg xmlns="http://www.w3.org/2000/svg" class="icon" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 5m0 1a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1z" /><path d="M9 9h6v6h-6z" /><path d="M3 10h2" /><path d="M3 14h2" /><path d="M10 3v2" /><path d="M14 3v2" /><path d="M21 10h-2" /><path d="M21 14h-2" /><path d="M14 19v2" /><path d="M10 19v2" /></svg></span>
-                    <strong class="text-secondary small uppercase">Processor (CPU)</strong>
-                </div>
-                <div class="ms-7 font-weight-medium">{{ object.asset_type.cpu }}</div>
-            </div>
-            {% endif %}
-
-            {% if object.asset_type.ram_gb %}
-            <div class="col-md-6">
-                <div class="d-flex align-items-center mb-1">
-                    <span class="badge bg-green-lt me-2 p-1.5"><svg xmlns="http://www.w3.org/2000/svg" class="icon" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 13h16" /><path d="M4 9h16" /><path d="M17 6h3" /><path d="M18 18h2" /><path d="M4 6h3" /><path d="M4 18h2" /><path d="M7 6v12" /><path d="M17 6v12" /><path d="M12 6v12" /></svg></span>
-                    <strong class="text-secondary small uppercase">Memory (RAM)</strong>
-                </div>
-                <div class="ms-7 font-weight-medium">{{ object.asset_type.ram_gb }} GB</div>
-            </div>
-            {% endif %}
-
-            {% if object.asset_type.storage_capacity_gb %}
-            <div class="col-md-6">
-                <div class="d-flex align-items-center mb-1">
-                    <span class="badge bg-red-lt me-2 p-1.5"><svg xmlns="http://www.w3.org/2000/svg" class="icon" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 4m0 3a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v0a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3z" /><path d="M3 14m0 3a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v0a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3z" /><path d="M10 6h.01" /><path d="M10 16h.01" /></svg></span>
-                    <strong class="text-secondary small uppercase">Storage Capacity</strong>
-                </div>
-                <div class="ms-7 font-weight-medium">
-                    {{ object.asset_type.storage_capacity_gb }} GB
-                    {% if object.asset_type.storage_type %}
-                        <span class="badge bg-red-lt ms-1">{{ object.asset_type.get_storage_type_display }}</span>
-                    {% endif %}
-                </div>
-            </div>
-            {% endif %}
-
-            {% if object.asset_type.gpu %}
-            <div class="col-md-6">
-                <div class="d-flex align-items-center mb-1">
-                    <span class="badge bg-yellow-lt me-2 p-1.5"><svg xmlns="http://www.w3.org/2000/svg" class="icon" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M13 8l2 2l-2 2" /><path d="M14 20h-8a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v6" /><path d="M18 18m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /></svg></span>
-                    <strong class="text-secondary small uppercase">Graphics (GPU)</strong>
-                </div>
-                <div class="ms-7 font-weight-medium">{{ object.asset_type.gpu }}</div>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-</div>
-{% endif %}
-
-{% if object.custom_values %}
-<div class="card mt-4 border-0 specs-container shadow-none">
-    <div class="card-body">
-        <h4 class="card-title text-secondary mb-3 d-flex align-items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-2 text-primary" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9z" /><path d="M12 12l8 -4.5" /><path d="M8.2 10.1l8.8 -5" /><path d="M12 12l0 9" /><path d="M12 12l-8 -4.5" /></svg>
-            Custom Specifications
-        </h4>
-        <div class="row g-3">
-            {% for key, val in object.custom_values.items %}
-                {% if val is not None and val != "" %}
-                <div class="col-md-6">
-                    <div class="d-flex align-items-center mb-1">
-                        <strong class="text-secondary small uppercase">{{ key|humanize_key }}</strong>
-                    </div>
-                    <div class="ms-0 font-weight-medium">
-                        {% if val == True or val == "True" %}
-                            <span class="badge bg-success-lt">Yes</span>
-                        {% elif val == False or val == "False" %}
-                            <span class="badge bg-danger-lt">No</span>
-                        {% else %}
-                            {{ val }}
-                        {% endif %}
-                    </div>
-                </div>
-                {% endif %}
-            {% endfor %}
-        </div>
-    </div>
-</div>
-{% endif %}
-{% endblock object_details %}
-
-{# --- Extra Cards Left Column --- #}
-{% block extra_cards_left %}
-    {# Assignment Card #}
-    <div class="card mt-4 border-0 shadow-sm">
-        <div class="card-header border-0 bg-transparent">
-            <h3 class="card-title d-flex align-items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-2 text-indigo" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M6 18a6 6 0 0 1 12 0" /></svg>
-                Current Deployment Details
-            </h3>
-        </div>
-         <div class="card-body">
-            <dl class="row mb-0">
-                <dt class="col-sm-3">Assigned Asset Holder:</dt>
-                <dd class="col-sm-9">
-                    {% if assignment and assignment.asset_holder %}
-                        <a href="{% url 'organization:assetholder_detail' pk=assignment.asset_holder.pk %}" class="badge bg-indigo-lt px-2 py-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 7m-5.143 0a5.143 5.143 0 1 0 10.286 0a5.143 5.143 0 1 0 -10.286 0" /><path d="M6 21v-2a6 6 0 0 1 6 -6h0a6 6 0 0 1 6 6v2" /></svg>
-                            {{ assignment.asset_holder }}
-                        </a>
-                    {% else %}
-                        <span class="text-muted"><i>No assignment holder</i></span>
-                    {% endif %}
-                </dd>
-
-                <dt class="col-sm-3">Physical Location:</dt>
-                <dd class="col-sm-9">
-                     {% if object.location %}
-                        <a href="{% url 'organization:location_detail' pk=object.location.pk %}" class="badge bg-azure-lt px-2 py-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-map-pin me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" /><path d="M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0z" /></svg>
-                            {{ object.location }}
-                        </a>
-                    {% else %}
-                        <span class="text-muted"><i>Not Set</i></span>
-                    {% endif %}
-                </dd>
-
-                {% if assignment and assignment.asset_holder %}
-                    <dt class="col-sm-3">Custody Status:</dt>
-                    <dd class="col-sm-9">
-                        {% if custody_receipt %}
-                            <span class="badge bg-success-lt text-success font-weight-bold px-2 py-1 align-middle">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-shield-check me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 12l2 2l4 -4" /><path d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3" /></svg>
-                                Custody Secured
-                            </span>
-                            <a href="{% url 'assets:custody_eula_sign' token=eula_token %}" target="_blank" class="btn btn-sm btn-ghost-success border-0 py-1.5 px-2 ms-2 font-weight-bold align-middle">
-                                View Custody Receipt
-                            </a>
-                        {% else %}
-                            <span class="badge bg-warning-lt text-warning font-weight-bold px-2 py-1 align-middle">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-alert-triangle me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9v4" /><path d="M12 17h.01" /><path d="M5 19h14a2 2 0 0 0 1.84 -2.75l-7.1 -12.25a2 2 0 0 0 -3.5 0l-7.1 12.25a2 2 0 0 0 1.75 2.75" /></svg>
-                                Pending EULA Acceptance
-                            </span>
-                            <div class="mt-2 input-group input-group-flat" style="max-width: 450px;">
-                                <input type="text" class="form-control form-control-sm text-secondary small specs-container" readonly value="{{ request.scheme }}://{{ request.get_host }}{% url 'assets:custody_eula_sign' token=eula_token %}" id="eula-link-input"/>
-                                <span class="input-group-text p-0 bg-transparent">
-                                    <button class="btn btn-sm btn-ghost-indigo font-weight-bold py-1 px-3 border-0" onclick="navigator.clipboard.writeText(document.getElementById('eula-link-input').value); alert('EULA custody sign-off link copied to clipboard!');">
-                                        Copy Link
-                                    </button>
-                                </span>
-                            </div>
-                        {% endif %}
-                    </dd>
-                {% endif %}
-            </dl>
-        </div>
-    </div>
-
-    {# Financial & Lifecycle Card #}
-    <div class="card mt-4 border-0 shadow-sm">
-        <div class="card-header border-0 bg-transparent">
-            <h3 class="card-title d-flex align-items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-2 text-green" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                    <circle cx="12" cy="12" r="9" />
-                    <path d="M14.8 9A2 2 0 0 0 13 8h-2a2 2 0 0 0 0 4h2a2 2 0 0 1 0 4h-2a2 2 0 0 1 -1.8 -1" />
-                    <path d="M12 6v2m0 8v2" />
-                </svg>
-                Financial & Lifecycle Details
-            </h3>
-        </div>
-        <div class="card-body">
-            <dl class="row mb-0">
-                <dt class="col-sm-4">Purchase Cost:</dt>
-                <dd class="col-sm-8">
-                    {% if object.purchase_cost %}
-                        ${{ object.purchase_cost|floatformat:2 }}
-                    {% else %}
-                        <span class="text-muted"><i>Not Set</i></span>
-                    {% endif %}
-                </dd>
-
-                <dt class="col-sm-4">Salvage Value:</dt>
-                <dd class="col-sm-8">
-                    {% if object.salvage_value %}
-                        ${{ object.salvage_value|floatformat:2 }}
-                    {% else %}
-                        <span class="text-muted"><i>Not Set</i></span>
-                    {% endif %}
-                </dd>
-
-                <dt class="col-sm-4">Depreciated Book Value:</dt>
-                <dd class="col-sm-8">
-                    {% if object.current_value is not None %}
-                        <span class="h3 font-weight-bold text-success">
-                            ${{ object.current_value|floatformat:2 }}
-                        </span>
-                        {% if object.asset_type.depreciation %}
-                            <br>
-                            <small class="text-muted">Depreciated over {{ object.asset_type.depreciation.months }} months ({{ object.asset_type.depreciation.name }})</small>
-                        {% endif %}
-                    {% else %}
-                        <span class="text-muted"><i>N/A (No Purchase Cost)</i></span>
-                    {% endif %}
-                </dd>
-
-                <dt class="col-sm-4">Estimated EOL Date:</dt>
-                <dd class="col-sm-8">
-                    {% if eol_date %}
-                        {{ eol_date|date:"Y-m-d" }} 
-                        <span class="badge bg-secondary-lt ms-1">{{ object.asset_type.eol_months }} months</span>
-                    {% else %}
-                        <span class="text-muted"><i>N/A</i></span>
-                    {% endif %}
-                </dd>
-
-                <dt class="col-sm-4">Remaining Lifespan:</dt>
-                <dd class="col-sm-8">
-                    {% if time_to_eol == 'Expired' %}
-                        <span class="badge bg-danger-lt text-danger font-weight-bold text-uppercase">Expired (EOL Reached)</span>
-                    {% elif time_to_eol != '—' %}
-                        <span class="badge bg-success-lt text-success font-weight-bold">{{ time_to_eol }}</span>
-                    {% else %}
-                        <span class="text-muted"><i>N/A</i></span>
-                    {% endif %}
-                </dd>
-
-                <dt class="col-sm-4">Total Cost of Ownership (TCO):</dt>
-                <dd class="col-sm-8">
-                    <span class="h3 font-weight-bold text-success">
-                        ${{ total_cost_of_ownership|floatformat:2 }}
-                    </span>
-                    <br>
-                    <small class="text-muted">Purchase + {{ object.maintenances.count }} repair/maintenance item{{ object.maintenances.count|pluralize }}</small>
-                </dd>
-            </dl>
-        </div>
-    </div>
-
-    {# Support & Warranty Card (Snipe-IT Gap Analysis Integration) #}
-    {% with support_contact=object.asset_type.manufacturer.get_support_contact %}
-    <div class="card mt-4 border-0 shadow-sm">
-        <div class="card-header border-0 bg-transparent">
-            <h3 class="card-title d-flex align-items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-2 text-indigo" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                    <rect x="3" y="4" width="18" height="12" rx="2" />
-                    <line x1="7" y1="20" x2="17" y2="20" />
-                    <line x1="9" y1="16" x2="9" y2="20" />
-                    <line x1="15" y1="16" x2="15" y2="20" />
-                    <path d="M8 8v.01" />
-                    <path d="M12 8v.01" />
-                    <path d="M16 8v.01" />
-                </svg>
-                Support & Warranty Details
-            </h3>
-        </div>
-        <div class="card-body">
-            {% if support_contact %}
-                <dl class="row mb-3">
-                    <dt class="col-sm-4">Manufacturer:</dt>
-                    <dd class="col-sm-8 font-weight-bold text-dark">{{ object.asset_type.manufacturer.name }}</dd>
-
-                    <dt class="col-sm-4">Support Contact:</dt>
-                    <dd class="col-sm-8"><a href="{{ support_contact.get_absolute_url }}"><strong>{{ support_contact.name }}</strong></a>{% if support_contact.title %} ({{ support_contact.title }}){% endif %}</dd>
-
-                    <dt class="col-sm-4">Support Phone:</dt>
-                    <dd class="col-sm-8">
-                        {% if support_contact.phone %}
-                            <a href="tel:{{ support_contact.phone }}" class="text-secondary font-weight-medium">{{ support_contact.phone }}</a>
-                        {% else %}
-                            <span class="text-muted small"><i>Not configured</i></span>
-                        {% endif %}
-                    </dd>
-
-                    <dt class="col-sm-4">Support Email:</dt>
-                    <dd class="col-sm-8">
-                        {% if support_contact.email %}
-                            <a href="mailto:{{ support_contact.email }}" class="text-secondary font-weight-medium">{{ support_contact.email }}</a>
-                        {% else %}
-                            <span class="text-muted small"><i>Not configured</i></span>
-                        {% endif %}
-                    </dd>
-
-                    <dt class="col-sm-4">Support Portal:</dt>
-                    <dd class="col-sm-8">
-                        {% if support_contact.web_url %}
-                            <a href="{{ support_contact.web_url }}" target="_blank" class="link-primary font-weight-medium d-inline-flex align-items-center">
-                                Visit Support Portal
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-external-link ms-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6" /><path d="M11 13l9 -9" /><path d="M15 4h5v5" /></svg>
-                            </a>
-                        {% else %}
-                            <span class="text-muted small"><i>Not configured</i></span>
-                        {% endif %}
-                    </dd>
-                </dl>
-
-                {% if support_contact.email %}
-                    <div class="mt-3">
-                        <a href="mailto:{{ support_contact.email }}?subject=Warranty%20Claim%3A%20{{ object.asset_type.manufacturer.name }}%20{{ object.asset_type.model }}%20%28S%2FN%3A%20{{ object.serial_number|default:'N/A' }}%29&body=Dear%20Support%20Team%2C%0A%0AI%20would%20like%20to%20file%20a%20warranty%20claim%20for%20our%20{{ object.asset_type.manufacturer.name }}%20{{ object.asset_type.model }}%20hardware%20unit.%0A%0AHere%20are%20the%20technical%20details%20for%20cross-referencing%3A%0A-%20Asset%20Model%3A%20{{ object.asset_type.model }}%0A-%20Asset%20Tag%3A%20{{ object.asset_tag }}%0A-%20Serial%20Number%3A%20{{ object.serial_number|default:'N/A' }}%0A-%20Purchase%20Date%3A%20{{ object.purchase_date|default:'N/A' }}%0A%0APlease%20let%20us%20know%20how%20we%20should%20proceed%20with%20the%20warranty%20coverage.%0A%0ABest%20regards%2C%0AIT%20Operations%20Team" 
-                           class="btn btn-sm btn-outline-primary d-inline-flex align-items-center w-100 justify-content-center p-2 mt-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-mail-forward me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 18h-7a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v7.5" /><path d="M3 6l9 6l9 -6" /><path d="M15 18h6" /><path d="M18 15l3 3l-3 3" /></svg>
-                            Generate Warranty Claim Email
-                        </a>
-                    </div>
-                {% endif %}
-            {% else %}
-                <div class="text-center py-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-alert-circle text-muted mb-2" width="32" height="32" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
-                    <p class="text-muted small mb-0">No active support contact is configured for {{ object.asset_type.manufacturer.name }}.</p>
-                    {% if request.user.is_staff or request.user.is_superuser %}
-                        <a href="{% url 'assets:manufacturer_detail' pk=object.asset_type.manufacturer.pk %}#contacts" class="btn btn-sm btn-outline-secondary mt-2">
-                            Configure Support Contact
-                        </a>
-                    {% endif %}
-                </div>
-            {% endif %}
-        </div>
-    </div>
-    {% endwith %}
-
-{% endblock extra_cards_left %}
-
-{# --- Extra Tab Panes --- #}
+{# Extra tab panes: Components, Maintenances, Software #}
 {% block extra_tab_panes %}
-    {# Components Tab Pane #}
     {% if object.is_modular %}
     <div class="tab-pane fade" id="components" role="tabpanel">
         <div class="card border-0 shadow-sm">
@@ -545,19 +77,6 @@
                 {% include 'generic/includes/table_pagination.html' with table=components_table %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cpu text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                        <path d="M5 5m0 1a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1z" />
-                        <path d="M9 9h6v6h-6z" />
-                        <path d="M3 10h2" />
-                        <path d="M3 14h2" />
-                        <path d="M10 3v2" />
-                        <path d="M14 3v2" />
-                        <path d="M21 10h-2" />
-                        <path d="M21 14h-2" />
-                        <path d="M14 21v-2" />
-                        <path d="M10 21v-2" />
-                    </svg>
                     <p class="mb-0">No physical modules (like RAM, SSD, GPU) checked into this hardware asset.</p>
                 </div>
             {% endif %}
@@ -565,7 +84,6 @@
     </div>
     {% endif %}
 
-    {# Maintenances Tab Pane #}
     <div class="tab-pane fade" id="maintenances" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
@@ -582,18 +100,12 @@
                 {% include 'generic/includes/table_pagination.html' with table=maintenances_table %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-settings text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                        <path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" />
-                        <path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" />
-                    </svg>
                     <p class="mb-0">No repair, calibration, or hardware maintenance logged for this asset.</p>
                 </div>
             {% endif %}
         </div>
     </div>
 
-    {# Software Tab Pane #}
     <div class="tab-pane fade" id="software" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
@@ -606,7 +118,6 @@
                 {% include 'generic/includes/table_pagination.html' with table=software_table %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-ban text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M5.7 5.7l12.6 12.6" /></svg>
                     <p class="mb-0">No catalog software items registered on this asset.</p>
                 </div>
             {% endif %}
@@ -614,62 +125,3 @@
     </div>
 
 {% endblock extra_tab_panes %}
-
-
-{% block extra_cards_right %}
-<div class="card mb-4 border-0 bg-success-lt shadow-none">
-    <div class="card-body">
-        <h4 class="card-title text-success mb-3 d-flex align-items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-2 text-success" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                <path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2" />
-                <path d="M9 3m0 2a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2z" />
-                <path d="M9 14l2 2l4 -4" />
-            </svg>
-            Audit & Compliance Control
-        </h4>
-        
-        <div class="mb-3">
-            <span class="text-muted small d-block">Physical Audit State</span>
-            <div id="asset-audit-badge-container" class="mt-1">
-                {% include 'assets/includes/asset_audit_badge.html' with asset=object %}
-            </div>
-        </div>
-
-        <div class="d-grid gap-2">
-            <button class="btn btn-success font-weight-bold shadow-sm"
-                    hx-post="{% url 'assets:asset_audit' pk=object.pk %}"
-                    hx-target="#asset-audit-badge-container"
-                    hx-swap="outerHTML"
-                    id="audit-verify-btn">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                    <path d="M5 12l5 5l10 -10" />
-                </svg>
-                Verify Physical Presence
-            </button>
-
-            <a href="{% url 'assets:asset_label_print' pk=object.pk %}" 
-               target="_blank" 
-               class="btn btn-outline-success font-weight-bold">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                    <path d="M4 7V5a2 2 0 0 1 2 -2h2" />
-                    <path d="M4 17v2a2 2 0 0 0 2 2h2" />
-                    <path d="M16 3h2a2 2 0 0 1 2 2v2" />
-                    <path d="M16 21h2a2 2 0 0 0 2 -2v-2" />
-                    <path d="M7 12h10" />
-                    <path d="M10 9v6" />
-                    <path d="M14 9v6" />
-                </svg>
-                Print Barcode Label
-            </a>
-        </div>
-    </div>
-</div>
-
-<!-- Embedded Base64 Mechanical Audio Cue (Satisfying mechanical tick) -->
-<audio id="audit-success-audio" src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQQAAAAAAACWAA=="></audio>
-
-<script src="{% static 'js/audit.js' %}"></script>
-{% endblock %}

@@ -1,0 +1,68 @@
+{% if object.remaining_qty <= 0 %}
+<div class="alert alert-important alert-danger shadow-sm mb-4" role="alert">
+    <div class="d-flex">
+        <div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9v2m0 4v.01m-6.938 2.002a9 9 0 1 1 13.876 0" /></svg>
+        </div>
+        <div>
+            <strong>Out of Stock Alert:</strong> This consumable item is completely depleted. Reorder immediately!
+        </div>
+    </div>
+</div>
+{% elif object.remaining_qty < object.min_qty %}
+<div class="alert alert-important alert-warning shadow-sm mb-4" role="alert">
+    <div class="d-flex">
+        <div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9v2m0 4v.01m-6.938 2.002a9 9 0 1 1 13.876 0" /></svg>
+        </div>
+        <div>
+            <strong>Low Stock Warning:</strong> Stock count has dipped below the configured safety threshold of <strong>{{ object.min_qty }}</strong> units. Consider replenishing inventory.
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<dl class="row mb-0">
+    <dt class="col-sm-3">Manufacturer:</dt>
+    <dd class="col-sm-9">
+        {% if object.manufacturer %}
+            <a href="{{ object.manufacturer.get_absolute_url }}" class="font-weight-bold text-decoration-none">{{ object.manufacturer.name }}</a>
+        {% else %}
+             <span class="text-muted"><i>None</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">Name:</dt>
+    <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
+
+    <dt class="col-sm-3">Slug:</dt>
+    <dd class="col-sm-9"><code>{{ object.slug }}</code></dd>
+
+    <dt class="col-sm-3">Category:</dt>
+    <dd class="col-sm-9">
+        <span class="badge bg-purple-lt px-2.5 py-1 text-uppercase">
+            {{ object.get_category_display }}
+        </span>
+    </dd>
+
+    <dt class="col-sm-3">Part Number / SKU:</dt>
+    <dd class="col-sm-9">
+        {% if object.part_number %}
+            <code>{{ object.part_number }}</code>
+        {% else %}
+            <span class="text-muted"><i>Not Set</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">Over-allocation Policy:</dt>
+    <dd class="col-sm-9">
+        {% if object.allow_overallocate %}
+            <span class="badge bg-warning-lt text-warning text-uppercase">Allowed (Negative Stock Permitted)</span>
+        {% else %}
+            <span class="badge bg-success-lt text-success text-uppercase">Strict Enforcement (Prevent Negative Stock)</span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">Safety Stock Limit:</dt>
+    <dd class="col-sm-9"><span class="badge bg-secondary-lt">{{ object.min_qty }} Units</span></dd>
+</dl>

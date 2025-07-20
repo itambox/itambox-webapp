@@ -13,6 +13,7 @@ from django.contrib import messages
 from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView # Import base CBVs
 from core.quick_add import QuickAddMixin
 from core.utils import get_paginate_count, get_model_viewname # Import the utility function and get_model_viewname
+from core.panels import Panel
 from assets.tables import AssetTable # Import AssetTable
 from assets.models import Asset # Import Asset model
 
@@ -69,6 +70,11 @@ class SiteDetailView(ObjectDetailView):
             'tags'
     )
     # template_name = 'organization/sites/site_detail.html' # Can be inferred
+
+    layout = (
+        ((Panel('metrics', 'Site Overview'),),),
+        ((Panel('info', 'Site Details'),),),
+    )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -161,6 +167,10 @@ class RegionDetailView(ObjectDetailView):
     )
     # template_name = 'organization/regions/region_detail.html' # Can be inferred
 
+    layout = (
+        ((Panel('info', 'Region Details'),),),
+    )
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         region = self.get_object()
@@ -237,6 +247,10 @@ class SiteGroupDetailView(ObjectDetailView):
         'children', 'tags', 'sites__tenant', 'sites__region' # Prefetch related for SiteTable links
     )
     # template_name = 'organization/sitegroups/sitegroup_detail.html' # Can be inferred
+
+    layout = (
+        ((Panel('info', 'Site Group Details'),),),
+    )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -317,6 +331,11 @@ class LocationDetailView(ObjectDetailView):
     )
     # template_name = 'organization/locations/location_detail.html' # Can be inferred
 
+    layout = (
+        ((Panel('metrics', 'Location Overview'),),),
+        ((Panel('info', 'Location Details'),),),
+    )
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         location = self.get_object()
@@ -389,6 +408,10 @@ class TenantGroupDetailView(ObjectDetailView):
         'children', 'tags', 'tenants' # Removed 'tenants__group' as it's self-referential
     )
     # template_name = 'organization/tenantgroups/tenantgroup_detail.html' # Can be inferred
+
+    layout = (
+        ((Panel('info', 'Tenant Group Details'),),),
+    )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -468,6 +491,11 @@ class TenantDetailView(ObjectDetailView):
     )
     # template_name = 'organization/tenants/tenant_detail.html' # Can be inferred
 
+    layout = (
+        ((Panel('metrics', 'Tenant Overview'),),),
+        ((Panel('info', 'Tenant Details'),),),
+    )
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         tenant = self.get_object()
@@ -512,6 +540,14 @@ class TenantDetailView(ObjectDetailView):
         context['locations_table'] = locations_table
         context['assetholders_table'] = assetholders_table
         context['related_objects_list'] = related_objects_list
+
+        # Aggregate counts for all reverse relationships
+        context['tenant_asset_count'] = tenant.assets.count()
+        context['tenant_accessory_count'] = tenant.accessories.count()
+        context['tenant_consumable_count'] = tenant.consumables.count()
+        context['tenant_license_count'] = tenant.licenses.count()
+        context['tenant_kit_count'] = tenant.kits.count()
+        context['tenant_subscription_count'] = tenant.subscriptions_org.count()
         return context
 
 class TenantEditView(ObjectEditView):
@@ -560,6 +596,11 @@ class AssetHolderDetailView(ObjectDetailView):
         'assignments__assigned_object', 'assignments__content_type', 'tags' # Added content_type prefetch
     )
     # template_name = 'organization/assetholders/assetholder_detail.html' # Can be inferred
+
+    layout = (
+        ((Panel('metrics', 'Asset Holder Overview'),),),
+        ((Panel('info', 'Asset Holder Details'),),),
+    )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -648,6 +689,11 @@ class ContactListView(ObjectListView):
 class ContactDetailView(ObjectDetailView):
     queryset = Contact.objects.prefetch_related('tags', 'assignments')
 
+    layout = (
+        ((Panel('metrics', 'Contact Overview'),),),
+        ((Panel('info', 'Contact Details'),),),
+    )
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         contact = self.get_object()
@@ -699,6 +745,10 @@ class ContactRoleListView(ObjectListView):
 
 class ContactRoleDetailView(ObjectDetailView):
     queryset = ContactRole.objects.prefetch_related('assignments')
+
+    layout = (
+        ((Panel('info', 'Contact Role Details'),),),
+    )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

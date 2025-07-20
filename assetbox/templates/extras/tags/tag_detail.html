@@ -2,35 +2,7 @@
 {% load static %}
 {% load render_table from django_tables2 %}
 
-{# Define the specific details for a Tag object #}
-{% block object_details %}
-<dl class="row">
-    <dt class="col-sm-3">Name:</dt>
-    <dd class="col-sm-9">{{ object.name }}</dd>
-
-    <dt class="col-sm-3">Slug:</dt>
-    <dd class="col-sm-9">{{ object.slug }}</dd>
-
-    <dt class="col-sm-3">Color:</dt>
-    <dd class="col-sm-9">
-        {% if object.color %}
-            <span class="badge">&nbsp;</span> 
-            #{{ object.color }}
-        {% else %}
-            <i>Not Set</i>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">Description:</dt>
-    <dd class="col-sm-9">{{ object.description|linebreaksbr|default:"<i>Not Set</i>"|safe }}</dd>
-
-    {# Add Created/Updated Timestamps if desired #}
-    {# <dt class="col-sm-3">Created:</dt> #}
-    {# <dd class="col-sm-9">{{ object.created_at|date:"Y-m-d H:i:s" }}</dd> #}
-    {# <dt class="col-sm-3">Updated:</dt> #}
-    {# <dd class="col-sm-9">{{ object.updated_at|date:"Y-m-d H:i:s" }}</dd> #}
-</dl>
-{% endblock object_details %}
+{# Object details rendered via panel layout #}
 
 {# We will add related objects tables later if needed #}
 {# For now, keep these blocks empty or minimal #}

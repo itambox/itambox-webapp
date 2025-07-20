@@ -1,0 +1,49 @@
+<dl class="row mb-0">
+    <dt class="col-sm-4">Full Name:</dt>
+    <dd class="col-sm-8"><strong>{{ object.first_name }} {{ object.last_name }}</strong></dd>
+
+    <dt class="col-sm-4">User Principal Name (UPN):</dt>
+    <dd class="col-sm-8"><span class="badge bg-purple-lt px-2 py-1"><code>{{ object.upn }}</code></span></dd>
+
+    <dt class="col-sm-4">Email Address:</dt>
+    <dd class="col-sm-8">
+        {% if object.email %}
+            <a href="mailto:{{ object.email }}">{{ object.email }}</a>
+        {% else %}
+            <span class="text-muted"><i>Not Set</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">Tenant:</dt>
+    <dd class="col-sm-8">
+        {% if object.tenant %}
+            <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant }}</a>
+        {% else %}
+             <span class="text-muted"><i>None</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">Linked User account:</dt>
+    <dd class="col-sm-8">
+        {% if object.user %}
+            <span class="badge bg-blue-lt"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 7m-5.143 0a5.143 5.143 0 1 0 10.286 0a5.143 5.143 0 1 0 -10.286 0" /><path d="M6 21v-2a6 6 0 0 1 6 -6h0a6 6 0 0 1 6 6v2" /></svg>{{ object.user.username }}</span>
+        {% else %}
+            <span class="text-muted"><i>No linked user</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">Description:</dt>
+    <dd class="col-sm-8 text-secondary">{{ object.description|linebreaksbr|default:"<span class='text-muted'><i>No description provided.</i></span>"|safe }}</dd>
+
+    <dt class="col-sm-4">Comments:</dt>
+    <dd class="col-sm-8 text-secondary">{{ object.comments|linebreaksbr|default:"<span class='text-muted'><i>None</i></span>"|safe }}</dd>
+
+    {% if object.tags.all %}
+    <dt class="col-sm-4">Tags:</dt>
+    <dd class="col-sm-8">
+        {% for tag in object.tags.all %}
+            {% include 'inc/tags.html' with tag=tag %}
+        {% endfor %}
+    </dd>
+    {% endif %}
+</dl>

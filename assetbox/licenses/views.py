@@ -8,6 +8,7 @@ from core.views import (
     ObjectDeleteView
 )
 from core.utils import get_paginate_count
+from core.panels import Panel
 from .models import License, LicenseSeatAssignment
 from . import forms
 from . import tables
@@ -28,6 +29,11 @@ class LicenseListView(ObjectListView):
 class LicenseDetailView(ObjectDetailView):
     queryset = License.objects.select_related('software', 'software__manufacturer', 'tenant').prefetch_related('tags')
     template_name = 'licenses/license_detail.html'
+
+    layout = (
+        ((Panel('metrics', 'License Overview'),),),
+        ((Panel('info', 'License Details'),),),
+    )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

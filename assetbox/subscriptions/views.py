@@ -2,6 +2,7 @@ from django.db.models import Count
 from django_tables2 import RequestConfig
 from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
 from core.utils import get_paginate_count
+from core.panels import Panel
 from .models import Provider, Subscription
 from . import forms
 from . import tables
@@ -23,6 +24,10 @@ class ProviderListView(ObjectListView):
 class ProviderDetailView(ObjectDetailView):
     queryset = Provider.objects.prefetch_related('subscriptions', 'tags')
     template_name = 'subscriptions/provider_detail.html'
+
+    layout = (
+        ((Panel('info', 'Provider Details'),),),
+    )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -65,6 +70,10 @@ class SubscriptionListView(ObjectListView):
 class SubscriptionDetailView(ObjectDetailView):
     queryset = Subscription.objects.select_related('provider', 'tenant', 'owner').prefetch_related('tags', 'assignments')
     template_name = 'subscriptions/subscription_detail.html'
+
+    layout = (
+        ((Panel('info', 'Subscription Details'),),),
+    )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

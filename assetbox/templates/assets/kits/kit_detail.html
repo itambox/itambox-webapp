@@ -1,9 +1,10 @@
-{% extends base_template|default:"layout.html" %}
+{% extends 'generic/object_detail.html' %}
 {% load static %}
 
 {% block title %}Kit: {{ object.name }} - AssetBox{% endblock %}
 
 {% block page_header %}
+    <div class="page-pretitle">Assets / Kits</div>
     <h2 class="page-title">
         Kit: {{ object.name }}
     </h2>
@@ -39,77 +40,73 @@
     </a>
 {% endblock page_actions %}
 
-{% block content %}
-<div class="row">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">Kit Components</h3>
-            </div>
-            <div class="table-responsive">
-                <table class="table table-vcenter card-table table-striped">
-                    <thead>
-                        <tr>
-                            <th>Item Type</th>
-                            <th>Target Model / Catalog Item</th>
-                            <th>Quantity Required</th>
-                            <th>In-Stock / Available</th>
-                            <th>Status</th>
-                            <th class="w-1">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item_info in items_with_availability %}
-                            <tr>
-                                <td>
-                                    {% if item_info.item.asset_type %}
-                                        <span class="badge bg-blue-lt">Hardware Asset</span>
-                                    {% elif item_info.item.accessory %}
-                                        <span class="badge bg-green-lt">Accessory</span>
-                                    {% elif item_info.item.license %}
-                                        <span class="badge bg-purple-lt">License</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if item_info.item.asset_type %}
-                                        <a href="{{ item_info.item.asset_type.get_absolute_url }}">{{ item_info.item.asset_type }}</a>
-                                    {% elif item_info.item.accessory %}
-                                        <a href="{{ item_info.item.accessory.get_absolute_url }}">{{ item_info.item.accessory }}</a>
-                                    {% elif item_info.item.license %}
-                                        <a href="{{ item_info.item.license.get_absolute_url }}">{{ item_info.item.license.software.name }} - {{ item_info.item.license.name }}</a>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {{ item_info.item.qty }}
-                                </td>
-                                <td>
-                                    {{ item_info.available_count }}
-                                </td>
-                                <td>
-                                    {% if item_info.is_available %}
-                                        <span class="badge bg-success-lt">Available</span>
-                                    {% else %}
-                                        <span class="badge bg-danger-lt">Unavailable</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <div class="btn-group">
-                                        <a href="{% url 'assets:kititem_update' pk=item_info.item.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
-                                        <a href="{% url 'assets:kititem_delete' pk=item_info.item.pk %}" class="btn btn-sm btn-outline-danger">Remove</a>
-                                    </div>
-                                </td>
-                            </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="6" class="text-center text-muted py-4">
-                                    No components added to this kit yet. Click "Add Item" above to construct the bundle.
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+{% block full_width_content %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Kit Components</h3>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-striped">
+            <thead>
+                <tr>
+                    <th>Item Type</th>
+                    <th>Target Model / Catalog Item</th>
+                    <th>Quantity Required</th>
+                    <th>In-Stock / Available</th>
+                    <th>Status</th>
+                    <th class="w-1">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item_info in items_with_availability %}
+                    <tr>
+                        <td>
+                            {% if item_info.item.asset_type %}
+                                <span class="badge bg-blue-lt">Hardware Asset</span>
+                            {% elif item_info.item.accessory %}
+                                <span class="badge bg-green-lt">Accessory</span>
+                            {% elif item_info.item.license %}
+                                <span class="badge bg-purple-lt">License</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item_info.item.asset_type %}
+                                <a href="{{ item_info.item.asset_type.get_absolute_url }}">{{ item_info.item.asset_type }}</a>
+                            {% elif item_info.item.accessory %}
+                                <a href="{{ item_info.item.accessory.get_absolute_url }}">{{ item_info.item.accessory }}</a>
+                            {% elif item_info.item.license %}
+                                <a href="{{ item_info.item.license.get_absolute_url }}">{{ item_info.item.license.software.name }} - {{ item_info.item.license.name }}</a>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {{ item_info.item.qty }}
+                        </td>
+                        <td>
+                            {{ item_info.available_count }}
+                        </td>
+                        <td>
+                            {% if item_info.is_available %}
+                                <span class="badge bg-success-lt">Available</span>
+                            {% else %}
+                                <span class="badge bg-danger-lt">Unavailable</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group">
+                                <a href="{% url 'assets:kititem_update' pk=item_info.item.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                <a href="{% url 'assets:kititem_delete' pk=item_info.item.pk %}" class="btn btn-sm btn-outline-danger">Remove</a>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">
+                            No components added to this kit yet. Click "Add Item" above to construct the bundle.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
-{% endblock content %}
+{% endblock full_width_content %}

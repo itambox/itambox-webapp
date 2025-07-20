@@ -1,0 +1,13 @@
+<dl class="row mb-0">
+    <dt class="col-sm-3">Name:</dt>
+    <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
+
+    <dt class="col-sm-3">Rate:</dt>
+    <dd class="col-sm-9">{{ object.rate }}%</dd>
+
+    <dt class="col-sm-3">Duration (months):</dt>
+    <dd class="col-sm-9">{{ object.duration_months }}</dd>
+
+    <dt class="col-sm-3">Description:</dt>
+    <dd class="col-sm-9 text-secondary">{{ object.description|linebreaksbr|default:"<i>No description.</i>"|safe }}</dd>
+</dl>

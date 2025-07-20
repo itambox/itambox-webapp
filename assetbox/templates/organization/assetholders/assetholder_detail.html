@@ -18,67 +18,7 @@
      </li>
 {% endblock extra_tabs %}
 
-{# Define the specific details for an Asset Holder #}
-{% block object_details %}
-<!-- Metrics Dashboard Row -->
-<div class="row g-3 mb-4">
-    <div class="col-12">
-        <div class="card card-sm bg-indigo-lt border-0 shadow-none">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-indigo text-white avatar rounded shadow-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clipboard-check" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2" /><path d="M9 3m0 2a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2z" /><path d="M9 14l2 2l4 -4" /></svg>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-indigo small uppercase font-sans">Checked Out Assets Assigned</div>
-                        <div class="text-indigo h1 mb-0 font-weight-bold">{{ assignments_table.rows|length }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<dl class="row mb-0">
-    <dt class="col-sm-4">Full Name:</dt>
-    <dd class="col-sm-8"><strong>{{ object.first_name }} {{ object.last_name }}</strong></dd>
-
-    <dt class="col-sm-4">User Principal Name (UPN):</dt>
-    <dd class="col-sm-8"><span class="badge bg-purple-lt px-2 py-1"><code>{{ object.upn }}</code></span></dd>
-
-    <dt class="col-sm-4">Email Address:</dt>
-    <dd class="col-sm-8">
-        {% if object.email %}
-            <a href="mailto:{{ object.email }}">{{ object.email }}</a>
-        {% else %}
-            <span class="text-muted"><i>Not Set</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-4">Tenant:</dt>
-    <dd class="col-sm-8">
-        {% if object.tenant %}
-            <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant }}</a>
-        {% else %}
-             <span class="text-muted"><i>None</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-4">Linked User account:</dt>
-    <dd class="col-sm-8">
-        {% if object.user %}
-            <span class="badge bg-blue-lt"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 7m-5.143 0a5.143 5.143 0 1 0 10.286 0a5.143 5.143 0 1 0 -10.286 0" /><path d="M6 21v-2a6 6 0 0 1 6 -6h0a6 6 0 0 1 6 6v2" /></svg>{{ object.user.username }}</span>
-        {% else %}
-            <span class="text-muted"><i>No linked user</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-4">Description:</dt>
-    <dd class="col-sm-8 text-secondary">{{ object.description|linebreaksbr|default:"<span class='text-muted'><i>No description provided.</i></span>"|safe }}</dd>
-</dl>
-{% endblock object_details %}
+{# Object details rendered via panel layout #}
 
 {# Leave related_objects empty for the sidebar #}
 {% block related_objects %}{% endblock related_objects %}

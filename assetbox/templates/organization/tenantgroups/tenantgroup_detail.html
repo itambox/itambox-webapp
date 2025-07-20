@@ -11,28 +11,7 @@
 
 {# --- Page Actions (from base) --- #}
 
-{# --- Tenant Group Specific Details --- #}
-{% block object_details %}
-<dl class="row">
-    <dt class="col-sm-3">Name:</dt>
-    <dd class="col-sm-9">{{ object.name }}</dd>
-
-    <dt class="col-sm-3">Slug:</dt>
-    <dd class="col-sm-9">{{ object.slug }}</dd>
-
-    <dt class="col-sm-3">Parent:</dt>
-    <dd class="col-sm-9">
-        {% if object.parent %}
-            <a href="{% url 'organization:tenantgroup_detail' pk=object.parent.pk %}">{{ object.parent.name }}</a>
-        {% else %}
-            <i>None</i>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">Description:</dt>
-    <dd class="col-sm-9">{{ object.description|default:"<i>None</i>"|safe }}</dd>
-</dl>
-{% endblock object_details %}
+{# Object details rendered via panel layout #}
 
 {# --- Related Objects (Sidebar) --- #}
 {% block related_objects %}
