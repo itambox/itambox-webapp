@@ -1,7 +1,7 @@
 # assetbox/assets/tables.py
 import django_tables2 as tables
 from django_tables2.utils import A  # Alias for Accessor
-from .models import Asset, AssetRole, Manufacturer, AssetType, ComponentType, ComponentInstance, Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit
+from .models import Asset, AssetRole, Manufacturer, AssetType, ComponentType, ComponentInstance, Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, Supplier, Category, AssetRequest
 from core.tables import ActionsColumn, BaseTable, ToggleColumn
 from extras.tables import TagColumn # Import TagColumn
 from django.urls import reverse, NoReverseMatch
@@ -11,7 +11,7 @@ from organization.models import AssetHolderAssignment
 from django.utils.html import format_html
 
 class AssetTable(BaseTable): # Inherit from BaseTable
-    pk = ToggleColumn(accessor='pk')
+    pks = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('assets:asset_detail', args=[A('pk')], verbose_name='Name')
     manufacturer = tables.Column(accessor='asset_type.manufacturer', linkify=True, verbose_name='Manufacturer')
     model = tables.Column(accessor='asset_type.model', linkify=True, verbose_name='Model')
@@ -19,6 +19,7 @@ class AssetTable(BaseTable): # Inherit from BaseTable
     assignee = tables.Column(accessor='_assignee_display', verbose_name='Assignee', orderable=False)
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name='Tenant')
     location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], accessor='location.name', verbose_name='Location')
+    supplier = tables.LinkColumn('assets:supplier_detail', args=[A('supplier.pk')], accessor='supplier.name', verbose_name='Supplier')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta): # Inherit Meta from BaseTable
@@ -375,4 +376,41 @@ class KitTable(BaseTable):
         model = Kit
         fields = ('pk', 'name', 'tenant', 'description', 'item_count', 'actions')
         default_columns = ('pk', 'name', 'tenant', 'description', 'item_count', 'actions')
+
+
+class SupplierTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    name = tables.LinkColumn('assets:supplier_detail', args=[A('pk')], verbose_name='Name')
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = Supplier
+        fields = ('pk', 'name', 'website', 'contact_email', 'contact_phone', 'contact_name', 'actions')
+        default_columns = ('pk', 'name', 'contact_email', 'contact_phone', 'actions')
+
+
+class CategoryTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    name = tables.LinkColumn('assets:category_detail', args=[A('pk')], verbose_name='Name')
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = Category
+        fields = ('pk', 'name', 'color', 'email_on_checkout', 'email_on_checkin', 'require_acceptance', 'actions')
+        default_columns = ('pk', 'name', 'email_on_checkout', 'require_acceptance', 'actions')
+
+
+class AssetRequestTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    requester = tables.Column(accessor='requester.username', verbose_name='Requester')
+    asset = tables.LinkColumn('assets:asset_detail', args=[A('asset.pk')], verbose_name='Asset')
+    asset_type = tables.Column(accessor='asset_type.model', verbose_name='Asset Type')
+    status = tables.Column(verbose_name='Status')
+    request_date = tables.Column(verbose_name='Request Date')
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = AssetRequest
+        fields = ('pk', 'requester', 'asset', 'asset_type', 'status', 'request_date', 'notes', 'actions')
+        default_columns = ('pk', 'requester', 'asset', 'asset_type', 'status', 'request_date', 'actions')
 

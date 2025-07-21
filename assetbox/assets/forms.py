@@ -1,7 +1,7 @@
 from django import forms
 from django.core.exceptions import ValidationError # Import ValidationError
 # Import models from this app
-from .models import Asset, AssetRole, Manufacturer, AssetType, ComponentType, ComponentInstance, Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, KitItem
+from .models import Asset, AssetRole, Manufacturer, AssetType, ComponentType, ComponentInstance, Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, KitItem, Supplier, Category, AssetRequest
 # Import models from other apps
 from organization.models import Location, AssetHolder, Region, Site # Import Location, AssetHolder, Region, Site
 from extras.models import Tag # Import Tag
@@ -16,7 +16,8 @@ from .filters import (
     AssetFilterSet, AssetRoleFilterSet, ManufacturerFilterSet, AssetTypeFilterSet,
     ComponentTypeFilterSet, ComponentInstanceFilterSet, AccessoryFilterSet,
     ConsumableFilterSet, StatusLabelFilterSet, AssetMaintenanceFilterSet,
-    CustomFieldFilterSet, CustomFieldsetFilterSet, DepreciationFilterSet, KitFilterSet
+    CustomFieldFilterSet, CustomFieldsetFilterSet, DepreciationFilterSet, KitFilterSet,
+    SupplierFilterSet, CategoryFilterSet, AssetRequestFilterSet
 )
 # --- End Imports --- 
 
@@ -93,10 +94,10 @@ class AssetForm(forms.ModelForm):
             'purchase_cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'salvage_value': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'order_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'supplier': forms.TextInput(attrs={'class': 'form-control'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'tenant': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
             'tags': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
+            'supplier': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
         }
 
     def clean_status(self):
@@ -1326,3 +1327,64 @@ class DepreciationFilterForm(FilterForm):
 
 class KitFilterForm(FilterForm):
     filterset_class = KitFilterSet
+
+
+class SupplierForm(SlugModelForm, BootstrapMixin):
+    class Meta:
+        model = Supplier
+        fields = ['name', 'website', 'contact_email', 'contact_phone', 'contact_name', 'address', 'notes', 'tags']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'website': forms.URLInput(attrs={'class': 'form-control'}),
+            'contact_email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'contact_phone': forms.TextInput(attrs={'class': 'form-control'}),
+            'contact_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'tags': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
+        }
+
+
+class CategoryForm(SlugModelForm, BootstrapMixin):
+    class Meta:
+        model = Category
+        fields = ['name', 'color', 'description', 'email_on_checkout', 'email_on_checkin', 'require_acceptance', 'email_eula', 'tags']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'color': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '00ff00'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'tags': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
+        }
+
+
+class AssetRequestForm(BootstrapMixin, forms.ModelForm):
+    class Meta:
+        model = AssetRequest
+        fields = ['asset', 'asset_type', 'notes']
+        widgets = {
+            'asset': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+            'asset_type': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+
+
+class AssetRequestResponseForm(BootstrapMixin, forms.ModelForm):
+    class Meta:
+        model = AssetRequest
+        fields = ['status', 'response_notes']
+        widgets = {
+            'status': forms.Select(attrs={'class': 'form-select'}),
+            'response_notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+
+
+class SupplierFilterForm(FilterForm):
+    filterset_class = SupplierFilterSet
+
+
+class CategoryFilterForm(FilterForm):
+    filterset_class = CategoryFilterSet
+
+
+class AssetRequestFilterForm(FilterForm):
+    filterset_class = AssetRequestFilterSet

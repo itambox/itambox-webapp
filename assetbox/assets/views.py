@@ -1,7 +1,8 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
-from .models import Asset, AssetRole, Manufacturer, AssetType, InstalledSoftware, ComponentType, ComponentInstance, Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, KitItem, ActivityLog
+from django.utils import timezone
+from .models import Asset, AssetRole, Manufacturer, AssetType, InstalledSoftware, ComponentType, ComponentInstance, Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, KitItem, ActivityLog, Supplier, Category, AssetRequest
 from licenses.models import License, LicenseSeatAssignment
 from .forms import AssetForm, AssetRoleForm, ManufacturerForm, AssetCheckOutForm, AssetTypeForm # Keep only Asset forms
 from django.contrib.auth import get_user_model
@@ -1469,3 +1470,92 @@ def bulk_assign_assets(request):
         return response
 
     return HttpResponseRedirect(request.META.get('HTTP_REFERER', reverse('assets:asset_list')))
+
+class SupplierListView(ObjectListView):
+    queryset = Supplier.objects.all()
+    filterset = filters.SupplierFilterSet
+    filterset_form = forms.SupplierFilterForm
+    table = tables.SupplierTable
+    action_buttons = ("add",)
+
+class SupplierDetailView(ObjectDetailView):
+    queryset = Supplier.objects.all()
+
+class SupplierEditView(ObjectEditView):
+    queryset = Supplier.objects.all()
+    model = Supplier
+    model_form = forms.SupplierForm
+    template_name = "generic/object_edit.html"
+    default_return_url = "assets:supplier_list"
+
+class SupplierDeleteView(ObjectDeleteView):
+    queryset = Supplier.objects.all()
+    model = Supplier
+    template_name = "generic/object_confirm_delete.html"
+    success_url = reverse_lazy("assets:supplier_list")
+
+class CategoryListView(ObjectListView):
+    queryset = Category.objects.all()
+    filterset = filters.CategoryFilterSet
+    filterset_form = forms.CategoryFilterForm
+    table = tables.CategoryTable
+    action_buttons = ("add",)
+
+class CategoryDetailView(ObjectDetailView):
+    queryset = Category.objects.all()
+
+class CategoryEditView(ObjectEditView):
+    queryset = Category.objects.all()
+    model = Category
+    model_form = forms.CategoryForm
+    template_name = "generic/object_edit.html"
+    default_return_url = "assets:category_list"
+
+class CategoryDeleteView(ObjectDeleteView):
+    queryset = Category.objects.all()
+    model = Category
+    template_name = "generic/object_confirm_delete.html"
+    success_url = reverse_lazy("assets:category_list")
+
+class AssetRequestListView(ObjectListView):
+    queryset = AssetRequest.objects.select_related("requester", "asset", "asset_type").all()
+    filterset = filters.AssetRequestFilterSet
+    filterset_form = forms.AssetRequestFilterForm
+    table = tables.AssetRequestTable
+    action_buttons = ("add",)
+
+class AssetRequestDetailView(ObjectDetailView):
+    queryset = AssetRequest.objects.select_related("requester", "asset", "asset_type", "responded_by").all()
+
+class AssetRequestCreateView(ObjectEditView):
+    model = AssetRequest
+    model_form = forms.AssetRequestForm
+    template_name = "generic/object_edit.html"
+    default_return_url = "assets:assetrequest_list"
+
+    def form_valid(self, form):
+        form.instance.requester = self.request.user
+        return super().form_valid(form)
+
+class AssetRequestEditView(ObjectEditView):
+    queryset = AssetRequest.objects.all()
+    model = AssetRequest
+    model_form = forms.AssetRequestResponseForm
+    template_name = "generic/object_edit.html"
+
+    def form_valid(self, form):
+        if form.instance.status in ("approved", "denied", "fulfilled", "cancelled"):
+            form.instance.response_date = timezone.now()
+            form.instance.responded_by = self.request.user
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        if self.object:
+            return self.object.get_absolute_url()
+        return reverse("assets:assetrequest_list")
+
+class AssetRequestDeleteView(ObjectDeleteView):
+    queryset = AssetRequest.objects.all()
+    model = AssetRequest
+    template_name = "generic/object_confirm_delete.html"
+    success_url = reverse_lazy("assets:assetrequest_list")

@@ -122,4 +122,25 @@ urlpatterns = [
     path('kit-items/add/', views.KitItemEditView.as_view(), name='kititem_create'),
     path('kit-items/<int:pk>/edit/', views.KitItemEditView.as_view(), name='kititem_update'),
     path('kit-items/<int:pk>/delete/', views.KitItemDeleteView.as_view(), name='kititem_delete'),
+
+    # Suppliers
+    path('suppliers/', views.SupplierListView.as_view(), name='supplier_list'),
+    path('suppliers/add/', views.SupplierEditView.as_view(), name='supplier_create'),
+    path('suppliers/<int:pk>/', views.SupplierDetailView.as_view(), name='supplier_detail'),
+    path('suppliers/<int:pk>/edit/', views.SupplierEditView.as_view(), name='supplier_update'),
+    path('suppliers/<int:pk>/delete/', views.SupplierDeleteView.as_view(), name='supplier_delete'),
+
+    # Categories
+    path('categories/', views.CategoryListView.as_view(), name='category_list'),
+    path('categories/add/', views.CategoryEditView.as_view(), name='category_create'),
+    path('categories/<int:pk>/', views.CategoryDetailView.as_view(), name='category_detail'),
+    path('categories/<int:pk>/edit/', views.CategoryEditView.as_view(), name='category_update'),
+    path('categories/<int:pk>/delete/', views.CategoryDeleteView.as_view(), name='category_delete'),
+
+    # Asset Requests
+    path('requests/', views.AssetRequestListView.as_view(), name='assetrequest_list'),
+    path('requests/add/', views.AssetRequestCreateView.as_view(), name='assetrequest_create'),
+    path('requests/<int:pk>/', views.AssetRequestDetailView.as_view(), name='assetrequest_detail'),
+    path('requests/<int:pk>/edit/', views.AssetRequestEditView.as_view(), name='assetrequest_update'),
+    path('requests/<int:pk>/delete/', views.AssetRequestDeleteView.as_view(), name='assetrequest_delete'),
 ] 

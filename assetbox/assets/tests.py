@@ -360,6 +360,8 @@ class AssetProcurementTestCase(TestCase):
         )
 
     def test_asset_procurement_fields_save_and_display(self):
+        from .models import Supplier
+        supplier = Supplier.objects.create(name='Lenovo Germany GmbH', slug='lenovo-germany-gmbh')
         # Create asset with procurement details
         asset = Asset.objects.create(
             name="Developer ThinkPad",
@@ -368,14 +370,14 @@ class AssetProcurementTestCase(TestCase):
             asset_role=self.role,
             purchase_cost=Decimal("1249.99"),
             order_number="PO-998877",
-            supplier="Lenovo Germany GmbH"
+            supplier=supplier
         )
         
         # Verify saved correctly in DB
         asset.refresh_from_db()
         self.assertEqual(asset.purchase_cost, Decimal("1249.99"))
         self.assertEqual(asset.order_number, "PO-998877")
-        self.assertEqual(asset.supplier, "Lenovo Germany GmbH")
+        self.assertEqual(asset.supplier.name, "Lenovo Germany GmbH")
 
         # Verify detail page displays them
         response = self.client.get(reverse('assets:asset_detail', kwargs={'pk': asset.pk}))
@@ -385,6 +387,8 @@ class AssetProcurementTestCase(TestCase):
         self.assertContains(response, "Lenovo Germany GmbH")
 
     def test_asset_form_procurement_fields(self):
+        from .models import Supplier
+        supplier = Supplier.objects.create(name='Bechtle AG', slug='bechtle-ag')
         # Test creating new asset via POST
         post_data = {
             'name': 'Sales ThinkPad',
@@ -394,7 +398,7 @@ class AssetProcurementTestCase(TestCase):
             'status': Asset.STATUS_AVAILABLE,
             'purchase_cost': '999.50',
             'order_number': 'PO-112233',
-            'supplier': 'Bechtle AG',
+            'supplier': supplier.pk,
             'notes': 'Sales laptop standard spec',
             'tags': []
         }
@@ -406,7 +410,7 @@ class AssetProcurementTestCase(TestCase):
         self.assertEqual(new_asset.name, 'Sales ThinkPad')
         self.assertEqual(new_asset.purchase_cost, Decimal('999.50'))
         self.assertEqual(new_asset.order_number, 'PO-112233')
-        self.assertEqual(new_asset.supplier, 'Bechtle AG')
+        self.assertEqual(new_asset.supplier.name, 'Bechtle AG')
 
         # Test fields are optional
         post_data_optional = {
@@ -427,7 +431,7 @@ class AssetProcurementTestCase(TestCase):
         minimal_asset = Asset.objects.get(asset_tag='LAP-003')
         self.assertIsNone(minimal_asset.purchase_cost)
         self.assertEqual(minimal_asset.order_number, '')
-        self.assertEqual(minimal_asset.supplier, '')
+        self.assertEqual(minimal_asset.supplier, None)
 
 
 class StatusLabelTestCase(TestCase):

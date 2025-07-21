@@ -1,5 +1,5 @@
 import django_filters
-from .models import Asset, AssetRole, Manufacturer, AssetType, ComponentType, ComponentInstance, Accessory, Consumable, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit
+from .models import Asset, AssetRole, Manufacturer, AssetType, ComponentType, ComponentInstance, Accessory, Consumable, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, Supplier, Category, AssetRequest
 from organization.models import Location, Tenant
 from extras.models import Tag
 from django import forms
@@ -45,10 +45,10 @@ class AssetFilterSet(django_filters.FilterSet):
         widget=forms.Select(attrs={'class': 'form-select'}),
         label='Tenant'
     )
-    supplier = django_filters.CharFilter(
-        lookup_expr='icontains',
+    supplier = django_filters.ModelChoiceFilter(
+        queryset=Supplier.objects.all(),
         label='Supplier',
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Supplier name'})
+        widget=forms.Select(attrs={'class': 'form-select'})
     )
     tags = django_filters.ModelMultipleChoiceFilter(
         field_name='tags__slug',
@@ -388,4 +388,53 @@ class KitFilterSet(django_filters.FilterSet):
         return queryset.filter(
             Q(name__icontains=value) |
             Q(description__icontains=value)
-        ).distinct() 
+        ).distinct()
+
+
+class SupplierFilterSet(django_filters.FilterSet):
+    q = django_filters.CharFilter(method='search', label='Search', widget=forms.TextInput(attrs={'placeholder': 'Name...'}))
+
+    class Meta:
+        model = Supplier
+        fields = ['name']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=value) | Q(website__icontains=value) | Q(contact_name__icontains=value)
+        ).distinct()
+
+
+class CategoryFilterSet(django_filters.FilterSet):
+    q = django_filters.CharFilter(method='search', label='Search', widget=forms.TextInput(attrs={'placeholder': 'Name...'}))
+
+    class Meta:
+        model = Category
+        fields = ['name']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=value) | Q(description__icontains=value)
+        ).distinct()
+
+
+class AssetRequestFilterSet(django_filters.FilterSet):
+    q = django_filters.CharFilter(method='search', label='Search', widget=forms.TextInput(attrs={'placeholder': 'Search...'}))
+    status = django_filters.ChoiceFilter(choices=AssetRequest.STATUS_CHOICES, widget=forms.Select(attrs={'class': 'form-select'}))
+
+    class Meta:
+        model = AssetRequest
+        fields = ['status']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(asset__name__icontains=value) |
+            Q(asset_type__model__icontains=value) |
+            Q(requester__username__icontains=value) |
+            Q(notes__icontains=value)
+        ).distinct()

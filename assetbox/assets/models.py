@@ -1,12 +1,14 @@
+import uuid
+
 from django.db import models
-from django.conf import settings # Required for referencing AUTH_USER_MODEL
-from django.utils.text import slugify # Needed for slug generation if we automate it later
-from django.db.models import Q, CheckConstraint, F # Import Q and CheckConstraint
+from django.conf import settings
+from django.utils.text import slugify
+from django.db.models import Q, CheckConstraint, F
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
-from django.utils import timezone # Added import for timezone default fields
-from software.models import Software # Import Software model
-from core.models import BaseModel, ChangeLoggingMixin # Added import
+from django.utils import timezone
+from software.models import Software
+from core.models import BaseModel, ChangeLoggingMixin
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.auth import get_user_model
 
@@ -222,14 +224,24 @@ class AssetType(ChangeLoggingMixin, BaseModel):
         verbose_name="Depreciation"
     )
 
+    category = models.ForeignKey(
+        'Category',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='asset_types',
+        verbose_name="Category",
+        db_index=True
+    )
+    image = models.ImageField(upload_to='asset_types/', blank=True, null=True, verbose_name="Model Image")
+
     # Other
     description = models.TextField(blank=True)
     comments = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', related_name="asset_types", blank=True)
 
     class Meta:
-        # ordering = ['manufacturer', 'model'] # Removed old ordering
-        unique_together = ('manufacturer', 'model') # Ensure model is unique per manufacturer
+        unique_together = ('manufacturer', 'model')
         verbose_name = "Asset Type"
         verbose_name_plural = "Asset Types"
 
@@ -285,10 +297,14 @@ class Asset(ChangeLoggingMixin, BaseModel):
         blank=True,
         verbose_name="Order Number"
     )
-    supplier = models.CharField(
-        max_length=100,
+    supplier = models.ForeignKey(
+        'Supplier',
+        on_delete=models.SET_NULL,
+        null=True,
         blank=True,
-        verbose_name="Supplier"
+        related_name='assets',
+        verbose_name="Supplier",
+        db_index=True
     )
     salvage_value = models.DecimalField(
         max_digits=10,
@@ -626,7 +642,25 @@ class Accessory(ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True)
     manufacturer = models.ForeignKey(Manufacturer, on_delete=models.PROTECT, related_name='accessories')
-    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default=CATEGORY_OTHER)
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default=CATEGORY_OTHER, verbose_name="Accessory Type")
+    notification_category = models.ForeignKey(
+        'Category',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='acc_categories',
+        verbose_name="Notification Category",
+        db_index=True
+    )
+    supplier = models.ForeignKey(
+        'Supplier',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='supplier_accessories',
+        verbose_name="Supplier",
+        db_index=True
+    )
     part_number = models.CharField(max_length=100, blank=True, db_index=True, help_text="SKU or manufacturer part number")
     qty = models.PositiveIntegerField(default=0, verbose_name="Total Stock")
     min_qty = models.PositiveIntegerField(default=0, verbose_name="Safety Threshold", help_text="Alert threshold quantity")
@@ -908,3 +942,107 @@ class KitItem(ChangeLoggingMixin, BaseModel):
             raise ValidationError("A kit item must select either an Asset Type, Accessory, or License.")
         if len(filled) > 1:
             raise ValidationError("A kit item cannot select more than one target (must be either Asset Type OR Accessory OR License).")
+
+
+class Supplier(ChangeLoggingMixin, BaseModel):
+    name = models.CharField(max_length=255, unique=True)
+    slug = models.SlugField(max_length=255, unique=True)
+    website = models.URLField(max_length=500, blank=True, null=True)
+    contact_email = models.EmailField(max_length=255, blank=True, null=True)
+    contact_phone = models.CharField(max_length=50, blank=True, null=True)
+    address = models.TextField(blank=True, null=True)
+    contact_name = models.CharField(max_length=255, blank=True, null=True)
+    notes = models.TextField(blank=True, null=True)
+    tags = models.ManyToManyField('extras.Tag', related_name='suppliers', blank=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = "Supplier"
+        verbose_name_plural = "Suppliers"
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse('assets:supplier_detail', kwargs={'pk': self.pk})
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+            base_slug = self.slug
+            counter = 1
+            while Supplier.objects.filter(slug=self.slug).exists():
+                self.slug = f"{base_slug}-{counter}"
+                counter += 1
+        super().save(*args, **kwargs)
+
+
+class Category(ChangeLoggingMixin, BaseModel):
+    name = models.CharField(max_length=255, unique=True)
+    slug = models.SlugField(max_length=255, unique=True)
+    color = models.CharField(max_length=6, blank=True, null=True, help_text="RGB color in hexadecimal (e.g. 00ff00)")
+    description = models.TextField(blank=True, null=True)
+    email_on_checkout = models.BooleanField(default=False, help_text="Send email notification on asset checkout")
+    email_on_checkin = models.BooleanField(default=False, help_text="Send email notification on asset checkin")
+    require_acceptance = models.BooleanField(default=False, help_text="Require digital acceptance on checkout")
+    email_eula = models.BooleanField(default=False, help_text="Send EULA email on acceptance")
+    applies_to = models.JSONField(default=list, blank=True, help_text="Applies to: ['asset', 'accessory', 'license']")
+    tags = models.ManyToManyField('extras.Tag', related_name='categories', blank=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = "Category"
+        verbose_name_plural = "Categories"
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse('assets:category_detail', kwargs={'pk': self.pk})
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+            base_slug = self.slug
+            counter = 1
+            while Category.objects.filter(slug=self.slug).exists():
+                self.slug = f"{base_slug}-{counter}"
+                counter += 1
+        super().save(*args, **kwargs)
+
+
+class AssetRequest(ChangeLoggingMixin, BaseModel):
+    STATUS_PENDING = 'pending'
+    STATUS_APPROVED = 'approved'
+    STATUS_DENIED = 'denied'
+    STATUS_FULFILLED = 'fulfilled'
+    STATUS_CANCELLED = 'cancelled'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_APPROVED, 'Approved'),
+        (STATUS_DENIED, 'Denied'),
+        (STATUS_FULFILLED, 'Fulfilled'),
+        (STATUS_CANCELLED, 'Cancelled'),
+    ]
+
+    requester = models.ForeignKey(User, on_delete=models.PROTECT, related_name='asset_requests', db_index=True)
+    asset = models.ForeignKey('Asset', on_delete=models.SET_NULL, null=True, blank=True, related_name='requests', db_index=True)
+    asset_type = models.ForeignKey(AssetType, on_delete=models.SET_NULL, null=True, blank=True, related_name='requests', db_index=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+    request_date = models.DateTimeField(auto_now_add=True, db_index=True)
+    response_date = models.DateTimeField(null=True, blank=True)
+    responded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='asset_request_responses')
+    notes = models.TextField(blank=True, null=True)
+    response_notes = models.TextField(blank=True, null=True)
+
+    class Meta:
+        ordering = ['-request_date']
+        verbose_name = "Asset Request"
+        verbose_name_plural = "Asset Requests"
+
+    def __str__(self):
+        target = str(self.asset) if self.asset else str(self.asset_type) if self.asset_type else "Any Asset"
+        return f"Request for {target} by {self.requester} ({self.get_status_display()})"
+
+    def get_absolute_url(self):
+        return reverse('assets:assetrequest_detail', kwargs={'pk': self.pk})
