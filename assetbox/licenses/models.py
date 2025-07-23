@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from core.models import BaseModel, ChangeLoggingMixin
+from core.mixins import ExportableMixin, SoftDeleteMixin, CloneableMixin
 from extras.models import Tag
 from software.models import Software
 from assets.models import Asset
@@ -21,7 +22,27 @@ class LicenseQuerySet(models.QuerySet):
         from django.db.models import Count
         return self.annotate(assigned_count=Count('assignments'))
 
-class License(ChangeLoggingMixin, BaseModel):
+    def deleted(self):
+        return self.filter(deleted_at__isnull=False)
+
+    def active(self):
+        return self.filter(deleted_at__isnull=True)
+
+
+class SoftDeleteLicenseManager(models.Manager.from_queryset(LicenseQuerySet)):
+    def get_queryset(self):
+        from django.core.exceptions import FieldError
+        try:
+            return super().get_queryset().filter(deleted_at__isnull=True)
+        except FieldError:
+            return super().get_queryset()
+
+
+class AllObjectsLicenseManager(models.Manager.from_queryset(LicenseQuerySet)):
+    pass
+
+
+class License(SoftDeleteMixin, ExportableMixin, CloneableMixin, ChangeLoggingMixin, BaseModel):
     """Represents the specific entitlement/purchase record for software."""
     name = models.CharField(
         max_length=255,
@@ -53,7 +74,8 @@ class License(ChangeLoggingMixin, BaseModel):
     tags = models.ManyToManyField(Tag, blank=True, related_name='licenses')
     tenant = models.ForeignKey('organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='licenses', db_index=True)
 
-    objects = LicenseQuerySet.as_manager()
+    objects = SoftDeleteLicenseManager()
+    all_objects = AllObjectsLicenseManager()
 
     class Meta:
         ordering = ('software__manufacturer', 'software__name', 'name')

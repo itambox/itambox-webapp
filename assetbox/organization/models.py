@@ -4,11 +4,12 @@ from django.urls import reverse
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.conf import settings # Import settings
-from core.models import BaseModel, ChangeLoggingMixin # Added import
+from core.models import BaseModel, ChangeLoggingMixin
+from core.mixins import ExportableMixin
 
 # Create your models here.
 
-class Location(ChangeLoggingMixin, BaseModel):
+class Location(ExportableMixin, ChangeLoggingMixin, BaseModel):
     STATUS_PLANNED = 'planned'
     STATUS_STAGING = 'staging'
     STATUS_ACTIVE = 'active'
@@ -211,7 +212,7 @@ class Site(ChangeLoggingMixin, BaseModel):
         return reverse('organization:site_detail', kwargs={'pk': self.pk})
 
 # +++ AssetHolder Model +++
-class AssetHolder(ChangeLoggingMixin, BaseModel):
+class AssetHolder(ExportableMixin, ChangeLoggingMixin, BaseModel):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL, # Keep holder if user is deleted, set user link to null

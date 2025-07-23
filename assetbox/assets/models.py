@@ -1,4 +1,5 @@
 import uuid
+import secrets
 
 from django.db import models
 from django.conf import settings
@@ -9,13 +10,27 @@ from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from software.models import Software
 from core.models import BaseModel, ChangeLoggingMixin
+from core.mixins import ExportableMixin, SoftDeleteMixin, CloneableMixin, ImageAttachmentMixin, FileAttachmentMixin
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
 
-# Create your models here.
+class SoftDeleteManager(models.Manager):
+    def get_queryset(self):
+        qs = super().get_queryset()
+        from django.core.exceptions import FieldError
+        try:
+            return qs.filter(deleted_at__isnull=True)
+        except FieldError:
+            return qs
+
+
+class AllObjectsManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset()
+
 
 class StatusLabel(ChangeLoggingMixin, BaseModel):
     TYPE_DEPLOYABLE = 'deployable'
@@ -76,7 +91,7 @@ class AssetRole(ChangeLoggingMixin, BaseModel):
         # Use standardized URL name
         return reverse('assets:assetrole_detail', args=[self.pk])
 
-class Manufacturer(ChangeLoggingMixin, BaseModel):
+class Manufacturer(ExportableMixin, ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=255, unique=True)
     slug = models.SlugField(max_length=255, unique=True)  # Re-add unique=True
     description = models.TextField(blank=True, null=True)
@@ -171,7 +186,7 @@ class Depreciation(ChangeLoggingMixin, BaseModel):
         return reverse('assets:depreciation_detail', kwargs={'pk': self.pk})
 
 
-class AssetType(ChangeLoggingMixin, BaseModel):
+class AssetType(ImageAttachmentMixin, FileAttachmentMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
     """Defines a specific type of asset (e.g., a specific laptop model)."""
     STORAGE_SSD = 'ssd'
     STORAGE_NVME = 'nvme'
@@ -239,6 +254,7 @@ class AssetType(ChangeLoggingMixin, BaseModel):
     description = models.TextField(blank=True)
     comments = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', related_name="asset_types", blank=True)
+    requestable = models.BooleanField(default=False, help_text="Allow users to request assets of this type")
 
     class Meta:
         unique_together = ('manufacturer', 'model')
@@ -262,7 +278,9 @@ class AssetType(ChangeLoggingMixin, BaseModel):
                  counter += 1
         super().save(*args, **kwargs)
 
-class Asset(ChangeLoggingMixin, BaseModel):
+class Asset(ImageAttachmentMixin, FileAttachmentMixin, SoftDeleteMixin, ExportableMixin, CloneableMixin, ChangeLoggingMixin, BaseModel):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
     # --- Define choices as class attributes --- 
     STATUS_IN_USE = 'in_use'
     STATUS_AVAILABLE = 'available'
@@ -332,6 +350,7 @@ class Asset(ChangeLoggingMixin, BaseModel):
         blank=True,
         verbose_name="Custom Values"
     )
+    requestable = models.BooleanField(default=False, help_text="Allow users to request this asset")
 
     @property
     def manufacturer(self):
@@ -456,6 +475,15 @@ class Asset(ChangeLoggingMixin, BaseModel):
     def get_absolute_url(self):
         """Return the canonical URL for the asset."""
         return reverse('assets:asset_detail', kwargs={'pk': self.pk})
+
+    def save(self, *args, **kwargs):
+        if not self.asset_tag:
+            sequence, _ = AssetTagSequence.objects.get_or_create(
+                prefix='ASSET-',
+                defaults={'next_value': 1, 'zero_padding': 6}
+            )
+            self.asset_tag = sequence.next_tag()
+        super().save(*args, **kwargs)
 
 class ActivityLog(models.Model):
     ACTION_CHOICES = [
@@ -619,7 +647,9 @@ class ComponentInstance(ChangeLoggingMixin, BaseModel):
         return reverse('assets:componentinstance_detail', kwargs={'pk': self.pk})
 
 
-class Accessory(ChangeLoggingMixin, BaseModel):
+class Accessory(SoftDeleteMixin, ExportableMixin, CloneableMixin, ChangeLoggingMixin, BaseModel):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
     """Bulk non-serialized returnable peripherals tracked in inventory (e.g. Dell Keyboard)."""
     CATEGORY_KEYBOARD = 'keyboard'
     CATEGORY_MOUSE = 'mouse'
@@ -729,7 +759,9 @@ class AccessoryAssignment(ChangeLoggingMixin, BaseModel):
         return f"{self.qty}x {self.accessory} assigned to {recipient}"
 
 
-class Consumable(ChangeLoggingMixin, BaseModel):
+class Consumable(SoftDeleteMixin, ExportableMixin, CloneableMixin, ChangeLoggingMixin, BaseModel):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
     """Non-returnable bulk items that are permanently consumed (e.g. thermal paste, printer toner)."""
     CATEGORY_TONER = 'toner'
     CATEGORY_INK = 'ink'
@@ -818,14 +850,34 @@ class ConsumableAssignment(ChangeLoggingMixin, BaseModel):
         return f"{self.qty}x {self.consumable} consumed by {recipient}"
 
 
+def generate_token():
+    return secrets.token_urlsafe(48)
+
+
 class CustodyReceipt(ChangeLoggingMixin, BaseModel):
-    """Immutable digital custody sign-off ledger receipt binding checked-out assets to Asset Holders."""
+    STATUS_PENDING = 'pending'
+    STATUS_ACCEPTED = 'accepted'
+    STATUS_DECLINED = 'declined'
+    ACCEPTANCE_STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_ACCEPTED, 'Accepted'),
+        (STATUS_DECLINED, 'Declined'),
+    ]
+
     asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='custody_receipts', db_index=True)
     holder = models.ForeignKey('organization.AssetHolder', on_delete=models.CASCADE, related_name='custody_receipts')
-    verification_hash = models.CharField(max_length=64, unique=True)
-    signature_canvas = models.TextField(help_text="Base64 canvas stroke vector string representation")
+    token = models.CharField(max_length=64, unique=True, default=generate_token)
+    accepted = models.BooleanField(default=False)
+    accepted_date = models.DateTimeField(null=True, blank=True)
+    acceptance_method = models.CharField(max_length=50, default='link')
+    acceptance_status = models.CharField(max_length=20, choices=ACCEPTANCE_STATUS_CHOICES, default=STATUS_PENDING)
+    signature_data = models.TextField(blank=True, null=True)
+    signature_hash = models.CharField(max_length=64, blank=True, null=True)
+    verification_hash = models.CharField(max_length=64, unique=True, blank=True, null=True)
+    signature_canvas = models.TextField(blank=True, null=True, help_text="Base64 canvas stroke vector string representation")
     signed_at = models.DateTimeField(default=timezone.now)
     eula_version = models.CharField(max_length=10, default='1.0')
+    created_date = models.DateTimeField(auto_now_add=True, null=True)
 
     class Meta:
         ordering = ('-signed_at',)
@@ -1046,3 +1098,25 @@ class AssetRequest(ChangeLoggingMixin, BaseModel):
 
     def get_absolute_url(self):
         return reverse('assets:assetrequest_detail', kwargs={'pk': self.pk})
+
+
+class AssetTagSequence(ChangeLoggingMixin, BaseModel):
+    prefix = models.CharField(max_length=20, default='ASSET-', unique=True)
+    next_value = models.PositiveIntegerField(default=1)
+    zero_padding = models.PositiveSmallIntegerField(default=6)
+
+    class Meta:
+        verbose_name = "Asset Tag Sequence"
+        verbose_name_plural = "Asset Tag Sequences"
+
+    def __str__(self):
+        return f'{self.prefix} (next: {self.next_value:0{self.zero_padding}d})'
+
+    def get_absolute_url(self):
+        return reverse('assets:assettagsequence_detail', kwargs={'pk': self.pk})
+
+    def next_tag(self):
+        tag = f'{self.prefix}{self.next_value:0{self.zero_padding}d}'
+        self.next_value += 1
+        self.save(update_fields=['next_value'])
+        return tag

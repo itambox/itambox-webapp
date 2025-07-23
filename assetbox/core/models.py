@@ -10,6 +10,8 @@ from core.middleware import get_current_request_id, get_current_user
 from core.utils import serialize_object
 from core.registry import registry
 
+from django.core.exceptions import ValidationError
+
 
 class BaseModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, editable=False)
@@ -129,6 +131,15 @@ class ChangeLoggingMixin:
         self._changelog_message = ''
         self._prechange_snapshot = None
         super().__init__(*args, **kwargs)
+
+    def clean(self):
+        from core.validators import get_validators, parse_json_rules
+        for validator in get_validators(self):
+            if callable(validator):
+                validator_instance = validator()
+                validator_instance.validate(self)
+            elif isinstance(validator, dict):
+                parse_json_rules(self, validator)
 
     def snapshot(self):
         self._prechange_snapshot = serialize_object(
@@ -399,6 +410,9 @@ class EventRule(ChangeLoggingMixin, BaseModel):
     def __str__(self):
         return self.name
 
+    def get_absolute_url(self):
+        return reverse('eventrule_detail', kwargs={'pk': self.pk})
+
 
 class WebhookEndpoint(ChangeLoggingMixin, BaseModel):
     HTTP_GET = 'GET'
@@ -428,6 +442,9 @@ class WebhookEndpoint(ChangeLoggingMixin, BaseModel):
 
     def __str__(self):
         return self.name
+
+    def get_absolute_url(self):
+        return reverse('webhookendpoint_detail', kwargs={'pk': self.pk})
 
 
 class Job(ChangeLoggingMixin, BaseModel):
@@ -581,3 +598,132 @@ class EmailSettings(ChangeLoggingMixin, BaseModel):
     @classmethod
     def load(cls):
         return cls.objects.first()
+
+
+class ExportTemplate(BaseModel):
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='export_templates')
+    template_code = models.TextField(help_text="Jinja2 or Django template code for export")
+    mime_type = models.CharField(max_length=50, default='text/csv', help_text="MIME type for the exported file")
+    file_extension = models.CharField(max_length=10, default='csv')
+
+    class Meta:
+        ordering = ['content_type', 'name']
+        unique_together = [['content_type', 'name']]
+        verbose_name = "Export Template"
+        verbose_name_plural = "Export Templates"
+
+    def __str__(self):
+        return f"{self.content_type.model} - {self.name}"
+
+    def get_absolute_url(self):
+        return reverse('export_template_detail', kwargs={'pk': self.pk})
+
+    def render(self, obj):
+        from django.template import Template, Context
+        template = Template(self.template_code)
+        context = Context({'obj': obj})
+        return template.render(context)
+
+    def render_queryset(self, queryset):
+        from django.template import Template, Context
+        template = Template(self.template_code)
+        results = []
+        for obj in queryset:
+            context = Context({'obj': obj})
+            results.append(template.render(context))
+        return '\n'.join(results)
+
+
+class PermissionGroup(BaseModel):
+    name = models.CharField(max_length=255, unique=True)
+    description = models.TextField(blank=True)
+    permissions = models.JSONField(default=dict, help_text="{'assets.view_asset': True, 'assets.change_asset': True, ...}")
+    users = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='permission_groups', blank=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = "Permission Group"
+        verbose_name_plural = "Permission Groups"
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse('permissiongroup_detail', kwargs={'pk': self.pk})
+
+
+class LDAPSettings(ChangeLoggingMixin, BaseModel):
+    server_uri = models.CharField(max_length=500, help_text="ldap://ldap.example.com")
+    bind_dn = models.CharField(max_length=500, blank=True)
+    bind_password = models.CharField(max_length=255, blank=True)
+    user_search_base = models.CharField(max_length=500, blank=True)
+    user_search_filter = models.CharField(max_length=500, default='(uid=%(user)s)')
+    group_search_base = models.CharField(max_length=500, blank=True)
+    is_active = models.BooleanField(default=False)
+    require_group = models.CharField(max_length=500, blank=True)
+
+    class Meta:
+        verbose_name = "LDAP Settings"
+        verbose_name_plural = "LDAP Settings"
+
+    def __str__(self):
+        return f"LDAP Settings ({'Active' if self.is_active else 'Inactive'})"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        return cls.objects.first()
+
+
+class SAMLSettings(ChangeLoggingMixin, BaseModel):
+    idp_metadata_url = models.URLField(blank=True, help_text="Identity Provider metadata URL")
+    idp_entity_id = models.CharField(max_length=500, blank=True)
+    sp_entity_id = models.CharField(max_length=500, default='assetbox')
+    is_active = models.BooleanField(default=False)
+    strict = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "SAML Settings"
+        verbose_name_plural = "SAML Settings"
+
+    def __str__(self):
+        return f"SAML Settings ({'Active' if self.is_active else 'Inactive'})"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        return cls.objects.first()
+
+
+class LabelTemplate(ChangeLoggingMixin, BaseModel):
+    name = models.CharField(max_length=255, unique=True)
+    description = models.TextField(blank=True)
+    page_width = models.FloatField(default=2.25, help_text="Label width in inches")
+    page_height = models.FloatField(default=1.25, help_text="Label height in inches")
+    barcode_format = models.CharField(max_length=20, default='code128', choices=[
+        ('code128', 'Code 128'),
+        ('code39', 'Code 39'),
+        ('qr', 'QR Code'),
+        ('datamatrix', 'Data Matrix'),
+    ])
+    template_code = models.TextField(blank=True, help_text="Jinja2/HTML template for label layout")
+    printer_settings = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = "Label Template"
+        verbose_name_plural = "Label Templates"
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse('label_template_detail', kwargs={'pk': self.pk})

@@ -127,7 +127,7 @@ class TaggableMixin:
         registry.register_feature(cls, 'taggable')
 
 
-class SoftDeleteMixin:
+class SoftDeleteMixin(models.Model):
     """
     Mixin for models that support soft deletion via a `deleted_at` timestamp.
     Objects with a non-null `deleted_at` are considered deleted.
@@ -135,8 +135,10 @@ class SoftDeleteMixin:
 
     deleted_at = models.DateTimeField(null=True, blank=True, editable=False)
 
+    class Meta:
+        abstract = True
+
     def soft_delete(self):
-        self.deleted_at = models.DateTimeField.auto_now.__get__(self, self.__class__)  # noqa
         from django.utils import timezone
         self.deleted_at = timezone.now()
         self.save(update_fields=['deleted_at'])
