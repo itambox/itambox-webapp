@@ -6,7 +6,7 @@ import logging
 import requests
 from django.contrib.contenttypes.models import ContentType
 
-from core.models import ChangeLoggingMixin, Event, EventRule, Job
+from core.models import ChangeLoggingMixin, Event, EventRule, Job, NotificationChannel
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +136,14 @@ def _send_webhook(rule, event):
     headers = config.get('headers', {})
     secret = config.get('secret', '')
 
+    if 'hooks.slack.com' in url:
+        _send_slack_notification(url, f"Event: {event.action} on {event.model.model} (ID: {event.object_id})")
+        return
+
+    if 'webhook.office.com' in url or 'outlook.office.com/webhook' in url:
+        _send_teams_notification(url, f"Event: {event.action} on {event.model.model} (ID: {event.object_id})")
+        return
+
     payload = {
         'event': event.action,
         'model': f"{event.model.app_label}.{event.model.model}",
@@ -213,4 +221,105 @@ def _run_script_job(rule, event):
     )
 
 
+def _send_slack_notification(webhook_url, message_text, title=None):
+    payload = {
+        'text': message_text,
+    }
+    if title:
+        payload['blocks'] = [
+            {
+                'type': 'header',
+                'text': {'type': 'plain_text', 'text': title}
+            },
+            {
+                'type': 'section',
+                'text': {'type': 'mrkdwn', 'text': message_text}
+            }
+        ]
+    try:
+        response = requests.post(webhook_url, json=payload, timeout=10)
+        response.raise_for_status()
+        logger.info("Slack notification sent — status %s", response.status_code)
+        return True
+    except requests.RequestException as e:
+        logger.error("Slack notification failed: %s", e)
+        return False
+
+
+def _send_teams_notification(webhook_url, message_text, title=None):
+    payload = {
+        '@type': 'MessageCard',
+        '@context': 'https://schema.org/extensions',
+        'summary': title or message_text[:80],
+        'themeColor': '0076D7',
+        'title': title or 'AssetBox Notification',
+        'text': message_text,
+    }
+    try:
+        response = requests.post(webhook_url, json=payload, timeout=10)
+        response.raise_for_status()
+        logger.info("Teams notification sent — status %s", response.status_code)
+        return True
+    except requests.RequestException as e:
+        logger.error("Teams notification failed: %s", e)
+        return False
+
+
+def send_notification_to_channel(channel, subject, body):
+    if channel.channel_type == NotificationChannel.TYPE_SLACK:
+        return _send_slack_notification(
+            webhook_url=channel.config.get('webhook_url', ''),
+            message_text=body,
+            title=subject
+        )
+    elif channel.channel_type == NotificationChannel.TYPE_TEAMS:
+        return _send_teams_notification(
+            webhook_url=channel.config.get('webhook_url', ''),
+            message_text=body,
+            title=subject
+        )
+    elif channel.channel_type == NotificationChannel.TYPE_WEBHOOK:
+        try:
+            response = requests.post(
+                channel.config.get('url', ''),
+                json={'subject': subject, 'body': body},
+                timeout=10
+            )
+            response.raise_for_status()
+            return True
+        except requests.RequestException:
+            return False
+    elif channel.channel_type == NotificationChannel.TYPE_EMAIL:
+        from django.core.mail import send_mail
+        from core.models import EmailSettings
+        email_config = EmailSettings.load()
+        if email_config and email_config.enabled:
+            try:
+                send_mail(
+                    subject=subject,
+                    message=body,
+                    from_email=email_config.from_address,
+                    recipient_list=channel.config.get('recipients', [email_config.from_address]),
+                    fail_silently=True,
+                )
+                return True
+            except Exception:
+                return False
+    elif channel.channel_type == NotificationChannel.TYPE_IN_APP:
+        from core.models import Notification
+        Notification.objects.create(user=None, subject=subject, message=body)
+        return True
+    return False
+
+
+def send_notification(subject, body, channel_type=None):
+    channels = NotificationChannel.objects.filter(enabled=True)
+    if channel_type:
+        channels = channels.filter(channel_type=channel_type)
+
+    results = {}
+    for channel in channels:
+        results[channel.name] = send_notification_to_channel(channel, subject, body)
+
+    return results
 

@@ -1,8 +1,10 @@
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
+from django.db import DatabaseError
 from django.contrib.auth import get_user_model
-from assets.models import ConsumableAssignment, Consumable
+from assets.models import ConsumableAssignment, Consumable, AssetRequest
 from core.models import Notification
+from core.events import dispatch_event
 
 User = get_user_model()
 
@@ -36,3 +38,22 @@ def check_consumable_stock(sender, instance, **kwargs):
                     message=message,
                     level=level
                 )
+
+
+@receiver(post_save, sender=AssetRequest)
+def on_asset_request_save(sender, instance, created, **kwargs):
+    try:
+        if created:
+            dispatch_event(sender, instance, action='create')
+            admins = User.objects.filter(is_staff=True)
+            for admin in admins:
+                Notification.objects.create(
+                    user=admin,
+                    subject=f"New Asset Request from {instance.requester}",
+                    message=f"{instance.requester} has requested {instance}.",
+                    level=Notification.LEVEL_INFO,
+                )
+    except DatabaseError:
+        pass
+    except Exception:
+        pass

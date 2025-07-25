@@ -1,5 +1,5 @@
 import django_filters
-from .models import Asset, AssetRole, Manufacturer, AssetType, ComponentType, ComponentInstance, Accessory, Consumable, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, Supplier, Category, AssetRequest
+from .models import Asset, AssetRole, Manufacturer, AssetType, ComponentType, ComponentInstance, Accessory, Consumable, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, Supplier, Category, AssetRequest, AssetTagSequence
 from organization.models import Location, Tenant
 from extras.models import Tag
 from django import forms
@@ -70,6 +70,10 @@ class AssetFilterSet(django_filters.FilterSet):
         label='Purchased Before',
         widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
     )
+    requestable = django_filters.BooleanFilter(
+        label='Requestable',
+        widget=forms.Select(choices=[('', 'Any'), ('true', 'Yes'), ('false', 'No')], attrs={'class': 'form-select'})
+    )
 
     class Meta:
         model = Asset
@@ -138,10 +142,14 @@ class AssetTypeFilterSet(django_filters.FilterSet):
         field_name='manufacturer',
         label='Manufacturer'
     )
+    requestable = django_filters.BooleanFilter(
+        label='Requestable',
+        widget=forms.Select(choices=[('', 'Any'), ('true', 'Yes'), ('false', 'No')], attrs={'class': 'form-select'})
+    )
 
     class Meta:
         model = AssetType
-        fields = ['manufacturer', 'model', 'part_number', 'cpu', 'storage_type']
+        fields = ['manufacturer', 'model', 'part_number', 'cpu', 'storage_type', 'requestable']
 
     def search(self, queryset, name, value):
         if not value.strip():
@@ -437,4 +445,23 @@ class AssetRequestFilterSet(django_filters.FilterSet):
             Q(asset_type__model__icontains=value) |
             Q(requester__username__icontains=value) |
             Q(notes__icontains=value)
+        ).distinct()
+
+
+class AssetTagSequenceFilterSet(django_filters.FilterSet):
+    q = django_filters.CharFilter(
+        method='search',
+        label='Search',
+        widget=forms.TextInput(attrs={'placeholder': 'Prefix...'})
+    )
+
+    class Meta:
+        model = AssetTagSequence
+        fields = ['prefix']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(prefix__icontains=value)
         ).distinct()

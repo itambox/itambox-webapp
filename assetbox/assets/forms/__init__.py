@@ -1,7 +1,7 @@
 from django import forms
 from django.core.exceptions import ValidationError # Import ValidationError
 # Import models from this app
-from .models import Asset, AssetRole, Manufacturer, AssetType, ComponentType, ComponentInstance, Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, KitItem, Supplier, Category, AssetRequest
+from ..models import Asset, AssetRole, Manufacturer, AssetType, ComponentType, ComponentInstance, Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, KitItem, Supplier, Category, AssetRequest, AssetTagSequence
 # Import models from other apps
 from organization.models import Location, AssetHolder, Region, Site # Import Location, AssetHolder, Region, Site
 from extras.models import Tag # Import Tag
@@ -12,12 +12,12 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 # --- Import FilterForm and FilterSets --- 
 from core.forms import SlugModelForm, BootstrapMixin, FilterForm 
-from .filters import (
+from ..filters import (
     AssetFilterSet, AssetRoleFilterSet, ManufacturerFilterSet, AssetTypeFilterSet,
     ComponentTypeFilterSet, ComponentInstanceFilterSet, AccessoryFilterSet,
     ConsumableFilterSet, StatusLabelFilterSet, AssetMaintenanceFilterSet,
     CustomFieldFilterSet, CustomFieldsetFilterSet, DepreciationFilterSet, KitFilterSet,
-    SupplierFilterSet, CategoryFilterSet, AssetRequestFilterSet
+    SupplierFilterSet, CategoryFilterSet, AssetRequestFilterSet, AssetTagSequenceFilterSet
 )
 # --- End Imports --- 
 
@@ -85,7 +85,7 @@ class AssetForm(forms.ModelForm):
             'asset_role', 'status', 'location', 'tenant',
             'purchase_date', 'warranty_expiration',
             'purchase_cost', 'salvage_value', 'order_number', 'supplier',
-            'notes', 'tags'
+            'notes', 'tags', 'requestable'
         ]
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
@@ -506,7 +506,7 @@ class AssetTypeForm(SlugModelForm):
         fields = [
             'manufacturer', 'part_number', 'model', 'slug', 
             'cpu', 'ram_gb', 'storage_capacity_gb', 'storage_type', 'gpu', 'eol_months',
-            'description', 'comments', 'tags'
+            'description', 'comments', 'tags', 'requestable'
         ]
         widgets = {
             'model': forms.TextInput(attrs={'class': 'form-control'}),
@@ -1388,3 +1388,37 @@ class CategoryFilterForm(FilterForm):
 
 class AssetRequestFilterForm(FilterForm):
     filterset_class = AssetRequestFilterSet
+
+
+class AssetTagSequenceForm(forms.ModelForm):
+    class Meta:
+        model = AssetTagSequence
+        fields = ['prefix', 'next_value', 'zero_padding']
+        widgets = {
+            'prefix': forms.TextInput(attrs={'class': 'form-control'}),
+            'next_value': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+            'zero_padding': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 20}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+
+        button_text = 'Update' if self.instance.pk else 'Create'
+        cancel_url = reverse('assets:assettagsequence_list')
+
+        self.helper.layout = Layout(
+            'prefix',
+            'next_value',
+            'zero_padding',
+            HTML('<div class="mt-3">'),
+            Submit('submit', button_text, css_class='btn btn-primary'),
+            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+            HTML('</div>')
+        )
+
+
+class AssetTagSequenceFilterForm(FilterForm):
+    filterset_class = AssetTagSequenceFilterSet

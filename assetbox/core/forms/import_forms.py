@@ -81,15 +81,13 @@ class BulkImportForm(forms.Form):
         return csv_file
 
     def import_data(self, request=None):
-        """
-        Import the CSV data into the database.
-        Returns (imported_count, errors_list).
-        """
-        if not self.is_valid():
-            return 0, [str(e) for e in self.errors.values()]
+        from django.db import transaction
 
         if not self.model:
             raise NotImplementedError('BulkImportForm subclass must define a `model` attribute.')
+
+        if not self._rows_data:
+            return 0, ['No data to import.']
 
         imported = 0
         errors = []

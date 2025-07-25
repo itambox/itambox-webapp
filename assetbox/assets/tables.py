@@ -1,7 +1,7 @@
 # assetbox/assets/tables.py
 import django_tables2 as tables
 from django_tables2.utils import A  # Alias for Accessor
-from .models import Asset, AssetRole, Manufacturer, AssetType, ComponentType, ComponentInstance, Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, Supplier, Category, AssetRequest
+from .models import Asset, AssetRole, Manufacturer, AssetType, ComponentType, ComponentInstance, Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, Supplier, Category, AssetRequest, AssetTagSequence
 from core.tables import ActionsColumn, BaseTable, ToggleColumn
 from extras.tables import TagColumn # Import TagColumn
 from django.urls import reverse, NoReverseMatch
@@ -20,13 +20,14 @@ class AssetTable(BaseTable): # Inherit from BaseTable
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name='Tenant')
     location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], accessor='location.name', verbose_name='Location')
     supplier = tables.LinkColumn('assets:supplier_detail', args=[A('supplier.pk')], accessor='supplier.name', verbose_name='Supplier')
+    requestable = tables.BooleanColumn(verbose_name='Requestable', yesno='Yes,No')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta): # Inherit Meta from BaseTable
         model = Asset
         fields = (
             'pk', 'name', 'asset_tag', 'serial_number', 'asset_type', 'asset_role', 
-            'status', 'assignee', 'tenant', 'location', 'purchase_date', 'purchase_cost', 'salvage_value', 'order_number', 'supplier', 'actions',
+            'status', 'assignee', 'tenant', 'location', 'purchase_date', 'purchase_cost', 'salvage_value', 'order_number', 'supplier', 'requestable', 'actions',
         )
         default_columns = (
             'pk', 'name', 'asset_tag', 'asset_type', 'asset_role', 
@@ -147,12 +148,13 @@ class AssetTypeTable(BaseTable):
     eol_months = tables.Column(verbose_name='EOL (Months)')
     created_at = tables.DateTimeColumn(format="Y-m-d") # Explicitly add 'created'
     last_updated = tables.DateTimeColumn(format="Y-m-d H:i") # Explicitly add 'last_updated'
+    requestable = tables.BooleanColumn(verbose_name='Requestable', yesno='Yes,No')
     actions = ActionsColumn() # Add actions column
 
     class Meta(BaseTable.Meta):
         model = AssetType
         # Add 'created' and 'last_updated' to fields
-        fields = ('pk', 'manufacturer', 'model', 'part_number', 'eol_months', 'created', 'last_updated', 'actions') 
+        fields = ('pk', 'manufacturer', 'model', 'part_number', 'eol_months', 'created', 'last_updated', 'requestable', 'actions') 
         # Keep default columns as before, or add created/last_updated if desired
         default_columns = ('pk', 'manufacturer', 'model', 'part_number', 'eol_months', 'actions')
         order_by = ('manufacturer', 'model')
@@ -413,4 +415,17 @@ class AssetRequestTable(BaseTable):
         model = AssetRequest
         fields = ('pk', 'requester', 'asset', 'asset_type', 'status', 'request_date', 'notes', 'actions')
         default_columns = ('pk', 'requester', 'asset', 'asset_type', 'status', 'request_date', 'actions')
+
+
+class AssetTagSequenceTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    prefix = tables.LinkColumn('assets:assettagsequence_detail', args=[A('pk')], verbose_name='Prefix')
+    next_value = tables.Column(verbose_name='Next Value')
+    zero_padding = tables.Column(verbose_name='Zero Padding')
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = AssetTagSequence
+        fields = ('pk', 'prefix', 'next_value', 'zero_padding', 'actions')
+        default_columns = ('pk', 'prefix', 'next_value', 'zero_padding', 'actions')
 
