@@ -11,7 +11,7 @@ from organization.models import AssetHolderAssignment
 from django.utils.html import format_html
 
 class AssetTable(BaseTable): # Inherit from BaseTable
-    pks = ToggleColumn(accessor='pk')
+    pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('assets:asset_detail', args=[A('pk')], verbose_name='Name')
     manufacturer = tables.Column(accessor='asset_type.manufacturer', linkify=True, verbose_name='Manufacturer')
     model = tables.Column(accessor='asset_type.model', linkify=True, verbose_name='Model')
