@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand
 from django.db import models
 
 from core.models import Notification, EmailSettings
+from core.events import send_notification
 from assets.models import Accessory, Consumable
 
 
@@ -23,12 +24,14 @@ class Command(BaseCommand):
             subject = f'Low Stock: {acc.name} ({acc.remaining_qty}/{acc.qty} remaining)'
             body = f'{acc.manufacturer.name} {acc.name}\nPart: {acc.part_number or "N/A"}\nStock: {acc.remaining_qty}/{acc.qty}\nMin: {acc.min_qty}'
             Notification.objects.create(user=None, subject=subject, message=body, level='warning')
+            send_notification(subject, body)
             count += 1
 
         for con in low_consumables:
             subject = f'Low Stock: {con.name} ({con.remaining_qty}/{con.qty} remaining)'
             body = f'{con.manufacturer.name} {con.name}\nPart: {con.part_number or "N/A"}\nStock: {con.remaining_qty}/{con.qty}\nMin: {con.min_qty}'
             Notification.objects.create(user=None, subject=subject, message=body, level='warning')
+            send_notification(subject, body)
             count += 1
 
         self.stdout.write(self.style.SUCCESS(f'Sent {count} low stock alerts.'))

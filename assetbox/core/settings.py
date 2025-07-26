@@ -83,6 +83,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -195,7 +196,20 @@ TIME_ZONE = 'UTC'
 
 USE_I18N = True
 
+USE_L10N = True
+
 USE_TZ = True
+
+from django.utils.translation import gettext_lazy as _  # noqa: E402
+
+LANGUAGES = [
+    ('en', _('English')),
+    ('de', _('German')),
+]
+
+LOCALE_PATHS = [
+    BASE_DIR / 'locale',
+]
 
 
 # Static files (CSS, JavaScript, Images)
@@ -205,6 +219,9 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -269,6 +286,11 @@ LOGIN_URL = 'login' # URL name for the login view
 LOGIN_REDIRECT_URL = 'dashboard' # URL name to redirect to after successful login
 LOGOUT_REDIRECT_URL = 'login' # URL name to redirect to after logout
 
+AUTHENTICATION_BACKENDS = [
+    'core.auth.AssetBoxPermissionBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
 # --- Pagination Settings --- 
 DEFAULT_PAGINATE_COUNT = 25 
 PAGINATE_COUNT_CHOICES = (
@@ -279,3 +301,28 @@ PAGINATE_COUNT_CHOICES = (
     (500, '500'),
     (1000, '1000'),
 )
+
+# --- SAML Authentication Settings ---
+SAML_ACTIVE = False
+
+try:
+    from core.models import SAMLSettings
+    saml_config = SAMLSettings.load()
+    if saml_config and saml_config.is_active:
+        SAML_ACTIVE = True
+        SAML_DJANGO_USER_MAIN_ATTRIBUTE = 'username'
+        SAML_USE_NAME_ID_AS_USERNAME = True
+        SAML_CREATE_UNKNOWN_USER = True
+        SAML_ATTRIBUTE_MAPPING = {
+            'email': ('email',),
+            'first_name': ('first_name', 'givenName'),
+            'last_name': ('last_name', 'sn'),
+        }
+        if saml_config.strict:
+            SAML_STRICT = True
+        if saml_config.sp_entity_id:
+            SAML_SP_ENTITY_ID = saml_config.sp_entity_id
+        if saml_config.idp_entity_id:
+            SAML_IDP_ENTITY_ID = saml_config.idp_entity_id
+except Exception:
+    SAML_ACTIVE = False

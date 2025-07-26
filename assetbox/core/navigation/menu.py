@@ -75,6 +75,14 @@ ASSETS_MENU = Menu(
                 get_model_item('assets', 'depreciation', _('Depreciation')),
             ),
         ),
+        MenuGroup(
+            label=_('Procurement'),
+            items=(
+                get_model_item('assets', 'supplier', _('Suppliers')),
+                get_model_item('assets', 'category', _('Categories')),
+                get_model_item('assets', 'assetrequest', _('Asset Requests')),
+            ),
+        ),
     ),
 )
 

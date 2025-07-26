@@ -7,6 +7,7 @@ from datetime import timedelta
 from assets.models import Asset
 from licenses.models import License
 from core.models import Notification, EmailSettings
+from core.events import send_notification
 
 
 class Command(BaseCommand):
@@ -62,6 +63,8 @@ class Command(BaseCommand):
             )
 
         Notification.objects.create(user=None, subject=subject, message=body, level='warning')
+
+        send_notification(subject, body)
 
         if config.from_address:
             try:

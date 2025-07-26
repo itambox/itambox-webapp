@@ -3,6 +3,7 @@ from django.utils import timezone
 from datetime import timedelta
 
 from core.models import Notification, EmailSettings
+from core.events import send_notification
 from subscriptions.models import Subscription
 
 
@@ -35,6 +36,7 @@ class Command(BaseCommand):
                 f'Auto-Renewal: {"Yes" if sub.auto_renewal else "No"}'
             )
             Notification.objects.create(user=None, subject=subject, message=body, level='warning')
+            send_notification(subject, body)
             count += 1
 
         self.stdout.write(self.style.SUCCESS(f'Sent {count} renewal reminders.'))
