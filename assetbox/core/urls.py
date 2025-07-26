@@ -53,4 +53,57 @@ urlpatterns = [
 
     # Bulk Actions
     path('bulk-delete/', core_views.bulk_delete, name='bulk_delete'),
+
+    # Export Templates
+    path('export-templates/', core_views.ExportTemplateListView.as_view(), name='export_template_list'),
+    path('export-templates/add/', core_views.ExportTemplateEditView.as_view(), name='export_template_add'),
+    path('export-templates/<int:pk>/', core_views.ExportTemplateDetailView.as_view(), name='export_template_detail'),
+    path('export-templates/<int:pk>/edit/', core_views.ExportTemplateEditView.as_view(), name='export_template_edit'),
+    path('export-templates/<int:pk>/delete/', core_views.ExportTemplateDeleteView.as_view(), name='export_template_delete'),
+
+    # Webhook Endpoints
+    path('webhooks/', core_views.WebhookEndpointListView.as_view(), name='webhookendpoint_list'),
+    path('webhooks/add/', core_views.WebhookEndpointEditView.as_view(), name='webhookendpoint_add'),
+    path('webhooks/<int:pk>/', core_views.WebhookEndpointDetailView.as_view(), name='webhookendpoint_detail'),
+    path('webhooks/<int:pk>/edit/', core_views.WebhookEndpointEditView.as_view(), name='webhookendpoint_edit'),
+    path('webhooks/<int:pk>/delete/', core_views.WebhookEndpointDeleteView.as_view(), name='webhookendpoint_delete'),
+
+    # Event Rules
+    path('event-rules/', core_views.EventRuleListView.as_view(), name='eventrule_list'),
+    path('event-rules/add/', core_views.EventRuleEditView.as_view(), name='eventrule_add'),
+    path('event-rules/<int:pk>/', core_views.EventRuleDetailView.as_view(), name='eventrule_detail'),
+    path('event-rules/<int:pk>/edit/', core_views.EventRuleEditView.as_view(), name='eventrule_edit'),
+    path('event-rules/<int:pk>/delete/', core_views.EventRuleDeleteView.as_view(), name='eventrule_delete'),
+
+    # Label Templates
+    path('label-templates/', core_views.LabelTemplateListView.as_view(), name='labeltemplate_list'),
+    path('label-templates/add/', core_views.LabelTemplateEditView.as_view(), name='labeltemplate_add'),
+    path('label-templates/<int:pk>/', core_views.LabelTemplateDetailView.as_view(), name='labeltemplate_detail'),
+    path('label-templates/<int:pk>/edit/', core_views.LabelTemplateEditView.as_view(), name='labeltemplate_edit'),
+    path('label-templates/<int:pk>/delete/', core_views.LabelTemplateDeleteView.as_view(), name='labeltemplate_delete'),
+
+    # Export View
+    path('export/<str:app_label>/<str:model_name>/<int:template_id>/', core_views.ObjectExportView.as_view(), name='object_export'),
+
+    # i18n
+    path('i18n/', include('django.conf.urls.i18n')),
+
+    # Attachments
+    path('attachments/image/upload/<str:app_label>/<str:model_name>/<int:object_id>/', core_views.ImageAttachmentUploadView.as_view(), name='image_attachment_upload'),
+    path('attachments/image/delete/<int:pk>/', core_views.ImageAttachmentDeleteView.as_view(), name='image_attachment_delete'),
+    path('attachments/file/upload/<str:app_label>/<str:model_name>/<int:object_id>/', core_views.FileAttachmentUploadView.as_view(), name='file_attachment_upload'),
+    path('attachments/file/delete/<int:pk>/', core_views.FileAttachmentDeleteView.as_view(), name='file_attachment_delete'),
+
+    # Journal Entries
+    path('journal/add/<str:app_label>/<str:model_name>/<int:object_id>/', core_views.JournalEntryCreateView.as_view(), name='journal_entry_add'),
+
+    # Label Printing
+    path('labels/select/<str:app_label>/<str:model_name>/<int:object_id>/', core_views.LabelSelectView.as_view(), name='label_select'),
+    path('labels/print/<int:template_id>/<int:object_id>/', core_views.LabelPrintView.as_view(), name='label_print'),
+
+    # Health Check
+    path('health/', core_views.health, name='health'),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

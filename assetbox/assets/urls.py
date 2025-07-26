@@ -13,6 +13,7 @@ urlpatterns = [
     path('assets/<int:pk>/', views.AssetDetailView.as_view(), name='asset_detail'),
     path('assets/<int:pk>/edit/', views.AssetEditView.as_view(), name='asset_update'),
     path('assets/<int:pk>/delete/', views.AssetDeleteView.as_view(), name='asset_delete'),
+    path('assets/<int:pk>/clone/', views.AssetCloneView.as_view(), name='asset_clone'),
     path('assets/<int:pk>/checkout/', views.asset_checkout_modal, name='asset_checkout_modal'),
     path('assets/<int:pk>/checkin/', views.asset_checkin, name='asset_checkin'),
 
@@ -42,6 +43,7 @@ urlpatterns = [
     # Asset Types
     path('types/', views.AssetTypeListView.as_view(), name='assettype_list'),
     path('types/add/', views.AssetTypeEditView.as_view(), name='assettype_create'),
+    path('types/import/', views.AssetTypeImportView.as_view(), name='assettype_import'),
     path('types/<slug:slug>/', views.AssetTypeDetailView.as_view(), name='assettype_detail'),
     path('types/<slug:slug>/edit/', views.AssetTypeEditView.as_view(), name='assettype_update'),
     path('types/<slug:slug>/delete/', views.AssetTypeDeleteView.as_view(), name='assettype_delete'),
@@ -66,6 +68,7 @@ urlpatterns = [
     path('accessories/<int:pk>/', views.AccessoryDetailView.as_view(), name='accessory_detail'),
     path('accessories/<int:pk>/edit/', views.AccessoryEditView.as_view(), name='accessory_update'),
     path('accessories/<int:pk>/delete/', views.AccessoryDeleteView.as_view(), name='accessory_delete'),
+    path('accessories/<int:pk>/clone/', views.AccessoryCloneView.as_view(), name='accessory_clone'),
     path('accessories/<int:pk>/checkout/', views.accessory_checkout, name='accessory_checkout'),
     path('accessories/assignments/<int:pk>/checkin/', views.accessory_checkin, name='accessory_checkin'),
 
@@ -75,6 +78,7 @@ urlpatterns = [
     path('consumables/<int:pk>/', views.ConsumableDetailView.as_view(), name='consumable_detail'),
     path('consumables/<int:pk>/edit/', views.ConsumableEditView.as_view(), name='consumable_update'),
     path('consumables/<int:pk>/delete/', views.ConsumableDeleteView.as_view(), name='consumable_delete'),
+    path('consumables/<int:pk>/clone/', views.ConsumableCloneView.as_view(), name='consumable_clone'),
     path('consumables/<int:pk>/checkout/', views.consumable_checkout, name='consumable_checkout'),
     
     # Asset Maintenances
@@ -87,6 +91,7 @@ urlpatterns = [
     # Phase 4 Audits & Barcoding
     path('<int:pk>/audit/', views.asset_audit, name='asset_audit'),
     path('<int:pk>/print/', views.asset_label_print, name='asset_label_print'),
+    path('<int:pk>/print/<int:template_id>/', views.asset_label_print, name='asset_label_print_template'),
     path('custody/sign/<str:token>/', views.custody_eula_sign, name='custody_eula_sign'),
 
     # Custom Fields
@@ -143,4 +148,16 @@ urlpatterns = [
     path('requests/<int:pk>/', views.AssetRequestDetailView.as_view(), name='assetrequest_detail'),
     path('requests/<int:pk>/edit/', views.AssetRequestEditView.as_view(), name='assetrequest_update'),
     path('requests/<int:pk>/delete/', views.AssetRequestDeleteView.as_view(), name='assetrequest_delete'),
+
+    # Import URLs
+    path('assets/import/', views.AssetImportView.as_view(), name='asset_import'),
+    path('manufacturers/import/', views.ManufacturerImportView.as_view(), name='manufacturer_import'),
+    path('accessories/import/', views.AccessoryImportView.as_view(), name='accessory_import'),
+    path('consumables/import/', views.ConsumableImportView.as_view(), name='consumable_import'),
+
+    path('asset-tag-sequences/', views.AssetTagSequenceListView.as_view(), name='assettagsequence_list'),
+    path('asset-tag-sequences/add/', views.AssetTagSequenceEditView.as_view(), name='assettagsequence_create'),
+    path('asset-tag-sequences/<int:pk>/', views.AssetTagSequenceDetailView.as_view(), name='assettagsequence_detail'),
+    path('asset-tag-sequences/<int:pk>/edit/', views.AssetTagSequenceEditView.as_view(), name='assettagsequence_update'),
+    path('asset-tag-sequences/<int:pk>/delete/', views.AssetTagSequenceDeleteView.as_view(), name='assettagsequence_delete'),
 ] 

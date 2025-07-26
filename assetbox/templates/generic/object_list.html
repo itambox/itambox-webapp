@@ -74,6 +74,13 @@
                                 </span>
                             </button>
                         {% endif %}
+
+                        {% if import_url_name %}
+                        <a href="{% url import_url_name %}" class="btn btn-outline-secondary d-flex align-items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-import me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 13v-8a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-5.5"/><path d="M2 19h7"/><path d="M5 16l-3 3l3 3"/></svg>
+                            Import
+                        </a>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -203,9 +210,12 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
         </a>
         {% endif %}
-        
-        {% if export_url_name %}
-        <a href="#" class="btn btn-secondary d-none d-sm-inline-block">Export</a>
+
+        {% if import_url_name %}
+        <a href="{% url import_url_name %}" class="btn btn-secondary d-none d-sm-inline-block">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 13v-8a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-5.5"/><path d="M2 19h7"/><path d="M5 16l-3 3l3 3"/></svg>
+            Import
+        </a>
         {% endif %}
     </div>
 {% endblock page_actions %}

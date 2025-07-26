@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.utils import timezone
-from .models import Asset, AssetRole, Manufacturer, AssetType, InstalledSoftware, ComponentType, ComponentInstance, Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, KitItem, ActivityLog, Supplier, Category, AssetRequest
+from .models import Asset, AssetRole, Manufacturer, AssetType, InstalledSoftware, ComponentType, ComponentInstance, Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, KitItem, ActivityLog, Supplier, Category, AssetRequest, AssetTagSequence, CustodyReceipt
 from licenses.models import License, LicenseSeatAssignment
 from .forms import AssetForm, AssetRoleForm, ManufacturerForm, AssetCheckOutForm, AssetTypeForm # Keep only Asset forms
 from django.contrib.auth import get_user_model
@@ -26,7 +26,7 @@ from django.contrib import messages # <--- Add this import
 from users.models import UserPreference # Import UserPreference
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
-from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, BaseHTMXView
+from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectImportView, BaseHTMXView
 from core.quick_add import QuickAddMixin
 from django.db.models import Count
 import json
@@ -172,10 +172,8 @@ class AssetDetailView(ObjectDetailView):
         eula_token = None
         if assignment and assignment.asset_holder:
             custody_receipt = CustodyReceipt.objects.filter(asset=asset, holder=assignment.asset_holder).first()
-            eula_token = signing.dumps({
-                'asset_id': asset.pk,
-                'holder_id': assignment.asset_holder.pk
-            })
+            if custody_receipt:
+                eula_token = custody_receipt.token
         
         context['custody_receipt'] = custody_receipt
         context['eula_token'] = eula_token
@@ -207,8 +205,20 @@ class AssetDeleteView(ObjectDeleteView):
     model = Asset
     template_name = 'generic/object_confirm_delete.html'
     success_url = reverse_lazy('assets:asset_list')
-    # No related objects check needed for Asset deletion itself (dependencies handled by other models)
-    # Base view handles success message
+
+class AssetCloneView(ObjectEditView):
+    model = Asset
+    model_form = forms.AssetForm
+    template_name = 'generic/object_edit.html'
+
+    def get_object(self, queryset=None):
+        original = get_object_or_404(Asset, pk=self.kwargs['pk'])
+        cloned = original.clone()
+        cloned.asset_tag = ''
+        cloned.name = f'{original.name} (Copy)'
+        cloned.save()
+        cloned.tags.set(original.tags.all())
+        return cloned
 
 @login_required
 def asset_checkout_modal(request, pk):
@@ -262,6 +272,43 @@ def asset_checkout_modal(request, pk):
                     ).delete()
 
                 messages.success(request, f"Asset '{asset}' checked out successfully to {assignee}.")
+
+                if selected_holder:
+                    category = asset.asset_type.category if asset.asset_type else None
+                    if category and category.require_acceptance:
+                        receipt = CustodyReceipt.objects.create(
+                            asset=asset,
+                            holder=selected_holder,
+                        )
+                        if category.email_eula:
+                            try:
+                                from django.core.mail import send_mail
+                                from core.models import EmailSettings
+                                email_config = EmailSettings.load()
+                                if email_config and email_config.enabled and email_config.from_address:
+                                    recipient = selected_holder.email
+                                    if not recipient:
+                                        recipient = email_config.test_recipient or email_config.from_address
+                                    if recipient:
+                                        sign_url = request.build_absolute_uri(
+                                            reverse('assets:custody_eula_sign', kwargs={'token': receipt.token})
+                                        )
+                                        send_mail(
+                                            subject=f'Asset Acceptance Required: {asset.name} ({asset.asset_tag})',
+                                            message=(
+                                                f'You have been assigned custody of:\n\n'
+                                                f'  Asset: {asset.name}\n'
+                                                f'  Asset Tag: {asset.asset_tag}\n'
+                                                f'  Serial: {asset.serial_number or "N/A"}\n\n'
+                                                f'Please accept custody at the following link:\n{sign_url}\n\n'
+                                                f'This link expires in 7 days.'
+                                            ),
+                                            from_email=email_config.from_address,
+                                            recipient_list=[recipient],
+                                            fail_silently=True,
+                                        )
+                            except Exception:
+                                pass
                 # --- End Checkout Logic ---
 
                 # --- HTMX Response for Success --- 
@@ -770,6 +817,22 @@ class AccessoryDeleteView(ObjectDeleteView):
         return super().post(request, *args, **kwargs)
 
 
+class AccessoryCloneView(ObjectEditView):
+    model = Accessory
+    model_form = forms.AccessoryForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'assets:accessory_list'
+
+    def get_object(self, queryset=None):
+        original = get_object_or_404(Accessory, pk=self.kwargs['pk'])
+        cloned = original.clone()
+        cloned.name = f'{original.name} (Copy)'
+        cloned.slug = ''
+        cloned.save()
+        cloned.tags.set(original.tags.all())
+        return cloned
+
+
 @login_required
 def accessory_checkout(request, pk):
     accessory = get_object_or_404(Accessory, pk=pk)
@@ -881,6 +944,22 @@ class ConsumableDeleteView(ObjectDeleteView):
         return super().post(request, *args, **kwargs)
 
 
+class ConsumableCloneView(ObjectEditView):
+    model = Consumable
+    model_form = forms.ConsumableForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'assets:consumable_list'
+
+    def get_object(self, queryset=None):
+        original = get_object_or_404(Consumable, pk=self.kwargs['pk'])
+        cloned = original.clone()
+        cloned.name = f'{original.name} (Copy)'
+        cloned.slug = ''
+        cloned.save()
+        cloned.tags.set(original.tags.all())
+        return cloned
+
+
 @login_required
 def consumable_checkout(request, pk):
     consumable = get_object_or_404(Consumable, pk=pk)
@@ -969,9 +1048,7 @@ class AssetMaintenanceDeleteView(ObjectDeleteView):
 # --- Phase 4 views ---
 import segno
 import hashlib
-from django.core import signing
 from django.views.decorators.clickjacking import xframe_options_exempt
-from assets.models import CustodyReceipt
 
 @login_required
 @require_POST
@@ -997,14 +1074,23 @@ def asset_audit(request, pk):
 
 
 @login_required
-def asset_label_print(request, pk):
+def asset_label_print(request, pk, template_id=None):
     asset = get_object_or_404(Asset, pk=pk)
-    
-    # Generate vector QR Code using segno
+
+    if template_id:
+        from core.models import LabelTemplate
+        label_template = get_object_or_404(LabelTemplate, pk=template_id)
+        if label_template.template_code:
+            from django.template import Template, Context
+            tpl = Template(label_template.template_code)
+            ctx = Context({'obj': asset, 'barcode_format': label_template.barcode_format})
+            html = tpl.render(ctx)
+            return HttpResponse(html)
+
     qr_data = request.build_absolute_uri(asset.get_absolute_url())
     qr = segno.make(qr_data)
     qr_svg = qr.svg_inline(scale=4, border=0)
-    
+
     context = {
         'asset': asset,
         'qr_svg': qr_svg,
@@ -1013,54 +1099,75 @@ def asset_label_print(request, pk):
 
 
 def custody_eula_sign(request, token):
-    try:
-        # Validate EULA sign secure URL token
-        data = signing.loads(token, max_age=86400 * 7) # Token valid for 7 days
-        asset_id = data.get('asset_id')
-        holder_id = data.get('holder_id')
-    except (signing.BadSignature, signing.SignatureExpired):
-        return render(request, "assets/custody/sign_error.html", {"error": "Invalid or expired EULA checkout token."})
-    
-    asset = get_object_or_404(Asset, pk=asset_id)
-    holder = get_object_or_404(AssetHolder, pk=holder_id)
-    
-    # Check if receipt already exists
-    receipt = CustodyReceipt.objects.filter(asset=asset, holder=holder).first()
-    if receipt:
-        return render(request, "assets/custody/receipt_success.html", {"receipt": receipt, "asset": asset, "holder": holder})
-        
+    receipt = get_object_or_404(CustodyReceipt, token=token)
+
+    if receipt.created_date and (timezone.now() - receipt.created_date).days > 7:
+        return render(request, "assets/custody/sign_error.html", {"error": "This custody acceptance link has expired (7 day limit)."})
+
+    if receipt.acceptance_status == CustodyReceipt.STATUS_ACCEPTED:
+        return render(request, "assets/custody/receipt_success.html", {"receipt": receipt, "asset": receipt.asset, "holder": receipt.holder})
+
+    if receipt.acceptance_status == CustodyReceipt.STATUS_DECLINED:
+        return render(request, "assets/custody/sign_error.html", {"error": "This custody transfer has been declined."})
+
+    asset = receipt.asset
+    holder = receipt.holder
+
     if request.method == 'POST':
+        action = request.POST.get('action', 'accept')
         signature_data = request.POST.get('signature_canvas')
+
+        if action == 'decline':
+            receipt.acceptance_status = CustodyReceipt.STATUS_DECLINED
+            receipt.save(update_fields=['acceptance_status', 'updated_at'])
+            return render(request, "assets/custody/sign_error.html", {"error": "You have declined the custody transfer."})
+
         if not signature_data or signature_data == 'empty':
             return render(request, "assets/custody/sign_portal.html", {
                 "asset": asset,
                 "holder": holder,
                 "token": token,
-                "error": "Please provide a valid canvas signature."
+                "receipt": receipt,
+                "error": "Please provide a valid signature."
             })
-            
-        # Create custody cryptographic hash: Holder UPN + Asset Tag + Timestamp + Signature Data
+
         timestamp_str = timezone.now().isoformat()
         raw_to_hash = f"{holder.upn}|{asset.asset_tag}|{timestamp_str}|{signature_data}"
         verification_hash = hashlib.sha256(raw_to_hash.encode('utf-8')).hexdigest()
-        
-        # Create EULA custody receipt
-        receipt = CustodyReceipt.objects.create(
-            asset=asset,
-            holder=holder,
-            verification_hash=verification_hash,
-            signature_canvas=signature_data,
-            eula_version="1.0"
-        )
-        
-        # Log EULA custody event via changelog
+
+        receipt.accepted = True
+        receipt.accepted_date = timezone.now()
+        receipt.acceptance_method = 'digital'
+        receipt.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
+        receipt.signature_canvas = signature_data
+        receipt.signature_data = signature_data
+        receipt.signature_hash = verification_hash
+        receipt.verification_hash = verification_hash
+        receipt.eula_version = '1.0'
+        receipt.signed_at = timezone.now()
+        receipt.save()
+
+        try:
+            from django.db import transaction, DatabaseError
+            from core.events import dispatch_event
+            transaction.on_commit(lambda: _safe_dispatch_custody(receipt))
+        except Exception:
+            _safe_dispatch_custody(receipt)
+
         asset._changelog_action = 'audit'
-        asset._changelog_message = f"EULA digital custody receipt created. SHA-256 Hash: {verification_hash[:16]}..."
+        asset._changelog_message = f"EULA digital custody receipt accepted. SHA-256 Hash: {verification_hash[:16]}..."
         asset.save()
-        
+
         return render(request, "assets/custody/receipt_success.html", {"receipt": receipt, "asset": asset, "holder": holder})
-        
-    return render(request, "assets/custody/sign_portal.html", {"asset": asset, "holder": holder, "token": token})
+
+    return render(request, "assets/custody/sign_portal.html", {"asset": asset, "holder": holder, "token": token, "receipt": receipt})
+
+
+def _safe_dispatch_custody(receipt):
+    try:
+        dispatch_event(CustodyReceipt, receipt, action='update')
+    except Exception:
+        pass
 
 
 # =============================================================================
@@ -1547,15 +1654,94 @@ class AssetRequestEditView(ObjectEditView):
         if form.instance.status in ("approved", "denied", "fulfilled", "cancelled"):
             form.instance.response_date = timezone.now()
             form.instance.responded_by = self.request.user
-        return super().form_valid(form)
+        response = super().form_valid(form)
+        try:
+            from core.events import dispatch_event
+            from core.models import Notification
+            dispatch_event(AssetRequest, self.object, action='update')
+            Notification.objects.create(
+                user=self.object.requester,
+                subject=f"Asset Request {self.object.get_status_display()}",
+                message=f"Your request for {self.object} has been {self.object.get_status_display().lower()}.",
+                level=Notification.LEVEL_INFO,
+            )
+        except Exception:
+            pass
+        return response
 
     def get_success_url(self):
         if self.object:
             return self.object.get_absolute_url()
         return reverse("assets:assetrequest_list")
 
+class AssetRequestQueueView(ObjectListView):
+    queryset = AssetRequest.objects.filter(status=AssetRequest.STATUS_PENDING).select_related("requester", "asset", "asset_type")
+    filterset = filters.AssetRequestFilterSet
+    filterset_form = forms.AssetRequestFilterForm
+    table = tables.AssetRequestTable
+    action_buttons = ()
+    template_name = 'generic/object_list.html'
+
 class AssetRequestDeleteView(ObjectDeleteView):
     queryset = AssetRequest.objects.all()
     model = AssetRequest
     template_name = "generic/object_confirm_delete.html"
     success_url = reverse_lazy("assets:assetrequest_list")
+
+
+# --- Import Views ---
+from .forms.import_forms import (
+    AssetBulkImportForm, AssetTypeBulkImportForm, ManufacturerBulkImportForm,
+    AccessoryBulkImportForm, ConsumableBulkImportForm,
+)
+
+
+class AssetImportView(ObjectImportView):
+    model_form = AssetBulkImportForm
+
+
+class AssetTypeImportView(ObjectImportView):
+    model_form = AssetTypeBulkImportForm
+
+
+class ManufacturerImportView(ObjectImportView):
+    model_form = ManufacturerBulkImportForm
+
+
+class AccessoryImportView(ObjectImportView):
+    model_form = AccessoryBulkImportForm
+
+
+class ConsumableImportView(ObjectImportView):
+    model_form = ConsumableBulkImportForm
+
+
+class AssetTagSequenceListView(ObjectListView):
+    queryset = AssetTagSequence.objects.all()
+    filterset = filters.AssetTagSequenceFilterSet
+    filterset_form = forms.AssetTagSequenceFilterForm
+    table = tables.AssetTagSequenceTable
+    action_buttons = ('add',)
+
+
+class AssetTagSequenceDetailView(ObjectDetailView):
+    queryset = AssetTagSequence.objects.all()
+
+    layout = (
+        ((Panel('info', 'Asset Tag Sequence Details'),),),
+    )
+
+
+class AssetTagSequenceEditView(ObjectEditView):
+    queryset = AssetTagSequence.objects.all()
+    model = AssetTagSequence
+    model_form = forms.AssetTagSequenceForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'assets:assettagsequence_list'
+
+
+class AssetTagSequenceDeleteView(ObjectDeleteView):
+    queryset = AssetTagSequence.objects.all()
+    model = AssetTagSequence
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('assets:assettagsequence_list')

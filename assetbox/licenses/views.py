@@ -1,11 +1,13 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.urls import reverse
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django_tables2 import RequestConfig
 from core.views import (
     ObjectListView,
     ObjectDetailView,
     ObjectEditView,
-    ObjectDeleteView
+    ObjectDeleteView,
+    ObjectImportView,
 )
 from core.utils import get_paginate_count
 from core.panels import Panel
@@ -13,6 +15,7 @@ from .models import License, LicenseSeatAssignment
 from . import forms
 from . import tables
 from . import filters
+from assets.forms.import_forms import LicenseBulkImportForm
 
 # =============================================================================
 # License Entitlement Views
@@ -56,3 +59,23 @@ class LicenseEditView(ObjectEditView):
 class LicenseDeleteView(ObjectDeleteView):
     queryset = License.objects.all()
     default_return_url = 'licenses:license_list'
+
+
+class LicenseCloneView(ObjectEditView):
+    model = License
+    model_form = forms.LicenseForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'licenses:license_list'
+
+    def get_object(self, queryset=None):
+        original = get_object_or_404(License, pk=self.kwargs['pk'])
+        cloned = original.clone()
+        cloned.name = f'{original.name} (Copy)'
+        cloned.product_key = ''
+        cloned.save()
+        cloned.tags.set(original.tags.all())
+        return cloned
+
+
+class LicenseImportView(ObjectImportView):
+    model_form = LicenseBulkImportForm

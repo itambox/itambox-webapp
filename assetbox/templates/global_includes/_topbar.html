@@ -1,3 +1,4 @@
+{% load i18n %}
 <header class="navbar navbar-expand-md d-print-none" >
     <div class="container-fluid">
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu" aria-controls="navbar-menu" aria-expanded="false" aria-label="Toggle navigation">
@@ -16,6 +17,22 @@
         </div>
         <div class="navbar-nav flex-row order-md-last">
             <div class="d-flex">
+                {% get_available_languages as LANGUAGES %}
+                {% get_current_language as CURRENT_LANG %}
+                {% if LANGUAGES|length > 1 %}
+                <div class="nav-item dropdown me-2">
+                    <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" aria-label="Change language">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" /><path d="M3.6 9h16.8" /><path d="M3.6 15h16.8" /><path d="M11.5 3a17 17 0 0 0 0 18" /><path d="M12.5 3a17 17 0 0 1 0 18" /></svg>
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                        {% for lang_code, lang_name in LANGUAGES %}
+                        <a href="{% url 'set_language' %}" class="dropdown-item {% if lang_code == CURRENT_LANG %}active{% endif %}" onclick="event.preventDefault(); var form=document.createElement('form'); form.method='POST'; form.action=this.href; var input=document.createElement('input'); input.type='hidden'; input.name='language'; input.value='{{ lang_code }}'; var csrf=document.createElement('input'); csrf.type='hidden'; csrf.name='csrfmiddlewaretoken'; csrf.value='{{ csrf_token }}'; form.appendChild(input); form.appendChild(csrf); document.body.appendChild(form); form.submit();">
+                            {{ lang_name }}
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
                 <button class="nav-link px-0 color-mode-toggle hide-theme-dark" title="Enable dark mode" data-bs-toggle="tooltip" data-bs-placement="bottom">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" /></svg>
                 </button>

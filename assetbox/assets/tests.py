@@ -311,39 +311,58 @@ class ComponentTrackingTestCase(TestCase):
     def test_custody_receipt_signoff(self):
         from organization.models import AssetHolder
         holder = AssetHolder.objects.create(first_name="Alice", last_name="Wonder", upn="alice@example.com")
-        
-        # 1. Generate EULA checkout token
-        from django.core import signing
-        token = signing.dumps({
-            'asset_id': self.asset.pk,
-            'holder_id': holder.pk
-        })
-        
-        # 2. Open EULA portal view
+
+        receipt = CustodyReceipt.objects.create(
+            asset=self.asset,
+            holder=holder,
+        )
+        token = receipt.token
+
         sign_url = reverse('assets:custody_eula_sign', kwargs={'token': token})
         response = self.client.get(sign_url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "custody-sign-form")
-        
-        # 3. Invalid token EULA sign
+
         invalid_url = reverse('assets:custody_eula_sign', kwargs={'token': "invalid-token-value"})
         response = self.client.get(invalid_url)
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Validation Failure")
-        
-        # 4. Successful EULA signing upload
+        self.assertEqual(response.status_code, 404)
+
         post_data = {
-            'signature_canvas': 'data:image/png;base64,drawingdata123'
+            'signature_canvas': 'data:image/png;base64,drawingdata123',
+            'action': 'accept',
         }
         response = self.client.post(sign_url, data=post_data)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Secured")
-        
-        # Verify custody receipt committed to database
-        self.assertTrue(CustodyReceipt.objects.filter(asset=self.asset, holder=holder).exists())
-        receipt = CustodyReceipt.objects.get(asset=self.asset, holder=holder)
+
+        receipt.refresh_from_db()
+        self.assertTrue(receipt.accepted)
+        self.assertEqual(receipt.acceptance_status, CustodyReceipt.STATUS_ACCEPTED)
+        self.assertIsNotNone(receipt.accepted_date)
+        self.assertEqual(receipt.acceptance_method, 'digital')
         self.assertEqual(receipt.signature_canvas, 'data:image/png;base64,drawingdata123')
-        self.assertEqual(len(receipt.verification_hash), 64) # SHA-256 hash length
+        self.assertEqual(len(receipt.verification_hash), 64)
+
+    def test_custody_receipt_decline(self):
+        from organization.models import AssetHolder
+        holder = AssetHolder.objects.create(first_name="Bob", last_name="Builder", upn="bob@example.com")
+
+        receipt = CustodyReceipt.objects.create(
+            asset=self.asset,
+            holder=holder,
+        )
+
+        sign_url = reverse('assets:custody_eula_sign', kwargs={'token': receipt.token})
+        post_data = {
+            'action': 'decline',
+        }
+        response = self.client.post(sign_url, data=post_data)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "declined")
+
+        receipt.refresh_from_db()
+        self.assertEqual(receipt.acceptance_status, CustodyReceipt.STATUS_DECLINED)
+        self.assertFalse(receipt.accepted)
 
 
 class AssetProcurementTestCase(TestCase):

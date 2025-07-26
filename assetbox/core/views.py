@@ -31,20 +31,22 @@ from .tables import SearchResultTable # Add SearchResultTable
 # Use the direct app name import path
 from assets.models import AssetRole, Manufacturer
 
-from django.views.generic import View, ListView, DetailView, UpdateView, DeleteView
+from django.views.generic import View, ListView, DetailView, UpdateView, DeleteView, TemplateView
 from django.views.generic.base import TemplateResponseMixin
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib import messages
 from django.contrib.auth.views import PasswordChangeView as DjangoPasswordChangeView
-from .models import ObjectChange
-from .tables import ObjectChangeTable
+from django.utils import timezone
+from .models import ObjectChange, ExportTemplate, JournalEntry, PermissionGroup, WebhookEndpoint, EventRule, LabelTemplate, ImageAttachment, FileAttachment
+from .tables import ObjectChangeTable, ExportTemplateTable, WebhookEndpointTable, EventRuleTable, LabelTemplateTable
 from .utils import get_model_viewname, get_table_for_model
-from django.contrib.contenttypes.models import ContentType # Add ContentType
+from django.contrib.contenttypes.models import ContentType
 from django.utils.http import urlencode
-from django.views.decorators.http import require_POST # Add require_POST
-from django.db.models import ProtectedError # To handle deletion prevention
-from .forms import ConfirmationForm # A generic confirmation form
-from django.core.exceptions import ImproperlyConfigured # Added ImproperlyConfigured
+from django.views.decorators.http import require_POST
+from django.db.models import ProtectedError
+from .forms import ConfirmationForm, JournalEntryForm, WebhookEndpointForm, EventRuleForm, LabelTemplateForm
+from django.core.exceptions import ImproperlyConfigured
+from core.registry import registry
 
 User = get_user_model() # Get the User model
 
@@ -221,6 +223,13 @@ class ObjectListView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, 
         except NoReverseMatch:
             context['create_url_name'] = None
 
+        try:
+            import_url_name = get_model_viewname(_model, 'import')
+            reverse(import_url_name)
+            context['import_url_name'] = import_url_name
+        except NoReverseMatch:
+            context['import_url_name'] = None
+
         # Add action buttons to context IF they are defined in the tuple AND the corresponding URL exists
         context['action_buttons'] = self.action_buttons # Pass the tuple itself
         if 'add' in self.action_buttons and not context['create_url_name']:
@@ -347,6 +356,36 @@ class ObjectDetailView(LoginRequiredMixin, BaseHTMXView, DetailView):
         }
         # Pass the main template name to the wrapper
         context['content_template_name'] = self.get_template_names()[0]
+
+        if registry.model_has_feature(obj.__class__, 'journaling'):
+            obj_type = ContentType.objects.get_for_model(obj)
+            journal_qs = JournalEntry.objects.filter(
+                model=obj_type,
+                object_id=obj.pk
+            )
+            context['has_journaling'] = True
+            context['journal_app_label'] = app_label
+            context['journal_model_name'] = model_name
+            context['journal_entries'] = journal_qs.select_related('user').order_by('-created')[:50]
+            context['journal_entries_count'] = journal_qs.count()
+            context['journal_form'] = JournalEntryForm()
+
+        context['attachment_app_label'] = app_label
+        context['attachment_model_name'] = model_name
+
+        if registry.model_has_feature(obj.__class__, 'image_attachments'):
+            obj_type = ContentType.objects.get_for_model(obj)
+            context['image_attachments'] = ImageAttachment.objects.filter(
+                model=obj_type, object_id=obj.pk
+            ).order_by('-created')[:20]
+            context['has_image_attachments'] = True
+
+        if registry.model_has_feature(obj.__class__, 'file_attachments'):
+            obj_type = ContentType.objects.get_for_model(obj)
+            context['file_attachments'] = FileAttachment.objects.filter(
+                model=obj_type, object_id=obj.pk
+            ).order_by('-created')[:20]
+            context['has_file_attachments'] = True
 
         return context
 
@@ -549,6 +588,112 @@ class ObjectDeleteView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
         return context 
 
     # render_to_response is now handled by BaseHTMXView
+
+
+class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, TemplateView):
+    model_form = None
+    template_name = 'generic/object_import.html'
+
+    def get_permission_required(self):
+        model = self._get_model()
+        if model:
+            return (f'{model._meta.app_label}.add_{model._meta.model_name}',)
+        return ('',)
+
+    def _get_model(self):
+        if self.model_form and hasattr(self.model_form, 'model'):
+            return self.model_form.model
+        if hasattr(self, 'model') and self.model:
+            return self.model
+        return None
+
+    def get(self, request, *args, **kwargs):
+        form = self.model_form()
+        return self._render_response(request, form)
+
+    def post(self, request, *args, **kwargs):
+        form = self.model_form(request.POST, request.FILES)
+
+        if '_preview' in request.POST:
+            if form.is_valid():
+                rows = form._rows_data
+                request.session['import_rows'] = rows
+                request.session['import_delimiter'] = form.cleaned_data.get('delimiter', ',')
+                context = {
+                    'form': form,
+                    'preview_rows': rows,
+                    'preview_headers': form.field_names if rows else [],
+                    'title': self._get_title(),
+                    'cancel_url': self._get_cancel_url(),
+                }
+                return self.render_to_response(context)
+            return self._render_response(request, form, errors=[str(e) for e in form.errors.values()])
+
+        if '_confirm' in request.POST:
+            rows = request.session.get('import_rows', [])
+            if rows:
+                from django.db import transaction
+                form = self.model_form()
+                form._rows_data = rows
+                with transaction.atomic():
+                    imported, errors = form.import_data(request=request)
+                context = {
+                    'form': form,
+                    'import_summary': {
+                        'imported_count': imported,
+                        'row_count': len(rows),
+                        'errors_list': errors,
+                    },
+                    'title': self._get_title(),
+                    'cancel_url': self._get_cancel_url(),
+                }
+                request.session.pop('import_rows', None)
+                request.session.pop('import_delimiter', None)
+                return self.render_to_response(context)
+            return self._render_response(request, form, errors=['No import data found. Please upload a file first.'])
+
+        return self._render_response(request, form)
+
+    def _render_response(self, request, form, **extra_context):
+        context = {
+            'form': form,
+            'title': self._get_title(),
+            'cancel_url': self._get_cancel_url(),
+            **extra_context,
+        }
+        return self.render_to_response(context)
+
+    def _get_title(self):
+        model = self._get_model()
+        if model:
+            return f'Import {model._meta.verbose_name_plural.title()}'
+        return 'Import Objects'
+
+    def _get_cancel_url(self):
+        model = self._get_model()
+        if model:
+            try:
+                list_view_name = get_model_viewname(model, 'list')
+                return reverse(list_view_name)
+            except NoReverseMatch:
+                pass
+        return reverse('dashboard')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs) if hasattr(super(), 'get_context_data') else {}
+        context['title'] = kwargs.get('title', self._get_title())
+        context['cancel_url'] = kwargs.get('cancel_url', self._get_cancel_url())
+        context['breadcrumbs'] = [
+            (reverse('dashboard'), 'Dashboard'),
+            (context['cancel_url'], self._get_model()._meta.verbose_name_plural.title() if self._get_model() else 'List'),
+            (None, context['title']),
+        ]
+        return context
+
+    def render_to_response(self, context, **response_kwargs):
+        context['breadcrumbs'] = context.get('breadcrumbs', [])
+        return BaseHTMXView.render_to_response(self, context, **response_kwargs)
+
 
 # =============================================================================
 # END Generic Object Views
@@ -798,5 +943,458 @@ def bulk_delete(request):
             'return_url': return_url, 
         }
         return render(request, 'generic/object_confirm_bulk_delete.html', context) 
+
+class ObjectExportView(LoginRequiredMixin, View):
+    def get(self, request, app_label, model_name, template_id):
+        from django.apps import apps
+        from django.http import HttpResponse
+
+        model = apps.get_model(app_label, model_name)
+        content_type = ContentType.objects.get_for_model(model)
+        template = get_object_or_404(ExportTemplate, pk=template_id, content_type=content_type)
+
+        pks = request.GET.get('pk', '')
+        if pks:
+            pks = [int(p) for p in pks.split(',') if p.strip()]
+            queryset = model.objects.filter(pk__in=pks)
+        else:
+            queryset = model.objects.all()
+
+        content = template.render_queryset(queryset)
+
+        response = HttpResponse(content, content_type=template.mime_type)
+        response['Content-Disposition'] = f'attachment; filename="{model_name}_export.{template.file_extension}"'
+        return response
+
+
+@method_decorator(login_required, name='dispatch')
+class ExportTemplateListView(ObjectListView):
+    queryset = ExportTemplate.objects.select_related('content_type')
+    table = ExportTemplateTable
+    template_name = 'generic/object_list.html'
+    action_buttons = ('add',)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Export Templates'
+        return context
+
+
+@method_decorator(login_required, name='dispatch')
+class ExportTemplateDetailView(ObjectDetailView):
+    queryset = ExportTemplate.objects.select_related('content_type')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = str(self.get_object())
+        return context
+
+
+@method_decorator(login_required, name='dispatch')
+class ExportTemplateEditView(ObjectEditView):
+    queryset = ExportTemplate.objects.all()
+    fields = ['name', 'description', 'content_type', 'template_code', 'mime_type', 'file_extension']
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Edit Export Template' if self.object else 'Create Export Template'
+        return context
+
+
+@method_decorator(login_required, name='dispatch')
+class ExportTemplateDeleteView(ObjectDeleteView):
+    queryset = ExportTemplate.objects.all()
+
+
+class JournalEntryCreateView(LoginRequiredMixin, View):
+    def post(self, request, app_label, model_name, object_id):
+        model = apps.get_model(app_label, model_name)
+        obj = get_object_or_404(model, pk=object_id)
+        form = JournalEntryForm(request.POST)
+        if form.is_valid():
+            obj_type = ContentType.objects.get_for_model(model)
+            JournalEntry.objects.create(
+                model=obj_type,
+                object_id=obj.pk,
+                user=request.user,
+                comment=form.cleaned_data['comment'],
+            )
+            messages.success(request, 'Journal entry added.')
+        else:
+            messages.error(request, 'Could not add journal entry.')
+        redirect_url = request.POST.get('return_url') or request.META.get('HTTP_REFERER')
+        if redirect_url:
+            return HttpResponseRedirect(redirect_url)
+        return redirect(obj)
+
+
+class ImageAttachmentUploadView(LoginRequiredMixin, View):
+    def post(self, request, app_label, model_name, object_id):
+        from django.apps import apps
+        from django.shortcuts import get_object_or_404
+        model = apps.get_model(app_label, model_name)
+        obj = get_object_or_404(model, pk=object_id)
+        obj_type = ContentType.objects.get_for_model(obj)
+        uploaded_file = request.FILES.get('image')
+        if uploaded_file:
+            attachment = ImageAttachment.objects.create(
+                model=obj_type,
+                object_id=obj.pk,
+                image=uploaded_file,
+                name=uploaded_file.name,
+            )
+            messages.success(request, f"Image '{uploaded_file.name}' uploaded.")
+        return redirect(request.POST.get('return_url', obj.get_absolute_url()))
+
+
+class FileAttachmentUploadView(LoginRequiredMixin, View):
+    def post(self, request, app_label, model_name, object_id):
+        from django.apps import apps
+        from django.shortcuts import get_object_or_404
+        model = apps.get_model(app_label, model_name)
+        obj = get_object_or_404(model, pk=object_id)
+        obj_type = ContentType.objects.get_for_model(obj)
+        uploaded_file = request.FILES.get('file')
+        if uploaded_file:
+            import mimetypes
+            mime_type, _ = mimetypes.guess_type(uploaded_file.name)
+            attachment = FileAttachment.objects.create(
+                model=obj_type,
+                object_id=obj.pk,
+                file=uploaded_file,
+                name=uploaded_file.name,
+                mime_type=mime_type or '',
+            )
+            messages.success(request, f"File '{uploaded_file.name}' uploaded.")
+        return redirect(request.POST.get('return_url', obj.get_absolute_url()))
+
+
+class ImageAttachmentDeleteView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        attachment = get_object_or_404(ImageAttachment, pk=pk)
+        obj_url = request.POST.get('return_url', '/')
+        attachment.delete()
+        messages.success(request, f"Image '{attachment.name}' deleted.")
+        return redirect(obj_url)
+
+
+class FileAttachmentDeleteView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        attachment = get_object_or_404(FileAttachment, pk=pk)
+        obj_url = request.POST.get('return_url', '/')
+        attachment.delete()
+        messages.success(request, f"File '{attachment.name}' deleted.")
+        return redirect(obj_url)
+
+
+class LabelSelectView(LoginRequiredMixin, View):
+    def get(self, request, app_label, model_name, object_id):
+        templates = LabelTemplate.objects.all()
+        context = {
+            'label_templates': templates,
+            'object_id': object_id,
+            'app_label': app_label,
+            'model_name': model_name,
+            'title': 'Select Label Template',
+        }
+        return render(request, 'generic/label_select.html', context)
+
+
+class LabelPrintView(LoginRequiredMixin, View):
+    def get(self, request, template_id, object_id):
+        label_template = get_object_or_404(LabelTemplate, pk=template_id)
+        content_type = label_template.content_type if hasattr(label_template, 'content_type') else None
+
+        if content_type:
+            model = content_type.model_class()
+            obj = get_object_or_404(model, pk=object_id)
+        else:
+            model = None
+            try:
+                from assets.models import Asset
+                obj = get_object_or_404(Asset, pk=object_id)
+            except Exception:
+                obj = None
+
+        if label_template.template_code:
+            from django.template import Template, Context
+            template = Template(label_template.template_code)
+            context = Context({'obj': obj, 'barcode_format': label_template.barcode_format})
+            html = template.render(context)
+        else:
+            html = self._render_default_label(obj, label_template)
+
+        response = HttpResponse(html)
+        response['Content-Type'] = 'text/html'
+        return response
+
+    def _render_default_label(self, obj, label_template):
+        barcode_fmt = label_template.barcode_format
+        obj_name = str(obj) if obj else 'Unknown'
+        asset_tag = getattr(obj, 'asset_tag', '') if obj else ''
+        barcode_img = ''
+        if barcode_fmt:
+            barcode_img = self._generate_barcode(asset_tag or obj_name, barcode_fmt)
+        return f'<html><body style="width:{label_template.page_width}in;height:{label_template.page_height}in;margin:0;padding:5pt;font-family:sans-serif;font-size:8pt;"><div style="text-align:center"><h3 style="margin:0">{obj_name}</h3>{barcode_img}<p style="margin:2pt 0">{asset_tag}</p></div></body></html>'
+
+    def _generate_barcode(self, data, fmt):
+        try:
+            import segno
+            qr = segno.make(data)
+            return f'<div style="max-width:100%">{qr.svg_inline(scale=4, border=0)}</div>'
+        except Exception:
+            try:
+                import barcode
+                from barcode.writer import SVGWriter
+                from io import BytesIO
+                buf = BytesIO()
+                if fmt.lower() in ('code128', 'code39'):
+                    bc_class = barcode.get(fmt.lower(), lambda x: x)
+                    bc = bc_class(data, writer=SVGWriter())
+                    bc.write(buf)
+                    return buf.getvalue().decode('utf-8')
+            except Exception:
+                pass
+        return ''
+
+
+class PermissionGroupListView(ObjectListView):
+    queryset = PermissionGroup.objects.all()
+    action_buttons = ('add',)
+
+    def get_table(self):
+        from .tables import PermissionGroupTable
+        return PermissionGroupTable(self.get_queryset(), request=self.request)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Permission Groups'
+        return context
+
+
+class PermissionGroupDetailView(ObjectDetailView):
+    queryset = PermissionGroup.objects.all()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = str(self.get_object())
+        return context
+
+
+class PermissionGroupEditView(ObjectEditView):
+    queryset = PermissionGroup.objects.all()
+    fields = ['name', 'description', 'permissions', 'users']
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Edit Permission Group' if self.object else 'Create Permission Group'
+        return context
+
+
+class PermissionGroupDeleteView(ObjectDeleteView):
+    queryset = PermissionGroup.objects.all()
+
+
+@method_decorator(login_required, name='dispatch')
+class WebhookEndpointListView(ObjectListView):
+    queryset = WebhookEndpoint.objects.all()
+    table = WebhookEndpointTable
+    template_name = 'generic/object_list.html'
+    action_buttons = ('add',)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Webhook Endpoints'
+        return context
+
+
+@method_decorator(login_required, name='dispatch')
+class WebhookEndpointDetailView(ObjectDetailView):
+    queryset = WebhookEndpoint.objects.all()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = str(self.get_object())
+        return context
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if 'test_webhook' in request.POST:
+            return self._send_test_webhook(request)
+        return self.get(request, *args, **kwargs)
+
+    def _send_test_webhook(self, request):
+        import json
+        import requests as http_requests
+        from django.http import JsonResponse
+
+        endpoint = self.object
+        payload = {
+            'event': 'test',
+            'model': 'core.webhookendpoint',
+            'object_id': endpoint.pk,
+            'timestamp': timezone.now().isoformat(),
+            'data': {'test': True, 'endpoint': endpoint.name},
+        }
+        body = json.dumps(payload, default=str)
+        headers = endpoint.headers or {}
+        headers.setdefault('Content-Type', 'application/json')
+
+        try:
+            response = http_requests.request(
+                method=endpoint.http_method,
+                url=endpoint.url,
+                headers=headers,
+                data=body,
+                timeout=10,
+            )
+            result = {
+                'status': 'success',
+                'status_code': response.status_code,
+                'response_body': response.text[:1000],
+            }
+            messages.success(request, f"Test webhook sent — HTTP {response.status_code}")
+        except http_requests.RequestException as e:
+            result = {
+                'status': 'error',
+                'error': str(e),
+            }
+            messages.error(request, f"Test webhook failed: {e}")
+
+        return redirect(self.object.get_absolute_url())
+
+
+@method_decorator(login_required, name='dispatch')
+class WebhookEndpointEditView(ObjectEditView):
+    queryset = WebhookEndpoint.objects.all()
+    model_form = WebhookEndpointForm
+
+    def post(self, request, *args, **kwargs):
+        if '_test' in request.POST:
+            self.object = self.get_object() if 'pk' in self.kwargs else None
+            return self._test_webhook(request)
+        return super().post(request, *args, **kwargs)
+
+    def _test_webhook(self, request):
+        url = request.POST.get('url', '')
+        if not url:
+            messages.error(request, "No URL configured.")
+            return redirect(request.get_full_path())
+        success = False
+        try:
+            test_payload = "Test notification from AssetBox"
+            if 'hooks.slack.com' in url:
+                from core.events import _send_slack_notification
+                success = _send_slack_notification(url, test_payload, "AssetBox Test")
+            elif 'webhook.office.com' in url or 'outlook.office.com/webhook' in url:
+                from core.events import _send_teams_notification
+                success = _send_teams_notification(url, test_payload, "AssetBox Test")
+            else:
+                import requests
+                resp = requests.post(url, json={'test': True, 'message': test_payload}, timeout=10)
+                success = resp.status_code < 400
+        except Exception as e:
+            messages.error(request, f"Test failed: {e}")
+        if success:
+            messages.success(request, "Webhook test succeeded!")
+        else:
+            messages.error(request, "Webhook test failed.")
+        return redirect(request.get_full_path())
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Edit Webhook Endpoint' if self.object else 'Create Webhook Endpoint'
+        return context
+
+
+@method_decorator(login_required, name='dispatch')
+class WebhookEndpointDeleteView(ObjectDeleteView):
+    queryset = WebhookEndpoint.objects.all()
+
+
+@method_decorator(login_required, name='dispatch')
+class EventRuleListView(ObjectListView):
+    queryset = EventRule.objects.select_related('model')
+    table = EventRuleTable
+    template_name = 'generic/object_list.html'
+    action_buttons = ('add',)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Event Rules'
+        return context
+
+
+@method_decorator(login_required, name='dispatch')
+class EventRuleDetailView(ObjectDetailView):
+    queryset = EventRule.objects.select_related('model')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = str(self.get_object())
+        return context
+
+
+@method_decorator(login_required, name='dispatch')
+class EventRuleEditView(ObjectEditView):
+    queryset = EventRule.objects.all()
+    model_form = EventRuleForm
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Edit Event Rule' if self.object else 'Create Event Rule'
+        return context
+
+
+@method_decorator(login_required, name='dispatch')
+class EventRuleDeleteView(ObjectDeleteView):
+    queryset = EventRule.objects.all()
+
+
+@method_decorator(login_required, name='dispatch')
+class LabelTemplateListView(ObjectListView):
+    queryset = LabelTemplate.objects.all()
+    table = LabelTemplateTable
+    template_name = 'generic/object_list.html'
+    action_buttons = ('add',)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Label Templates'
+        return context
+
+
+@method_decorator(login_required, name='dispatch')
+class LabelTemplateDetailView(ObjectDetailView):
+    queryset = LabelTemplate.objects.all()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        obj = self.get_object()
+        context['title'] = str(obj)
+        context['barcode_formats'] = dict(LabelTemplate._meta.get_field('barcode_format').choices)
+        return context
+
+
+@method_decorator(login_required, name='dispatch')
+class LabelTemplateEditView(ObjectEditView):
+    queryset = LabelTemplate.objects.all()
+    model_form = LabelTemplateForm
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Edit Label Template' if self.object else 'Create Label Template'
+        return context
+
+
+@method_decorator(login_required, name='dispatch')
+class LabelTemplateDeleteView(ObjectDeleteView):
+    queryset = LabelTemplate.objects.all()
+
+
+def health(request):
+    """Health check endpoint returning 200 OK."""
+    from django.http import JsonResponse
+    return JsonResponse({'status': 'ok'})
 
 # ... (Any other User/Profile/etc views remain at the end) ... 

@@ -51,6 +51,22 @@
         </a>
     </li>
     {% endif %}
+    {% if has_journaling %}
+    <li class="nav-item" role="presentation">
+        <a href="#journal" class="nav-link" data-bs-toggle="tab" role="tab">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M16 7a4 4 0 1 1 -8 0a4 4 0 0 1 8 0z" /><path d="M12 14v7" /><path d="M9 18h6" /></svg>
+            Journal <span class="badge bg-secondary ms-1">{{ journal_entries_count }}</span>
+        </a>
+    </li>
+    {% endif %}
+    {% if has_image_attachments or has_file_attachments %}
+    <li class="nav-item" role="presentation">
+        <a href="#attachments" class="nav-link" data-bs-toggle="tab" role="tab">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 7l-6.5 6.5a1.5 1.5 0 0 0 3 3l6.5 -6.5a3 3 0 0 0 -6 -6l-6.5 6.5a4.5 4.5 0 0 0 9 9l6.5 -6.5"/></svg>
+            Attachments
+        </a>
+    </li>
+    {% endif %}
 </ul>
 {% endblock tabs %}
 
@@ -197,6 +213,127 @@
                 {% render_table changelog_table %}
             </div>
             {% include 'generic/includes/table_pagination.html' with table=changelog_table %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if has_journaling %}
+    <div class="tab-pane fade" id="journal" role="tabpanel">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="card-title">Journal Entries</h3>
+            </div>
+            <div class="card-body">
+                {% if journal_entries %}
+                <ul class="list-group list-group-flush mb-3">
+                    {% for entry in journal_entries %}
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between">
+                            <strong>{{ entry.user }}</strong>
+                            <small class="text-muted">{{ entry.created|date:"Y-m-d H:i" }}</small>
+                        </div>
+                        <p class="mb-0 mt-1">{{ entry.comment|linebreaksbr }}</p>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted">No journal entries yet.</p>
+                {% endif %}
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Add Journal Entry</h3>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'journal_entry_add' app_label=journal_app_label model_name=journal_model_name object_id=object.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+                    {{ journal_form.comment }}
+                    <button type="submit" class="btn btn-primary mt-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+                        Add Entry
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if has_image_attachments or has_file_attachments %}
+    <div class="tab-pane fade" id="attachments" role="tabpanel">
+        <div class="row g-4">
+            {% if has_image_attachments %}
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h3 class="card-title">Images</h3>
+                        <form method="post" action="{% url 'image_attachment_upload' app_label=attachment_app_label model_name=attachment_model_name object_id=object.pk %}" enctype="multipart/form-data" class="d-inline-flex gap-2">
+                            {% csrf_token %}
+                            <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+                            <input type="file" name="image" class="form-control form-control-sm" accept="image/*">
+                            <button type="submit" class="btn btn-sm btn-primary">Upload</button>
+                        </form>
+                    </div>
+                    <div class="card-body">
+                        {% if image_attachments %}
+                        <div class="row g-2">
+                        {% for img in image_attachments %}
+                        <div class="col-4 col-md-3">
+                            <div class="card card-sm">
+                                <img src="{{ img.image.url }}" class="card-img-top" alt="{{ img.name }}" style="max-height:150px;object-fit:cover;">
+                                <div class="card-body p-2 text-center">
+                                    <small class="text-muted d-block text-truncate">{{ img.name }}</small>
+                                    <form method="post" action="{% url 'image_attachment_delete' pk=img.pk %}" class="mt-1">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this image?')" title="Delete">×</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-muted">No images attached.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% if has_file_attachments %}
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h3 class="card-title">Files</h3>
+                        <form method="post" action="{% url 'file_attachment_upload' app_label=attachment_app_label model_name=attachment_model_name object_id=object.pk %}" enctype="multipart/form-data" class="d-inline-flex gap-2">
+                            {% csrf_token %}
+                            <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+                            <input type="file" name="file" class="form-control form-control-sm">
+                            <button type="submit" class="btn btn-sm btn-primary">Upload</button>
+                        </form>
+                    </div>
+                    <div class="card-body">
+                        {% if file_attachments %}
+                        <ul class="list-group list-group-flush">
+                        {% for file in file_attachments %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <a href="{{ file.file.url }}" class="text-reset">{{ file.name }}</a>
+                            <form method="post" action="{% url 'file_attachment_delete' pk=file.pk %}" class="d-inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this file?')" title="Delete">×</button>
+                            </form>
+                        </li>
+                        {% endfor %}
+                        </ul>
+                        {% else %}
+                        <p class="text-muted">No files attached.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
     {% endif %}

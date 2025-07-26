@@ -10,7 +10,7 @@ from django.contrib.auth import get_user_model
 from django.contrib import messages
 
 
-from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView # Import base CBVs
+from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectImportView # Import base CBVs
 from core.quick_add import QuickAddMixin
 from core.utils import get_paginate_count, get_model_viewname # Import the utility function and get_model_viewname
 from core.panels import Panel
@@ -845,7 +845,6 @@ class ContactAssignmentDeleteView(ObjectDeleteView):
     template_name = 'generic/object_confirm_delete.html'
 
     def get_success_url(self):
-        # Redirect back to the assigned object after deletion
         return_url = self.request.GET.get('return_url') or self.request.POST.get('return_url')
         if return_url:
             return return_url
@@ -853,3 +852,15 @@ class ContactAssignmentDeleteView(ObjectDeleteView):
         if obj and obj.assigned_object and hasattr(obj.assigned_object, 'get_absolute_url'):
             return obj.assigned_object.get_absolute_url()
         return reverse('dashboard')
+
+
+# --- Import Views ---
+from assets.forms.import_forms import LocationBulkImportForm, AssetHolderBulkImportForm
+
+
+class LocationImportView(ObjectImportView):
+    model_form = LocationBulkImportForm
+
+
+class AssetHolderImportView(ObjectImportView):
+    model_form = AssetHolderBulkImportForm
