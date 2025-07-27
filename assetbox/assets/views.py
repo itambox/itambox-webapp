@@ -127,7 +127,7 @@ class AssetDetailView(ObjectDetailView):
         ((Panel('metrics', 'Asset Overview'),),),
         (
             (Panel('asset_info', 'Asset Details'), Panel('specs', 'Hardware Specifications'), Panel('custom_fields', 'Custom Fields')),
-            (Panel('assignment', 'Deployment & Custody'), Panel('financial', 'Financial & Lifecycle'), Panel('audit', 'Audit & Compliance')),
+            (Panel('assignment', 'Deployment & Custody'), Panel('financial', 'Financial & Lifecycle'), Panel('audit', 'Audit & Compliance'), Panel('support', 'Support & Warranty Details')),
         ),
     )
 
@@ -1588,6 +1588,35 @@ class SupplierListView(ObjectListView):
 class SupplierDetailView(ObjectDetailView):
     queryset = Supplier.objects.all()
 
+    layout = (
+        ((Panel('metrics', 'Supplier Overview'),),),
+        ((Panel('info', 'Supplier Details'),),),
+    )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        supplier = self.get_object()
+
+        # Prepare Assets table supplied by this supplier
+        supplier_assets = Asset.objects.filter(supplier=supplier).select_related(
+            'asset_role', 'asset_type', 'location'
+        )
+        assets_table = tables.AssetTable(supplier_assets, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assets_table)
+        context['assets_table'] = assets_table
+
+        # Prepare Related Objects List
+        related_objects_list = []
+        asset_count = supplier_assets.count()
+        if asset_count:
+            related_objects_list.append({
+                'label': 'Assets',
+                'count': asset_count,
+                'url': f"{reverse('assets:asset_list')}?supplier={supplier.slug}"
+            })
+        context['related_objects_list'] = related_objects_list
+        return context
+
 class SupplierEditView(ObjectEditView):
     queryset = Supplier.objects.all()
     model = Supplier
@@ -1611,6 +1640,46 @@ class CategoryListView(ObjectListView):
 class CategoryDetailView(ObjectDetailView):
     queryset = Category.objects.all()
 
+    layout = (
+        ((Panel('metrics', 'Category Overview'),),),
+        ((Panel('info', 'Category Details'),),),
+    )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        category = self.get_object()
+
+        # Prepare Asset Types table for this category
+        cat_asset_types = AssetType.objects.filter(category=category).select_related('manufacturer')
+        asset_types_table = tables.AssetTypeTable(cat_asset_types, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(asset_types_table)
+        context['asset_types_table'] = asset_types_table
+
+        # Prepare Accessories table for this category
+        cat_accessories = Accessory.objects.filter(notification_category=category).select_related('manufacturer')
+        accessories_table = tables.AccessoryTable(cat_accessories, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(accessories_table)
+        context['accessories_table'] = accessories_table
+
+        # Prepare Related Objects List
+        related_objects_list = []
+        assettype_count = cat_asset_types.count()
+        if assettype_count:
+            related_objects_list.append({
+                'label': 'Asset Types',
+                'count': assettype_count,
+                'url': f"{reverse('assets:assettype_list')}?category={category.slug}"
+            })
+        accessory_count = cat_accessories.count()
+        if accessory_count:
+            related_objects_list.append({
+                'label': 'Accessories',
+                'count': accessory_count,
+                'url': f"{reverse('assets:accessory_list')}?category={category.slug}"
+            })
+        context['related_objects_list'] = related_objects_list
+        return context
+
 class CategoryEditView(ObjectEditView):
     queryset = Category.objects.all()
     model = Category
@@ -1633,6 +1702,13 @@ class AssetRequestListView(ObjectListView):
 
 class AssetRequestDetailView(ObjectDetailView):
     queryset = AssetRequest.objects.select_related("requester", "asset", "asset_type", "responded_by").all()
+
+    layout = (
+        (
+            (Panel('info', 'Asset Request Details'),),
+            (Panel('response', 'Decision & Response Details'),),
+        ),
+    )
 
 class AssetRequestCreateView(ObjectEditView):
     model = AssetRequest
