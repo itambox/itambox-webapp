@@ -1,0 +1,40 @@
+<dl class="row mb-0">
+    <dt class="col-sm-4">Requester:</dt>
+    <dd class="col-sm-8"><strong>{{ object.requester }}</strong></dd>
+
+    <dt class="col-sm-4">Target Object:</dt>
+    <dd class="col-sm-8">
+        {% if object.asset %}
+            <span class="badge bg-green-lt me-1">Asset</span>
+            <a href="{{ object.asset.get_absolute_url }}"><strong>{{ object.asset.name }}</strong> ({{ object.asset.asset_tag }})</a>
+        {% elif object.asset_type %}
+            <span class="badge bg-blue-lt me-1">Asset Type</span>
+            <a href="{{ object.asset_type.get_absolute_url }}"><strong>{{ object.asset_type }}</strong></a>
+        {% else %}
+            <span class="text-muted">Any Asset</span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">Status:</dt>
+    <dd class="col-sm-8">
+        {% if object.status == 'pending' %}
+            <span class="badge bg-warning text-warning-fg">Pending</span>
+        {% elif object.status == 'approved' %}
+            <span class="badge bg-blue text-blue-fg">Approved</span>
+        {% elif object.status == 'denied' %}
+            <span class="badge bg-danger text-danger-fg">Denied</span>
+        {% elif object.status == 'fulfilled' %}
+            <span class="badge bg-success text-success-fg">Fulfilled</span>
+        {% elif object.status == 'cancelled' %}
+            <span class="badge bg-secondary text-secondary-fg">Cancelled</span>
+        {% else %}
+            <span class="badge bg-light text-dark">{{ object.get_status_display }}</span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">Request Date:</dt>
+    <dd class="col-sm-8">{{ object.request_date|date:"Y-m-d H:i" }}</dd>
+
+    <dt class="col-sm-4">Requester Notes:</dt>
+    <dd class="col-sm-8 text-secondary">{{ object.notes|linebreaksbr|default:"—" }}</dd>
+</dl>
