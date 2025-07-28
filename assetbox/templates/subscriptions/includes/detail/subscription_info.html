@@ -65,4 +65,26 @@
     <dt class="col-sm-3">Cost Center:</dt>
     <dd class="col-sm-9">{{ object.cost_center }}</dd>
     {% endif %}
+
+    <dt class="col-sm-3">Renewal Cost:</dt>
+    <dd class="col-sm-9">
+        {% if object.renewal_cost %}
+            <strong>{{ object.renewal_cost|floatformat:2 }} {{ object.currency }}</strong>
+        {% else %}&mdash;{% endif %}
+    </dd>
+
+    {% if object.annual_cost %}
+    <dt class="col-sm-3">Est. Annual Cost:</dt>
+    <dd class="col-sm-9"><strong>{{ object.annual_cost|floatformat:2 }} {{ object.currency }}</strong></dd>
+    {% endif %}
+
+    {% if object.licensed_quantity %}
+    <dt class="col-sm-3">Licensed Qty:</dt>
+    <dd class="col-sm-9"><strong>{{ object.licensed_quantity }}</strong></dd>
+    {% endif %}
+
+    {% if object.licensed_quantity and assignment_count is not None %}
+    <dt class="col-sm-3">Assigned Qty:</dt>
+    <dd class="col-sm-9"><span class="badge bg-primary">{{ assignment_count }}</span></dd>
+    {% endif %}
 </dl>
