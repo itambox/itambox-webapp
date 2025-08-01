@@ -1,7 +1,7 @@
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
-from assets.models import Manufacturer, ComponentType, ComponentInstance, Asset, AssetType, AssetRole, Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, ActivityLog, CustodyReceipt, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, KitItem
+from assets.models import Manufacturer, ComponentType, ComponentInstance, Asset, AssetType, AssetRole, Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, ActivityLog, CustodyReceipt, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, KitItem, Supplier, Category, AssetRequest
 from core.models import Notification
 from django.contrib.contenttypes.models import ContentType
 from organization.models import Contact, ContactRole, ContactAssignment
@@ -750,7 +750,7 @@ class AssetMaintenanceAndLifecycleTestCase(TestCase):
         # Retrieve the details page to ensure support card is visible and mailto links are rendered correctly
         response = self.client.get(reverse('assets:asset_detail', kwargs={'pk': asset.pk}))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Support & Warranty Details')
+        self.assertContains(response, 'Support &amp; Warranty Details')
         self.assertContains(response, 'enterprise_support@dell.com')
         self.assertContains(response, 'DELL-SN-12345')
         self.assertContains(response, 'Dell Technologies')
@@ -968,6 +968,65 @@ class EnterpriseITAMTestCase(TestCase):
 
         # ActivityLog created
         self.assertTrue(ActivityLog.objects.filter(asset=asset, action='checked_out').exists())
+
+    def test_itam_layouts(self):
+        # 1. Test Supplier Detail View Layout
+        supplier = Supplier.objects.create(
+            name="Bechtle IT-Services",
+            slug="bechtle-it-services",
+            website="https://www.bechtle.com",
+            contact_email="sales@bechtle.com",
+            contact_name="Markus Müller"
+        )
+        
+        detail_url = reverse('assets:supplier_detail', kwargs={'pk': supplier.pk})
+        response = self.client.get(detail_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Bechtle IT-Services")
+        self.assertContains(response, "https://www.bechtle.com")
+        self.assertContains(response, "sales@bechtle.com")
+        self.assertContains(response, "Markus Müller")
+        self.assertContains(response, "Supplied Assets")
+        self.assertIn('assets_table', response.context)
+
+        # 2. Test Category Detail View Layout
+        category = Category.objects.create(
+            name="Enterprise Laptops",
+            slug="enterprise-laptops",
+            color="00ff00",
+            applies_to=["asset", "accessory"]
+        )
+        
+        detail_url = reverse('assets:category_detail', kwargs={'pk': category.pk})
+        response = self.client.get(detail_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Enterprise Laptops")
+        self.assertContains(response, "#00ff00")
+        self.assertContains(response, "Asset Types")
+        self.assertContains(response, "Accessories")
+        self.assertIn('asset_types_table', response.context)
+        self.assertIn('accessories_table', response.context)
+
+        # 3. Test Asset Request Detail View Layout
+        asset_type = AssetType.objects.create(
+            manufacturer=self.manufacturer,
+            model="MacBook Pro 14",
+            slug="apple-macbook-pro-14"
+        )
+        request_obj = AssetRequest.objects.create(
+            requester=self.user,
+            asset_type=asset_type,
+            notes="Need a development machine."
+        )
+        
+        detail_url = reverse('assets:assetrequest_detail', kwargs={'pk': request_obj.pk})
+        response = self.client.get(detail_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Asset Request Details")
+        self.assertContains(response, "Decision &amp; Response Details")
+        self.assertContains(response, "Need a development machine.")
+        self.assertContains(response, "Pending")
+
 
 
 
