@@ -1,6 +1,9 @@
 from django.db import models
+from django.db.models.signals import class_prepared
 
 from core.registry import registry
+
+
 
 
 class BookmarkableMixin:
@@ -47,12 +50,37 @@ class CustomFieldDataMixin:
     @classmethod
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        if not any(f.name == 'custom_field_data' for f in cls._meta.get_fields() if hasattr(f, 'name')):
-            raise TypeError(
-                f"{cls.__name__} using CustomFieldDataMixin must define a "
-                f"'custom_field_data' JSONField."
-            )
+        # Register the feature eagerly; field validation is deferred
+        # to the class_prepared signal handler below.
         registry.register_feature(cls, 'custom_field_data')
+
+
+def _validate_custom_field_data(sender, **kwargs):
+    """
+    Deferred validation for CustomFieldDataMixin.
+    Called by Django's class_prepared signal after the model class is fully
+    built and the app registry is ready. This avoids the AppRegistryNotReady
+    error that occurs when accessing cls._meta inside __init_subclass__.
+
+    Uses _meta.local_fields instead of get_fields() because get_fields()
+    triggers _relation_tree population, which requires ALL models to be loaded.
+    """
+    if issubclass(sender, CustomFieldDataMixin) and not getattr(sender._meta, 'abstract', False):
+        # Check local_fields (safe during class_prepared — no relation tree lookup)
+        local_field_names = {f.name for f in sender._meta.local_fields}
+        # Also check MRO for fields defined on parent abstract models
+        for klass in sender.__mro__:
+            if hasattr(klass, '_meta') and hasattr(klass._meta, 'local_fields'):
+                local_field_names.update(f.name for f in klass._meta.local_fields)
+
+        if 'custom_field_data' not in local_field_names and 'custom_values' not in local_field_names:
+            raise TypeError(
+                f"{sender.__name__} using CustomFieldDataMixin must define a "
+                f"'custom_field_data' or 'custom_values' JSONField."
+            )
+
+
+class_prepared.connect(_validate_custom_field_data)
 
 
 class ExportableMixin:
@@ -146,6 +174,23 @@ class SoftDeleteMixin(models.Model):
     def restore(self):
         self.deleted_at = None
         self.save(update_fields=['deleted_at'])
+
+    def delete(self, *args, force_hard_delete=False, **kwargs):
+        """
+        Overrides Django's standard delete. If force_hard_delete is True,
+        performs a standard physical delete. Otherwise, soft-deletes the record.
+        """
+        if force_hard_delete:
+            super().delete(*args, **kwargs)
+        else:
+            if hasattr(self, '_changelog_action'):
+                from core.choices import ObjectChangeActionChoices
+                self._changelog_action = ObjectChangeActionChoices.ACTION_DELETE
+            
+            if hasattr(self, 'snapshot') and callable(self.snapshot):
+                self.snapshot()
+            
+            self.soft_delete()
 
     @classmethod
     def __init_subclass__(cls, **kwargs):
