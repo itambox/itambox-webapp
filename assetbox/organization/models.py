@@ -5,11 +5,13 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.conf import settings # Import settings
 from core.models import BaseModel, ChangeLoggingMixin
-from core.mixins import ExportableMixin
+from core.mixins import ExportableMixin, TaggableMixin, JournalingMixin
+from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 
 # Create your models here.
 
-class Location(ExportableMixin, ChangeLoggingMixin, BaseModel):
+class Location(JournalingMixin, TaggableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
+    journal_entries = GenericRelation('core.JournalEntry', content_type_field='model', object_id_field='object_id')
     STATUS_PLANNED = 'planned'
     STATUS_STAGING = 'staging'
     STATUS_ACTIVE = 'active'
@@ -77,7 +79,8 @@ class Location(ExportableMixin, ChangeLoggingMixin, BaseModel):
     def get_absolute_url(self):
         return reverse('organization:location_detail', kwargs={'pk': self.pk})
 
-class Region(ChangeLoggingMixin, BaseModel):
+class Region(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
+    journal_entries = GenericRelation('core.JournalEntry', content_type_field='model', object_id_field='object_id')
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     parent = models.ForeignKey(
@@ -100,7 +103,7 @@ class Region(ChangeLoggingMixin, BaseModel):
     def get_absolute_url(self):
         return reverse('organization:region_detail', kwargs={'pk': self.pk})
 
-class SiteGroup(ChangeLoggingMixin, BaseModel):
+class SiteGroup(TaggableMixin, ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     parent = models.ForeignKey(
@@ -124,7 +127,7 @@ class SiteGroup(ChangeLoggingMixin, BaseModel):
     def get_absolute_url(self):
         return reverse('organization:sitegroup_detail', kwargs={'pk': self.pk})
 
-class TenantGroup(ChangeLoggingMixin, BaseModel):
+class TenantGroup(TaggableMixin, ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     parent = models.ForeignKey(
@@ -148,7 +151,8 @@ class TenantGroup(ChangeLoggingMixin, BaseModel):
     def get_absolute_url(self):
         return reverse('organization:tenantgroup_detail', kwargs={'pk': self.pk})
 
-class Tenant(ChangeLoggingMixin, BaseModel):
+class Tenant(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
+    journal_entries = GenericRelation('core.JournalEntry', content_type_field='model', object_id_field='object_id')
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     group = models.ForeignKey(
@@ -171,7 +175,8 @@ class Tenant(ChangeLoggingMixin, BaseModel):
     def __str__(self):
         return self.name
 
-class Site(ChangeLoggingMixin, BaseModel):
+class Site(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
+    journal_entries = GenericRelation('core.JournalEntry', content_type_field='model', object_id_field='object_id')
     STATUS_PLANNED = 'planned'
     STATUS_STAGING = 'staging'
     STATUS_ACTIVE = 'active'
@@ -212,7 +217,8 @@ class Site(ChangeLoggingMixin, BaseModel):
         return reverse('organization:site_detail', kwargs={'pk': self.pk})
 
 # +++ AssetHolder Model +++
-class AssetHolder(ExportableMixin, ChangeLoggingMixin, BaseModel):
+class AssetHolder(JournalingMixin, TaggableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
+    journal_entries = GenericRelation('core.JournalEntry', content_type_field='model', object_id_field='object_id')
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL, # Keep holder if user is deleted, set user link to null
@@ -304,7 +310,7 @@ class ContactRole(ChangeLoggingMixin, BaseModel):
         super().save(*args, **kwargs)
 
 
-class Contact(ChangeLoggingMixin, BaseModel):
+class Contact(TaggableMixin, ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=100)
     title = models.CharField(max_length=100, blank=True)
     phone = models.CharField(max_length=50, blank=True)

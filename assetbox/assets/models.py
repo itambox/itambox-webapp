@@ -10,7 +10,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from software.models import Software
 from core.models import BaseModel, ChangeLoggingMixin
-from core.mixins import ExportableMixin, SoftDeleteMixin, CloneableMixin, ImageAttachmentMixin, FileAttachmentMixin
+from core.mixins import ExportableMixin, SoftDeleteMixin, CloneableMixin, ImageAttachmentMixin, FileAttachmentMixin, CustomFieldDataMixin, JournalingMixin, TaggableMixin
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.auth import get_user_model
 
@@ -71,7 +71,7 @@ class StatusLabel(ChangeLoggingMixin, BaseModel):
                 counter += 1
         super().save(*args, **kwargs)
 
-class AssetRole(ChangeLoggingMixin, BaseModel):
+class AssetRole(TaggableMixin, ChangeLoggingMixin, BaseModel):
     """Categorizes assets based on their functional role (e.g., Laptop, Monitor, Server)."""
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
@@ -186,8 +186,10 @@ class Depreciation(ChangeLoggingMixin, BaseModel):
         return reverse('assets:depreciation_detail', kwargs={'pk': self.pk})
 
 
-class AssetType(ImageAttachmentMixin, FileAttachmentMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
+class AssetType(JournalingMixin, TaggableMixin, ImageAttachmentMixin, FileAttachmentMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
     """Defines a specific type of asset (e.g., a specific laptop model)."""
+    
+    journal_entries = GenericRelation('core.JournalEntry', content_type_field='model', object_id_field='object_id')
     STORAGE_SSD = 'ssd'
     STORAGE_NVME = 'nvme'
     STORAGE_HDD = 'hdd'
@@ -278,9 +280,11 @@ class AssetType(ImageAttachmentMixin, FileAttachmentMixin, ExportableMixin, Chan
                  counter += 1
         super().save(*args, **kwargs)
 
-class Asset(ImageAttachmentMixin, FileAttachmentMixin, SoftDeleteMixin, ExportableMixin, CloneableMixin, ChangeLoggingMixin, BaseModel):
+class Asset(CustomFieldDataMixin, JournalingMixin, TaggableMixin, ImageAttachmentMixin, FileAttachmentMixin, SoftDeleteMixin, ExportableMixin, CloneableMixin, ChangeLoggingMixin, BaseModel):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
+    
+    journal_entries = GenericRelation('core.JournalEntry', content_type_field='model', object_id_field='object_id')
     # --- Define choices as class attributes --- 
     STATUS_IN_USE = 'in_use'
     STATUS_AVAILABLE = 'available'
@@ -563,7 +567,7 @@ class InstalledSoftware(BaseModel):
         return self.asset.get_absolute_url()
 
 
-class ComponentType(ChangeLoggingMixin, BaseModel):
+class ComponentType(TaggableMixin, ChangeLoggingMixin, BaseModel):
     """Catalog of physical hardware component models (e.g. Samsung 990 Pro 2TB SSD)."""
     CATEGORY_RAM = 'ram'
     CATEGORY_STORAGE = 'storage'
@@ -613,7 +617,7 @@ class ComponentType(ChangeLoggingMixin, BaseModel):
         super().save(*args, **kwargs)
 
 
-class ComponentInstance(ChangeLoggingMixin, BaseModel):
+class ComponentInstance(TaggableMixin, ChangeLoggingMixin, BaseModel):
     """A physical component unit (e.g., a specific NVMe SSD with serial number) installed inside an Asset."""
     STATUS_INSTALLED = 'installed'
     STATUS_IN_STOCK = 'in_stock'
@@ -647,9 +651,11 @@ class ComponentInstance(ChangeLoggingMixin, BaseModel):
         return reverse('assets:componentinstance_detail', kwargs={'pk': self.pk})
 
 
-class Accessory(SoftDeleteMixin, ExportableMixin, CloneableMixin, ChangeLoggingMixin, BaseModel):
+class Accessory(JournalingMixin, TaggableMixin, SoftDeleteMixin, ExportableMixin, CloneableMixin, ChangeLoggingMixin, BaseModel):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
+    
+    journal_entries = GenericRelation('core.JournalEntry', content_type_field='model', object_id_field='object_id')
     """Bulk non-serialized returnable peripherals tracked in inventory (e.g. Dell Keyboard)."""
     CATEGORY_KEYBOARD = 'keyboard'
     CATEGORY_MOUSE = 'mouse'
@@ -759,9 +765,11 @@ class AccessoryAssignment(ChangeLoggingMixin, BaseModel):
         return f"{self.qty}x {self.accessory} assigned to {recipient}"
 
 
-class Consumable(SoftDeleteMixin, ExportableMixin, CloneableMixin, ChangeLoggingMixin, BaseModel):
+class Consumable(JournalingMixin, TaggableMixin, SoftDeleteMixin, ExportableMixin, CloneableMixin, ChangeLoggingMixin, BaseModel):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
+    
+    journal_entries = GenericRelation('core.JournalEntry', content_type_field='model', object_id_field='object_id')
     """Non-returnable bulk items that are permanently consumed (e.g. thermal paste, printer toner)."""
     CATEGORY_TONER = 'toner'
     CATEGORY_INK = 'ink'
@@ -996,7 +1004,8 @@ class KitItem(ChangeLoggingMixin, BaseModel):
             raise ValidationError("A kit item cannot select more than one target (must be either Asset Type OR Accessory OR License).")
 
 
-class Supplier(ChangeLoggingMixin, BaseModel):
+class Supplier(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
+    journal_entries = GenericRelation('core.JournalEntry', content_type_field='model', object_id_field='object_id')
     name = models.CharField(max_length=255, unique=True)
     slug = models.SlugField(max_length=255, unique=True)
     website = models.URLField(max_length=500, blank=True, null=True)
@@ -1029,7 +1038,8 @@ class Supplier(ChangeLoggingMixin, BaseModel):
         super().save(*args, **kwargs)
 
 
-class Category(ChangeLoggingMixin, BaseModel):
+class Category(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
+    journal_entries = GenericRelation('core.JournalEntry', content_type_field='model', object_id_field='object_id')
     name = models.CharField(max_length=255, unique=True)
     slug = models.SlugField(max_length=255, unique=True)
     color = models.CharField(max_length=6, blank=True, null=True, help_text="RGB color in hexadecimal (e.g. 00ff00)")
@@ -1063,7 +1073,8 @@ class Category(ChangeLoggingMixin, BaseModel):
         super().save(*args, **kwargs)
 
 
-class AssetRequest(ChangeLoggingMixin, BaseModel):
+class AssetRequest(JournalingMixin, ChangeLoggingMixin, BaseModel):
+    journal_entries = GenericRelation('core.JournalEntry', content_type_field='model', object_id_field='object_id')
     STATUS_PENDING = 'pending'
     STATUS_APPROVED = 'approved'
     STATUS_DENIED = 'denied'

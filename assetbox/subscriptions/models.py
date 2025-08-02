@@ -1,16 +1,17 @@
 from django.db import models
 from django.conf import settings
 from django.urls import reverse, NoReverseMatch
-from django.contrib.contenttypes.fields import GenericForeignKey
+from core.models import BaseModel, ChangeLoggingMixin
+from core.mixins import TaggableMixin, JournalingMixin
+from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import gettext_lazy as _
 from django.utils.text import slugify
-
-from core.models import BaseModel, ChangeLoggingMixin
 from extras.models import Tag
 
 
-class Provider(ChangeLoggingMixin, BaseModel):
+class Provider(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
+    journal_entries = GenericRelation('core.JournalEntry', content_type_field='model', object_id_field='object_id')
     """Represents the vendor/supplier of a subscription or service."""
     name = models.CharField(
         max_length=255,
@@ -116,8 +117,9 @@ class BillingCycleChoices(models.TextChoices):
     ONETIME = 'onetime', _('One-Time')
 
 
-class Subscription(ChangeLoggingMixin, BaseModel):
+class Subscription(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
     """Represents a recurring service agreement (SaaS, Support, etc.)."""
+    journal_entries = GenericRelation('core.JournalEntry', content_type_field='model', object_id_field='object_id')
     name = models.CharField(
         max_length=255,
         help_text="Descriptive name (e.g., Adobe Creative Cloud - All Apps (Team))"
