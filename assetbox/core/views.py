@@ -695,6 +695,206 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
         return BaseHTMXView.render_to_response(self, context, **response_kwargs)
 
 
+class ObjectBulkEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, TemplateResponseMixin, View):
+    """
+    Generic CBV for bulk-editing multiple objects of the same model.
+
+    Accepts POST containing a list of object primary keys ('pk') and renders
+    a form (form_class) whose fields are applied selectively based on a
+    '_selected_fields' array submitted by the user. Only fields explicitly
+    marked in '_selected_fields' are overwritten on the selected queryset.
+    All modifications execute inside transaction.atomic(), and each object
+    receives a changelog snapshot before mutation.
+
+    Subclass attributes:
+        queryset        – base queryset (required)
+        form_class      – ModelForm class for the bulk edit form (required)
+        template_name   – defaults to 'generic/object_bulk_edit.html'
+    """
+    queryset = None
+    form_class = None
+    template_name = 'generic/object_bulk_edit.html'
+
+    def get_permission_required(self):
+        model = self._get_model()
+        if model:
+            return (f'{model._meta.app_label}.change_{model._meta.model_name}',)
+        return ('',)
+
+    def _get_model(self):
+        if self.queryset is not None:
+            return self.queryset.model
+        if hasattr(self, 'model') and self.model:
+            return self.model
+        if self.form_class and hasattr(self.form_class, '_meta'):
+            return self.form_class._meta.model
+        return None
+
+    def _get_queryset(self, pks):
+        """Return a filtered queryset for the given primary keys."""
+        qs = self.queryset if self.queryset is not None else self._get_model().objects.all()
+        return qs.filter(pk__in=pks)
+
+    def post(self, request, *args, **kwargs):
+        from django.db import transaction
+
+        pks = request.POST.getlist('pk')
+        model = self._get_model()
+        return_url = request.POST.get('return_url') or request.META.get('HTTP_REFERER', reverse('dashboard'))
+
+        if not pks:
+            messages.warning(request, f"No {model._meta.verbose_name_plural} were selected.")
+            return HttpResponseRedirect(return_url)
+
+        queryset = self._get_queryset(pks)
+
+        if '_apply' in request.POST:
+            form = self.form_class(request.POST)
+            selected_fields = request.POST.getlist('_selected_fields')
+
+            if form.is_valid() and selected_fields:
+                updated_count = 0
+
+                with transaction.atomic():
+                    for obj in queryset:
+                        # Take a pre-change snapshot for changelog
+                        if hasattr(obj, 'snapshot') and callable(obj.snapshot):
+                            obj.snapshot()
+
+                        # Apply only the explicitly selected fields
+                        for field_name in selected_fields:
+                            if field_name in form.cleaned_data:
+                                setattr(obj, field_name, form.cleaned_data[field_name])
+
+                        obj.full_clean()
+                        obj.save()
+                        updated_count += 1
+
+                messages.success(
+                    request,
+                    f"Updated {updated_count} {model._meta.verbose_name_plural}."
+                )
+                return HttpResponseRedirect(return_url)
+            else:
+                if not selected_fields:
+                    messages.warning(request, "No fields were selected for editing.")
+        else:
+            # Initial POST from list view — render the bulk edit form
+            form = self.form_class()
+
+        context = {
+            'form': form,
+            'model': model,
+            'objects': queryset,
+            'object_pks': pks,
+            'return_url': return_url,
+            'verbose_name': model._meta.verbose_name,
+            'verbose_name_plural': model._meta.verbose_name_plural,
+            'title': f'Bulk Edit {model._meta.verbose_name_plural.title()}',
+            'breadcrumbs': [
+                (reverse('dashboard'), 'Dashboard'),
+                (return_url, model._meta.verbose_name_plural.title()),
+                (None, f'Bulk Edit ({len(pks)})'),
+            ],
+        }
+        return self.render_to_response(context)
+
+
+class ObjectBulkDeleteView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, TemplateResponseMixin, View):
+    """
+    Generic CBV for bulk-deleting multiple objects of the same model.
+
+    Replaces the function-based bulk_delete view with a clean, class-based
+    implementation. Iterates over individual instances and calls .delete()
+    on each one so that SoftDeleteMixin and ChangeLoggingMixin lifecycle
+    hooks fire correctly (as opposed to an unmanaged queryset.delete()).
+
+    Subclass attributes:
+        queryset        – base queryset (required)
+        template_name   – defaults to 'generic/object_confirm_bulk_delete.html'
+    """
+    queryset = None
+    template_name = 'generic/object_confirm_bulk_delete.html'
+
+    def get_permission_required(self):
+        model = self._get_model()
+        if model:
+            return (f'{model._meta.app_label}.delete_{model._meta.model_name}',)
+        return ('',)
+
+    def _get_model(self):
+        if self.queryset is not None:
+            return self.queryset.model
+        if hasattr(self, 'model') and self.model:
+            return self.model
+        return None
+
+    def _get_queryset(self, pks):
+        """Return a filtered queryset for the given primary keys."""
+        qs = self.queryset if self.queryset is not None else self._get_model().objects.all()
+        return qs.filter(pk__in=pks)
+
+    def post(self, request, *args, **kwargs):
+        from django.db import transaction
+
+        pks = request.POST.getlist('pk')
+        model = self._get_model()
+        return_url = request.POST.get('return_url') or request.META.get('HTTP_REFERER', reverse('dashboard'))
+
+        if not pks:
+            messages.warning(request, f"No {model._meta.verbose_name_plural} were selected.")
+            return HttpResponseRedirect(return_url)
+
+        queryset = self._get_queryset(pks)
+        objects_to_delete = list(queryset)
+
+        if not objects_to_delete:
+            messages.warning(request, f"No valid {model._meta.verbose_name_plural} selected for deletion.")
+            return HttpResponseRedirect(return_url)
+
+        if '_confirm' in request.POST:
+            # User has confirmed deletion — execute inside atomic block
+            try:
+                deleted_count = 0
+                with transaction.atomic():
+                    for obj in objects_to_delete:
+                        # Take a pre-change snapshot for changelog
+                        if hasattr(obj, 'snapshot') and callable(obj.snapshot):
+                            obj.snapshot()
+                        obj.delete()  # Respects SoftDeleteMixin lifecycle
+                        deleted_count += 1
+
+                messages.success(
+                    request,
+                    f"Successfully deleted {deleted_count} {model._meta.verbose_name_plural}."
+                )
+                return HttpResponseRedirect(return_url)
+            except ProtectedError as e:
+                messages.error(
+                    request,
+                    f"Could not delete objects due to protected relationships: {e}"
+                )
+                return HttpResponseRedirect(return_url)
+        else:
+            # Initial POST from list view — show confirmation page
+            context = {
+                'model': model,
+                'model_name': f'{model._meta.app_label}.{model._meta.model_name}',
+                'model_verbose_name': model._meta.verbose_name,
+                'model_verbose_name_plural': model._meta.verbose_name_plural,
+                'objects': objects_to_delete,
+                'object_pks': pks,
+                'return_url': return_url,
+                'title': f'Confirm Bulk Deletion',
+                'breadcrumbs': [
+                    (reverse('dashboard'), 'Dashboard'),
+                    (return_url, model._meta.verbose_name_plural.title()),
+                    (None, f'Delete ({len(objects_to_delete)})'),
+                ],
+            }
+            return self.render_to_response(context)
+
+
 # =============================================================================
 # END Generic Object Views
 # =============================================================================
