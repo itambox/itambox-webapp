@@ -2,14 +2,12 @@ from django.db import models
 from django.urls import reverse
 from extras.models import Tag
 from core.models import BaseModel, ChangeLoggingMixin
-from core.mixins import JournalingMixin, TaggableMixin
-from django.contrib.contenttypes.fields import GenericRelation
+from core.mixins import JournalingMixin, TaggableMixin, ExportableMixin
 
-class Software(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
+class Software(JournalingMixin, TaggableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
     """
     Represents a catalog entry for a software product.
     """
-    journal_entries = GenericRelation('core.JournalEntry', content_type_field='model', object_id_field='object_id')
     name = models.CharField(
         max_length=255, 
         unique=True, 

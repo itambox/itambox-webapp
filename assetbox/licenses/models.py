@@ -6,7 +6,6 @@ from django.utils.translation import gettext_lazy as _
 
 from core.models import BaseModel, ChangeLoggingMixin
 from core.mixins import ExportableMixin, SoftDeleteMixin, CloneableMixin, TaggableMixin, JournalingMixin
-from django.contrib.contenttypes.fields import GenericRelation
 from extras.models import Tag
 from software.models import Software
 from assets.models import Asset
@@ -45,8 +44,7 @@ class AllObjectsLicenseManager(models.Manager.from_queryset(LicenseQuerySet)):
 
 class License(JournalingMixin, TaggableMixin, SoftDeleteMixin, ExportableMixin, CloneableMixin, ChangeLoggingMixin, BaseModel):
     """Represents the specific entitlement/purchase record for software."""
-    
-    journal_entries = GenericRelation('core.JournalEntry', content_type_field='model', object_id_field='object_id')
+
     name = models.CharField(
         max_length=255,
         help_text="Descriptive name for the license (e.g., Visio Pro 2021 - EA Renewal FY24)"

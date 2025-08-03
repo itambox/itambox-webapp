@@ -32,7 +32,7 @@ class AllObjectsManager(models.Manager):
         return super().get_queryset()
 
 
-class StatusLabel(ChangeLoggingMixin, BaseModel):
+class StatusLabel(TaggableMixin, ChangeLoggingMixin, BaseModel):
     TYPE_DEPLOYABLE = 'deployable'
     TYPE_PENDING = 'pending'
     TYPE_UNDEPLOYABLE = 'undeployable'
@@ -49,6 +49,7 @@ class StatusLabel(ChangeLoggingMixin, BaseModel):
     type = models.CharField(max_length=50, choices=TYPE_CHOICES, default=TYPE_DEPLOYABLE)
     description = models.TextField(blank=True)
     color = models.CharField(max_length=6, blank=True, help_text="RGB color in hexadecimal (e.g. 00ff00)")
+    tags = models.ManyToManyField('extras.Tag', related_name='status_labels_tagged', blank=True)
 
     class Meta:
         ordering = ['name']
@@ -91,12 +92,13 @@ class AssetRole(TaggableMixin, ChangeLoggingMixin, BaseModel):
         # Use standardized URL name
         return reverse('assets:assetrole_detail', args=[self.pk])
 
-class Manufacturer(ExportableMixin, ChangeLoggingMixin, BaseModel):
+class Manufacturer(ExportableMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=255, unique=True)
     slug = models.SlugField(max_length=255, unique=True)  # Re-add unique=True
     description = models.TextField(blank=True, null=True)
     
     contacts = GenericRelation('organization.ContactAssignment')
+    tags = models.ManyToManyField('extras.Tag', related_name='manufacturers', blank=True)
 
     class Meta:
         ordering = ['name']
@@ -186,10 +188,9 @@ class Depreciation(ChangeLoggingMixin, BaseModel):
         return reverse('assets:depreciation_detail', kwargs={'pk': self.pk})
 
 
-class AssetType(JournalingMixin, TaggableMixin, ImageAttachmentMixin, FileAttachmentMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
+class AssetType(JournalingMixin, TaggableMixin, ImageAttachmentMixin, FileAttachmentMixin, ExportableMixin, CloneableMixin, ChangeLoggingMixin, BaseModel):
     """Defines a specific type of asset (e.g., a specific laptop model)."""
     
-    journal_entries = GenericRelation('core.JournalEntry', content_type_field='model', object_id_field='object_id')
     STORAGE_SSD = 'ssd'
     STORAGE_NVME = 'nvme'
     STORAGE_HDD = 'hdd'
@@ -284,7 +285,6 @@ class Asset(CustomFieldDataMixin, JournalingMixin, TaggableMixin, ImageAttachmen
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     
-    journal_entries = GenericRelation('core.JournalEntry', content_type_field='model', object_id_field='object_id')
     # --- Define choices as class attributes --- 
     STATUS_IN_USE = 'in_use'
     STATUS_AVAILABLE = 'available'
@@ -510,7 +510,7 @@ class ActivityLog(models.Model):
     def __str__(self):
         return f"{self.asset} - {self.get_action_display()} by {self.user or 'System'} on {self.timestamp.strftime('%Y-%m-%d %H:%M')}"
 
-class InstalledSoftware(BaseModel):
+class InstalledSoftware(ChangeLoggingMixin, BaseModel):
     """
     Represents an instance of software discovered or inventoried on a specific asset.
     Distinct from license assignment/tracking.
@@ -567,7 +567,7 @@ class InstalledSoftware(BaseModel):
         return self.asset.get_absolute_url()
 
 
-class ComponentType(TaggableMixin, ChangeLoggingMixin, BaseModel):
+class ComponentType(JournalingMixin, TaggableMixin, ExportableMixin, CloneableMixin, ChangeLoggingMixin, BaseModel):
     """Catalog of physical hardware component models (e.g. Samsung 990 Pro 2TB SSD)."""
     CATEGORY_RAM = 'ram'
     CATEGORY_STORAGE = 'storage'
@@ -655,7 +655,6 @@ class Accessory(JournalingMixin, TaggableMixin, SoftDeleteMixin, ExportableMixin
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     
-    journal_entries = GenericRelation('core.JournalEntry', content_type_field='model', object_id_field='object_id')
     """Bulk non-serialized returnable peripherals tracked in inventory (e.g. Dell Keyboard)."""
     CATEGORY_KEYBOARD = 'keyboard'
     CATEGORY_MOUSE = 'mouse'
@@ -769,7 +768,6 @@ class Consumable(JournalingMixin, TaggableMixin, SoftDeleteMixin, ExportableMixi
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     
-    journal_entries = GenericRelation('core.JournalEntry', content_type_field='model', object_id_field='object_id')
     """Non-returnable bulk items that are permanently consumed (e.g. thermal paste, printer toner)."""
     CATEGORY_TONER = 'toner'
     CATEGORY_INK = 'ink'
@@ -947,10 +945,11 @@ class AssetMaintenance(ChangeLoggingMixin, BaseModel):
         return None
 
 
-class Kit(ChangeLoggingMixin, BaseModel):
+class Kit(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=100, unique=True, verbose_name="Kit Name")
     description = models.TextField(blank=True, verbose_name="Description")
     tenant = models.ForeignKey('organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='kits', db_index=True)
+    tags = models.ManyToManyField('extras.Tag', related_name='kits', blank=True)
 
     class Meta:
         ordering = ['name']
@@ -1004,8 +1003,7 @@ class KitItem(ChangeLoggingMixin, BaseModel):
             raise ValidationError("A kit item cannot select more than one target (must be either Asset Type OR Accessory OR License).")
 
 
-class Supplier(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
-    journal_entries = GenericRelation('core.JournalEntry', content_type_field='model', object_id_field='object_id')
+class Supplier(JournalingMixin, TaggableMixin, ExportableMixin, CloneableMixin, ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=255, unique=True)
     slug = models.SlugField(max_length=255, unique=True)
     website = models.URLField(max_length=500, blank=True, null=True)
@@ -1038,8 +1036,7 @@ class Supplier(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
         super().save(*args, **kwargs)
 
 
-class Category(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
-    journal_entries = GenericRelation('core.JournalEntry', content_type_field='model', object_id_field='object_id')
+class Category(JournalingMixin, TaggableMixin, ExportableMixin, CloneableMixin, ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=255, unique=True)
     slug = models.SlugField(max_length=255, unique=True)
     color = models.CharField(max_length=6, blank=True, null=True, help_text="RGB color in hexadecimal (e.g. 00ff00)")
@@ -1073,8 +1070,7 @@ class Category(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
         super().save(*args, **kwargs)
 
 
-class AssetRequest(JournalingMixin, ChangeLoggingMixin, BaseModel):
-    journal_entries = GenericRelation('core.JournalEntry', content_type_field='model', object_id_field='object_id')
+class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
     STATUS_PENDING = 'pending'
     STATUS_APPROVED = 'approved'
     STATUS_DENIED = 'denied'
@@ -1097,6 +1093,7 @@ class AssetRequest(JournalingMixin, ChangeLoggingMixin, BaseModel):
     responded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='asset_request_responses')
     notes = models.TextField(blank=True, null=True)
     response_notes = models.TextField(blank=True, null=True)
+    tags = models.ManyToManyField('extras.Tag', related_name='asset_requests_tagged', blank=True)
 
     class Meta:
         ordering = ['-request_date']
