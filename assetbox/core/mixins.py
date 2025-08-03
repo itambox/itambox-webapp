@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.contenttypes.fields import GenericRelation
 from django.db.models.signals import class_prepared
 
 from core.registry import registry
@@ -105,13 +106,21 @@ class ImportableMixin:
         registry.register_feature(cls, 'importable')
 
 
-class JournalingMixin:
+class JournalingMixin(models.Model):
     """
     Mixin for models that support persistent free-form commentary
     via JournalEntry records.
     Models using this mixin will have a reverse GenericRelation
     to JournalEntry for easy lookup.
     """
+    journal_entries = GenericRelation(
+        'core.JournalEntry',
+        content_type_field='model',
+        object_id_field='object_id'
+    )
+
+    class Meta:
+        abstract = True
 
     @classmethod
     def __init_subclass__(cls, **kwargs):
@@ -119,10 +128,18 @@ class JournalingMixin:
         registry.register_feature(cls, 'journaling')
 
 
-class ImageAttachmentMixin:
+class ImageAttachmentMixin(models.Model):
     """
     Mixin for models that can have uploaded images.
     """
+    image_attachments = GenericRelation(
+        'core.ImageAttachment',
+        content_type_field='model',
+        object_id_field='object_id'
+    )
+
+    class Meta:
+        abstract = True
 
     @classmethod
     def __init_subclass__(cls, **kwargs):
@@ -130,10 +147,18 @@ class ImageAttachmentMixin:
         registry.register_feature(cls, 'image_attachments')
 
 
-class FileAttachmentMixin:
+class FileAttachmentMixin(models.Model):
     """
     Mixin for models that can have uploaded files.
     """
+    file_attachments = GenericRelation(
+        'core.FileAttachment',
+        content_type_field='model',
+        object_id_field='object_id'
+    )
+
+    class Meta:
+        abstract = True
 
     @classmethod
     def __init_subclass__(cls, **kwargs):

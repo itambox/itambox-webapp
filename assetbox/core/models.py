@@ -4,6 +4,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelatio
 from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import urlencode
 
 from core.choices import ObjectChangeActionChoices, EventActionChoices, JobStatusChoices
 from core.middleware import get_current_request_id, get_current_user
@@ -209,6 +210,13 @@ class ChangeLoggingMixin:
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         registry.register_feature(cls, 'change_logging')
+
+    def get_changelog_url(self):
+        ct = ContentType.objects.get_for_model(self.__class__)
+        return reverse('objectchange_list') + '?' + urlencode({
+            'changed_object_type': ct.pk,
+            'changed_object_id': self.pk,
+        })
 
 
 class Notification(models.Model):
