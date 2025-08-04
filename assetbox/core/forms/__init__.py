@@ -241,6 +241,98 @@ class ConfirmationForm(BootstrapMixin, forms.Form):
             except Exception:
                 pass
 
+
+BULK_EDIT_FIELD_BLACKLIST = {
+    'id', 'pk',
+    'created_at', 'updated_at', 'deleted_at',
+    'last_audited', 'last_audited_by',
+    'signed_at', 'accepted_date', 'verification_hash',
+    'slug',
+}
+
+BULK_EDIT_FIELD_TYPE_MAP = {
+    'CharField': forms.CharField,
+    'TextField': lambda **kw: forms.CharField(widget=forms.Textarea(attrs={'rows': 3}), **kw),
+    'IntegerField': forms.IntegerField,
+    'PositiveIntegerField': forms.IntegerField,
+    'BigIntegerField': forms.IntegerField,
+    'PositiveBigIntegerField': forms.IntegerField,
+    'SmallIntegerField': forms.IntegerField,
+    'PositiveSmallIntegerField': forms.IntegerField,
+    'FloatField': forms.FloatField,
+    'DecimalField': forms.DecimalField,
+    'BooleanField': forms.BooleanField,
+    'NullBooleanField': forms.NullBooleanField,
+    'DateField': forms.DateField,
+    'DateTimeField': forms.DateTimeField,
+    'EmailField': forms.EmailField,
+    'URLField': forms.URLField,
+    'ForeignKey': forms.ChoiceField,
+}
+
+
+class BulkEditForm(BootstrapMixin, forms.Form):
+    _selected_fields = forms.MultipleChoiceField(
+        widget=forms.MultipleHiddenInput(),
+        required=False
+    )
+    add_tags = forms.ModelMultipleChoiceField(
+        queryset=None,
+        required=False,
+        label="Add Tags",
+        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''})
+    )
+    remove_tags = forms.ModelMultipleChoiceField(
+        queryset=None,
+        required=False,
+        label="Remove Tags",
+        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''})
+    )
+
+    def __init__(self, *args, model=None, **kwargs):
+        from extras.models import Tag
+        super().__init__(*args, **kwargs)
+        self.fields['add_tags'].queryset = Tag.objects.all()
+        self.fields['remove_tags'].queryset = Tag.objects.all()
+        
+        if model is None:
+            return
+
+        from django.db.models import ForeignKey, ManyToManyField
+        from django.db.models.fields import related
+
+        for field in model._meta.get_fields():
+            if field.name in BULK_EDIT_FIELD_BLACKLIST:
+                continue
+            if not field.editable:
+                continue
+            if isinstance(field, (ManyToManyField, related.RelatedField)) and not isinstance(field, ForeignKey):
+                continue
+            if field.auto_created and field.name.endswith('_ptr'):
+                continue
+            if getattr(field, 'primary_key', False):
+                continue
+
+            internal_type = field.get_internal_type()
+            form_field_cls = BULK_EDIT_FIELD_TYPE_MAP.get(internal_type)
+            if form_field_cls is None:
+                continue
+
+            field_kwargs = {
+                'label': getattr(field, 'verbose_name', field.name).title(),
+                'required': False,
+            }
+
+            if isinstance(field, ForeignKey):
+                related_model = field.remote_field.model
+                if related_model:
+                    field_kwargs['choices'] = [('', '---------')] + [
+                        (obj.pk, str(obj))
+                        for obj in related_model.objects.all()[:200]
+                    ]
+
+            self.fields[field.name] = form_field_cls(**field_kwargs)
+
 class SlugModelForm(forms.ModelForm):
     class Media:
         js = (

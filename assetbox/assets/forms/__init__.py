@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError # Import ValidationError
 # Import models from this app
 from ..models import Asset, AssetRole, Manufacturer, AssetType, ComponentType, ComponentInstance, Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, KitItem, Supplier, Category, AssetRequest, AssetTagSequence
 # Import models from other apps
-from organization.models import Location, AssetHolder, Region, Site # Import Location, AssetHolder, Region, Site
+from organization.models import Location, AssetHolder, Region, Site, Tenant # Import Location, AssetHolder, Region, Site, Tenant
 from extras.models import Tag # Import Tag
 from django.contrib.auth import get_user_model
 from crispy_forms.helper import FormHelper
@@ -11,7 +11,7 @@ from crispy_forms.layout import Layout, Submit, HTML, Button, Div, Fieldset, Row
 from django.template.loader import render_to_string
 from django.urls import reverse
 # --- Import FilterForm and FilterSets --- 
-from core.forms import SlugModelForm, BootstrapMixin, FilterForm 
+from core.forms import SlugModelForm, BootstrapMixin, FilterForm, BulkEditForm 
 from ..filters import (
     AssetFilterSet, AssetRoleFilterSet, ManufacturerFilterSet, AssetTypeFilterSet,
     ComponentTypeFilterSet, ComponentInstanceFilterSet, AccessoryFilterSet,
@@ -386,9 +386,15 @@ class AssetRoleForm(forms.ModelForm):
 
 # --- StatusLabel Form ---
 class StatusLabelForm(forms.ModelForm):
+    tags = forms.ModelMultipleChoiceField(
+        queryset=Tag.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tomselect-tags': 'true'}),
+    )
+
     class Meta:
         model = StatusLabel
-        fields = ['name', 'slug', 'type', 'description', 'color']
+        fields = ['name', 'slug', 'type', 'description', 'color', 'tags']
         
     color = forms.CharField(
         max_length=7, 
@@ -418,6 +424,7 @@ class StatusLabelForm(forms.ModelForm):
                 'type',
                 'description',
                 'color',
+                'tags',
             ),
             Row(
                 Column(Submit('submit', 'Save', css_class='btn btn-primary'), css_class='col'),
@@ -452,9 +459,15 @@ class StatusLabelForm(forms.ModelForm):
 # --- Manufacturer Form ---
 # Use SlugModelForm for ManufacturerForm as well
 class ManufacturerForm(SlugModelForm):
+    tags = forms.ModelMultipleChoiceField(
+        queryset=Tag.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tomselect-tags': 'true'}),
+    )
+
     class Meta:
         model = Manufacturer
-        fields = ['name', 'slug', 'description']
+        fields = ['name', 'slug', 'description', 'tags']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'slug': forms.TextInput(attrs={'class': 'form-control', 'slugify': 'name'}), # Add slugify attribute
@@ -480,6 +493,7 @@ class ManufacturerForm(SlugModelForm):
             'name',
             'slug',
             'description',
+            'tags',
             HTML('<div class="mt-4">'),
             Submit('submit', button_text, css_class='btn btn-primary'),
             HTML('<a href="{0}" class="btn btn-outline-secondary ms-2">Cancel</a>'.format(reverse('assets:manufacturer_list'))),
@@ -506,6 +520,7 @@ class AssetTypeForm(SlugModelForm):
         fields = [
             'manufacturer', 'part_number', 'model', 'slug', 
             'cpu', 'ram_gb', 'storage_capacity_gb', 'storage_type', 'gpu', 'eol_months',
+            'category', 'custom_fieldset', 'depreciation', 'image',
             'description', 'comments', 'tags', 'requestable'
         ]
         widgets = {
@@ -519,6 +534,10 @@ class AssetTypeForm(SlugModelForm):
             'storage_type': forms.Select(attrs={'class': 'form-select'}),
             'gpu': forms.TextInput(attrs={'class': 'form-control'}),
             'eol_months': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+            'category': forms.Select(attrs={'class': 'form-select'}),
+            'custom_fieldset': forms.Select(attrs={'class': 'form-select'}),
+            'depreciation': forms.Select(attrs={'class': 'form-select'}),
+            'image': forms.FileInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'comments': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
         }
@@ -551,7 +570,18 @@ class AssetTypeForm(SlugModelForm):
                     Column('part_number', css_class='col-md-4'),
                     Column('eol_months', css_class='col-md-4')
                 ),
+                'image',
                 'description'
+            ),
+            Fieldset(
+                'Classification',
+                Row(
+                    Column('category', css_class='col-md-6'),
+                    Column('custom_fieldset', css_class='col-md-6')
+                ),
+                Row(
+                    Column('depreciation', css_class='col-md-12'),
+                ),
             ),
             Fieldset(
                 'Specifications (Optional)',
@@ -1193,9 +1223,15 @@ class DepreciationForm(forms.ModelForm):
 
 
 class KitForm(forms.ModelForm):
+    tags = forms.ModelMultipleChoiceField(
+        queryset=Tag.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tomselect-tags': 'true'}),
+    )
+
     class Meta:
         model = Kit
-        fields = ['name', 'description', 'tenant']
+        fields = ['name', 'description', 'tenant', 'tags']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
@@ -1214,6 +1250,7 @@ class KitForm(forms.ModelForm):
             'name',
             'description',
             'tenant',
+            'tags',
             HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
@@ -1332,9 +1369,10 @@ class KitFilterForm(FilterForm):
 class SupplierForm(SlugModelForm, BootstrapMixin):
     class Meta:
         model = Supplier
-        fields = ['name', 'website', 'contact_email', 'contact_phone', 'contact_name', 'address', 'notes', 'tags']
+        fields = ['name', 'slug', 'website', 'contact_email', 'contact_phone', 'contact_name', 'address', 'notes', 'tags']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'slug': forms.TextInput(attrs={'class': 'form-control', 'slugify': 'name'}),
             'website': forms.URLInput(attrs={'class': 'form-control'}),
             'contact_email': forms.EmailInput(attrs={'class': 'form-control'}),
             'contact_phone': forms.TextInput(attrs={'class': 'form-control'}),
@@ -1348,11 +1386,13 @@ class SupplierForm(SlugModelForm, BootstrapMixin):
 class CategoryForm(SlugModelForm, BootstrapMixin):
     class Meta:
         model = Category
-        fields = ['name', 'color', 'description', 'email_on_checkout', 'email_on_checkin', 'require_acceptance', 'email_eula', 'tags']
+        fields = ['name', 'slug', 'color', 'description', 'applies_to', 'email_on_checkout', 'email_on_checkin', 'require_acceptance', 'email_eula', 'tags']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'slug': forms.TextInput(attrs={'class': 'form-control', 'slugify': 'name'}),
             'color': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '00ff00'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'applies_to': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': '["asset", "accessory", "license"]'}),
             'tags': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
         }
 
@@ -1422,3 +1462,29 @@ class AssetTagSequenceForm(forms.ModelForm):
 
 class AssetTagSequenceFilterForm(FilterForm):
     filterset_class = AssetTagSequenceFilterSet
+
+
+class AssetBulkEditForm(BulkEditForm):
+    status = forms.ModelChoiceField(
+        queryset=StatusLabel.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''})
+    )
+    asset_role = forms.ModelChoiceField(
+        queryset=AssetRole.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''})
+    )
+    location = forms.ModelChoiceField(
+        queryset=Location.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''})
+    )
+    tenant = forms.ModelChoiceField(
+        queryset=Tenant.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''})
+    )
+
+    class Meta:
+        nullable_fields = ['asset_role', 'location', 'tenant']

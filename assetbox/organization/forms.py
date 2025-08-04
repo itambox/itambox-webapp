@@ -332,13 +332,17 @@ class AssetHolderForm(forms.ModelForm):
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'})
     )
-    # Add tags field later if using a specific widget like NetBox uses
+    tags = forms.ModelMultipleChoiceField(
+        queryset=Tag.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tomselect-tags': 'true'}),
+    )
 
     class Meta:
         model = AssetHolder
         fields = [
             'first_name', 'last_name', 'upn', 'email', 'tenant',
-            'description', 'comments', # 'tags' excluded for now
+            'description', 'comments', 'tags',
         ]
         widgets = {
             'first_name': forms.TextInput(attrs={'class': 'form-control'}),
@@ -372,7 +376,7 @@ class AssetHolderForm(forms.ModelForm):
             'tenant',
             'description',
             'comments',
-            # Add 'tags' here later if needed
+            'tags',
             HTML('<div class="mt-4"></div>'),
             Submit('submit', button_text, css_class='btn btn-primary'),
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
