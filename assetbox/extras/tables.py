@@ -3,7 +3,7 @@ import django_tables2 as tables
 from django_tables2.utils import A
 from django.utils.safestring import mark_safe
 from django.urls import reverse
-from django.utils.html import escape, format_html_join
+from django.utils.html import escape, format_html
 from .models import Tag
 from core.tables import ActionsColumn, BaseTable, ToggleColumn
 
@@ -24,14 +24,10 @@ A table column which renders linked tags for an object.
         super().__init__(*args, **kwargs)
 
     def render_tags(self, value):
-        if not value.exists():
-            return "—" # Render dash if no tags
-        tags = [(reverse(self.url_name or 'extras:tag_list') + f'?tag={escape(tag.slug)}', tag.name, tag.color)
-                for tag in value.all()]
-        # Uses format_html_join for safe HTML generation
-        return format_html_join(
-            '\n', '<a href="{}" class="badge bg-primary me-1" style="background-color: #{};">{}</a>',
-            tags
+        url = reverse(self.url_name or 'extras:tag_list') + '?tag=' + escape(value.slug)
+        return format_html(
+            '<a href="{}" class="badge bg-primary me-1" style="background-color: #{};">{}</a>',
+            url, value.color, value.name
         )
 
 # =============================================================================

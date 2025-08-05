@@ -28,7 +28,7 @@ class LicenseTable(BaseTable):
     class Meta(BaseTable.Meta):
         model = License
         fields = ('pk', 'name', 'software', 'tenant', 'license_type', 'seats', 'available_seats', 'purchase_date', 'expiration_date', 'tags', 'actions')
-        default_columns = ('pk', 'name', 'software', 'tenant', 'license_type', 'seats', 'available_seats', 'expiration_date', 'actions')
+        default_columns = ('pk', 'name', 'software', 'tenant', 'license_type', 'seats', 'available_seats', 'expiration_date', 'tags', 'actions')
 
 class LicenseSeatAssignmentTable(BaseTable):
     """Table for displaying individual License Seat Assignments."""

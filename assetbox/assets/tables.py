@@ -20,6 +20,7 @@ class AssetTable(BaseTable): # Inherit from BaseTable
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name='Tenant')
     location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], accessor='location.name', verbose_name='Location')
     supplier = tables.LinkColumn('assets:supplier_detail', args=[A('supplier.pk')], accessor='supplier.name', verbose_name='Supplier')
+    tags = TagColumn(url_name='assets:asset_list')
     requestable = tables.BooleanColumn(verbose_name='Requestable', yesno='Yes,No')
     actions = ActionsColumn()
 
@@ -27,11 +28,11 @@ class AssetTable(BaseTable): # Inherit from BaseTable
         model = Asset
         fields = (
             'pk', 'name', 'asset_tag', 'serial_number', 'asset_type', 'asset_role', 
-            'status', 'assignee', 'tenant', 'location', 'purchase_date', 'purchase_cost', 'salvage_value', 'order_number', 'supplier', 'requestable', 'actions',
+            'status', 'assignee', 'tenant', 'location', 'purchase_date', 'purchase_cost', 'salvage_value', 'order_number', 'supplier', 'tags', 'requestable', 'actions',
         )
         default_columns = (
-            'pk', 'name', 'asset_tag', 'asset_type', 'asset_role', 
-            'status', 'assignee', 'tenant', 'location', 'salvage_value', 'actions',
+            'pk', 'name', 'asset_tag', 'serial_number', 'asset_type', 'asset_role', 
+            'status', 'assignee', 'tenant', 'location', 'purchase_date', 'purchase_cost', 'supplier', 'requestable', 'tags', 'actions',
         )
         order_by = ('name',)
 
@@ -93,12 +94,13 @@ class AssetRoleTable(BaseTable):
     name = tables.LinkColumn('assets:assetrole_detail', args=[A('pk')], verbose_name='Name')
     color = tables.Column(verbose_name='Color', orderable=False)
     asset_count = tables.Column(verbose_name='Asset Count', orderable=False)
+    tags = TagColumn(url_name='assets:assetrole_list')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta): # Inherit Meta
         model = AssetRole
-        fields = ('pk', 'name', 'color', 'description', 'asset_count', 'actions')
-        default_columns = ('pk', 'name', 'color', 'asset_count', 'description', 'actions')
+        fields = ('pk', 'name', 'color', 'description', 'asset_count', 'tags', 'actions')
+        default_columns = ('pk', 'name', 'color', 'asset_count', 'description', 'tags', 'actions')
 
     def render_asset_count(self, value, record=None):
         return value or 0
@@ -138,7 +140,7 @@ class ManufacturerTable(BaseTable):
             'pk', 'name', 'asset_type_count', 'asset_count', 'description', 'tags', 'actions'
         )
         default_columns = (
-            'pk', 'name', 'asset_type_count', 'asset_count', 'description', 'actions'
+            'pk', 'name', 'asset_type_count', 'asset_count', 'description', 'tags', 'actions'
         )
 
 class AssetTypeTable(BaseTable):
@@ -148,15 +150,16 @@ class AssetTypeTable(BaseTable):
     eol_months = tables.Column(verbose_name='EOL (Months)')
     created_at = tables.DateTimeColumn(format="Y-m-d") # Explicitly add 'created'
     last_updated = tables.DateTimeColumn(format="Y-m-d H:i") # Explicitly add 'last_updated'
+    tags = TagColumn(url_name='assets:assettype_list')
     requestable = tables.BooleanColumn(verbose_name='Requestable', yesno='Yes,No')
     actions = ActionsColumn() # Add actions column
 
     class Meta(BaseTable.Meta):
         model = AssetType
         # Add 'created' and 'last_updated' to fields
-        fields = ('pk', 'manufacturer', 'model', 'part_number', 'eol_months', 'created', 'last_updated', 'requestable', 'actions') 
+        fields = ('pk', 'manufacturer', 'model', 'part_number', 'eol_months', 'created', 'last_updated', 'tags', 'requestable', 'actions') 
         # Keep default columns as before, or add created/last_updated if desired
-        default_columns = ('pk', 'manufacturer', 'model', 'part_number', 'eol_months', 'actions')
+        default_columns = ('pk', 'manufacturer', 'model', 'part_number', 'eol_months', 'created', 'last_updated', 'requestable', 'tags', 'actions')
         order_by = ('manufacturer', 'model')
 
     def render_eol_months(self, value):
@@ -172,12 +175,13 @@ class ComponentTypeTable(BaseTable):
     category = tables.Column(verbose_name='Category')
     part_number = tables.Column(verbose_name='Part Number')
     specs = tables.Column(verbose_name='Specifications')
+    tags = TagColumn(url_name='assets:componenttype_list')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = ComponentType
-        fields = ('pk', 'name', 'manufacturer', 'category', 'part_number', 'specs', 'actions')
-        default_columns = ('pk', 'name', 'manufacturer', 'category', 'part_number', 'specs', 'actions')
+        fields = ('pk', 'name', 'manufacturer', 'category', 'part_number', 'specs', 'tags', 'actions')
+        default_columns = ('pk', 'name', 'manufacturer', 'category', 'part_number', 'specs', 'tags', 'actions')
 
 
 class ComponentInstanceTable(BaseTable):
@@ -186,12 +190,13 @@ class ComponentInstanceTable(BaseTable):
     serial_number = tables.Column(verbose_name='Serial Number')
     parent_asset = tables.LinkColumn('assets:asset_detail', args=[A('parent_asset__pk')], verbose_name='Asset Installed In')
     status = tables.Column(verbose_name='Status')
+    tags = TagColumn(url_name='assets:componentinstance_list')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = ComponentInstance
-        fields = ('pk', 'component_type', 'serial_number', 'parent_asset', 'status', 'actions')
-        default_columns = ('pk', 'component_type', 'serial_number', 'parent_asset', 'status', 'actions')
+        fields = ('pk', 'component_type', 'serial_number', 'parent_asset', 'status', 'purchase_date', 'purchase_cost', 'notes', 'tags', 'actions')
+        default_columns = ('pk', 'component_type', 'serial_number', 'parent_asset', 'status', 'purchase_date', 'purchase_cost', 'notes', 'tags', 'actions')
 
 
 class AccessoryTable(BaseTable):
@@ -204,12 +209,13 @@ class AccessoryTable(BaseTable):
     checked_out_qty = tables.Column(accessor='checked_out_qty', verbose_name='Checked Out')
     remaining_qty = tables.Column(accessor='remaining_qty', verbose_name='Available')
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name='Tenant')
+    tags = TagColumn(url_name='assets:accessory_list')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = Accessory
-        fields = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'part_number', 'qty', 'checked_out_qty', 'remaining_qty', 'actions')
-        default_columns = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'qty', 'checked_out_qty', 'remaining_qty', 'actions')
+        fields = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'part_number', 'qty', 'checked_out_qty', 'remaining_qty', 'tags', 'actions')
+        default_columns = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'qty', 'checked_out_qty', 'remaining_qty', 'tags', 'actions')
 
     def render_remaining_qty(self, value, record):
         if value <= 0:
@@ -252,12 +258,13 @@ class ConsumableTable(BaseTable):
     consumed_qty = tables.Column(accessor='consumed_qty', verbose_name='Consumed')
     remaining_qty = tables.Column(accessor='remaining_qty', verbose_name='Available')
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name='Tenant')
+    tags = TagColumn(url_name='assets:consumable_list')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = Consumable
-        fields = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'part_number', 'qty', 'consumed_qty', 'remaining_qty', 'actions')
-        default_columns = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'qty', 'consumed_qty', 'remaining_qty', 'actions')
+        fields = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'part_number', 'qty', 'consumed_qty', 'remaining_qty', 'tags', 'actions')
+        default_columns = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'qty', 'consumed_qty', 'remaining_qty', 'tags', 'actions')
 
     def render_remaining_qty(self, value, record):
         if value <= 0:
@@ -383,23 +390,25 @@ class KitTable(BaseTable):
 class SupplierTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('assets:supplier_detail', args=[A('pk')], verbose_name='Name')
+    tags = TagColumn(url_name='assets:supplier_list')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = Supplier
-        fields = ('pk', 'name', 'website', 'contact_email', 'contact_phone', 'contact_name', 'actions')
-        default_columns = ('pk', 'name', 'contact_email', 'contact_phone', 'actions')
+        fields = ('pk', 'name', 'website', 'contact_email', 'contact_phone', 'contact_name', 'tags', 'actions')
+        default_columns = ('pk', 'name', 'website', 'contact_email', 'contact_phone', 'contact_name', 'tags', 'actions')
 
 
 class CategoryTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('assets:category_detail', args=[A('pk')], verbose_name='Name')
+    tags = TagColumn(url_name='assets:category_list')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = Category
-        fields = ('pk', 'name', 'color', 'email_on_checkout', 'email_on_checkin', 'require_acceptance', 'actions')
-        default_columns = ('pk', 'name', 'email_on_checkout', 'require_acceptance', 'actions')
+        fields = ('pk', 'name', 'color', 'email_on_checkout', 'email_on_checkin', 'require_acceptance', 'tags', 'actions')
+        default_columns = ('pk', 'name', 'email_on_checkout', 'require_acceptance', 'tags', 'actions')
 
 
 class AssetRequestTable(BaseTable):

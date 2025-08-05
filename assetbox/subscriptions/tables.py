@@ -2,6 +2,7 @@ import django_tables2 as tables
 from django.utils.html import format_html
 from django_tables2.utils import A
 from core.tables import ActionsColumn, BaseTable, ToggleColumn
+from extras.tables import TagColumn
 from .models import Provider, Subscription, SubscriptionAssignment, SubscriptionStatusChoices
 
 
@@ -10,12 +11,13 @@ class ProviderTable(BaseTable):
     name = tables.LinkColumn('subscriptions:provider_detail', args=[A('pk')], verbose_name='Name')
     is_active = tables.BooleanColumn(verbose_name='Active', yesno='✓,✗')
     subscription_count = tables.Column(accessor='subscription_count', verbose_name='Subscriptions', orderable=False)
+    tags = TagColumn(url_name='subscriptions:provider_list')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = Provider
-        fields = ('pk', 'name', 'is_active', 'account_id', 'contact_email', 'subscription_count', 'actions')
-        default_columns = ('pk', 'name', 'is_active', 'account_id', 'subscription_count', 'actions')
+        fields = ('pk', 'name', 'is_active', 'account_id', 'contact_email', 'subscription_count', 'tags', 'actions')
+        default_columns = ('pk', 'name', 'is_active', 'account_id', 'subscription_count', 'tags', 'actions')
 
 
 class SubscriptionTable(BaseTable):
@@ -30,6 +32,7 @@ class SubscriptionTable(BaseTable):
     renewal_cost = tables.Column(verbose_name='Renewal Cost')
     currency = tables.Column(verbose_name='Currency')
     auto_renewal = tables.BooleanColumn(verbose_name='Auto-Renew', yesno='✓,')
+    tags = TagColumn(url_name='subscriptions:subscription_list')
 
     days_until_renewal = tables.Column(accessor='days_until_renewal', verbose_name='Due In', orderable=False)
     actions = ActionsColumn()
@@ -39,11 +42,11 @@ class SubscriptionTable(BaseTable):
         fields = (
             'pk', 'name', 'provider', 'status', 'type', 'tenant',
             'start_date', 'renewal_date', 'renewal_cost', 'currency',
-            'auto_renewal', 'days_until_renewal', 'actions',
+            'auto_renewal', 'tags', 'days_until_renewal', 'actions',
         )
         default_columns = (
             'pk', 'name', 'provider', 'status', 'type',
-            'renewal_date', 'renewal_cost', 'days_until_renewal', 'actions',
+            'renewal_date', 'renewal_cost', 'tags', 'days_until_renewal', 'actions',
         )
 
     def render_status(self, value):
