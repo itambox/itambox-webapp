@@ -32,7 +32,6 @@ class SoftwareDetailView(ObjectDetailView):
     template_name = 'software/software_detail.html' # Use a specific template or generic one
 
     layout = (
-        ((Panel('metrics', 'Software Overview'),),),
         ((Panel('info', 'Software Details'),),),
     )
 

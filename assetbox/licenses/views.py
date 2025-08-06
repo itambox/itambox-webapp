@@ -8,6 +8,8 @@ from core.views import (
     ObjectEditView,
     ObjectDeleteView,
     ObjectImportView,
+    ObjectBulkEditView,
+    ObjectBulkDeleteView,
 )
 from core.utils import get_paginate_count
 from core.panels import Panel
@@ -34,7 +36,6 @@ class LicenseDetailView(ObjectDetailView):
     template_name = 'licenses/license_detail.html'
 
     layout = (
-        ((Panel('metrics', 'License Overview'),),),
         ((Panel('info', 'License Details'),),),
     )
 
@@ -79,3 +80,11 @@ class LicenseCloneView(ObjectEditView):
 
 class LicenseImportView(ObjectImportView):
     model_form = LicenseBulkImportForm
+
+
+class LicenseBulkEditView(ObjectBulkEditView):
+    queryset = License.objects.all()
+
+
+class LicenseBulkDeleteView(ObjectBulkDeleteView):
+    queryset = License.objects.all()

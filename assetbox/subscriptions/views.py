@@ -1,6 +1,6 @@
 from django.db.models import Count
 from django_tables2 import RequestConfig
-from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
+from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView
 from core.utils import get_paginate_count
 from core.panels import Panel
 from .models import Provider, Subscription
@@ -98,3 +98,19 @@ class SubscriptionEditView(ObjectEditView):
 class SubscriptionDeleteView(ObjectDeleteView):
     queryset = Subscription.objects.all()
     default_return_url = 'subscriptions:subscription_list'
+
+
+class SubscriptionBulkEditView(ObjectBulkEditView):
+    queryset = Subscription.objects.all()
+
+
+class SubscriptionBulkDeleteView(ObjectBulkDeleteView):
+    queryset = Subscription.objects.all()
+
+
+class ProviderBulkEditView(ObjectBulkEditView):
+    queryset = Provider.objects.all()
+
+
+class ProviderBulkDeleteView(ObjectBulkDeleteView):
+    queryset = Provider.objects.all()

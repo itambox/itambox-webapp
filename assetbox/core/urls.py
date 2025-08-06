@@ -52,7 +52,8 @@ urlpatterns = [
     path('changelog/<int:pk>/', core_views.ObjectChangeView.as_view(), name='objectchange'),
 
     # Bulk Actions
-    path('bulk-delete/', core_views.bulk_delete, name='bulk_delete'),
+    path('bulk-delete/', core_views.ObjectBulkDeleteView.as_view(), name='bulk_delete'),
+    path('bulk-edit/', core_views.ObjectBulkEditView.as_view(), name='bulk_edit'),
 
     # Export Templates
     path('export-templates/', core_views.ExportTemplateListView.as_view(), name='export_template_list'),

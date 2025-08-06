@@ -387,6 +387,51 @@ class ObjectDetailView(LoginRequiredMixin, BaseHTMXView, DetailView):
             ).order_by('-created')[:20]
             context['has_file_attachments'] = True
 
+        # Automatically discover and resolve all related inventory counts (reverse relations)
+        # to populate `related_objects_list` dynamically if it wasn't already set.
+        if 'related_objects_list' not in context:
+            related_objects_list = []
+            for relation in obj._meta.get_fields(include_parents=True):
+                if not relation.is_relation or relation.concrete:
+                    continue
+                if relation.auto_created and not relation.concrete:
+                    related_model = relation.related_model
+                    if not related_model:
+                        continue
+                    
+                    accessor_name = relation.get_accessor_name()
+                    if not accessor_name or not hasattr(obj, accessor_name):
+                        continue
+                    
+                    try:
+                        manager = getattr(obj, accessor_name)
+                        count = manager.count()
+                    except Exception:
+                        continue
+                        
+                    if count > 0:
+                        related_app = related_model._meta.app_label
+                        related_model_name = related_model._meta.model_name
+                        view_name = f"{related_app}:{related_model_name}_list"
+                        
+                        try:
+                            base_url = reverse(view_name)
+                            filter_field_name = relation.remote_field.name if relation.remote_field else obj._meta.model_name
+                            filter_val = getattr(obj, 'slug', obj.pk)
+                            url = f"{base_url}?{filter_field_name}={filter_val}"
+                            label = related_model._meta.verbose_name_plural.title()
+                            
+                            related_objects_list.append({
+                                'label': label,
+                                'count': count,
+                                'url': url
+                            })
+                        except NoReverseMatch:
+                            continue
+            
+            related_objects_list.sort(key=lambda x: x['label'])
+            context['related_objects_list'] = related_objects_list
+
         return context
 
 class ObjectEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, UpdateView):
@@ -431,7 +476,47 @@ class ObjectEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, 
         kwargs['instance'] = self.object
         if form_class is None:
             form_class = self.get_form_class()
-        return form_class(**kwargs)
+        form = form_class(**kwargs)
+        
+        # Ensure a FormHelper with Create/Update and Cancel buttons is present on the form.
+        # This resolves the issue where edit forms render without submit/cancel buttons,
+        # ensuring a robust, unified CBV DRY pattern across all models in AssetBox!
+        if not hasattr(form, 'helper') or form.helper is None:
+            from crispy_forms.helper import FormHelper
+            from crispy_forms.layout import Layout, Submit, HTML
+            
+            helper = FormHelper(form)
+            helper.form_method = 'post'
+            helper.form_tag = True
+            
+            is_editing = self.object is not None and self.object.pk is not None
+            button_text = 'Update' if is_editing else 'Create'
+            
+            cancel_url = '#'
+            if self.object and hasattr(self.object, 'get_absolute_url'):
+                try:
+                    cancel_url = self.object.get_absolute_url()
+                except Exception:
+                    pass
+            if cancel_url == '#':
+                _model = self._get_model()
+                if _model:
+                    try:
+                        list_view_name = get_model_viewname(_model, 'list')
+                        cancel_url = reverse(list_view_name)
+                    except Exception:
+                        cancel_url = reverse('dashboard')
+            
+            layout_elements = list(form.fields.keys())
+            layout_elements.extend([
+                HTML('<div class="mt-4"></div>'),
+                Submit('submit', button_text, css_class='btn btn-primary'),
+                HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>')
+            ])
+            helper.layout = Layout(*layout_elements)
+            form.helper = helper
+            
+        return form
 
     def get_success_url(self):
         if self.request.POST.get('return_url'):
@@ -735,6 +820,14 @@ class ObjectBulkEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXVi
         qs = self.queryset if self.queryset is not None else self._get_model().objects.all()
         return qs.filter(pk__in=pks)
 
+    def _get_bulk_edit_form(self, data=None, model=None):
+        form_class = getattr(self, 'form_class', None) or BulkEditForm
+        import inspect
+        sig = inspect.signature(form_class.__init__)
+        if 'model' in sig.parameters:
+            return form_class(data, model=model)
+        return form_class(data)
+
     def post(self, request, *args, **kwargs):
         from django.db import transaction
 
@@ -749,10 +842,10 @@ class ObjectBulkEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXVi
         queryset = self._get_queryset(pks)
 
         if '_apply' in request.POST:
-            form = self.form_class(request.POST)
+            form = self._get_bulk_edit_form(request.POST, model)
             selected_fields = request.POST.getlist('_selected_fields')
 
-            if form.is_valid() and selected_fields:
+            if form.is_valid() and (selected_fields or form.cleaned_data.get('add_tags') or form.cleaned_data.get('remove_tags')):
                 updated_count = 0
 
                 with transaction.atomic():
@@ -768,6 +861,14 @@ class ObjectBulkEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXVi
 
                         obj.full_clean()
                         obj.save()
+
+                        # Mutate ManyToMany tags inside the atomic transaction
+                        if hasattr(obj, 'tags'):
+                            if form.cleaned_data.get('add_tags'):
+                                obj.tags.add(*form.cleaned_data['add_tags'])
+                            if form.cleaned_data.get('remove_tags'):
+                                obj.tags.remove(*form.cleaned_data['remove_tags'])
+
                         updated_count += 1
 
                 messages.success(
@@ -776,11 +877,12 @@ class ObjectBulkEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXVi
                 )
                 return HttpResponseRedirect(return_url)
             else:
-                if not selected_fields:
-                    messages.warning(request, "No fields were selected for editing.")
+                if not (selected_fields or form.cleaned_data.get('add_tags') or form.cleaned_data.get('remove_tags')):
+                    messages.warning(request, "No fields or tags were selected for editing.")
+                form = self._get_bulk_edit_form(request.POST if '_apply' in request.POST else None, model)
         else:
             # Initial POST from list view — render the bulk edit form
-            form = self.form_class()
+            form = self._get_bulk_edit_form(model=model)
 
         context = {
             'form': form,

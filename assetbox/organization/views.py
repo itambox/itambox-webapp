@@ -10,11 +10,13 @@ from django.contrib.auth import get_user_model
 from django.contrib import messages
 
 
-from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectImportView # Import base CBVs
+from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectImportView, ObjectBulkEditView, ObjectBulkDeleteView # Import base CBVs
 from core.quick_add import QuickAddMixin
 from core.utils import get_paginate_count, get_model_viewname # Import the utility function and get_model_viewname
 from core.panels import Panel
-from assets.tables import AssetTable # Import AssetTable
+from assets.tables import AssetTable, AccessoryTable, ConsumableTable, KitTable # Import AssetTable and other asset-related tables
+from licenses.tables import LicenseTable # Import LicenseTable
+from subscriptions.tables import SubscriptionTable # Import SubscriptionTable
 from assets.models import Asset # Import Asset model
 
 
@@ -72,7 +74,6 @@ class SiteDetailView(ObjectDetailView):
     # template_name = 'organization/sites/site_detail.html' # Can be inferred
 
     layout = (
-        ((Panel('metrics', 'Site Overview'),),),
         ((Panel('info', 'Site Details'),),),
     )
 
@@ -332,7 +333,6 @@ class LocationDetailView(ObjectDetailView):
     # template_name = 'organization/locations/location_detail.html' # Can be inferred
 
     layout = (
-        ((Panel('metrics', 'Location Overview'),),),
         ((Panel('info', 'Location Details'),),),
     )
 
@@ -492,7 +492,6 @@ class TenantDetailView(ObjectDetailView):
     # template_name = 'organization/tenants/tenant_detail.html' # Can be inferred
 
     layout = (
-        ((Panel('metrics', 'Tenant Overview'),),),
         ((Panel('info', 'Tenant Details'),),),
     )
 
@@ -503,43 +502,47 @@ class TenantDetailView(ObjectDetailView):
         # Prepare Sites table
         sites_table = SiteTable(tenant.sites.all(), request=self.request)
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(sites_table)
+        context['sites_table'] = sites_table
 
         # Prepare Locations table
         locations_table = LocationTable(tenant.locations.all(), request=self.request)
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(locations_table)
+        context['locations_table'] = locations_table
 
         # Prepare AssetHolders table
         assetholders_table = AssetHolderTable(tenant.asset_holders.all(), request=self.request) # Use related_name
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assetholders_table)
-
-        # Prepare Related Objects List
-        related_objects_list = []
-        site_count = tenant.sites.count()
-        if site_count:
-            related_objects_list.append({
-                'label': 'Sites',
-                'count': site_count,
-                'url': f"{reverse('organization:site_list')}?tenant={tenant.slug}" # Filter link
-            })
-        location_count = tenant.locations.count()
-        if location_count:
-            related_objects_list.append({
-                'label': 'Locations',
-                'count': location_count,
-                'url': f"{reverse('organization:location_list')}?tenant={tenant.slug}" # Filter link
-            })
-        assetholder_count = tenant.asset_holders.count()
-        if assetholder_count:
-            related_objects_list.append({
-                'label': 'Asset Holders',
-                'count': assetholder_count,
-                'url': f"{reverse('organization:assetholder_list')}?tenant={tenant.slug}" # Filter link
-            })
-
-        context['sites_table'] = sites_table
-        context['locations_table'] = locations_table
         context['assetholders_table'] = assetholders_table
-        context['related_objects_list'] = related_objects_list
+
+        # Prepare Assets table
+        assets_table = AssetTable(tenant.assets.all(), request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assets_table)
+        context['assets_table'] = assets_table
+
+        # Prepare Accessories table
+        accessories_table = AccessoryTable(tenant.accessories.all(), request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(accessories_table)
+        context['accessories_table'] = accessories_table
+
+        # Prepare Consumables table
+        consumables_table = ConsumableTable(tenant.consumables.all(), request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(consumables_table)
+        context['consumables_table'] = consumables_table
+
+        # Prepare Licenses table
+        licenses_table = LicenseTable(tenant.licenses.all(), request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(licenses_table)
+        context['licenses_table'] = licenses_table
+
+        # Prepare Kits table
+        kits_table = KitTable(tenant.kits.all(), request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(kits_table)
+        context['kits_table'] = kits_table
+
+        # Prepare Subscriptions table
+        subscriptions_table = SubscriptionTable(tenant.subscriptions_org.all(), request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(subscriptions_table)
+        context['subscriptions_table'] = subscriptions_table
 
         # Aggregate counts for all reverse relationships
         context['tenant_asset_count'] = tenant.assets.count()
@@ -598,7 +601,6 @@ class AssetHolderDetailView(ObjectDetailView):
     # template_name = 'organization/assetholders/assetholder_detail.html' # Can be inferred
 
     layout = (
-        ((Panel('metrics', 'Asset Holder Overview'),),),
         ((Panel('info', 'Asset Holder Details'),),),
     )
 
@@ -690,7 +692,6 @@ class ContactDetailView(ObjectDetailView):
     queryset = Contact.objects.prefetch_related('tags', 'assignments')
 
     layout = (
-        ((Panel('metrics', 'Contact Overview'),),),
         ((Panel('info', 'Contact Details'),),),
     )
 
@@ -864,3 +865,59 @@ class LocationImportView(ObjectImportView):
 
 class AssetHolderImportView(ObjectImportView):
     model_form = AssetHolderBulkImportForm
+
+
+class AssetHolderBulkEditView(ObjectBulkEditView):
+    queryset = AssetHolder.objects.all()
+
+
+class AssetHolderBulkDeleteView(ObjectBulkDeleteView):
+    queryset = AssetHolder.objects.all()
+
+
+class SiteBulkEditView(ObjectBulkEditView):
+    queryset = Site.objects.all()
+
+
+class SiteBulkDeleteView(ObjectBulkDeleteView):
+    queryset = Site.objects.all()
+
+
+class RegionBulkEditView(ObjectBulkEditView):
+    queryset = Region.objects.all()
+
+
+class RegionBulkDeleteView(ObjectBulkDeleteView):
+    queryset = Region.objects.all()
+
+
+class LocationBulkEditView(ObjectBulkEditView):
+    queryset = Location.objects.all()
+
+
+class LocationBulkDeleteView(ObjectBulkDeleteView):
+    queryset = Location.objects.all()
+
+
+class TenantBulkEditView(ObjectBulkEditView):
+    queryset = Tenant.objects.all()
+
+
+class TenantBulkDeleteView(ObjectBulkDeleteView):
+    queryset = Tenant.objects.all()
+
+
+class ContactBulkEditView(ObjectBulkEditView):
+    queryset = Contact.objects.all()
+
+
+class ContactBulkDeleteView(ObjectBulkDeleteView):
+    queryset = Contact.objects.all()
+
+
+class ContactRoleBulkEditView(ObjectBulkEditView):
+    queryset = ContactRole.objects.all()
+
+
+class ContactRoleBulkDeleteView(ObjectBulkDeleteView):
+    queryset = ContactRole.objects.all()

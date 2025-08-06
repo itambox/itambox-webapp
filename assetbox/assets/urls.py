@@ -7,6 +7,10 @@ urlpatterns = [
     # Dashboard path removed, handled in core.urls
     path('assets/bulk-assign/', views.bulk_assign_assets, name='asset_bulk_assign'),
 
+    # Asset bulk operations
+    path('assets/edit/', views.AssetBulkEditView.as_view(), name='asset_bulk_edit'),
+    path('assets/delete/', views.AssetBulkDeleteView.as_view(), name='asset_bulk_delete'),
+
     # Asset specific URLs (no 'assets/' prefix needed here anymore)
     path('assets/', views.AssetListView.as_view(), name='asset_list'),
     path('assets/add/', views.AssetEditView.as_view(), name='asset_create'),
@@ -43,6 +47,7 @@ urlpatterns = [
     # Asset Types
     path('types/', views.AssetTypeListView.as_view(), name='assettype_list'),
     path('types/add/', views.AssetTypeEditView.as_view(), name='assettype_create'),
+    path('types/<int:pk>/clone/', views.AssetTypeCloneView.as_view(), name='assettype_clone'),
     path('types/import/', views.AssetTypeImportView.as_view(), name='assettype_import'),
     path('types/<slug:slug>/', views.AssetTypeDetailView.as_view(), name='assettype_detail'),
     path('types/<slug:slug>/edit/', views.AssetTypeEditView.as_view(), name='assettype_update'),
@@ -51,6 +56,7 @@ urlpatterns = [
     # Component Types
     path('component-types/', views.ComponentTypeListView.as_view(), name='componenttype_list'),
     path('component-types/add/', views.ComponentTypeEditView.as_view(), name='componenttype_create'),
+    path('component-types/<int:pk>/clone/', views.ComponentTypeCloneView.as_view(), name='componenttype_clone'),
     path('component-types/<int:pk>/', views.ComponentTypeDetailView.as_view(), name='componenttype_detail'),
     path('component-types/<int:pk>/edit/', views.ComponentTypeEditView.as_view(), name='componenttype_update'),
     path('component-types/<int:pk>/delete/', views.ComponentTypeDeleteView.as_view(), name='componenttype_delete'),
@@ -58,6 +64,8 @@ urlpatterns = [
     # Component Instances
     path('components/', views.ComponentInstanceListView.as_view(), name='componentinstance_list'),
     path('components/add/', views.ComponentInstanceEditView.as_view(), name='componentinstance_create'),
+    path('components/edit/', views.ComponentInstanceBulkEditView.as_view(), name='componentinstance_bulk_edit'),
+    path('components/delete/', views.ComponentInstanceBulkDeleteView.as_view(), name='componentinstance_bulk_delete'),
     path('components/<int:pk>/', views.ComponentInstanceDetailView.as_view(), name='componentinstance_detail'),
     path('components/<int:pk>/edit/', views.ComponentInstanceEditView.as_view(), name='componentinstance_update'),
     path('components/<int:pk>/delete/', views.ComponentInstanceDeleteView.as_view(), name='componentinstance_delete'),
@@ -65,6 +73,8 @@ urlpatterns = [
     # Accessories
     path('accessories/', views.AccessoryListView.as_view(), name='accessory_list'),
     path('accessories/add/', views.AccessoryEditView.as_view(), name='accessory_create'),
+    path('accessories/edit/', views.AccessoryBulkEditView.as_view(), name='accessory_bulk_edit'),
+    path('accessories/delete/', views.AccessoryBulkDeleteView.as_view(), name='accessory_bulk_delete'),
     path('accessories/<int:pk>/', views.AccessoryDetailView.as_view(), name='accessory_detail'),
     path('accessories/<int:pk>/edit/', views.AccessoryEditView.as_view(), name='accessory_update'),
     path('accessories/<int:pk>/delete/', views.AccessoryDeleteView.as_view(), name='accessory_delete'),
@@ -75,6 +85,8 @@ urlpatterns = [
     # Consumables
     path('consumables/', views.ConsumableListView.as_view(), name='consumable_list'),
     path('consumables/add/', views.ConsumableEditView.as_view(), name='consumable_create'),
+    path('consumables/edit/', views.ConsumableBulkEditView.as_view(), name='consumable_bulk_edit'),
+    path('consumables/delete/', views.ConsumableBulkDeleteView.as_view(), name='consumable_bulk_delete'),
     path('consumables/<int:pk>/', views.ConsumableDetailView.as_view(), name='consumable_detail'),
     path('consumables/<int:pk>/edit/', views.ConsumableEditView.as_view(), name='consumable_update'),
     path('consumables/<int:pk>/delete/', views.ConsumableDeleteView.as_view(), name='consumable_delete'),
@@ -131,6 +143,7 @@ urlpatterns = [
     # Suppliers
     path('suppliers/', views.SupplierListView.as_view(), name='supplier_list'),
     path('suppliers/add/', views.SupplierEditView.as_view(), name='supplier_create'),
+    path('suppliers/<int:pk>/clone/', views.SupplierCloneView.as_view(), name='supplier_clone'),
     path('suppliers/<int:pk>/', views.SupplierDetailView.as_view(), name='supplier_detail'),
     path('suppliers/<int:pk>/edit/', views.SupplierEditView.as_view(), name='supplier_update'),
     path('suppliers/<int:pk>/delete/', views.SupplierDeleteView.as_view(), name='supplier_delete'),
@@ -138,6 +151,7 @@ urlpatterns = [
     # Categories
     path('categories/', views.CategoryListView.as_view(), name='category_list'),
     path('categories/add/', views.CategoryEditView.as_view(), name='category_create'),
+    path('categories/<int:pk>/clone/', views.CategoryCloneView.as_view(), name='category_clone'),
     path('categories/<int:pk>/', views.CategoryDetailView.as_view(), name='category_detail'),
     path('categories/<int:pk>/edit/', views.CategoryEditView.as_view(), name='category_update'),
     path('categories/<int:pk>/delete/', views.CategoryDeleteView.as_view(), name='category_delete'),

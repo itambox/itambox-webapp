@@ -26,7 +26,7 @@ from django.contrib import messages # <--- Add this import
 from users.models import UserPreference # Import UserPreference
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
-from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectImportView, BaseHTMXView
+from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectImportView, BaseHTMXView, ObjectBulkEditView, ObjectBulkDeleteView
 from core.quick_add import QuickAddMixin
 from django.db.models import Count
 import json
@@ -219,6 +219,71 @@ class AssetCloneView(ObjectEditView):
         cloned.save()
         cloned.tags.set(original.tags.all())
         return cloned
+
+
+class AssetTypeCloneView(ObjectEditView):
+    model = AssetType
+    model_form = forms.AssetTypeForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'assets:assettype_list'
+
+    def get_object(self, queryset=None):
+        original = get_object_or_404(AssetType, pk=self.kwargs['pk'])
+        cloned = original.clone()
+        cloned.model = f'{original.model} (Copy)'
+        cloned.slug = ''
+        cloned.save()
+        cloned.tags.set(original.tags.all())
+        return cloned
+
+
+class ComponentTypeCloneView(ObjectEditView):
+    model = ComponentType
+    model_form = forms.ComponentTypeForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'assets:componenttype_list'
+
+    def get_object(self, queryset=None):
+        original = get_object_or_404(ComponentType, pk=self.kwargs['pk'])
+        cloned = original.clone()
+        cloned.name = f'{original.name} (Copy)'
+        cloned.slug = ''
+        cloned.save()
+        cloned.tags.set(original.tags.all())
+        return cloned
+
+
+class SupplierCloneView(ObjectEditView):
+    model = Supplier
+    model_form = forms.SupplierForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'assets:supplier_list'
+
+    def get_object(self, queryset=None):
+        original = get_object_or_404(Supplier, pk=self.kwargs['pk'])
+        cloned = original.clone()
+        cloned.name = f'{original.name} (Copy)'
+        cloned.slug = ''
+        cloned.save()
+        cloned.tags.set(original.tags.all())
+        return cloned
+
+
+class CategoryCloneView(ObjectEditView):
+    model = Category
+    model_form = forms.CategoryForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'assets:category_list'
+
+    def get_object(self, queryset=None):
+        original = get_object_or_404(Category, pk=self.kwargs['pk'])
+        cloned = original.clone()
+        cloned.name = f'{original.name} (Copy)'
+        cloned.slug = ''
+        cloned.save()
+        cloned.tags.set(original.tags.all())
+        return cloned
+
 
 @login_required
 def asset_checkout_modal(request, pk):
@@ -465,7 +530,6 @@ class StatusLabelDetailView(ObjectDetailView):
     queryset = StatusLabel.objects.prefetch_related('assets')
 
     layout = (
-        ((Panel('metrics', 'Status Label Overview'),),),
         ((Panel('info', 'Status Label Details'),),),
     )
 
@@ -536,7 +600,6 @@ class ManufacturerDetailView(ObjectDetailView):
     # template_name = 'assets/manufacturers/manufacturer_detail.html' # Can be inferred
 
     layout = (
-        ((Panel('metrics', 'Manufacturer Overview'),),),
         ((Panel('info', 'Manufacturer Details'),),),
     )
 
@@ -619,7 +682,6 @@ class AssetTypeDetailView(ObjectDetailView): # Inherit from ObjectDetailView
     slug_url_kwarg = 'slug' # Still need this if lookup is by slug
 
     layout = (
-        ((Panel('metrics', 'Asset Type Overview'),),),
         ((Panel('info', 'Asset Type Details'), Panel('specs', 'Hardware Specifications')),),
     )
 
@@ -691,7 +753,6 @@ class ComponentTypeDetailView(ObjectDetailView):
     template_name = 'assets/componenttypes/componenttype_detail.html'
 
     layout = (
-        ((Panel('metrics', 'Component Type Overview'),),),
         ((Panel('info', 'Component Type Details'),),),
     )
 
@@ -744,7 +805,6 @@ class ComponentInstanceDetailView(ObjectDetailView):
     template_name = 'assets/componentinstances/componentinstance_detail.html'
 
     layout = (
-        ((Panel('metrics', 'Component Status'),),),
         ((Panel('info', 'Component Details'),),),
     )
 
@@ -776,7 +836,6 @@ class AccessoryDetailView(ObjectDetailView):
     template_name = 'assets/accessories/accessory_detail.html'
 
     layout = (
-        ((Panel('metrics', 'Inventory Overview'),),),
         ((Panel('info', 'Accessory Details'),),),
     )
 
@@ -903,7 +962,6 @@ class ConsumableDetailView(ObjectDetailView):
     template_name = 'assets/consumables/consumable_detail.html'
 
     layout = (
-        ((Panel('metrics', 'Inventory Overview'),),),
         ((Panel('info', 'Consumable Details'),),),
     )
 
@@ -1017,7 +1075,6 @@ class AssetMaintenanceDetailView(ObjectDetailView):
     template_name = 'assets/assetmaintenances/assetmaintenance_detail.html'
 
     layout = (
-        ((Panel('metrics', 'Maintenance Overview'),),),
         ((Panel('info', 'Maintenance Details'),),),
     )
 
@@ -1589,7 +1646,6 @@ class SupplierDetailView(ObjectDetailView):
     queryset = Supplier.objects.all()
 
     layout = (
-        ((Panel('metrics', 'Supplier Overview'),),),
         ((Panel('info', 'Supplier Details'),),),
     )
 
@@ -1641,7 +1697,6 @@ class CategoryDetailView(ObjectDetailView):
     queryset = Category.objects.all()
 
     layout = (
-        ((Panel('metrics', 'Category Overview'),),),
         ((Panel('info', 'Category Details'),),),
     )
 
@@ -1821,3 +1876,36 @@ class AssetTagSequenceDeleteView(ObjectDeleteView):
     model = AssetTagSequence
     template_name = 'generic/object_confirm_delete.html'
     success_url = reverse_lazy('assets:assettagsequence_list')
+
+
+class AssetBulkEditView(ObjectBulkEditView):
+    queryset = Asset.objects.all()
+    form_class = forms.AssetBulkEditForm
+
+
+class AssetBulkDeleteView(ObjectBulkDeleteView):
+    queryset = Asset.objects.all()
+
+
+class AccessoryBulkEditView(ObjectBulkEditView):
+    queryset = Accessory.objects.all()
+
+
+class AccessoryBulkDeleteView(ObjectBulkDeleteView):
+    queryset = Accessory.objects.all()
+
+
+class ConsumableBulkEditView(ObjectBulkEditView):
+    queryset = Consumable.objects.all()
+
+
+class ConsumableBulkDeleteView(ObjectBulkDeleteView):
+    queryset = Consumable.objects.all()
+
+
+class ComponentInstanceBulkEditView(ObjectBulkEditView):
+    queryset = ComponentInstance.objects.all()
+
+
+class ComponentInstanceBulkDeleteView(ObjectBulkDeleteView):
+    queryset = ComponentInstance.objects.all()
