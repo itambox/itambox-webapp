@@ -1,7 +1,7 @@
-<div class="card mb-4">
+<div class="card mb-3 shadow-sm">
     {% if panel.display_label %}
-    <div class="card-header">
-        <h3 class="card-title">{{ panel.display_label }}</h3>
+    <div class="card-header border-0 bg-transparent pb-0">
+        <h3 class="card-title text-secondary">{{ panel.display_label }}</h3>
         {% if panel.description %}
         <div class="text-muted small">{{ panel.description }}</div>
         {% endif %}

@@ -60,7 +60,155 @@
     </li>
 {% endblock extra_tabs %}
 
-{# --- Content panels are rendered via the declarative layout on the view class --- #}
+{% block details_tab %}
+    {# --- Full-Width Top Block: Asset Overview --- #}
+    {% include 'assets/includes/detail/asset_metrics.html' %}
+
+    <div class="row g-3">
+        {# --- Left Column: Main area (col-lg-8) --- #}
+        <div class="col-12 col-lg-8">
+            {# 1. Asset Details Card #}
+            <div class="card mb-3 shadow-sm">
+                <div class="card-header border-0 bg-transparent pb-0">
+                    <h3 class="card-title text-secondary">Asset Details</h3>
+                </div>
+                <div class="card-body">
+                    {% include 'assets/includes/detail/asset_asset_info.html' %}
+                </div>
+            </div>
+
+            {# 2. Deployment & Custody Card #}
+            <div class="card mb-3 shadow-sm">
+                <div class="card-header border-0 bg-transparent pb-0">
+                    <h3 class="card-title text-secondary">Deployment & Custody</h3>
+                </div>
+                <div class="card-body">
+                    {% include 'assets/includes/detail/asset_assignment.html' %}
+                </div>
+            </div>
+
+            {# 3. Hardware Specifications Card (Conditional Check) #}
+            {% if object.asset_type and object.asset_type.cpu or object.asset_type.ram_gb or object.asset_type.storage_capacity_gb or object.asset_type.gpu %}
+            <div class="card mb-3 shadow-sm">
+                <div class="card-body">
+                    {% include 'assets/includes/detail/asset_specs.html' %}
+                </div>
+            </div>
+            {% endif %}
+
+            {# 4. Custom Specifications Card (Conditional Check) #}
+            {% if object.custom_values %}
+            <div class="card mb-3 shadow-sm">
+                <div class="card-body">
+                    {% include 'assets/includes/detail/asset_custom_fields.html' %}
+                </div>
+            </div>
+            {% endif %}
+
+            {# 5. Support & Warranty Details Card #}
+            <div class="card mb-3 shadow-sm">
+                <div class="card-header border-0 bg-transparent pb-0">
+                    <h3 class="card-title text-secondary">Support &amp; Warranty Details</h3>
+                </div>
+                <div class="card-body">
+                    {% include 'assets/includes/detail/asset_support.html' %}
+                </div>
+            </div>
+
+            {# 6. Comments, Notes, & Description Card (Stacked at bottom) --- #}
+            {% if object.notes %}
+            <div class="card mb-3 shadow-sm">
+                <div class="card-header border-0 bg-transparent">
+                    <h3 class="card-title text-secondary">Notes</h3>
+                </div>
+                <div class="card-body pt-0">{{ object.notes|linebreaksbr|safe }}</div>
+            </div>
+            {% endif %}
+            
+            {% if object.comments %}
+            <div class="card mb-3 shadow-sm">
+                <div class="card-header border-0 bg-transparent">
+                    <h3 class="card-title text-secondary">Comments</h3>
+                </div>
+                <div class="card-body pt-0">{{ object.comments|linebreaksbr|safe }}</div>
+            </div>
+            {% endif %}
+
+            {% if object.description %}
+            <div class="card mb-3 shadow-sm">
+                <div class="card-header border-0 bg-transparent">
+                    <h3 class="card-title text-secondary">Description</h3>
+                </div>
+                <div class="card-body pt-0">{{ object.description|linebreaksbr|safe }}</div>
+            </div>
+            {% endif %}
+        </div>
+
+        {# --- Right Column: Sidebar (col-lg-4) --- #}
+        <div class="col-12 col-lg-4">
+            {# 1. Metadata Details Card #}
+            {% if object.created_at or object.updated_at %}
+            <div class="card mb-3 shadow-sm">
+                <div class="card-body">
+                    <h3 class="card-title text-muted mb-2">Metadata</h3>
+                    <p class="text-secondary small mb-0">
+                        {% if object.created_at %}<strong>Created:</strong> {{ object.created_at|date:"Y-m-d H:i" }}<br>{% endif %}
+                        {% if object.updated_at %}<strong>Updated:</strong> {{ object.updated_at|date:"Y-m-d H:i" }}{% endif %}
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+
+            {# 2. Assigned Tags Card #}
+            {% if object.tags.all %}
+            <div class="card mb-3 shadow-sm">
+                <div class="card-header border-0 bg-transparent">
+                    <h3 class="card-title text-secondary">Assigned Tags</h3>
+                </div>
+                <div class="card-body pt-0">
+                    {% for tag in object.tags.all %}
+                        {% include 'inc/tags.html' with tag=tag %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {# 3. Financial & Lifecycle Card #}
+            <div class="card mb-3 shadow-sm">
+                <div class="card-header border-0 bg-transparent pb-0">
+                    <h3 class="card-title text-secondary">Financial & Lifecycle</h3>
+                </div>
+                <div class="card-body">
+                    {% include 'assets/includes/detail/asset_financial.html' %}
+                </div>
+            </div>
+
+            {# 4. Audit & Compliance Card #}
+            <div class="card mb-3 shadow-sm">
+                <div class="card-body">
+                    {% include 'assets/includes/detail/asset_audit.html' %}
+                </div>
+            </div>
+
+            {# 5. Related Inventory Card #}
+            {% if related_objects_list %}
+            <div class="card mb-3 shadow-sm">
+                <div class="card-header border-0 bg-transparent">
+                    <h3 class="card-title text-secondary">Related Inventory</h3>
+                </div>
+                <div class="list-group list-group-flush">
+                    {% for item in related_objects_list %}
+                        <a href="{{ item.url }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            {{ item.label }}
+                            <span class="badge bg-primary-lt text-primary rounded-pill">{{ item.count }}</span>
+                        </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock details_tab %}
 
 {# Extra tab panes: Components, Maintenances, Software #}
 {% block extra_tab_panes %}

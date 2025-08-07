@@ -45,13 +45,35 @@
                 Assign Selected
             </button>
             {% endif %}
-            <form id="bulk-delete-form" method="post" action="{% url 'bulk_delete' %}" class="d-inline">
+            <form id="bulk-delete-form" method="post" action="{{ bulk_delete_url }}" class="d-inline">
                 {% csrf_token %}
                 <input type="hidden" name="model_name" value="{{ model_name_str }}">
+                <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
                 <input type="hidden" name="pk" value="" id="bulk-delete-pks">
-                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete selected items? This cannot be undone.')">
+                <button type="button" class="btn btn-sm btn-outline-danger"
+                        onclick="if(!confirm('Delete selected items? This cannot be undone.'))return false;var form=document.getElementById('bulk-delete-form');form.querySelector('#bulk-delete-pks').value=Array.from(document.querySelectorAll('#object-list-table-container input[type=checkbox][name=pk]:checked')).map(function(cb){return cb.value;}).join(',');form.submit();">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
                     Delete Selected
+                </button>
+            </form>
+            <form id="bulk-edit-form" method="post" action="{{ bulk_edit_url }}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="model_name" value="{{ model_name_str }}">
+                <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+                <input type="hidden" name="pk" value="" id="bulk-edit-pks">
+                <button type="button" class="btn btn-sm btn-outline-primary"
+                        onclick="var form=document.getElementById('bulk-edit-form');form.querySelector('#bulk-edit-pks').value=Array.from(document.querySelectorAll('#object-list-table-container input[type=checkbox][name=pk]:checked')).map(function(cb){return cb.value;}).join(',');form.submit();">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-pencil me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/></svg>
+                    Edit Selected
+                </button>
+            </form>
+            <form id="bulk-edit-form" method="post" action="{{ bulk_edit_url }}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="model_name" value="{{ model_name_str }}">
+                <input type="hidden" name="pk" value="" id="bulk-edit-pks">
+                <button type="submit" class="btn btn-sm btn-outline-primary">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-pencil me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/></svg>
+                    Edit Selected
                 </button>
             </form>
         </div>

@@ -16,4 +16,42 @@
 
     <dt class="col-sm-3">Part Number:</dt>
     <dd class="col-sm-9">{{ object.part_number|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
+
+    <dt class="col-sm-3">Category:</dt>
+    <dd class="col-sm-9">
+        {% if object.category %}
+            <span class="badge" style="background-color: #{{ object.category.color }}1a; color: #{{ object.category.color }}; border: 1px solid #{{ object.category.color }}33;">
+                {{ object.category.name }}
+            </span>
+        {% else %}
+            <span class="text-muted"><i>Not Set</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">Custom Fieldset:</dt>
+    <dd class="col-sm-9">
+        {% if object.custom_fieldset %}
+            <a href="{% url 'assets:customfieldset_detail' pk=object.custom_fieldset.pk %}">{{ object.custom_fieldset.name }}</a>
+        {% else %}
+            <span class="text-muted"><i>None</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">Depreciation Policy:</dt>
+    <dd class="col-sm-9">
+        {% if object.depreciation %}
+            <a href="{% url 'assets:depreciation_detail' pk=object.depreciation.pk %}">{{ object.depreciation.name }}</a>
+        {% else %}
+            <span class="text-muted"><i>No Depreciation</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">Requestable:</dt>
+    <dd class="col-sm-9">
+        {% if object.requestable %}
+            <span class="badge bg-success-lt text-success">Yes (Users can request this model)</span>
+        {% else %}
+            <span class="badge bg-secondary-lt text-secondary">No</span>
+        {% endif %}
+    </dd>
 </dl>

@@ -20,6 +20,15 @@
         <span class="badge bg-blue-lt text-uppercase">{{ object.get_license_type_display }}</span>
     </dd>
 
+    <dt class="col-sm-3">Assigned Tenant:</dt>
+    <dd class="col-sm-9">
+        {% if object.tenant %}
+            <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}"><strong>{{ object.tenant.name }}</strong></a>
+        {% else %}
+            <span class="text-muted"><i>Global (No Tenant)</i></span>
+        {% endif %}
+    </dd>
+
     <dt class="col-sm-3">Purchase Date:</dt>
     <dd class="col-sm-9 text-secondary">{{ object.purchase_date|date:"Y-m-d"|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
 

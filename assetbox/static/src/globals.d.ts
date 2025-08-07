@@ -30,6 +30,15 @@ declare const bootstrap: {
     getInstance: (element: Element) => { hide: () => void } | null;
     getOrCreateInstance: (element: Element) => { show: () => void; hide: () => void; _isShown?: boolean };
   };
+  Tooltip: {
+    new (element: Element, options?: Record<string, unknown>): {
+      show: () => void;
+      hide: () => void;
+      dispose: () => void;
+    };
+    getInstance: (element: Element) => { hide: () => void; dispose: () => void } | null;
+    getOrCreateInstance: (element: Element) => { show: () => void; hide: () => void; dispose: () => void };
+  };
 };
 
 // TomSelect

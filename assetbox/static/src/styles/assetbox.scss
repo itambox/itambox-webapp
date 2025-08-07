@@ -347,3 +347,63 @@ html {
 .table-responsive .table {
     margin-bottom: 0;
 }
+
+// ---- Compact & Interactive Slide-to-Expand Detail Tabs ----
+.page-header-tabs {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; // Firefox
+    
+    &::-webkit-scrollbar {
+        display: none !important; // Chrome/Safari/Opera
+    }
+
+    .nav-item {
+        display: inline-block;
+
+        .nav-link {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: inline-flex;
+            align-items: center;
+            white-space: nowrap;
+            padding: 0.5rem 0.75rem;
+
+            // Inactive tabs: hide text labels, collapse padding to keep icons tidy
+            &:not(.active) {
+                span.d-xl-inline {
+                    display: none !important;
+                }
+                .badge {
+                    margin-left: 0.25rem !important;
+                }
+            }
+
+            // Active tab: ALWAYS show text label (on all screen sizes!) and animate expansion
+            &.active {
+                background-color: rgba(var(--tblr-primary-rgb, 32, 107, 196), 0.06);
+                border-color: transparent transparent var(--tblr-primary);
+                font-weight: 600;
+
+                span.d-xl-inline {
+                    display: inline-block !important;
+                    animation: slideExpand 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+                }
+            }
+        }
+    }
+}
+
+@keyframes slideExpand {
+    from {
+        max-width: 0;
+        opacity: 0;
+        transform: translateX(-6px);
+    }
+    to {
+        max-width: 250px;
+        opacity: 1;
+        transform: translateX(0);
+    }
+}

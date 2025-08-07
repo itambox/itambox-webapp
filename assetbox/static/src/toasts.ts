@@ -21,9 +21,25 @@
     });
   }
 
+  function initTooltips(container: HTMLElement | Document = document): void {
+    const tooltipTriggerList = Array.from(container.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.forEach(function (el) {
+      bootstrap.Tooltip.getOrCreateInstance(el);
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     const container = document.getElementById('django-messages');
     if (container) initToastsInContainer(container);
+    initTooltips();
+  });
+
+  document.body.addEventListener('htmx:beforeSwap', function () {
+    // Scan for and remove active/lingering tooltip DOM nodes to prevent orphans
+    const activeTooltips = document.querySelectorAll('.tooltip');
+    activeTooltips.forEach(function (el) {
+      el.remove();
+    });
   });
 
   document.body.addEventListener('htmx:afterSwap', function (evt: Event) {
@@ -34,6 +50,7 @@
     }
     if (detail.elt) {
       initToastsInContainer(detail.elt as HTMLElement);
+      initTooltips(detail.elt as HTMLElement);
     }
   });
 

@@ -12,7 +12,7 @@
 {% endblock %}
 
 {% block content %}
-<form method="post">
+<form method="post" hx-boost="false">
     {% csrf_token %}
     {# Pass back the primary keys and the model type #}
     <input type="hidden" name="model_name" value="{{ model_name }}" />

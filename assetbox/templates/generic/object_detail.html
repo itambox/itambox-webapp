@@ -36,34 +36,35 @@
 
 {% block tabs %}
 <ul class="nav nav-tabs page-header-tabs" data-bs-toggle="tabs" role="tablist">
-    <li class="nav-item" role="presentation">
+    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="Details">
         <a href="#details" class="nav-link active" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M6.168 18.849a4 4 0 0 1 3.832 -2.849h4a4 4 0 0 1 3.834 2.855" /></svg>
-            Details
+            <span class="d-none d-xl-inline ms-1">Details</span>
         </a>
     </li>
     {% block extra_tabs %}{% endblock extra_tabs %}
     {% if changelog_table %}
-    <li class="nav-item" role="presentation">
+    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="Changelog">
         <a href="#changelog" class="nav-link" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 8l0 4l2 2" /><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5" /></svg>
-            Changelog
+            <span class="d-none d-xl-inline ms-1">Changelog</span>
         </a>
     </li>
     {% endif %}
     {% if has_journaling %}
-    <li class="nav-item" role="presentation">
+    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="Journal">
         <a href="#journal" class="nav-link" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M16 7a4 4 0 1 1 -8 0a4 4 0 0 1 8 0z" /><path d="M12 14v7" /><path d="M9 18h6" /></svg>
-            Journal <span class="badge bg-secondary ms-1">{{ journal_entries_count }}</span>
+            <span class="d-none d-xl-inline ms-1">Journal</span>
+            <span class="badge bg-secondary ms-1">{{ journal_entries_count }}</span>
         </a>
     </li>
     {% endif %}
     {% if has_image_attachments or has_file_attachments %}
-    <li class="nav-item" role="presentation">
+    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="Attachments">
         <a href="#attachments" class="nav-link" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 7l-6.5 6.5a1.5 1.5 0 0 0 3 3l6.5 -6.5a3 3 0 0 0 -6 -6l-6.5 6.5a4.5 4.5 0 0 0 9 9l6.5 -6.5"/></svg>
-            Attachments
+            <span class="d-none d-xl-inline ms-1">Attachments</span>
         </a>
     </li>
     {% endif %}
@@ -73,130 +74,133 @@
 {% block content %}
 <div class="tab-content">
     <div class="tab-pane fade show active" id="details" role="tabpanel">
-
-        {% if layout %}
-            {% for row in layout %}
-            <div class="row g-4">
-                {% for column in row %}
-                <div class="col-md-{% widthratio 12 row|length 1 %}">
-                    {% for panel in column %}
-                        {% render_panel panel %}
+        {% block details_tab %}
+        <div class="row g-3">
+            {# --- Left Column: Main area (Panels or primary info) --- #}
+            <div class="col-12 col-lg-8">
+                {% if layout %}
+                    {% for row in layout %}
+                    <div class="row g-3 mb-3">
+                        {% for column in row %}
+                        <div class="col-12 col-md-{% widthratio 12 row|length 1 %}">
+                            {% for panel in column %}
+                                {% render_panel panel %}
+                            {% endfor %}
+                        </div>
+                        {% endfor %}
+                    </div>
                     {% endfor %}
-                </div>
-                {% endfor %}
-            </div>
-            {% endfor %}
-        {% else %}
-        <div class="row g-4">
-
-            {# --- Left Column --- #}
-            <div class="col-md-8">
-
-                {# --- Primary Object Details Card --- #}
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">{{ object_type|default:"Object" }} Information</h3>
+                {% else %}
+                    {# --- Default Object Details Card --- #}
+                    <div class="card mb-3 shadow-sm">
+                        <div class="card-header">
+                            <h3 class="card-title">{{ object_type|default:"Object" }} Information</h3>
+                        </div>
+                        <div class="card-body">
+                            {% block object_details %}
+                                {# Specific templates should override this block #}
+                                <p class="text-muted"><em>Object details should be defined in the specific template extending this base.</em></p>
+                            {% endblock object_details %}
+                        </div>
                     </div>
-                    <div class="card-body">
-                        {% block object_details %}
-                            {# Specific templates should override this block #}
-                            <p class="text-muted"><em>Object details should be defined in the specific template extending this base.</em></p>
-                        {% endblock object_details %}
-                    </div>
-                </div>
+                {% endif %}
 
-                {# --- Comments/Notes Card --- #}
+                {# --- Hierarchy Placeholder --- #}
+                {% block hierarchy %}{% endblock hierarchy %}
+
+                {# --- Comments, Notes, & Descriptions (ALWAYS Rendered Below Main Block) --- #}
                 {% if object.comments %}
-                <div class="card mt-4">
-                    <div class="card-header"><h3 class="card-title">Comments</h3></div>
-                    <div class="card-body">{{ object.comments|linebreaksbr|safe }}</div>
+                <div class="card mt-3 shadow-sm">
+                    <div class="card-header border-0 bg-transparent">
+                        <h3 class="card-title text-secondary">Comments</h3>
+                    </div>
+                    <div class="card-body pt-0">{{ object.comments|linebreaksbr|safe }}</div>
                 </div>
                 {% endif %}
                 {% if object.notes %}
-                 <div class="card mt-4">
-                    <div class="card-header"><h3 class="card-title">Notes</h3></div>
-                    <div class="card-body">{{ object.notes|linebreaksbr|safe }}</div>
+                <div class="card mt-3 shadow-sm">
+                    <div class="card-header border-0 bg-transparent">
+                        <h3 class="card-title text-secondary">Notes</h3>
+                    </div>
+                    <div class="card-body pt-0">{{ object.notes|linebreaksbr|safe }}</div>
                 </div>
                 {% endif %}
-                 {% if object.description %}
-                 <div class="card mt-4">
-                    <div class="card-header"><h3 class="card-title">Description</h3></div>
-                    <div class="card-body">{{ object.description|linebreaksbr|safe }}</div>
+                {% if object.description %}
+                <div class="card mt-3 shadow-sm">
+                    <div class="card-header border-0 bg-transparent">
+                        <h3 class="card-title text-secondary">Description</h3>
+                    </div>
+                    <div class="card-body pt-0">{{ object.description|linebreaksbr|safe }}</div>
                 </div>
                 {% endif %}
-
-                {# --- Placeholder for Hierarchy (Parent/Children) --- #}
-                {% block hierarchy %}
-                {% endblock hierarchy %}
 
                 {# --- Placeholder for Extra Cards (Left Column) --- #}
                 {% block extra_cards_left %}{% endblock %}
 
+                {# --- Full Width Content Block --- #}
+                <div class="row g-3 mt-2">
+                    <div class="col-12">
+                        {% block full_width_content %}
+                        {# Specific templates can add full-width cards/tables here #}
+                        {% endblock full_width_content %}
+                    </div>
+                </div>
             </div>
 
-            {# --- Right Column --- #}
-            <div class="col-md-4">
-
+            {# --- Right Column: Sidebar (Metadata, Tags, Related summary) --- #}
+            <div class="col-12 col-lg-4">
                 {# --- Metadata Card --- #}
                 {% if object.created_at or object.updated_at %}
-                 <div class="card mb-4">
-                     <div class="card-body">
-                         <h3 class="card-title">Metadata</h3>
-                         <p class="text-muted small">
-                            {% if object.created_at %}Created: {{ object.created_at|date:"Y-m-d H:i" }} <br>{% endif %}
-                            {% if object.updated_at %}Updated: {{ object.updated_at|date:"Y-m-d H:i" }}{% endif %}
-                         </p>
+                <div class="card mb-3 shadow-sm">
+                    <div class="card-body">
+                        <h3 class="card-title text-muted mb-2">Metadata</h3>
+                        <p class="text-secondary small mb-0">
+                            {% if object.created_at %}<strong>Created:</strong> {{ object.created_at|date:"Y-m-d H:i" }}<br>{% endif %}
+                            {% if object.updated_at %}<strong>Updated:</strong> {{ object.updated_at|date:"Y-m-d H:i" }}{% endif %}
+                        </p>
                     </div>
                 </div>
                 {% endif %}
 
                 {# --- Tags Card --- #}
                 {% if object.tags.all %}
-                    <div class="card mb-4">
-                        <div class="card-header"><h3 class="card-title">Tags</h3></div>
-                        <div class="card-body">
-                            {% for tag in object.tags.all %}
-                                {% include 'inc/tags.html' with tag=tag %}
-                            {% endfor %}
-                        </div>
+                <div class="card mb-3 shadow-sm">
+                    <div class="card-header border-0 bg-transparent">
+                        <h3 class="card-title text-secondary">Assigned Tags</h3>
                     </div>
+                    <div class="card-body pt-0">
+                        {% for tag in object.tags.all %}
+                            {% include 'inc/tags.html' with tag=tag %}
+                        {% endfor %}
+                    </div>
+                </div>
                 {% endif %}
 
                 {# --- Placeholder for Related Object Tables --- #}
                 {% block related_objects %}{% endblock related_objects %}
 
-                 {# --- Related Objects Card (NetBox Style) --- #}
-                 {% if related_objects_list %}
-                 <div class="card mb-4">
-                     <div class="card-header"><h3 class="card-title">Related Objects</h3></div>
-                     <div class="list-group list-group-flush">
-                         {% for item in related_objects_list %}
-                             <a href="{{ item.url }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                                 {{ item.label }}
-                                 <span class="badge bg-primary rounded-pill">{{ item.count }}</span>
-                             </a>
-                         {% endfor %}
-                     </div>
-                 </div>
-                 {% endif %}
-                 {# --- End Related Objects Card --- #}
+                {# --- Related Objects Card (NetBox Style) --- #}
+                {% if related_objects_list %}
+                <div class="card mb-3 shadow-sm">
+                    <div class="card-header border-0 bg-transparent">
+                        <h3 class="card-title text-secondary">Related Inventory</h3>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        {% for item in related_objects_list %}
+                            <a href="{{ item.url }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                {{ item.label }}
+                                <span class="badge bg-primary-lt text-primary rounded-pill">{{ item.count }}</span>
+                            </a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
 
-                 {# --- Placeholder for Extra Cards (Right Column) --- #}
-                 {% block extra_cards_right %}{% endblock %}
-
+                {# --- Placeholder for Extra Cards (Right Column) --- #}
+                {% block extra_cards_right %}{% endblock %}
             </div>
         </div>
-
-        {# --- Add Full Width Content Block --- #}
-        <div class="row g-4 mt-2">
-            <div class="col-12">
-                {% block full_width_content %}
-                {# Specific templates can add full-width cards/tables here #}
-                {% endblock full_width_content %}
-            </div>
-        </div>
-        {% endif %}
-
+        {% endblock details_tab %}
     </div>
 
     {# --- Placeholder for extra tab panes --- #}
