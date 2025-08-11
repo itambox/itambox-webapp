@@ -221,3 +221,55 @@ class SoftDeleteMixin(models.Model):
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         registry.register_feature(cls, 'soft_delete')
+
+
+class AutoSlugMixin:
+    """
+    Mixin to automatically generate a unique slug field on save.
+    
+    By default, it will slugify the field specified by `slug_source` (default: 'name').
+    It can also take a tuple/list of field names as `slug_source`, which will be
+    concatenated together.
+    
+    If there is a collision, it will append a counter to ensure uniqueness.
+    """
+    slug_source = 'name'
+
+    def save(self, *args, **kwargs):
+        if not getattr(self, 'slug', None):
+            from django.utils.text import slugify
+            
+            # Resolve slug source
+            if isinstance(self.slug_source, (list, tuple)):
+                source_values = []
+                for field_name in self.slug_source:
+                    # Support double underscore relation lookup (e.g. manufacturer__name)
+                    if '__' in field_name:
+                        parts = field_name.split('__')
+                        obj = self
+                        for part in parts:
+                            obj = getattr(obj, part, None) if obj else None
+                        val = str(obj) if obj else ""
+                    else:
+                        val = getattr(self, field_name, "")
+                    if val:
+                        source_values.append(str(val))
+                slug_src = "-".join(source_values)
+            else:
+                slug_src = getattr(self, self.slug_source, "")
+            
+            # Slugify the resolved source string
+            self.slug = slugify(slug_src or "auto-slug")
+            
+            # Handle collision
+            base_slug = self.slug
+            counter = 1
+            model_class = self.__class__
+            manager = getattr(model_class, '_base_manager', model_class.objects)
+            
+            while manager.filter(slug=self.slug).exclude(pk=self.pk).exists():
+                self.slug = f"{base_slug}-{counter}"
+                counter += 1
+                
+        super().save(*args, **kwargs)
+

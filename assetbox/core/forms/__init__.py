@@ -333,7 +333,21 @@ class BulkEditForm(BootstrapMixin, forms.Form):
 
             self.fields[field.name] = form_field_cls(**field_kwargs)
 
-class SlugModelForm(forms.ModelForm):
+
+class CrispyFormMixin:
+    """
+    Form mixin to auto-initialize FormHelper with standard settings,
+    reducing crispy FormHelper boilerplate across all forms.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not hasattr(self, 'helper') or self.helper is None:
+            self.helper = FormHelper(self)
+            self.helper.form_method = 'post'
+            self.helper.form_tag = True
+
+
+class SlugModelForm(CrispyFormMixin, forms.ModelForm):
     class Media:
         js = (
             'js/slugify.js',
@@ -410,3 +424,33 @@ class FilterForm(BootstrapMixin, forms.Form):
                     applied[name] = value
 
         return applied
+
+
+class ColorFieldFormMixin:
+    """
+    Mixin for forms with a 'color' hex field. Ensures '#' is prepended for the picker
+    and cleaned up to raw hex when validating/saving.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if hasattr(self, 'instance') and self.instance and getattr(self.instance, 'color', None):
+            self.initial['color'] = f"#{self.instance.color}"
+
+    def clean_color(self):
+        color = self.cleaned_data.get('color')
+        if color and color.startswith('#'):
+            cleaned_color = color[1:]
+            if len(cleaned_color) == 6:
+                return cleaned_color
+            else:
+                raise forms.ValidationError("Ensure the color hex code is 6 characters long (after removing '#').")
+        elif not color:
+            return ''
+        if len(color) == 6:
+            return color
+        elif len(color) == 0:
+            return ''
+        else:
+            raise forms.ValidationError("Ensure the color hex code is 6 characters long.")
+
+

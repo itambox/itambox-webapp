@@ -735,3 +735,24 @@ class LabelTemplate(ChangeLoggingMixin, BaseModel):
 
     def get_absolute_url(self):
         return reverse('label_template_detail', kwargs={'pk': self.pk})
+
+
+from core.mixins import (
+    JournalingMixin, TaggableMixin,
+    ImageAttachmentMixin, FileAttachmentMixin, ExportableMixin, CloneableMixin
+)
+
+class AssetBoxModel(
+    JournalingMixin,
+    TaggableMixin,
+    ImageAttachmentMixin,
+    FileAttachmentMixin,
+    ExportableMixin,
+    CloneableMixin,
+    ChangeLoggingMixin,
+    BaseModel
+):
+    class Meta:
+        abstract = True
+
+
