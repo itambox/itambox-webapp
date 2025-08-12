@@ -2,7 +2,7 @@ from django.db import models
 from django.conf import settings
 from django.urls import reverse, NoReverseMatch
 from core.models import BaseModel, ChangeLoggingMixin
-from core.mixins import TaggableMixin, JournalingMixin, ExportableMixin
+from core.mixins import TaggableMixin, JournalingMixin, ExportableMixin, AutoSlugMixin
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import gettext_lazy as _
@@ -10,7 +10,7 @@ from django.utils.text import slugify
 from extras.models import Tag
 
 
-class Provider(JournalingMixin, TaggableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
+class Provider(AutoSlugMixin, JournalingMixin, TaggableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
     """Represents the vendor/supplier of a subscription or service."""
     name = models.CharField(
         max_length=255,
@@ -85,11 +85,6 @@ class Provider(JournalingMixin, TaggableMixin, ExportableMixin, ChangeLoggingMix
         except NoReverseMatch:
             return reverse('admin:subscriptions_provider_change', args=[self.pk])
 
-    def save(self, *args, **kwargs):
-        if not self.slug:
-            self.slug = slugify(self.name)
-        super().save(*args, **kwargs)
-
 
 class SubscriptionTypeChoices(models.TextChoices):
     SAAS = 'saas', _('SaaS')
@@ -116,7 +111,7 @@ class BillingCycleChoices(models.TextChoices):
     ONETIME = 'onetime', _('One-Time')
 
 
-class Subscription(JournalingMixin, TaggableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
+class Subscription(AutoSlugMixin, JournalingMixin, TaggableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
     """Represents a recurring service agreement (SaaS, Support, etc.)."""
     name = models.CharField(
         max_length=255,
@@ -257,11 +252,6 @@ class Subscription(JournalingMixin, TaggableMixin, ExportableMixin, ChangeLoggin
             return reverse('subscriptions:subscription_detail', kwargs={'pk': self.pk})
         except NoReverseMatch:
             return reverse('admin:subscriptions_subscription_change', args=[self.pk])
-
-    def save(self, *args, **kwargs):
-        if not self.slug:
-            self.slug = slugify(self.name)
-        super().save(*args, **kwargs)
 
     @property
     def is_expired(self):

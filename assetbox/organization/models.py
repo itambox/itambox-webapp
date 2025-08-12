@@ -5,7 +5,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.conf import settings # Import settings
 from core.models import BaseModel, ChangeLoggingMixin
-from core.mixins import ExportableMixin, TaggableMixin, JournalingMixin
+from core.mixins import ExportableMixin, TaggableMixin, JournalingMixin, AutoSlugMixin
 from django.contrib.contenttypes.fields import GenericForeignKey
 
 # Create your models here.
@@ -278,7 +278,7 @@ class AssetHolderAssignment(ChangeLoggingMixin, BaseModel):
     def __str__(self):
         return f"Assignment for {self.asset_holder} to {self.assigned_object}"
 
-class ContactRole(ExportableMixin, ChangeLoggingMixin, BaseModel):
+class ContactRole(AutoSlugMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     description = models.TextField(blank=True)
@@ -293,16 +293,6 @@ class ContactRole(ExportableMixin, ChangeLoggingMixin, BaseModel):
 
     def get_absolute_url(self):
         return reverse('organization:contactrole_detail', kwargs={'pk': self.pk})
-
-    def save(self, *args, **kwargs):
-        if not self.slug:
-            self.slug = slugify(self.name)
-            base_slug = self.slug
-            counter = 1
-            while ContactRole.objects.filter(slug=self.slug).exists():
-                self.slug = f"{base_slug}-{counter}"
-                counter += 1
-        super().save(*args, **kwargs)
 
 
 class Contact(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):

@@ -9,30 +9,18 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from software.models import Software
-from core.models import BaseModel, ChangeLoggingMixin
-from core.mixins import ExportableMixin, SoftDeleteMixin, CloneableMixin, ImageAttachmentMixin, FileAttachmentMixin, CustomFieldDataMixin, JournalingMixin, TaggableMixin
+from core.models import BaseModel, ChangeLoggingMixin, AssetBoxModel
+from core.mixins import ExportableMixin, SoftDeleteMixin, CloneableMixin, ImageAttachmentMixin, FileAttachmentMixin, CustomFieldDataMixin, JournalingMixin, TaggableMixin, AutoSlugMixin
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
 
-class SoftDeleteManager(models.Manager):
-    def get_queryset(self):
-        qs = super().get_queryset()
-        from django.core.exceptions import FieldError
-        try:
-            return qs.filter(deleted_at__isnull=True)
-        except FieldError:
-            return qs
+from core.managers import SoftDeleteManager, AllObjectsManager
 
 
-class AllObjectsManager(models.Manager):
-    def get_queryset(self):
-        return super().get_queryset()
-
-
-class StatusLabel(TaggableMixin, ChangeLoggingMixin, BaseModel):
+class StatusLabel(AutoSlugMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
     TYPE_DEPLOYABLE = 'deployable'
     TYPE_PENDING = 'pending'
     TYPE_UNDEPLOYABLE = 'undeployable'
@@ -62,15 +50,7 @@ class StatusLabel(TaggableMixin, ChangeLoggingMixin, BaseModel):
     def get_absolute_url(self):
         return reverse('assets:statuslabel_detail', kwargs={'pk': self.pk})
 
-    def save(self, *args, **kwargs):
-        if not self.slug:
-            self.slug = slugify(self.name)
-            base_slug = self.slug
-            counter = 1
-            while StatusLabel.objects.filter(slug=self.slug).exists():
-                self.slug = f"{base_slug}-{counter}"
-                counter += 1
-        super().save(*args, **kwargs)
+
 
 class AssetRole(TaggableMixin, ChangeLoggingMixin, BaseModel):
     """Categorizes assets based on their functional role (e.g., Laptop, Monitor, Server)."""
@@ -188,8 +168,9 @@ class Depreciation(ChangeLoggingMixin, BaseModel):
         return reverse('assets:depreciation_detail', kwargs={'pk': self.pk})
 
 
-class AssetType(JournalingMixin, TaggableMixin, ImageAttachmentMixin, FileAttachmentMixin, ExportableMixin, CloneableMixin, ChangeLoggingMixin, BaseModel):
+class AssetType(AutoSlugMixin, AssetBoxModel):
     """Defines a specific type of asset (e.g., a specific laptop model)."""
+    slug_source = ('manufacturer__name', 'model')
     
     STORAGE_SSD = 'ssd'
     STORAGE_NVME = 'nvme'
@@ -270,18 +251,9 @@ class AssetType(JournalingMixin, TaggableMixin, ImageAttachmentMixin, FileAttach
     def get_absolute_url(self):
         return reverse('assets:assettype_detail', kwargs={'slug': self.slug})
 
-    def save(self, *args, **kwargs):
-        if not self.slug:
-            self.slug = slugify(f"{self.manufacturer.name}-{self.model}")
-            # Ensure slug uniqueness if auto-generated
-            base_slug = self.slug
-            counter = 1
-            while AssetType.objects.filter(slug=self.slug).exists():
-                 self.slug = f"{base_slug}-{counter}"
-                 counter += 1
-        super().save(*args, **kwargs)
 
-class Asset(CustomFieldDataMixin, JournalingMixin, TaggableMixin, ImageAttachmentMixin, FileAttachmentMixin, SoftDeleteMixin, ExportableMixin, CloneableMixin, ChangeLoggingMixin, BaseModel):
+
+class Asset(CustomFieldDataMixin, SoftDeleteMixin, AssetBoxModel):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     
@@ -567,8 +539,9 @@ class InstalledSoftware(ChangeLoggingMixin, BaseModel):
         return self.asset.get_absolute_url()
 
 
-class ComponentType(JournalingMixin, TaggableMixin, ExportableMixin, CloneableMixin, ChangeLoggingMixin, BaseModel):
+class ComponentType(AutoSlugMixin, AssetBoxModel):
     """Catalog of physical hardware component models (e.g. Samsung 990 Pro 2TB SSD)."""
+    slug_source = ('manufacturer__name', 'name')
     CATEGORY_RAM = 'ram'
     CATEGORY_STORAGE = 'storage'
     CATEGORY_GPU = 'gpu'
@@ -606,15 +579,7 @@ class ComponentType(JournalingMixin, TaggableMixin, ExportableMixin, CloneableMi
     def get_absolute_url(self):
         return reverse('assets:componenttype_detail', kwargs={'pk': self.pk})
 
-    def save(self, *args, **kwargs):
-        if not self.slug:
-            self.slug = slugify(f"{self.manufacturer.name}-{self.name}")
-            base_slug = self.slug
-            counter = 1
-            while ComponentType.objects.filter(slug=self.slug).exists():
-                self.slug = f"{base_slug}-{counter}"
-                counter += 1
-        super().save(*args, **kwargs)
+
 
 
 class ComponentInstance(TaggableMixin, ChangeLoggingMixin, BaseModel):
@@ -651,7 +616,7 @@ class ComponentInstance(TaggableMixin, ChangeLoggingMixin, BaseModel):
         return reverse('assets:componentinstance_detail', kwargs={'pk': self.pk})
 
 
-class Accessory(JournalingMixin, TaggableMixin, SoftDeleteMixin, ExportableMixin, CloneableMixin, ChangeLoggingMixin, BaseModel):
+class Accessory(AutoSlugMixin, SoftDeleteMixin, AssetBoxModel):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     
@@ -704,6 +669,8 @@ class Accessory(JournalingMixin, TaggableMixin, SoftDeleteMixin, ExportableMixin
     tags = models.ManyToManyField('extras.Tag', related_name='accessories', blank=True)
     tenant = models.ForeignKey('organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='accessories', db_index=True)
 
+    slug_source = ('manufacturer__name', 'name')
+
     class Meta:
         ordering = ('manufacturer', 'name')
         unique_together = ('manufacturer', 'name')
@@ -725,15 +692,7 @@ class Accessory(JournalingMixin, TaggableMixin, SoftDeleteMixin, ExportableMixin
     def remaining_qty(self):
         return self.qty - self.checked_out_qty
 
-    def save(self, *args, **kwargs):
-        if not self.slug:
-            self.slug = slugify(f"{self.manufacturer.name}-{self.name}")
-            base_slug = self.slug
-            counter = 1
-            while Accessory.objects.filter(slug=self.slug).exists():
-                self.slug = f"{base_slug}-{counter}"
-                counter += 1
-        super().save(*args, **kwargs)
+
 
 
 class AccessoryAssignment(ChangeLoggingMixin, BaseModel):
@@ -764,7 +723,7 @@ class AccessoryAssignment(ChangeLoggingMixin, BaseModel):
         return f"{self.qty}x {self.accessory} assigned to {recipient}"
 
 
-class Consumable(JournalingMixin, TaggableMixin, SoftDeleteMixin, ExportableMixin, CloneableMixin, ChangeLoggingMixin, BaseModel):
+class Consumable(AutoSlugMixin, SoftDeleteMixin, AssetBoxModel):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     
@@ -797,6 +756,8 @@ class Consumable(JournalingMixin, TaggableMixin, SoftDeleteMixin, ExportableMixi
     tags = models.ManyToManyField('extras.Tag', related_name='consumables', blank=True)
     tenant = models.ForeignKey('organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='consumables', db_index=True)
 
+    slug_source = ('manufacturer__name', 'name')
+
     class Meta:
         ordering = ('manufacturer', 'name')
         unique_together = ('manufacturer', 'name')
@@ -817,15 +778,7 @@ class Consumable(JournalingMixin, TaggableMixin, SoftDeleteMixin, ExportableMixi
     def remaining_qty(self):
         return self.qty - self.consumed_qty
 
-    def save(self, *args, **kwargs):
-        if not self.slug:
-            self.slug = slugify(f"{self.manufacturer.name}-{self.name}")
-            base_slug = self.slug
-            counter = 1
-            while Consumable.objects.filter(slug=self.slug).exists():
-                self.slug = f"{base_slug}-{counter}"
-                counter += 1
-        super().save(*args, **kwargs)
+
 
 
 class ConsumableAssignment(ChangeLoggingMixin, BaseModel):
@@ -1003,7 +956,7 @@ class KitItem(ChangeLoggingMixin, BaseModel):
             raise ValidationError("A kit item cannot select more than one target (must be either Asset Type OR Accessory OR License).")
 
 
-class Supplier(JournalingMixin, TaggableMixin, ExportableMixin, CloneableMixin, ChangeLoggingMixin, BaseModel):
+class Supplier(AutoSlugMixin, AssetBoxModel):
     name = models.CharField(max_length=255, unique=True)
     slug = models.SlugField(max_length=255, unique=True)
     website = models.URLField(max_length=500, blank=True, null=True)
@@ -1025,18 +978,10 @@ class Supplier(JournalingMixin, TaggableMixin, ExportableMixin, CloneableMixin, 
     def get_absolute_url(self):
         return reverse('assets:supplier_detail', kwargs={'pk': self.pk})
 
-    def save(self, *args, **kwargs):
-        if not self.slug:
-            self.slug = slugify(self.name)
-            base_slug = self.slug
-            counter = 1
-            while Supplier.objects.filter(slug=self.slug).exists():
-                self.slug = f"{base_slug}-{counter}"
-                counter += 1
-        super().save(*args, **kwargs)
 
 
-class Category(JournalingMixin, TaggableMixin, ExportableMixin, CloneableMixin, ChangeLoggingMixin, BaseModel):
+
+class Category(AutoSlugMixin, AssetBoxModel):
     name = models.CharField(max_length=255, unique=True)
     slug = models.SlugField(max_length=255, unique=True)
     color = models.CharField(max_length=6, blank=True, null=True, help_text="RGB color in hexadecimal (e.g. 00ff00)")
@@ -1059,15 +1004,7 @@ class Category(JournalingMixin, TaggableMixin, ExportableMixin, CloneableMixin, 
     def get_absolute_url(self):
         return reverse('assets:category_detail', kwargs={'pk': self.pk})
 
-    def save(self, *args, **kwargs):
-        if not self.slug:
-            self.slug = slugify(self.name)
-            base_slug = self.slug
-            counter = 1
-            while Category.objects.filter(slug=self.slug).exists():
-                self.slug = f"{base_slug}-{counter}"
-                counter += 1
-        super().save(*args, **kwargs)
+
 
 
 class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
