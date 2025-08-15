@@ -57,11 +57,11 @@ class ToggleColumn(tables.CheckBoxColumn):
         if 'attrs' not in kwargs:
             kwargs['attrs'] = {
                 'th': {
-                    'class': 'w-1',
+                    'class': 'w-1 text-nowrap',
                     'aria-label': _('Select all'),
                 },
                 'td': {
-                    'class': 'w-1',
+                    'class': 'w-1 text-nowrap',
                 },
                 'input': {
                     'class': 'form-check-input',
@@ -80,8 +80,11 @@ class ToggleColumn(tables.CheckBoxColumn):
 
 class ActionsColumn(tables.Column):
     attrs = {
+        'th': {
+            'class': 'col-actions text-nowrap',
+        },
         'td': {
-            'class': 'text-end text-nowrap noprint p-1'
+            'class': 'text-end text-nowrap noprint p-1 col-actions'
         }
     }
     empty_values = ()
@@ -202,6 +205,34 @@ class BaseTable(tables.Table):
                 )
             else:
                 self.empty_text = _('No results found')
+
+        self._apply_column_width_classes()
+
+    def _apply_column_width_classes(self):
+        width_heuristics = {
+            'name': 'col-name',
+            'description': 'col-name',
+            'serial_number': 'col-serial',
+            'asset_tag': 'col-tag',
+            'part_number': 'col-tag',
+            'tenant': 'col-relation',
+            'location': 'col-relation',
+            'supplier': 'col-relation',
+            'manufacturer': 'col-relation',
+            'assignee': 'col-relation',
+            'contacts': 'col-relation',
+            'actions': 'col-actions',
+        }
+        for col_name, width_class in width_heuristics.items():
+            if col_name not in self.columns:
+                continue
+            base_column = self.columns[col_name].column
+            if base_column.attrs is None:
+                base_column.attrs = {}
+            for attr_key in ('th', 'td'):
+                cell_attrs = base_column.attrs.setdefault(attr_key, {})
+                current_class = cell_attrs.get('class', '')
+                cell_attrs['class'] = f"{current_class} {width_class}".strip()
 
     def _get_columns(self, visible=True):
         columns = []

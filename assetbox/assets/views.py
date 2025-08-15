@@ -26,7 +26,7 @@ from django.contrib import messages # <--- Add this import
 from users.models import UserPreference # Import UserPreference
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
-from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectImportView, BaseHTMXView, ObjectBulkEditView, ObjectBulkDeleteView
+from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectImportView, BaseHTMXView, ObjectBulkEditView, ObjectBulkDeleteView, ObjectCloneView
 from core.quick_add import QuickAddMixin
 from django.db.models import Count
 import json
@@ -74,7 +74,7 @@ class AssetListView(ObjectListView):
         'location',
         'tenant',
         'status',
-    ).prefetch_related('tags')
+    ).prefetch_related('tags', 'maintenances')
 
     def get_table(self):
         table = super().get_table()
@@ -206,84 +206,41 @@ class AssetDeleteView(ObjectDeleteView):
     template_name = 'generic/object_confirm_delete.html'
     success_url = reverse_lazy('assets:asset_list')
 
-class AssetCloneView(ObjectEditView):
+class AssetCloneView(ObjectCloneView):
     model = Asset
     model_form = forms.AssetForm
     template_name = 'generic/object_edit.html'
 
-    def get_object(self, queryset=None):
-        original = get_object_or_404(Asset, pk=self.kwargs['pk'])
-        cloned = original.clone()
+    def pre_save_clone(self, original, cloned):
         cloned.asset_tag = ''
-        cloned.name = f'{original.name} (Copy)'
-        cloned.save()
-        cloned.tags.set(original.tags.all())
-        return cloned
 
 
-class AssetTypeCloneView(ObjectEditView):
+class AssetTypeCloneView(ObjectCloneView):
     model = AssetType
     model_form = forms.AssetTypeForm
     template_name = 'generic/object_edit.html'
     default_return_url = 'assets:assettype_list'
 
-    def get_object(self, queryset=None):
-        original = get_object_or_404(AssetType, pk=self.kwargs['pk'])
-        cloned = original.clone()
-        cloned.model = f'{original.model} (Copy)'
-        cloned.slug = ''
-        cloned.save()
-        cloned.tags.set(original.tags.all())
-        return cloned
 
-
-class ComponentTypeCloneView(ObjectEditView):
+class ComponentTypeCloneView(ObjectCloneView):
     model = ComponentType
     model_form = forms.ComponentTypeForm
     template_name = 'generic/object_edit.html'
     default_return_url = 'assets:componenttype_list'
 
-    def get_object(self, queryset=None):
-        original = get_object_or_404(ComponentType, pk=self.kwargs['pk'])
-        cloned = original.clone()
-        cloned.name = f'{original.name} (Copy)'
-        cloned.slug = ''
-        cloned.save()
-        cloned.tags.set(original.tags.all())
-        return cloned
 
-
-class SupplierCloneView(ObjectEditView):
+class SupplierCloneView(ObjectCloneView):
     model = Supplier
     model_form = forms.SupplierForm
     template_name = 'generic/object_edit.html'
     default_return_url = 'assets:supplier_list'
 
-    def get_object(self, queryset=None):
-        original = get_object_or_404(Supplier, pk=self.kwargs['pk'])
-        cloned = original.clone()
-        cloned.name = f'{original.name} (Copy)'
-        cloned.slug = ''
-        cloned.save()
-        cloned.tags.set(original.tags.all())
-        return cloned
 
-
-class CategoryCloneView(ObjectEditView):
+class CategoryCloneView(ObjectCloneView):
     model = Category
     model_form = forms.CategoryForm
     template_name = 'generic/object_edit.html'
     default_return_url = 'assets:category_list'
-
-    def get_object(self, queryset=None):
-        original = get_object_or_404(Category, pk=self.kwargs['pk'])
-        cloned = original.clone()
-        cloned.name = f'{original.name} (Copy)'
-        cloned.slug = ''
-        cloned.save()
-        cloned.tags.set(original.tags.all())
-        return cloned
-
 
 @login_required
 def asset_checkout_modal(request, pk):
@@ -291,90 +248,24 @@ def asset_checkout_modal(request, pk):
     
     # Ensure asset is available before proceeding
     if not asset.status or asset.status.slug != 'available':
-        # Returning a simple message inside the modal might be better UX
-        # For now, returning a basic forbidden response
         return HttpResponse("Asset is not available for assignment.", status=403)
 
     if request.method == 'POST':
-        form = AssetCheckOutForm(request.POST)
+        form = forms.AssetCheckOutForm(request.POST)
         if form.is_valid():
-            from django.db import transaction
-            with transaction.atomic():
-                selected_holder = form.cleaned_data.get('asset_holder')
-                selected_location = form.cleaned_data.get('location')
-                
-                # --- Checkout Logic --- 
-                assignee = None
-                if selected_holder:
-                    assignee = selected_holder
-                    asset.location = None # Clear location if assigned to holder
-                elif selected_location:
-                    assignee = selected_location
-                    asset.location = selected_location # Set location
-
-                # Update asset status
-                in_use_status = StatusLabel.objects.filter(slug='in-use').first()
-                if in_use_status:
-                    asset.status = in_use_status
-                asset._changelog_action = 'checkout'
-                asset._changelog_message = f"Checked out to {'Holder' if selected_holder else 'Location'}: {assignee}"
-                asset.save(update_fields=['status', 'location'])
-
-                # Create/update assignment record
-                if selected_holder:
-                    AssetHolderAssignment.objects.update_or_create(
-                        content_type=ContentType.objects.get_for_model(Asset),
-                        object_id=asset.pk,
-                        defaults={
-                            'asset_holder': selected_holder,
-                        }
-                    )
-                else:
-                    # If assigned to location, clear any existing holder assignment
-                    AssetHolderAssignment.objects.filter(
-                        content_type=ContentType.objects.get_for_model(Asset),
-                        object_id=asset.pk
-                    ).delete()
-
+            from .services import checkout_asset
+            selected_holder = form.cleaned_data.get('asset_holder')
+            selected_location = form.cleaned_data.get('location')
+            
+            try:
+                assignee = checkout_asset(
+                    asset,
+                    holder=selected_holder,
+                    location=selected_location,
+                    user=request.user,
+                    request=request
+                )
                 messages.success(request, f"Asset '{asset}' checked out successfully to {assignee}.")
-
-                if selected_holder:
-                    category = asset.asset_type.category if asset.asset_type else None
-                    if category and category.require_acceptance:
-                        receipt = CustodyReceipt.objects.create(
-                            asset=asset,
-                            holder=selected_holder,
-                        )
-                        if category.email_eula:
-                            try:
-                                from django.core.mail import send_mail
-                                from core.models import EmailSettings
-                                email_config = EmailSettings.load()
-                                if email_config and email_config.enabled and email_config.from_address:
-                                    recipient = selected_holder.email
-                                    if not recipient:
-                                        recipient = email_config.test_recipient or email_config.from_address
-                                    if recipient:
-                                        sign_url = request.build_absolute_uri(
-                                            reverse('assets:custody_eula_sign', kwargs={'token': receipt.token})
-                                        )
-                                        send_mail(
-                                            subject=f'Asset Acceptance Required: {asset.name} ({asset.asset_tag})',
-                                            message=(
-                                                f'You have been assigned custody of:\n\n'
-                                                f'  Asset: {asset.name}\n'
-                                                f'  Asset Tag: {asset.asset_tag}\n'
-                                                f'  Serial: {asset.serial_number or "N/A"}\n\n'
-                                                f'Please accept custody at the following link:\n{sign_url}\n\n'
-                                                f'This link expires in 7 days.'
-                                            ),
-                                            from_email=email_config.from_address,
-                                            recipient_list=[recipient],
-                                            fail_silently=True,
-                                        )
-                            except Exception:
-                                pass
-                # --- End Checkout Logic ---
 
                 # --- HTMX Response for Success --- 
                 import json
@@ -386,17 +277,17 @@ def asset_checkout_modal(request, pk):
                     "showMessage": {"message": f"Asset '{asset}' checked out to {assignee}.", "level": "success"} # Send message via trigger
                 }) 
                 return response
-            # --- End HTMX Response --- 
+            except Exception as e:
+                form.add_error(None, str(e))
+                context = {'form': form, 'asset': asset, 'request': request}
+                return render(request, "assets/includes/asset_checkout_modal.html#checkout-modal-form", context)
         else:
             # --- HTMX Response for Validation Error ---
             # Re-render only the partial form body inside the modal
             context = {'form': form, 'asset': asset, 'request': request}
             return render(request, "assets/includes/asset_checkout_modal.html#checkout-modal-form", context)
-            # --- End HTMX Response ---
-
-
     else: # GET request
-        form = AssetCheckOutForm()
+        form = forms.AssetCheckOutForm()
 
     # Initial GET still renders the whole modal template via the placeholder swap
     context = {'form': form, 'asset': asset}
@@ -406,44 +297,11 @@ def asset_checkout_modal(request, pk):
 @require_POST
 def asset_checkin(request, pk):
     asset = get_object_or_404(Asset, pk=pk)
+    from .services import checkin_asset
     
-    # Find the AssetHolderAssignment, if one exists
-    assignment = AssetHolderAssignment.objects.filter(
-        content_type=ContentType.objects.get_for_model(Asset),
-        object_id=asset.pk
-    ).select_related('asset_holder').first()
-    
-    # Check if the asset has an assignment record first
-    if assignment:
-        from django.db import transaction
-        with transaction.atomic():
-            # Check in from Asset Holder
-            checked_in_from = assignment.asset_holder
-            from_str = str(checked_in_from) if checked_in_from else 'N/A'
-            
-            assignment.delete()
-            available_status = StatusLabel.objects.filter(slug='available').first()
-            if available_status:
-                asset.status = available_status
-            asset._changelog_action = 'checkin'
-            asset._changelog_message = f"Checked in from Asset Holder: {from_str}"
-            asset.save()
-        messages.success(request, f"Asset '{asset}' successfully checked in from Asset Holder: {from_str}.")
-    elif asset.location:
-        from django.db import transaction
-        with transaction.atomic():
-            # Check in (clear) from Location
-            checked_in_from = asset.location
-            from_str = str(checked_in_from) if checked_in_from else 'N/A'
-            
-            asset.location = None
-            available_status = StatusLabel.objects.filter(slug='available').first()
-            if available_status:
-                asset.status = available_status
-            asset._changelog_action = 'checkin'
-            asset._changelog_message = f"Checked in from Location: {from_str}"
-            asset.save()
-        messages.success(request, f"Asset '{asset}' successfully checked in from Location: {from_str}.")
+    msg = checkin_asset(asset, user=request.user)
+    if msg:
+        messages.success(request, f"Asset '{asset}' successfully {msg.lower()}.")
     else:
         # Asset was not assigned to a holder or location
         messages.warning(request, f"Asset '{asset}' was not checked out to a holder or assigned to a location.")
@@ -876,20 +734,11 @@ class AccessoryDeleteView(ObjectDeleteView):
         return super().post(request, *args, **kwargs)
 
 
-class AccessoryCloneView(ObjectEditView):
+class AccessoryCloneView(ObjectCloneView):
     model = Accessory
     model_form = forms.AccessoryForm
     template_name = 'generic/object_edit.html'
     default_return_url = 'assets:accessory_list'
-
-    def get_object(self, queryset=None):
-        original = get_object_or_404(Accessory, pk=self.kwargs['pk'])
-        cloned = original.clone()
-        cloned.name = f'{original.name} (Copy)'
-        cloned.slug = ''
-        cloned.save()
-        cloned.tags.set(original.tags.all())
-        return cloned
 
 
 @login_required
@@ -902,29 +751,35 @@ def accessory_checkout(request, pk):
     if request.method == 'POST':
         form = forms.AccessoryCheckoutForm(request.POST, accessory=accessory)
         if form.is_valid():
+            from .services import checkout_accessory
             holder = form.cleaned_data.get('assigned_holder')
             location = form.cleaned_data.get('assigned_location')
             qty = form.cleaned_data.get('qty')
             notes = form.cleaned_data.get('notes')
             
-            AccessoryAssignment.objects.create(
-                accessory=accessory,
-                assigned_holder=holder,
-                assigned_location=location,
-                qty=qty,
-                notes=notes
-            )
-            
-            recipient = holder or location
-            messages.success(request, f"Checked out {qty}x '{accessory}' successfully to {recipient}.")
-            
-            response = HttpResponse(status=204)
-            response['HX-Trigger'] = json.dumps({
-                "closeModalEvent": None,
-                "assetListUpdated": None,
-                "showMessage": {"message": f"Checked out {qty}x '{accessory}' successfully to {recipient}.", "level": "success"}
-            })
-            return response
+            try:
+                checkout_accessory(
+                    accessory,
+                    qty,
+                    holder=holder,
+                    location=location,
+                    user=request.user,
+                    notes=notes
+                )
+                recipient = holder or location
+                messages.success(request, f"Checked out {qty}x '{accessory}' successfully to {recipient}.")
+                
+                response = HttpResponse(status=204)
+                response['HX-Trigger'] = json.dumps({
+                    "closeModalEvent": None,
+                    "assetListUpdated": None,
+                    "showMessage": {"message": f"Checked out {qty}x '{accessory}' successfully to {recipient}.", "level": "success"}
+                })
+                return response
+            except Exception as e:
+                form.add_error(None, str(e))
+                context = {'form': form, 'accessory': accessory, 'request': request}
+                return render(request, "assets/includes/accessory_checkout_modal.html#checkout-modal-form", context)
         else:
             context = {'form': form, 'accessory': accessory, 'request': request}
             return render(request, "assets/includes/accessory_checkout_modal.html#checkout-modal-form", context)
@@ -938,14 +793,11 @@ def accessory_checkout(request, pk):
 @login_required
 @require_POST
 def accessory_checkin(request, pk):
-    assignment = get_object_or_404(AccessoryAssignment, pk=pk)
-    accessory = assignment.accessory
-    qty = assignment.qty
-    recipient = assignment.assigned_holder or assignment.assigned_location
-    
-    assignment.delete()
+    from .services import checkin_accessory
+    accessory, qty, recipient = checkin_accessory(pk, user=request.user)
     messages.success(request, f"Checked in {qty}x '{accessory}' from {recipient}.")
     return redirect(accessory.get_absolute_url())
+
 
 
 # Consumable Views
@@ -1002,20 +854,11 @@ class ConsumableDeleteView(ObjectDeleteView):
         return super().post(request, *args, **kwargs)
 
 
-class ConsumableCloneView(ObjectEditView):
+class ConsumableCloneView(ObjectCloneView):
     model = Consumable
     model_form = forms.ConsumableForm
     template_name = 'generic/object_edit.html'
     default_return_url = 'assets:consumable_list'
-
-    def get_object(self, queryset=None):
-        original = get_object_or_404(Consumable, pk=self.kwargs['pk'])
-        cloned = original.clone()
-        cloned.name = f'{original.name} (Copy)'
-        cloned.slug = ''
-        cloned.save()
-        cloned.tags.set(original.tags.all())
-        return cloned
 
 
 @login_required
@@ -1028,29 +871,35 @@ def consumable_checkout(request, pk):
     if request.method == 'POST':
         form = forms.ConsumableCheckoutForm(request.POST, consumable=consumable)
         if form.is_valid():
+            from .services import checkout_consumable
             holder = form.cleaned_data.get('assigned_holder')
             location = form.cleaned_data.get('assigned_location')
             qty = form.cleaned_data.get('qty')
             notes = form.cleaned_data.get('notes')
             
-            ConsumableAssignment.objects.create(
-                consumable=consumable,
-                assigned_holder=holder,
-                assigned_location=location,
-                qty=qty,
-                notes=notes
-            )
-            
-            recipient = holder or location
-            messages.success(request, f"Checked out / Consumed {qty}x '{consumable}' for {recipient}.")
-            
-            response = HttpResponse(status=204)
-            response['HX-Trigger'] = json.dumps({
-                "closeModalEvent": None,
-                "assetListUpdated": None,
-                "showMessage": {"message": f"Consumed {qty}x '{consumable}' for {recipient}.", "level": "success"}
-            })
-            return response
+            try:
+                checkout_consumable(
+                    consumable,
+                    qty,
+                    holder=holder,
+                    location=location,
+                    user=request.user,
+                    notes=notes
+                )
+                recipient = holder or location
+                messages.success(request, f"Checked out / Consumed {qty}x '{consumable}' for {recipient}.")
+                
+                response = HttpResponse(status=204)
+                response['HX-Trigger'] = json.dumps({
+                    "closeModalEvent": None,
+                    "assetListUpdated": None,
+                    "showMessage": {"message": f"Consumed {qty}x '{consumable}' for {recipient}.", "level": "success"}
+                })
+                return response
+            except Exception as e:
+                form.add_error(None, str(e))
+                context = {'form': form, 'consumable': consumable, 'request': request}
+                return render(request, "assets/includes/consumable_checkout_modal.html#checkout-modal-form", context)
         else:
             context = {'form': form, 'consumable': consumable, 'request': request}
             return render(request, "assets/includes/consumable_checkout_modal.html#checkout-modal-form", context)
@@ -1059,6 +908,7 @@ def consumable_checkout(request, pk):
 
     context = {'form': form, 'consumable': consumable}
     return render(request, 'assets/includes/consumable_checkout_modal.html', context)
+
 
 
 # Asset Maintenance Views
@@ -1075,6 +925,7 @@ class AssetMaintenanceDetailView(ObjectDetailView):
     template_name = 'assets/assetmaintenances/assetmaintenance_detail.html'
 
     layout = (
+        ((Panel('metrics', 'Maintenance Overview'),),),
         ((Panel('info', 'Maintenance Details'),),),
     )
 
@@ -1424,7 +1275,6 @@ class KitItemDeleteView(ObjectDeleteView):
 # Atomic Kit Checkout
 class KitCheckoutView(LoginRequiredMixin, View):
     def post(self, request, pk):
-        from django.db import transaction
         from django.core.exceptions import ValidationError
         kit = get_object_or_404(Kit, pk=pk)
         form = forms.KitCheckoutForm(request.POST)
@@ -1443,89 +1293,14 @@ class KitCheckoutView(LoginRequiredMixin, View):
         notes = form.cleaned_data.get('notes') or ''
 
         try:
-            with transaction.atomic():
-                in_use_status = StatusLabel.objects.filter(slug='in-use').first()
-                if not in_use_status:
-                    raise ValidationError("The 'in-use' Status Label does not exist. Please configure it.")
-
-                allocated_assets = []
-
-                # Verification Pass
-                for item in kit.items.all():
-                    if item.asset_type:
-                        asset = Asset.objects.filter(asset_type=item.asset_type, status__slug='available').first()
-                        if not asset:
-                            raise ValidationError(f"No available assets of type '{item.asset_type}' in stock.")
-                        allocated_assets.append(asset)
-                    elif item.accessory:
-                        rem = item.accessory.remaining_qty
-                        if not item.accessory.allow_overallocate and rem < item.qty:
-                            raise ValidationError(f"Insufficient stock for accessory '{item.accessory}'. Required: {item.qty}, Available: {rem}")
-                    elif item.license:
-                        rem = item.license.available_seats
-                        if rem < 1:
-                            raise ValidationError(f"No available seats for software license '{item.license}'.")
-
-                # Execution Pass
-                for item in kit.items.all():
-                    if item.asset_type:
-                        asset = Asset.objects.filter(asset_type=item.asset_type, status__slug='available').first()
-                        asset.status = in_use_status
-                        
-                        if holder:
-                            asset.location = None
-                            assignee = holder
-                        else:
-                            asset.location = location
-                            assignee = location
-                        
-                        asset._changelog_action = 'checkout'
-                        asset._changelog_message = f"Checked out via Kit '{kit.name}'. {notes}"
-                        asset.save(update_fields=['status', 'location'])
-                        ActivityLog.objects.create(
-                            asset=asset,
-                            action='checked_out',
-                            user=request.user,
-                            notes=f"Checked out via Kit '{kit.name}'. {notes}"
-                        )
-                        
-                        if holder:
-                            AssetHolderAssignment.objects.update_or_create(
-                                content_type=ContentType.objects.get_for_model(Asset),
-                                object_id=asset.pk,
-                                defaults={
-                                    'asset_holder': holder,
-                                }
-                            )
-                        else:
-                            AssetHolderAssignment.objects.filter(
-                                content_type=ContentType.objects.get_for_model(Asset),
-                                object_id=asset.pk
-                            ).delete()
-                        
-                    elif item.accessory:
-                        AccessoryAssignment.objects.create(
-                            accessory=item.accessory,
-                            assigned_holder=holder,
-                            assigned_location=location,
-                            qty=item.qty,
-                            notes=f"Checked out via Kit '{kit.name}'. {notes}"
-                        )
-                    elif item.license:
-                        if holder:
-                            LicenseSeatAssignment.objects.create(
-                                license=item.license,
-                                assigned_holder=holder,
-                                notes=f"Checked out via Kit '{kit.name}'. {notes}"
-                            )
-                        elif allocated_assets:
-                            LicenseSeatAssignment.objects.create(
-                                license=item.license,
-                                asset=allocated_assets[0],
-                                notes=f"Checked out via Kit '{kit.name}'. {notes}"
-                            )
-                        else:
-                            raise ValidationError(f"License seat for '{item.license.name}' must be assigned to either a Holder or an Asset.")
+            from .services import checkout_kit
+            checkout_kit(
+                kit,
+                holder=holder,
+                location=location,
+                user=request.user,
+                notes=notes
+            )
 
             messages.success(request, f"Kit '{kit.name}' checked out successfully.")
             
@@ -1566,6 +1341,7 @@ def kit_checkout_modal(request, pk):
 
     context = {'form': form, 'kit': kit}
     return render(request, 'assets/includes/kit_checkout_modal.html', context)
+
 
 
 @login_required

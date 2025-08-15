@@ -1,3 +1,4 @@
+import logging
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.db import DatabaseError
@@ -6,6 +7,7 @@ from assets.models import ConsumableAssignment, Consumable, AssetRequest
 from core.models import Notification
 from core.events import dispatch_event
 
+logger = logging.getLogger(__name__)
 User = get_user_model()
 
 @receiver(post_save, sender=ConsumableAssignment)
@@ -53,7 +55,7 @@ def on_asset_request_save(sender, instance, created, **kwargs):
                     message=f"{instance.requester} has requested {instance}.",
                     level=Notification.LEVEL_INFO,
                 )
-    except DatabaseError:
-        pass
-    except Exception:
-        pass
+    except DatabaseError as e:
+        logger.exception("Database error occurred while processing asset request notification: %s", e)
+    except Exception as e:
+        logger.exception("Unexpected error occurred while processing asset request notification: %s", e)
