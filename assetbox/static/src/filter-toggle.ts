@@ -88,23 +88,21 @@
     }
   });
 
-  // Re-initialize when body content transitions or dynamic content loads
-  document.body.addEventListener('htmx:afterOnLoad', function (event: Event) {
-    const detail = (event as CustomEvent).detail;
-    if (
-      detail.target &&
-      (detail.target.id === 'page-body-main' ||
-        detail.target.id === 'object-list-dynamic-content' ||
-        detail.target.id === 'page-content-wrapper')
-    ) {
+  function scheduleFilterInit(): void {
+    queueMicrotask(() => {
       initFiltersToggle();
-    }
+    });
+  }
+
+  // Re-initialize after HTMX settles (DOM fully updated, OOB swaps complete)
+  document.body.addEventListener('htmx:afterSettle', function (event: Event) {
+    scheduleFilterInit();
   });
 
   // Initial call on DOM ready
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initFiltersToggle);
+    document.addEventListener('DOMContentLoaded', scheduleFilterInit);
   } else {
-    initFiltersToggle();
+    scheduleFilterInit();
   }
 })();

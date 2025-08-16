@@ -29,7 +29,9 @@
 </div>
 
 {# Render the django-tables2 table #}
+<div class="table-responsive w-100">
 {% render_table table "global_includes/htmx_table.html" %}
+</div>
 
 {# Render pagination controls #}
 {% if table.page %}

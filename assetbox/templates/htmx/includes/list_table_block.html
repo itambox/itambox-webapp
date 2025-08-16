@@ -1,7 +1,7 @@
 {# Table rendering block for HTMX list views #}
 {# Expects context: table #}
 <div id="object-list-table-container">
-    <div class="table-responsive">
+    <div class="table-responsive w-100">
        {% if table %}
            {% render_table table "global_includes/htmx_table.html" %}
        {% else %}
