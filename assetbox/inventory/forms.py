@@ -1,0 +1,350 @@
+from django import forms
+from django.core.exceptions import ValidationError
+from django.urls import reverse
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Layout, Submit, HTML, Row, Column, Div
+
+from core.forms import SlugModelForm, FilterForm
+from extras.models import Tag
+from organization.models import Location, AssetHolder, Tenant
+from assets.models import Manufacturer
+from .models import Accessory, Consumable, Kit, KitItem
+
+
+class AccessoryForm(SlugModelForm):
+    manufacturer = forms.ModelChoiceField(
+        queryset=Manufacturer.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    tags = forms.ModelMultipleChoiceField(
+        queryset=Tag.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tomselect-tags': 'true'}),
+        label="Tags"
+    )
+
+    class Meta:
+        model = Accessory
+        fields = ['manufacturer', 'name', 'slug', 'category', 'part_number', 'qty', 'min_qty', 'allow_overallocate', 'notes', 'tags', 'tenant']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'slug': forms.TextInput(attrs={'class': 'form-control', 'slugify': 'name'}),
+            'part_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'qty': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+            'min_qty': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+            'allow_overallocate': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+        self.fields['slug'].widget.attrs['slugify'] = 'name'
+        
+        button_text = 'Update' if self.instance.pk else 'Create'
+        cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse('assets:accessory_list')
+        
+        self.helper.layout = Layout(
+            Row(
+                Column('manufacturer', css_class='col-md-6'),
+                Column('name', css_class='col-md-6')
+            ),
+            Row(
+                Column('slug', css_class='col-md-6'),
+                Column('part_number', css_class='col-md-6')
+            ),
+            Row(
+                Column('category', css_class='col-md-4'),
+                Column('qty', css_class='col-md-4'),
+                Column('min_qty', css_class='col-md-4')
+            ),
+            Row(
+                Column('tenant', css_class='col-md-6'),
+                Column('tags', css_class='col-md-6')
+            ),
+            Div(
+                'allow_overallocate',
+                css_class='mb-3 form-check'
+            ),
+            'notes',
+            'tags',
+            HTML('<div class="mt-3">'),
+            Submit('submit', button_text, css_class='btn btn-primary'),
+            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+            HTML('</div>')
+        )
+
+
+class ConsumableForm(SlugModelForm):
+    manufacturer = forms.ModelChoiceField(
+        queryset=Manufacturer.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    tags = forms.ModelMultipleChoiceField(
+        queryset=Tag.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tomselect-tags': 'true'}),
+        label="Tags"
+    )
+
+    class Meta:
+        model = Consumable
+        fields = ['manufacturer', 'name', 'slug', 'category', 'part_number', 'qty', 'min_qty', 'allow_overallocate', 'notes', 'tags', 'tenant']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'slug': forms.TextInput(attrs={'class': 'form-control', 'slugify': 'name'}),
+            'part_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'qty': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+            'min_qty': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+            'allow_overallocate': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+        self.fields['slug'].widget.attrs['slugify'] = 'name'
+        
+        button_text = 'Update' if self.instance.pk else 'Create'
+        cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse('assets:consumable_list')
+        
+        self.helper.layout = Layout(
+            Row(
+                Column('manufacturer', css_class='col-md-6'),
+                Column('name', css_class='col-md-6')
+            ),
+            Row(
+                Column('slug', css_class='col-md-6'),
+                Column('part_number', css_class='col-md-6')
+            ),
+            Row(
+                Column('category', css_class='col-md-4'),
+                Column('qty', css_class='col-md-4'),
+                Column('min_qty', css_class='col-md-4')
+            ),
+            Row(
+                Column('tenant', css_class='col-md-6'),
+                Column('tags', css_class='col-md-6')
+            ),
+            Div(
+                'allow_overallocate',
+                css_class='mb-3 form-check'
+            ),
+            'notes',
+            'tags',
+            HTML('<div class="mt-3">'),
+            Submit('submit', button_text, css_class='btn btn-primary'),
+            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+            HTML('</div>')
+        )
+
+
+class KitForm(forms.ModelForm):
+    tags = forms.ModelMultipleChoiceField(
+        queryset=Tag.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tomselect-tags': 'true'}),
+    )
+
+    class Meta:
+        model = Kit
+        fields = ['name', 'description', 'tenant', 'tags']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+        
+        button_text = 'Update' if self.instance.pk else 'Create'
+        cancel_url = reverse('assets:kit_list')
+        
+        self.helper.layout = Layout(
+            'name',
+            'description',
+            'tenant',
+            'tags',
+            HTML('<div class="mt-3">'),
+            Submit('submit', button_text, css_class='btn btn-primary'),
+            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+            HTML('</div>')
+        )
+
+
+class KitItemForm(forms.ModelForm):
+    class Meta:
+        model = KitItem
+        fields = ['kit', 'asset_type', 'accessory', 'license', 'qty']
+        widgets = {
+            'kit': forms.Select(attrs={'class': 'form-select'}),
+            'asset_type': forms.Select(attrs={'class': 'form-select'}),
+            'accessory': forms.Select(attrs={'class': 'form-select'}),
+            'license': forms.Select(attrs={'class': 'form-select'}),
+            'qty': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+        
+        button_text = 'Update' if self.instance.pk else 'Create'
+        cancel_url = self.instance.kit.get_absolute_url() if (self.instance.pk and self.instance.kit) else reverse('assets:kit_list')
+        
+        self.helper.layout = Layout(
+            'kit',
+            'asset_type',
+            'accessory',
+            'license',
+            'qty',
+            HTML('<div class="mt-3">'),
+            Submit('submit', button_text, css_class='btn btn-primary'),
+            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+            HTML('</div>')
+        )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        asset_type = cleaned_data.get('asset_type')
+        accessory = cleaned_data.get('accessory')
+        license_item = cleaned_data.get('license')
+
+        targets = [asset_type, accessory, license_item]
+        filled = [t for t in targets if t is not None]
+        if len(filled) == 0:
+            raise ValidationError("A kit item must select either an Asset Type, Accessory, or License.")
+        if len(filled) > 1:
+            raise ValidationError("A kit item cannot select more than one target (must be either Asset Type OR Accessory OR License).")
+        return cleaned_data
+
+
+class BaseCheckoutForm(forms.Form):
+    assigned_holder = forms.ModelChoiceField(
+        queryset=AssetHolder.objects.all().order_by('last_name', 'first_name'),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Assign to Asset Holder"
+    )
+    assigned_location = forms.ModelChoiceField(
+        queryset=Location.objects.all().select_related('site').order_by('site__name', 'name'),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Assign to Location"
+    )
+    notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        label="Notes"
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        holder = cleaned_data.get('assigned_holder')
+        location = cleaned_data.get('assigned_location')
+
+        if not holder and not location:
+            raise ValidationError("You must select either an Asset Holder or a Location.")
+        if holder and location:
+            raise ValidationError("Please select either an Asset Holder OR a Location, not both.")
+        return cleaned_data
+
+
+class AccessoryCheckoutForm(BaseCheckoutForm):
+    qty = forms.IntegerField(
+        initial=1,
+        min_value=1,
+        widget=forms.NumberInput(attrs={'class': 'form-control'}),
+        label="Quantity"
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.accessory = kwargs.pop('accessory', None)
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_tag = False
+        self.helper.layout = Layout(
+            'assigned_holder',
+            HTML('<p class="text-muted text-center my-2">OR</p>'),
+            'assigned_location',
+            'qty',
+            'notes'
+        )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        qty = cleaned_data.get('qty')
+
+        if self.accessory and qty:
+            remaining = self.accessory.remaining_qty
+            if not self.accessory.allow_overallocate and qty > remaining:
+                raise ValidationError(f"Cannot checkout {qty} units. Only {remaining} units are currently in stock.")
+
+        return cleaned_data
+
+
+class ConsumableCheckoutForm(BaseCheckoutForm):
+    qty = forms.IntegerField(
+        initial=1,
+        min_value=1,
+        widget=forms.NumberInput(attrs={'class': 'form-control'}),
+        label="Quantity"
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.consumable = kwargs.pop('consumable', None)
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_tag = False
+        self.helper.layout = Layout(
+            'assigned_holder',
+            HTML('<p class="text-muted text-center my-2">OR</p>'),
+            'assigned_location',
+            'qty',
+            'notes'
+        )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        qty = cleaned_data.get('qty')
+
+        if self.consumable and qty:
+            remaining = self.consumable.remaining_qty
+            if not self.consumable.allow_overallocate and qty > remaining:
+                raise ValidationError(f"Cannot checkout {qty} units. Only {remaining} units are currently in stock.")
+
+        return cleaned_data
+
+
+class KitCheckoutForm(BaseCheckoutForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_tag = False
+        self.helper.layout = Layout(
+            'assigned_holder',
+            HTML('<p class="text-muted text-center my-2">OR</p>'),
+            'assigned_location',
+            'notes'
+        )
+
+
+from .filters import AccessoryFilterSet, ConsumableFilterSet, KitFilterSet
+
+class AccessoryFilterForm(FilterForm):
+    filterset_class = AccessoryFilterSet
+
+class ConsumableFilterForm(FilterForm):
+    filterset_class = ConsumableFilterSet
+
+class KitFilterForm(FilterForm):
+    filterset_class = KitFilterSet
+
