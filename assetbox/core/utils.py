@@ -19,6 +19,8 @@ def get_model_viewname(model, action):
     Example: (Asset, 'list') -> 'assets:asset_list'
     """
     app_label = model._meta.app_label
+    if app_label in ['components', 'inventory', 'compliance']:
+        app_label = 'assets'
     model_name = model._meta.model_name
     return f"{app_label}:{model_name}_{action}"
 
@@ -256,7 +258,10 @@ def build_breadcrumbs(request, obj=None):
     if obj:
         # If an object is provided, add its list view and itself
         model_meta = obj._meta
-        list_view_name = f"{model_meta.app_label}:{model_meta.model_name}_list"
+        app_label = model_meta.app_label
+        if app_label in ['components', 'inventory', 'compliance']:
+            app_label = 'assets'
+        list_view_name = f"{app_label}:{model_meta.model_name}_list"
         try:
             list_url = reverse(list_view_name)
             breadcrumbs.append({'url': list_url, 'name': model_meta.verbose_name_plural.capitalize()})
