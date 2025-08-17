@@ -73,3 +73,56 @@ class Dashboard(models.Model):
             widget = layout.pop(from_index)
             layout.insert(to_index, widget)
             self.save(update_fields=['layout'])
+
+
+class CustomField(ChangeLoggingMixin, BaseModel):
+    FIELD_TYPE_TEXT = 'text'
+    FIELD_TYPE_NUMBER = 'number'
+    FIELD_TYPE_DATE = 'date'
+    FIELD_TYPE_BOOLEAN = 'boolean'
+    FIELD_TYPE_SELECT = 'select'
+    FIELD_TYPE_CHOICES = [
+        (FIELD_TYPE_TEXT, 'Text'),
+        (FIELD_TYPE_NUMBER, 'Number'),
+        (FIELD_TYPE_DATE, 'Date'),
+        (FIELD_TYPE_BOOLEAN, 'Boolean'),
+        (FIELD_TYPE_SELECT, 'Select / Dropdown'),
+    ]
+
+    name = models.SlugField(max_length=50, unique=True, verbose_name="Field Name", help_text="Slug-like name (e.g. sim_card_number)")
+    label = models.CharField(max_length=100, verbose_name="Display Label")
+    field_type = models.CharField(max_length=50, choices=FIELD_TYPE_CHOICES, default=FIELD_TYPE_TEXT, verbose_name="Field Type")
+    choices = models.TextField(blank=True, null=True, help_text="New-line separated list of choices (only for 'select' type)")
+    required = models.BooleanField(default=False, verbose_name="Required")
+
+    class Meta:
+        ordering = ['label']
+        verbose_name = "Custom Field"
+        verbose_name_plural = "Custom Fields"
+        db_table = 'assets_customfield'
+        app_label = 'assets'
+
+    def __str__(self):
+        return f"{self.label} ({self.get_field_type_display()})"
+
+    def get_absolute_url(self):
+        return reverse('assets:customfield_detail', kwargs={'pk': self.pk})
+
+
+class CustomFieldset(ChangeLoggingMixin, BaseModel):
+    name = models.CharField(max_length=100, unique=True, verbose_name="Fieldset Name")
+    fields = models.ManyToManyField(CustomField, related_name='fieldsets', blank=True, verbose_name="Custom Fields")
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = "Custom Fieldset"
+        verbose_name_plural = "Custom Fieldsets"
+        db_table = 'assets_customfieldset'
+        app_label = 'assets'
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse('assets:customfieldset_detail', kwargs={'pk': self.pk})
+

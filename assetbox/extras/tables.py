@@ -4,7 +4,7 @@ from django_tables2.utils import A
 from django.utils.safestring import mark_safe
 from django.urls import reverse
 from django.utils.html import escape, format_html
-from .models import Tag
+from .models import Tag, CustomField, CustomFieldset
 from core.tables import ActionsColumn, BaseTable, ToggleColumn
 
 # =============================================================================
@@ -53,4 +53,34 @@ class TagTable(BaseTable):
         if value:
             return mark_safe(f'<span class="badge" style="background-color: #{value};">&nbsp;</span> #{value}')
         return "—"
+
+
+class CustomFieldTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    name = tables.LinkColumn('assets:customfield_detail', args=[A('pk')], verbose_name='Name')
+    label = tables.Column(verbose_name='Label')
+    field_type = tables.Column(verbose_name='Field Type')
+    required = tables.BooleanColumn(verbose_name='Required')
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = CustomField
+        fields = ('pk', 'name', 'label', 'field_type', 'required', 'actions')
+        default_columns = ('pk', 'name', 'label', 'field_type', 'required', 'actions')
+
+
+class CustomFieldsetTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    name = tables.LinkColumn('assets:customfieldset_detail', args=[A('pk')], verbose_name='Name')
+    fields_count = tables.Column(verbose_name='Fields Count', orderable=False)
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = CustomFieldset
+        fields = ('pk', 'name', 'fields_count', 'actions')
+        default_columns = ('pk', 'name', 'fields_count', 'actions')
+
+    def render_fields_count(self, value, record=None):
+        return value or 0
+
 

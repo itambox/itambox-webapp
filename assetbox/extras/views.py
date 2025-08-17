@@ -1,11 +1,12 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
-from .models import Tag
-from .forms import TagForm, TagFilterForm
+from django.db.models import Count
+from .models import Tag, CustomField, CustomFieldset
+from .forms import TagForm, TagFilterForm, CustomFieldForm, CustomFieldFilterForm, CustomFieldsetForm, CustomFieldsetFilterForm
 from django_tables2 import RequestConfig
-from .tables import TagTable
-from .filters import TagFilter
+from .tables import TagTable, CustomFieldTable, CustomFieldsetTable
+from .filters import TagFilter, CustomFieldFilterSet, CustomFieldsetFilterSet
 from core.utils import get_paginate_count, get_model_viewname # Import the utility function
 from assets.tables import AssetTable # Import AssetTable
 from users.models import UserPreference # Import UserPreference
@@ -64,3 +65,68 @@ class TagListView(ObjectListView):
     table = TagTable
     action_buttons = ('add',) # Add create button
     template_name = 'generic/object_list.html' # Use base template
+
+
+# Custom Fields
+class CustomFieldListView(ObjectListView):
+    queryset = CustomField.objects.all()
+    filterset = CustomFieldFilterSet
+    filterset_form = CustomFieldFilterForm
+    table = CustomFieldTable
+    action_buttons = ('add',)
+
+
+class CustomFieldDetailView(ObjectDetailView):
+    queryset = CustomField.objects.all()
+
+    layout = (
+        ((Panel('info', 'Custom Field Details'),),),
+    )
+
+
+class CustomFieldEditView(ObjectEditView):
+    queryset = CustomField.objects.all()
+    model = CustomField
+    model_form = CustomFieldForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'assets:customfield_list'
+
+
+class CustomFieldDeleteView(ObjectDeleteView):
+    queryset = CustomField.objects.all()
+    model = CustomField
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('assets:customfield_list')
+
+
+# Custom Fieldsets
+class CustomFieldsetListView(ObjectListView):
+    queryset = CustomFieldset.objects.annotate(fields_count=Count('fields'))
+    filterset = CustomFieldsetFilterSet
+    filterset_form = CustomFieldsetFilterForm
+    table = CustomFieldsetTable
+    action_buttons = ('add',)
+
+
+class CustomFieldsetDetailView(ObjectDetailView):
+    queryset = CustomFieldset.objects.all().prefetch_related('fields', 'asset_types')
+
+    layout = (
+        ((Panel('info', 'Custom Field Set Details'),),),
+    )
+
+
+class CustomFieldsetEditView(ObjectEditView):
+    queryset = CustomFieldset.objects.all()
+    model = CustomFieldset
+    model_form = CustomFieldsetForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'assets:customfieldset_list'
+
+
+class CustomFieldsetDeleteView(ObjectDeleteView):
+    queryset = CustomFieldset.objects.all()
+    model = CustomFieldset
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('assets:customfieldset_list')
+
