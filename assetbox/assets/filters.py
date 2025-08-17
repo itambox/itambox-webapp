@@ -1,12 +1,9 @@
 import django_filters
-from .models import Asset, AssetRole, Manufacturer, AssetType, ComponentType, ComponentInstance, Accessory, Consumable, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, Supplier, Category, AssetRequest, AssetTagSequence
+from .models import Asset, AssetRole, Manufacturer, AssetType, StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence
 from organization.models import Location, Tenant
 from extras.models import Tag
 from django import forms
 from django.db.models import Q
-from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, HTML
-from django.contrib.contenttypes.models import ContentType
 
 class AssetFilterSet(django_filters.FilterSet):
     q = django_filters.CharFilter(
@@ -164,119 +161,6 @@ class AssetTypeFilterSet(django_filters.FilterSet):
         ).distinct()
 
 
-class ComponentTypeFilterSet(django_filters.FilterSet):
-    q = django_filters.CharFilter(
-        method='search',
-        label='Search',
-        widget=forms.TextInput(attrs={'placeholder': 'Name, Part Number...'})
-    )
-    manufacturer = django_filters.ModelChoiceFilter(
-        queryset=Manufacturer.objects.all(),
-        label='Manufacturer',
-        widget=forms.Select(attrs={'class': 'form-select'})
-    )
-
-    class Meta:
-        model = ComponentType
-        fields = ['manufacturer', 'category']
-
-    def search(self, queryset, name, value):
-        if not value.strip():
-            return queryset
-        return queryset.filter(
-            Q(name__icontains=value) |
-            Q(part_number__icontains=value) |
-            Q(description__icontains=value) |
-            Q(specs__icontains=value)
-        ).distinct()
-
-
-class ComponentInstanceFilterSet(django_filters.FilterSet):
-    q = django_filters.CharFilter(
-        method='search',
-        label='Search',
-        widget=forms.TextInput(attrs={'placeholder': 'Serial, Notes...'})
-    )
-    component_type = django_filters.ModelChoiceFilter(
-        queryset=ComponentType.objects.all(),
-        label='Component Model',
-        widget=forms.Select(attrs={'class': 'form-select'})
-    )
-
-    class Meta:
-        model = ComponentInstance
-        fields = ['component_type', 'status']
-
-    def search(self, queryset, name, value):
-        if not value.strip():
-            return queryset
-        return queryset.filter(
-            Q(serial_number__icontains=value) |
-            Q(notes__icontains=value)
-        ).distinct()
-
-
-class AccessoryFilterSet(django_filters.FilterSet):
-    q = django_filters.CharFilter(
-        method='search',
-        label='Search',
-        widget=forms.TextInput(attrs={'placeholder': 'Name, Part Number...'})
-    )
-    manufacturer = django_filters.ModelChoiceFilter(
-        queryset=Manufacturer.objects.all(),
-        label='Manufacturer',
-        widget=forms.Select(attrs={'class': 'form-select'})
-    )
-    tenant = django_filters.ModelChoiceFilter(
-        queryset=Tenant.objects.all(),
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        label='Tenant'
-    )
-
-    class Meta:
-        model = Accessory
-        fields = []  # All defined explicitly above
-
-    def search(self, queryset, name, value):
-        if not value.strip():
-            return queryset
-        return queryset.filter(
-            Q(name__icontains=value) |
-            Q(part_number__icontains=value) |
-            Q(notes__icontains=value)
-        ).distinct()
-
-
-class ConsumableFilterSet(django_filters.FilterSet):
-    q = django_filters.CharFilter(
-        method='search',
-        label='Search',
-        widget=forms.TextInput(attrs={'placeholder': 'Name, Part Number...'})
-    )
-    manufacturer = django_filters.ModelChoiceFilter(
-        queryset=Manufacturer.objects.all(),
-        label='Manufacturer',
-        widget=forms.Select(attrs={'class': 'form-select'})
-    )
-    tenant = django_filters.ModelChoiceFilter(
-        queryset=Tenant.objects.all(),
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        label='Tenant'
-    )
-
-    class Meta:
-        model = Consumable
-        fields = ['manufacturer', 'category']
-
-    def search(self, queryset, name, value):
-        if not value.strip():
-            return queryset
-        return queryset.filter(
-            Q(name__icontains=value) |
-            Q(part_number__icontains=value) |
-            Q(notes__icontains=value)
-        ).distinct()
-
 class StatusLabelFilterSet(django_filters.FilterSet):
     q = django_filters.CharFilter(
         method='search',
@@ -301,68 +185,6 @@ class StatusLabelFilterSet(django_filters.FilterSet):
         ).distinct()
 
 
-class AssetMaintenanceFilterSet(django_filters.FilterSet):
-    q = django_filters.CharFilter(
-        method='search',
-        label='Search',
-        widget=forms.TextInput(attrs={'placeholder': 'Supplier, Notes, Asset Name...'})
-    )
-    asset = django_filters.ModelChoiceFilter(
-        queryset=Asset.objects.all(),
-        label='Asset',
-        widget=forms.Select(attrs={'class': 'form-select'})
-    )
-    maintenance_type = django_filters.ChoiceFilter(
-        choices=AssetMaintenance.MAINTENANCE_TYPE_CHOICES,
-        label='Type',
-        widget=forms.Select(attrs={'class': 'form-select'})
-    )
-
-    class Meta:
-        model = AssetMaintenance
-        fields = ['asset', 'maintenance_type', 'supplier']
-
-    def search(self, queryset, name, value):
-        if not value.strip():
-            return queryset
-        return queryset.filter(
-            Q(supplier__icontains=value) |
-            Q(notes__icontains=value) |
-            Q(asset__name__icontains=value)
-        ).distinct()
-
-
-class CustomFieldFilterSet(django_filters.FilterSet):
-    q = django_filters.CharFilter(method='search', label='Search')
-
-    class Meta:
-        model = CustomField
-        fields = ['name', 'label', 'field_type', 'required']
-
-    def search(self, queryset, name, value):
-        if not value.strip():
-            return queryset
-        return queryset.filter(
-            Q(name__icontains=value) |
-            Q(label__icontains=value)
-        ).distinct()
-
-
-class CustomFieldsetFilterSet(django_filters.FilterSet):
-    q = django_filters.CharFilter(method='search', label='Search')
-
-    class Meta:
-        model = CustomFieldset
-        fields = ['name']
-
-    def search(self, queryset, name, value):
-        if not value.strip():
-            return queryset
-        return queryset.filter(
-            Q(name__icontains=value)
-        ).distinct()
-
-
 class DepreciationFilterSet(django_filters.FilterSet):
     q = django_filters.CharFilter(method='search', label='Search')
 
@@ -376,29 +198,6 @@ class DepreciationFilterSet(django_filters.FilterSet):
         return queryset.filter(
             Q(name__icontains=value)
         ).distinct()
-
-
-class KitFilterSet(django_filters.FilterSet):
-    q = django_filters.CharFilter(method='search', label='Search')
-    tenant = django_filters.ModelChoiceFilter(
-        queryset=Tenant.objects.all(),
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        label='Tenant'
-    )
-
-    class Meta:
-        model = Kit
-        fields = ['name']
-
-    def search(self, queryset, name, value):
-        if not value.strip():
-            return queryset
-        return queryset.filter(
-            Q(name__icontains=value) |
-            Q(description__icontains=value)
-        ).distinct()
-
-
 class SupplierFilterSet(django_filters.FilterSet):
     q = django_filters.CharFilter(method='search', label='Search', widget=forms.TextInput(attrs={'placeholder': 'Name...'}))
 
