@@ -4,8 +4,10 @@ from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
 from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
-from .models import Asset, StatusLabel, CustodyReceipt, AccessoryAssignment, ConsumableAssignment, Kit, ActivityLog
-from organization.models import AssetHolderAssignment, AssetHolder, Location
+from .models import Asset, StatusLabel, ActivityLog
+from compliance.models import CustodyReceipt
+from inventory.models import AccessoryAssignment, ConsumableAssignment
+from organization.models import AssetHolderAssignment
 from licenses.models import LicenseSeatAssignment
 
 def checkout_asset(asset, holder=None, location=None, user=None, request=None):

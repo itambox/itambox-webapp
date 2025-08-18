@@ -1,5 +1,9 @@
 from django.urls import path
 from . import views
+from components import views as component_views
+from inventory import views as inventory_views
+from compliance import views as compliance_views
+from extras import views as extras_views
 
 app_name = 'assets' # Namespace for URLs
 
@@ -54,71 +58,72 @@ urlpatterns = [
     path('types/<slug:slug>/delete/', views.AssetTypeDeleteView.as_view(), name='assettype_delete'),
 
     # Component Types
-    path('component-types/', views.ComponentTypeListView.as_view(), name='componenttype_list'),
-    path('component-types/add/', views.ComponentTypeEditView.as_view(), name='componenttype_create'),
-    path('component-types/<int:pk>/clone/', views.ComponentTypeCloneView.as_view(), name='componenttype_clone'),
-    path('component-types/<int:pk>/', views.ComponentTypeDetailView.as_view(), name='componenttype_detail'),
-    path('component-types/<int:pk>/edit/', views.ComponentTypeEditView.as_view(), name='componenttype_update'),
-    path('component-types/<int:pk>/delete/', views.ComponentTypeDeleteView.as_view(), name='componenttype_delete'),
+    path('component-types/', component_views.ComponentTypeListView.as_view(), name='componenttype_list'),
+    path('component-types/add/', component_views.ComponentTypeEditView.as_view(), name='componenttype_create'),
+    path('component-types/<int:pk>/clone/', component_views.ComponentTypeCloneView.as_view(), name='componenttype_clone'),
+    path('component-types/<int:pk>/', component_views.ComponentTypeDetailView.as_view(), name='componenttype_detail'),
+    path('component-types/<int:pk>/edit/', component_views.ComponentTypeEditView.as_view(), name='componenttype_update'),
+    path('component-types/<int:pk>/delete/', component_views.ComponentTypeDeleteView.as_view(), name='componenttype_delete'),
 
     # Component Instances
-    path('components/', views.ComponentInstanceListView.as_view(), name='componentinstance_list'),
-    path('components/add/', views.ComponentInstanceEditView.as_view(), name='componentinstance_create'),
-    path('components/edit/', views.ComponentInstanceBulkEditView.as_view(), name='componentinstance_bulk_edit'),
-    path('components/delete/', views.ComponentInstanceBulkDeleteView.as_view(), name='componentinstance_bulk_delete'),
-    path('components/<int:pk>/', views.ComponentInstanceDetailView.as_view(), name='componentinstance_detail'),
-    path('components/<int:pk>/edit/', views.ComponentInstanceEditView.as_view(), name='componentinstance_update'),
-    path('components/<int:pk>/delete/', views.ComponentInstanceDeleteView.as_view(), name='componentinstance_delete'),
+    path('components/', component_views.ComponentInstanceListView.as_view(), name='componentinstance_list'),
+    path('components/add/', component_views.ComponentInstanceEditView.as_view(), name='componentinstance_create'),
+    path('components/edit/', component_views.ComponentInstanceBulkEditView.as_view(), name='componentinstance_bulk_edit'),
+    path('components/delete/', component_views.ComponentInstanceBulkDeleteView.as_view(), name='componentinstance_bulk_delete'),
+    path('components/<int:pk>/', component_views.ComponentInstanceDetailView.as_view(), name='componentinstance_detail'),
+    path('components/<int:pk>/edit/', component_views.ComponentInstanceEditView.as_view(), name='componentinstance_update'),
+    path('components/<int:pk>/delete/', component_views.ComponentInstanceDeleteView.as_view(), name='componentinstance_delete'),
 
     # Accessories
-    path('accessories/', views.AccessoryListView.as_view(), name='accessory_list'),
-    path('accessories/add/', views.AccessoryEditView.as_view(), name='accessory_create'),
-    path('accessories/edit/', views.AccessoryBulkEditView.as_view(), name='accessory_bulk_edit'),
-    path('accessories/delete/', views.AccessoryBulkDeleteView.as_view(), name='accessory_bulk_delete'),
-    path('accessories/<int:pk>/', views.AccessoryDetailView.as_view(), name='accessory_detail'),
-    path('accessories/<int:pk>/edit/', views.AccessoryEditView.as_view(), name='accessory_update'),
-    path('accessories/<int:pk>/delete/', views.AccessoryDeleteView.as_view(), name='accessory_delete'),
-    path('accessories/<int:pk>/clone/', views.AccessoryCloneView.as_view(), name='accessory_clone'),
-    path('accessories/<int:pk>/checkout/', views.accessory_checkout, name='accessory_checkout'),
-    path('accessories/assignments/<int:pk>/checkin/', views.accessory_checkin, name='accessory_checkin'),
+    path('accessories/', inventory_views.AccessoryListView.as_view(), name='accessory_list'),
+    path('accessories/add/', inventory_views.AccessoryEditView.as_view(), name='accessory_create'),
+    path('accessories/edit/', inventory_views.AccessoryBulkEditView.as_view(), name='accessory_bulk_edit'),
+    path('accessories/delete/', inventory_views.AccessoryBulkDeleteView.as_view(), name='accessory_bulk_delete'),
+    path('accessories/<int:pk>/', inventory_views.AccessoryDetailView.as_view(), name='accessory_detail'),
+    path('accessories/<int:pk>/edit/', inventory_views.AccessoryEditView.as_view(), name='accessory_update'),
+    path('accessories/<int:pk>/delete/', inventory_views.AccessoryDeleteView.as_view(), name='accessory_delete'),
+    path('accessories/<int:pk>/clone/', inventory_views.AccessoryCloneView.as_view(), name='accessory_clone'),
+    path('accessories/<int:pk>/checkout/', inventory_views.accessory_checkout, name='accessory_checkout'),
+    path('accessories/assignments/<int:pk>/checkin/', inventory_views.accessory_checkin, name='accessory_checkin'),
 
     # Consumables
-    path('consumables/', views.ConsumableListView.as_view(), name='consumable_list'),
-    path('consumables/add/', views.ConsumableEditView.as_view(), name='consumable_create'),
-    path('consumables/edit/', views.ConsumableBulkEditView.as_view(), name='consumable_bulk_edit'),
-    path('consumables/delete/', views.ConsumableBulkDeleteView.as_view(), name='consumable_bulk_delete'),
-    path('consumables/<int:pk>/', views.ConsumableDetailView.as_view(), name='consumable_detail'),
-    path('consumables/<int:pk>/edit/', views.ConsumableEditView.as_view(), name='consumable_update'),
-    path('consumables/<int:pk>/delete/', views.ConsumableDeleteView.as_view(), name='consumable_delete'),
-    path('consumables/<int:pk>/clone/', views.ConsumableCloneView.as_view(), name='consumable_clone'),
-    path('consumables/<int:pk>/checkout/', views.consumable_checkout, name='consumable_checkout'),
+    path('consumables/', inventory_views.ConsumableListView.as_view(), name='consumable_list'),
+    path('consumables/add/', inventory_views.ConsumableEditView.as_view(), name='consumable_create'),
+    path('consumables/edit/', inventory_views.ConsumableBulkEditView.as_view(), name='consumable_bulk_edit'),
+    path('consumables/delete/', inventory_views.ConsumableBulkDeleteView.as_view(), name='consumable_bulk_delete'),
+    path('consumables/<int:pk>/', inventory_views.ConsumableDetailView.as_view(), name='consumable_detail'),
+    path('consumables/<int:pk>/edit/', inventory_views.ConsumableEditView.as_view(), name='consumable_update'),
+    path('consumables/<int:pk>/delete/', inventory_views.ConsumableDeleteView.as_view(), name='consumable_delete'),
+    path('consumables/<int:pk>/clone/', inventory_views.ConsumableCloneView.as_view(), name='consumable_clone'),
+    path('consumables/<int:pk>/checkout/', inventory_views.consumable_checkout, name='consumable_checkout'),
     
     # Asset Maintenances
-    path('maintenances/', views.AssetMaintenanceListView.as_view(), name='assetmaintenance_list'),
-    path('maintenances/add/', views.AssetMaintenanceEditView.as_view(), name='assetmaintenance_create'),
-    path('maintenances/<int:pk>/', views.AssetMaintenanceDetailView.as_view(), name='assetmaintenance_detail'),
-    path('maintenances/<int:pk>/edit/', views.AssetMaintenanceEditView.as_view(), name='assetmaintenance_update'),
-    path('maintenances/<int:pk>/delete/', views.AssetMaintenanceDeleteView.as_view(), name='assetmaintenance_delete'),
+    path('maintenances/', compliance_views.AssetMaintenanceListView.as_view(), name='assetmaintenance_list'),
+    path('maintenances/add/', compliance_views.AssetMaintenanceEditView.as_view(), name='assetmaintenance_create'),
+    path('maintenances/<int:pk>/', compliance_views.AssetMaintenanceDetailView.as_view(), name='assetmaintenance_detail'),
+    path('maintenances/<int:pk>/edit/', compliance_views.AssetMaintenanceEditView.as_view(), name='assetmaintenance_update'),
+    path('maintenances/<int:pk>/delete/', compliance_views.AssetMaintenanceDeleteView.as_view(), name='assetmaintenance_delete'),
 
     # Phase 4 Audits & Barcoding
     path('<int:pk>/audit/', views.asset_audit, name='asset_audit'),
     path('<int:pk>/print/', views.asset_label_print, name='asset_label_print'),
     path('<int:pk>/print/<int:template_id>/', views.asset_label_print, name='asset_label_print_template'),
-    path('custody/sign/<str:token>/', views.custody_eula_sign, name='custody_eula_sign'),
+    path('custody/sign/<str:token>/', compliance_views.custody_eula_sign, name='custody_eula_sign'),
 
     # Custom Fields
-    path('custom-fields/', views.CustomFieldListView.as_view(), name='customfield_list'),
-    path('custom-fields/add/', views.CustomFieldEditView.as_view(), name='customfield_create'),
-    path('custom-fields/<int:pk>/', views.CustomFieldDetailView.as_view(), name='customfield_detail'),
-    path('custom-fields/<int:pk>/edit/', views.CustomFieldEditView.as_view(), name='customfield_update'),
-    path('custom-fields/<int:pk>/delete/', views.CustomFieldDeleteView.as_view(), name='customfield_delete'),
+    path('custom-fields/', extras_views.CustomFieldListView.as_view(), name='customfield_list'),
+    path('custom-fields/add/', extras_views.CustomFieldEditView.as_view(), name='customfield_create'),
+    path('custom-fields/<int:pk>/', extras_views.CustomFieldDetailView.as_view(), name='customfield_detail'),
+    path('custom-fields/<int:pk>/edit/', extras_views.CustomFieldEditView.as_view(), name='customfield_update'),
+    path('custom-fields/<int:pk>/delete/', extras_views.CustomFieldDeleteView.as_view(), name='customfield_delete'),
 
     # Custom Fieldsets
-    path('custom-fieldsets/', views.CustomFieldsetListView.as_view(), name='customfieldset_list'),
-    path('custom-fieldsets/add/', views.CustomFieldsetEditView.as_view(), name='customfieldset_create'),
-    path('custom-fieldsets/<int:pk>/', views.CustomFieldsetDetailView.as_view(), name='customfieldset_detail'),
-    path('custom-fieldsets/<int:pk>/edit/', views.CustomFieldsetEditView.as_view(), name='customfieldset_update'),
-    path('custom-fieldsets/<int:pk>/delete/', views.CustomFieldsetDeleteView.as_view(), name='customfieldset_delete'),
+    path('custom-fieldsets/', extras_views.CustomFieldsetListView.as_view(), name='customfieldset_list'),
+    path('custom-fieldsets/add/', extras_views.CustomFieldsetEditView.as_view(), name='customfieldset_create'),
+    path('custom-fieldsets/<int:pk>/', extras_views.CustomFieldsetDetailView.as_view(), name='customfieldset_detail'),
+    path('custom-fieldsets/<int:pk>/edit/', extras_views.CustomFieldsetEditView.as_view(), name='customfieldset_update'),
+    path('custom-fieldsets/<int:pk>/delete/', extras_views.CustomFieldsetDeleteView.as_view(), name='customfieldset_delete'),
+
 
     # Depreciation
     path('depreciations/', views.DepreciationListView.as_view(), name='depreciation_list'),
@@ -128,17 +133,17 @@ urlpatterns = [
     path('depreciations/<int:pk>/delete/', views.DepreciationDeleteView.as_view(), name='depreciation_delete'),
 
     # Kits
-    path('kits/', views.KitListView.as_view(), name='kit_list'),
-    path('kits/add/', views.KitEditView.as_view(), name='kit_create'),
-    path('kits/<int:pk>/', views.KitDetailView.as_view(), name='kit_detail'),
-    path('kits/<int:pk>/edit/', views.KitEditView.as_view(), name='kit_update'),
-    path('kits/<int:pk>/delete/', views.KitDeleteView.as_view(), name='kit_delete'),
-    path('kits/<int:pk>/checkout/', views.kit_checkout_modal, name='kit_checkout_modal'),
+    path('kits/', inventory_views.KitListView.as_view(), name='kit_list'),
+    path('kits/add/', inventory_views.KitEditView.as_view(), name='kit_create'),
+    path('kits/<int:pk>/', inventory_views.KitDetailView.as_view(), name='kit_detail'),
+    path('kits/<int:pk>/edit/', inventory_views.KitEditView.as_view(), name='kit_update'),
+    path('kits/<int:pk>/delete/', inventory_views.KitDeleteView.as_view(), name='kit_delete'),
+    path('kits/<int:pk>/checkout/', inventory_views.kit_checkout_modal, name='kit_checkout_modal'),
 
     # Kit Items
-    path('kit-items/add/', views.KitItemEditView.as_view(), name='kititem_create'),
-    path('kit-items/<int:pk>/edit/', views.KitItemEditView.as_view(), name='kititem_update'),
-    path('kit-items/<int:pk>/delete/', views.KitItemDeleteView.as_view(), name='kititem_delete'),
+    path('kit-items/add/', inventory_views.KitItemEditView.as_view(), name='kititem_create'),
+    path('kit-items/<int:pk>/edit/', inventory_views.KitItemEditView.as_view(), name='kititem_update'),
+    path('kit-items/<int:pk>/delete/', inventory_views.KitItemDeleteView.as_view(), name='kititem_delete'),
 
     # Suppliers
     path('suppliers/', views.SupplierListView.as_view(), name='supplier_list'),
@@ -166,8 +171,8 @@ urlpatterns = [
     # Import URLs
     path('assets/import/', views.AssetImportView.as_view(), name='asset_import'),
     path('manufacturers/import/', views.ManufacturerImportView.as_view(), name='manufacturer_import'),
-    path('accessories/import/', views.AccessoryImportView.as_view(), name='accessory_import'),
-    path('consumables/import/', views.ConsumableImportView.as_view(), name='consumable_import'),
+    path('accessories/import/', inventory_views.AccessoryImportView.as_view(), name='accessory_import'),
+    path('consumables/import/', inventory_views.ConsumableImportView.as_view(), name='consumable_import'),
 
     path('asset-tag-sequences/', views.AssetTagSequenceListView.as_view(), name='assettagsequence_list'),
     path('asset-tag-sequences/add/', views.AssetTagSequenceEditView.as_view(), name='assettagsequence_create'),

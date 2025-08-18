@@ -1,7 +1,11 @@
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
-from assets.models import Manufacturer, ComponentType, ComponentInstance, Asset, AssetType, AssetRole, Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, ActivityLog, CustodyReceipt, StatusLabel, AssetMaintenance, CustomField, CustomFieldset, Depreciation, Kit, KitItem, Supplier, Category, AssetRequest
+from assets.models import Manufacturer, Asset, AssetType, AssetRole, ActivityLog, StatusLabel, Depreciation, Supplier, Category, AssetRequest
+from components.models import ComponentType, ComponentInstance
+from inventory.models import Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, Kit, KitItem
+from compliance.models import CustodyReceipt, AssetMaintenance
+from extras.models import CustomField, CustomFieldset
 from core.models import Notification
 from django.contrib.contenttypes.models import ContentType
 from organization.models import Contact, ContactRole, ContactAssignment
@@ -627,7 +631,7 @@ class AssetMaintenanceAndLifecycleTestCase(TestCase):
 
     def test_asset_maintenance_crud_views(self):
         import datetime
-        from assets.models import AssetMaintenance
+        from compliance.models import AssetMaintenance
         
         asset = Asset.objects.create(
             name="Developer ThinkPad",

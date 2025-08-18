@@ -5,10 +5,9 @@ from django.db.models.functions import Extract
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django.template.loader import render_to_string
-from assets.models import (
-    Asset, AssetMaintenance, Accessory, Consumable,
-    ActivityLog, StatusLabel,
-)
+from assets.models import Asset, ActivityLog, StatusLabel
+from compliance.models import AssetMaintenance
+from inventory.models import Accessory, Consumable
 from licenses.models import License
 from subscriptions.models import Subscription
 

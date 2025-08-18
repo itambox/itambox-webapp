@@ -3,7 +3,8 @@ from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.db import DatabaseError
 from django.contrib.auth import get_user_model
-from assets.models import ConsumableAssignment, Consumable, AssetRequest
+from assets.models import AssetRequest
+from inventory.models import ConsumableAssignment
 from core.models import Notification
 from core.events import dispatch_event
 
