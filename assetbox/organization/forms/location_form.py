@@ -1,0 +1,73 @@
+from django import forms
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Layout
+
+from core.forms import FilterForm
+from extras.models import Tag
+
+from ..models import Location, Site, Tenant
+from ..filters import LocationFilterSet
+
+
+class LocationForm(forms.ModelForm):
+    site = forms.ModelChoiceField(
+        queryset=Site.objects.all(),
+        required=True,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    parent = forms.ModelChoiceField(
+        queryset=Location.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    tenant = forms.ModelChoiceField(
+        queryset=Tenant.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    tags = forms.ModelMultipleChoiceField(
+        queryset=Tag.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
+    )
+
+    class Meta:
+        model = Location
+        fields = [
+            'site', 'name', 'slug', 'status', 'parent', 'tenant',
+            'facility', 'description', 'tags'
+        ]
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'slug': forms.TextInput(attrs={'class': 'form-control'}),
+            'status': forms.Select(attrs={'class': 'form-select'}),
+            'facility': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+        help_texts = {
+            'slug': 'URL-friendly identifier.',
+            'facility': 'Building, Floor, Room, Rack, etc.'
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+        self.helper.layout = Layout(
+            'site', 'name', 'slug', 'status', 'parent', 'tenant',
+            'facility', 'description', 'tags'
+        )
+        from .helpers import add_standard_buttons
+        add_standard_buttons(self.helper, self.instance, 'organization:location_list')
+
+    def clean_parent(self):
+        parent = self.cleaned_data.get('parent')
+        if parent and self.instance and self.instance.pk:
+            if parent.pk == self.instance.pk:
+                raise forms.ValidationError("A location cannot be its own parent.")
+        return parent
+
+
+class LocationFilterForm(FilterForm):
+    filterset_class = LocationFilterSet
