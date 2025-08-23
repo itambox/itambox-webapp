@@ -1,29 +1,46 @@
 from rest_framework.routers import DefaultRouter
 
+
 class AssetBoxRouter(DefaultRouter):
     """
-        Custom router for the AssetBox API.
-        (Currently just inherits DefaultRouter, can add NetBox customizations later)
+    Extend DRF's built-in DefaultRouter to:
+    1. Support bulk operations
+    2. Alphabetically order endpoints under the root view
+    3. Provide contextual view names for breadcrumb trails
     """
+    class APIRootView(DefaultRouter.APIRootView):
+        _module_name = None
+
+        def get_view_name(self):
+            if self._module_name:
+                return self._module_name
+            return 'API Root'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.routes[0].mapping.update({
+            'put': 'bulk_update',
+            'patch': 'bulk_partial_update',
+            'delete': 'bulk_destroy',
+        })
+
     def get_api_root_view(self, api_urls=None):
-        # Get the original view function
-        root_view_func = super().get_api_root_view(api_urls=api_urls)
+        api_root_dict = {}
+        list_name = self.routes[0].name
+        for prefix, viewset, basename in sorted(self.registry, key=lambda x: x[0]):
+            api_root_dict[prefix] = list_name.format(basename=basename)
 
-        # Define a wrapper that modifies the response context
-        def view_wrapper(request, *args, **kwargs):
-            # print(f"--- Entering view_wrapper for {request.resolver_match.namespace} ---") # DEBUG
-            response = root_view_func(request, *args, **kwargs)
-            # Ensure the context used by the template has the correct name
-            if hasattr(response, 'renderer_context') and response.renderer_context is not None:
-                # Extract app label from namespace for a better default name
-                app_label = request.resolver_match.namespace.replace('-api', '').title()
-                new_name = f"{app_label} API"
-                # print(f"  Setting renderer_context['name'] to: {new_name}") # DEBUG
-                response.renderer_context['name'] = new_name
-                # print(f"  Current response context keys: {response.renderer_context.keys()}") # DEBUG
-            # else:
-                # print("  Response has no renderer_context or it is None") # DEBUG
-            return response
+        root_view_cls = self.APIRootView
+        if self.registry:
+            viewset = self.registry[0][1]
+            model = viewset.queryset.model
+            meta = model._meta
+            module_name = meta.app_config.verbose_name if meta.app_config else meta.app_label
+            root_view_cls = type(
+                'AppRootView',
+                (self.APIRootView,),
+                {'_module_name': module_name},
+            )
 
-        # Return the wrapped view function
-        return view_wrapper 
+        return root_view_cls.as_view(api_root_dict=api_root_dict)

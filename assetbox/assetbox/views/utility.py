@@ -8,7 +8,7 @@ from django.utils.module_loading import import_string
 from django.http import JsonResponse
 
 from core.forms import SearchForm
-from core.utils import get_table_for_model
+from assetbox.utils import get_table_for_model
 from .generic import BaseHTMXView
 
 logger = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ class SearchView(LoginRequiredMixin, BaseHTMXView, TemplateResponseMixin, View):
                     data['table'] = table_class(list(data['queryset'][:10]), request=request) 
                     try:
                         from django.urls import reverse
-                        from core.utils import get_model_viewname
+                        from assetbox.utils import get_model_viewname
                         data['list_url'] = reverse(get_model_viewname(model, 'list'))
                     except Exception:
                         data['list_url'] = f'/{model._meta.app_label}/{model._meta.model_name}s/'

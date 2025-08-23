@@ -20,6 +20,15 @@ class Registry:
         self._export_templates = defaultdict(list)
         self._counter_fields = {}
         self._denormalized_fields = defaultdict(list)
+        self._lazy_handlers = []
+
+    def defer_init(self, callback):
+        self._lazy_handlers.append(callback)
+
+    def execute_deferred(self):
+        for handler in self._lazy_handlers:
+            handler()
+        self._lazy_handlers.clear()
 
     @property
     def model_features(self):

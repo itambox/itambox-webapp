@@ -27,7 +27,7 @@ from core.tables import (
 from core.forms import (
     JournalEntryForm, WebhookEndpointForm, EventRuleForm, LabelTemplateForm
 )
-from core.registry import registry
+from assetbox.registry import registry
 
 from .generic import BaseHTMXView, ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
 

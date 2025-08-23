@@ -1,5 +1,5 @@
 from django.urls import path, include
-from core.api.views import APIRootView, StatusView, AuthenticationCheckView
+from assetbox.api.views import APIRootView, StatusView, AuthenticationCheckView
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularSwaggerView,
