@@ -27,6 +27,12 @@ inspiration/*
 
 # Temp output files
 test_output*.txt
+dead_code_*.txt
+scratch_*.txt
 
+# Media uploads
+media/
 
-assetbox/scratch/seed_bughunt.py
+# Project scratch files
+scratch/
+test_holders.csv
