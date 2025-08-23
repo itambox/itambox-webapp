@@ -1,11 +1,13 @@
 from django.test import TestCase, RequestFactory
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
 from django.utils import timezone
-from core.middleware import CurrentUserMiddleware, get_current_user, get_current_request_id
+from assetbox.middleware import CurrentUserMiddleware, get_current_user, get_current_request_id
 from core.utils import serialize_object
 from core.models import ObjectChange
 from assets.models import Manufacturer, AssetRole, Asset
+from inventory.models import Accessory
 from licenses.models import License, LicenseSeatAssignment
 from software.models import Software
 from users.views import UserPreferencesView
@@ -126,4 +128,95 @@ class CoreRefactoringTestCase(TestCase):
         self.assertIn(b'hx-swap-oob="true"', response.content)
         self.assertIn(b'id="page-title-block"', response.content)
         self.assertIn(b'id="breadcrumbs-block"', response.content)
+
+    def test_change_logging_create_on_save(self):
+        request = self.factory.get('/')
+        request.user = self.user
+        middleware = CurrentUserMiddleware(get_response=lambda r: None)
+        middleware.process_request(request)
+
+        initial_count = ObjectChange.objects.count()
+        Manufacturer.objects.create(name='Dell', slug='dell-change')
+
+        self.assertGreater(ObjectChange.objects.count(), initial_count)
+        change = ObjectChange.objects.latest('time')
+        self.assertEqual(change.action, 'create')
+
+        middleware.process_response(request, None)
+
+    def test_change_logging_update_on_save(self):
+        request = self.factory.get('/')
+        request.user = self.user
+        middleware = CurrentUserMiddleware(get_response=lambda r: None)
+        middleware.process_request(request)
+
+        mfr = Manufacturer.objects.create(name='HP-update', slug='hp-update')
+        ObjectChange.objects.all().delete()
+
+        mfr.name = 'HP Inc'
+        mfr.save()
+
+        self.assertEqual(ObjectChange.objects.count(), 1)
+        change = ObjectChange.objects.latest('time')
+        self.assertEqual(change.action, 'update')
+
+        middleware.process_response(request, None)
+
+    def test_change_logging_delete_on_delete(self):
+        request = self.factory.get('/')
+        request.user = self.user
+        middleware = CurrentUserMiddleware(get_response=lambda r: None)
+        middleware.process_request(request)
+
+        mfr = Manufacturer.objects.create(name='Lenovo-del', slug='lenovo-del')
+        ObjectChange.objects.all().delete()
+        mfr.delete()
+
+        self.assertEqual(ObjectChange.objects.count(), 1)
+        change = ObjectChange.objects.latest('time')
+        self.assertEqual(change.action, 'delete')
+
+        middleware.process_response(request, None)
+
+    def test_notification_creation(self):
+        from core.models import Notification
+        notif = Notification.objects.create(
+            user=self.user,
+            message='This is a test notification',
+        )
+        self.assertFalse(notif.is_read)
+
+    def test_bookmark_creation(self):
+        from core.models import Bookmark
+        maker_ct = ContentType.objects.get_for_model(self.manufacturer)
+        bookmark = Bookmark.objects.create(
+            user=self.user,
+            model=maker_ct,
+            object_id=self.manufacturer.pk,
+        )
+        self.assertEqual(bookmark.user, self.user)
+
+    def test_journal_entry_creation(self):
+        from core.models import JournalEntry
+        maker_ct = ContentType.objects.get_for_model(self.manufacturer)
+        entry = JournalEntry.objects.create(
+            comment='Test journal note',
+            user=self.user,
+            model=maker_ct,
+            object_id=self.manufacturer.pk,
+        )
+        self.assertIsNotNone(entry.created_at)
+
+    def test_serialize_object_with_fk(self):
+        data = serialize_object(self.software)
+        self.assertEqual(data['name'], 'Windows 11')
+        self.assertEqual(data['manufacturer'], self.manufacturer.pk)
+        self.assertIn('description', data)
+
+    def test_soft_delete_accessory(self):
+        from inventory.models import Accessory
+        acc = Accessory.objects.create(name='Test Accessory', manufacturer=self.manufacturer)
+        acc.delete()
+        self.assertIsNotNone(acc.deleted_at)
+        self.assertEqual(Accessory.objects.filter(pk=acc.pk).count(), 0)
 
