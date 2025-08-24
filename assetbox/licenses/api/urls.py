@@ -1,4 +1,4 @@
-from core.api.routers import AssetBoxRouter
+from assetbox.api.routers import AssetBoxRouter
 from .views import LicenseViewSet, LicenseSeatAssignmentViewSet
 
 app_name = 'licenses_api'

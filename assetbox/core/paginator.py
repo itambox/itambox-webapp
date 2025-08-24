@@ -1,7 +1,7 @@
 from django.core.paginator import Page, Paginator
 import logging
 
-from .constants import DEFAULT_PAGINATE_COUNT
+from assetbox.constants import DEFAULT_PAGINATE_COUNT
 
 logger = logging.getLogger(__name__)
 

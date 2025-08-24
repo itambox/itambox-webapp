@@ -1,4 +1,4 @@
-from core.api.routers import AssetBoxRouter
+from assetbox.api.routers import AssetBoxRouter
 from .views import (
     AssetViewSet, AssetRoleViewSet, ManufacturerViewSet,
     InstalledSoftwareViewSet

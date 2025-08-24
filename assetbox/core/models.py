@@ -7,9 +7,9 @@ from django.utils import timezone
 from django.utils.http import urlencode
 
 from core.choices import ObjectChangeActionChoices, EventActionChoices, JobStatusChoices
-from core.middleware import get_current_request_id, get_current_user
+from assetbox.middleware import get_current_request_id, get_current_user
 from core.utils import serialize_object
-from core.registry import registry
+from assetbox.registry import registry
 
 from django.core.exceptions import ValidationError
 

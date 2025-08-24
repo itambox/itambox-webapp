@@ -3,8 +3,8 @@ from django.urls import reverse_lazy
 from ..models import Depreciation
 from .. import forms, tables, filters
 
-from core.panels import Panel
-from core.views import (
+from assetbox.panels import Panel
+from assetbox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
 )
 

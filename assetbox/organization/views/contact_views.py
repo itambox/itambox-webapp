@@ -2,11 +2,11 @@ from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 
-from core.views import (
+from assetbox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView,
 )
-from core.utils import get_paginate_count
-from core.panels import Panel
+from assetbox.utils import get_paginate_count
+from assetbox.panels import Panel
 
 from ..models import Contact
 from ..forms import ContactForm, ContactFilterForm

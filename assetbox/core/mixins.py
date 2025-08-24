@@ -2,7 +2,7 @@ from django.db import models
 from django.contrib.contenttypes.fields import GenericRelation
 from django.db.models.signals import class_prepared
 
-from core.registry import registry
+from assetbox.registry import registry
 
 
 

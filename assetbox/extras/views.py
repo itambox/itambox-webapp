@@ -7,14 +7,14 @@ from .forms import TagForm, TagFilterForm, CustomFieldForm, CustomFieldFilterFor
 from django_tables2 import RequestConfig
 from .tables import TagTable, CustomFieldTable, CustomFieldsetTable
 from .filters import TagFilter, CustomFieldFilterSet, CustomFieldsetFilterSet
-from core.utils import get_paginate_count, get_model_viewname # Import the utility function
+from assetbox.utils import get_paginate_count, get_model_viewname # Import the utility function
 from assets.tables import AssetTable # Import AssetTable
 from users.models import UserPreference # Import UserPreference
 from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.contrib import messages
-from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
-from core.panels import Panel
+from assetbox.views.generic import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
+from assetbox.panels import Panel
 
 class TagDetailView(ObjectDetailView):
     queryset = Tag.objects.all()

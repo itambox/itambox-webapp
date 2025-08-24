@@ -7,12 +7,12 @@ from django.db.models import Count
 from ..models import AssetRole
 from .. import forms, tables, filters
 
-from core.utils import get_paginate_count
-from core.panels import Panel
-from core.views import (
+from assetbox.utils import get_paginate_count
+from assetbox.panels import Panel
+from assetbox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
 )
-from core.quick_add import QuickAddMixin
+from assetbox.quick_add import QuickAddMixin
 
 
 class AssetRoleListView(ObjectListView):

@@ -12,12 +12,12 @@ from django.db.models import Count
 from django_tables2 import RequestConfig
 
 # Core generic views & helpers
-from core.views.generic import (
+from assetbox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
     ObjectCloneView, ObjectBulkEditView, ObjectBulkDeleteView, ObjectImportView
 )
-from core.utils import get_paginate_count
-from core.panels import Panel
+from assetbox.utils import get_paginate_count
+from assetbox.panels import Panel
 
 # Assets bulk import forms
 from assets.forms.import_forms import AccessoryBulkImportForm, ConsumableBulkImportForm

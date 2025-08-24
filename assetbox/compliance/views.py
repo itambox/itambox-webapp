@@ -3,8 +3,8 @@ from django.shortcuts import render, get_object_or_404
 from django.urls import reverse_lazy
 from django.utils import timezone
 
-from core.panels import Panel
-from core.views import (
+from assetbox.panels import Panel
+from assetbox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
 )
 

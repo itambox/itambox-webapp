@@ -1,4 +1,4 @@
-from core.api.routers import AssetBoxRouter
+from assetbox.api.routers import AssetBoxRouter
 from .views import ProviderViewSet, SubscriptionViewSet, SubscriptionAssignmentViewSet
 
 app_name = 'subscriptions_api'

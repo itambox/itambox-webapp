@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.contenttypes.models import ContentType
 
 from core.api.base import BaseModelSerializer
-from core.api.fields import ContentTypeField
+from assetbox.api.fields import ContentTypeField
 from assetbox.api.serializers import GenericObjectSerializer
 from organization.models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, AssetHolderAssignment
 

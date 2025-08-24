@@ -7,12 +7,12 @@ from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count
 
-from core.views import (
+from assetbox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
     ObjectImportView, ObjectBulkEditView, ObjectBulkDeleteView,
 )
-from core.utils import get_paginate_count
-from core.panels import Panel
+from assetbox.utils import get_paginate_count
+from assetbox.panels import Panel
 
 from ..models import AssetHolder, AssetHolderAssignment, ContactAssignment
 from ..forms import AssetHolderForm, AssetHolderFilterForm, ContactAssignmentForm

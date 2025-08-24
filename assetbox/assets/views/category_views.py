@@ -6,9 +6,9 @@ from .. import forms, tables, filters
 
 from inventory.models import Accessory
 
-from core.utils import get_paginate_count
-from core.panels import Panel
-from core.views import (
+from assetbox.utils import get_paginate_count
+from assetbox.panels import Panel
+from assetbox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView,
     ObjectDeleteView, ObjectCloneView,
 )

@@ -7,9 +7,9 @@ from django_tables2 import RequestConfig
 from ..models import Manufacturer, Asset
 from .. import forms, tables, filters
 
-from core.utils import get_paginate_count
-from core.panels import Panel
-from core.views import (
+from assetbox.utils import get_paginate_count
+from assetbox.panels import Panel
+from assetbox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView,
     ObjectDeleteView, ObjectImportView,
 )

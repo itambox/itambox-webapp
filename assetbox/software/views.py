@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from django.urls import reverse
-from core.views import (
+from assetbox.views.generic import (
     ObjectListView,
     ObjectDetailView,
     ObjectEditView,
@@ -9,7 +9,7 @@ from core.views import (
     # BulkEditView,  # Add later if needed
     # BulkDeleteView # Add later if needed
 )
-from core.panels import Panel
+from assetbox.panels import Panel
 from .models import Software
 from . import forms
 from . import tables

@@ -1,4 +1,4 @@
-from core.api.routers import AssetBoxRouter
+from assetbox.api.routers import AssetBoxRouter
 from .views import (
     SiteViewSet, RegionViewSet, SiteGroupViewSet, LocationViewSet,
     TenantViewSet, TenantGroupViewSet, AssetHolderViewSet, AssetHolderAssignmentViewSet

@@ -3,11 +3,11 @@ from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 from django.db.models import Count
 
-from core.views import (
+from assetbox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView,
 )
-from core.utils import get_paginate_count
-from core.panels import Panel
+from assetbox.utils import get_paginate_count
+from assetbox.panels import Panel
 from assets.tables import AssetTable
 
 from ..models import Site

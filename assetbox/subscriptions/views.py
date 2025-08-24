@@ -1,8 +1,8 @@
 from django.db.models import Count
 from django_tables2 import RequestConfig
-from core.views import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView
-from core.utils import get_paginate_count
-from core.panels import Panel
+from assetbox.views.generic import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView
+from assetbox.utils import get_paginate_count
+from assetbox.panels import Panel
 from .models import Provider, Subscription
 from . import forms
 from . import tables

@@ -13,8 +13,8 @@ from django.shortcuts import get_object_or_404
 from .models import UserPreference
 from core.models import ObjectChange
 from core.tables import ObjectChangeTable
-from core.utils import get_paginate_count
-from core.views import BaseHTMXView
+from assetbox.utils import get_paginate_count
+from assetbox.views.generic import BaseHTMXView
 from django_tables2 import SingleTableView, RequestConfig
 from .forms import UserProfileForm, UserPreferencesForm
 

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from core.api.base import BaseModelSerializer
-from core.api.fields import RelatedObjectCountField
+from assetbox.api.fields import RelatedObjectCountField
 from core.api.nested_serializers import (
     NestedAssetRoleSerializer,
     NestedManufacturerSerializer,

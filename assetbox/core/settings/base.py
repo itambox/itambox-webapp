@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'django_filters',
     'crispy_forms',
     'crispy_bootstrap5',
+    'assetbox.apps.AssetBoxConfig',
     'core.apps.CoreConfig',
     'extras.apps.ExtrasConfig',
     'rest_framework',
@@ -54,8 +55,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_htmx.middleware.HtmxMiddleware',
-    'core.middleware.CSPMiddleware',
-    'core.middleware.CurrentUserMiddleware',
+    'assetbox.middleware.CSPMiddleware',
+    'assetbox.middleware.CurrentUserMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -78,8 +79,8 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'core.context_processors.breadcrumbs',
-                'core.context_processors.notifications_processor',
+                'assetbox.context_processors.breadcrumbs',
+                'assetbox.context_processors.notifications_processor',
             ],
             'loaders': partial_loaders,
             'libraries': {
@@ -153,14 +154,14 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'core.api.authentication.TokenAuthentication',
+        'assetbox.api.authentication.TokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'core.api.permissions.TokenPermissions',
+        'assetbox.api.permissions.TokenPermissions',
     ],
-    'DEFAULT_PAGINATION_CLASS': 'core.api.pagination.AssetBoxPagination',
+    'DEFAULT_PAGINATION_CLASS': 'assetbox.api.pagination.AssetBoxPagination',
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle',
@@ -169,7 +170,7 @@ REST_FRAMEWORK = {
         'anon': '100/hour',
         'user': '1000/hour',
     },
-    'VIEW_NAME_FUNCTION': 'core.api.utils.get_view_name',
+    'VIEW_NAME_FUNCTION': 'assetbox.api.utils.get_view_name',
 }
 
 PAGINATE_COUNT = 50

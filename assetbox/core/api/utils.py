@@ -14,7 +14,7 @@ from rest_framework.serializers import ListSerializer
 from rest_framework.views import get_view_name as drf_get_view_name
 
 from core.api.exceptions import SerializerNotFound
-from core.api.fields import RelatedObjectCountField
+from assetbox.api.fields import RelatedObjectCountField
 from core.querysets import count_related
 
 logger = logging.getLogger('assetbox.utilities.api')

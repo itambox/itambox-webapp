@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404
 from django.urls import reverse
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django_tables2 import RequestConfig
-from core.views import (
+from assetbox.views.generic import (
     ObjectListView,
     ObjectDetailView,
     ObjectEditView,
@@ -11,8 +11,8 @@ from core.views import (
     ObjectBulkEditView,
     ObjectBulkDeleteView,
 )
-from core.utils import get_paginate_count
-from core.panels import Panel
+from assetbox.utils import get_paginate_count
+from assetbox.panels import Panel
 from .models import License, LicenseSeatAssignment
 from . import forms
 from . import tables

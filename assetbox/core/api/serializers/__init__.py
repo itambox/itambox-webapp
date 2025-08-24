@@ -3,7 +3,7 @@ from django.contrib.contenttypes.models import ContentType
 from rest_framework import serializers
 
 from core.api.base import BaseModelSerializer
-from core.api.fields import ChoiceField, ContentTypeField
+from assetbox.api.fields import ChoiceField, ContentTypeField
 from core.models import ObjectChange
 from core.choices import ObjectChangeActionChoices
 from core.api.serializers.bulk import BulkOperationSerializer

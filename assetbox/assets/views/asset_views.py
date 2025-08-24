@@ -16,14 +16,14 @@ from .. import forms, tables, filters
 from software.tables import InstalledSoftwareTable
 from compliance.models import CustodyReceipt
 
-from core.utils import get_paginate_count
-from core.panels import Panel
-from core.views import (
+from assetbox.utils import get_paginate_count
+from assetbox.panels import Panel
+from assetbox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView,
     ObjectDeleteView, ObjectImportView, ObjectBulkEditView,
     ObjectBulkDeleteView, ObjectCloneView,
 )
-from core.quick_add import QuickAddMixin
+from assetbox.quick_add import QuickAddMixin
 
 from organization.models import AssetHolderAssignment, AssetHolder
 

@@ -2,9 +2,9 @@ from django.urls import reverse_lazy
 from django.shortcuts import redirect
 from django.contrib import messages
 from django_tables2 import RequestConfig
-from core.utils import get_paginate_count
-from core.panels import Panel
-from core.views import (
+from assetbox.utils import get_paginate_count
+from assetbox.panels import Panel
+from assetbox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, 
     ObjectDeleteView, ObjectCloneView, ObjectBulkEditView, ObjectBulkDeleteView
 )

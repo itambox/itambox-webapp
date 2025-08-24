@@ -1,6 +1,6 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import TemplateView
-from core.views.generic import BaseHTMXView
+from assetbox.views.htmx import BaseHTMXView
 
 
 class DashboardView(LoginRequiredMixin, BaseHTMXView, TemplateView):
