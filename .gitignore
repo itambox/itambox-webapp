@@ -36,3 +36,7 @@ media/
 # Project scratch files
 scratch/
 test_holders.csv
+
+# Internal design documents
+internal-docs/
+
