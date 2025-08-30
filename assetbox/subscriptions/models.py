@@ -63,6 +63,7 @@ class Provider(AutoSlugMixin, JournalingMixin, TaggableMixin, ExportableMixin, C
     is_active = models.BooleanField(
         default=True,
         verbose_name="Active",
+        db_index=True,
         help_text="Deactivate to hide from selection lists without deleting"
     )
     tags = models.ManyToManyField(
@@ -133,7 +134,8 @@ class Subscription(AutoSlugMixin, JournalingMixin, TaggableMixin, ExportableMixi
         max_length=50,
         choices=SubscriptionTypeChoices.choices,
         default=SubscriptionTypeChoices.SAAS,
-        verbose_name="Subscription Type"
+        verbose_name="Subscription Type",
+        db_index=True
     )
     status = models.CharField(
         max_length=20,
@@ -146,6 +148,7 @@ class Subscription(AutoSlugMixin, JournalingMixin, TaggableMixin, ExportableMixi
         blank=True,
         null=True,
         verbose_name="Start Date",
+        db_index=True,
     )
     renewal_date = models.DateField(
         blank=True,
@@ -207,6 +210,7 @@ class Subscription(AutoSlugMixin, JournalingMixin, TaggableMixin, ExportableMixi
         blank=True,
         null=True,
         verbose_name="Cancellation Date",
+        db_index=True,
     )
     owner = models.ForeignKey(
         to=settings.AUTH_USER_MODEL,

@@ -66,7 +66,8 @@ class AssetMaintenance(ChangeLoggingMixin, BaseModel):
         max_length=50,
         choices=MAINTENANCE_TYPE_CHOICES,
         default=MAINTENANCE_TYPE_REPAIR,
-        verbose_name="Maintenance Type"
+        verbose_name="Maintenance Type",
+        db_index=True
     )
     cost = models.DecimalField(
         max_digits=10,
@@ -75,8 +76,8 @@ class AssetMaintenance(ChangeLoggingMixin, BaseModel):
         blank=True,
         verbose_name="Maintenance Cost"
     )
-    start_date = models.DateField(verbose_name="Start Date")
-    completion_date = models.DateField(null=True, blank=True, verbose_name="Completion Date")
+    start_date = models.DateField(verbose_name="Start Date", db_index=True)
+    completion_date = models.DateField(null=True, blank=True, verbose_name="Completion Date", db_index=True)
     notes = models.TextField(blank=True)
 
     class Meta:

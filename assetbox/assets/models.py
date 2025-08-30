@@ -29,7 +29,7 @@ class StatusLabel(AutoSlugMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
 
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
-    type = models.CharField(max_length=50, choices=TYPE_CHOICES, default=TYPE_DEPLOYABLE)
+    type = models.CharField(max_length=50, choices=TYPE_CHOICES, default=TYPE_DEPLOYABLE, db_index=True)
     description = models.TextField(blank=True)
     color = models.CharField(max_length=6, blank=True, help_text="RGB color in hexadecimal (e.g. 00ff00)")
     tags = models.ManyToManyField('extras.Tag', related_name='status_labels_tagged', blank=True)
@@ -131,12 +131,12 @@ class AssetType(AutoSlugMixin, AssetBoxModel):
     ]
 
     manufacturer = models.ForeignKey(Manufacturer, on_delete=models.PROTECT, related_name='asset_types')
-    model = models.CharField(max_length=255)
+    model = models.CharField(max_length=255, db_index=True)
     slug = models.SlugField(max_length=255, unique=True)
     part_number = models.CharField(max_length=100, blank=True, db_index=True, help_text="Manufacturer part number or SKU")
 
     # Specs
-    cpu = models.CharField(max_length=100, blank=True, verbose_name="Processor (CPU)")
+    cpu = models.CharField(max_length=100, blank=True, db_index=True, verbose_name="Processor (CPU)")
     ram_gb = models.PositiveIntegerField(blank=True, null=True, verbose_name="RAM (GB)")
     storage_capacity_gb = models.PositiveIntegerField(blank=True, null=True, verbose_name="Storage (GB)")
     storage_type = models.CharField(
@@ -184,7 +184,7 @@ class AssetType(AutoSlugMixin, AssetBoxModel):
     description = models.TextField(blank=True)
     comments = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', related_name="asset_types", blank=True)
-    requestable = models.BooleanField(default=False, help_text="Allow users to request assets of this type")
+    requestable = models.BooleanField(default=False, db_index=True, help_text="Allow users to request assets of this type")
 
     class Meta:
         unique_together = ('manufacturer', 'model')
@@ -222,7 +222,7 @@ class Asset(CustomFieldDataMixin, SoftDeleteMixin, AssetBoxModel):
     asset_type = models.ForeignKey(AssetType, on_delete=models.PROTECT, related_name='assets', null=True, blank=True, db_index=True)
     asset_role = models.ForeignKey(AssetRole, on_delete=models.SET_NULL, blank=True, null=True, db_index=True)
     purchase_date = models.DateField(blank=True, null=True, db_index=True)
-    warranty_expiration = models.DateField(blank=True, null=True)
+    warranty_expiration = models.DateField(blank=True, null=True, db_index=True)
     
     # Procurement Metadata (Maturity Phase 1)
     purchase_cost = models.DecimalField(
@@ -272,7 +272,7 @@ class Asset(CustomFieldDataMixin, SoftDeleteMixin, AssetBoxModel):
         blank=True,
         verbose_name="Custom Values"
     )
-    requestable = models.BooleanField(default=False, help_text="Allow users to request this asset")
+    requestable = models.BooleanField(default=False, db_index=True, help_text="Allow users to request this asset")
 
     @property
     def manufacturer(self):
@@ -417,9 +417,9 @@ class ActivityLog(models.Model):
     ]
 
     asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='logs', db_index=True)
-    action = models.CharField(max_length=50, choices=ACTION_CHOICES)
+    action = models.CharField(max_length=50, choices=ACTION_CHOICES, db_index=True)
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, db_index=True)
-    timestamp = models.DateTimeField(auto_now_add=True)
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
     notes = models.TextField(blank=True, null=True)
 
     class Meta:
@@ -452,6 +452,7 @@ class InstalledSoftware(ChangeLoggingMixin, BaseModel):
     install_date = models.DateField(
         blank=True,
         null=True,
+        db_index=True,
         help_text="Estimated or known installation date"
     )
     discovered_by_agent = models.CharField(
@@ -463,6 +464,7 @@ class InstalledSoftware(ChangeLoggingMixin, BaseModel):
     last_seen_date = models.DateTimeField(
         blank=True,
         null=True,
+        db_index=True,
         help_text="Timestamp when this software was last detected on the asset"
     )
     notes = models.TextField(

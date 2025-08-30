@@ -42,7 +42,7 @@ class Token(models.Model):
         related_name='tokens'
     )
     created = models.DateTimeField(auto_now_add=True)
-    expires = models.DateTimeField(blank=True, null=True)
+    expires = models.DateTimeField(blank=True, null=True, db_index=True)
     last_used = models.DateTimeField(blank=True, null=True)
     write_enabled = models.BooleanField(default=True)
     description = models.CharField(max_length=200, blank=True)

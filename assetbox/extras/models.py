@@ -90,10 +90,10 @@ class CustomField(ChangeLoggingMixin, BaseModel):
     ]
 
     name = models.SlugField(max_length=50, unique=True, verbose_name="Field Name", help_text="Slug-like name (e.g. sim_card_number)")
-    label = models.CharField(max_length=100, verbose_name="Display Label")
-    field_type = models.CharField(max_length=50, choices=FIELD_TYPE_CHOICES, default=FIELD_TYPE_TEXT, verbose_name="Field Type")
+    label = models.CharField(max_length=100, db_index=True, verbose_name="Display Label")
+    field_type = models.CharField(max_length=50, choices=FIELD_TYPE_CHOICES, default=FIELD_TYPE_TEXT, db_index=True, verbose_name="Field Type")
     choices = models.TextField(blank=True, null=True, help_text="New-line separated list of choices (only for 'select' type)")
-    required = models.BooleanField(default=False, verbose_name="Required")
+    required = models.BooleanField(default=False, db_index=True, verbose_name="Required")
 
     class Meta:
         ordering = ['label']

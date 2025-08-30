@@ -48,7 +48,8 @@ class License(JournalingMixin, TaggableMixin, SoftDeleteMixin, ExportableMixin, 
     license_type = models.CharField(
         max_length=50,
         choices=LicenseTypeChoices.choices,
-        default=LicenseTypeChoices.PERPETUAL_SEAT
+        default=LicenseTypeChoices.PERPETUAL_SEAT,
+        db_index=True
     )
     product_key = models.TextField(
         blank=True,
@@ -58,10 +59,10 @@ class License(JournalingMixin, TaggableMixin, SoftDeleteMixin, ExportableMixin, 
         default=1,
         help_text="Total number of seats purchased or entitled"
     )
-    purchase_date = models.DateField(blank=True, null=True)
+    purchase_date = models.DateField(blank=True, null=True, db_index=True)
     purchase_cost = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     order_number = models.CharField(max_length=100, blank=True)
-    expiration_date = models.DateField(blank=True, null=True, help_text="For term licenses or maintenance")
+    expiration_date = models.DateField(blank=True, null=True, db_index=True, help_text="For term licenses or maintenance")
     notes = models.TextField(blank=True)
     tags = models.ManyToManyField(Tag, blank=True, related_name='licenses')
     tenant = models.ForeignKey('organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='licenses', db_index=True)

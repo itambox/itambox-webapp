@@ -35,7 +35,7 @@ class Accessory(AutoSlugMixin, SoftDeleteMixin, AssetBoxModel):
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True)
     manufacturer = models.ForeignKey('assets.Manufacturer', on_delete=models.PROTECT, related_name='accessories')
-    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default=CATEGORY_OTHER, verbose_name="Accessory Type")
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default=CATEGORY_OTHER, verbose_name="Accessory Type", db_index=True)
     notification_category = models.ForeignKey(
         'assets.Category',
         on_delete=models.SET_NULL,
@@ -80,7 +80,9 @@ class Accessory(AutoSlugMixin, SoftDeleteMixin, AssetBoxModel):
 
     @property
     def checked_out_qty(self):
-        # Calculate active assignments total quantity
+        co = getattr(self, '_checked_out', None)
+        if co is not None:
+            return co
         return sum(assignment.qty for assignment in self.assignments.all())
 
     @property
@@ -142,7 +144,7 @@ class Consumable(AutoSlugMixin, SoftDeleteMixin, AssetBoxModel):
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True)
     manufacturer = models.ForeignKey('assets.Manufacturer', on_delete=models.PROTECT, related_name='consumables')
-    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default=CATEGORY_OTHER)
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default=CATEGORY_OTHER, db_index=True)
     part_number = models.CharField(max_length=100, blank=True, db_index=True, help_text="SKU or manufacturer part number")
     qty = models.PositiveIntegerField(default=0, verbose_name="Total Quantity")
     min_qty = models.PositiveIntegerField(default=0, verbose_name="Safety Threshold", help_text="Alert threshold quantity")
@@ -169,6 +171,9 @@ class Consumable(AutoSlugMixin, SoftDeleteMixin, AssetBoxModel):
 
     @property
     def consumed_qty(self):
+        cq = getattr(self, '_consumed', None)
+        if cq is not None:
+            return cq
         return sum(consumption.qty for consumption in self.consumptions.all())
 
     @property

@@ -32,12 +32,13 @@ class Location(JournalingMixin, TaggableMixin, ExportableMixin, ChangeLoggingMix
         # null=True # REMOVED temporary null
         # No blank=True as per requirements
     )
-    name = models.CharField(max_length=100) # Changed max_length based on Site/Region etc.
+    name = models.CharField(max_length=100, db_index=True) # Changed max_length based on Site/Region etc.
     slug = models.SlugField(max_length=100, unique=True)
     status = models.CharField(
         max_length=50,
         choices=STATUS_CHOICES,
-        default=STATUS_ACTIVE
+        default=STATUS_ACTIVE,
+        db_index=True
     )
     parent = models.ForeignKey(
         'self',
@@ -188,7 +189,7 @@ class Site(JournalingMixin, TaggableMixin, ExportableMixin, ChangeLoggingMixin, 
 
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
-    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default=STATUS_ACTIVE)
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default=STATUS_ACTIVE, db_index=True)
     # Use local models for FKs within the app
     region = models.ForeignKey(Region, on_delete=models.SET_NULL, related_name='sites', blank=True, null=True, db_index=True)
     group = models.ForeignKey(SiteGroup, on_delete=models.SET_NULL, related_name='sites', blank=True, null=True, db_index=True)
