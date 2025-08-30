@@ -2,7 +2,7 @@
 import django_tables2 as tables
 from django_tables2.utils import A  # Alias for Accessor
 from .models import Asset, AssetRole, Manufacturer, AssetType, StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence
-from core.tables import ActionsColumn, BaseTable, ToggleColumn
+from core.tables import ActionsColumn, AssigneeColumn, BaseTable, ToggleColumn
 from extras.tables import TagColumn # Import TagColumn
 from django.urls import reverse
 from django.utils.safestring import mark_safe
@@ -14,7 +14,7 @@ class AssetTable(BaseTable): # Inherit from BaseTable
     manufacturer = tables.Column(accessor='asset_type.manufacturer', linkify=True, verbose_name='Manufacturer')
     model = tables.Column(accessor='asset_type.model', linkify=True, verbose_name='Model')
     asset_type = tables.LinkColumn('assets:assettype_detail', args=[A('asset_type.pk')], verbose_name='Asset Type')
-    assignee = tables.Column(accessor='_assignee_display', verbose_name='Assignee', orderable=False)
+    assignee = AssigneeColumn(location_field='location')
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name='Tenant')
     location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], accessor='location.name', verbose_name='Location')
     supplier = tables.LinkColumn('assets:supplier_detail', args=[A('supplier.pk')], accessor='supplier.name', verbose_name='Supplier')

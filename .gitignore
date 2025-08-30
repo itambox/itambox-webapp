@@ -37,6 +37,6 @@ media/
 scratch/
 test_holders.csv
 
-# Internal design documents
+# Internal design documents (external repo: ../assetbox-internal-docs)
 internal-docs/
 

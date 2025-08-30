@@ -177,6 +177,92 @@ class ActionsColumn(tables.Column):
         return mark_safe(html)
 
 
+class AssigneeColumn(tables.Column):
+    """
+    A reusable column that resolves an AssetHolder (via AssetHolderAssignment
+    GenericForeignKey) for each row, falling back to a named model field
+    (e.g., ``location``) when no holder is assigned.
+
+    The bulk assignment lookup is cached on the parent table instance so
+    that only a single database query is issued per table rendering.
+
+    Usage::
+
+        assignee = AssigneeColumn(location_field='location')
+
+    Parameters:
+        location_field (str | None): Model field name to display as fallback
+            when no AssetHolder is assigned.
+        empty_text (str): Displayed when no holder or location is available.
+        assignment_model_path (str): Dotted app-model path to the
+            AssetHolderAssignment-like model.
+    """
+
+    EMPTY_MARK = mark_safe('<span class="text-muted">&mdash;</span>')
+
+    def __init__(
+        self,
+        *args,
+        location_field=None,
+        empty_text=None,
+        assignment_model_path='organization.AssetHolderAssignment',
+        **kwargs,
+    ):
+        kwargs.setdefault('verbose_name', 'Assignee')
+        kwargs.setdefault('orderable', False)
+        kwargs.setdefault('accessor', 'pk')
+        self.location_field = location_field
+        self._empty_text = empty_text
+        self._assignment_model_path = assignment_model_path
+        super().__init__(*args, **kwargs)
+
+    def _get_assignment_model(self):
+        from django.apps import apps
+        return apps.get_model(self._assignment_model_path)
+
+    def render(self, value, record, bound_column, table=None):
+        if table is None:
+            table = bound_column._table
+        cache_attr = f'_assignee_cache_{id(self)}'
+        if not hasattr(table, cache_attr):
+            self._build_cache(table, record.__class__, cache_attr)
+        cache = getattr(table, cache_attr)
+
+        holder = cache.get(value)
+        if holder:
+            try:
+                url = holder.get_absolute_url()
+                return format_html('<a href="{}">{}</a>', url, holder)
+            except Exception:
+                return str(holder)
+
+        if self.location_field and hasattr(record, self.location_field):
+            loc = getattr(record, self.location_field)
+            if loc:
+                return f"Location: {loc}"
+
+        if self._empty_text is not None:
+            return self._empty_text
+        return self.EMPTY_MARK
+
+    def _build_cache(self, table, model_class, cache_attr):
+        from django.contrib.contenttypes.models import ContentType
+        AssignmentModel = self._get_assignment_model()
+        ct = ContentType.objects.get_for_model(model_class)
+        pks = [row.pk for row in table.data]
+        if not pks:
+            setattr(table, cache_attr, {})
+            return
+        assignments = AssignmentModel.objects.filter(
+            content_type=ct, object_id__in=pks
+        ).select_related('asset_holder')
+        setattr(table, cache_attr, {
+            a.object_id: a.asset_holder
+            for a in assignments
+            if a.asset_holder
+        })
+
+
 # Base Table for common settings
 class BaseTable(tables.Table):
     exempt_columns = ('pk', 'actions')
