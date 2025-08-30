@@ -1,13 +1,18 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from core.api.viewsets import AssetBoxModelViewSet, AssetBoxReadOnlyModelViewSet
-from organization.models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, AssetHolderAssignment
+from organization.models import (
+    Site, Region, SiteGroup, Location, Tenant, TenantGroup,
+    AssetHolder, AssetHolderAssignment, Contact, ContactRole, ContactAssignment
+)
 from organization.filters import (
     SiteFilterSet, RegionFilterSet, SiteGroupFilterSet, LocationFilterSet,
-    TenantFilterSet, TenantGroupFilterSet, AssetHolderFilterSet
+    TenantFilterSet, TenantGroupFilterSet, AssetHolderFilterSet,
+    ContactFilterSet, ContactRoleFilterSet
 )
 from .serializers import (
     SiteSerializer, RegionSerializer, SiteGroupSerializer, LocationSerializer,
-    TenantSerializer, TenantGroupSerializer, AssetHolderSerializer, AssetHolderAssignmentSerializer
+    TenantSerializer, TenantGroupSerializer, AssetHolderSerializer, AssetHolderAssignmentSerializer,
+    ContactSerializer, ContactRoleSerializer, ContactAssignmentSerializer
 )
 
 
@@ -65,3 +70,26 @@ class AssetHolderAssignmentViewSet(AssetBoxReadOnlyModelViewSet):
         'asset_holder', 'content_type'
     ).prefetch_related('assigned_object')
     serializer_class = AssetHolderAssignmentSerializer
+
+
+class ContactViewSet(AssetBoxModelViewSet):
+    queryset = Contact.objects.prefetch_related('tags').all()
+    serializer_class = ContactSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = ContactFilterSet
+
+
+class ContactRoleViewSet(AssetBoxModelViewSet):
+    queryset = ContactRole.objects.all()
+    serializer_class = ContactRoleSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = ContactRoleFilterSet
+
+
+class ContactAssignmentViewSet(AssetBoxModelViewSet):
+    queryset = ContactAssignment.objects.select_related(
+        'contact', 'role', 'content_type'
+    ).prefetch_related('contact__tags')
+    serializer_class = ContactAssignmentSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_fields = ['contact_id', 'role_id', 'content_type_id', 'object_id']

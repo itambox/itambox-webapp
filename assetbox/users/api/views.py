@@ -6,9 +6,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import RetrieveUpdateAPIView
 from rest_framework.response import Response
 
-from core.api.viewsets import AssetBoxReadOnlyModelViewSet
-from users.models import UserPreference
-from .serializers import UserSerializer, GroupSerializer, UserConfigSerializer
+from core.api.viewsets import AssetBoxReadOnlyModelViewSet, AssetBoxModelViewSet
+from users.models import UserPreference, Token
+from .serializers import UserSerializer, GroupSerializer, UserConfigSerializer, TokenSerializer
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -22,6 +22,13 @@ class UserViewSet(AssetBoxReadOnlyModelViewSet):
 class GroupViewSet(AssetBoxReadOnlyModelViewSet):
     queryset = Group.objects.all().annotate(user_count=Count('user'))
     serializer_class = GroupSerializer
+
+
+class TokenViewSet(AssetBoxModelViewSet):
+    serializer_class = TokenSerializer
+
+    def get_queryset(self):
+        return Token.objects.select_related('user').filter(user=self.request.user)
 
 
 class UserConfigView(RetrieveUpdateAPIView):

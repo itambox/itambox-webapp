@@ -4,7 +4,11 @@ from django.contrib.contenttypes.models import ContentType
 from core.api.base import BaseModelSerializer
 from assetbox.api.fields import ContentTypeField
 from assetbox.api.serializers import GenericObjectSerializer
-from organization.models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, AssetHolderAssignment
+from organization.models import (
+    Site, Region, SiteGroup, Location, Tenant, TenantGroup,
+    AssetHolder, AssetHolderAssignment, Contact, ContactRole, ContactAssignment
+)
+from extras.api.serializers import TagSerializer
 
 
 class NestedRegionSerializer(BaseModelSerializer):
@@ -211,8 +215,54 @@ class AssetHolderAssignmentSerializer(BaseModelSerializer):
     class Meta:
         model = AssetHolderAssignment
         fields = [
-            'id', 'url', 'asset_holder', 'assigned_object_type', 'assigned_object_id',
+            'id', 'url', 'asset_holder', 'assigned_object_type', 'object_id',
             'assigned_object', 'created_at', 'updated_at'
         ]
         read_only_fields = fields
         brief_fields = ['id', 'url', 'asset_holder']
+
+
+class ContactRoleSerializer(BaseModelSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:contactrole-detail')
+
+    class Meta:
+        model = ContactRole
+        fields = ['id', 'url', 'name', 'slug', 'description', 'created_at', 'updated_at']
+        brief_fields = ['id', 'url', 'name', 'slug']
+
+
+class ContactSerializer(BaseModelSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:contact-detail')
+    tags = TagSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Contact
+        fields = [
+            'id', 'url', 'name', 'title', 'phone', 'email',
+            'web_url', 'description', 'comments', 'tags',
+            'created_at', 'updated_at'
+        ]
+        brief_fields = ['id', 'url', 'name', 'email']
+
+
+class ContactAssignmentSerializer(BaseModelSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:contactassignment-detail')
+    contact = ContactSerializer(read_only=True)
+    contact_id = serializers.PrimaryKeyRelatedField(
+        queryset=Contact.objects.all(), source='contact', write_only=True
+    )
+    role = ContactRoleSerializer(read_only=True)
+    role_id = serializers.PrimaryKeyRelatedField(
+        queryset=ContactRole.objects.all(), source='role', write_only=True
+    )
+    assigned_object_type = ContentTypeField(queryset=ContentType.objects.all())
+    assigned_object = GenericObjectSerializer(read_only=True)
+
+    class Meta:
+        model = ContactAssignment
+        fields = [
+            'id', 'url', 'contact', 'contact_id', 'role', 'role_id',
+            'assigned_object_type', 'object_id', 'assigned_object',
+            'priority', 'created_at', 'updated_at'
+        ]
+        brief_fields = ['id', 'url', 'contact', 'role']

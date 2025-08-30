@@ -2,7 +2,7 @@ import django_filters
 from django.db.models import Q
 from django import forms
 from organization.models import Tenant
-from .models import Provider, Subscription, SubscriptionStatusChoices, SubscriptionTypeChoices
+from .models import Provider, Subscription, SubscriptionAssignment, SubscriptionStatusChoices, SubscriptionTypeChoices
 
 
 class SubscriptionFilterSet(django_filters.FilterSet):
@@ -91,3 +91,9 @@ class ProviderFilterSet(django_filters.FilterSet):
         if value:  # Only filter when checkbox is explicitly checked
             return queryset.filter(is_active=True)
         return queryset  # Unchecked = show all
+
+
+class SubscriptionAssignmentFilterSet(django_filters.FilterSet):
+    class Meta:
+        model = SubscriptionAssignment
+        fields = ['subscription', 'content_type', 'object_id']

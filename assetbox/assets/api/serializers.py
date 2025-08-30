@@ -1,3 +1,4 @@
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from core.api.base import BaseModelSerializer
 from assetbox.api.fields import RelatedObjectCountField
@@ -7,11 +8,16 @@ from core.api.nested_serializers import (
     NestedAssetSerializer,
     NestedAssetTypeSerializer
 )
-from assets.models import Asset, AssetRole, Manufacturer, ActivityLog, AssetType, InstalledSoftware
+from assets.models import (
+    Asset, AssetRole, Manufacturer, ActivityLog, AssetType, InstalledSoftware,
+    StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence
+)
 from organization.models import Location, Tenant
 from software.models import Software
 from organization.api.serializers import NestedLocationSerializer, NestedTenantSerializer
 from extras.api.serializers import TagSerializer
+
+User = get_user_model()
 
 
 class AssetRoleSerializer(BaseModelSerializer):
@@ -97,3 +103,100 @@ class InstalledSoftwareSerializer(BaseModelSerializer):
         )
         read_only_fields = ('created_at', 'updated_at')
         brief_fields = ['id', 'software_name', 'version_detected']
+
+
+class StatusLabelSerializer(BaseModelSerializer):
+    type_display = serializers.CharField(source='get_type_display', read_only=True)
+    tags = TagSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = StatusLabel
+        fields = [
+            'id', 'name', 'slug', 'type', 'type_display',
+            'description', 'color', 'tags',
+            'created_at', 'updated_at'
+        ]
+        brief_fields = ['id', 'name', 'slug', 'type', 'color']
+
+
+class DepreciationSerializer(BaseModelSerializer):
+    class Meta:
+        model = Depreciation
+        fields = ['id', 'name', 'months', 'created_at', 'updated_at']
+        brief_fields = ['id', 'name', 'months']
+
+
+class SupplierSerializer(BaseModelSerializer):
+    tags = TagSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Supplier
+        fields = [
+            'id', 'name', 'slug', 'website', 'contact_email',
+            'contact_phone', 'address', 'contact_name', 'notes', 'tags',
+            'created_at', 'updated_at'
+        ]
+        brief_fields = ['id', 'name', 'slug']
+
+
+class CategorySerializer(BaseModelSerializer):
+    tags = TagSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Category
+        fields = [
+            'id', 'name', 'slug', 'color', 'description',
+            'email_on_checkout', 'email_on_checkin', 'require_acceptance',
+            'email_eula', 'applies_to', 'tags',
+            'created_at', 'updated_at'
+        ]
+        brief_fields = ['id', 'name', 'slug', 'color']
+
+
+class AssetRequestSerializer(BaseModelSerializer):
+    requester = serializers.StringRelatedField(read_only=True)
+    requester_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(), source='requester', write_only=True
+    )
+    asset = NestedAssetSerializer(read_only=True)
+    asset_id = serializers.PrimaryKeyRelatedField(
+        queryset=Asset.objects.all(), source='asset', write_only=True, required=False, allow_null=True
+    )
+    asset_type = NestedAssetTypeSerializer(read_only=True)
+    asset_type_id = serializers.PrimaryKeyRelatedField(
+        queryset=AssetType.objects.all(), source='asset_type', write_only=True, required=False, allow_null=True
+    )
+    responded_by = serializers.StringRelatedField(read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    tags = TagSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = AssetRequest
+        fields = [
+            'id', 'requester', 'requester_id',
+            'asset', 'asset_id', 'asset_type', 'asset_type_id',
+            'status', 'status_display', 'request_date', 'response_date',
+            'responded_by', 'notes', 'response_notes', 'tags',
+            'created_at', 'updated_at'
+        ]
+        brief_fields = ['id', 'requester', 'asset', 'status', 'request_date']
+
+
+class AssetTagSequenceSerializer(BaseModelSerializer):
+    class Meta:
+        model = AssetTagSequence
+        fields = ['id', 'prefix', 'next_value', 'zero_padding', 'created_at', 'updated_at']
+        brief_fields = ['id', 'prefix', 'next_value']
+
+
+class ActivityLogSerializer(serializers.ModelSerializer):
+    action_display = serializers.CharField(source='get_action_display', read_only=True)
+    user = serializers.StringRelatedField(read_only=True)
+
+    class Meta:
+        model = ActivityLog
+        fields = [
+            'id', 'asset', 'action', 'action_display',
+            'user', 'timestamp', 'notes'
+        ]
+        brief_fields = ['id', 'asset', 'action', 'user', 'timestamp']

@@ -11,6 +11,7 @@ app_name = 'users_api'
 router = AssetBoxRouter()
 router.register(r'users', views.UserViewSet)
 router.register(r'groups', views.GroupViewSet)
+router.register(r'tokens', views.TokenViewSet, basename='token')
 
 class UsersAPIRootView(APIView):
     _ignore_model_permissions = True

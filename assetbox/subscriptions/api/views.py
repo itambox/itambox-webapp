@@ -2,9 +2,11 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import serializers as drf_serializers
+from django_filters.rest_framework import DjangoFilterBackend
 
 from core.api.viewsets import AssetBoxReadOnlyModelViewSet
 from subscriptions.models import Provider, Subscription, SubscriptionAssignment
+from subscriptions.filters import ProviderFilterSet, SubscriptionFilterSet, SubscriptionAssignmentFilterSet
 from .serializers import ProviderSerializer, SubscriptionSerializer, SubscriptionAssignmentSerializer
 
 
@@ -20,11 +22,15 @@ class SubscriptionStatusSerializer(drf_serializers.Serializer):
 class ProviderViewSet(AssetBoxReadOnlyModelViewSet):
     queryset = Provider.objects.prefetch_related('tags').all()
     serializer_class = ProviderSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = ProviderFilterSet
 
 
 class SubscriptionViewSet(AssetBoxReadOnlyModelViewSet):
     queryset = Subscription.objects.select_related('provider').prefetch_related('tags').all()
     serializer_class = SubscriptionSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = SubscriptionFilterSet
 
     @action(detail=True, methods=['patch'], url_path='status', serializer_class=SubscriptionStatusSerializer)
     def update_status(self, request, pk=None):
@@ -41,3 +47,5 @@ class SubscriptionAssignmentViewSet(AssetBoxReadOnlyModelViewSet):
         'subscription__provider', 'content_type'
     ).prefetch_related('assigned_object').all()
     serializer_class = SubscriptionAssignmentSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = SubscriptionAssignmentFilterSet

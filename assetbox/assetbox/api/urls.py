@@ -15,8 +15,11 @@ urlpatterns = [
     path('auth-check/', AuthenticationCheckView.as_view(), name='auth-check'),
 
     path('assets/', include('assets.api.urls', namespace='assets_api')),
+    path('compliance/', include('compliance.api.urls', namespace='compliance_api')),
+    path('components/', include('components.api.urls', namespace='components_api')),
     path('core/', include('core.api.urls', namespace='core_api')),
     path('extras/', include('extras.api.urls', namespace='extras_api')),
+    path('inventory/', include('inventory.api.urls', namespace='inventory_api')),
     path('licenses/', include('licenses.api.urls', namespace='licenses_api')),
     path('organization/', include('organization.api.urls', namespace='organization_api')),
     path('software/', include('software.api.urls', namespace='software_api')),

@@ -2,11 +2,20 @@ from django.db import models
 from django_filters.rest_framework import DjangoFilterBackend
 
 from core.api.viewsets import AssetBoxModelViewSet, AssetBoxReadOnlyModelViewSet
-from assets.models import Asset, AssetRole, Manufacturer, AssetType, InstalledSoftware
-from assets.filters import AssetFilterSet, AssetRoleFilterSet, ManufacturerFilterSet
+from assets.models import (
+    Asset, AssetRole, Manufacturer, AssetType, InstalledSoftware,
+    StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence, ActivityLog
+)
+from assets.filters import (
+    AssetFilterSet, AssetRoleFilterSet, ManufacturerFilterSet,
+    AssetTypeFilterSet, StatusLabelFilterSet, DepreciationFilterSet,
+    SupplierFilterSet, CategoryFilterSet, AssetRequestFilterSet, AssetTagSequenceFilterSet
+)
 from .serializers import (
     AssetSerializer, AssetRoleSerializer, ManufacturerSerializer, AssetTypeSerializer,
-    InstalledSoftwareSerializer
+    InstalledSoftwareSerializer, StatusLabelSerializer, DepreciationSerializer,
+    SupplierSerializer, CategorySerializer, AssetRequestSerializer,
+    AssetTagSequenceSerializer, ActivityLogSerializer
 )
 
 
@@ -42,3 +51,61 @@ class InstalledSoftwareViewSet(AssetBoxReadOnlyModelViewSet):
     serializer_class = InstalledSoftwareSerializer
     filterset_fields = ['asset_id', 'software_id', 'software__manufacturer_id', 'version_detected']
     search_fields = ['asset__name', 'software__name', 'version_detected']
+
+
+class AssetTypeViewSet(AssetBoxModelViewSet):
+    queryset = AssetType.objects.select_related('manufacturer').prefetch_related('tags').all()
+    serializer_class = AssetTypeSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = AssetTypeFilterSet
+
+
+class StatusLabelViewSet(AssetBoxModelViewSet):
+    queryset = StatusLabel.objects.prefetch_related('tags').all()
+    serializer_class = StatusLabelSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = StatusLabelFilterSet
+
+
+class DepreciationViewSet(AssetBoxModelViewSet):
+    queryset = Depreciation.objects.all()
+    serializer_class = DepreciationSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = DepreciationFilterSet
+
+
+class SupplierViewSet(AssetBoxModelViewSet):
+    queryset = Supplier.objects.prefetch_related('tags').all()
+    serializer_class = SupplierSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = SupplierFilterSet
+
+
+class CategoryViewSet(AssetBoxModelViewSet):
+    queryset = Category.objects.prefetch_related('tags').all()
+    serializer_class = CategorySerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = CategoryFilterSet
+
+
+class AssetRequestViewSet(AssetBoxModelViewSet):
+    queryset = AssetRequest.objects.select_related(
+        'requester', 'asset', 'asset_type__manufacturer', 'responded_by'
+    ).prefetch_related('tags').all()
+    serializer_class = AssetRequestSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = AssetRequestFilterSet
+
+
+class AssetTagSequenceViewSet(AssetBoxModelViewSet):
+    queryset = AssetTagSequence.objects.all()
+    serializer_class = AssetTagSequenceSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = AssetTagSequenceFilterSet
+
+
+class ActivityLogViewSet(AssetBoxReadOnlyModelViewSet):
+    queryset = ActivityLog.objects.select_related('asset', 'user').all()
+    serializer_class = ActivityLogSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_fields = ['asset_id', 'user_id', 'action']
