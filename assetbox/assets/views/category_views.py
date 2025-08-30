@@ -15,7 +15,7 @@ from assetbox.views.generic import (
 
 
 class CategoryListView(ObjectListView):
-    queryset = Category.objects.all()
+    queryset = Category.objects.prefetch_related('tags')
     filterset = filters.CategoryFilterSet
     filterset_form = forms.CategoryFilterForm
     table = tables.CategoryTable

@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from django import forms
 from django.db.models import Sum, Count, Q, Avg, F, Case, When, Value, IntegerField
-from django.db.models.functions import Extract
+from django.db.models.functions import Extract, Coalesce
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django.template.loader import render_to_string
@@ -348,11 +348,11 @@ class LowStockWidget(DashboardWidget):
     def get_context(self, request):
         accessories = Accessory.objects.filter(
             qty__lt=F('min_qty')
-        ).filter(min_qty__gt=0).order_by('qty')
+        ).filter(min_qty__gt=0).order_by('qty').annotate(_checked_out=Coalesce(Sum('assignments__qty'), 0))
 
         consumables = Consumable.objects.filter(
             qty__lt=F('min_qty')
-        ).filter(min_qty__gt=0).order_by('qty')
+        ).filter(min_qty__gt=0).order_by('qty').annotate(_consumed=Coalesce(Sum('consumptions__qty'), 0))
 
         return {
             'low_stock_accessories': accessories,

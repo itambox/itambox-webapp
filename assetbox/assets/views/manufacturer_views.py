@@ -16,7 +16,7 @@ from assetbox.views.generic import (
 
 
 class ManufacturerListView(ObjectListView):
-    queryset = Manufacturer.objects.annotate(
+    queryset = Manufacturer.objects.prefetch_related('tags').annotate(
         asset_count=Count('asset_types__assets'),
         asset_type_count=Count('asset_types'),
     )

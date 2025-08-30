@@ -14,7 +14,7 @@ from . import filters
 # =============================================================================
 
 class ProviderListView(ObjectListView):
-    queryset = Provider.objects.annotate(subscription_count=Count('subscriptions'))
+    queryset = Provider.objects.prefetch_related('tags').annotate(subscription_count=Count('subscriptions'))
     filterset = filters.ProviderFilterSet
     filterset_form = forms.ProviderFilterForm
     table = tables.ProviderTable
@@ -60,7 +60,7 @@ class ProviderDeleteView(ObjectDeleteView):
 # =============================================================================
 
 class SubscriptionListView(ObjectListView):
-    queryset = Subscription.objects.select_related('provider', 'tenant', 'owner')
+    queryset = Subscription.objects.select_related('provider', 'tenant', 'owner').prefetch_related('tags')
     filterset = filters.SubscriptionFilterSet
     filterset_form = forms.SubscriptionFilterForm
     table = tables.SubscriptionTable

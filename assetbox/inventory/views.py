@@ -7,7 +7,8 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse, reverse_lazy
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.views.generic import View
-from django.db.models import Count
+from django.db.models import Count, Sum
+from django.db.models.functions import Coalesce
 
 from django_tables2 import RequestConfig
 
@@ -29,7 +30,7 @@ from assets.models import Asset
 
 
 class AccessoryListView(ObjectListView):
-    queryset = Accessory.objects.select_related('manufacturer').prefetch_related('tags')
+    queryset = Accessory.objects.select_related('tenant', 'manufacturer').prefetch_related('tags').annotate(_checked_out=Coalesce(Sum('assignments__qty'), 0))
     filterset = filters.AccessoryFilterSet
     filterset_form = forms.AccessoryFilterForm
     table = tables.AccessoryTable
@@ -89,7 +90,7 @@ class AccessoryCloneView(ObjectCloneView):
 
 
 class ConsumableListView(ObjectListView):
-    queryset = Consumable.objects.select_related('manufacturer').prefetch_related('tags')
+    queryset = Consumable.objects.select_related('tenant', 'manufacturer').prefetch_related('tags').annotate(_consumed=Coalesce(Sum('consumptions__qty'), 0))
     filterset = filters.ConsumableFilterSet
     filterset_form = forms.ConsumableFilterForm
     table = tables.ConsumableTable
@@ -149,7 +150,7 @@ class ConsumableCloneView(ObjectCloneView):
 
 
 class KitListView(ObjectListView):
-    queryset = Kit.objects.all().annotate(item_count=Count('items'))
+    queryset = Kit.objects.select_related('tenant').annotate(item_count=Count('items'))
     filterset = filters.KitFilterSet
     filterset_form = forms.KitFilterForm
     table = tables.KitTable

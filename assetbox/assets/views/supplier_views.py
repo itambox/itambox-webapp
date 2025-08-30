@@ -13,7 +13,7 @@ from assetbox.views.generic import (
 
 
 class SupplierListView(ObjectListView):
-    queryset = Supplier.objects.all()
+    queryset = Supplier.objects.prefetch_related('tags')
     filterset = filters.SupplierFilterSet
     filterset_form = forms.SupplierFilterForm
     table = tables.SupplierTable

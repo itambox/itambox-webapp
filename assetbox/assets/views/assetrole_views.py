@@ -16,7 +16,7 @@ from assetbox.quick_add import QuickAddMixin
 
 
 class AssetRoleListView(ObjectListView):
-    queryset = AssetRole.objects.annotate(asset_count=Count('asset'))
+    queryset = AssetRole.objects.prefetch_related('tags').annotate(asset_count=Count('asset'))
     filterset = filters.AssetRoleFilterSet
     filterset_form = forms.AssetRoleFilterForm
     table = tables.AssetRoleTable

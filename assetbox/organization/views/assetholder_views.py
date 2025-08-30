@@ -25,7 +25,7 @@ from django_tables2 import RequestConfig
 
 
 class AssetHolderListView(ObjectListView):
-    queryset = AssetHolder.objects.prefetch_related('tags').annotate(
+    queryset = AssetHolder.objects.select_related('tenant').prefetch_related('tags').annotate(
         assignment_count=Count('assignments'),
     )
     filterset = AssetHolderFilterSet
