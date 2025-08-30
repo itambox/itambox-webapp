@@ -46,8 +46,9 @@ class BaseTable(tables.Table):
                 logger.error("Error getting user column preferences: %s", e)
 
         # Determine the effective list of columns to show
-        if user_columns is not None:
-            # Use user's prefs if they exist (even if empty)
+        # Treat both None and empty list as "no preference" so that Reset
+        # (which stores columns: []) and fresh users both fall back to defaults
+        if user_columns:
             columns_to_show = user_columns
             logger.debug("Using user preference columns: %s", columns_to_show)
         else:

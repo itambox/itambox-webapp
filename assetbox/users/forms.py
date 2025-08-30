@@ -119,7 +119,8 @@ class TableConfigForm(forms.Form):
         # Determine initial selected columns (priority: user > table default > all)
         default_cols = getattr(table.Meta, 'default_columns', None)
         initial_selected_names = user_config.get('columns', default_cols)
-        if initial_selected_names is None:
+        # Treat empty list (from Reset) the same as None — fall back to defaults
+        if not initial_selected_names:
              # Fallback if no user pref and no Meta.default_columns
              # Use Meta.fields or all non-excluded fields
              if hasattr(table.Meta, 'fields'):

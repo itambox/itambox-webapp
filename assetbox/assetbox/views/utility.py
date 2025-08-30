@@ -41,7 +41,6 @@ class SearchView(LoginRequiredMixin, BaseHTMXView, TemplateResponseMixin, View):
                 if table_class:
                     data['table'] = table_class(list(data['queryset'][:10]), request=request) 
                     try:
-                        from django.urls import reverse
                         from assetbox.utils import get_model_viewname
                         data['list_url'] = reverse(get_model_viewname(model, 'list'))
                     except Exception:

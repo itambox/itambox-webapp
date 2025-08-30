@@ -2,7 +2,7 @@ from django import forms
 from django.urls import reverse
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Row, Column
-from core.forms import SlugModelForm
+from core.forms import SlugModelForm, FilterForm
 from extras.models import Tag
 from assets.models import Manufacturer, Asset
 from .models import ComponentType, ComponentInstance
@@ -63,6 +63,16 @@ class ComponentTypeForm(SlugModelForm):
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
             HTML('</div>')
         )
+
+
+class ComponentTypeFilterForm(FilterForm):
+    from .filters import ComponentTypeFilterSet
+    filterset_class = ComponentTypeFilterSet
+
+
+class ComponentInstanceFilterForm(FilterForm):
+    from .filters import ComponentInstanceFilterSet
+    filterset_class = ComponentInstanceFilterSet
 
 class ComponentInstanceForm(forms.ModelForm):
     component_type = forms.ModelChoiceField(
@@ -126,3 +136,13 @@ class ComponentInstanceForm(forms.ModelForm):
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
             HTML('</div>')
         )
+
+
+class ComponentTypeFilterForm(FilterForm):
+    from .filters import ComponentTypeFilterSet
+    filterset_class = ComponentTypeFilterSet
+
+
+class ComponentInstanceFilterForm(FilterForm):
+    from .filters import ComponentInstanceFilterSet
+    filterset_class = ComponentInstanceFilterSet

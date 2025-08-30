@@ -328,7 +328,11 @@ class BaseTable(tables.Table):
                         app_label = model._meta.app_label
                         user_config = prefs.data.get('tables', {}).get(app_label, {}).get(self.name, {})
                         if columns is None:
-                            columns = user_config.get('columns')
+                            cols_from_pref = user_config.get('columns')
+                            # Treat empty list same as absent key — fall through
+                            # to Meta.default_columns / Meta.fields below
+                            if cols_from_pref:
+                                columns = cols_from_pref
             except Exception:
                 logger.debug("Error reading user column preferences for table %s", self.name)
 

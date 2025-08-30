@@ -9,7 +9,7 @@ from assetbox.views.generic import (
     ObjectDeleteView, ObjectCloneView, ObjectBulkEditView, ObjectBulkDeleteView
 )
 from .models import ComponentType, ComponentInstance
-from .forms import ComponentTypeForm, ComponentInstanceForm
+from .forms import ComponentTypeForm, ComponentInstanceForm, ComponentTypeFilterForm, ComponentInstanceFilterForm
 from .filters import ComponentTypeFilterSet, ComponentInstanceFilterSet
 from .tables import ComponentTypeTable, ComponentInstanceTable
 
@@ -23,7 +23,7 @@ class ComponentTypeCloneView(ObjectCloneView):
 class ComponentTypeListView(ObjectListView):
     queryset = ComponentType.objects.select_related('manufacturer').prefetch_related('tags')
     filterset = ComponentTypeFilterSet
-    filterset_form = ComponentTypeForm
+    filterset_form = ComponentTypeFilterForm
     table = ComponentTypeTable
     action_buttons = ('add',)
 
@@ -77,7 +77,7 @@ class ComponentTypeDeleteView(ObjectDeleteView):
 class ComponentInstanceListView(ObjectListView):
     queryset = ComponentInstance.objects.select_related('component_type', 'component_type__manufacturer', 'parent_asset').prefetch_related('tags')
     filterset = ComponentInstanceFilterSet
-    filterset_form = ComponentInstanceForm
+    filterset_form = ComponentInstanceFilterForm
     table = ComponentInstanceTable
     action_buttons = ('add',)
 
