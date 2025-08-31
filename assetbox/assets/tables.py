@@ -144,7 +144,7 @@ class ManufacturerTable(BaseTable):
 class AssetTypeTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     manufacturer = tables.Column(linkify=True) # Linkify using default get_absolute_url
-    model = tables.LinkColumn('assets:assettype_detail', args=[A('slug')], verbose_name='Model')
+    model = tables.LinkColumn('assets:assettype_detail', args=[A('pk')], verbose_name='Model')
     eol_months = tables.Column(verbose_name='EOL (Months)')
     created_at = tables.DateTimeColumn(format="Y-m-d") # Explicitly add 'created'
     last_updated = tables.DateTimeColumn(format="Y-m-d H:i") # Explicitly add 'last_updated'

@@ -25,8 +25,6 @@ class AssetTypeListView(ObjectListView):
 
 class AssetTypeDetailView(ObjectDetailView):
     queryset = AssetType.objects.select_related('manufacturer').prefetch_related('tags', 'assets')
-    slug_field = 'slug'
-    slug_url_kwarg = 'slug'
 
     layout = (
         ((Panel('info', 'Asset Type Details'), Panel('specs', 'Hardware Specifications')),),
@@ -45,7 +43,7 @@ class AssetTypeDetailView(ObjectDetailView):
             related_objects_list.append({
                 'label': 'Assets',
                 'count': asset_count,
-                'url': f"{reverse('assets:asset_list')}?asset_type={assettype.slug}"
+                'url': f"{reverse('assets:asset_list')}?asset_type={assettype.pk}"
             })
 
         context['assets_table'] = assets_table
@@ -59,8 +57,6 @@ class AssetTypeEditView(QuickAddMixin, ObjectEditView):
     model_form = forms.AssetTypeForm
     template_name = 'generic/object_edit.html'
     quick_add_target = 'id_asset_type'
-    slug_field = 'slug'
-    slug_url_kwarg = 'slug'
 
 
 class AssetTypeDeleteView(ObjectDeleteView):
@@ -68,8 +64,6 @@ class AssetTypeDeleteView(ObjectDeleteView):
     model = AssetType
     template_name = 'generic/object_confirm_delete.html'
     success_url = reverse_lazy('assets:assettype_list')
-    slug_field = 'slug'
-    slug_url_kwarg = 'slug'
 
     def post(self, request, *args, **kwargs):
         assettype = self.get_object()

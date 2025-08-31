@@ -53,9 +53,9 @@ urlpatterns = [
     path('types/add/', views.AssetTypeEditView.as_view(), name='assettype_create'),
     path('types/<int:pk>/clone/', views.AssetTypeCloneView.as_view(), name='assettype_clone'),
     path('types/import/', views.AssetTypeImportView.as_view(), name='assettype_import'),
-    path('types/<slug:slug>/', views.AssetTypeDetailView.as_view(), name='assettype_detail'),
-    path('types/<slug:slug>/edit/', views.AssetTypeEditView.as_view(), name='assettype_update'),
-    path('types/<slug:slug>/delete/', views.AssetTypeDeleteView.as_view(), name='assettype_delete'),
+    path('types/<int:pk>/', views.AssetTypeDetailView.as_view(), name='assettype_detail'),
+    path('types/<int:pk>/edit/', views.AssetTypeEditView.as_view(), name='assettype_update'),
+    path('types/<int:pk>/delete/', views.AssetTypeDeleteView.as_view(), name='assettype_delete'),
 
     # Component Types
     path('component-types/', component_views.ComponentTypeListView.as_view(), name='componenttype_list'),

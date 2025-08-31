@@ -195,7 +195,7 @@ class AssetType(AutoSlugMixin, AssetBoxModel):
         return f"{self.manufacturer.name} {self.model}"
 
     def get_absolute_url(self):
-        return reverse('assets:assettype_detail', kwargs={'slug': self.slug})
+        return reverse('assets:assettype_detail', kwargs={'pk': self.pk})
 
 
 
