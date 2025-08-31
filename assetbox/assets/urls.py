@@ -57,22 +57,25 @@ urlpatterns = [
     path('types/<int:pk>/edit/', views.AssetTypeEditView.as_view(), name='assettype_update'),
     path('types/<int:pk>/delete/', views.AssetTypeDeleteView.as_view(), name='assettype_delete'),
 
-    # Component Types
-    path('component-types/', component_views.ComponentTypeListView.as_view(), name='componenttype_list'),
-    path('component-types/add/', component_views.ComponentTypeEditView.as_view(), name='componenttype_create'),
-    path('component-types/<int:pk>/clone/', component_views.ComponentTypeCloneView.as_view(), name='componenttype_clone'),
-    path('component-types/<int:pk>/', component_views.ComponentTypeDetailView.as_view(), name='componenttype_detail'),
-    path('component-types/<int:pk>/edit/', component_views.ComponentTypeEditView.as_view(), name='componenttype_update'),
-    path('component-types/<int:pk>/delete/', component_views.ComponentTypeDeleteView.as_view(), name='componenttype_delete'),
+    # Component Catalog (quantity-based)
+    path('components/', component_views.ComponentListView.as_view(), name='component_list'),
+    path('components/add/', component_views.ComponentEditView.as_view(), name='component_create'),
+    path('components/<int:pk>/', component_views.ComponentDetailView.as_view(), name='component_detail'),
+    path('components/<int:pk>/edit/', component_views.ComponentEditView.as_view(), name='component_update'),
+    path('components/<int:pk>/delete/', component_views.ComponentDeleteView.as_view(), name='component_delete'),
+    path('components/<int:pk>/clone/', component_views.ComponentCloneView.as_view(), name='component_clone'),
 
-    # Component Instances
-    path('components/', component_views.ComponentInstanceListView.as_view(), name='componentinstance_list'),
-    path('components/add/', component_views.ComponentInstanceEditView.as_view(), name='componentinstance_create'),
-    path('components/edit/', component_views.ComponentInstanceBulkEditView.as_view(), name='componentinstance_bulk_edit'),
-    path('components/delete/', component_views.ComponentInstanceBulkDeleteView.as_view(), name='componentinstance_bulk_delete'),
-    path('components/<int:pk>/', component_views.ComponentInstanceDetailView.as_view(), name='componentinstance_detail'),
-    path('components/<int:pk>/edit/', component_views.ComponentInstanceEditView.as_view(), name='componentinstance_update'),
-    path('components/<int:pk>/delete/', component_views.ComponentInstanceDeleteView.as_view(), name='componentinstance_delete'),
+    # Component Stock
+    path('component-stocks/', component_views.ComponentStockListView.as_view(), name='componentstock_list'),
+    path('component-stocks/add/', component_views.ComponentStockEditView.as_view(), name='componentstock_create'),
+    path('component-stocks/<int:pk>/edit/', component_views.ComponentStockEditView.as_view(), name='componentstock_update'),
+    path('component-stocks/<int:pk>/delete/', component_views.ComponentStockDeleteView.as_view(), name='componentstock_delete'),
+
+    # Component Allocations
+    path('component-allocations/', component_views.ComponentAllocationListView.as_view(), name='componentallocation_list'),
+    path('component-allocations/add/', component_views.ComponentAllocationEditView.as_view(), name='componentallocation_create'),
+    path('component-allocations/<int:pk>/edit/', component_views.ComponentAllocationEditView.as_view(), name='componentallocation_update'),
+    path('component-allocations/<int:pk>/delete/', component_views.ComponentAllocationDeleteView.as_view(), name='componentallocation_delete'),
 
     # Accessories
     path('accessories/', inventory_views.AccessoryListView.as_view(), name='accessory_list'),

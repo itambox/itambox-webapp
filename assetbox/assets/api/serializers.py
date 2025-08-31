@@ -10,7 +10,8 @@ from core.api.nested_serializers import (
 )
 from assets.models import (
     Asset, AssetRole, Manufacturer, ActivityLog, AssetType, InstalledSoftware,
-    StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence
+    StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence,
+    AssetAssignment
 )
 from organization.models import Location, Tenant
 from software.models import Software
@@ -200,3 +201,30 @@ class ActivityLogSerializer(serializers.ModelSerializer):
             'user', 'timestamp', 'notes'
         ]
         brief_fields = ['id', 'asset', 'action', 'user', 'timestamp']
+
+
+class AssetAssignmentSerializer(BaseModelSerializer):
+    asset = NestedAssetSerializer(read_only=True)
+    asset_id = serializers.PrimaryKeyRelatedField(
+        queryset=Asset.objects.all(), source='asset', write_only=True
+    )
+    assigned_to_type = serializers.CharField(source='assigned_to_content_type.model', read_only=True)
+    assigned_to_name = serializers.SerializerMethodField()
+    checked_out_by_name = serializers.CharField(source='checked_out_by.username', read_only=True)
+
+    class Meta:
+        model = AssetAssignment
+        fields = [
+            'id', 'asset', 'asset_id', 'assigned_to_content_type',
+            'assigned_to_object_id', 'assigned_to_type', 'assigned_to_name',
+            'checked_out_by', 'checked_out_by_name', 'checked_out_at',
+            'expected_checkin_date', 'is_active', 'checked_in_at',
+            'checked_in_by', 'notes', 'created_at', 'updated_at'
+        ]
+        brief_fields = ['id', 'asset', 'assigned_to_name', 'is_active']
+
+    def get_assigned_to_name(self, obj):
+        try:
+            return str(obj.assigned_to)
+        except Exception:
+            return None

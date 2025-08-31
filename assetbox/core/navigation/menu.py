@@ -2,7 +2,7 @@ from functools import cache
 
 from django.utils.translation import gettext_lazy as _
 
-from . import Menu, MenuGroup, MenuItem, get_model_item
+from . import Menu, MenuGroup, MenuItem, MenuItemButton, get_model_item
 
 ORGANIZATION_MENU = Menu(
     label=_('Organization'),
@@ -21,6 +21,7 @@ ORGANIZATION_MENU = Menu(
             label=_('Tenancy'),
             items=(
                 get_model_item('organization', 'tenant', _('Tenants')),
+                get_model_item('organization', 'tenantgroup', _('Tenant Groups')),
                 get_model_item('organization', 'assetholder', _('Asset Holders')),
                 MenuItem(
                     link='organization:assetholderassignment_list',
@@ -57,8 +58,50 @@ ASSETS_MENU = Menu(
             items=(
                 get_model_item('assets', 'assettype', _('Asset Types')),
                 get_model_item('assets', 'manufacturer', _('Manufacturers')),
-                get_model_item('assets', 'componenttype', _('Component Types')),
-                get_model_item('assets', 'componentinstance', _('Component Instances')),
+            ),
+        ),
+        MenuGroup(
+            label=_('Components'),
+            items=(
+                MenuItem(
+                    link='assets:component_list',
+                    link_text=_('Components'),
+                    permissions=['components.view_component'],
+                    buttons=(
+                        MenuItemButton(
+                            link='assets:component_create',
+                            title='Add',
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=['components.add_component'],
+                        ),
+                    ),
+                ),
+                MenuItem(
+                    link='assets:componentstock_list',
+                    link_text=_('Component Stocks'),
+                    permissions=['components.view_componentstock'],
+                    buttons=(
+                        MenuItemButton(
+                            link='assets:componentstock_create',
+                            title='Add',
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=['components.add_componentstock'],
+                        ),
+                    ),
+                ),
+                MenuItem(
+                    link='assets:componentallocation_list',
+                    link_text=_('Component Allocations'),
+                    permissions=['components.view_componentallocation'],
+                    buttons=(
+                        MenuItemButton(
+                            link='assets:componentallocation_create',
+                            title='Add',
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=['components.add_componentallocation'],
+                        ),
+                    ),
+                ),
             ),
         ),
         MenuGroup(

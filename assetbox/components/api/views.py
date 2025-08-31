@@ -1,20 +1,27 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from core.api.viewsets import AssetBoxModelViewSet
-from components.models import ComponentType, ComponentInstance
-from .serializers import ComponentTypeSerializer, ComponentInstanceSerializer
+from components.models import Component, ComponentStock, ComponentAllocation
+from .serializers import (
+    ComponentSerializer, ComponentStockSerializer, ComponentAllocationSerializer
+)
 
 
-class ComponentTypeViewSet(AssetBoxModelViewSet):
-    queryset = ComponentType.objects.select_related('manufacturer').prefetch_related('tags').all()
-    serializer_class = ComponentTypeSerializer
+class ComponentViewSet(AssetBoxModelViewSet):
+    queryset = Component.objects.select_related('manufacturer', 'category').prefetch_related('tags').all()
+    serializer_class = ComponentSerializer
     filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ['manufacturer_id', 'category']
+    filterset_fields = ['manufacturer_id', 'category_id']
 
 
-class ComponentInstanceViewSet(AssetBoxModelViewSet):
-    queryset = ComponentInstance.objects.select_related(
-        'component_type__manufacturer', 'parent_asset'
-    ).prefetch_related('tags').all()
-    serializer_class = ComponentInstanceSerializer
+class ComponentStockViewSet(AssetBoxModelViewSet):
+    queryset = ComponentStock.objects.select_related('component', 'location').all()
+    serializer_class = ComponentStockSerializer
     filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ['component_type_id', 'parent_asset_id', 'status', 'serial_number']
+    filterset_fields = ['component_id', 'location_id']
+
+
+class ComponentAllocationViewSet(AssetBoxModelViewSet):
+    queryset = ComponentAllocation.objects.select_related('component', 'asset').prefetch_related('tags').all()
+    serializer_class = ComponentAllocationSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_fields = ['component_id', 'asset_id']

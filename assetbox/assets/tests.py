@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from assets.models import Manufacturer, Asset, AssetType, AssetRole, ActivityLog, StatusLabel, Depreciation, Supplier, Category, AssetRequest
-from components.models import ComponentType, ComponentInstance
+from components.models import Component, ComponentAllocation
 from inventory.models import Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, Kit, KitItem
 from compliance.models import CustodyReceipt, AssetMaintenance
 from extras.models import CustomField, CustomFieldset
@@ -16,163 +16,140 @@ User = get_user_model()
 
 class ComponentTrackingTestCase(TestCase):
     def setUp(self):
-        # Create user
         self.user = User.objects.create_user(username='testadmin', password='testpassword', is_staff=True, is_superuser=True)
         self.client.login(username='testadmin', password='testpassword')
-        
-        # Create manufacturer
+
         self.manufacturer = Manufacturer.objects.create(name="Dell", slug="dell")
-        
-        # Create component type
-        self.comp_type = ComponentType.objects.create(
+        self.category = Category.objects.create(name="Memory", slug="memory", applies_to={"component": True})
+
+        self.component = Component.objects.create(
             manufacturer=self.manufacturer,
             name="16GB DDR5 RAM",
             slug="dell-16gb-ddr5-ram",
-            category=ComponentType.CATEGORY_RAM,
-            specs="16GB DDR5 4800MHz",
+            category=self.category,
+            specs={"capacity_gb": 16, "type": "DDR5", "speed_mhz": 4800},
             part_number="RAM-16G-D5"
         )
-        
-        # Create asset role and type
+
         self.role = AssetRole.objects.create(name="Server", slug="server")
         self.asset_type = AssetType.objects.create(
             manufacturer=self.manufacturer,
             model="PowerEdge R750",
             slug="dell-poweredge-r750"
         )
-        
-        # Create asset
+
         self.asset = Asset.objects.create(
             name="Web Server 01",
             asset_tag="SRV-001",
             asset_type=self.asset_type,
             asset_role=self.role
         )
-        
-        # Create component instance
-        self.comp_instance = ComponentInstance.objects.create(
-            component_type=self.comp_type,
-            serial_number="SN-RAM-12345",
-            parent_asset=self.asset,
-            status=ComponentInstance.STATUS_INSTALLED,
-            purchase_cost=Decimal("150.00")
+
+        self.allocation = ComponentAllocation.objects.create(
+            component=self.component,
+            asset=self.asset,
+            qty_allocated=2,
+            notes="Initial RAM allocation"
         )
 
-    def test_component_type_detail_view(self):
-        response = self.client.get(reverse('assets:componenttype_detail', kwargs={'pk': self.comp_type.pk}))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "16GB DDR5 RAM")
-        self.assertContains(response, "Memory (RAM)")
-
-    def test_component_type_list_view(self):
-        response = self.client.get(reverse('assets:componenttype_list'))
+    def test_component_detail_view(self):
+        response = self.client.get(reverse('assets:component_detail', kwargs={'pk': self.component.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "16GB DDR5 RAM")
 
-    def test_component_type_create_view(self):
-        response = self.client.get(reverse('assets:componenttype_create'))
+    def test_component_list_view(self):
+        response = self.client.get(reverse('assets:component_list'))
         self.assertEqual(response.status_code, 200)
-        
+        self.assertContains(response, "16GB DDR5 RAM")
+
+    def test_component_create_view(self):
+        response = self.client.get(reverse('assets:component_create'))
+        self.assertEqual(response.status_code, 200)
+
         post_data = {
             'manufacturer': self.manufacturer.pk,
             'name': '2TB NVMe SSD',
             'slug': 'dell-2tb-nvme-ssd',
-            'category': ComponentType.CATEGORY_STORAGE,
+            'category': self.category.pk,
             'part_number': 'SSD-2TB-NVME',
-            'specs': '2TB PCIe Gen4',
-            'description': 'Samsung SSD for server storage'
+            'min_stock_level': 0,
+            'specs': '{}',
+            'description': 'Samsung SSD for server storage',
+            'tags': [],
         }
-        response = self.client.post(reverse('assets:componenttype_create'), data=post_data)
-        self.assertEqual(response.status_code, 302) # Redirect to detail view
-        self.assertTrue(ComponentType.objects.filter(name='2TB NVMe SSD').exists())
+        response = self.client.post(reverse('assets:component_create'), data=post_data)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Component.objects.filter(name='2TB NVMe SSD').exists())
 
-    def test_component_type_update_view(self):
-        response = self.client.get(reverse('assets:componenttype_update', kwargs={'pk': self.comp_type.pk}))
+    def test_component_update_view(self):
+        response = self.client.get(reverse('assets:component_update', kwargs={'pk': self.component.pk}))
         self.assertEqual(response.status_code, 200)
-        
+
         post_data = {
             'manufacturer': self.manufacturer.pk,
             'name': '16GB DDR5 RAM (Updated)',
             'slug': 'dell-16gb-ddr5-ram',
-            'category': ComponentType.CATEGORY_RAM,
+            'category': self.category.pk,
             'part_number': 'RAM-16G-D5-UPDATED',
-            'specs': '16GB DDR5 5200MHz',
-            'description': 'Updated spec RAM'
+            'min_stock_level': 0,
+            'specs': '{}',
+            'description': 'Updated spec RAM',
+            'tags': [],
         }
-        response = self.client.post(reverse('assets:componenttype_update', kwargs={'pk': self.comp_type.pk}), data=post_data)
+        response = self.client.post(reverse('assets:component_update', kwargs={'pk': self.component.pk}), data=post_data)
         self.assertEqual(response.status_code, 302)
-        self.comp_type.refresh_from_db()
-        self.assertEqual(self.comp_type.name, '16GB DDR5 RAM (Updated)')
+        self.component.refresh_from_db()
+        self.assertEqual(self.component.name, '16GB DDR5 RAM (Updated)')
 
-    def test_component_type_delete_view(self):
-        # Trying to delete with active physical instance should fail with error message/redirect
-        response = self.client.post(reverse('assets:componenttype_delete', kwargs={'pk': self.comp_type.pk}))
+    def test_component_delete_view(self):
+        response = self.client.post(reverse('assets:component_delete', kwargs={'pk': self.component.pk}))
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(ComponentType.objects.filter(pk=self.comp_type.pk).exists())
-        
-        # Delete instance first
-        self.comp_instance.delete()
-        response = self.client.post(reverse('assets:componenttype_delete', kwargs={'pk': self.comp_type.pk}))
-        self.assertEqual(response.status_code, 302)
-        self.assertFalse(ComponentType.objects.filter(pk=self.comp_type.pk).exists())
+        self.assertFalse(Component.objects.filter(pk=self.component.pk).exists())
 
-    def test_component_instance_detail_view(self):
-        response = self.client.get(reverse('assets:componentinstance_detail', kwargs={'pk': self.comp_instance.pk}))
+    def test_componentallocation_list_view(self):
+        response = self.client.get(reverse('assets:componentallocation_list'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "SN-RAM-12345")
-        self.assertContains(response, "Installed")
 
-    def test_component_instance_list_view(self):
-        response = self.client.get(reverse('assets:componentinstance_list'))
+    def test_componentallocation_create_view(self):
+        response = self.client.get(reverse('assets:componentallocation_create'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "SN-RAM-12345")
 
-    def test_component_instance_create_view(self):
-        response = self.client.get(reverse('assets:componentinstance_create'))
-        self.assertEqual(response.status_code, 200)
-        
         post_data = {
-            'component_type': self.comp_type.pk,
-            'serial_number': 'SN-RAM-99999',
-            'parent_asset': self.asset.pk,
-            'status': ComponentInstance.STATUS_INSTALLED,
-            'purchase_cost': '145.50',
-            'notes': 'New secondary RAM stick'
+            'component': self.component.pk,
+            'asset': self.asset.pk,
+            'qty_allocated': 1,
+            'notes': 'Secondary RAM stick'
         }
-        response = self.client.post(reverse('assets:componentinstance_create'), data=post_data)
+        response = self.client.post(reverse('assets:componentallocation_create'), data=post_data)
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(ComponentInstance.objects.filter(serial_number='SN-RAM-99999').exists())
+        self.assertTrue(ComponentAllocation.objects.filter(qty_allocated=1, notes='Secondary RAM stick').exists())
 
-    def test_component_instance_update_view(self):
-        response = self.client.get(reverse('assets:componentinstance_update', kwargs={'pk': self.comp_instance.pk}))
+    def test_componentallocation_update_view(self):
+        response = self.client.get(reverse('assets:componentallocation_update', kwargs={'pk': self.allocation.pk}))
         self.assertEqual(response.status_code, 200)
-        
-        post_data = {
-            'component_type': self.comp_type.pk,
-            'serial_number': 'SN-RAM-12345-UPDATED',
-            'parent_asset': '',
-            'status': ComponentInstance.STATUS_IN_STOCK,
-            'purchase_cost': '120.00',
-            'notes': 'Uninstalled RAM stick'
-        }
-        response = self.client.post(reverse('assets:componentinstance_update', kwargs={'pk': self.comp_instance.pk}), data=post_data)
-        self.assertEqual(response.status_code, 302)
-        self.comp_instance.refresh_from_db()
-        self.assertEqual(self.comp_instance.serial_number, 'SN-RAM-12345-UPDATED')
-        self.assertEqual(self.comp_instance.status, ComponentInstance.STATUS_IN_STOCK)
-        self.assertIsNone(self.comp_instance.parent_asset)
 
-    def test_component_instance_delete_view(self):
-        response = self.client.post(reverse('assets:componentinstance_delete', kwargs={'pk': self.comp_instance.pk}))
+        post_data = {
+            'component': self.component.pk,
+            'asset': self.asset.pk,
+            'qty_allocated': 3,
+            'notes': 'Updated RAM allocation'
+        }
+        response = self.client.post(reverse('assets:componentallocation_update', kwargs={'pk': self.allocation.pk}), data=post_data)
         self.assertEqual(response.status_code, 302)
-        self.assertFalse(ComponentInstance.objects.filter(pk=self.comp_instance.pk).exists())
+        self.allocation.refresh_from_db()
+        self.assertEqual(self.allocation.qty_allocated, 3)
+        self.assertEqual(self.allocation.notes, 'Updated RAM allocation')
+
+    def test_componentallocation_delete_view(self):
+        response = self.client.post(reverse('assets:componentallocation_delete', kwargs={'pk': self.allocation.pk}))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(ComponentAllocation.objects.filter(pk=self.allocation.pk).exists())
 
     def test_asset_detail_view_components_integration(self):
         response = self.client.get(reverse('assets:asset_detail', kwargs={'pk': self.asset.pk}))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "SN-RAM-12345")
         self.assertContains(response, "Installed Physical Modules / Components")
-        
+
         self.assertIn('components_table', response.context)
         comp_table = response.context['components_table']
         self.assertEqual(len(comp_table.rows), 1)

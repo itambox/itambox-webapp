@@ -1,11 +1,13 @@
 from django.db import models
 from django.conf import settings
 from django.urls import reverse
+from django.utils import timezone
 from software.models import Software
 from core.models import BaseModel, ChangeLoggingMixin, AssetBoxModel
 from core.mixins import ExportableMixin, SoftDeleteMixin, CustomFieldDataMixin, JournalingMixin, TaggableMixin, AutoSlugMixin
 from extras.models import CustomFieldset
-from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import get_user_model
 from compliance.models import generate_token
 
@@ -384,12 +386,61 @@ class Asset(CustomFieldDataMixin, SoftDeleteMixin, AssetBoxModel):
 
     @property
     def is_modular(self):
-        if self.components.exists():
+        if self.component_allocations.filter(deleted_at__isnull=True).exists():
             return True
         if self.asset_role:
             role_slug = self.asset_role.slug.lower()
             return 'server' in role_slug or 'modular' in role_slug or 'workstation' in role_slug or 'hypervisor' in role_slug
         return False
+
+    @property
+    def active_assignment(self):
+        return self.assignments.filter(is_active=True).first()
+
+    @property
+    def assigned_to(self):
+        active = self.active_assignment
+        return active.assigned_to if active else None
+
+    def checkout(self, target, checked_out_by, expected_checkin=None, notes=''):
+        if self.active_assignment:
+            raise ValueError(f"Asset {self.asset_tag} already has an active assignment.")
+        from organization.models import AssetHolder, Location
+        allowed_models = (AssetHolder, Location, Asset)
+        if not isinstance(target, allowed_models):
+            raise TypeError(f"Target must be one of: AssetHolder, Location, or Asset.")
+        assignment = AssetAssignment.objects.create(
+            asset=self,
+            assigned_to=target,
+            checked_out_by=checked_out_by,
+            expected_checkin_date=expected_checkin,
+            notes=notes,
+        )
+        ActivityLog.objects.create(
+            asset=self,
+            action='checked_out',
+            user=checked_out_by,
+            notes=f"Checked out to {target}. {notes}"
+        )
+        return assignment
+
+    def checkin(self, checked_in_by, notes=''):
+        active = self.active_assignment
+        if not active:
+            raise ValueError(f"Asset {self.asset_tag} has no active assignment.")
+        active.is_active = False
+        active.checked_in_at = timezone.now()
+        active.checked_in_by = checked_in_by
+        if notes:
+            active.notes = (active.notes + '\n' + notes).strip()
+        active.save()
+        ActivityLog.objects.create(
+            asset=self,
+            action='checked_in',
+            user=checked_in_by,
+            notes=f"Checked in from {active.assigned_to}. {notes}"
+        )
+        return active
 
     def __str__(self):
         return f"{self.name} ({self.asset_tag})"
@@ -521,7 +572,7 @@ class Category(AutoSlugMixin, AssetBoxModel):
     email_on_checkin = models.BooleanField(default=False, help_text="Send email notification on asset checkin")
     require_acceptance = models.BooleanField(default=False, help_text="Require digital acceptance on checkout")
     email_eula = models.BooleanField(default=False, help_text="Send EULA email on acceptance")
-    applies_to = models.JSONField(default=list, blank=True, help_text="Applies to: ['asset', 'accessory', 'license']")
+    applies_to = models.JSONField(default=dict, blank=True, help_text="Applies to: {'asset': True, 'accessory': True, 'component': True}")
     tags = models.ManyToManyField('extras.Tag', related_name='categories', blank=True)
 
     class Meta:
@@ -596,3 +647,50 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel):
         self.next_value += 1
         self.save(update_fields=['next_value'])
         return tag
+
+
+class AssetAssignment(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
+    asset = models.ForeignKey(
+        Asset, on_delete=models.CASCADE, related_name='assignments', db_index=True
+    )
+    assigned_to_content_type = models.ForeignKey(
+        ContentType, on_delete=models.CASCADE, related_name='asset_assignments'
+    )
+    assigned_to_object_id = models.PositiveIntegerField()
+    assigned_to = GenericForeignKey('assigned_to_content_type', 'assigned_to_object_id')
+
+    checked_out_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='checkouts'
+    )
+    checked_out_at = models.DateTimeField(auto_now_add=True)
+    expected_checkin_date = models.DateField(null=True, blank=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    checked_in_at = models.DateTimeField(null=True, blank=True)
+    checked_in_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='checkins'
+    )
+    notes = models.TextField(blank=True)
+    tags = models.ManyToManyField('extras.Tag', related_name='asset_assignments', blank=True)
+
+    class Meta:
+        ordering = ['-checked_out_at']
+        indexes = [
+            models.Index(fields=['assigned_to_content_type', 'assigned_to_object_id']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['asset'],
+                condition=models.Q(is_active=True),
+                name='unique_active_assignment_per_asset'
+            ),
+        ]
+        verbose_name = "Asset Assignment"
+        verbose_name_plural = "Asset Assignments"
+
+    def __str__(self):
+        return f"{self.asset} → {self.assigned_to} ({'active' if self.is_active else 'inactive'})"
+
+    def get_absolute_url(self):
+        return self.asset.get_absolute_url()

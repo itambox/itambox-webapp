@@ -11,7 +11,7 @@ from django.contrib.auth import get_user_model
 from django_tables2 import RequestConfig
 from django.db.models import Count
 
-from ..models import Asset, InstalledSoftware, StatusLabel, ActivityLog
+from ..models import Asset, InstalledSoftware, StatusLabel, ActivityLog, AssetAssignment
 from .. import forms, tables, filters
 from software.tables import InstalledSoftwareTable
 from compliance.models import CustodyReceipt
@@ -56,7 +56,7 @@ class AssetDetailView(ObjectDetailView):
     queryset = Asset.objects.select_related(
         'asset_role', 'location', 'asset_type', 'asset_type__manufacturer'
     ).prefetch_related(
-        'tags', 'maintenances'
+        'tags', 'maintenances', 'assignments'
     )
 
     layout = (
@@ -71,20 +71,16 @@ class AssetDetailView(ObjectDetailView):
         context = super().get_context_data(**kwargs)
         asset = self.get_object()
 
-        assignment = AssetHolderAssignment.objects.filter(
-            content_type=ContentType.objects.get_for_model(Asset),
-            object_id=asset.pk
-        ).select_related('asset_holder').first()
-
-        context['assignment'] = assignment
+        active_assignment = asset.active_assignment
+        context['assignment'] = active_assignment
 
         sw_qs = InstalledSoftware.objects.filter(asset=asset).select_related('software', 'software__manufacturer')
         sw_table = InstalledSoftwareTable(sw_qs)
         RequestConfig(self.request, paginate={'per_page': 10}).configure(sw_table)
         context['software_table'] = sw_table
 
-        comp_qs = asset.components.select_related('component_type', 'component_type__manufacturer')
-        comp_table = tables.ComponentInstanceTable(comp_qs, request=self.request)
+        comp_qs = asset.component_allocations.filter(deleted_at__isnull=True).select_related('component', 'component__manufacturer')
+        comp_table = tables.ComponentAllocationTable(comp_qs, request=self.request)
         RequestConfig(self.request, paginate={'per_page': 10}).configure(comp_table)
         context['components_table'] = comp_table
 
@@ -99,10 +95,14 @@ class AssetDetailView(ObjectDetailView):
 
         custody_receipt = None
         eula_token = None
-        if assignment and assignment.asset_holder:
-            custody_receipt = CustodyReceipt.objects.filter(asset=asset, holder=assignment.asset_holder).first()
-            if custody_receipt:
-                eula_token = custody_receipt.token
+        if active_assignment and active_assignment.assigned_to:
+            from organization.models import AssetHolder
+            if isinstance(active_assignment.assigned_to, AssetHolder):
+                custody_receipt = CustodyReceipt.objects.filter(
+                    asset=asset, holder=active_assignment.assigned_to
+                ).first()
+                if custody_receipt:
+                    eula_token = custody_receipt.token
 
         context['custody_receipt'] = custody_receipt
         context['eula_token'] = eula_token
@@ -152,18 +152,31 @@ def asset_checkout_modal(request, pk):
     if not asset.status or asset.status.slug != 'available':
         return HttpResponse("Asset is not available for assignment.", status=403)
 
+    if asset.active_assignment:
+        return HttpResponse(f"Asset already assigned to {asset.assigned_to}.", status=403)
+
     if request.method == 'POST':
         form = forms.AssetCheckOutForm(request.POST)
         if form.is_valid():
             from .services import checkout_asset
-            selected_holder = form.cleaned_data.get('asset_holder')
-            selected_location = form.cleaned_data.get('location')
+            target_type = form.cleaned_data.get('target_type')
+            holder = form.cleaned_data.get('asset_holder')
+            location = form.cleaned_data.get('location')
+            asset_target = form.cleaned_data.get('asset_target')
+
+            target_map = {
+                'holder': holder,
+                'location': location,
+                'asset': asset_target,
+            }
+            target = target_map.get(target_type)
 
             try:
                 assignee = checkout_asset(
                     asset,
-                    holder=selected_holder,
-                    location=selected_location,
+                    holder=holder,
+                    location=location,
+                    asset_target=asset_target,
                     user=request.user,
                     request=request
                 )
@@ -198,9 +211,9 @@ def asset_checkin(request, pk):
 
     msg = checkin_asset(asset, user=request.user)
     if msg:
-        messages.success(request, f"Asset '{asset}' successfully {msg.lower()}.")
+        messages.success(request, f"Asset '{asset}' successfully checked in.")
     else:
-        messages.warning(request, f"Asset '{asset}' was not checked out to a holder or assigned to a location.")
+        messages.warning(request, f"Asset '{asset}' was not checked out or assigned to a location.")
 
     return redirect('assets:asset_detail', pk=asset.pk)
 
@@ -276,24 +289,28 @@ def bulk_assign_assets(request):
 
     with transaction.atomic():
         for asset in assets:
-            existing = AssetHolderAssignment.objects.filter(
-                content_type=ct, object_id=asset.pk
-            ).first()
-            if existing and existing.asset_holder_id == int(holder_id):
-                skipped += 1
-                continue
+            if asset.active_assignment:
+                if asset.active_assignment.assigned_to == holder:
+                    skipped += 1
+                    continue
 
-            AssetHolderAssignment.objects.update_or_create(
-                content_type=ct,
-                object_id=asset.pk,
-                defaults={'asset_holder': holder}
-            )
+            AssetHolderAssignment.objects.filter(
+                content_type=ct, object_id=asset.pk
+            ).delete()
 
             if in_use_status:
                 asset.status = in_use_status
+                asset.location = None
                 asset._changelog_action = 'checkout'
                 asset._changelog_message = f'Bulk assigned to {holder}'
-                asset.save(update_fields=['status'])
+                asset.save(update_fields=['status', 'location'])
+
+            AssetAssignment.objects.create(
+                asset=asset,
+                assigned_to=holder,
+                checked_out_by=request.user,
+                notes=f'Bulk assigned to {holder}'
+            )
             assigned += 1
 
     messages.success(

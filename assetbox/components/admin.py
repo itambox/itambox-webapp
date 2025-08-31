@@ -1,16 +1,24 @@
 from django.contrib import admin
-from .models import ComponentType, ComponentInstance
+from .models import Component, ComponentStock, ComponentAllocation
 
-@admin.register(ComponentType)
-class ComponentTypeAdmin(admin.ModelAdmin):
-    list_display = ('manufacturer', 'name', 'category', 'part_number', 'specs')
+
+@admin.register(Component)
+class ComponentAdmin(admin.ModelAdmin):
+    list_display = ('manufacturer', 'name', 'category', 'part_number', 'min_stock_level')
     list_filter = ('manufacturer', 'category')
-    search_fields = ('name', 'part_number', 'specs', 'description')
+    search_fields = ('name', 'part_number', 'description')
     prepopulated_fields = {"slug": ("manufacturer", "name",)}
 
-@admin.register(ComponentInstance)
-class ComponentInstanceAdmin(admin.ModelAdmin):
-    list_display = ('component_type', 'serial_number', 'parent_asset', 'status', 'purchase_date', 'purchase_cost')
-    list_filter = ('status', 'component_type__manufacturer', 'component_type')
-    search_fields = ('serial_number', 'notes', 'parent_asset__name')
-    raw_id_fields = ('parent_asset',)
+
+@admin.register(ComponentStock)
+class ComponentStockAdmin(admin.ModelAdmin):
+    list_display = ('component', 'location', 'qty')
+    list_filter = ('component__manufacturer', 'component', 'location')
+    search_fields = ('component__name', 'location__name')
+
+
+@admin.register(ComponentAllocation)
+class ComponentAllocationAdmin(admin.ModelAdmin):
+    list_display = ('component', 'asset', 'qty_allocated', 'allocated_at')
+    list_filter = ('component__manufacturer', 'component', 'asset')
+    search_fields = ('component__name', 'asset__name', 'notes')

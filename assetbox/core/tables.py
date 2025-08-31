@@ -248,19 +248,55 @@ class AssigneeColumn(tables.Column):
     def _build_cache(self, table, model_class, cache_attr):
         from django.contrib.contenttypes.models import ContentType
         AssignmentModel = self._get_assignment_model()
-        ct = ContentType.objects.get_for_model(model_class)
         pks = [row.pk for row in table.data]
         if not pks:
             setattr(table, cache_attr, {})
             return
-        assignments = AssignmentModel.objects.filter(
-            content_type=ct, object_id__in=pks
-        ).select_related('asset_holder')
-        setattr(table, cache_attr, {
-            a.object_id: a.asset_holder
-            for a in assignments
-            if a.asset_holder
-        })
+
+        cache = {}
+        if self._assignment_model_path == 'assets.AssetAssignment':
+            assignments = AssignmentModel.objects.filter(
+                asset_id__in=pks, is_active=True
+            ).select_related(
+                'assigned_to_content_type'
+            )
+            assigned_to_ids_by_ct = {}
+            for a in assignments:
+                ct_id = a.assigned_to_content_type_id
+                if ct_id not in assigned_to_ids_by_ct:
+                    assigned_to_ids_by_ct[ct_id] = []
+                assigned_to_ids_by_ct[ct_id].append((a.asset_id, a.assigned_to_object_id))
+
+            ct_map = {}
+            for ct_id in assigned_to_ids_by_ct:
+                ct = ContentType.objects.get_for_id(ct_id)
+                ct_map[ct_id] = ct
+
+            for ct_id, entries in assigned_to_ids_by_ct.items():
+                ct = ct_map.get(ct_id)
+                if ct is None:
+                    continue
+                model = ct.model_class()
+                if model is None:
+                    continue
+                obj_ids = [e[1] for e in entries]
+                instances = model.objects.filter(pk__in=obj_ids).only('pk')
+                instance_map = {obj.pk: obj for obj in instances}
+                for asset_id, obj_id in entries:
+                    cache[asset_id] = instance_map.get(obj_id)
+
+        else:
+            ct = ContentType.objects.get_for_model(model_class)
+            assignments = AssignmentModel.objects.filter(
+                content_type=ct, object_id__in=pks
+            ).select_related('asset_holder')
+            cache = {
+                a.object_id: a.asset_holder
+                for a in assignments
+                if a.asset_holder
+            }
+
+        setattr(table, cache_attr, cache)
 
 
 # Base Table for common settings

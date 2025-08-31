@@ -1,114 +1,120 @@
 from django.urls import reverse_lazy
-from django.shortcuts import redirect
-from django.contrib import messages
 from django_tables2 import RequestConfig
 from assetbox.utils import get_paginate_count
 from assetbox.panels import Panel
 from assetbox.views.generic import (
-    ObjectListView, ObjectDetailView, ObjectEditView, 
-    ObjectDeleteView, ObjectCloneView, ObjectBulkEditView, ObjectBulkDeleteView
+    ObjectListView, ObjectDetailView, ObjectEditView,
+    ObjectDeleteView, ObjectCloneView
 )
-from .models import ComponentType, ComponentInstance
-from .forms import ComponentTypeForm, ComponentInstanceForm, ComponentTypeFilterForm, ComponentInstanceFilterForm
-from .filters import ComponentTypeFilterSet, ComponentInstanceFilterSet
-from .tables import ComponentTypeTable, ComponentInstanceTable
-
-class ComponentTypeCloneView(ObjectCloneView):
-    model = ComponentType
-    model_form = ComponentTypeForm
-    template_name = 'generic/object_edit.html'
-    default_return_url = 'assets:componenttype_list'
+from .models import Component, ComponentStock, ComponentAllocation
+from .forms import (
+    ComponentForm, ComponentStockForm, ComponentAllocationForm,
+    ComponentFilterForm, ComponentStockFilterForm, ComponentAllocationFilterForm,
+)
+from .filters import ComponentFilterSet, ComponentStockFilterSet, ComponentAllocationFilterSet
+from .tables import ComponentTable, ComponentStockTable, ComponentAllocationTable
 
 
-class ComponentTypeListView(ObjectListView):
-    queryset = ComponentType.objects.select_related('manufacturer').prefetch_related('tags')
-    filterset = ComponentTypeFilterSet
-    filterset_form = ComponentTypeFilterForm
-    table = ComponentTypeTable
+# =============================================================================
+# Component Views (new quantity-based system)
+# =============================================================================
+
+class ComponentListView(ObjectListView):
+    queryset = Component.objects.select_related('manufacturer', 'category').prefetch_related('tags', 'stocks')
+    filterset = ComponentFilterSet
+    filterset_form = ComponentFilterForm
+    table = ComponentTable
     action_buttons = ('add',)
 
 
-class ComponentTypeDetailView(ObjectDetailView):
-    queryset = ComponentType.objects.select_related('manufacturer').prefetch_related('tags', 'instances')
-    template_name = 'assets/componenttypes/componenttype_detail.html'
-
-    layout = (
-        ((Panel('info', 'Component Type Details'),),),
-    )
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        componenttype = self.get_object()
-
-        # Prepare instances table
-        instances_table = ComponentInstanceTable(componenttype.instances.all(), request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(instances_table)
-        context['instances_table'] = instances_table
-
-        return context
-
-
-class ComponentTypeEditView(ObjectEditView):
-    queryset = ComponentType.objects.all()
-    model = ComponentType
-    model_form = ComponentTypeForm
-    template_name = 'generic/object_edit.html'
-    default_return_url = 'assets:componenttype_list'
-
-
-class ComponentTypeDeleteView(ObjectDeleteView):
-    queryset = ComponentType.objects.all()
-    model = ComponentType
-    template_name = 'generic/object_confirm_delete.html'
-    success_url = reverse_lazy('assets:componenttype_list')
-
-    def post(self, request, *args, **kwargs):
-        comp_type = self.get_object()
-        instance_count = comp_type.instances.count()
-        if instance_count > 0:
-            messages.error(
-                request,
-                f"Cannot delete component type '{comp_type}': It has {instance_count} active physical parts."
-            )
-            return redirect(comp_type.get_absolute_url())
-        return super().post(request, *args, **kwargs)
-
-
-class ComponentInstanceListView(ObjectListView):
-    queryset = ComponentInstance.objects.select_related('component_type', 'component_type__manufacturer', 'parent_asset').prefetch_related('tags')
-    filterset = ComponentInstanceFilterSet
-    filterset_form = ComponentInstanceFilterForm
-    table = ComponentInstanceTable
-    action_buttons = ('add',)
-
-
-class ComponentInstanceDetailView(ObjectDetailView):
-    queryset = ComponentInstance.objects.select_related('component_type', 'component_type__manufacturer', 'parent_asset').prefetch_related('tags')
-    template_name = 'assets/componentinstances/componentinstance_detail.html'
+class ComponentDetailView(ObjectDetailView):
+    queryset = Component.objects.select_related('manufacturer', 'category').prefetch_related('tags', 'stocks', 'allocations')
 
     layout = (
         ((Panel('info', 'Component Details'),),),
     )
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        component = self.get_object()
 
-class ComponentInstanceEditView(ObjectEditView):
-    queryset = ComponentInstance.objects.all()
-    model = ComponentInstance
-    model_form = ComponentInstanceForm
+        stocks_table = ComponentStockTable(component.stocks.all(), request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(stocks_table)
+        context['stocks_table'] = stocks_table
+
+        allocations_table = ComponentAllocationTable(
+            component.allocations.filter(deleted_at__isnull=True).select_related('asset'),
+            request=self.request
+        )
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(allocations_table)
+        context['allocations_table'] = allocations_table
+
+        return context
+
+
+class ComponentEditView(ObjectEditView):
+    queryset = Component.objects.all()
+    model = Component
+    model_form = ComponentForm
     template_name = 'generic/object_edit.html'
-    default_return_url = 'assets:componentinstance_list'
+    default_return_url = 'assets:component_list'
 
 
-class ComponentInstanceDeleteView(ObjectDeleteView):
-    queryset = ComponentInstance.objects.all()
-    model = ComponentInstance
+class ComponentDeleteView(ObjectDeleteView):
+    queryset = Component.objects.all()
+    model = Component
     template_name = 'generic/object_confirm_delete.html'
-    success_url = reverse_lazy('assets:componentinstance_list')
+    success_url = reverse_lazy('assets:component_list')
 
 
-class ComponentInstanceBulkEditView(ObjectBulkEditView):
-    queryset = ComponentInstance.objects.all()
+class ComponentCloneView(ObjectCloneView):
+    model = Component
+    model_form = ComponentForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'assets:component_list'
 
 
-class ComponentInstanceBulkDeleteView(ObjectBulkDeleteView):
-    queryset = ComponentInstance.objects.all()
+class ComponentStockListView(ObjectListView):
+    queryset = ComponentStock.objects.select_related('component', 'location')
+    filterset = ComponentStockFilterSet
+    filterset_form = ComponentStockFilterForm
+    table = ComponentStockTable
+    action_buttons = ('add',)
+
+
+class ComponentStockEditView(ObjectEditView):
+    queryset = ComponentStock.objects.all()
+    model = ComponentStock
+    model_form = ComponentStockForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'assets:componentstock_list'
+
+
+class ComponentStockDeleteView(ObjectDeleteView):
+    queryset = ComponentStock.objects.all()
+    model = ComponentStock
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('assets:componentstock_list')
+
+
+class ComponentAllocationListView(ObjectListView):
+    queryset = ComponentAllocation.objects.select_related('component', 'asset').prefetch_related('tags')
+    filterset = ComponentAllocationFilterSet
+    filterset_form = ComponentAllocationFilterForm
+    table = ComponentAllocationTable
+    action_buttons = ('add',)
+
+
+class ComponentAllocationEditView(ObjectEditView):
+    queryset = ComponentAllocation.objects.all()
+    model = ComponentAllocation
+    model_form = ComponentAllocationForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'assets:componentallocation_list'
+
+
+class ComponentAllocationDeleteView(ObjectDeleteView):
+    queryset = ComponentAllocation.objects.all()
+    model = ComponentAllocation
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('assets:componentallocation_list')

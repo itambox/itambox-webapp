@@ -1,247 +1,217 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
-from assets.models import Manufacturer, AssetRole, Asset
-from .models import ComponentType, ComponentInstance
+from assets.models import Manufacturer, Category, AssetRole, Asset
+from organization.models import Location, Site
+from .models import Component, ComponentStock, ComponentAllocation
 
 User = get_user_model()
 
 
-class ComponentTypeModelTests(TestCase):
+class ComponentModelTests(TestCase):
     def setUp(self):
         self.manufacturer = Manufacturer.objects.create(name='Samsung', slug='samsung')
+        self.category = Category.objects.create(name='Storage', slug='storage', applies_to={'component': True})
 
-    def test_component_type_creation(self):
-        ct = ComponentType.objects.create(
+    def test_component_creation(self):
+        comp = Component.objects.create(
             name='990 Pro 2TB',
             manufacturer=self.manufacturer,
-            category=ComponentType.CATEGORY_STORAGE,
+            category=self.category,
             part_number='MZ-V9P2T0B',
-            specs='2TB NVMe M.2 PCIe 4.0',
+            specs={'capacity_gb': 2000, 'type': 'NVMe', 'interface': 'PCIe 4.0'},
         )
-        self.assertEqual(str(ct), 'Samsung 990 Pro 2TB')
-        self.assertEqual(ct.slug, 'samsung-990-pro-2tb')
+        self.assertEqual(str(comp), 'Samsung 990 Pro 2TB')
+        self.assertEqual(comp.slug, 'samsung-990-pro-2tb')
 
-    def test_component_type_absolute_url(self):
-        ct = ComponentType.objects.create(name='980 Pro', manufacturer=self.manufacturer)
-        url = ct.get_absolute_url()
-        self.assertIn(str(ct.pk), url)
+    def test_component_absolute_url(self):
+        comp = Component.objects.create(name='980 Pro', manufacturer=self.manufacturer, category=self.category)
+        url = comp.get_absolute_url()
+        self.assertIn(str(comp.pk), url)
 
-    def test_component_type_unique_per_manufacturer(self):
-        ComponentType.objects.create(name='Test RAM', manufacturer=self.manufacturer)
+    def test_component_unique_per_manufacturer(self):
+        Component.objects.create(name='Test RAM', manufacturer=self.manufacturer, category=self.category)
         from django.db import IntegrityError
         with self.assertRaises(IntegrityError):
-            ComponentType.objects.create(name='Test RAM', manufacturer=self.manufacturer)
+            Component.objects.create(name='Test RAM', manufacturer=self.manufacturer, category=self.category)
 
-    def test_component_type_categories(self):
-        categories = dict(ComponentType.CATEGORY_CHOICES)
-        self.assertIn('ram', categories)
-        self.assertIn('storage', categories)
-        self.assertIn('gpu', categories)
-        self.assertIn('cpu', categories)
-        self.assertIn('nic', categories)
-        self.assertIn('other', categories)
+    def test_component_stock_computation(self):
+        comp = Component.objects.create(
+            name='990 Pro 2TB', manufacturer=self.manufacturer, category=self.category
+        )
+        site = Site.objects.create(name='Berlin HQ', slug='berlin-hq')
+        location = Location.objects.create(name='Server Room A', slug='server-room-a', site=site)
+        ComponentStock.objects.create(component=comp, location=location, qty=10)
+        location2 = Location.objects.create(name='Server Room B', slug='server-room-b', site=site)
+        ComponentStock.objects.create(component=comp, location=location2, qty=5)
+        self.assertEqual(comp.total_stock, 15)
+        self.assertEqual(comp.available_stock, 15)
 
-    def test_component_type_default_category(self):
-        ct = ComponentType.objects.create(name='Default Cat', manufacturer=self.manufacturer)
-        self.assertEqual(ct.category, ComponentType.CATEGORY_OTHER)
 
-
-class ComponentInstanceModelTests(TestCase):
+class ComponentAllocationModelTests(TestCase):
     def setUp(self):
         self.manufacturer = Manufacturer.objects.create(name='Intel', slug='intel')
-        self.component_type = ComponentType.objects.create(
-            name='Core i9-13900K', manufacturer=self.manufacturer, category=ComponentType.CATEGORY_CPU
+        self.category = Category.objects.create(name='CPU', slug='cpu', applies_to={'component': True})
+        self.component = Component.objects.create(
+            name='Core i9-13900K', manufacturer=self.manufacturer, category=self.category
         )
+        self.role = AssetRole.objects.create(name='Workstation', slug='workstation')
+        self.asset = Asset.objects.create(name='WS-001', asset_tag='TAG-CPU-001', asset_role=self.role)
 
-    def test_component_instance_creation(self):
-        ci = ComponentInstance.objects.create(
-            component_type=self.component_type,
-            serial_number='SN-CPU-001',
-            status=ComponentInstance.STATUS_IN_STOCK,
+    def test_allocation_creation(self):
+        alloc = ComponentAllocation.objects.create(
+            component=self.component,
+            asset=self.asset,
+            qty_allocated=1,
         )
-        self.assertIn('Intel Core i9-13900K', str(ci))
-        self.assertIn('SN-CPU-001', str(ci))
+        self.assertIn('Core i9-13900K', str(alloc))
+        self.assertIn('WS-001', str(alloc))
 
-    def test_component_instance_installed_in_asset(self):
-        role = AssetRole.objects.create(name='Workstation', slug='workstation')
-        asset = Asset.objects.create(name='WS-001', asset_tag='TAG-CPU-001', asset_role=role)
-        ci = ComponentInstance.objects.create(
-            component_type=self.component_type,
-            serial_number='SN-CPU-002',
-            parent_asset=asset,
-            status=ComponentInstance.STATUS_INSTALLED,
+    def test_allocation_absolute_url(self):
+        alloc = ComponentAllocation.objects.create(
+            component=self.component, asset=self.asset, qty_allocated=1
         )
-        self.assertEqual(ci.parent_asset, asset)
-        self.assertIn('Intel Core i9-13900K', str(ci))
+        url = alloc.get_absolute_url()
+        self.assertIn(str(self.asset.pk), url)
 
-    def test_component_instance_absolute_url(self):
-        ci = ComponentInstance.objects.create(
-            component_type=self.component_type, status=ComponentInstance.STATUS_IN_STOCK
-        )
-        url = ci.get_absolute_url()
-        self.assertIn(str(ci.pk), url)
-
-    def test_component_instance_default_status(self):
-        ci = ComponentInstance.objects.create(component_type=self.component_type)
-        self.assertEqual(ci.status, ComponentInstance.STATUS_IN_STOCK)
-
-    def test_component_instance_no_serial_number(self):
-        ci = ComponentInstance.objects.create(
-            component_type=self.component_type, status=ComponentInstance.STATUS_DEFECTIVE
-        )
-        self.assertNotIn('[S/N:', str(ci))
+    def test_allocation_default_qty(self):
+        alloc = ComponentAllocation.objects.create(component=self.component, asset=self.asset)
+        self.assertEqual(alloc.qty_allocated, 1)
 
 
-class ComponentTypeViewTests(TestCase):
+class ComponentViewTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             username='testadmin', password='testpassword', is_staff=True, is_superuser=True
         )
         self.client.login(username='testadmin', password='testpassword')
         self.manufacturer = Manufacturer.objects.create(name='Samsung', slug='samsung')
-        self.component_type = ComponentType.objects.create(
-            name='990 Pro 2TB', manufacturer=self.manufacturer, category=ComponentType.CATEGORY_STORAGE
+        self.category = Category.objects.create(name='Storage', slug='storage', applies_to={'component': True})
+        self.component = Component.objects.create(
+            name='990 Pro 2TB', manufacturer=self.manufacturer, category=self.category
         )
 
     def test_list_view(self):
-        url = reverse('assets:componenttype_list')
+        url = reverse('assets:component_list')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '990 Pro 2TB')
 
     def test_detail_view(self):
-        url = reverse('assets:componenttype_detail', kwargs={'pk': self.component_type.pk})
+        url = reverse('assets:component_detail', kwargs={'pk': self.component.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '990 Pro 2TB')
 
     def test_create_view_get(self):
-        url = reverse('assets:componenttype_create')
+        url = reverse('assets:component_create')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_create_view_post(self):
-        url = reverse('assets:componenttype_create')
+        url = reverse('assets:component_create')
         response = self.client.post(url, {
             'manufacturer': self.manufacturer.pk,
             'name': '980 Pro 1TB',
             'slug': 'samsung-980-pro-1tb',
-            'category': ComponentType.CATEGORY_STORAGE,
+            'category': self.category.pk,
+            'min_stock_level': 0,
+            'specs': '{}',
+            'tags': [],
         })
         if response.status_code != 302:
             form = response.context.get('form')
             self.fail(f'Form invalid. Errors: {form.errors if form else "no form in context"}')
-        self.assertTrue(ComponentType.objects.filter(name='980 Pro 1TB').exists())
+        self.assertTrue(Component.objects.filter(name='980 Pro 1TB').exists())
 
     def test_edit_view_get(self):
-        url = reverse('assets:componenttype_update', kwargs={'pk': self.component_type.pk})
+        url = reverse('assets:component_update', kwargs={'pk': self.component.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_edit_view_post(self):
-        url = reverse('assets:componenttype_update', kwargs={'pk': self.component_type.pk})
+        url = reverse('assets:component_update', kwargs={'pk': self.component.pk})
         response = self.client.post(url, {
             'manufacturer': self.manufacturer.pk,
             'name': '990 Pro 4TB',
             'slug': 'samsung-990-pro-4tb',
-            'category': ComponentType.CATEGORY_STORAGE,
+            'category': self.category.pk,
+            'min_stock_level': 0,
+            'specs': '{}',
+            'tags': [],
         })
         if response.status_code != 302:
             form = response.context.get('form')
             self.fail(f'Form invalid. Errors: {form.errors if form else "no form in context"}')
-        self.component_type.refresh_from_db()
-        self.assertEqual(self.component_type.name, '990 Pro 4TB')
+        self.component.refresh_from_db()
+        self.assertEqual(self.component.name, '990 Pro 4TB')
 
-    def test_delete_view_get(self):
-        url = reverse('assets:componenttype_delete', kwargs={'pk': self.component_type.pk})
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-
-    def test_delete_view_post_no_instances(self):
-        url = reverse('assets:componenttype_delete', kwargs={'pk': self.component_type.pk})
+    def test_delete_view(self):
+        url = reverse('assets:component_delete', kwargs={'pk': self.component.pk})
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
-        self.assertFalse(ComponentType.objects.filter(pk=self.component_type.pk).exists())
-
-    def test_delete_view_blocked_with_instances(self):
-        ComponentInstance.objects.create(
-            component_type=self.component_type, status=ComponentInstance.STATUS_IN_STOCK
-        )
-        url = reverse('assets:componenttype_delete', kwargs={'pk': self.component_type.pk})
-        response = self.client.post(url)
-        self.assertEqual(response.status_code, 302)
-        self.assertTrue(ComponentType.objects.filter(pk=self.component_type.pk).exists())
+        self.assertFalse(Component.objects.filter(pk=self.component.pk).exists())
 
 
-class ComponentInstanceViewTests(TestCase):
+class ComponentAllocationViewTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             username='testadmin', password='testpassword', is_staff=True, is_superuser=True
         )
         self.client.login(username='testadmin', password='testpassword')
         self.manufacturer = Manufacturer.objects.create(name='Samsung', slug='samsung')
-        self.component_type = ComponentType.objects.create(
-            name='990 Pro 2TB', manufacturer=self.manufacturer, category=ComponentType.CATEGORY_STORAGE
+        self.category = Category.objects.create(name='Storage', slug='storage', applies_to={'component': True})
+        self.component = Component.objects.create(
+            name='990 Pro 2TB', manufacturer=self.manufacturer, category=self.category
         )
-        self.component = ComponentInstance.objects.create(
-            component_type=self.component_type,
-            serial_number='SN-001',
-            status=ComponentInstance.STATUS_IN_STOCK,
+        self.role = AssetRole.objects.create(name='Server', slug='server')
+        self.asset = Asset.objects.create(name='SRV-001', asset_tag='SRV-001', asset_role=self.role)
+        self.allocation = ComponentAllocation.objects.create(
+            component=self.component,
+            asset=self.asset,
+            qty_allocated=2,
+            notes='Initial setup',
         )
 
     def test_list_view(self):
-        url = reverse('assets:componentinstance_list')
+        url = reverse('assets:componentallocation_list')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-
-    def test_detail_view(self):
-        url = reverse('assets:componentinstance_detail', kwargs={'pk': self.component.pk})
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'SN-001')
 
     def test_create_view_get(self):
-        url = reverse('assets:componentinstance_create')
+        url = reverse('assets:componentallocation_create')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_create_view_post(self):
-        url = reverse('assets:componentinstance_create')
+        url = reverse('assets:componentallocation_create')
         response = self.client.post(url, {
-            'component_type': self.component_type.pk,
-            'serial_number': 'SN-002',
-            'status': ComponentInstance.STATUS_INSTALLED,
+            'component': self.component.pk,
+            'asset': self.asset.pk,
+            'qty_allocated': 1,
         })
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(ComponentInstance.objects.filter(serial_number='SN-002').exists())
 
     def test_edit_view_get(self):
-        url = reverse('assets:componentinstance_update', kwargs={'pk': self.component.pk})
+        url = reverse('assets:componentallocation_update', kwargs={'pk': self.allocation.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_edit_view_post(self):
-        url = reverse('assets:componentinstance_update', kwargs={'pk': self.component.pk})
+        url = reverse('assets:componentallocation_update', kwargs={'pk': self.allocation.pk})
         response = self.client.post(url, {
-            'component_type': self.component_type.pk,
-            'serial_number': 'SN-001-UPDATED',
-            'status': ComponentInstance.STATUS_DEFECTIVE,
-            'notes': 'Replaced under warranty',
+            'component': self.component.pk,
+            'asset': self.asset.pk,
+            'qty_allocated': 3,
+            'notes': 'Updated allocation',
         })
         self.assertEqual(response.status_code, 302)
-        self.component.refresh_from_db()
-        self.assertEqual(self.component.serial_number, 'SN-001-UPDATED')
-        self.assertEqual(self.component.status, ComponentInstance.STATUS_DEFECTIVE)
-        self.assertEqual(self.component.notes, 'Replaced under warranty')
+        self.allocation.refresh_from_db()
+        self.assertEqual(self.allocation.qty_allocated, 3)
+        self.assertEqual(self.allocation.notes, 'Updated allocation')
 
-    def test_delete_view_get(self):
-        url = reverse('assets:componentinstance_delete', kwargs={'pk': self.component.pk})
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-
-    def test_delete_view_post(self):
-        url = reverse('assets:componentinstance_delete', kwargs={'pk': self.component.pk})
+    def test_delete_view(self):
+        url = reverse('assets:componentallocation_delete', kwargs={'pk': self.allocation.pk})
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
-        self.assertFalse(ComponentInstance.objects.filter(pk=self.component.pk).exists())
+        self.assertFalse(ComponentAllocation.objects.filter(pk=self.allocation.pk).exists())

@@ -75,7 +75,6 @@ class Command(BaseCommand):
             ('assets', 'AccessoryAssignment'),
             ('assets', 'ConsumableAssignment'),
             ('assets', 'InstalledSoftware'),
-            ('assets', 'ComponentInstance'),
             ('assets', 'AssetMaintenance'),
             ('assets', 'KitItem'),
             ('assets', 'Kit'),
@@ -83,7 +82,6 @@ class Command(BaseCommand):
             ('assets', 'AssetType'),
             ('assets', 'Accessory'),
             ('assets', 'Consumable'),
-            ('assets', 'ComponentType'),
             ('licenses', 'License'),
             ('software', 'Software'),
             ('subscriptions', 'Subscription'),
@@ -556,11 +554,13 @@ class Command(BaseCommand):
                           f'{len(self._contacts)} contacts.')
 
     # ─────────────────────────────────────────
-    # Phase 2: Asset Infrastructure (AssetTypes, ComponentTypes, Accessories, Consumables)
+    # Phase 2: Asset Infrastructure (AssetTypes, Components, Accessories, Consumables)
     # ─────────────────────────────────────────
 
     def _seed_phase2(self):
-        from assets.models import AssetType, ComponentType, Accessory, Consumable
+        from assets.models import AssetType, Category
+        from components.models import Component
+        from inventory.models import Accessory, Consumable
 
         self.stdout.write('--- Phase 2: Asset Infrastructure ---')
 
@@ -625,26 +625,30 @@ class Command(BaseCommand):
             )
             self._asset_types[slug] = obj
 
-        # --- ComponentTypes ---
-        ct_data = [
-            ('Samsung 32GB DDR5-4800', 'samsung-32gb-ddr5', 'samsung-electronics', 'RAM', 'M324R4GA3BB0', '32GB DDR5-4800 ECC'),
-            ('Crucial 16GB DDR4-3200', 'crucial-16gb-ddr4', 'dell-technologies', 'RAM', 'CT16G4SFD832A', '16GB DDR4-3200 SODIMM'),
-            ('Samsung 1TB 990 Pro NVMe', 'samsung-1tb-nvme', 'samsung-electronics', 'SSD/NVMe', 'MZ-V9P1T0B', '1TB NVMe M.2 PCIe 4.0'),
-            ('WD Red Pro 8TB HDD', 'wd-red-8tb', 'dell-technologies', 'HDD', 'WD8003FFBX', '8TB SATA 7200RPM'),
-            ('Intel X710 10GbE NIC', 'intel-x710-nic', 'dell-technologies', 'NIC', 'X710DA2', 'Dual Port 10GbE SFP+'),
-            ('NVIDIA A100 80GB', 'nvidia-a100', 'dell-technologies', 'GPU', 'A100-80GB', '80GB HBM2e PCIe 4.0'),
-            ('Intel Xeon Gold 6430', 'xeon-gold-6430', 'dell-technologies', 'CPU', 'SRMZS', '32 cores, 2.10GHz'),
+        # --- Components ---
+        comp_data = [
+            ('Samsung 32GB DDR5-4800', 'samsung-32gb-ddr5', 'samsung-electronics', 'ram-memory', 'M324R4GA3BB0', {'capacity_gb': 32, 'type': 'DDR5', 'speed_mhz': 4800}),
+            ('Crucial 16GB DDR4-3200', 'crucial-16gb-ddr4', 'dell-technologies', 'ram-memory', 'CT16G4SFD832A', {'capacity_gb': 16, 'type': 'DDR4', 'speed_mhz': 3200}),
+            ('Samsung 1TB 990 Pro NVMe', 'samsung-1tb-nvme', 'samsung-electronics', 'ssd-nvme', 'MZ-V9P1T0B', {'capacity_gb': 1000, 'type': 'NVMe', 'interface': 'PCIe 4.0'}),
+            ('WD Red Pro 8TB HDD', 'wd-red-8tb', 'dell-technologies', 'hdd', 'WD8003FFBX', {'capacity_gb': 8000, 'type': 'HDD', 'interface': 'SATA'}),
+            ('Intel X710 10GbE NIC', 'intel-x710-nic', 'dell-technologies', 'nic', 'X710DA2', {'type': 'SFP+', 'speed': '10GbE'}),
+            ('NVIDIA A100 80GB', 'nvidia-a100', 'dell-technologies', 'gpu', 'A100-80GB', {'type': 'A100', 'vram_gb': 80}),
+            ('Intel Xeon Gold 6430', 'xeon-gold-6430', 'dell-technologies', 'cpu', 'SRMZS', {'type': 'Xeon Gold', 'cores': 32}),
         ]
-        self._component_types = {}
-        for name, slug, mfr_slug, category, part_number, specs in ct_data:
-            obj, _ = ComponentType.objects.get_or_create(
+        self._components = {}
+        for name, slug, mfr_slug, cat_slug, part_number, specs in comp_data:
+            category, _ = Category.objects.get_or_create(
+                slug=cat_slug,
+                defaults={'name': cat_slug.replace('-', ' ').title(), 'applies_to': {'component': True}},
+            )
+            obj, _ = Component.objects.get_or_create(
                 slug=slug,
                 defaults={
                     'name': name, 'manufacturer': self._manufacturers[mfr_slug],
                     'category': category, 'part_number': part_number, 'specs': specs,
                 }
             )
-            self._component_types[slug] = obj
+            self._components[slug] = obj
 
         # --- Accessories ---
         acc_data = [
@@ -696,7 +700,7 @@ class Command(BaseCommand):
             )
             self._consumables[slug] = obj
 
-        self.stdout.write(f'  {len(self._asset_types)} asset types, {len(self._component_types)} component types, '
+        self.stdout.write(f'  {len(self._asset_types)} asset types, {len(self._components)} components, '
                           f'{len(self._accessories)} accessories, {len(self._consumables)} consumables.')
 
     # ─────────────────────────────────────────
@@ -705,9 +709,10 @@ class Command(BaseCommand):
 
     def _seed_phase3(self):
         from assets.models import (
-            Asset, ComponentInstance, InstalledSoftware,
+            Asset, InstalledSoftware,
             AccessoryAssignment, ConsumableAssignment, CustodyReceipt,
         )
+        from components.models import ComponentAllocation
 
         self.stdout.write('--- Phase 3: Hardware Assets ---')
 
@@ -791,32 +796,27 @@ class Command(BaseCommand):
                     asset_holder=holder, content_type=ct, object_id=obj.pk,
                 )
 
-        # --- ComponentInstances ---
-        component_data = [
-            ('samsung-32gb-ddr5', 'ABX-022', 'installed', 'SERIAL-RAM-001'),
-            ('samsung-32gb-ddr5', 'ABX-022', 'installed', 'SERIAL-RAM-002'),
-            ('samsung-32gb-ddr5', 'ABX-023', 'installed', 'SERIAL-RAM-003'),
-            ('samsung-32gb-ddr5', 'ABX-023', 'installed', 'SERIAL-RAM-004'),
-            ('samsung-1tb-nvme', 'ABX-022', 'installed', 'SERIAL-NVME-001'),
-            ('wd-red-8tb', 'ABX-022', 'installed', 'SERIAL-HDD-001'),
-            ('wd-red-8tb', 'ABX-023', 'installed', 'SERIAL-HDD-002'),
-            ('wd-red-8tb', 'ABX-025', 'installed', 'SERIAL-HDD-003'),
-            ('intel-x710-nic', 'ABX-022', 'installed', 'SERIAL-NIC-001'),
-            ('intel-x710-nic', 'ABX-023', 'installed', 'SERIAL-NIC-002'),
-            ('nvidia-a100', 'ABX-024', 'installed', 'SERIAL-GPU-001'),
-            ('xeon-gold-6430', 'ABX-024', 'installed', 'SERIAL-CPU-001'),
-            ('crucial-16gb-ddr4', 'ABX-003', 'installed', 'SERIAL-RAM-LT-001'),
-            ('samsung-1tb-nvme', 'ABX-001', 'installed', 'SERIAL-NVME-MBP-001'),
-            ('samsung-1tb-nvme', 'ABX-002', 'installed', 'SERIAL-NVME-MBP-002'),
+        # --- ComponentAllocations ---
+        alloc_data = [
+            ('samsung-32gb-ddr5', 'ABX-022', 2),
+            ('samsung-32gb-ddr5', 'ABX-023', 2),
+            ('samsung-1tb-nvme', 'ABX-022', 1),
+            ('wd-red-8tb', 'ABX-022', 1),
+            ('wd-red-8tb', 'ABX-023', 1),
+            ('wd-red-8tb', 'ABX-025', 1),
+            ('intel-x710-nic', 'ABX-022', 1),
+            ('intel-x710-nic', 'ABX-023', 1),
+            ('nvidia-a100', 'ABX-024', 1),
+            ('xeon-gold-6430', 'ABX-024', 1),
+            ('crucial-16gb-ddr4', 'ABX-003', 1),
+            ('samsung-1tb-nvme', 'ABX-001', 1),
+            ('samsung-1tb-nvme', 'ABX-002', 1),
         ]
-        for comp_type_slug, asset_tag, status, serial in component_data:
-            ComponentInstance.objects.get_or_create(
-                serial_number=serial,
-                defaults={
-                    'component_type': self._component_types[comp_type_slug],
-                    'parent_asset': self._assets[asset_tag],
-                    'status': status,
-                }
+        for comp_slug, asset_tag, qty in alloc_data:
+            ComponentAllocation.objects.get_or_create(
+                component=self._components[comp_slug],
+                asset=self._assets[asset_tag],
+                defaults={'qty_allocated': qty},
             )
 
         # --- AccessoryAssignments ---

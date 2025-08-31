@@ -4,12 +4,18 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Row, Column
 from core.forms import SlugModelForm, FilterForm
 from extras.models import Tag
-from assets.models import Manufacturer, Asset
-from .models import ComponentType, ComponentInstance
+from assets.models import Manufacturer, Asset, Category
+from organization.models import Location
+from .models import Component, ComponentStock, ComponentAllocation
 
-class ComponentTypeForm(SlugModelForm):
+
+class ComponentForm(SlugModelForm):
     manufacturer = forms.ModelChoiceField(
         queryset=Manufacturer.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    category = forms.ModelChoiceField(
+        queryset=Category.objects.filter(applies_to__component=True),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     tags = forms.ModelMultipleChoiceField(
@@ -20,17 +26,19 @@ class ComponentTypeForm(SlugModelForm):
     )
 
     class Meta:
-        model = ComponentType
-        fields = ['manufacturer', 'name', 'slug', 'category', 'part_number', 'specs', 'description', 'tags']
+        model = Component
+        fields = ['manufacturer', 'name', 'slug', 'category', 'part_number', 'specs', 'min_stock_level', 'description', 'tags']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'slug': forms.TextInput(attrs={'class': 'form-control', 'slugify': 'name'}),
             'part_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'specs': forms.TextInput(attrs={'class': 'form-control'}),
+            'min_stock_level': forms.NumberInput(attrs={'class': 'form-control'}),
+            'specs': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
         help_texts = {
             'slug': 'URL-friendly identifier. Leave blank to auto-generate.',
+            'specs': 'JSON format: {"speed_mhz": 3200, "capacity_gb": 16, "type": "DDR4"}',
         }
 
     def __init__(self, *args, **kwargs):
@@ -39,10 +47,10 @@ class ComponentTypeForm(SlugModelForm):
         self.helper.form_method = 'post'
         self.helper.form_tag = True
         self.fields['slug'].widget.attrs['slugify'] = 'name'
-        
+
         button_text = 'Update' if self.instance.pk else 'Create'
-        cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse('assets:componenttype_list')
-        
+        cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse('assets:component_list')
+
         self.helper.layout = Layout(
             Row(
                 Column('manufacturer', css_class='col-md-6'),
@@ -54,8 +62,9 @@ class ComponentTypeForm(SlugModelForm):
             ),
             Row(
                 Column('category', css_class='col-md-6'),
-                Column('specs', css_class='col-md-6')
+                Column('min_stock_level', css_class='col-md-6')
             ),
+            'specs',
             'description',
             'tags',
             HTML('<div class="mt-3">'),
@@ -65,45 +74,60 @@ class ComponentTypeForm(SlugModelForm):
         )
 
 
-class ComponentTypeFilterForm(FilterForm):
-    from .filters import ComponentTypeFilterSet
-    filterset_class = ComponentTypeFilterSet
-
-
-class ComponentInstanceFilterForm(FilterForm):
-    from .filters import ComponentInstanceFilterSet
-    filterset_class = ComponentInstanceFilterSet
-
-class ComponentInstanceForm(forms.ModelForm):
-    component_type = forms.ModelChoiceField(
-        queryset=ComponentType.objects.all(),
-        label="Component Model",
+class ComponentStockForm(forms.ModelForm):
+    component = forms.ModelChoiceField(
+        queryset=Component.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
-    parent_asset = forms.ModelChoiceField(
-        queryset=Asset.objects.all(),
-        label="Asset Installed In",
-        required=False,
+    location = forms.ModelChoiceField(
+        queryset=Location.objects.all().select_related('site'),
         widget=forms.Select(attrs={'class': 'form-select'})
-    )
-    purchase_date = forms.DateField(
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-        required=False
-    )
-    tags = forms.ModelMultipleChoiceField(
-        queryset=Tag.objects.all(),
-        required=False,
-        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tomselect-tags': 'true'}),
-        label="Tags"
     )
 
     class Meta:
-        model = ComponentInstance
-        fields = ['component_type', 'serial_number', 'parent_asset', 'status', 'purchase_date', 'purchase_cost', 'notes', 'tags']
+        model = ComponentStock
+        fields = ['component', 'location', 'qty']
         widgets = {
-            'serial_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'status': forms.Select(attrs={'class': 'form-select'}),
-            'purchase_cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'qty': forms.NumberInput(attrs={'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+
+        button_text = 'Update' if self.instance.pk else 'Create'
+        cancel_url = reverse('assets:componentstock_list')
+
+        self.helper.layout = Layout(
+            Row(
+                Column('component', css_class='col-md-6'),
+                Column('location', css_class='col-md-6')
+            ),
+            'qty',
+            HTML('<div class="mt-3">'),
+            Submit('submit', button_text, css_class='btn btn-primary'),
+            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+            HTML('</div>')
+        )
+
+
+class ComponentAllocationForm(forms.ModelForm):
+    component = forms.ModelChoiceField(
+        queryset=Component.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    asset = forms.ModelChoiceField(
+        queryset=Asset.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    class Meta:
+        model = ComponentAllocation
+        fields = ['component', 'asset', 'qty_allocated', 'notes']
+        widgets = {
+            'qty_allocated': forms.NumberInput(attrs={'class': 'form-control'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
 
@@ -112,25 +136,19 @@ class ComponentInstanceForm(forms.ModelForm):
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
         self.helper.form_tag = True
-        
+
         button_text = 'Update' if self.instance.pk else 'Create'
-        cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse('assets:componentinstance_list')
-        
+        cancel_url = reverse('assets:componentallocation_list')
+
         self.helper.layout = Layout(
             Row(
-                Column('component_type', css_class='col-md-6'),
-                Column('serial_number', css_class='col-md-6')
+                Column('component', css_class='col-md-6'),
+                Column('asset', css_class='col-md-6')
             ),
             Row(
-                Column('parent_asset', css_class='col-md-6'),
-                Column('status', css_class='col-md-6')
-            ),
-            Row(
-                Column('purchase_date', css_class='col-md-6'),
-                Column('purchase_cost', css_class='col-md-6')
+                Column('qty_allocated', css_class='col-md-6'),
             ),
             'notes',
-            'tags',
             HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
@@ -138,11 +156,16 @@ class ComponentInstanceForm(forms.ModelForm):
         )
 
 
-class ComponentTypeFilterForm(FilterForm):
-    from .filters import ComponentTypeFilterSet
-    filterset_class = ComponentTypeFilterSet
+class ComponentFilterForm(FilterForm):
+    from .filters import ComponentFilterSet
+    filterset_class = ComponentFilterSet
 
 
-class ComponentInstanceFilterForm(FilterForm):
-    from .filters import ComponentInstanceFilterSet
-    filterset_class = ComponentInstanceFilterSet
+class ComponentStockFilterForm(FilterForm):
+    from .filters import ComponentStockFilterSet
+    filterset_class = ComponentStockFilterSet
+
+
+class ComponentAllocationFilterForm(FilterForm):
+    from .filters import ComponentAllocationFilterSet
+    filterset_class = ComponentAllocationFilterSet

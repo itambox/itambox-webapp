@@ -14,7 +14,10 @@ class AssetTable(BaseTable): # Inherit from BaseTable
     manufacturer = tables.Column(accessor='asset_type.manufacturer', linkify=True, verbose_name='Manufacturer')
     model = tables.Column(accessor='asset_type.model', linkify=True, verbose_name='Model')
     asset_type = tables.LinkColumn('assets:assettype_detail', args=[A('asset_type.pk')], verbose_name='Asset Type')
-    assignee = AssigneeColumn(location_field='location')
+    assignee = AssigneeColumn(
+        location_field='location',
+        assignment_model_path='assets.AssetAssignment',
+    )
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name='Tenant')
     location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], accessor='location.name', verbose_name='Location')
     supplier = tables.LinkColumn('assets:supplier_detail', args=[A('supplier.pk')], accessor='supplier.name', verbose_name='Supplier')
@@ -164,7 +167,7 @@ class AssetTypeTable(BaseTable):
         if value is not None:
             return f"{value} month{'s' if value != 1 else ''}"
         return "—"
-from components.tables import ComponentTypeTable, ComponentInstanceTable
+from components.tables import ComponentAllocationTable
 from compliance.tables import AssetMaintenanceTable
 from extras.tables import CustomFieldTable, CustomFieldsetTable
 from inventory.tables import AccessoryTable, ConsumableTable, KitTable
