@@ -22,8 +22,8 @@ urlpatterns = [
     path('assets/<int:pk>/edit/', views.AssetEditView.as_view(), name='asset_update'),
     path('assets/<int:pk>/delete/', views.AssetDeleteView.as_view(), name='asset_delete'),
     path('assets/<int:pk>/clone/', views.AssetCloneView.as_view(), name='asset_clone'),
-    path('assets/<int:pk>/checkout/', views.asset_checkout_modal, name='asset_checkout_modal'),
-    path('assets/<int:pk>/checkin/', views.asset_checkin, name='asset_checkin'),
+    path('assets/<int:pk>/checkout/', views.AssetCheckoutView.as_view(), name='asset_checkout_modal'),
+    path('assets/<int:pk>/checkin/', views.AssetCheckinView.as_view(), name='asset_checkin'),
 
     # Organization URLs were moved to organization.urls
 
@@ -86,8 +86,12 @@ urlpatterns = [
     path('accessories/<int:pk>/edit/', inventory_views.AccessoryEditView.as_view(), name='accessory_update'),
     path('accessories/<int:pk>/delete/', inventory_views.AccessoryDeleteView.as_view(), name='accessory_delete'),
     path('accessories/<int:pk>/clone/', inventory_views.AccessoryCloneView.as_view(), name='accessory_clone'),
-    path('accessories/<int:pk>/checkout/', inventory_views.accessory_checkout, name='accessory_checkout'),
-    path('accessories/assignments/<int:pk>/checkin/', inventory_views.accessory_checkin, name='accessory_checkin'),
+    path('accessories/<int:pk>/checkout/', inventory_views.AccessoryCheckoutView.as_view(), name='accessory_checkout'),
+    path('accessories/assignments/<int:pk>/checkin/', inventory_views.AccessoryCheckinView.as_view(), name='accessory_checkin'),
+    path('accessory-stocks/', inventory_views.AccessoryStockListView.as_view(), name='accessorystock_list'),
+    path('accessory-stocks/add/', inventory_views.AccessoryStockEditView.as_view(), name='accessorystock_create'),
+    path('accessory-stocks/<int:pk>/edit/', inventory_views.AccessoryStockEditView.as_view(), name='accessorystock_update'),
+    path('accessory-stocks/<int:pk>/delete/', inventory_views.AccessoryStockDeleteView.as_view(), name='accessorystock_delete'),
 
     # Consumables
     path('consumables/', inventory_views.ConsumableListView.as_view(), name='consumable_list'),
@@ -98,8 +102,12 @@ urlpatterns = [
     path('consumables/<int:pk>/edit/', inventory_views.ConsumableEditView.as_view(), name='consumable_update'),
     path('consumables/<int:pk>/delete/', inventory_views.ConsumableDeleteView.as_view(), name='consumable_delete'),
     path('consumables/<int:pk>/clone/', inventory_views.ConsumableCloneView.as_view(), name='consumable_clone'),
-    path('consumables/<int:pk>/checkout/', inventory_views.consumable_checkout, name='consumable_checkout'),
-    
+    path('consumables/<int:pk>/checkout/', inventory_views.ConsumableCheckoutView.as_view(), name='consumable_checkout'),
+    path('consumable-stocks/', inventory_views.ConsumableStockListView.as_view(), name='consumablestock_list'),
+    path('consumable-stocks/add/', inventory_views.ConsumableStockEditView.as_view(), name='consumablestock_create'),
+    path('consumable-stocks/<int:pk>/edit/', inventory_views.ConsumableStockEditView.as_view(), name='consumablestock_update'),
+    path('consumable-stocks/<int:pk>/delete/', inventory_views.ConsumableStockDeleteView.as_view(), name='consumablestock_delete'),
+
     # Asset Maintenances
     path('maintenances/', compliance_views.AssetMaintenanceListView.as_view(), name='assetmaintenance_list'),
     path('maintenances/add/', compliance_views.AssetMaintenanceEditView.as_view(), name='assetmaintenance_create'),
@@ -141,7 +149,7 @@ urlpatterns = [
     path('kits/<int:pk>/', inventory_views.KitDetailView.as_view(), name='kit_detail'),
     path('kits/<int:pk>/edit/', inventory_views.KitEditView.as_view(), name='kit_update'),
     path('kits/<int:pk>/delete/', inventory_views.KitDeleteView.as_view(), name='kit_delete'),
-    path('kits/<int:pk>/checkout/', inventory_views.kit_checkout_modal, name='kit_checkout_modal'),
+    path('kits/<int:pk>/checkout/', inventory_views.KitCheckoutView.as_view(), name='kit_checkout_modal'),
 
     # Kit Items
     path('kit-items/add/', inventory_views.KitItemEditView.as_view(), name='kititem_create'),

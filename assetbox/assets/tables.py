@@ -23,7 +23,15 @@ class AssetTable(BaseTable): # Inherit from BaseTable
     supplier = tables.LinkColumn('assets:supplier_detail', args=[A('supplier.pk')], accessor='supplier.name', verbose_name='Supplier')
     tags = TagColumn(url_name='assets:asset_list')
     requestable = tables.BooleanColumn(verbose_name='Requestable', yesno='Yes,No')
-    actions = ActionsColumn()
+    actions = tables.TemplateColumn(
+        template_name='assets/includes/asset_actions.html',
+        verbose_name='',
+        orderable=False,
+        attrs={
+            'th': {'class': 'col-actions text-nowrap'},
+            'td': {'class': 'text-end text-nowrap noprint p-1 col-actions'}
+        },
+    )
 
     class Meta(BaseTable.Meta): # Inherit Meta from BaseTable
         model = Asset

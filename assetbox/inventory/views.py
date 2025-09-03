@@ -17,6 +17,7 @@ from assetbox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
     ObjectCloneView, ObjectBulkEditView, ObjectBulkDeleteView, ObjectImportView
 )
+from assetbox.views.generic.service_views import GenericTransactionView, SimplePostView
 from assetbox.utils import get_paginate_count
 from assetbox.panels import Panel
 
@@ -24,13 +25,14 @@ from assetbox.panels import Panel
 from assets.forms.import_forms import AccessoryBulkImportForm, ConsumableBulkImportForm
 
 # Inventory models, forms, tables, filters
-from .models import Accessory, Consumable, Kit, KitItem
+from .models import Accessory, Consumable, Kit, KitItem, AccessoryStock, ConsumableStock, AccessoryAssignment
 from . import forms, tables, filters
 from assets.models import Asset
+from assets.services import checkout_accessory, checkin_accessory, checkout_consumable, checkout_kit
 
 
 class AccessoryListView(ObjectListView):
-    queryset = Accessory.objects.select_related('tenant', 'manufacturer').prefetch_related('tags').annotate(_checked_out=Coalesce(Sum('assignments__qty'), 0))
+    queryset = Accessory.objects.select_related('tenant', 'manufacturer').prefetch_related('tags').annotate(_total_stock=Coalesce(Sum('stocks__qty'), 0), _checked_out=Coalesce(Sum('assignments__qty'), 0))
     filterset = filters.AccessoryFilterSet
     filterset_form = forms.AccessoryFilterForm
     table = tables.AccessoryTable
@@ -38,7 +40,7 @@ class AccessoryListView(ObjectListView):
 
 
 class AccessoryDetailView(ObjectDetailView):
-    queryset = Accessory.objects.select_related('manufacturer').prefetch_related('tags', 'assignments__assigned_holder', 'assignments__assigned_location')
+    queryset = Accessory.objects.select_related('manufacturer').prefetch_related('tags', 'assignments__assigned_holder', 'assignments__assigned_location', 'stocks__location')
     template_name = 'assets/accessories/accessory_detail.html'
 
     layout = (
@@ -49,10 +51,13 @@ class AccessoryDetailView(ObjectDetailView):
         context = super().get_context_data(**kwargs)
         accessory = self.get_object()
 
-        # Prepare assignments table
         assignments_table = tables.AccessoryAssignmentTable(accessory.assignments.all(), request=self.request)
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assignments_table)
         context['assignments_table'] = assignments_table
+
+        stocks_table = tables.AccessoryStockTable(accessory.stocks.all(), request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(stocks_table)
+        context['stocks_table'] = stocks_table
         return context
 
 
@@ -90,7 +95,7 @@ class AccessoryCloneView(ObjectCloneView):
 
 
 class ConsumableListView(ObjectListView):
-    queryset = Consumable.objects.select_related('tenant', 'manufacturer').prefetch_related('tags').annotate(_consumed=Coalesce(Sum('consumptions__qty'), 0))
+    queryset = Consumable.objects.select_related('tenant', 'manufacturer').prefetch_related('tags').annotate(_total_stock=Coalesce(Sum('stocks__qty'), 0), _consumed=Coalesce(Sum('consumptions__qty'), 0))
     filterset = filters.ConsumableFilterSet
     filterset_form = forms.ConsumableFilterForm
     table = tables.ConsumableTable
@@ -98,7 +103,7 @@ class ConsumableListView(ObjectListView):
 
 
 class ConsumableDetailView(ObjectDetailView):
-    queryset = Consumable.objects.select_related('manufacturer').prefetch_related('tags', 'consumptions__assigned_holder', 'consumptions__assigned_location')
+    queryset = Consumable.objects.select_related('manufacturer').prefetch_related('tags', 'consumptions__assigned_holder', 'consumptions__assigned_location', 'stocks__location')
     template_name = 'assets/consumables/consumable_detail.html'
 
     layout = (
@@ -109,10 +114,13 @@ class ConsumableDetailView(ObjectDetailView):
         context = super().get_context_data(**kwargs)
         consumable = self.get_object()
 
-        # Prepare consumptions table
         consumptions_table = tables.ConsumableAssignmentTable(consumable.consumptions.all(), request=self.request)
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(consumptions_table)
         context['consumptions_table'] = consumptions_table
+
+        stocks_table = tables.ConsumableStockTable(consumable.stocks.all(), request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(stocks_table)
+        context['stocks_table'] = stocks_table
         return context
 
 
@@ -178,7 +186,7 @@ class KitDetailView(ObjectDetailView):
                 if avail < 1:
                     all_available = False
             elif item.accessory:
-                avail = item.accessory.remaining_qty
+                avail = item.accessory.available
                 if avail < item.qty:
                     all_available = False
             elif item.license:
@@ -242,181 +250,77 @@ class KitItemDeleteView(ObjectDeleteView):
         return reverse('assets:kit_list')
 
 
-class KitCheckoutView(LoginRequiredMixin, View):
-    def post(self, request, pk):
-        from django.core.exceptions import ValidationError
-        kit = get_object_or_404(Kit, pk=pk)
-        form = forms.KitCheckoutForm(request.POST)
-        
-        if not form.is_valid():
-            if request.htmx:
-                context = {
-                    'form': form,
-                    'kit': kit,
-                }
-                return render(request, "assets/includes/kit_checkout_modal.html#checkout-modal-form", context)
-            return HttpResponseBadRequest("Invalid checkout form data.")
+class KitCheckoutView(GenericTransactionView):
+    queryset = Kit.objects.all()
+    model_form = forms.KitCheckoutForm
+    service_callable = checkout_kit
+    context_object_name = 'kit'
+    template_name = 'assets/includes/kit_checkout_modal.html'
+    success_message = "Kit checked out successfully."
+    hx_trigger = "kitListUpdated"
+    form_field_map = {
+        'assigned_holder': 'holder',
+        'assigned_location': 'location',
+    }
 
-        holder = form.cleaned_data.get('assigned_holder')
-        location = form.cleaned_data.get('assigned_location')
-        notes = form.cleaned_data.get('notes') or ''
-
-        try:
-            from assets.services import checkout_kit
-            checkout_kit(
-                kit,
-                holder=holder,
-                location=location,
-                user=request.user,
-                notes=notes
-            )
-
-            messages.success(request, f"Kit '{kit.name}' checked out successfully.")
-            
-            if request.htmx:
-                response = HttpResponse(status=204)
-                response['HX-Trigger'] = json.dumps({
-                    "closeModalEvent": None,
-                    "kitListUpdated": None,
-                    "showMessage": {"message": f"Kit '{kit.name}' checked out successfully.", "level": "success"}
-                })
-                return response
-            return redirect(kit.get_absolute_url())
-
-        except ValidationError as e:
-            form.add_error(None, e.message)
-            if request.htmx:
-                context = {
-                    'form': form,
-                    'kit': kit,
-                }
-                return render(request, "assets/includes/kit_checkout_modal.html#checkout-modal-form", context)
-            return render(request, "assets/includes/kit_checkout_modal.html", {'form': form, 'kit': kit})
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        del kwargs['instance']
+        return kwargs
 
 
-@login_required
-def accessory_checkout(request, pk):
-    accessory = get_object_or_404(Accessory, pk=pk)
-    
-    if not accessory.allow_overallocate and accessory.remaining_qty <= 0:
-        return HttpResponse("No stock available for checkout.", status=403)
+class AccessoryCheckoutView(GenericTransactionView):
+    queryset = Accessory.objects.all()
+    model_form = forms.AccessoryCheckoutForm
+    service_callable = checkout_accessory
+    context_object_name = 'accessory'
+    template_name = 'assets/includes/accessory_checkout_modal.html'
+    success_message = "Accessory checked out successfully."
+    form_field_map = {
+        'assigned_holder': 'holder',
+        'assigned_location': 'location',
+        'from_location': 'source_location',
+    }
 
-    if request.method == 'POST':
-        form = forms.AccessoryCheckoutForm(request.POST, accessory=accessory)
-        if form.is_valid():
-            from assets.services import checkout_accessory
-            holder = form.cleaned_data.get('assigned_holder')
-            location = form.cleaned_data.get('assigned_location')
-            qty = form.cleaned_data.get('qty')
-            notes = form.cleaned_data.get('notes')
-            
-            try:
-                checkout_accessory(
-                    accessory,
-                    qty,
-                    holder=holder,
-                    location=location,
-                    user=request.user,
-                    notes=notes
-                )
-                recipient = holder or location
-                messages.success(request, f"Checked out {qty}x '{accessory}' successfully to {recipient}.")
-                
-                response = HttpResponse(status=204)
-                response['HX-Trigger'] = json.dumps({
-                    "closeModalEvent": None,
-                    "assetListUpdated": None,
-                    "showMessage": {"message": f"Checked out {qty}x '{accessory}' successfully to {recipient}.", "level": "success"}
-                })
-                return response
-            except Exception as e:
-                form.add_error(None, str(e))
-                context = {'form': form, 'accessory': accessory, 'request': request}
-                return render(request, "assets/includes/accessory_checkout_modal.html#checkout-modal-form", context)
-        else:
-            context = {'form': form, 'accessory': accessory, 'request': request}
-            return render(request, "assets/includes/accessory_checkout_modal.html#checkout-modal-form", context)
-    else:
-        form = forms.AccessoryCheckoutForm(accessory=accessory)
-
-    context = {'form': form, 'accessory': accessory}
-    return render(request, 'assets/includes/accessory_checkout_modal.html', context)
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        del kwargs['instance']
+        kwargs['accessory'] = self.get_object()
+        return kwargs
 
 
-@login_required
-@require_POST
-def accessory_checkin(request, pk):
-    from assets.services import checkin_accessory
-    accessory, qty, recipient = checkin_accessory(pk, user=request.user)
-    messages.success(request, f"Checked in {qty}x '{accessory}' from {recipient}.")
-    return redirect(accessory.get_absolute_url())
+class AccessoryCheckinView(SimplePostView):
+    queryset = AccessoryAssignment.objects.all()
+
+    def perform_action(self, assignment, request):
+        accessory, qty, recipient = checkin_accessory(assignment.pk, user=request.user)
+        return {
+            'message': f"Checked in {qty}x '{accessory}' from {recipient}.",
+            'redirect': accessory.get_absolute_url(),
+        }
+
+    def get_success_redirect(self, obj, result):
+        return redirect(result.get('redirect', obj.get_absolute_url()))
 
 
-@login_required
-def consumable_checkout(request, pk):
-    consumable = get_object_or_404(Consumable, pk=pk)
-    
-    if not consumable.allow_overallocate and consumable.remaining_qty <= 0:
-        return HttpResponse("No stock available for consumption checkout.", status=403)
+class ConsumableCheckoutView(GenericTransactionView):
+    queryset = Consumable.objects.all()
+    model_form = forms.ConsumableCheckoutForm
+    service_callable = checkout_consumable
+    context_object_name = 'consumable'
+    template_name = 'assets/includes/consumable_checkout_modal.html'
+    success_message = "Consumable consumed successfully."
+    form_field_map = {
+        'assigned_holder': 'holder',
+        'assigned_location': 'location',
+        'from_location': 'source_location',
+    }
 
-    if request.method == 'POST':
-        form = forms.ConsumableCheckoutForm(request.POST, consumable=consumable)
-        if form.is_valid():
-            from assets.services import checkout_consumable
-            holder = form.cleaned_data.get('assigned_holder')
-            location = form.cleaned_data.get('assigned_location')
-            qty = form.cleaned_data.get('qty')
-            notes = form.cleaned_data.get('notes')
-            
-            try:
-                checkout_consumable(
-                    consumable,
-                    qty,
-                    holder=holder,
-                    location=location,
-                    user=request.user,
-                    notes=notes
-                )
-                recipient = holder or location
-                messages.success(request, f"Checked out / Consumed {qty}x '{consumable}' for {recipient}.")
-                
-                response = HttpResponse(status=204)
-                response['HX-Trigger'] = json.dumps({
-                    "closeModalEvent": None,
-                    "assetListUpdated": None,
-                    "showMessage": {"message": f"Consumed {qty}x '{consumable}' for {recipient}.", "level": "success"}
-                })
-                return response
-            except Exception as e:
-                form.add_error(None, str(e))
-                context = {'form': form, 'consumable': consumable, 'request': request}
-                return render(request, "assets/includes/consumable_checkout_modal.html#checkout-modal-form", context)
-        else:
-            context = {'form': form, 'consumable': consumable, 'request': request}
-            return render(request, "assets/includes/consumable_checkout_modal.html#checkout-modal-form", context)
-    else:
-        form = forms.ConsumableCheckoutForm(consumable=consumable)
-
-    context = {'form': form, 'consumable': consumable}
-    return render(request, 'assets/includes/consumable_checkout_modal.html', context)
-
-
-@login_required
-def kit_checkout_modal(request, pk):
-    kit = get_object_or_404(Kit, pk=pk)
-    
-    # Check if kit has items
-    if not kit.items.exists():
-        return HttpResponse("This kit has no items to check out.", status=400)
-
-    if request.method == 'POST':
-        # Let KitCheckoutView handle it
-        return KitCheckoutView.as_view()(request, pk=pk)
-    else:
-        form = forms.KitCheckoutForm()
-
-    context = {'form': form, 'kit': kit}
-    return render(request, 'assets/includes/kit_checkout_modal.html', context)
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        del kwargs['instance']
+        kwargs['consumable'] = self.get_object()
+        return kwargs
 
 
 class AccessoryImportView(ObjectImportView):
@@ -441,3 +345,45 @@ class ConsumableBulkEditView(ObjectBulkEditView):
 
 class ConsumableBulkDeleteView(ObjectBulkDeleteView):
     queryset = Consumable.objects.all()
+
+
+class AccessoryStockListView(ObjectListView):
+    queryset = AccessoryStock.objects.select_related('accessory', 'location').all()
+    table = tables.AccessoryStockTable
+    action_buttons = ('add',)
+
+
+class AccessoryStockEditView(ObjectEditView):
+    queryset = AccessoryStock.objects.all()
+    model = AccessoryStock
+    model_form = forms.AccessoryStockForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'assets:accessory_list'
+
+
+class AccessoryStockDeleteView(ObjectDeleteView):
+    queryset = AccessoryStock.objects.all()
+    model = AccessoryStock
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('assets:accessory_list')
+
+
+class ConsumableStockListView(ObjectListView):
+    queryset = ConsumableStock.objects.select_related('consumable', 'location').all()
+    table = tables.ConsumableStockTable
+    action_buttons = ('add',)
+
+
+class ConsumableStockEditView(ObjectEditView):
+    queryset = ConsumableStock.objects.all()
+    model = ConsumableStock
+    model_form = forms.ConsumableStockForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'assets:consumable_list'
+
+
+class ConsumableStockDeleteView(ObjectDeleteView):
+    queryset = ConsumableStock.objects.all()
+    model = ConsumableStock
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('assets:consumable_list')

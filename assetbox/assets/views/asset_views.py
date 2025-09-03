@@ -13,6 +13,7 @@ from django.db.models import Count
 
 from ..models import Asset, InstalledSoftware, StatusLabel, ActivityLog, AssetAssignment
 from .. import forms, tables, filters
+from ..services import checkout_asset, checkin_asset
 from software.tables import InstalledSoftwareTable
 from compliance.models import CustodyReceipt
 
@@ -23,6 +24,7 @@ from assetbox.views.generic import (
     ObjectDeleteView, ObjectImportView, ObjectBulkEditView,
     ObjectBulkDeleteView, ObjectCloneView,
 )
+from assetbox.views.generic.service_views import GenericTransactionView, SimplePostView
 from assetbox.quick_add import QuickAddMixin
 
 from organization.models import AssetHolderAssignment, AssetHolder
@@ -40,7 +42,7 @@ class AssetListView(ObjectListView):
         'location',
         'tenant',
         'status',
-    ).prefetch_related('tags', 'maintenances')
+    ).prefetch_related('tags', 'maintenances', 'assignments')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -145,77 +147,34 @@ class AssetCloneView(ObjectCloneView):
         cloned.asset_tag = ''
 
 
-@login_required
-def asset_checkout_modal(request, pk):
-    asset = get_object_or_404(Asset, pk=pk)
+class AssetCheckoutView(GenericTransactionView):
+    queryset = Asset.objects.all()
+    model_form = forms.AssetCheckOutForm
+    service_callable = checkout_asset
+    context_object_name = 'asset'
+    template_name = 'assets/includes/asset_checkout_modal.html'
+    success_message = "Asset checked out successfully."
+    hx_trigger = "assetListUpdated"
+    form_field_map = {'asset_holder': 'holder'}
+    form_exclude_fields = ('target_type',)
 
-    if not asset.status or asset.status.slug != 'available':
-        return HttpResponse("Asset is not available for assignment.", status=403)
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        del kwargs['instance']
+        return kwargs
 
-    if asset.active_assignment:
-        return HttpResponse(f"Asset already assigned to {asset.assigned_to}.", status=403)
-
-    if request.method == 'POST':
-        form = forms.AssetCheckOutForm(request.POST)
-        if form.is_valid():
-            from .services import checkout_asset
-            target_type = form.cleaned_data.get('target_type')
-            holder = form.cleaned_data.get('asset_holder')
-            location = form.cleaned_data.get('location')
-            asset_target = form.cleaned_data.get('asset_target')
-
-            target_map = {
-                'holder': holder,
-                'location': location,
-                'asset': asset_target,
-            }
-            target = target_map.get(target_type)
-
-            try:
-                assignee = checkout_asset(
-                    asset,
-                    holder=holder,
-                    location=location,
-                    asset_target=asset_target,
-                    user=request.user,
-                    request=request
-                )
-                messages.success(request, f"Asset '{asset}' checked out successfully to {assignee}.")
-
-                response = HttpResponse(status=204)
-                response['HX-Trigger'] = json.dumps({
-                    "closeModalEvent": None,
-                    "assetListUpdated": None,
-                    "showMessage": {"message": f"Asset '{asset}' checked out to {assignee}.", "level": "success"}
-                })
-                return response
-            except Exception as e:
-                form.add_error(None, str(e))
-                context = {'form': form, 'asset': asset, 'request': request}
-                return render(request, "assets/includes/asset_checkout_modal.html#checkout-modal-form", context)
-        else:
-            context = {'form': form, 'asset': asset, 'request': request}
-            return render(request, "assets/includes/asset_checkout_modal.html#checkout-modal-form", context)
-    else:
-        form = forms.AssetCheckOutForm()
-
-    context = {'form': form, 'asset': asset}
-    return render(request, 'assets/includes/asset_checkout_modal.html', context)
+    def get_success_message(self, result=None):
+        return f"Asset '{self.get_object()}' checked out to {result}."
 
 
-@login_required
-@require_POST
-def asset_checkin(request, pk):
-    asset = get_object_or_404(Asset, pk=pk)
-    from .services import checkin_asset
+class AssetCheckinView(SimplePostView):
+    queryset = Asset.objects.all()
 
-    msg = checkin_asset(asset, user=request.user)
-    if msg:
-        messages.success(request, f"Asset '{asset}' successfully checked in.")
-    else:
-        messages.warning(request, f"Asset '{asset}' was not checked out or assigned to a location.")
-
-    return redirect('assets:asset_detail', pk=asset.pk)
+    def perform_action(self, asset, request):
+        msg = checkin_asset(asset, user=request.user)
+        if msg:
+            return {'message': f"Asset '{asset}' checked in."}
+        return {'message': f"No active assignment for '{asset}'."}
 
 
 @login_required
@@ -281,7 +240,7 @@ def bulk_assign_assets(request):
     holder = get_object_or_404(AssetHolder, pk=holder_id)
     assets = Asset.objects.filter(pk__in=object_pks).select_related('status')
     ct = ContentType.objects.get_for_model(Asset)
-    in_use_status = StatusLabel.objects.filter(slug='in-use').first()
+    in_use_status = StatusLabel.objects.filter(type='deployed').first()
 
     from django.db import transaction
     assigned = 0
