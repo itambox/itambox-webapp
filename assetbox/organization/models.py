@@ -5,7 +5,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.conf import settings # Import settings
 from core.models import BaseModel, ChangeLoggingMixin
-from core.mixins import ExportableMixin, TaggableMixin, JournalingMixin, AutoSlugMixin
+from core.mixins import ExportableMixin, TaggableMixin, JournalingMixin, AutoSlugMixin, CloneableMixin, ImageAttachmentMixin, FileAttachmentMixin, BookmarkableMixin
 from django.contrib.contenttypes.fields import GenericForeignKey
 
 # Create your models here.
@@ -150,7 +150,7 @@ class TenantGroup(TaggableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel)
     def get_absolute_url(self):
         return reverse('organization:tenantgroup_detail', kwargs={'pk': self.pk})
 
-class Tenant(JournalingMixin, TaggableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
+class Tenant(JournalingMixin, TaggableMixin, CloneableMixin, ImageAttachmentMixin, FileAttachmentMixin, BookmarkableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     group = models.ForeignKey(
@@ -173,7 +173,7 @@ class Tenant(JournalingMixin, TaggableMixin, ExportableMixin, ChangeLoggingMixin
     def __str__(self):
         return self.name
 
-class Site(JournalingMixin, TaggableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
+class Site(JournalingMixin, TaggableMixin, CloneableMixin, ImageAttachmentMixin, FileAttachmentMixin, BookmarkableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
     STATUS_PLANNED = 'planned'
     STATUS_STAGING = 'staging'
     STATUS_ACTIVE = 'active'
@@ -245,6 +245,21 @@ class AssetHolder(JournalingMixin, TaggableMixin, ExportableMixin, ChangeLogging
         ]
         verbose_name = "Asset Holder"
         verbose_name_plural = "Asset Holders"
+
+    @property
+    def checked_out_assets(self):
+        from django.contrib.contenttypes.models import ContentType
+        from assets.models import AssetAssignment
+        holder_ct = ContentType.objects.get_for_model(AssetHolder)
+        return AssetAssignment.objects.filter(
+            assigned_to_content_type=holder_ct,
+            assigned_to_object_id=self.pk,
+            is_active=True
+        )
+
+    @property
+    def checked_out_asset_count(self):
+        return self.checked_out_assets.count()
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.upn})"

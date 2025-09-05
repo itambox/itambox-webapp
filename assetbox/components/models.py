@@ -1,11 +1,11 @@
 from django.db import models
 from django.urls import reverse
-from core.models import BaseModel, ChangeLoggingMixin, AssetBoxModel
-from core.mixins import TaggableMixin, AutoSlugMixin, JournalingMixin, SoftDeleteMixin
+from core.models import BaseModel, ChangeLoggingMixin
+from core.mixins import TaggableMixin, AutoSlugMixin, JournalingMixin, ImageAttachmentMixin, CloneableMixin, ExportableMixin, SoftDeleteMixin
 from core.managers import SoftDeleteManager, AllObjectsManager
 
 
-class Component(AutoSlugMixin, AssetBoxModel):
+class Component(AutoSlugMixin, JournalingMixin, TaggableMixin, ImageAttachmentMixin, CloneableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
     """Catalog entry for a hardware component (e.g. 'Crucial 16GB DDR4')."""
     slug_source = ('manufacturer__name', 'name')
     name = models.CharField(max_length=255)

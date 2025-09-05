@@ -3,7 +3,7 @@ from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.db import DatabaseError
 from django.contrib.auth import get_user_model
-from assets.models import AssetRequest
+from assets.models import AssetRequest, AssetAssignment
 from inventory.models import ConsumableAssignment
 from core.models import Notification
 from core.events import dispatch_event
@@ -15,7 +15,7 @@ User = get_user_model()
 @receiver(post_delete, sender=ConsumableAssignment)
 def check_consumable_stock(sender, instance, **kwargs):
     consumable = instance.consumable
-    remaining = consumable.remaining_qty
+    remaining = consumable.available
     min_qty = consumable.min_qty
     
     # Check if stock dips below safety threshold
@@ -41,6 +41,19 @@ def check_consumable_stock(sender, instance, **kwargs):
                     message=message,
                     level=level
                 )
+
+
+@receiver(post_save, sender=AssetAssignment)
+def on_asset_assignment_save(sender, instance, created, **kwargs):
+    try:
+        if created:
+            dispatch_event(sender, instance, action='checkout')
+        elif not instance.is_active and instance.checked_in_at:
+            dispatch_event(sender, instance, action='checkin')
+    except DatabaseError as e:
+        logger.exception("Database error occurred while processing asset assignment event: %s", e)
+    except Exception as e:
+        logger.exception("Unexpected error occurred while processing asset assignment event: %s", e)
 
 
 @receiver(post_save, sender=AssetRequest)

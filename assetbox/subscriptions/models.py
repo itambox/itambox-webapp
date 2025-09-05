@@ -2,10 +2,12 @@ from django.db import models
 from django.conf import settings
 from django.urls import reverse, NoReverseMatch
 from core.models import BaseModel, ChangeLoggingMixin
-from core.mixins import TaggableMixin, JournalingMixin, ExportableMixin, AutoSlugMixin
+from core.mixins import TaggableMixin, JournalingMixin, ExportableMixin, AutoSlugMixin, ImageAttachmentMixin, FileAttachmentMixin, CloneableMixin, SoftDeleteMixin, BookmarkableMixin
+from core.managers import SoftDeleteManager, AllObjectsManager
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import gettext_lazy as _
+from django.utils import timezone
 from django.utils.text import slugify
 from extras.models import Tag
 
@@ -109,10 +111,14 @@ class BillingCycleChoices(models.TextChoices):
     QUARTERLY = 'quarterly', _('Quarterly')
     ANNUAL = 'annual', _('Annual')
     BIANNUAL = 'biannual', _('Biannual')
+    MULTI_YEAR = 'multi_year', _('Multi-Year')
     ONETIME = 'onetime', _('One-Time')
 
 
-class Subscription(AutoSlugMixin, JournalingMixin, TaggableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
+class Subscription(AutoSlugMixin, JournalingMixin, TaggableMixin, ImageAttachmentMixin, FileAttachmentMixin, BookmarkableMixin, SoftDeleteMixin, CloneableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
+
     """Represents a recurring service agreement (SaaS, Support, etc.)."""
     name = models.CharField(
         max_length=255,
@@ -285,6 +291,25 @@ class Subscription(AutoSlugMixin, JournalingMixin, TaggableMixin, ExportableMixi
         elif self.billing_cycle == BillingCycleChoices.BIANNUAL:
             return self.renewal_cost * 2
         return self.renewal_cost
+
+    def renew(self, new_renewal_date, cost=None):
+        self.renewal_date = new_renewal_date
+        if cost is not None:
+            self.renewal_cost = cost
+        self.status = SubscriptionStatusChoices.ACTIVE
+        self.save(update_fields=['renewal_date', 'renewal_cost', 'status'])
+
+    def cancel(self, cancellation_date=None, reason=''):
+        self.cancellation_date = cancellation_date or timezone.now().date()
+        self.status = SubscriptionStatusChoices.CANCELLED
+        if reason:
+            existing = self.notes or ''
+            self.notes = f"{existing}\n[{timezone.now().date()}] Cancelled: {reason}".strip()
+        self.save(update_fields=['cancellation_date', 'status', 'notes'])
+
+    def suspend(self):
+        self.status = SubscriptionStatusChoices.SUSPENDED
+        self.save(update_fields=['status'])
 
 
 class SubscriptionAssignment(ChangeLoggingMixin, BaseModel):
