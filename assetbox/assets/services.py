@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import Sum
 from django.core.exceptions import ValidationError
 from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
@@ -12,19 +13,16 @@ from organization.models import AssetHolderAssignment
 from licenses.models import LicenseSeatAssignment
 
 
-def checkout_asset(asset, holder=None, location=None, asset_target=None, user=None, request=None):
-    if not asset.status or asset.status.slug != 'available':
-        raise ValidationError("Asset is not available for assignment.")
-
+def checkout_asset(asset, holder=None, location=None, asset_target=None, user=None, request=None, expected_checkin=None, notes=''):
     target = holder or location or asset_target
     if not target:
         raise ValidationError("Either holder, location, or asset must be specified.")
 
-    if asset.active_assignment:
-        raise ValidationError(f"Asset {asset.asset_tag} already has an active assignment.")
-
     with transaction.atomic():
-        in_use_status = StatusLabel.objects.filter(slug='in-use').first()
+        if asset.active_assignment:
+            checkin_asset(asset, user=user, notes='Auto-checkin for reassignment')
+
+        in_use_status = StatusLabel.objects.filter(type='deployed').first()
         if in_use_status:
             asset.status = in_use_status
 
@@ -46,7 +44,15 @@ def checkout_asset(asset, holder=None, location=None, asset_target=None, user=No
             asset=asset,
             assigned_to=target,
             checked_out_by=user,
-            notes='',
+            expected_checkin_date=expected_checkin,
+            notes=notes,
+        )
+
+        ActivityLog.objects.create(
+            asset=asset,
+            action='checked_out',
+            user=user,
+            notes=f"Checked out to {target}. {notes}".strip()
         )
 
         category = asset.asset_type.category if asset.asset_type else None
@@ -87,7 +93,7 @@ def checkout_asset(asset, holder=None, location=None, asset_target=None, user=No
     return target
 
 
-def checkin_asset(asset, user=None):
+def checkin_asset(asset, user=None, notes=''):
     active = asset.active_assignment
     if active:
         target = active.assigned_to
@@ -95,20 +101,30 @@ def checkin_asset(asset, user=None):
             active.is_active = False
             active.checked_in_at = timezone.now()
             active.checked_in_by = user
+            if notes:
+                active.notes = (active.notes + '\n' + notes).strip()
             active.save()
 
-            available_status = StatusLabel.objects.filter(slug='available').first()
+            available_status = StatusLabel.objects.filter(type='deployable').first()
             if available_status:
                 asset.status = available_status
             asset._changelog_action = 'checkin'
             asset._changelog_message = f"Checked in from {target}"
             asset.save(update_fields=['status'])
+
+            ActivityLog.objects.create(
+                asset=asset,
+                action='checked_in',
+                user=user,
+                notes=f"Checked in from {target}. {notes}".strip()
+            )
+
             return f"Checked in from: {target}"
     elif asset.location:
         with transaction.atomic():
             checked_in_from = asset.location
             asset.location = None
-            available_status = StatusLabel.objects.filter(slug='available').first()
+            available_status = StatusLabel.objects.filter(type='deployable').first()
             if available_status:
                 asset.status = available_status
             asset._changelog_action = 'checkin'
@@ -119,19 +135,30 @@ def checkin_asset(asset, user=None):
         return None
 
 
-def checkout_accessory(accessory, qty, holder=None, location=None, user=None, notes=""):
-    if not accessory.allow_overallocate and accessory.remaining_qty < qty:
+def checkout_accessory(accessory, qty, holder=None, location=None, user=None, notes="", source_location=None):
+    if not accessory.allow_overallocate and accessory.available < qty:
         raise ValidationError("No stock available for checkout.")
     if not holder and not location:
         raise ValidationError("Either holder or location must be specified.")
+    if source_location:
+        from inventory.models import AccessoryStock
+        loc_stock = AccessoryStock.objects.filter(
+            accessory=accessory, location=source_location
+        ).aggregate(qty=Sum('qty'))['qty'] or 0
+        if not accessory.allow_overallocate and loc_stock < qty:
+            raise ValidationError(
+                f"Insufficient stock at {source_location}. Available: {loc_stock}, Requested: {qty}"
+            )
 
-    assignment = AccessoryAssignment.objects.create(
-        accessory=accessory,
-        assigned_holder=holder,
-        assigned_location=location,
-        qty=qty,
-        notes=notes
-    )
+    with transaction.atomic():
+        assignment = AccessoryAssignment.objects.create(
+            accessory=accessory,
+            assigned_holder=holder,
+            assigned_location=location,
+            from_location=source_location,
+            qty=qty,
+            notes=notes
+        )
     return assignment
 
 
@@ -145,41 +172,52 @@ def checkin_accessory(assignment_pk, user=None):
     return accessory, qty, recipient
 
 
-def checkout_consumable(consumable, qty, holder=None, location=None, user=None, notes=""):
-    if not consumable.allow_overallocate and consumable.remaining_qty < qty:
+def checkout_consumable(consumable, qty, holder=None, location=None, user=None, notes="", source_location=None):
+    if not consumable.allow_overallocate and consumable.available < qty:
         raise ValidationError("No stock available for consumption checkout.")
     if not holder and not location:
         raise ValidationError("Either holder or location must be specified.")
+    if source_location:
+        from inventory.models import ConsumableStock
+        loc_stock = ConsumableStock.objects.filter(
+            consumable=consumable, location=source_location
+        ).aggregate(qty=Sum('qty'))['qty'] or 0
+        if not consumable.allow_overallocate and loc_stock < qty:
+            raise ValidationError(
+                f"Insufficient stock at {source_location}. Available: {loc_stock}, Requested: {qty}"
+            )
 
-    assignment = ConsumableAssignment.objects.create(
-        consumable=consumable,
-        assigned_holder=holder,
-        assigned_location=location,
-        qty=qty,
-        notes=notes
-    )
+    with transaction.atomic():
+        assignment = ConsumableAssignment.objects.create(
+            consumable=consumable,
+            assigned_holder=holder,
+            assigned_location=location,
+            from_location=source_location,
+            qty=qty,
+            notes=notes
+        )
     return assignment
 
 
-def checkout_kit(kit, holder=None, location=None, user=None, notes=""):
+def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_location=None):
     if not holder and not location:
         raise ValidationError("Either holder or location must be specified.")
 
-    in_use_status = StatusLabel.objects.filter(slug='in-use').first()
+    in_use_status = StatusLabel.objects.filter(type='deployed').first()
     if not in_use_status:
-        raise ValidationError("The 'in-use' Status Label does not exist. Please configure it.")
+        raise ValidationError("No Status Label with type 'Deployed' exists. Please configure one.")
 
     with transaction.atomic():
         allocated_assets = []
 
         for item in kit.items.all():
             if item.asset_type:
-                asset = Asset.objects.filter(asset_type=item.asset_type, status__slug='available').first()
+                asset = Asset.objects.filter(asset_type=item.asset_type, status__type='deployable').first()
                 if not asset:
                     raise ValidationError(f"No available assets of type '{item.asset_type}' in stock.")
                 allocated_assets.append(asset)
             elif item.accessory:
-                rem = item.accessory.remaining_qty
+                rem = item.accessory.available
                 if not item.accessory.allow_overallocate and rem < item.qty:
                     raise ValidationError(f"Insufficient stock for accessory '{item.accessory}'. Required: {item.qty}, Available: {rem}")
             elif item.license:
@@ -189,7 +227,7 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes=""):
 
         for item in kit.items.all():
             if item.asset_type:
-                asset = Asset.objects.filter(asset_type=item.asset_type, status__slug='available').first()
+                asset = Asset.objects.filter(asset_type=item.asset_type, status__type='deployable').first()
                 asset.status = in_use_status
                 if holder:
                     asset.location = None
@@ -225,6 +263,7 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes=""):
                     accessory=item.accessory,
                     assigned_holder=holder,
                     assigned_location=location,
+                    from_location=source_location,
                     qty=item.qty,
                     notes=f"Checked out via Kit '{kit.name}'. {notes}"
                 )

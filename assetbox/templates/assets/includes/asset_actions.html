@@ -4,13 +4,23 @@
         Actions
     </button>
     <div class="dropdown-menu dropdown-menu-end" data-bs-strategy="fixed">
-        {# Use record.pk which django-tables2 provides for the row's object pk #}
+        <a class="dropdown-item" hx-get="{% url 'assets:asset_checkout_modal' pk=record.pk %}"
+           hx-target="#modal-placeholder" hx-swap="innerHTML" href="#">
+            Checkout
+        </a>
+        {% if record.active_assignment %}
+        <a class="dropdown-item text-success"
+           hx-post="{% url 'assets:asset_checkin' pk=record.pk %}"
+           hx-swap="none" href="#">
+            Checkin
+        </a>
+        {% endif %}
+        <div class="dropdown-divider"></div>
         <a class="dropdown-item" href="{% url 'assets:asset_update' pk=record.pk %}">
             Edit
         </a>
         <a class="dropdown-item text-danger" href="{% url 'assets:asset_delete' pk=record.pk %}">
             Delete
         </a>
-        {# Add other actions like check-in/out later #}
     </div>
 </div>

@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.utils import timezone
 from software.models import Software
 from core.models import BaseModel, ChangeLoggingMixin, AssetBoxModel
-from core.mixins import ExportableMixin, SoftDeleteMixin, CustomFieldDataMixin, JournalingMixin, TaggableMixin, AutoSlugMixin
+from core.mixins import ExportableMixin, SoftDeleteMixin, CustomFieldDataMixin, JournalingMixin, TaggableMixin, AutoSlugMixin, BookmarkableMixin
 from extras.models import CustomFieldset
 from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -19,11 +19,13 @@ from core.managers import SoftDeleteManager, AllObjectsManager
 
 class StatusLabel(AutoSlugMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
     TYPE_DEPLOYABLE = 'deployable'
+    TYPE_DEPLOYED = 'deployed'
     TYPE_PENDING = 'pending'
     TYPE_UNDEPLOYABLE = 'undeployable'
     TYPE_ARCHIVED = 'archived'
     TYPE_CHOICES = [
         (TYPE_DEPLOYABLE, 'Deployable'),
+        (TYPE_DEPLOYED, 'Deployed'),
         (TYPE_PENDING, 'Pending'),
         (TYPE_UNDEPLOYABLE, 'Undeployable'),
         (TYPE_ARCHIVED, 'Archived'),
@@ -201,7 +203,7 @@ class AssetType(AutoSlugMixin, AssetBoxModel):
 
 
 
-class Asset(CustomFieldDataMixin, SoftDeleteMixin, AssetBoxModel):
+class Asset(CustomFieldDataMixin, SoftDeleteMixin, BookmarkableMixin, AssetBoxModel):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     
@@ -688,6 +690,10 @@ class AssetAssignment(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseMo
         ]
         verbose_name = "Asset Assignment"
         verbose_name_plural = "Asset Assignments"
+
+    @property
+    def assigned_to_type(self):
+        return self.assigned_to_content_type.model if self.assigned_to_content_type else None
 
     def __str__(self):
         return f"{self.asset} → {self.assigned_to} ({'active' if self.is_active else 'inactive'})"
