@@ -6,29 +6,63 @@ from assets.models import Manufacturer, AssetType, AssetRole, Category
 from organization.models import Site, Location, AssetHolder
 from licenses.models import License
 from software.models import Software
-from .models import Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, Kit, KitItem
+from .models import Accessory, AccessoryStock, AccessoryAssignment, Consumable, ConsumableStock, ConsumableAssignment, Kit, KitItem
 
 User = get_user_model()
+
+
+def _create_category(name, component=False, accessory=False, consumable=False):
+    applies_to = {}
+    if component:
+        applies_to['component'] = True
+    if accessory:
+        applies_to['accessory'] = True
+    if consumable:
+        applies_to['consumable'] = True
+    slug = name.lower().replace(' ', '-')
+    cat, _ = Category.objects.get_or_create(
+        slug=slug,
+        defaults={'name': name, 'applies_to': applies_to}
+    )
+    return cat
+
+
+def _add_stock(model_class, stock_model_class, catalog_item, location, qty):
+    stock_model_class.objects.create(**{
+        model_class._meta.model_name: catalog_item,
+        'location': location,
+        'qty': qty,
+    })
 
 
 class AccessoryModelTests(TestCase):
     def setUp(self):
         self.manufacturer = Manufacturer.objects.create(name='Logitech', slug='logitech')
+        self.site = Site.objects.create(name='Warehouse', slug='warehouse')
+        self.location = Location.objects.create(name='Shelf A', slug='shelf-a', site=self.site)
+        self.cat_keyboard = _create_category('Keyboard', accessory=True)
+        self.cat_mouse = _create_category('Mouse', accessory=True)
+
+    def _make_accessory(self, name, category, stock_qty=0):
+        acc = Accessory.objects.create(
+            name=name,
+            manufacturer=self.manufacturer,
+            category=category,
+        )
+        if stock_qty:
+            _add_stock(Accessory, AccessoryStock, acc, self.location, stock_qty)
+        return acc
 
     def test_accessory_creation(self):
-        acc = Accessory.objects.create(
-            name='MX Keys Keyboard',
-            manufacturer=self.manufacturer,
-            category=Accessory.CATEGORY_KEYBOARD,
-            qty=50,
-            min_qty=5,
-        )
+        acc = self._make_accessory('MX Keys Keyboard', self.cat_keyboard, 50)
+        acc.min_qty = 5
+        acc.save()
         self.assertEqual(str(acc), 'Logitech MX Keys Keyboard')
-        self.assertEqual(acc.remaining_qty, 50)
+        self.assertEqual(acc.available, 50)
         self.assertEqual(acc.checked_out_qty, 0)
 
     def test_accessory_absolute_url(self):
-        acc = Accessory.objects.create(name='Mouse', manufacturer=self.manufacturer)
+        acc = self._make_accessory('Mouse', self.cat_mouse)
         url = acc.get_absolute_url()
         self.assertIn(str(acc.pk), url)
 
@@ -42,13 +76,12 @@ class AccessoryModelTests(TestCase):
         with self.assertRaises(IntegrityError):
             Accessory.objects.create(name='Test Item', manufacturer=self.manufacturer)
 
-    def test_accessory_remaining_qty_with_assignments(self):
-        site = Site.objects.create(name='Office', slug='office')
-        location = Location.objects.create(name='Desk 1', slug='desk-1', site=site)
+    def test_accessory_available_with_assignments(self):
         holder = AssetHolder.objects.create(first_name='Jane', last_name='Doe', upn='jane.doe')
-        acc = Accessory.objects.create(name='Keyboard', manufacturer=self.manufacturer, qty=10)
+        acc = Accessory.objects.create(name='Keyboard', manufacturer=self.manufacturer)
+        AccessoryStock.objects.create(accessory=acc, location=self.location, qty=10)
         AccessoryAssignment.objects.create(accessory=acc, assigned_holder=holder, qty=3)
-        self.assertEqual(acc.remaining_qty, 7)
+        self.assertEqual(acc.available, 7)
         self.assertEqual(acc.checked_out_qty, 3)
 
     def test_accessory_soft_delete(self):
@@ -94,17 +127,27 @@ class AccessoryAssignmentModelTests(TestCase):
 class ConsumableModelTests(TestCase):
     def setUp(self):
         self.manufacturer = Manufacturer.objects.create(name='HP', slug='hp')
+        self.site = Site.objects.create(name='Warehouse', slug='warehouse')
+        self.location = Location.objects.create(name='Shelf B', slug='shelf-b', site=self.site)
+        self.cat_toner = _create_category('Toner', consumable=True)
+        self.cat_ink = _create_category('Ink', consumable=True)
+
+    def _make_consumable(self, name, category, stock_qty=0):
+        con = Consumable.objects.create(
+            name=name,
+            manufacturer=self.manufacturer,
+            category=category,
+        )
+        if stock_qty:
+            _add_stock(Consumable, ConsumableStock, con, self.location, stock_qty)
+        return con
 
     def test_consumable_creation(self):
-        con = Consumable.objects.create(
-            name='LaserJet Toner',
-            manufacturer=self.manufacturer,
-            category=Consumable.CATEGORY_TONER,
-            qty=100,
-            min_qty=10,
-        )
+        con = self._make_consumable('LaserJet Toner', self.cat_toner, 100)
+        con.min_qty = 10
+        con.save()
         self.assertEqual(str(con), 'HP LaserJet Toner')
-        self.assertEqual(con.remaining_qty, 100)
+        self.assertEqual(con.available, 100)
         self.assertEqual(con.consumed_qty, 0)
 
     def test_consumable_absolute_url(self):
@@ -112,14 +155,12 @@ class ConsumableModelTests(TestCase):
         url = con.get_absolute_url()
         self.assertIn(str(con.pk), url)
 
-    def test_consumable_remaining_with_consumptions(self):
-        site = Site.objects.create(name='Warehouse', slug='warehouse')
-        location = Location.objects.create(name='Shelf A', slug='shelf-a', site=site)
-        con = Consumable.objects.create(name='Paper', manufacturer=self.manufacturer, qty=500)
+    def test_consumable_available_with_consumptions(self):
+        con = self._make_consumable('Paper', self.cat_toner, 500)
         ConsumableAssignment.objects.create(
-            consumable=con, assigned_location=location, qty=200
+            consumable=con, assigned_location=self.location, qty=200
         )
-        self.assertEqual(con.remaining_qty, 300)
+        self.assertEqual(con.available, 300)
         self.assertEqual(con.consumed_qty, 200)
 
     def test_consumable_soft_delete(self):
@@ -222,9 +263,14 @@ class AccessoryViewTests(TestCase):
         )
         self.client.login(username='testadmin', password='testpassword')
         self.manufacturer = Manufacturer.objects.create(name='Logitech', slug='logitech')
+        self.site = Site.objects.create(name='Office', slug='office')
+        self.location = Location.objects.create(name='Desk', slug='desk', site=self.site)
+        self.cat_keyboard = _create_category('Keyboard', accessory=True)
+        self.cat_mouse = _create_category('Mouse', accessory=True)
         self.accessory = Accessory.objects.create(
-            name='MX Master 3S', manufacturer=self.manufacturer, category=Accessory.CATEGORY_MOUSE, qty=20
+            name='MX Master 3S', manufacturer=self.manufacturer, category=self.cat_mouse
         )
+        AccessoryStock.objects.create(accessory=self.accessory, location=self.location, qty=20)
 
     def test_list_view(self):
         url = reverse('assets:accessory_list')
@@ -249,9 +295,7 @@ class AccessoryViewTests(TestCase):
             'manufacturer': self.manufacturer.pk,
             'name': 'K380 Keyboard',
             'slug': 'logitech-k380-keyboard',
-            'category': Accessory.CATEGORY_KEYBOARD,
-            'qty': 30,
-            'min_qty': 3,
+            'category': self.cat_keyboard.pk,
         })
         if response.status_code != 302:
             form = response.context.get('form')
@@ -270,9 +314,7 @@ class AccessoryViewTests(TestCase):
             'manufacturer': self.manufacturer.pk,
             'name': 'MX Master 3S Updated',
             'slug': 'logitech-mx-master-3s',
-            'category': Accessory.CATEGORY_MOUSE,
-            'qty': 25,
-            'min_qty': 0,
+            'category': self.cat_mouse.pk,
         })
         if response.status_code != 302:
             form = response.context.get('form')
@@ -293,10 +335,10 @@ class AccessoryViewTests(TestCase):
         self.assertFalse(Accessory.objects.filter(pk=self.accessory.pk).exists())
 
     def test_delete_view_blocked_with_assignments(self):
-        site = Site.objects.create(name='Office', slug='office')
-        location = Location.objects.create(name='Desk', slug='desk', site=site)
         holder = AssetHolder.objects.create(first_name='Test', last_name='User', upn='test.user')
-        AccessoryAssignment.objects.create(accessory=self.accessory, assigned_holder=holder, qty=1)
+        AccessoryAssignment.objects.create(
+            accessory=self.accessory, assigned_holder=holder, from_location=self.location, qty=1
+        )
         url = reverse('assets:accessory_delete', kwargs={'pk': self.accessory.pk})
         response = self.client.post(url)
         self.assertTrue(Accessory.objects.filter(pk=self.accessory.pk).exists())
@@ -309,13 +351,16 @@ class ConsumableViewTests(TestCase):
         )
         self.client.login(username='testadmin', password='testpassword')
         self.manufacturer = Manufacturer.objects.create(name='HP', slug='hp')
+        self.site = Site.objects.create(name='Office', slug='office')
+        self.location = Location.objects.create(name='Shelf', slug='shelf', site=self.site)
+        self.cat_toner = _create_category('Toner', consumable=True)
+        self.cat_ink = _create_category('Ink', consumable=True)
         self.consumable = Consumable.objects.create(
             name='LaserJet Toner Cartridge',
             manufacturer=self.manufacturer,
-            category=Consumable.CATEGORY_TONER,
-            qty=50,
-            min_qty=5,
+            category=self.cat_toner,
         )
+        ConsumableStock.objects.create(consumable=self.consumable, location=self.location, qty=50)
 
     def test_list_view(self):
         url = reverse('assets:consumable_list')
@@ -340,9 +385,7 @@ class ConsumableViewTests(TestCase):
             'manufacturer': self.manufacturer.pk,
             'name': 'Ink Cartridge Black',
             'slug': 'hp-ink-cartridge-black',
-            'category': Consumable.CATEGORY_INK,
-            'qty': 200,
-            'min_qty': 20,
+            'category': self.cat_ink.pk,
         })
         if response.status_code != 302:
             form = response.context.get('form')
@@ -361,9 +404,7 @@ class ConsumableViewTests(TestCase):
             'manufacturer': self.manufacturer.pk,
             'name': 'Updated Toner',
             'slug': 'hp-laserjet-toner-cartridge',
-            'category': Consumable.CATEGORY_TONER,
-            'qty': 100,
-            'min_qty': 10,
+            'category': self.cat_toner.pk,
         })
         if response.status_code != 302:
             form = response.context.get('form')
@@ -371,7 +412,6 @@ class ConsumableViewTests(TestCase):
                 self.fail(f'Form invalid. Errors: {form.errors}')
         self.consumable.refresh_from_db()
         self.assertEqual(self.consumable.name, 'Updated Toner')
-        self.assertEqual(self.consumable.qty, 100)
 
     def test_delete_view_post_no_consumptions(self):
         url = reverse('assets:consumable_delete', kwargs={'pk': self.consumable.pk})
@@ -380,9 +420,9 @@ class ConsumableViewTests(TestCase):
         self.assertFalse(Consumable.objects.filter(pk=self.consumable.pk).exists())
 
     def test_delete_view_blocked_with_consumptions(self):
-        site = Site.objects.create(name='Site', slug='site')
-        location = Location.objects.create(name='Loc', slug='loc', site=site)
-        ConsumableAssignment.objects.create(consumable=self.consumable, assigned_location=location, qty=1)
+        ConsumableAssignment.objects.create(
+            consumable=self.consumable, assigned_location=self.location, from_location=self.location, qty=1
+        )
         url = reverse('assets:consumable_delete', kwargs={'pk': self.consumable.pk})
         response = self.client.post(url)
         self.assertTrue(Consumable.objects.filter(pk=self.consumable.pk).exists())

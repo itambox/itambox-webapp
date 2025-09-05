@@ -5,7 +5,7 @@ from django_tables2.utils import A
 
 from core.tables import BaseTable, ToggleColumn, ActionsColumn
 from extras.tables import TagColumn
-from .models import Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, Kit
+from .models import Accessory, AccessoryAssignment, AccessoryStock, Consumable, ConsumableAssignment, ConsumableStock, Kit
 
 
 class AccessoryTable(BaseTable):
@@ -14,24 +14,37 @@ class AccessoryTable(BaseTable):
     manufacturer = tables.Column(linkify=True)
     category = tables.Column(verbose_name='Category')
     part_number = tables.Column(verbose_name='Part Number')
-    qty = tables.Column(verbose_name='Total Stock')
+    total_stock = tables.Column(accessor='total_stock', verbose_name='Total Stock')
     checked_out_qty = tables.Column(accessor='checked_out_qty', verbose_name='Checked Out')
-    remaining_qty = tables.Column(accessor='remaining_qty', verbose_name='Available')
+    available = tables.Column(accessor='available', verbose_name='Available')
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name='Tenant')
     tags = TagColumn(url_name='assets:accessory_list')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = Accessory
-        fields = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'part_number', 'qty', 'checked_out_qty', 'remaining_qty', 'tags', 'actions')
-        default_columns = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'qty', 'checked_out_qty', 'remaining_qty', 'tags', 'actions')
+        fields = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'part_number', 'total_stock', 'checked_out_qty', 'available', 'tags', 'actions')
+        default_columns = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'total_stock', 'checked_out_qty', 'available', 'tags', 'actions')
 
-    def render_remaining_qty(self, value, record):
+    def render_available(self, value, record):
         if value <= 0:
             return format_html('<span class="badge bg-danger-lt text-danger font-weight-bold">0 (Empty)</span>')
         elif value < record.min_qty:
             return format_html('<span class="badge bg-warning-lt text-warning font-weight-bold">{} (Low)</span>', value)
         return value
+
+
+class AccessoryStockTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    accessory = tables.LinkColumn('assets:accessory_detail', args=[A('accessory.pk')], verbose_name='Accessory')
+    location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], verbose_name='Location')
+    qty = tables.Column(verbose_name='Quantity')
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = AccessoryStock
+        fields = ('pk', 'accessory', 'location', 'qty', 'actions')
+        default_columns = ('pk', 'accessory', 'location', 'qty', 'actions')
 
 
 class AccessoryAssignmentTable(BaseTable):
@@ -63,24 +76,37 @@ class ConsumableTable(BaseTable):
     manufacturer = tables.Column(linkify=True)
     category = tables.Column(verbose_name='Category')
     part_number = tables.Column(verbose_name='Part Number')
-    qty = tables.Column(verbose_name='Total Qty')
+    total_stock = tables.Column(accessor='total_stock', verbose_name='Total Qty')
     consumed_qty = tables.Column(accessor='consumed_qty', verbose_name='Consumed')
-    remaining_qty = tables.Column(accessor='remaining_qty', verbose_name='Available')
+    available = tables.Column(accessor='available', verbose_name='Available')
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name='Tenant')
     tags = TagColumn(url_name='assets:consumable_list')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = Consumable
-        fields = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'part_number', 'qty', 'consumed_qty', 'remaining_qty', 'tags', 'actions')
-        default_columns = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'qty', 'consumed_qty', 'remaining_qty', 'tags', 'actions')
+        fields = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'part_number', 'total_stock', 'consumed_qty', 'available', 'tags', 'actions')
+        default_columns = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'total_stock', 'consumed_qty', 'available', 'tags', 'actions')
 
-    def render_remaining_qty(self, value, record):
+    def render_available(self, value, record):
         if value <= 0:
             return format_html('<span class="badge bg-danger-lt text-danger font-weight-bold">0 (Out of Stock)</span>')
         elif value < record.min_qty:
             return format_html('<span class="badge bg-warning-lt text-warning font-weight-bold">{} (Low Stock)</span>', value)
         return value
+
+
+class ConsumableStockTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    consumable = tables.LinkColumn('assets:consumable_detail', args=[A('consumable.pk')], verbose_name='Consumable')
+    location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], verbose_name='Location')
+    qty = tables.Column(verbose_name='Quantity')
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = ConsumableStock
+        fields = ('pk', 'consumable', 'location', 'qty', 'actions')
+        default_columns = ('pk', 'consumable', 'location', 'qty', 'actions')
 
 
 class ConsumableAssignmentTable(BaseTable):

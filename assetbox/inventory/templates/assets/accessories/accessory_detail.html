@@ -14,7 +14,7 @@
 
 {# --- Page Actions --- #}
 {% block extra_page_actions %}
-    {% if object.allow_overallocate or object.remaining_qty > 0 %}
+    {% if object.allow_overallocate or object.available > 0 %}
         <button type="button" class="btn btn-info"
                 hx-get="{% url 'assets:accessory_checkout' pk=object.pk %}"
                 hx-target="#modal-placeholder"

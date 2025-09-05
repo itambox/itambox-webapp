@@ -1,48 +1,30 @@
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
-from django.db.models import Q, CheckConstraint
+from django.db.models import Q, CheckConstraint, Sum
 from django.core.exceptions import ValidationError
 
 from core.models import BaseModel, ChangeLoggingMixin, AssetBoxModel
-from core.mixins import TaggableMixin, AutoSlugMixin, SoftDeleteMixin, JournalingMixin
+from core.mixins import TaggableMixin, AutoSlugMixin, SoftDeleteMixin, JournalingMixin, ImageAttachmentMixin, CloneableMixin, ExportableMixin
 from core.managers import SoftDeleteManager, AllObjectsManager
 
 
 class Accessory(AutoSlugMixin, SoftDeleteMixin, AssetBoxModel):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    
+
     """Bulk non-serialized returnable peripherals tracked in inventory (e.g. Dell Keyboard)."""
-    CATEGORY_KEYBOARD = 'keyboard'
-    CATEGORY_MOUSE = 'mouse'
-    CATEGORY_CHARGER = 'charger'
-    CATEGORY_ADAPTOR = 'adaptor'
-    CATEGORY_DISPLAY = 'display'
-    CATEGORY_CABLE = 'cable'
-    CATEGORY_OTHER = 'other'
-
-    CATEGORY_CHOICES = [
-        (CATEGORY_KEYBOARD, 'Keyboard'),
-        (CATEGORY_MOUSE, 'Mouse'),
-        (CATEGORY_CHARGER, 'Charger'),
-        (CATEGORY_ADAPTOR, 'Adapter/Dongle'),
-        (CATEGORY_DISPLAY, 'Display/Monitor'),
-        (CATEGORY_CABLE, 'Cable'),
-        (CATEGORY_OTHER, 'Other'),
-    ]
-
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True)
     manufacturer = models.ForeignKey('assets.Manufacturer', on_delete=models.PROTECT, related_name='accessories')
-    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default=CATEGORY_OTHER, verbose_name="Accessory Type", db_index=True)
-    notification_category = models.ForeignKey(
+    category = models.ForeignKey(
         'assets.Category',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='acc_categories',
-        verbose_name="Notification Category",
+        related_name='accessories',
+        limit_choices_to={'applies_to__accessory': True},
+        verbose_name="Category",
         db_index=True
     )
     supplier = models.ForeignKey(
@@ -55,7 +37,6 @@ class Accessory(AutoSlugMixin, SoftDeleteMixin, AssetBoxModel):
         db_index=True
     )
     part_number = models.CharField(max_length=100, blank=True, db_index=True, help_text="SKU or manufacturer part number")
-    qty = models.PositiveIntegerField(default=0, verbose_name="Total Stock")
     min_qty = models.PositiveIntegerField(default=0, verbose_name="Safety Threshold", help_text="Alert threshold quantity")
     allow_overallocate = models.BooleanField(default=False, verbose_name="Allow Over-allocation", help_text="Allow checkout count to exceed stock capacity")
     notes = models.TextField(blank=True)
@@ -79,6 +60,13 @@ class Accessory(AutoSlugMixin, SoftDeleteMixin, AssetBoxModel):
         return reverse('assets:accessory_detail', kwargs={'pk': self.pk})
 
     @property
+    def total_stock(self):
+        ts = getattr(self, '_total_stock', None)
+        if ts is not None:
+            return ts
+        return self.stocks.aggregate(total=Sum('qty'))['total'] or 0
+
+    @property
     def checked_out_qty(self):
         co = getattr(self, '_checked_out', None)
         if co is not None:
@@ -86,8 +74,33 @@ class Accessory(AutoSlugMixin, SoftDeleteMixin, AssetBoxModel):
         return sum(assignment.qty for assignment in self.assignments.all())
 
     @property
-    def remaining_qty(self):
-        return self.qty - self.checked_out_qty
+    def available(self):
+        return self.total_stock - self.checked_out_qty
+
+
+class AccessoryStock(ChangeLoggingMixin, BaseModel):
+    """Quantity of an accessory at a specific location."""
+    accessory = models.ForeignKey(
+        Accessory, on_delete=models.CASCADE, related_name='stocks', db_index=True
+    )
+    location = models.ForeignKey(
+        'organization.Location', on_delete=models.CASCADE, related_name='accessory_stocks', db_index=True
+    )
+    qty = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ('accessory', 'location')
+        unique_together = ('accessory', 'location')
+        verbose_name = "Accessory Stock"
+        verbose_name_plural = "Accessory Stocks"
+        db_table = 'assets_accessorystock'
+        app_label = 'assets'
+
+    def __str__(self):
+        return f"{self.accessory.name} @ {self.location.name}: {self.qty}"
+
+    def get_absolute_url(self):
+        return self.accessory.get_absolute_url()
 
 
 class AccessoryAssignment(ChangeLoggingMixin, BaseModel):
@@ -95,6 +108,10 @@ class AccessoryAssignment(ChangeLoggingMixin, BaseModel):
     accessory = models.ForeignKey(Accessory, on_delete=models.CASCADE, related_name='assignments', db_index=True)
     assigned_holder = models.ForeignKey('organization.AssetHolder', on_delete=models.SET_NULL, null=True, blank=True, related_name='accessory_assignments', db_index=True)
     assigned_location = models.ForeignKey('organization.Location', on_delete=models.SET_NULL, null=True, blank=True, related_name='accessory_assignments', db_index=True)
+    from_location = models.ForeignKey(
+        'organization.Location', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='accessory_checkouts', verbose_name="From Location", db_index=True
+    )
     qty = models.PositiveIntegerField(default=1, verbose_name="Checkout Quantity")
     assigned_date = models.DateTimeField(default=timezone.now)
     notes = models.TextField(blank=True)
@@ -120,33 +137,25 @@ class AccessoryAssignment(ChangeLoggingMixin, BaseModel):
         return f"{self.qty}x {self.accessory} assigned to {recipient}"
 
 
-class Consumable(AutoSlugMixin, SoftDeleteMixin, AssetBoxModel):
+class Consumable(AutoSlugMixin, SoftDeleteMixin, JournalingMixin, TaggableMixin, ImageAttachmentMixin, CloneableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    
+
     """Non-returnable bulk items that are permanently consumed (e.g. thermal paste, printer toner)."""
-    CATEGORY_TONER = 'toner'
-    CATEGORY_INK = 'ink'
-    CATEGORY_BATTERIES = 'batteries'
-    CATEGORY_THERMAL_PASTE = 'thermal_paste'
-    CATEGORY_PAPER = 'paper'
-    CATEGORY_OTHER = 'other'
-
-    CATEGORY_CHOICES = [
-        (CATEGORY_TONER, 'Toner/Ink'),
-        (CATEGORY_INK, 'Ink Cartridge'),
-        (CATEGORY_BATTERIES, 'Batteries'),
-        (CATEGORY_THERMAL_PASTE, 'Thermal Paste'),
-        (CATEGORY_PAPER, 'Printer Paper'),
-        (CATEGORY_OTHER, 'Other'),
-    ]
-
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True)
     manufacturer = models.ForeignKey('assets.Manufacturer', on_delete=models.PROTECT, related_name='consumables')
-    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default=CATEGORY_OTHER, db_index=True)
+    category = models.ForeignKey(
+        'assets.Category',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='consumables',
+        limit_choices_to={'applies_to__consumable': True},
+        verbose_name="Category",
+        db_index=True
+    )
     part_number = models.CharField(max_length=100, blank=True, db_index=True, help_text="SKU or manufacturer part number")
-    qty = models.PositiveIntegerField(default=0, verbose_name="Total Quantity")
     min_qty = models.PositiveIntegerField(default=0, verbose_name="Safety Threshold", help_text="Alert threshold quantity")
     allow_overallocate = models.BooleanField(default=False, verbose_name="Allow Over-allocation", help_text="Allow consumption count to exceed stock capacity")
     notes = models.TextField(blank=True)
@@ -170,6 +179,13 @@ class Consumable(AutoSlugMixin, SoftDeleteMixin, AssetBoxModel):
         return reverse('assets:consumable_detail', kwargs={'pk': self.pk})
 
     @property
+    def total_stock(self):
+        ts = getattr(self, '_total_stock', None)
+        if ts is not None:
+            return ts
+        return self.stocks.aggregate(total=Sum('qty'))['total'] or 0
+
+    @property
     def consumed_qty(self):
         cq = getattr(self, '_consumed', None)
         if cq is not None:
@@ -177,8 +193,33 @@ class Consumable(AutoSlugMixin, SoftDeleteMixin, AssetBoxModel):
         return sum(consumption.qty for consumption in self.consumptions.all())
 
     @property
-    def remaining_qty(self):
-        return self.qty - self.consumed_qty
+    def available(self):
+        return self.total_stock - self.consumed_qty
+
+
+class ConsumableStock(ChangeLoggingMixin, BaseModel):
+    """Quantity of a consumable at a specific location."""
+    consumable = models.ForeignKey(
+        Consumable, on_delete=models.CASCADE, related_name='stocks', db_index=True
+    )
+    location = models.ForeignKey(
+        'organization.Location', on_delete=models.CASCADE, related_name='consumable_stocks', db_index=True
+    )
+    qty = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ('consumable', 'location')
+        unique_together = ('consumable', 'location')
+        verbose_name = "Consumable Stock"
+        verbose_name_plural = "Consumable Stocks"
+        db_table = 'assets_consumablestock'
+        app_label = 'assets'
+
+    def __str__(self):
+        return f"{self.consumable.name} @ {self.location.name}: {self.qty}"
+
+    def get_absolute_url(self):
+        return self.consumable.get_absolute_url()
 
 
 class ConsumableAssignment(ChangeLoggingMixin, BaseModel):
@@ -186,6 +227,10 @@ class ConsumableAssignment(ChangeLoggingMixin, BaseModel):
     consumable = models.ForeignKey(Consumable, on_delete=models.CASCADE, related_name='consumptions', db_index=True)
     assigned_holder = models.ForeignKey('organization.AssetHolder', on_delete=models.SET_NULL, null=True, blank=True, related_name='consumable_consumptions', db_index=True)
     assigned_location = models.ForeignKey('organization.Location', on_delete=models.SET_NULL, null=True, blank=True, related_name='consumable_consumptions', db_index=True)
+    from_location = models.ForeignKey(
+        'organization.Location', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='consumable_consumptions_out', verbose_name="From Location", db_index=True
+    )
     qty = models.PositiveIntegerField(default=1, verbose_name="Consumed Quantity")
     assigned_date = models.DateTimeField(default=timezone.now)
     notes = models.TextField(blank=True)
@@ -230,6 +275,10 @@ class Kit(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
     def get_absolute_url(self):
         return reverse('assets:kit_detail', kwargs={'pk': self.pk})
 
+    def checkout_to_holder(self, holder, source_location, user=None):
+        from assets.services import checkout_kit
+        return checkout_kit(self, holder=holder, location=source_location, source_location=source_location, user=user)
+
 
 class KitItem(ChangeLoggingMixin, BaseModel):
     kit = models.ForeignKey(Kit, on_delete=models.CASCADE, related_name='items', verbose_name="Kit", db_index=True)
@@ -271,3 +320,66 @@ class KitItem(ChangeLoggingMixin, BaseModel):
             raise ValidationError("A kit item must select either an Asset Type, Accessory, or License.")
         if len(filled) > 1:
             raise ValidationError("A kit item cannot select more than one target (must be either Asset Type OR Accessory OR License).")
+
+    def fulfill_for_holder(self, holder, source_location):
+        if self.accessory:
+            from assets.services import checkout_accessory
+            return checkout_accessory(
+                self.accessory, self.qty, holder=holder, location=None,
+                source_location=source_location
+            )
+
+
+# ---------------------------------------------------------------------------
+# Signals for AccessoryAssignment and ConsumableAssignment stock management
+# ---------------------------------------------------------------------------
+from django.db.models.signals import post_save, post_delete
+from django.db.models import F
+from django.db import transaction
+from django.dispatch import receiver
+
+
+@receiver(post_save, sender=AccessoryAssignment)
+def decrement_accessory_stock(sender, instance, created, **kwargs):
+    if not created:
+        return
+    if not instance.from_location:
+        return
+    with transaction.atomic():
+        stock, _ = AccessoryStock.objects.select_for_update().get_or_create(
+            accessory=instance.accessory,
+            location=instance.from_location,
+            defaults={'qty': 0}
+        )
+        stock.qty = stock.qty - instance.qty
+        stock.save(update_fields=['qty'])
+
+
+@receiver(post_delete, sender=AccessoryAssignment)
+def return_accessory_stock(sender, instance, **kwargs):
+    if not instance.from_location:
+        return
+    with transaction.atomic():
+        stock, _ = AccessoryStock.objects.select_for_update().get_or_create(
+            accessory=instance.accessory,
+            location=instance.from_location,
+            defaults={'qty': 0}
+        )
+        stock.qty = stock.qty + instance.qty
+        stock.save(update_fields=['qty'])
+
+
+@receiver(post_save, sender=ConsumableAssignment)
+def decrement_consumable_stock(sender, instance, created, **kwargs):
+    if not created:
+        return
+    if not instance.from_location:
+        return
+    with transaction.atomic():
+        stock, _ = ConsumableStock.objects.select_for_update().get_or_create(
+            consumable=instance.consumable,
+            location=instance.from_location,
+            defaults={'qty': 0}
+        )
+        stock.qty = stock.qty - instance.qty
+        stock.save(update_fields=['qty'])

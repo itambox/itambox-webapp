@@ -7,14 +7,20 @@ from crispy_forms.layout import Layout, Submit, HTML, Row, Column, Div
 from core.forms import SlugModelForm, FilterForm
 from extras.models import Tag
 from organization.models import Location, AssetHolder, Tenant
-from assets.models import Manufacturer
-from .models import Accessory, Consumable, Kit, KitItem
+from assets.models import Manufacturer, Category
+from .models import Accessory, Consumable, Kit, KitItem, AccessoryStock, ConsumableStock
 
 
 class AccessoryForm(SlugModelForm):
     manufacturer = forms.ModelChoiceField(
         queryset=Manufacturer.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    category = forms.ModelChoiceField(
+        queryset=Category.objects.filter(applies_to__contains={'accessory': True}),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Category"
     )
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
@@ -25,12 +31,11 @@ class AccessoryForm(SlugModelForm):
 
     class Meta:
         model = Accessory
-        fields = ['manufacturer', 'name', 'slug', 'category', 'part_number', 'qty', 'min_qty', 'allow_overallocate', 'notes', 'tags', 'tenant']
+        fields = ['manufacturer', 'name', 'slug', 'category', 'part_number', 'min_qty', 'allow_overallocate', 'notes', 'tags', 'tenant']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'slug': forms.TextInput(attrs={'class': 'form-control', 'slugify': 'name'}),
             'part_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'qty': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
             'min_qty': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
             'allow_overallocate': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
@@ -57,12 +62,11 @@ class AccessoryForm(SlugModelForm):
             ),
             Row(
                 Column('category', css_class='col-md-4'),
-                Column('qty', css_class='col-md-4'),
-                Column('min_qty', css_class='col-md-4')
+                Column('min_qty', css_class='col-md-4'),
+                Column('tenant', css_class='col-md-4')
             ),
             Row(
-                Column('tenant', css_class='col-md-6'),
-                Column('tags', css_class='col-md-6')
+                Column('tags', css_class='col-md-12')
             ),
             Div(
                 'allow_overallocate',
@@ -82,6 +86,12 @@ class ConsumableForm(SlugModelForm):
         queryset=Manufacturer.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
+    category = forms.ModelChoiceField(
+        queryset=Category.objects.filter(applies_to__contains={'consumable': True}),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Category"
+    )
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
         required=False,
@@ -91,12 +101,11 @@ class ConsumableForm(SlugModelForm):
 
     class Meta:
         model = Consumable
-        fields = ['manufacturer', 'name', 'slug', 'category', 'part_number', 'qty', 'min_qty', 'allow_overallocate', 'notes', 'tags', 'tenant']
+        fields = ['manufacturer', 'name', 'slug', 'category', 'part_number', 'min_qty', 'allow_overallocate', 'notes', 'tags', 'tenant']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'slug': forms.TextInput(attrs={'class': 'form-control', 'slugify': 'name'}),
             'part_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'qty': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
             'min_qty': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
             'allow_overallocate': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
@@ -123,12 +132,11 @@ class ConsumableForm(SlugModelForm):
             ),
             Row(
                 Column('category', css_class='col-md-4'),
-                Column('qty', css_class='col-md-4'),
-                Column('min_qty', css_class='col-md-4')
+                Column('min_qty', css_class='col-md-4'),
+                Column('tenant', css_class='col-md-4')
             ),
             Row(
-                Column('tenant', css_class='col-md-6'),
-                Column('tags', css_class='col-md-6')
+                Column('tags', css_class='col-md-12')
             ),
             Div(
                 'allow_overallocate',
@@ -258,12 +266,91 @@ class BaseCheckoutForm(forms.Form):
         return cleaned_data
 
 
+class KitCheckoutForm(BaseCheckoutForm):
+    source_location = forms.ModelChoiceField(
+        queryset=Location.objects.all().order_by('name'),
+        required=True,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Source Location (stock deduction)"
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_tag = False
+        self.helper.layout = Layout(
+            'source_location',
+            'assigned_holder',
+            HTML('<p class="text-muted text-center my-2">OR</p>'),
+            'assigned_location',
+            'notes'
+        )
+
+
+class AccessoryStockForm(forms.ModelForm):
+    class Meta:
+        model = AccessoryStock
+        fields = ['accessory', 'location', 'qty']
+        widgets = {
+            'accessory': forms.Select(attrs={'class': 'form-select'}),
+            'location': forms.Select(attrs={'class': 'form-select'}),
+            'qty': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+        button_text = 'Update' if self.instance.pk else 'Create'
+        self.helper.layout = Layout(
+            'accessory',
+            'location',
+            'qty',
+            HTML('<div class="mt-3">'),
+            Submit('submit', button_text, css_class='btn btn-primary'),
+            HTML('</div>')
+        )
+
+
+class ConsumableStockForm(forms.ModelForm):
+    class Meta:
+        model = ConsumableStock
+        fields = ['consumable', 'location', 'qty']
+        widgets = {
+            'consumable': forms.Select(attrs={'class': 'form-select'}),
+            'location': forms.Select(attrs={'class': 'form-select'}),
+            'qty': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+        button_text = 'Update' if self.instance.pk else 'Create'
+        self.helper.layout = Layout(
+            'consumable',
+            'location',
+            'qty',
+            HTML('<div class="mt-3">'),
+            Submit('submit', button_text, css_class='btn btn-primary'),
+            HTML('</div>')
+        )
+
+
 class AccessoryCheckoutForm(BaseCheckoutForm):
     qty = forms.IntegerField(
         initial=1,
         min_value=1,
         widget=forms.NumberInput(attrs={'class': 'form-control'}),
         label="Quantity"
+    )
+    from_location = forms.ModelChoiceField(
+        queryset=Location.objects.all().order_by('name'),
+        required=True,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="From Location"
     )
 
     def __init__(self, *args, **kwargs):
@@ -272,6 +359,7 @@ class AccessoryCheckoutForm(BaseCheckoutForm):
         self.helper = FormHelper()
         self.helper.form_tag = False
         self.helper.layout = Layout(
+            'from_location',
             'assigned_holder',
             HTML('<p class="text-muted text-center my-2">OR</p>'),
             'assigned_location',
@@ -282,12 +370,10 @@ class AccessoryCheckoutForm(BaseCheckoutForm):
     def clean(self):
         cleaned_data = super().clean()
         qty = cleaned_data.get('qty')
-
         if self.accessory and qty:
-            remaining = self.accessory.remaining_qty
+            remaining = self.accessory.available
             if not self.accessory.allow_overallocate and qty > remaining:
                 raise ValidationError(f"Cannot checkout {qty} units. Only {remaining} units are currently in stock.")
-
         return cleaned_data
 
 
@@ -298,6 +384,12 @@ class ConsumableCheckoutForm(BaseCheckoutForm):
         widget=forms.NumberInput(attrs={'class': 'form-control'}),
         label="Quantity"
     )
+    from_location = forms.ModelChoiceField(
+        queryset=Location.objects.all().order_by('name'),
+        required=True,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="From Location"
+    )
 
     def __init__(self, *args, **kwargs):
         self.consumable = kwargs.pop('consumable', None)
@@ -305,6 +397,7 @@ class ConsumableCheckoutForm(BaseCheckoutForm):
         self.helper = FormHelper()
         self.helper.form_tag = False
         self.helper.layout = Layout(
+            'from_location',
             'assigned_holder',
             HTML('<p class="text-muted text-center my-2">OR</p>'),
             'assigned_location',
@@ -315,26 +408,11 @@ class ConsumableCheckoutForm(BaseCheckoutForm):
     def clean(self):
         cleaned_data = super().clean()
         qty = cleaned_data.get('qty')
-
         if self.consumable and qty:
-            remaining = self.consumable.remaining_qty
+            remaining = self.consumable.available
             if not self.consumable.allow_overallocate and qty > remaining:
                 raise ValidationError(f"Cannot checkout {qty} units. Only {remaining} units are currently in stock.")
-
         return cleaned_data
-
-
-class KitCheckoutForm(BaseCheckoutForm):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helper = FormHelper()
-        self.helper.form_tag = False
-        self.helper.layout = Layout(
-            'assigned_holder',
-            HTML('<p class="text-muted text-center my-2">OR</p>'),
-            'assigned_location',
-            'notes'
-        )
 
 
 from .filters import AccessoryFilterSet, ConsumableFilterSet, KitFilterSet

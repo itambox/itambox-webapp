@@ -1,4 +1,4 @@
-{% if object.remaining_qty <= 0 %}
+{% if object.available <= 0 %}
 <div class="alert alert-important alert-danger shadow-sm mb-4" role="alert">
     <div class="d-flex">
         <div>
@@ -9,7 +9,7 @@
         </div>
     </div>
 </div>
-{% elif object.remaining_qty < object.min_qty %}
+{% elif object.available < object.min_qty %}
 <div class="alert alert-important alert-warning shadow-sm mb-4" role="alert">
     <div class="d-flex">
         <div>
@@ -41,7 +41,7 @@
     <dt class="col-sm-3">Category:</dt>
     <dd class="col-sm-9">
         <span class="badge bg-purple-lt px-2.5 py-1 text-uppercase">
-            {{ object.get_category_display }}
+            {{ object.category.name }}
         </span>
     </dd>
 
