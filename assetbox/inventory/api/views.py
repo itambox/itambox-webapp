@@ -1,10 +1,14 @@
 from django.db import models
 from django_filters.rest_framework import DjangoFilterBackend
 from core.api.viewsets import AssetBoxModelViewSet
-from inventory.models import Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, Kit, KitItem
+from inventory.models import (
+    Accessory, AccessoryStock, AccessoryAssignment,
+    Consumable, ConsumableStock, ConsumableAssignment,
+    Kit, KitItem
+)
 from .serializers import (
-    AccessorySerializer, AccessoryAssignmentSerializer,
-    ConsumableSerializer, ConsumableAssignmentSerializer,
+    AccessorySerializer, AccessoryStockSerializer, AccessoryAssignmentSerializer,
+    ConsumableSerializer, ConsumableStockSerializer, ConsumableAssignmentSerializer,
     KitSerializer, KitItemSerializer
 )
 
@@ -16,13 +20,20 @@ class AccessoryViewSet(AssetBoxModelViewSet):
     filterset_fields = ['manufacturer_id', 'category', 'tenant_id']
 
 
+class AccessoryStockViewSet(AssetBoxModelViewSet):
+    queryset = AccessoryStock.objects.select_related('accessory', 'location').all()
+    serializer_class = AccessoryStockSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_fields = ['accessory_id', 'location_id']
+
+
 class AccessoryAssignmentViewSet(AssetBoxModelViewSet):
     queryset = AccessoryAssignment.objects.select_related(
-        'accessory__manufacturer', 'assigned_holder', 'assigned_location'
+        'accessory__manufacturer', 'assigned_holder', 'assigned_location', 'from_location'
     ).all()
     serializer_class = AccessoryAssignmentSerializer
     filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ['accessory_id', 'assigned_holder_id', 'assigned_location_id']
+    filterset_fields = ['accessory_id', 'assigned_holder_id', 'assigned_location_id', 'from_location_id']
 
 
 class ConsumableViewSet(AssetBoxModelViewSet):
@@ -32,13 +43,20 @@ class ConsumableViewSet(AssetBoxModelViewSet):
     filterset_fields = ['manufacturer_id', 'category', 'tenant_id']
 
 
+class ConsumableStockViewSet(AssetBoxModelViewSet):
+    queryset = ConsumableStock.objects.select_related('consumable', 'location').all()
+    serializer_class = ConsumableStockSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_fields = ['consumable_id', 'location_id']
+
+
 class ConsumableAssignmentViewSet(AssetBoxModelViewSet):
     queryset = ConsumableAssignment.objects.select_related(
-        'consumable__manufacturer', 'assigned_holder', 'assigned_location'
+        'consumable__manufacturer', 'assigned_holder', 'assigned_location', 'from_location'
     ).all()
     serializer_class = ConsumableAssignmentSerializer
     filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ['consumable_id', 'assigned_holder_id', 'assigned_location_id']
+    filterset_fields = ['consumable_id', 'assigned_holder_id', 'assigned_location_id', 'from_location_id']
 
 
 class KitViewSet(AssetBoxModelViewSet):

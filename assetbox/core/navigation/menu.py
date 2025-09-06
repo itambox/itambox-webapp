@@ -108,7 +108,33 @@ ASSETS_MENU = Menu(
             label=_('Peripherals & Consumables'),
             items=(
                 get_model_item('assets', 'accessory', _('Accessories')),
+                MenuItem(
+                    link='assets:accessorystock_list',
+                    link_text=_('Accessory Stocks'),
+                    permissions=['inventory.view_accessorystock'],
+                    buttons=(
+                        MenuItemButton(
+                            link='assets:accessorystock_create',
+                            title='Add',
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=['inventory.add_accessorystock'],
+                        ),
+                    ),
+                ),
                 get_model_item('assets', 'consumable', _('Consumables')),
+                MenuItem(
+                    link='assets:consumablestock_list',
+                    link_text=_('Consumable Stocks'),
+                    permissions=['inventory.view_consumablestock'],
+                    buttons=(
+                        MenuItemButton(
+                            link='assets:consumablestock_create',
+                            title='Add',
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=['inventory.add_consumablestock'],
+                        ),
+                    ),
+                ),
             ),
         ),
         MenuGroup(

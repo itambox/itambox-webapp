@@ -70,6 +70,7 @@ class AssetSerializer(BaseModelSerializer):
         queryset=Tenant.objects.all(), source='tenant', write_only=True, required=False, allow_null=True
     )
     tags = TagSerializer(many=True, read_only=True)
+    assigned_to = serializers.SerializerMethodField()
 
     class Meta:
         model = Asset
@@ -78,9 +79,29 @@ class AssetSerializer(BaseModelSerializer):
             'asset_type', 'asset_type_id', 'asset_role', 'assetrole_id',
             'location', 'location_id', 'tenant', 'tenant_id',
             'purchase_date', 'warranty_expiration',
-            'notes', 'tags', 'created_at', 'updated_at'
+            'notes', 'tags', 'assigned_to', 'created_at', 'updated_at'
         ]
         brief_fields = ['id', 'name', 'asset_tag', 'serial_number', 'status']
+
+    def get_assigned_to(self, obj):
+        cached = getattr(obj, '_active_assignments', None)
+        if cached is not None:
+            active = cached[0] if cached else None
+        else:
+            active = obj.active_assignment
+        if not active:
+            return None
+        target = active.assigned_to
+        if target is None:
+            return None
+        return {
+            'id': target.pk,
+            'type': active.assigned_to_content_type.model,
+            'name': str(target),
+            'is_active': active.is_active,
+            'checked_out_at': active.checked_out_at,
+            'expected_checkin_date': active.expected_checkin_date,
+        }
 
 
 class InstalledSoftwareSerializer(BaseModelSerializer):

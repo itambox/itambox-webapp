@@ -3,7 +3,7 @@ from django.db import models
 
 from core.models import Notification, EmailSettings
 from core.events import send_notification
-from assets.models import Accessory, Consumable
+from inventory.models import Accessory, Consumable
 
 
 class Command(BaseCommand):
@@ -15,21 +15,27 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING('Email notifications are disabled. Skipping.'))
             return
 
-        low_accessories = Accessory.objects.filter(min_qty__gt=0).exclude(qty__gte=models.F('min_qty'))
-        low_consumables = Consumable.objects.filter(min_qty__gt=0).exclude(qty__gte=models.F('min_qty'))
+        low_accessories = Accessory.objects.filter(min_qty__gt=0)
+        low_consumables = Consumable.objects.filter(min_qty__gt=0)
 
         count = 0
 
         for acc in low_accessories:
-            subject = f'Low Stock: {acc.name} ({acc.remaining_qty}/{acc.qty} remaining)'
-            body = f'{acc.manufacturer.name} {acc.name}\nPart: {acc.part_number or "N/A"}\nStock: {acc.remaining_qty}/{acc.qty}\nMin: {acc.min_qty}'
+            available = acc.available
+            if available >= acc.min_qty:
+                continue
+            subject = f'Low Stock: {acc.name} ({available}/{acc.min_qty} remaining)'
+            body = f'{acc.manufacturer.name} {acc.name}\nPart: {acc.part_number or "N/A"}\nStock: {available}\nMin: {acc.min_qty}'
             Notification.objects.create(user=None, subject=subject, message=body, level='warning')
             send_notification(subject, body)
             count += 1
 
         for con in low_consumables:
-            subject = f'Low Stock: {con.name} ({con.remaining_qty}/{con.qty} remaining)'
-            body = f'{con.manufacturer.name} {con.name}\nPart: {con.part_number or "N/A"}\nStock: {con.remaining_qty}/{con.qty}\nMin: {con.min_qty}'
+            available = con.available
+            if available >= con.min_qty:
+                continue
+            subject = f'Low Stock: {con.name} ({available}/{con.min_qty} remaining)'
+            body = f'{con.manufacturer.name} {con.name}\nPart: {con.part_number or "N/A"}\nStock: {available}\nMin: {con.min_qty}'
             Notification.objects.create(user=None, subject=subject, message=body, level='warning')
             send_notification(subject, body)
             count += 1

@@ -112,6 +112,7 @@ OBJECT_COUNT_MODEL_CHOICES = [
     ('assets.assettype', 'Asset Types'),
     ('assets.manufacturer', 'Manufacturers'),
     ('assets.statuslabel', 'Status Labels'),
+    ('components.component', 'Components'),
     ('organization.site', 'Sites'),
     ('organization.tenant', 'Tenants'),
     ('organization.location', 'Locations'),
@@ -149,12 +150,14 @@ class ObjectCountsWidget(DashboardWidget):
             return {'counts': [], 'has_data': False}
         from organization.models import Site, Tenant, Location
         from software.models import Software
+        from components.models import Component
         from assets.models import AssetType, Manufacturer
         model_map = {
             'assets.asset': (Asset, 'assets:asset_list'),
             'assets.assettype': (AssetType, 'assets:assettype_list'),
             'assets.manufacturer': (Manufacturer, 'assets:manufacturer_list'),
             'assets.statuslabel': (StatusLabel, 'assets:statuslabel_list'),
+            'components.component': (Component, 'assets:component_list'),
             'organization.site': (Site, 'organization:site_list'),
             'organization.tenant': (Tenant, 'organization:tenant_list'),
             'organization.location': (Location, 'organization:location_list'),
@@ -342,23 +345,40 @@ class RenewalsWidget(DashboardWidget):
 class LowStockWidget(DashboardWidget):
     widget_id = 'low-stock'
     title = 'Low Stock Alerts'
-    description = 'Accessories and consumables below minimum quantity'
+    description = 'Accessories, consumables, and components below minimum quantity'
     template_name = 'extras/dashboard/widgets/low_stock.html'
 
     def get_context(self, request):
-        accessories = Accessory.objects.filter(
-            qty__lt=F('min_qty')
-        ).filter(min_qty__gt=0).order_by('qty').annotate(_checked_out=Coalesce(Sum('assignments__qty'), 0))
+        accessories = list(Accessory.objects.filter(
+            min_qty__gt=0
+        ).annotate(_total_stock=Coalesce(Sum('stocks__qty'), 0), _checked_out=Coalesce(Sum('assignments__qty'), 0)))
+        low_accessories = [a for a in accessories if a.available < a.min_qty]
 
-        consumables = Consumable.objects.filter(
-            qty__lt=F('min_qty')
-        ).filter(min_qty__gt=0).order_by('qty').annotate(_consumed=Coalesce(Sum('consumptions__qty'), 0))
+        consumables = list(Consumable.objects.filter(
+            min_qty__gt=0
+        ).annotate(_total_stock=Coalesce(Sum('stocks__qty'), 0), _consumed=Coalesce(Sum('consumptions__qty'), 0)))
+        low_consumables = [c for c in consumables if c.available < c.min_qty]
+
+        from components.models import Component
+        components = Component.objects.filter(min_stock_level__gt=0).order_by('name')
+        low_components = []
+        for comp in components:
+            if comp.available_stock < comp.min_stock_level:
+                low_components.append({
+                    'component': comp,
+                    'available_stock': comp.available_stock,
+                    'total_stock': comp.total_stock,
+                    'total_allocated': comp.total_allocated,
+                    'min_stock_level': comp.min_stock_level,
+                })
 
         return {
-            'low_stock_accessories': accessories,
-            'low_stock_consumables': consumables,
-            'low_stock_accessory_count': accessories.count(),
-            'low_stock_consumable_count': consumables.count(),
+            'low_stock_accessories': low_accessories,
+            'low_stock_consumables': low_consumables,
+            'low_stock_components': low_components,
+            'low_stock_accessory_count': len(low_accessories),
+            'low_stock_consumable_count': len(low_consumables),
+            'low_stock_component_count': len(low_components),
         }
 
 

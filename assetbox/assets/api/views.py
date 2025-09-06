@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Prefetch
 from django_filters.rest_framework import DjangoFilterBackend
 
 from core.api.viewsets import AssetBoxModelViewSet, AssetBoxReadOnlyModelViewSet
@@ -21,7 +22,9 @@ from .serializers import (
 
 
 class AssetViewSet(AssetBoxModelViewSet):
-    queryset = Asset.objects.select_related('asset_role', 'asset_type__manufacturer', 'location')
+    queryset = Asset.objects.select_related('asset_role', 'asset_type__manufacturer', 'location').prefetch_related(
+        Prefetch('assignments', queryset=AssetAssignment.objects.filter(is_active=True), to_attr='_active_assignments')
+    )
     serializer_class = AssetSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = AssetFilterSet
