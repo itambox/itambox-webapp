@@ -47,6 +47,8 @@ urlpatterns = [
 
     # UI Paths
     path('assets/', include('assets.urls', namespace='assets')),
+    path('inventory/', include('inventory.urls', namespace='inventory')),
+    path('compliance/', include('compliance.urls', namespace='compliance')),
     path('organization/', include('organization.urls', namespace='organization')),
     path('extras/', include('extras.urls')),
     path('software/', include('software.urls', namespace='software')),

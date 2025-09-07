@@ -7,6 +7,14 @@ class CustomValidator:
     def validate(self, instance, request=None):
         raise NotImplementedError
 
+    @classmethod
+    def validate_object(cls, instance):
+        from django.conf import settings
+        model_path = f"{instance._meta.app_label}.{instance._meta.model_name}"
+        rules = getattr(settings, 'CUSTOM_VALIDATORS', {}).get(model_path, {})
+        if rules:
+            parse_json_rules(instance, rules)
+
 
 CUSTOM_VALIDATORS = {}
 

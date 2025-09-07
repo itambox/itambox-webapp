@@ -21,6 +21,11 @@ class BaseModel(models.Model):
     class Meta:
         abstract = True
 
+    def clean(self):
+        super().clean()
+        from core.validators import CustomValidator
+        CustomValidator.validate_object(self)
+
 
 class ObjectChange(models.Model):
     time = models.DateTimeField(
@@ -141,6 +146,7 @@ class ChangeLoggingMixin:
                 validator_instance.validate(self)
             elif isinstance(validator, dict):
                 parse_json_rules(self, validator)
+        super().clean()
 
     def snapshot(self):
         self._prechange_snapshot = serialize_object(
@@ -244,7 +250,9 @@ class Notification(models.Model):
     message = models.TextField()
     level = models.CharField(max_length=20, choices=LEVEL_CHOICES, default=LEVEL_INFO)
     is_read = models.BooleanField(default=False)
+    target_url = models.CharField(max_length=500, blank=True, null=True, help_text="Optional destination URL when clicked.")
     created_at = models.DateTimeField(auto_now_add=True)
+
 
     class Meta:
         ordering = ('-created_at',)
@@ -739,9 +747,12 @@ class LabelTemplate(ChangeLoggingMixin, BaseModel):
 
 from core.mixins import (
     JournalingMixin, TaggableMixin,
-    ImageAttachmentMixin, FileAttachmentMixin, ExportableMixin, CloneableMixin
+    ImageAttachmentMixin, FileAttachmentMixin, ExportableMixin, CloneableMixin,
+    SoftDeleteMixin
 )
 
+# DEPRECATED — replaced by StandardModel/VaultModel/DeletableVaultModel.
+# Kept temporarily for backward compatibility during Phase 1 transition.
 class AssetBoxModel(
     JournalingMixin,
     TaggableMixin,
@@ -752,6 +763,22 @@ class AssetBoxModel(
     ChangeLoggingMixin,
     BaseModel
 ):
+    class Meta:
+        abstract = True
+
+
+class StandardModel(JournalingMixin, TaggableMixin, ExportableMixin,
+                    CloneableMixin, ChangeLoggingMixin, BaseModel):
+    class Meta:
+        abstract = True
+
+
+class VaultModel(StandardModel, ImageAttachmentMixin, FileAttachmentMixin):
+    class Meta:
+        abstract = True
+
+
+class DeletableVaultModel(VaultModel, SoftDeleteMixin):
     class Meta:
         abstract = True
 

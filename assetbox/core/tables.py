@@ -232,14 +232,24 @@ class AssigneeColumn(tables.Column):
         if holder:
             try:
                 url = holder.get_absolute_url()
+                from organization.models import Location
+                if isinstance(holder, Location):
+                    return format_html('Location: <a href="{}">{}</a>', url, holder)
                 return format_html('<a href="{}">{}</a>', url, holder)
             except Exception:
                 return str(holder)
 
+        if hasattr(record, 'active_assignment') and record.active_assignment is None:
+            return self.EMPTY_MARK
+
         if self.location_field and hasattr(record, self.location_field):
             loc = getattr(record, self.location_field)
             if loc:
-                return f"Location: {loc}"
+                try:
+                    url = loc.get_absolute_url()
+                    return format_html('Location: <a href="{}">{}</a>', url, loc)
+                except Exception:
+                    return f"Location: {loc}"
 
         if self._empty_text is not None:
             return self._empty_text
@@ -254,10 +264,20 @@ class AssigneeColumn(tables.Column):
             return
 
         cache = {}
-        if self._assignment_model_path == 'assets.AssetAssignment':
-            assignments = AssignmentModel.objects.filter(
-                asset_id__in=pks, is_active=True
-            ).select_related(
+        
+        # Check if AssignmentModel has a direct ForeignKey to model_class
+        fk_field = None
+        for field in AssignmentModel._meta.fields:
+            if field.is_relation and field.related_model == model_class:
+                fk_field = field
+                break
+
+        if fk_field is not None:
+            filter_kwargs = {f"{fk_field.name}_id__in": pks}
+            if hasattr(AssignmentModel, 'is_active'):
+                filter_kwargs['is_active'] = True
+
+            assignments = AssignmentModel.objects.filter(**filter_kwargs).select_related(
                 'assigned_to_content_type'
             )
             assigned_to_ids_by_ct = {}
@@ -265,7 +285,8 @@ class AssigneeColumn(tables.Column):
                 ct_id = a.assigned_to_content_type_id
                 if ct_id not in assigned_to_ids_by_ct:
                     assigned_to_ids_by_ct[ct_id] = []
-                assigned_to_ids_by_ct[ct_id].append((a.asset_id, a.assigned_to_object_id))
+                parent_id = getattr(a, f"{fk_field.name}_id")
+                assigned_to_ids_by_ct[ct_id].append((parent_id, a.assigned_to_object_id))
 
             ct_map = {}
             for ct_id in assigned_to_ids_by_ct:
@@ -280,10 +301,10 @@ class AssigneeColumn(tables.Column):
                 if model is None:
                     continue
                 obj_ids = [e[1] for e in entries]
-                instances = model.objects.filter(pk__in=obj_ids).only('pk')
+                instances = model.objects.filter(pk__in=obj_ids)
                 instance_map = {obj.pk: obj for obj in instances}
-                for asset_id, obj_id in entries:
-                    cache[asset_id] = instance_map.get(obj_id)
+                for parent_id, obj_id in entries:
+                    cache[parent_id] = instance_map.get(obj_id)
 
         else:
             ct = ContentType.objects.get_for_model(model_class)
@@ -293,7 +314,7 @@ class AssigneeColumn(tables.Column):
             cache = {
                 a.object_id: a.asset_holder
                 for a in assignments
-                if a.asset_holder
+                if getattr(a, 'asset_holder', None)
             }
 
         setattr(table, cache_attr, cache)

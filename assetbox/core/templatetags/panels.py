@@ -23,6 +23,7 @@ def render_panel(context, panel):
         model_name = model._meta.model_name
         candidates = [
             f'{app_label}/includes/detail/{model_name}_{panel.name}.html',
+            f'assets/includes/detail/{model_name}_{panel.name}.html',
             f'{app_label}/includes/{panel.name}_panel.html',
         ]
         for candidate in candidates:

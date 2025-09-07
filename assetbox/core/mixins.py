@@ -215,6 +215,24 @@ class SoftDeleteMixin(models.Model):
             if hasattr(self, 'snapshot') and callable(self.snapshot):
                 self.snapshot()
             
+            # Recurse and soft-delete/hard-delete cascading relations
+            from django.db.models.deletion import Collector
+            
+            collector = Collector(using=self._state.db or 'default')
+            collector.collect([self])
+            collector.sort()
+            
+            for model, instances in list(collector.data.items()):
+                for instance in instances:
+                    if instance == self:
+                        continue
+                    if isinstance(instance, SoftDeleteMixin):
+                        if instance.deleted_at is None:
+                            instance.delete(force_hard_delete=False)
+                    else:
+                        if instance.pk is not None:
+                            instance.delete()
+            
             self.soft_delete()
 
     @classmethod

@@ -888,3 +888,6 @@ def table_config(request, model_name):
         'table_verbose_name': table_verbose_name,
     }
     return HttpResponse(template.render(context, request))
+
+
+from assetbox.views.features import ObjectExportView  # noqa: E402

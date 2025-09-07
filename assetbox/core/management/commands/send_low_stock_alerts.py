@@ -26,7 +26,13 @@ class Command(BaseCommand):
                 continue
             subject = f'Low Stock: {acc.name} ({available}/{acc.min_qty} remaining)'
             body = f'{acc.manufacturer.name} {acc.name}\nPart: {acc.part_number or "N/A"}\nStock: {available}\nMin: {acc.min_qty}'
-            Notification.objects.create(user=None, subject=subject, message=body, level='warning')
+            Notification.objects.create(
+                user=None,
+                subject=subject,
+                message=body,
+                level='warning',
+                target_url=acc.get_absolute_url(),
+            )
             send_notification(subject, body)
             count += 1
 
@@ -36,7 +42,13 @@ class Command(BaseCommand):
                 continue
             subject = f'Low Stock: {con.name} ({available}/{con.min_qty} remaining)'
             body = f'{con.manufacturer.name} {con.name}\nPart: {con.part_number or "N/A"}\nStock: {available}\nMin: {con.min_qty}'
-            Notification.objects.create(user=None, subject=subject, message=body, level='warning')
+            Notification.objects.create(
+                user=None,
+                subject=subject,
+                message=body,
+                level='warning',
+                target_url=con.get_absolute_url(),
+            )
             send_notification(subject, body)
             count += 1
 

@@ -49,6 +49,7 @@ class Command(BaseCommand):
                 subject=subject,
                 message=body,
                 level='warning',
+                target_url=asset.get_absolute_url(),
             )
 
             send_notification(subject, body)

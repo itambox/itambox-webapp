@@ -194,11 +194,22 @@ def _send_notification(rule, event):
     except (KeyError, ValueError):
         pass
 
+    target_url = None
+    try:
+        model_class = event.model.model_class()
+        if model_class and hasattr(model_class, 'get_absolute_url'):
+            instance = model_class.objects.filter(pk=event.object_id).first()
+            if instance:
+                target_url = instance.get_absolute_url()
+    except Exception:
+        pass
+
     Notification.objects.create(
         user=None,
         subject=subject,
         message=body,
         level=level,
+        target_url=target_url,
     )
 
 

@@ -1,16 +1,42 @@
 import base64
 import hashlib
 from django.conf import settings
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import Fernet, MultiFernet, InvalidToken
+
+import os
 
 def get_fernet():
     """
-    Derive a 32-byte key for Fernet from settings.SECRET_KEY.
-    This ensures zero manual configuration changes or extra environment variables.
+    Get a Fernet or MultiFernet instance.
+    Supports a MultiFernet keyring derived from the comma-separated
+    ASSETBOX_FIELD_ENCRYPTION_KEYS environment variable or Django settings.
+    Falls back to SECRET_KEY hashing in debug/dev environments.
     """
-    # Hash the SECRET_KEY to get a secure 32-byte digest
+    keys_str = os.environ.get('ASSETBOX_FIELD_ENCRYPTION_KEYS') or getattr(settings, 'ASSETBOX_FIELD_ENCRYPTION_KEYS', None)
+    
+    if keys_str:
+        keys = [k.strip() for k in keys_str.split(',') if k.strip()]
+        if keys:
+            fernet_instances = []
+            for k in keys:
+                try:
+                    decoded = base64.urlsafe_b64decode(k)
+                    if len(decoded) == 32:
+                        fernet_instances.append(Fernet(k))
+                        continue
+                except Exception:
+                    pass
+                
+                key_bytes = hashlib.sha256(k.encode('utf-8')).digest()
+                fernet_key = base64.urlsafe_b64encode(key_bytes)
+                fernet_instances.append(Fernet(fernet_key))
+            
+            if len(fernet_instances) > 1:
+                return MultiFernet(fernet_instances)
+            elif fernet_instances:
+                return fernet_instances[0]
+
     key_bytes = hashlib.sha256(settings.SECRET_KEY.encode('utf-8')).digest()
-    # URL-safe base64 encode the 32-byte digest to meet Fernet key requirements
     fernet_key = base64.urlsafe_b64encode(key_bytes)
     return Fernet(fernet_key)
 

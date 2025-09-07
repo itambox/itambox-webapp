@@ -64,7 +64,7 @@ class Command(BaseCommand):
         models_to_clear = [
             # Leaf models first
             ('assets', 'ActivityLog'),
-            ('assets', 'CustodyReceipt'),
+            ('compliance', 'CustodyReceipt'),
             ('core', 'ObjectChange'),
             ('core', 'Notification'),
             ('users', 'UserPreference'),
@@ -72,16 +72,16 @@ class Command(BaseCommand):
             ('organization', 'AssetHolderAssignment'),
             ('licenses', 'LicenseSeatAssignment'),
             ('subscriptions', 'SubscriptionAssignment'),
-            ('assets', 'AccessoryAssignment'),
-            ('assets', 'ConsumableAssignment'),
+            ('inventory', 'AccessoryAssignment'),
+            ('inventory', 'ConsumableAssignment'),
             ('assets', 'InstalledSoftware'),
-            ('assets', 'AssetMaintenance'),
-            ('assets', 'KitItem'),
-            ('assets', 'Kit'),
+            ('compliance', 'AssetMaintenance'),
+            ('inventory', 'KitItem'),
+            ('inventory', 'Kit'),
             ('assets', 'Asset'),
             ('assets', 'AssetType'),
-            ('assets', 'Accessory'),
-            ('assets', 'Consumable'),
+            ('inventory', 'Accessory'),
+            ('inventory', 'Consumable'),
             ('licenses', 'License'),
             ('software', 'Software'),
             ('subscriptions', 'Subscription'),
@@ -186,9 +186,8 @@ class Command(BaseCommand):
     # ─────────────────────────────────────────
 
     def _seed_phase0(self):
-        from assets.models import StatusLabel
-        from extras.models import Tag
-        from assets.models import AssetRole, Manufacturer, CustomField, CustomFieldset, Depreciation
+        from assets.models import StatusLabel, AssetRole, Manufacturer, Depreciation, Supplier
+        from extras.models import Tag, CustomField, CustomFieldset
         from users.models import UserPreference
 
         self.stdout.write('--- Phase 0: Foundation ---')
@@ -360,6 +359,25 @@ class Command(BaseCommand):
             obj, _ = Depreciation.objects.get_or_create(name=name, defaults={'months': months})
             self._depreciations[name] = obj
 
+        # Suppliers
+        supplier_data = [
+            ('ITZ Solutions GmbH', 'itz-solutions', 'info@itz-solutions.de', '+49-30-555-0100', 'https://itz-solutions.de'),
+            ('Dell Direct', 'dell-direct', 'enterprise@dell.com', '+1-800-555-0199', 'https://dell.com'),
+            ('Apple Business', 'apple-business', 'business@apple.com', '+1-800-555-0200', 'https://apple.com/business'),
+            ('HP Enterprise Store', 'hp-enterprise-store', 'hpe-sales@hp.com', '+1-800-555-0300', 'https://hpe.com'),
+            ('Lenovo Pro', 'lenovo-pro', 'pro-sales@lenovo.com', '+1-800-555-0400', 'https://lenovo.com/pro'),
+            ('CDW Deutschland', 'cdw-deutschland', 'de.sales@cdw.com', '+49-211-555-0500', 'https://cdw.de'),
+            ('Amazon Business', 'amazon-business', 'business@amazon.de', '+49-800-555-0600', 'https://business.amazon.de'),
+            ('Notebooksbilliger AG', 'notebooksbilliger-ag', 'b2b@notebooksbilliger.de', '+49-5921-555-0700', 'https://notebooksbilliger.de/b2b'),
+        ]
+        self._suppliers = {}
+        for name, slug, email, phone, website in supplier_data:
+            obj, _ = Supplier.objects.get_or_create(
+                slug=slug,
+                defaults={'name': name, 'contact_email': email, 'contact_phone': phone, 'website': website}
+            )
+            self._suppliers[slug] = obj
+
         self.stdout.write(f'  {len(self._users)} users, {len(self._tags)} tags, '
                           f'{len(self._asset_roles)} asset roles, {len(self._manufacturers)} manufacturers, '
                           f'{len(self._custom_fields)} custom fields, {len(self._depreciations)} depreciation schedules.')
@@ -410,15 +428,24 @@ class Command(BaseCommand):
             site_groups[slug] = obj
 
         # TenantGroups & Tenants
-        tg, _ = TenantGroup.objects.get_or_create(
+        tg_helheim, _ = TenantGroup.objects.get_or_create(
             slug='helheim-group', defaults={'name': 'Helheim Group'}
+        )
+        tg_customers, _ = TenantGroup.objects.get_or_create(
+            slug='customer-tenants', defaults={'name': 'Customer Tenants'}
         )
 
         tenants = {}
         tenant_data = [
-            ('Helheim Cloud GmbH', 'helheim-cloud-gmbh', tg),
-            ('Helheim Security AG', 'helheim-security-ag', tg),
-            ('Helheim Labs Inc.', 'helheim-labs-inc', tg),
+            # Internal (Helheim Group)
+            ('Helheim Cloud GmbH', 'helheim-cloud-gmbh', tg_helheim),
+            ('Helheim Security AG', 'helheim-security-ag', tg_helheim),
+            ('Helheim Labs Inc.', 'helheim-labs-inc', tg_helheim),
+            # Customer tenants
+            ('Finova Capital AG', 'finova-capital-ag', tg_customers),
+            ('MediCare Health GmbH', 'medicare-health-gmbh', tg_customers),
+            ('TechStartup.io GmbH', 'techstartup-io-gmbh', tg_customers),
+            ('GreenEnergy Solutions SE', 'greenenergy-solutions-se', tg_customers),
         ]
         for name, slug, tgroup in tenant_data:
             obj, _ = Tenant.objects.get_or_create(slug=slug, defaults={'name': name, 'group': tgroup})
@@ -446,6 +473,19 @@ class Command(BaseCommand):
             ('Singapore Office', 'singapore-office', site_groups['remote-sites'], tenants['helheim-cloud-gmbh'],
              sub_regions['southeast-asia'], 'APAC Hub', '1.3521', '103.8198',
              '8 Marina Boulevard\nSingapore 018981'),
+            # Customer Sites
+            ('Finova Frankfurt HQ', 'finova-frankfurt-hq', site_groups['corporate-offices'], tenants['finova-capital-ag'],
+             sub_regions['western-europe'], 'Customer HQ', '50.1109', '8.6821',
+             'Taunusanlage 12\n60325 Frankfurt\nGermany'),
+            ('MediCare Munich Office', 'medicare-munich-office', site_groups['corporate-offices'], tenants['medicare-health-gmbh'],
+             sub_regions['western-europe'], 'Customer Office', '48.1374', '11.5755',
+             'Rosenheimer Strasse 145\n81671 Munich\nGermany'),
+            ('TechStartup Berlin Hub', 'techstartup-berlin-hub', site_groups['remote-sites'], tenants['techstartup-io-gmbh'],
+             sub_regions['western-europe'], 'Co-Working Hub', '52.5067', '13.3911',
+             'Axel-Springer-Strasse 54\n10117 Berlin\nGermany'),
+            ('GreenEnergy Hamburg', 'greenenergy-hamburg', site_groups['corporate-offices'], tenants['greenenergy-solutions-se'],
+             sub_regions['northern-europe'], 'Customer HQ', '53.5511', '9.9937',
+             'Am Kaiserkai 1\n20457 Hamburg\nGermany'),
         ]
         for name, slug, group, tenant, region, facility, lat, lon, addr in site_data:
             obj, _ = Site.objects.get_or_create(
@@ -471,6 +511,15 @@ class Command(BaseCommand):
             ('Floor 5 - Engineering', 'ny-floor-5-eng', sites['new-york-office'], tenants['helheim-labs-inc']),
             ('Floor 6 - Sales', 'ny-floor-6-sales', sites['new-york-office'], tenants['helheim-labs-inc']),
             ('Office 12A', 'munich-office-12a', sites['munich-office'], tenants['helheim-security-ag']),
+            # Customer Locations
+            ('Floor 2 - Trading Desk', 'finova-floor-2-trading', sites['finova-frankfurt-hq'], tenants['finova-capital-ag']),
+            ('Floor 3 - Risk Management', 'finova-floor-3-risk', sites['finova-frankfurt-hq'], tenants['finova-capital-ag']),
+            ('Ward Administration', 'medicare-ward-admin', sites['medicare-munich-office'], tenants['medicare-health-gmbh']),
+            ('Lab Research Suite', 'medicare-lab-research', sites['medicare-munich-office'], tenants['medicare-health-gmbh']),
+            ('Open Space Area', 'techstartup-open-space', sites['techstartup-berlin-hub'], tenants['techstartup-io-gmbh']),
+            ('Engineering Lab', 'techstartup-eng-lab', sites['techstartup-berlin-hub'], tenants['techstartup-io-gmbh']),
+            ('Wind Analytics Office', 'greenenergy-wind-analytics', sites['greenenergy-hamburg'], tenants['greenenergy-solutions-se']),
+            ('Solar Operations Center', 'greenenergy-solar-ops', sites['greenenergy-hamburg'], tenants['greenenergy-solutions-se']),
         ]
         for name, slug, site, tenant in location_data:
             obj, _ = Location.objects.get_or_create(
@@ -494,6 +543,15 @@ class Command(BaseCommand):
             ('Lisa', 'Andersson', 'lisa.andersson', 'lisa.andersson@helheim.cloud', tenants['helheim-cloud-gmbh']),
             ('Carlos', 'Mendez', 'carlos.mendez', 'carlos.mendez@helheim.cloud', tenants['helheim-labs-inc']),
             ('Priya', 'Patel', 'priya.patel', 'priya.patel@helheim.cloud', tenants['helheim-cloud-gmbh']),
+            # Customer holders
+            ('Klaus', 'Fischer', 'klaus.fischer', 'klaus.fischer@finova-capital.de', tenants['finova-capital-ag']),
+            ('Nina', 'Bergmann', 'nina.bergmann', 'nina.bergmann@finova-capital.de', tenants['finova-capital-ag']),
+            ('Dr. Markus', 'Wagner', 'markus.wagner', 'dr.wagner@medicare-health.de', tenants['medicare-health-gmbh']),
+            ('Sophie', 'Klein', 'sophie.klein', 'sophie.klein@medicare-health.de', tenants['medicare-health-gmbh']),
+            ('Felix', 'Bauer', 'felix.bauer', 'felix@techstartup.io', tenants['techstartup-io-gmbh']),
+            ('Lena', 'Schulz', 'lena.schulz', 'lena@techstartup.io', tenants['techstartup-io-gmbh']),
+            ('Jonas', 'Hoffmann', 'jonas.hoffmann', 'jonas.hoffmann@greenenergy-se.de', tenants['greenenergy-solutions-se']),
+            ('Katja', 'Vogel', 'katja.vogel', 'katja.vogel@greenenergy-se.de', tenants['greenenergy-solutions-se']),
         ]
         self._holders = {}
         for first, last, upn, email, tenant in holder_data:
@@ -625,6 +683,21 @@ class Command(BaseCommand):
             )
             self._asset_types[slug] = obj
 
+        # --- Categories ---
+        cat_names = [
+            'charger', 'adaptor', 'mouse', 'keyboard', 'webcam', 'headset', 'cable',
+            'display', 'toner', 'ink', 'batteries', 'thermal-paste', 'other',
+            'ram-memory', 'ssd-nvme', 'hdd', 'nic', 'gpu', 'cpu', 'dock',
+        ]
+        self._categories = {}
+        for cat_slug in cat_names:
+            applies = {'asset': True, 'accessory': True, 'consumable': True, 'component': True}
+            obj, _ = Category.objects.get_or_create(
+                slug=cat_slug,
+                defaults={'name': cat_slug.replace('-', ' ').title(), 'applies_to': applies}
+            )
+            self._categories[cat_slug] = obj
+
         # --- Components ---
         comp_data = [
             ('Samsung 32GB DDR5-4800', 'samsung-32gb-ddr5', 'samsung-electronics', 'ram-memory', 'M324R4GA3BB0', {'capacity_gb': 32, 'type': 'DDR5', 'speed_mhz': 4800}),
@@ -637,10 +710,7 @@ class Command(BaseCommand):
         ]
         self._components = {}
         for name, slug, mfr_slug, cat_slug, part_number, specs in comp_data:
-            category, _ = Category.objects.get_or_create(
-                slug=cat_slug,
-                defaults={'name': cat_slug.replace('-', ' ').title(), 'applies_to': {'component': True}},
-            )
+            category = self._categories.get(cat_slug)
             obj, _ = Component.objects.get_or_create(
                 slug=slug,
                 defaults={
@@ -652,26 +722,26 @@ class Command(BaseCommand):
 
         # --- Accessories ---
         acc_data = [
-            ('USB-C Charger 65W', 'usb-c-charger-65w', 'dell-technologies', 'charger', '450-AFGM', 50, 5),
-            ('USB-C to HDMI Adapter', 'usb-c-hdmi-adapter', 'dell-technologies', 'adaptor', '470-AEGM', 30, 3),
-            ('Wireless Mouse MX Master 3S', 'mx-master-3s', 'logitech-international', 'mouse', '910-006556', 40, 5),
-            ('Wireless Keyboard MX Keys', 'mx-keys', 'logitech-international', 'keyboard', '920-009413', 35, 3),
-            ('Webcam C920s Pro', 'webcam-c920s', 'logitech-international', 'other', '960-001257', 20, 2),
-            ('Headset Zone Wireless 2', 'zone-wireless-2', 'logitech-international', 'other', '981-000886', 25, 3),
-            ('Thunderbolt 4 Cable 2m', 'thunderbolt-4-cable', 'apple-inc', 'cable', 'MWP02ZM/A', 15, 5),
-            ('Magic Mouse', 'magic-mouse', 'apple-inc', 'mouse', 'MK2E3ZM/A', 10, 2),
-            ('Dell 27" Monitor P2723DE', 'dell-p2723de', 'dell-technologies', 'display', 'DELL-P2723DE', 15, 2),
-            ('Dell 24" Monitor P2422HE', 'dell-p2422he', 'dell-technologies', 'display', 'DELL-P2422HE', 8, 2),
-            ('Ergonomic Laptop Stand', 'ergo-laptop-stand', 'logitech-international', 'other', '939-001790', 20, 5),
+            ('USB-C Charger 65W', 'usb-c-charger-65w', 'dell-technologies', 'charger', '450-AFGM', 5),
+            ('USB-C to HDMI Adapter', 'usb-c-hdmi-adapter', 'dell-technologies', 'adaptor', '470-AEGM', 3),
+            ('Wireless Mouse MX Master 3S', 'mx-master-3s', 'logitech-international', 'mouse', '910-006556', 5),
+            ('Wireless Keyboard MX Keys', 'mx-keys', 'logitech-international', 'keyboard', '920-009413', 3),
+            ('Webcam C920s Pro', 'webcam-c920s', 'logitech-international', 'webcam', '960-001257', 2),
+            ('Headset Zone Wireless 2', 'zone-wireless-2', 'logitech-international', 'headset', '981-000886', 3),
+            ('Thunderbolt 4 Cable 2m', 'thunderbolt-4-cable', 'apple-inc', 'cable', 'MWP02ZM/A', 5),
+            ('Magic Mouse', 'magic-mouse', 'apple-inc', 'mouse', 'MK2E3ZM/A', 2),
+            ('Dell 27" Monitor P2723DE', 'dell-p2723de', 'dell-technologies', 'display', 'DELL-P2723DE', 2),
+            ('Dell 24" Monitor P2422HE', 'dell-p2422he', 'dell-technologies', 'display', 'DELL-P2422HE', 2),
+            ('Ergonomic Laptop Stand', 'ergo-laptop-stand', 'logitech-international', 'other', '939-001790', 5),
         ]
         self._accessories = {}
-        for name, slug, mfr_slug, category, part_number, qty, min_qty in acc_data:
+        for name, slug, mfr_slug, cat_slug, part_number, min_qty in acc_data:
             obj, _ = Accessory.objects.get_or_create(
                 slug=slug,
                 defaults={
                     'name': name, 'manufacturer': self._manufacturers[mfr_slug],
-                    'category': category, 'part_number': part_number,
-                    'qty': qty, 'min_qty': min_qty,
+                    'category': self._categories.get(cat_slug), 'part_number': part_number,
+                    'min_qty': min_qty,
                     'tenant': self._tenants.get('helheim-cloud-gmbh'),
                 }
             )
@@ -679,28 +749,29 @@ class Command(BaseCommand):
 
         # --- Consumables ---
         cons_data = [
-            ('HP 26X Laser Toner - Black', 'hp-26x-toner-black', 'hp-inc', 'toner', 'CF226X', 30, 3, False),
-            ('HP 26A Laser Toner - Cyan', 'hp-26a-toner-cyan', 'hp-inc', 'toner', 'CF221A', 15, 2, False),
-            ('Canon Ink Cartridge PGI-280XL', 'canon-pgi-280xl', 'brother-industries', 'ink', 'PGI-280XL', 20, 3, False),
-            ('Brother DR-241CL Drum Unit', 'brother-dr-241cl', 'brother-industries', 'toner', 'DR-241CL', 10, 2, False),
-            ('Arctic Silver 5 Thermal Paste', 'arctic-silver-5', 'dell-technologies', 'thermal_paste', 'AS5-3.5G', 50, 5, False),
-            ('AA Batteries Pack 24', 'aa-batteries-24', 'logitech-international', 'batteries', 'AA-24PK', 100, 10, False),
-            ('Whiteboard Markers Box 12', 'whiteboard-markers-12', 'logitech-international', 'other', 'WB-MRK-12', 40, 5, False),
+            ('HP 26X Laser Toner - Black', 'hp-26x-toner-black', 'hp-inc', 'toner', 'CF226X', 3),
+            ('HP 26A Laser Toner - Cyan', 'hp-26a-toner-cyan', 'hp-inc', 'toner', 'CF221A', 2),
+            ('Canon Ink Cartridge PGI-280XL', 'canon-pgi-280xl', 'brother-industries', 'ink', 'PGI-280XL', 3),
+            ('Brother DR-241CL Drum Unit', 'brother-dr-241cl', 'brother-industries', 'toner', 'DR-241CL', 2),
+            ('Arctic Silver 5 Thermal Paste', 'arctic-silver-5', 'dell-technologies', 'thermal-paste', 'AS5-3.5G', 5),
+            ('AA Batteries Pack 24', 'aa-batteries-24', 'logitech-international', 'batteries', 'AA-24PK', 10),
+            ('Whiteboard Markers Box 12', 'whiteboard-markers-12', 'logitech-international', 'other', 'WB-MRK-12', 5),
         ]
         self._consumables = {}
-        for name, slug, mfr_slug, category, part_number, qty, min_qty, allow_over in cons_data:
+        for name, slug, mfr_slug, cat_slug, part_number, min_qty in cons_data:
             obj, _ = Consumable.objects.get_or_create(
                 slug=slug,
                 defaults={
                     'name': name, 'manufacturer': self._manufacturers[mfr_slug],
-                    'category': category, 'part_number': part_number,
-                    'qty': qty, 'min_qty': min_qty, 'allow_overallocate': allow_over,
+                    'category': self._categories.get(cat_slug), 'part_number': part_number,
+                    'min_qty': min_qty,
                     'tenant': self._tenants.get('helheim-cloud-gmbh'),
                 }
             )
             self._consumables[slug] = obj
 
-        self.stdout.write(f'  {len(self._asset_types)} asset types, {len(self._components)} components, '
+        self.stdout.write(f'  {len(self._categories)} categories, {len(self._asset_types)} asset types, '
+                          f'{len(self._components)} components, '                                    
                           f'{len(self._accessories)} accessories, {len(self._consumables)} consumables.')
 
     # ─────────────────────────────────────────
@@ -710,8 +781,9 @@ class Command(BaseCommand):
     def _seed_phase3(self):
         from assets.models import (
             Asset, InstalledSoftware,
-            AccessoryAssignment, ConsumableAssignment, CustodyReceipt,
         )
+        from inventory.models import AccessoryAssignment, ConsumableAssignment
+        from compliance.models import CustodyReceipt
         from components.models import ComponentAllocation
 
         self.stdout.write('--- Phase 3: Hardware Assets ---')
@@ -765,6 +837,25 @@ class Command(BaseCommand):
             ('iPhone 15 Pro Spare', 'ABX-044', 'iphone-15-pro', 'mobile-phone', 'available', None, 'berlin-floor-3-exec', 'IP15P-SP01', 1299.00, 150.00, datetime.date(2024, 11, 1)),
             ('iPad Pro Spare', 'ABX-045', 'ipad-pro-129-2024', 'tablet', 'available', None, 'ny-floor-6-sales', 'IPP-SP01', 1099.00, 100.00, datetime.date(2024, 11, 1)),
             ('OptiPlex 7010 Reception', 'ABX-046', 'dell-optiplex-7010', 'desktop', 'in-use', None, 'berlin-floor-3-exec', 'OPT-REC-01', 1299.00, 200.00, datetime.date(2024, 5, 20)),
+            # Customer Tenant Assets
+            ('Latitude 5550 Klaus', 'FIN-001', 'dell-latitude-5550', 'laptop', 'in-use', 'klaus.fischer', 'finova-floor-2-trading', 'DL5550-FIN01', 1899.00, 300.00, datetime.date(2024, 3, 1)),
+            ('Latitude 5550 Nina', 'FIN-002', 'dell-latitude-5550', 'laptop', 'in-use', 'nina.bergmann', 'finova-floor-3-risk', 'DL5550-FIN02', 1899.00, 300.00, datetime.date(2024, 3, 15)),
+            ('EliteBook 860 Dr. Wagner', 'MED-001', 'hp-elitebook-860-g11', 'laptop', 'in-use', 'markus.wagner', 'medicare-ward-admin', 'HPEB-MED01', 2099.00, 300.00, datetime.date(2024, 4, 1)),
+            ('EliteBook 860 Sophie', 'MED-002', 'hp-elitebook-860-g11', 'laptop', 'in-use', 'sophie.klein', 'medicare-lab-research', 'HPEB-MED02', 2099.00, 300.00, datetime.date(2024, 4, 15)),
+            ('MB Air 15 Felix', 'TSI-001', 'macbook-air-15-2024', 'laptop', 'in-use', 'felix.bauer', 'techstartup-open-space', 'MBA-TSI01', 1499.00, 200.00, datetime.date(2024, 5, 1)),
+            ('MB Air 15 Lena', 'TSI-002', 'macbook-air-15-2024', 'laptop', 'in-use', 'lena.schulz', 'techstartup-eng-lab', 'MBA-TSI02', 1499.00, 200.00, datetime.date(2024, 5, 10)),
+            ('ThinkPad X1 Jonas', 'GRE-001', 'thinkpad-x1-carbon-g12', 'laptop', 'in-use', 'jonas.hoffmann', 'greenenergy-wind-analytics', 'TPX1-GRE01', 2199.00, 350.00, datetime.date(2024, 6, 1)),
+            ('ThinkPad X1 Katja', 'GRE-002', 'thinkpad-x1-carbon-g12', 'laptop', 'in-use', 'katja.vogel', 'greenenergy-solar-ops', 'TPX1-GRE02', 2199.00, 350.00, datetime.date(2024, 6, 1)),
+            ('OptiPlex 7010 Finova-1', 'FIN-003', 'dell-optiplex-7010', 'desktop', 'in-use', None, 'finova-floor-2-trading', 'OPT-FIN01', 1299.00, 200.00, datetime.date(2024, 2, 15)),
+            ('OptiPlex 7010 Finova-2', 'FIN-004', 'dell-optiplex-7010', 'desktop', 'in-use', None, 'finova-floor-3-risk', 'OPT-FIN02', 1299.00, 200.00, datetime.date(2024, 2, 15)),
+            ('Mac Studio TechStartup', 'TSI-003', 'mac-studio-2024', 'desktop', 'in-use', None, 'techstartup-eng-lab', 'MST-TSI01', 6999.00, 1000.00, datetime.date(2024, 6, 15)),
+            ('iPhone 15 Pro Klaus', 'FIN-005', 'iphone-15-pro', 'mobile-phone', 'in-use', 'klaus.fischer', 'finova-floor-2-trading', 'IP15P-FIN01', 1299.00, 150.00, datetime.date(2024, 10, 1)),
+            ('iPad Pro Medicare', 'MED-003', 'ipad-pro-129-2024', 'tablet', 'in-use', 'markus.wagner', 'medicare-ward-admin', 'IPP-MED01', 1099.00, 100.00, datetime.date(2024, 8, 1)),
+            ('Surface Pro GreenEnergy', 'GRE-003', 'surface-pro-10', 'tablet', 'in-use', 'jonas.hoffmann', 'greenenergy-wind-analytics', 'SP10-GRE01', 1799.00, 200.00, datetime.date(2024, 7, 15)),
+            ('Dell P2422HE Finova 1', 'FIN-006', 'dell-p2422he-monitor', 'monitor', 'in-use', 'klaus.fischer', 'finova-floor-2-trading', 'MON-FIN01', 379.00, 30.00, datetime.date(2024, 3, 1)),
+            ('Dell P2422HE Finova 2', 'FIN-007', 'dell-p2422he-monitor', 'monitor', 'in-use', 'nina.bergmann', 'finova-floor-3-risk', 'MON-FIN02', 379.00, 30.00, datetime.date(2024, 3, 15)),
+            ('Latitude 5550 GreenEnergy Spare', 'GRE-004', 'dell-latitude-5550', 'laptop', 'available', None, 'greenenergy-wind-analytics', 'DL5550-GRE01', 1899.00, 300.00, datetime.date(2024, 8, 1)),
+            ('EliteBook 860 Finova Spare', 'FIN-008', 'hp-elitebook-860-g11', 'laptop', 'available', None, 'finova-floor-2-trading', 'HPEB-FIN01', 2099.00, 300.00, datetime.date(2024, 7, 1)),
         ]
         self._assets = {}
         for data in asset_data:
@@ -772,29 +863,63 @@ class Command(BaseCommand):
             holder = self._holders.get(data[5] or '') if data[5] else None
             location = self._locations.get(data[6] or '') if data[6] else None
 
-            obj, _ = Asset.objects.get_or_create(
+            # If checked out to a holder, physical location is None in Asset table
+            base_location = None if (holder and status_slug == 'in-use') else location
+
+            obj, created = Asset.objects.get_or_create(
                 asset_tag=tag,
                 defaults={
                     'name': name, 'asset_type': self._asset_types.get(at_slug),
                     'asset_role': self._asset_roles.get(role_slug),
                     'status': self._status_labels.get(status_slug),
-                    'location': location,
+                    'location': base_location,
                     'tenant': location.tenant if location and location.tenant else None,
                     'serial_number': data[7], 'purchase_cost': data[8],
                     'salvage_value': data[9], 'purchase_date': data[10],
-                    'supplier': 'IT Procurement Vendor',
+                    'supplier': self._suppliers.get('itz-solutions'),
                     'order_number': f'PO-2024-{random.randint(1000, 9999)}',
                 }
             )
             self._assets[tag] = obj
 
-            # Assign holders for in-use assets
-            if holder and status_slug == 'in-use':
-                from organization.models import AssetHolderAssignment
-                ct = ContentType.objects.get_for_model(Asset)
-                AssetHolderAssignment.objects.get_or_create(
-                    asset_holder=holder, content_type=ct, object_id=obj.pk,
-                )
+            # Create proper checkout log entries for new or unassigned assets
+            if created or not obj.assignments.exists():
+                from assets.models import AssetAssignment
+                from organization.models import AssetHolder, Location
+                
+                # Case A: Checked out to a Holder
+                if holder and status_slug == 'in-use':
+                    ct_holder = ContentType.objects.get_for_model(AssetHolder)
+                    AssetAssignment.objects.get_or_create(
+                        asset=obj,
+                        assigned_to_content_type=ct_holder,
+                        assigned_to_object_id=holder.pk,
+                        defaults={
+                            'checked_out_by': self._users[0],
+                            'is_active': True,
+                            'notes': 'Initial seed checkout to holder',
+                        }
+                    )
+                    # Support legacy direct GFK queries
+                    from organization.models import AssetHolderAssignment
+                    ct_asset = ContentType.objects.get_for_model(Asset)
+                    AssetHolderAssignment.objects.get_or_create(
+                        asset_holder=holder, content_type=ct_asset, object_id=obj.pk,
+                    )
+                
+                # Case B: Checked out to a Location
+                elif not holder and status_slug == 'in-use' and location:
+                    ct_loc = ContentType.objects.get_for_model(Location)
+                    AssetAssignment.objects.get_or_create(
+                        asset=obj,
+                        assigned_to_content_type=ct_loc,
+                        assigned_to_object_id=location.pk,
+                        defaults={
+                            'checked_out_by': self._users[0],
+                            'is_active': True,
+                            'notes': 'Initial seed checkout to location',
+                        }
+                    )
 
         # --- ComponentAllocations ---
         alloc_data = [
@@ -832,6 +957,15 @@ class Command(BaseCommand):
             ('usb-c-charger-65w', 'lisa.andersson', 1),
             ('mx-master-3s', 'carlos.mendez', 1),
             ('mx-master-3s', 'priya.patel', 1),
+            # Customer accessory assignments
+            ('mx-master-3s', 'klaus.fischer', 1),
+            ('mx-keys', 'nina.bergmann', 1),
+            ('zone-wireless-2', 'markus.wagner', 1),
+            ('webcam-c920s', 'sophie.klein', 1),
+            ('magic-mouse', 'felix.bauer', 1),
+            ('usb-c-charger-65w', 'lena.schulz', 1),
+            ('usb-c-hdmi-adapter', 'jonas.hoffmann', 1),
+            ('mx-master-3s', 'katja.vogel', 1),
         ]:
             AccessoryAssignment.objects.create(
                 accessory=self._accessories[acc_slug],
@@ -853,7 +987,8 @@ class Command(BaseCommand):
             )
 
         # --- CustodyReceipt ---
-        for tag, holder_upn in [('ABX-001', 'rene.rettig'), ('ABX-002', 'sarah.chen'), ('ABX-003', 'marcus.johnson')]:
+        for tag, holder_upn in [('ABX-001', 'rene.rettig'), ('ABX-002', 'sarah.chen'), ('ABX-003', 'marcus.johnson'),
+                                 ('FIN-001', 'klaus.fischer'), ('MED-001', 'markus.wagner'), ('GRE-001', 'jonas.hoffmann')]:
             h = self._holders[holder_upn]
             hash_val = hashlib.sha256(f"{tag}-{h.pk}-{timezone.now()}".encode()).hexdigest()[:64]
             CustodyReceipt.objects.get_or_create(
@@ -918,6 +1053,11 @@ class Command(BaseCommand):
             ('S1-Complete-1000', 'SentinelOne Singularity', 'subscription_seat', None, 1000, 45000.00, datetime.date(2024, 1, 1), 'helheim-security-ag'),
             ('CS-Falcon-1000', 'CrowdStrike Falcon', 'subscription_seat', None, 1000, 55000.00, datetime.date(2024, 1, 1), 'helheim-security-ag'),
             ('Cisco-AnyConnect', 'Cisco AnyConnect VPN', 'subscription_seat', None, 200, 8000.00, datetime.date(2024, 1, 1), 'helheim-cloud-gmbh'),
+            # Customer Licenses
+            ('Finova-M365-E3', 'Microsoft 365 E5', 'subscription_seat', None, 75, 11250.00, datetime.date(2024, 5, 1), 'finova-capital-ag'),
+            ('MediCare-Office-50', 'Microsoft Office 2024 LTSC', 'perpetual_seat', 'MED-OFF2024-XXXX-YYYY', 50, None, datetime.date(2024, 6, 1), 'medicare-health-gmbh'),
+            ('TechStartup-JetBrains', 'JetBrains IntelliJ IDEA Ultimate', 'subscription_seat', None, 10, 1700.00, datetime.date(2024, 8, 1), 'techstartup-io-gmbh'),
+            ('GreenEnergy-Win11', 'Windows 11 Enterprise', 'perpetual_seat', 'GRE-W11ENT-XXXX-YYYY', 30, None, datetime.date(2024, 9, 1), 'greenenergy-solutions-se'),
         ]
         self._licenses = []
         for name, sw_name, ltype, key, seats, cost, purchase_date, tenant_slug in license_data:
@@ -1022,10 +1162,16 @@ class Command(BaseCommand):
         sub_data = [
             ('AWS Production Account', 'Amazon Web Services', 'saas', datetime.date(2024, 1, 1), datetime.date(2025, 1, 1), 120000.00, 12, 'helheim-cloud-gmbh'),
             ('Azure Enterprise Agreement', 'Microsoft Azure', 'saas', datetime.date(2024, 3, 1), datetime.date(2027, 3, 1), 250000.00, 36, 'helheim-cloud-gmbh'),
-            ('GCP Starter', 'Google Cloud Platform', 'paas', datetime.date(2024, 6, 1), datetime.date(2025, 6, 1), 36000.00, 12, 'helheim-cloud-gmbh'),
+            ('GCP Starter', 'Google Cloud Platform', 'saas', datetime.date(2024, 6, 1), datetime.date(2025, 6, 1), 36000.00, 12, 'helheim-cloud-gmbh'),
             ('GitHub Enterprise Cloud', 'GitHub Enterprise', 'saas', datetime.date(2024, 1, 1), datetime.date(2025, 1, 1), 42000.00, 12, 'helheim-labs-inc'),
-            ('Cloudflare Enterprise', 'Cloudflare', 'iaas', datetime.date(2024, 2, 1), datetime.date(2025, 2, 1), 24000.00, 12, 'helheim-security-ag'),
-            ('AWS Dev/Test Sandbox', 'Amazon Web Services', 'paas', datetime.date(2024, 4, 1), datetime.date(2025, 4, 1), 18000.00, 12, 'helheim-labs-inc'),
+            ('Cloudflare Enterprise', 'Cloudflare', 'support', datetime.date(2024, 2, 1), datetime.date(2025, 2, 1), 24000.00, 12, 'helheim-security-ag'),
+            ('AWS Dev/Test Sandbox', 'Amazon Web Services', 'saas', datetime.date(2024, 4, 1), datetime.date(2025, 4, 1), 18000.00, 12, 'helheim-labs-inc'),
+            # Customer Subscriptions
+            ('Finova AWS Workloads', 'Amazon Web Services', 'saas', datetime.date(2024, 5, 1), datetime.date(2025, 5, 1), 85000.00, 12, 'finova-capital-ag'),
+            ('Finova Azure Backup', 'Microsoft Azure', 'saas', datetime.date(2024, 6, 1), datetime.date(2026, 6, 1), 48000.00, 24, 'finova-capital-ag'),
+            ('MediCare GCP Analytics', 'Google Cloud Platform', 'saas', datetime.date(2024, 7, 1), datetime.date(2025, 7, 1), 32000.00, 12, 'medicare-health-gmbh'),
+            ('TechStartup GitHub Team', 'GitHub Enterprise', 'saas', datetime.date(2024, 8, 1), datetime.date(2025, 8, 1), 4800.00, 12, 'techstartup-io-gmbh'),
+            ('GreenEnergy Cloudflare Pro', 'Cloudflare', 'support', datetime.date(2024, 9, 1), datetime.date(2025, 9, 1), 12000.00, 12, 'greenenergy-solutions-se'),
         ]
         self._subscriptions = []
         for name, prov_name, stype, start, renewal, cost, term, tenant_slug in sub_data:
@@ -1057,9 +1203,9 @@ class Command(BaseCommand):
     # ─────────────────────────────────────────
 
     def _seed_phase6(self):
-        from assets.models import (
-            Kit, KitItem, AssetMaintenance, ActivityLog, Asset,
-        )
+        from assets.models import Asset, ActivityLog
+        from inventory.models import Kit, KitItem
+        from compliance.models import AssetMaintenance
         from licenses.models import License
 
         self.stdout.write('--- Phase 6: Kits, Maintenance, Activities ---')
@@ -1089,22 +1235,36 @@ class Command(BaseCommand):
         KitItem.objects.create(kit=kit4, asset_type=self._asset_types['dell-poweredge-r760'], qty=1)
         KitItem.objects.create(kit=kit4, accessory=self._accessories['thunderbolt-4-cable'], qty=2)
 
-        # Asset Maintenance records
+        # Customer Kit
+        kit5 = Kit.objects.create(name='Finova Trader Setup', description='Standard trading desk setup for Finova Capital.', tenant=self._tenants.get('finova-capital-ag'))
+        KitItem.objects.create(kit=kit5, asset_type=self._asset_types['dell-latitude-5550'], qty=1)
+        KitItem.objects.create(kit=kit5, accessory=self._accessories['mx-master-3s'], qty=1)
+        KitItem.objects.create(kit=kit5, accessory=self._accessories['dell-p2723de'], qty=2)
+        KitItem.objects.create(kit=kit5, accessory=self._accessories['usb-c-hdmi-adapter'], qty=1)
+
+        # Asset Maintenance records (supplier must be FK now)
         maintenance_data = [
-            ('ABX-001', 'repair', 'Apple Store Berlin', 0.00, datetime.date(2024, 6, 10), datetime.date(2024, 6, 11), 'Keyboard replacement under warranty'),
-            ('ABX-022', 'upgrade', 'Dell ProSupport', 2500.00, datetime.date(2024, 5, 1), datetime.date(2024, 5, 2), 'Added 2x 32GB RAM modules'),
-            ('ABX-023', 'upgrade', 'Dell ProSupport', 2500.00, datetime.date(2024, 5, 3), datetime.date(2024, 5, 4), 'Added 2x 32GB RAM modules'),
-            ('ABX-032', 'repair', 'Cisco TAC', 850.00, datetime.date(2024, 8, 15), None, 'Port failure on blade 3 - RMA in progress'),
-            ('ABX-037', 'software_support', 'Synology Support', 0.00, datetime.date(2024, 9, 1), datetime.date(2024, 9, 1), 'DSM 7.2 upgrade'),
-            ('ABX-003', 'repair', 'Dell ProSupport', 0.00, datetime.date(2024, 10, 5), datetime.date(2024, 10, 6), 'Display hinge repair under warranty'),
-            ('ABX-042', 'repair', 'Apple Store Munich', 899.00, datetime.date(2024, 11, 1), None, 'Logic board failure - awaiting parts'),
-            ('ABX-024', 'calibration', 'HPE Support', 450.00, datetime.date(2024, 7, 20), datetime.date(2024, 7, 20), 'Annual RAID battery replacement'),
-            ('ABX-016', 'software_support', 'Apple Enterprise', 0.00, datetime.date(2024, 10, 10), datetime.date(2024, 10, 10), 'macOS 15.2 enterprise deployment'),
-            ('ABX-025', 'hardware_support', 'Dell ProSupport', 1200.00, datetime.date(2024, 6, 15), datetime.date(2024, 6, 16), 'PSU replacement - redundant unit failed'),
+            ('ABX-001', 'repair', 'dell-direct', 0.00, datetime.date(2024, 6, 10), datetime.date(2024, 6, 11), 'Keyboard replacement under warranty'),
+            ('ABX-022', 'upgrade', 'dell-direct', 2500.00, datetime.date(2024, 5, 1), datetime.date(2024, 5, 2), 'Added 2x 32GB RAM modules'),
+            ('ABX-023', 'upgrade', 'dell-direct', 2500.00, datetime.date(2024, 5, 3), datetime.date(2024, 5, 4), 'Added 2x 32GB RAM modules'),
+            ('ABX-032', 'repair', 'cdw-deutschland', 850.00, datetime.date(2024, 8, 15), None, 'Port failure on blade 3 - RMA in progress'),
+            ('ABX-037', 'software_support', 'itz-solutions', 0.00, datetime.date(2024, 9, 1), datetime.date(2024, 9, 1), 'DSM 7.2 upgrade'),
+            ('ABX-003', 'repair', 'dell-direct', 0.00, datetime.date(2024, 10, 5), datetime.date(2024, 10, 6), 'Display hinge repair under warranty'),
+            ('ABX-042', 'repair', 'apple-business', 899.00, datetime.date(2024, 11, 1), None, 'Logic board failure - awaiting parts'),
+            ('ABX-024', 'calibration', 'hp-enterprise-store', 450.00, datetime.date(2024, 7, 20), datetime.date(2024, 7, 20), 'Annual RAID battery replacement'),
+            ('ABX-016', 'software_support', 'apple-business', 0.00, datetime.date(2024, 10, 10), datetime.date(2024, 10, 10), 'macOS 15.2 enterprise deployment'),
+            ('ABX-025', 'hardware_support', 'dell-direct', 1200.00, datetime.date(2024, 6, 15), datetime.date(2024, 6, 16), 'PSU replacement - redundant unit failed'),
+            # Customer maintenance records
+            ('FIN-001', 'repair', 'notebooksbilliger-ag', 250.00, datetime.date(2024, 9, 10), datetime.date(2024, 9, 12), 'SSD upgrade from 256GB to 512GB'),
+            ('MED-001', 'repair', 'hp-enterprise-store', 650.00, datetime.date(2024, 11, 5), datetime.date(2024, 11, 7), 'Display replacement after damage'),
+            ('GRE-001', 'software_support', 'lenovo-pro', 0.00, datetime.date(2024, 10, 20), datetime.date(2024, 10, 20), 'BIOS update and driver refresh'),
+            ('TSI-002', 'repair', 'apple-business', 350.00, datetime.date(2024, 8, 25), datetime.date(2024, 8, 26), 'Battery replacement'),
         ]
-        for tag, mtype, supplier, cost, start, completion, notes in maintenance_data:
+        for tag, mtype, supplier_slug, cost, start, completion, notes in maintenance_data:
+            supplier = self._suppliers.get(supplier_slug)
             AssetMaintenance.objects.create(
                 asset=self._assets[tag],
+                title=f'{mtype.replace("_", " ").title()} - {self._assets[tag].name}',
                 maintenance_type=mtype,
                 supplier=supplier,
                 cost=cost,
@@ -1123,6 +1283,12 @@ class Command(BaseCommand):
             ('ABX-042', 'updated_at', self._users[0], 'Status changed to Pending Repair'),
             ('ABX-001', 'audited', self._users[1], 'Quarterly audit completed'),
             ('ABX-007', 'checked_out', self._users[1], 'Checked out to James Wilson'),
+            ('FIN-001', 'checked_out', self._users[0], 'Checked out to Klaus Fischer (Finova)'),
+            ('MED-001', 'checked_out', self._users[0], 'Checked out to Dr. Markus Wagner (MediCare)'),
+            ('GRE-001', 'checked_out', self._users[1], 'Checked out to Jonas Hoffmann (GreenEnergy)'),
+            ('TSI-001', 'checked_out', self._users[1], 'Checked out to Felix Bauer (TechStartup)'),
+            ('FIN-003', 'audited', self._users[0], 'Quarterly compliance audit'),
+            ('MED-003', 'audited', self._users[0], 'Device inventory verification'),
         ]
         for tag, action, user, notes in log_data:
             ActivityLog.objects.create(
@@ -1132,4 +1298,4 @@ class Command(BaseCommand):
                 notes=notes,
             )
 
-        self.stdout.write('  3 kits, 10 maintenance records, 8 activity logs.')
+        self.stdout.write('  5 kits, 14 maintenance records, 14 activity logs.')

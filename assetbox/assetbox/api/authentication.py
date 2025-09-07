@@ -54,3 +54,22 @@ class TokenAuthentication(BaseAuthentication):
 
     def authenticate_header(self, request):
         return 'Token'
+
+
+try:
+    from drf_spectacular.extensions import OpenApiAuthenticationExtension
+    
+    class TokenAuthenticationScheme(OpenApiAuthenticationExtension):
+        target_class = TokenAuthentication
+        name = 'TokenAuth'
+
+        def get_security_definition(self, auto_schema):
+            return {
+                'type': 'apiKey',
+                'in': 'header',
+                'name': 'Authorization',
+                'description': 'Token-based authentication using "Token <token_key>"',
+            }
+except ImportError:
+    pass
+

@@ -62,7 +62,13 @@ class Command(BaseCommand):
                 f'Days remaining: {(obj.expiration_date - today).days}'
             )
 
-        Notification.objects.create(user=None, subject=subject, message=body, level='warning')
+        Notification.objects.create(
+            user=None,
+            subject=subject,
+            message=body,
+            level='warning',
+            target_url=obj.get_absolute_url(),
+        )
 
         send_notification(subject, body)
 

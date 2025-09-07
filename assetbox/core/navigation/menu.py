@@ -9,7 +9,7 @@ ORGANIZATION_MENU = Menu(
     icon_class='mdi mdi-domain',
     groups=(
         MenuGroup(
-            label=_('Sites'),
+            label=_('Sites & Regions'),
             items=(
                 get_model_item('organization', 'site', _('Sites')),
                 get_model_item('organization', 'region', _('Regions')),
@@ -31,22 +31,15 @@ ORGANIZATION_MENU = Menu(
                 ),
             ),
         ),
-        MenuGroup(
-            label=_('Contacts'),
-            items=(
-                get_model_item('organization', 'contact', _('Contacts')),
-                get_model_item('organization', 'contactrole', _('Contact Roles')),
-            ),
-        ),
     ),
 )
 
 ASSETS_MENU = Menu(
-    label=_('Assets'),
+    label=_('Physical Assets'),
     icon_class='mdi mdi-server',
     groups=(
         MenuGroup(
-            label=_('Asset Inventory'),
+            label=_('Hardware'),
             items=(
                 get_model_item('assets', 'asset', _('Assets')),
                 get_model_item('assets', 'assetrole', _('Asset Roles')),
@@ -58,10 +51,18 @@ ASSETS_MENU = Menu(
             items=(
                 get_model_item('assets', 'assettype', _('Asset Types')),
                 get_model_item('assets', 'manufacturer', _('Manufacturers')),
+                get_model_item('assets', 'category', _('Categories')),
             ),
         ),
+    ),
+)
+
+INVENTORY_MENU = Menu(
+    label=_('Inventory & Stock'),
+    icon_class='mdi mdi-package-variant-closed',
+    groups=(
         MenuGroup(
-            label=_('Components'),
+            label=_('Component Inventory'),
             items=(
                 MenuItem(
                     link='assets:component_list',
@@ -105,30 +106,30 @@ ASSETS_MENU = Menu(
             ),
         ),
         MenuGroup(
-            label=_('Peripherals & Consumables'),
+            label=_('Peripherals & Accessories'),
             items=(
-                get_model_item('assets', 'accessory', _('Accessories')),
+                get_model_item('inventory', 'accessory', _('Accessories')),
                 MenuItem(
-                    link='assets:accessorystock_list',
+                    link='inventory:accessorystock_list',
                     link_text=_('Accessory Stocks'),
                     permissions=['inventory.view_accessorystock'],
                     buttons=(
                         MenuItemButton(
-                            link='assets:accessorystock_create',
+                            link='inventory:accessorystock_create',
                             title='Add',
                             icon_class='mdi mdi-plus-thick',
                             permissions=['inventory.add_accessorystock'],
                         ),
                     ),
                 ),
-                get_model_item('assets', 'consumable', _('Consumables')),
+                get_model_item('inventory', 'consumable', _('Consumables')),
                 MenuItem(
-                    link='assets:consumablestock_list',
+                    link='inventory:consumablestock_list',
                     link_text=_('Consumable Stocks'),
                     permissions=['inventory.view_consumablestock'],
                     buttons=(
                         MenuItemButton(
-                            link='assets:consumablestock_create',
+                            link='inventory:consumablestock_create',
                             title='Add',
                             icon_class='mdi mdi-plus-thick',
                             permissions=['inventory.add_consumablestock'],
@@ -138,42 +139,24 @@ ASSETS_MENU = Menu(
             ),
         ),
         MenuGroup(
-            label=_('Lifecycle'),
+            label=_('Kits & Lifecycle'),
             items=(
-                get_model_item('assets', 'kit', _('Kits')),
+                get_model_item('inventory', 'kit', _('Kits')),
                 get_model_item('assets', 'depreciation', _('Depreciation')),
-            ),
-        ),
-        MenuGroup(
-            label=_('Procurement'),
-            items=(
-                get_model_item('assets', 'supplier', _('Suppliers')),
-                get_model_item('assets', 'category', _('Categories')),
-                get_model_item('assets', 'assetrequest', _('Asset Requests')),
             ),
         ),
     ),
 )
 
 SOFTWARE_MENU = Menu(
-    label=_('Software & Licenses'),
-    icon_class='mdi mdi-license',
+    label=_('Software & SaaS'),
+    icon_class='mdi mdi-file-certificate',
     groups=(
         MenuGroup(
-            label=_('Software'),
+            label=_('Contracts & SaaS'),
             items=(
                 get_model_item('software', 'software', _('Software')),
-            ),
-        ),
-        MenuGroup(
-            label=_('Licenses'),
-            items=(
                 get_model_item('licenses', 'license', _('Licenses')),
-            ),
-        ),
-        MenuGroup(
-            label=_('Subscriptions'),
-            items=(
                 get_model_item('subscriptions', 'subscription', _('Subscriptions')),
                 get_model_item('subscriptions', 'provider', _('Providers')),
             ),
@@ -181,32 +164,57 @@ SOFTWARE_MENU = Menu(
     ),
 )
 
-EXTRAS_MENU = Menu(
-    label=_('Extras'),
-    icon_class='mdi mdi-puzzle',
-    groups=(
-        MenuGroup(
-            label=_('Tags'),
-            items=(
-                get_model_item('extras', 'tag', _('Tags')),
-            ),
-        ),
-        MenuGroup(
-            label=_('Custom Schemas'),
-            items=(
-                get_model_item('assets', 'customfield', _('Custom Fields')),
-                get_model_item('assets', 'customfieldset', _('Custom Fieldsets')),
-            ),
-        ),
-    ),
-)
-
 OPERATIONS_MENU = Menu(
     label=_('Operations'),
-    icon_class='mdi mdi-cogs',
+    icon_class='mdi mdi-clipboard-text-clock',
     groups=(
         MenuGroup(
-            label=_('Logging'),
+            label=_('Compliance & Audits'),
+            items=(
+                MenuItem(
+                    link='assets:auditsession_list',
+                    link_text=_('Audit Sessions'),
+                    permissions=['assets.view_auditsession'],
+                    buttons=(
+                        MenuItemButton(
+                            link='assets:auditsession_create',
+                            title='Add',
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=['assets.add_auditsession'],
+                        ),
+                    ),
+                ),
+                get_model_item('compliance', 'assetmaintenance', _('Maintenances')),
+            ),
+        ),
+        MenuGroup(
+            label=_('Procurement'),
+            items=(
+                MenuItem(
+                    link='assets:request_list',
+                    link_text=_('Requests'),
+                    permissions=['assets.view_assetrequest'],
+                    buttons=(
+                        MenuItemButton(
+                            link='assets:request_create',
+                            title='Add',
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=['assets.add_assetrequest'],
+                        ),
+                    ),
+                ),
+                get_model_item('assets', 'supplier', _('Suppliers')),
+            ),
+        ),
+        MenuGroup(
+            label=_('Contacts'),
+            items=(
+                get_model_item('organization', 'contact', _('Contacts')),
+                get_model_item('organization', 'contactrole', _('Contact Roles')),
+            ),
+        ),
+        MenuGroup(
+            label=_('System Activity'),
             items=(
                 MenuItem(
                     link='objectchange_list',
@@ -216,10 +224,37 @@ OPERATIONS_MENU = Menu(
                 ),
             ),
         ),
+    ),
+)
+
+EXTRAS_MENU = Menu(
+    label=_('Customization'),
+    icon_class='mdi mdi-tune',
+    groups=(
         MenuGroup(
-            label=_('Maintenance'),
+            label=_('Custom Schemas'),
             items=(
-                get_model_item('assets', 'assetmaintenance', _('Maintenances')),
+                get_model_item('assets', 'customfield', _('Custom Fields')),
+                get_model_item('assets', 'customfieldset', _('Custom Fieldsets')),
+            ),
+        ),
+        MenuGroup(
+            label=_('Metadata'),
+            items=(
+                get_model_item('extras', 'tag', _('Tags')),
+                MenuItem(
+                    link='assets:assettagsequence_list',
+                    link_text=_('Asset Tag Sequences'),
+                    permissions=['assets.view_assettagsequence'],
+                    buttons=(
+                        MenuItemButton(
+                            link='assets:assettagsequence_create',
+                            title='Add',
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=['assets.add_assettagsequence'],
+                        ),
+                    ),
+                ),
             ),
         ),
     ),
@@ -227,7 +262,7 @@ OPERATIONS_MENU = Menu(
 
 ADMIN_MENU = Menu(
     label=_('Admin'),
-    icon_class='mdi mdi-account-multiple',
+    icon_class='mdi mdi-shield-account',
     groups=(
         MenuGroup(
             label=_('System'),
@@ -250,8 +285,9 @@ def get_menus():
     return [
         ORGANIZATION_MENU,
         ASSETS_MENU,
+        INVENTORY_MENU,
         SOFTWARE_MENU,
-        EXTRAS_MENU,
         OPERATIONS_MENU,
+        EXTRAS_MENU,
         ADMIN_MENU,
     ]

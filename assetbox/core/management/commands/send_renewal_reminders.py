@@ -35,7 +35,13 @@ class Command(BaseCommand):
                 f'Cost: {sub.renewal_cost or "N/A"}\n'
                 f'Auto-Renewal: {"Yes" if sub.auto_renewal else "No"}'
             )
-            Notification.objects.create(user=None, subject=subject, message=body, level='warning')
+            Notification.objects.create(
+                user=None,
+                subject=subject,
+                message=body,
+                level='warning',
+                target_url=sub.get_absolute_url(),
+            )
             send_notification(subject, body)
             count += 1
 

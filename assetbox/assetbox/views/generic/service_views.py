@@ -50,7 +50,7 @@ class GenericTransactionView(LoginRequiredMixin, BaseHTMXView, FormView):
         obj = self.get_object()
         try:
             with transaction.atomic():
-                result = self.service_callable(
+                result = self.__class__.service_callable(
                     obj, user=self.request.user, request=self.request,
                     **self.get_service_kwargs(form)
                 )

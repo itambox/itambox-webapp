@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 def get_model_viewname(model, action):
     app_label = model._meta.app_label
-    if app_label in ['components', 'inventory', 'compliance']:
+    if app_label == 'components':
         app_label = 'assets'
     model_name = model._meta.model_name
     return f"{app_label}:{model_name}_{action}"
@@ -188,7 +188,7 @@ def build_breadcrumbs(request, obj=None):
     if obj:
         model_meta = obj._meta
         app_label = model_meta.app_label
-        if app_label in ['components', 'inventory', 'compliance']:
+        if app_label == 'components':
             app_label = 'assets'
         list_view_name = f"{app_label}:{model_meta.model_name}_list"
         try:
