@@ -6,18 +6,20 @@ from core.api.viewsets import AssetBoxModelViewSet, AssetBoxReadOnlyModelViewSet
 from assets.models import (
     Asset, AssetRole, Manufacturer, AssetType, InstalledSoftware,
     StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence,
-    ActivityLog, AssetAssignment
+    ActivityLog, AssetAssignment, AuditSession, AssetAudit
 )
 from assets.filters import (
     AssetFilterSet, AssetRoleFilterSet, ManufacturerFilterSet,
     AssetTypeFilterSet, StatusLabelFilterSet, DepreciationFilterSet,
-    SupplierFilterSet, CategoryFilterSet, AssetRequestFilterSet, AssetTagSequenceFilterSet
+    SupplierFilterSet, CategoryFilterSet, AssetRequestFilterSet, AssetTagSequenceFilterSet,
+    AuditSessionFilterSet, AssetAuditFilterSet
 )
 from .serializers import (
     AssetSerializer, AssetRoleSerializer, ManufacturerSerializer, AssetTypeSerializer,
     InstalledSoftwareSerializer, StatusLabelSerializer, DepreciationSerializer,
     SupplierSerializer, CategorySerializer, AssetRequestSerializer,
-    AssetTagSequenceSerializer, ActivityLogSerializer, AssetAssignmentSerializer
+    AssetTagSequenceSerializer, ActivityLogSerializer, AssetAssignmentSerializer,
+    AuditSessionSerializer, AssetAuditSerializer
 )
 
 
@@ -122,3 +124,26 @@ class AssetAssignmentViewSet(AssetBoxModelViewSet):
     serializer_class = AssetAssignmentSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_fields = ['asset_id', 'is_active', 'checked_out_by_id']
+
+
+class AuditSessionViewSet(AssetBoxModelViewSet):
+    queryset = AuditSession.objects.select_related('location', 'created_by').all()
+    serializer_class = AuditSessionSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = AuditSessionFilterSet
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+
+class AssetAuditViewSet(AssetBoxModelViewSet):
+    queryset = AssetAudit.objects.select_related(
+        'session', 'asset', 'auditor', 'location', 'status'
+    ).all()
+    serializer_class = AssetAuditSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = AssetAuditFilterSet
+
+    def perform_create(self, serializer):
+        serializer.save(auditor=self.request.user)
+

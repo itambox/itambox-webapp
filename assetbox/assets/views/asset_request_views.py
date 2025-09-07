@@ -60,6 +60,7 @@ class AssetRequestEditView(ObjectEditView):
                 subject=f"Asset Request {self.object.get_status_display()}",
                 message=f"Your request for {self.object} has been {self.object.get_status_display().lower()}.",
                 level=Notification.LEVEL_INFO,
+                target_url=self.object.get_absolute_url(),
             )
         except Exception:
             pass

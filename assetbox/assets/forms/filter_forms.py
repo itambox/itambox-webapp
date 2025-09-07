@@ -2,7 +2,8 @@ from core.forms import FilterForm
 from ..filters import (
     AssetFilterSet, AssetRoleFilterSet, ManufacturerFilterSet, AssetTypeFilterSet,
     StatusLabelFilterSet, DepreciationFilterSet,
-    SupplierFilterSet, CategoryFilterSet, AssetRequestFilterSet, AssetTagSequenceFilterSet
+    SupplierFilterSet, CategoryFilterSet, AssetRequestFilterSet, AssetTagSequenceFilterSet,
+    AuditSessionFilterSet
 )
 
 class AssetFilterForm(FilterForm):
@@ -34,3 +35,7 @@ class AssetRequestFilterForm(FilterForm):
 
 class AssetTagSequenceFilterForm(FilterForm):
     filterset_class = AssetTagSequenceFilterSet
+
+class AuditSessionFilterForm(FilterForm):
+    filterset_class = AuditSessionFilterSet
+

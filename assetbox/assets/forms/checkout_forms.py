@@ -35,7 +35,12 @@ class AssetCheckOutForm(forms.Form):
         queryset=Asset.objects.exclude(status__type='undeployable').order_by('name'),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Asset"
+        label="Parent Asset"
+    )
+    checkout_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        label="Checkout Date"
     )
     expected_checkin = forms.DateField(
         required=False,
@@ -47,14 +52,14 @@ class AssetCheckOutForm(forms.Form):
         required=False,
         label="Notes"
     )
-
+ 
     def clean(self):
         cleaned_data = super().clean()
         target_type = cleaned_data.get('target_type')
         holder = cleaned_data.get('asset_holder')
         location = cleaned_data.get('location')
         asset_target = cleaned_data.get('asset_target')
-
+ 
         if target_type == 'holder' and not holder:
             raise ValidationError("Must select an Asset Holder.", code='holder_required')
         if target_type == 'location' and not location:
@@ -64,9 +69,12 @@ class AssetCheckOutForm(forms.Form):
         if not target_type:
             raise ValidationError("Must select a target type.", code='target_type_required')
         return cleaned_data
-
+ 
     def __init__(self, *args, **kwargs):
+        asset = kwargs.pop('asset', None)
         super().__init__(*args, **kwargs)
+        if asset:
+            self.fields['asset_target'].queryset = Asset.objects.exclude(pk=asset.pk).exclude(status__type='undeployable').order_by('name')
         self.helper = FormHelper()
         self.helper.form_tag = False
         self.helper.layout = Layout(
@@ -74,6 +82,7 @@ class AssetCheckOutForm(forms.Form):
             'asset_holder',
             'location',
             'asset_target',
+            'checkout_date',
             'expected_checkin',
             'notes',
         )

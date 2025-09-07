@@ -13,7 +13,7 @@ from organization.models import AssetHolderAssignment
 from licenses.models import LicenseSeatAssignment
 
 
-def checkout_asset(asset, holder=None, location=None, asset_target=None, user=None, request=None, expected_checkin=None, notes=''):
+def checkout_asset(asset, holder=None, location=None, asset_target=None, user=None, request=None, expected_checkin=None, notes='', checkout_date=None):
     target = holder or location or asset_target
     if not target:
         raise ValidationError("Either holder, location, or asset must be specified.")
@@ -40,13 +40,17 @@ def checkout_asset(asset, holder=None, location=None, asset_target=None, user=No
             object_id=asset.pk
         ).delete()
 
-        assignment = AssetAssignment.objects.create(
-            asset=asset,
-            assigned_to=target,
-            checked_out_by=user,
-            expected_checkin_date=expected_checkin,
-            notes=notes,
-        )
+        assignment_kwargs = {
+            'asset': asset,
+            'assigned_to': target,
+            'checked_out_by': user,
+            'expected_checkin_date': expected_checkin,
+            'notes': notes,
+        }
+        if checkout_date:
+            assignment_kwargs['checked_out_at'] = checkout_date
+
+        assignment = AssetAssignment.objects.create(**assignment_kwargs)
 
         ActivityLog.objects.create(
             asset=asset,
@@ -71,7 +75,7 @@ def checkout_asset(asset, holder=None, location=None, asset_target=None, user=No
                             recipient = email_config.test_recipient or email_config.from_address
                         if recipient:
                             sign_url = request.build_absolute_uri(
-                                reverse('assets:custody_eula_sign', kwargs={'token': receipt.token})
+                                reverse('compliance:custody_eula_sign', kwargs={'token': receipt.token})
                             )
                             send_mail(
                                 subject=f'Asset Acceptance Required: {asset.name} ({asset.asset_tag})',
@@ -135,7 +139,7 @@ def checkin_asset(asset, user=None, notes=''):
         return None
 
 
-def checkout_accessory(accessory, qty, holder=None, location=None, user=None, notes="", source_location=None):
+def checkout_accessory(accessory, qty, holder=None, location=None, user=None, notes="", source_location=None, request=None, **kwargs):
     if not accessory.allow_overallocate and accessory.available < qty:
         raise ValidationError("No stock available for checkout.")
     if not holder and not location:
@@ -172,7 +176,7 @@ def checkin_accessory(assignment_pk, user=None):
     return accessory, qty, recipient
 
 
-def checkout_consumable(consumable, qty, holder=None, location=None, user=None, notes="", source_location=None):
+def checkout_consumable(consumable, qty, holder=None, location=None, user=None, notes="", source_location=None, request=None, **kwargs):
     if not consumable.allow_overallocate and consumable.available < qty:
         raise ValidationError("No stock available for consumption checkout.")
     if not holder and not location:
@@ -199,7 +203,7 @@ def checkout_consumable(consumable, qty, holder=None, location=None, user=None, 
     return assignment
 
 
-def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_location=None):
+def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_location=None, request=None, **kwargs):
     if not holder and not location:
         raise ValidationError("Either holder or location must be specified.")
 
@@ -224,6 +228,10 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_lo
                 rem = item.license.available_seats
                 if rem < 1:
                     raise ValidationError(f"No available seats for software license '{item.license}'.")
+            elif item.consumable:
+                rem = item.consumable.available
+                if not item.consumable.allow_overallocate and rem < item.qty:
+                    raise ValidationError(f"Insufficient stock for consumable '{item.consumable}'. Required: {item.qty}, Available: {rem}")
 
         for item in kit.items.all():
             if item.asset_type:
@@ -261,6 +269,15 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_lo
             elif item.accessory:
                 AccessoryAssignment.objects.create(
                     accessory=item.accessory,
+                    assigned_holder=holder,
+                    assigned_location=location,
+                    from_location=source_location,
+                    qty=item.qty,
+                    notes=f"Checked out via Kit '{kit.name}'. {notes}"
+                )
+            elif item.consumable:
+                ConsumableAssignment.objects.create(
+                    consumable=item.consumable,
                     assigned_holder=holder,
                     assigned_location=location,
                     from_location=source_location,

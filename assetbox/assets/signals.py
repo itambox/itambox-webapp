@@ -39,7 +39,8 @@ def check_consumable_stock(sender, instance, **kwargs):
                     user=admin,
                     subject=subject,
                     message=message,
-                    level=level
+                    level=level,
+                    target_url=consumable.get_absolute_url()
                 )
 
 
@@ -68,8 +69,45 @@ def on_asset_request_save(sender, instance, created, **kwargs):
                     subject=f"New Asset Request from {instance.requester}",
                     message=f"{instance.requester} has requested {instance}.",
                     level=Notification.LEVEL_INFO,
+                    target_url=instance.get_absolute_url()
                 )
     except DatabaseError as e:
         logger.exception("Database error occurred while processing asset request notification: %s", e)
     except Exception as e:
         logger.exception("Unexpected error occurred while processing asset request notification: %s", e)
+
+
+@receiver(post_save, sender=AssetAssignment)
+def auto_fulfill_asset_requests(sender, instance, created, **kwargs):
+    """
+    Listens for new active AssetAssignments and automatically transitions compatible 
+    pending/approved AssetRequests for that holder to a 'fulfilled' status.
+    """
+    if created and instance.is_active:
+        from django.db import models
+        from django.utils import timezone
+        from organization.models import AssetHolder
+        
+        asset = instance.asset
+        assignee = instance.assigned_to
+        
+        if isinstance(assignee, AssetHolder) and assignee.user:
+            user = assignee.user
+            
+            # Identify any matching pending/approved requests
+            matching_requests = AssetRequest.objects.filter(
+                requester=user,
+                status__in=[AssetRequest.STATUS_PENDING, AssetRequest.STATUS_APPROVED]
+            ).filter(
+                models.Q(asset=asset) | 
+                models.Q(asset_type=asset.asset_type, asset__isnull=True)
+            )
+
+            for req in matching_requests:
+                req.status = AssetRequest.STATUS_FULFILLED
+                req.asset = asset
+                req.responded_by = instance.checked_out_by
+                req.response_date = timezone.now()
+                req.response_notes = f"Automatically fulfilled via assignment checkout transaction ID: {instance.pk}."
+                req.save()
+

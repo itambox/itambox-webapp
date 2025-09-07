@@ -1,5 +1,5 @@
 import django_filters
-from .models import Asset, AssetRole, Manufacturer, AssetType, StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence
+from .models import Asset, AssetRole, Manufacturer, AssetType, StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence, AuditSession, AssetAudit
 from organization.models import Location, Tenant
 from extras.models import Tag
 from django import forms
@@ -263,4 +263,69 @@ class AssetTagSequenceFilterSet(django_filters.FilterSet):
             return queryset
         return queryset.filter(
             Q(prefix__icontains=value)
+        ).distinct()
+
+
+class AuditSessionFilterSet(django_filters.FilterSet):
+    q = django_filters.CharFilter(method='search', label='Search', widget=forms.TextInput(attrs={'placeholder': 'Name...'}))
+    status = django_filters.ChoiceFilter(
+        choices=[
+            ('planned', 'Planned'),
+            ('active', 'Active'),
+            ('completed', 'Completed'),
+        ],
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    location = django_filters.ModelChoiceFilter(
+        queryset=Location.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Location'
+    )
+
+    class Meta:
+        model = AuditSession
+        fields = ['status', 'location']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=value)
+        ).distinct()
+
+
+class AssetAuditFilterSet(django_filters.FilterSet):
+    q = django_filters.CharFilter(method='search', label='Search', widget=forms.TextInput(attrs={'placeholder': 'Notes...'}))
+    session = django_filters.ModelChoiceFilter(
+        queryset=AuditSession.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Audit Session'
+    )
+    asset = django_filters.ModelChoiceFilter(
+        queryset=Asset.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Asset'
+    )
+    location = django_filters.ModelChoiceFilter(
+        queryset=Location.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Observed Location'
+    )
+    status = django_filters.ModelChoiceFilter(
+        queryset=StatusLabel.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Observed Status'
+    )
+
+    class Meta:
+        model = AssetAudit
+        fields = ['session', 'asset', 'location', 'status', 'verification_method']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(notes__icontains=value) |
+            Q(asset__name__icontains=value) |
+            Q(auditor__username__icontains=value)
         ).distinct()

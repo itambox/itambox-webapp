@@ -23,6 +23,15 @@ class AssetTable(BaseTable): # Inherit from BaseTable
     supplier = tables.LinkColumn('assets:supplier_detail', args=[A('supplier.pk')], accessor='supplier.name', verbose_name='Supplier')
     tags = TagColumn(url_name='assets:asset_list')
     requestable = tables.BooleanColumn(verbose_name='Requestable', yesno='Yes,No')
+    checkout_checkin = tables.TemplateColumn(
+        template_name='assets/includes/asset_checkout_checkin.html',
+        verbose_name='',
+        orderable=False,
+        attrs={
+            'th': {'class': 'col-checkout text-nowrap'},
+            'td': {'class': 'text-center text-nowrap noprint p-1 col-checkout'}
+        },
+    )
     actions = tables.TemplateColumn(
         template_name='assets/includes/asset_actions.html',
         verbose_name='',
@@ -37,11 +46,11 @@ class AssetTable(BaseTable): # Inherit from BaseTable
         model = Asset
         fields = (
             'pk', 'name', 'asset_tag', 'serial_number', 'asset_type', 'asset_role', 
-            'status', 'assignee', 'tenant', 'location', 'purchase_date', 'purchase_cost', 'salvage_value', 'order_number', 'supplier', 'tags', 'requestable', 'actions',
+            'status', 'assignee', 'tenant', 'location', 'purchase_date', 'purchase_cost', 'salvage_value', 'order_number', 'supplier', 'tags', 'requestable', 'checkout_checkin', 'actions',
         )
         default_columns = (
             'pk', 'name', 'asset_tag', 'serial_number', 'asset_type', 'asset_role', 
-            'status', 'assignee', 'tenant', 'location', 'purchase_date', 'purchase_cost', 'supplier', 'requestable', 'tags', 'actions',
+            'status', 'assignee', 'tenant', 'location', 'purchase_date', 'purchase_cost', 'supplier', 'requestable', 'tags', 'checkout_checkin', 'actions',
         )
         order_by = ('name',)
 

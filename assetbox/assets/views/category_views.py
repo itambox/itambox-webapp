@@ -38,7 +38,7 @@ class CategoryDetailView(ObjectDetailView):
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(asset_types_table)
         context['asset_types_table'] = asset_types_table
 
-        cat_accessories = Accessory.objects.filter(notification_category=category).select_related('manufacturer')
+        cat_accessories = Accessory.objects.filter(category=category).select_related('manufacturer')
         accessories_table = tables.AccessoryTable(cat_accessories, request=self.request)
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(accessories_table)
         context['accessories_table'] = accessories_table
@@ -56,7 +56,7 @@ class CategoryDetailView(ObjectDetailView):
             related_objects_list.append({
                 'label': 'Accessories',
                 'count': accessory_count,
-                'url': f"{reverse('assets:accessory_list')}?category={category.slug}"
+                'url': f"{reverse('inventory:accessory_list')}?category={category.slug}"
             })
         context['related_objects_list'] = related_objects_list
         return context

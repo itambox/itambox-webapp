@@ -22,6 +22,12 @@ class ComponentTrackingTestCase(TestCase):
         self.manufacturer = Manufacturer.objects.create(name="Dell", slug="dell")
         self.category = Category.objects.create(name="Memory", slug="memory", applies_to={"component": True})
 
+        from organization.models import Site, Location
+        self.site = Site.objects.create(name="HQ", slug="hq")
+        self.location = Location.objects.create(name="Warehouse", slug="warehouse", site=self.site)
+        self.acc_category = Category.objects.create(name="Keyboard", slug="keyboard", applies_to={"accessory": True})
+        self.con_category = Category.objects.create(name="Thermal Paste", slug="thermal-paste", applies_to={"consumable": True})
+
         self.component = Component.objects.create(
             manufacturer=self.manufacturer,
             name="16GB DDR5 RAM",
@@ -53,6 +59,7 @@ class ComponentTrackingTestCase(TestCase):
         )
 
     def test_component_detail_view(self):
+        # We replace any reference to specific request views that might be affected
         response = self.client.get(reverse('assets:component_detail', kwargs={'pk': self.component.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "16GB DDR5 RAM")
@@ -155,24 +162,29 @@ class ComponentTrackingTestCase(TestCase):
         self.assertEqual(len(comp_table.rows), 1)
 
     def test_accessory_crud_and_checkout_views(self):
+        from inventory.models import AccessoryStock
         # Create Accessory
         acc = Accessory.objects.create(
             manufacturer=self.manufacturer,
             name="Wired Keyboard KB216",
             slug="dell-wired-keyboard-kb216",
-            category=Accessory.CATEGORY_KEYBOARD,
-            qty=10,
+            category=self.acc_category,
             min_qty=2,
             allow_overallocate=False
         )
+        AccessoryStock.objects.create(
+            accessory=acc,
+            location=self.location,
+            qty=10
+        )
 
         # 1. List View
-        response = self.client.get(reverse('assets:accessory_list'))
+        response = self.client.get(reverse('inventory:accessory_list'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Wired Keyboard KB216")
 
         # 2. Detail View
-        response = self.client.get(reverse('assets:accessory_detail', kwargs={'pk': acc.pk}))
+        response = self.client.get(reverse('inventory:accessory_detail', kwargs={'pk': acc.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Wired Keyboard KB216")
 
@@ -181,14 +193,13 @@ class ComponentTrackingTestCase(TestCase):
             'manufacturer': self.manufacturer.pk,
             'name': 'Wireless Mouse WM126',
             'slug': 'dell-wireless-mouse-wm126',
-            'category': Accessory.CATEGORY_MOUSE,
+            'category': self.acc_category.pk,
             'part_number': 'MS-WM126',
-            'qty': 15,
             'min_qty': 3,
             'allow_overallocate': True,
             'notes': 'Office standard mouse'
         }
-        response = self.client.post(reverse('assets:accessory_create'), data=post_data)
+        response = self.client.post(reverse('inventory:accessory_create'), data=post_data)
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Accessory.objects.filter(name='Wireless Mouse WM126').exists())
 
@@ -197,38 +208,44 @@ class ComponentTrackingTestCase(TestCase):
         holder = AssetHolder.objects.create(first_name="John", last_name="Doe", email="john@example.com")
         
         checkout_data = {
+            'from_location': self.location.pk,
             'assigned_holder': holder.pk,
             'assigned_location': '',
             'qty': 11,
             'notes': 'Over-allocate attempt'
         }
-        response = self.client.post(reverse('assets:accessory_checkout', kwargs={'pk': acc.pk}), data=checkout_data)
+        response = self.client.post(reverse('inventory:accessory_checkout', kwargs={'pk': acc.pk}), data=checkout_data)
         self.assertEqual(AccessoryAssignment.objects.filter(accessory=acc).count(), 0)
 
         # 5. Successful Checkout (qty=5 <= 10)
         checkout_data['qty'] = 5
-        response = self.client.post(reverse('assets:accessory_checkout', kwargs={'pk': acc.pk}), data=checkout_data)
+        response = self.client.post(reverse('inventory:accessory_checkout', kwargs={'pk': acc.pk}), data=checkout_data, HTTP_HX_REQUEST='true')
         self.assertEqual(response.status_code, 204) # 204 No Content for success HTMX modal
         self.assertEqual(AccessoryAssignment.objects.filter(accessory=acc).count(), 1)
         self.assertEqual(acc.remaining_qty, 5)
 
         # 6. Check In (Checkin Assignment deletes it)
         assignment = AccessoryAssignment.objects.get(accessory=acc)
-        response = self.client.post(reverse('assets:accessory_checkin', kwargs={'pk': assignment.pk}))
+        response = self.client.post(reverse('inventory:accessory_checkin', kwargs={'pk': assignment.pk}))
         self.assertEqual(response.status_code, 302)
         self.assertEqual(AccessoryAssignment.objects.filter(accessory=acc).count(), 0)
         self.assertEqual(acc.remaining_qty, 10)
 
     def test_consumable_stock_and_alert_signals(self):
+        from inventory.models import ConsumableStock
         # Create Consumable with min_qty safety limit
         con = Consumable.objects.create(
             manufacturer=self.manufacturer,
             name="Thermal Paste MX-4",
             slug="dell-thermal-paste-mx-4",
-            category=Consumable.CATEGORY_THERMAL_PASTE,
-            qty=5,
+            category=self.con_category,
             min_qty=3,
             allow_overallocate=False
+        )
+        ConsumableStock.objects.create(
+            consumable=con,
+            location=self.location,
+            qty=5
         )
 
         from organization.models import AssetHolder
@@ -238,6 +255,7 @@ class ComponentTrackingTestCase(TestCase):
         con_assign = ConsumableAssignment.objects.create(
             consumable=con,
             assigned_holder=holder,
+            from_location=self.location,
             qty=1
         )
         self.assertEqual(con.remaining_qty, 4)
@@ -248,6 +266,7 @@ class ComponentTrackingTestCase(TestCase):
         con_assign_2 = ConsumableAssignment.objects.create(
             consumable=con,
             assigned_holder=holder,
+            from_location=self.location,
             qty=2
         )
         self.assertEqual(con.remaining_qty, 2)
@@ -260,6 +279,7 @@ class ComponentTrackingTestCase(TestCase):
         con_assign_3 = ConsumableAssignment.objects.create(
             consumable=con,
             assigned_holder=holder,
+            from_location=self.location,
             qty=3
         )
         self.assertEqual(con.remaining_qty, -1)
@@ -299,12 +319,12 @@ class ComponentTrackingTestCase(TestCase):
         )
         token = receipt.token
 
-        sign_url = reverse('assets:custody_eula_sign', kwargs={'token': token})
+        sign_url = reverse('compliance:custody_eula_sign', kwargs={'token': token})
         response = self.client.get(sign_url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "custody-sign-form")
 
-        invalid_url = reverse('assets:custody_eula_sign', kwargs={'token': "invalid-token-value"})
+        invalid_url = reverse('compliance:custody_eula_sign', kwargs={'token': "invalid-token-value"})
         response = self.client.get(invalid_url)
         self.assertEqual(response.status_code, 404)
 
@@ -333,7 +353,7 @@ class ComponentTrackingTestCase(TestCase):
             holder=holder,
         )
 
-        sign_url = reverse('assets:custody_eula_sign', kwargs={'token': receipt.token})
+        sign_url = reverse('compliance:custody_eula_sign', kwargs={'token': receipt.token})
         post_data = {
             'action': 'decline',
         }
@@ -360,7 +380,7 @@ class AssetProcurementTestCase(TestCase):
         )
 
     def test_asset_procurement_fields_save_and_display(self):
-        from .models import Supplier
+        from assets.models import Supplier
         supplier = Supplier.objects.create(name='Lenovo Germany GmbH', slug='lenovo-germany-gmbh')
         # Create asset with procurement details
         asset = Asset.objects.create(
@@ -387,7 +407,7 @@ class AssetProcurementTestCase(TestCase):
         self.assertContains(response, "Lenovo Germany GmbH")
 
     def test_asset_form_procurement_fields(self):
-        from .models import Supplier
+        from assets.models import Supplier
         supplier = Supplier.objects.create(name='Bechtle AG', slug='bechtle-ag')
         # Test creating new asset via POST
         post_data = {
@@ -531,8 +551,6 @@ class AssetMaintenanceAndLifecycleTestCase(TestCase):
             purchase_date=today,
             status=self.status
         )
-        # Expected EOL year is today.year + 2. To avoid potential leap-year day offset errors:
-        # We can calculate eol_date manually using standard logic
         expected_year = today.year + 2
         try:
             expected_eol = datetime.date(expected_year, today.month, today.day)
@@ -581,10 +599,14 @@ class AssetMaintenanceAndLifecycleTestCase(TestCase):
         # Initial TCO should be purchase cost
         self.assertEqual(asset.total_cost_of_ownership, Decimal("1200.00"))
         
+        supplier = Supplier.objects.create(name="Lenovo Support", slug="lenovo-support")
+        
         # Record maintenance 1 costing $150.00
         AssetMaintenance.objects.create(
             asset=asset,
-            supplier="Lenovo Support",
+            title="Screen replacement",
+            status="completed",
+            supplier=supplier,
             maintenance_type=AssetMaintenance.MAINTENANCE_TYPE_REPAIR,
             cost=Decimal("150.00"),
             start_date=datetime.date(2025, 3, 1),
@@ -595,7 +617,9 @@ class AssetMaintenanceAndLifecycleTestCase(TestCase):
         # Record maintenance 2 costing $50.00
         AssetMaintenance.objects.create(
             asset=asset,
-            supplier="Lenovo Support",
+            title="RAM upgrade",
+            status="completed",
+            supplier=supplier,
             maintenance_type=AssetMaintenance.MAINTENANCE_TYPE_UPGRADE,
             cost=Decimal("50.00"),
             start_date=datetime.date(2025, 4, 1),
@@ -620,10 +644,15 @@ class AssetMaintenanceAndLifecycleTestCase(TestCase):
             status=self.status
         )
 
+        supplier = Supplier.objects.create(name="Local Repair Shop", slug="local-repair-shop")
+        supplier_premium = Supplier.objects.create(name="Local Repair Shop (Premium Center)", slug="local-repair-shop-premium-center")
+
         # 1. Create maintenance via View POST
         post_data = {
             'asset': asset.pk,
-            'supplier': 'Local Repair Shop',
+            'title': 'Fixed motherboard logic board issue',
+            'status': 'completed',
+            'supplier': supplier.pk,
             'maintenance_type': AssetMaintenance.MAINTENANCE_TYPE_REPAIR,
             'cost': '250.00',
             'start_date': '2025-05-10',
@@ -631,23 +660,23 @@ class AssetMaintenanceAndLifecycleTestCase(TestCase):
             'notes': 'Fixed motherboard logic board issue'
         }
         
-        response = self.client.post(reverse('assets:assetmaintenance_create'), data=post_data)
+        response = self.client.post(reverse('compliance:assetmaintenance_create'), data=post_data)
         self.assertEqual(response.status_code, 302)
         
         # Verify created
-        maint = AssetMaintenance.objects.get(supplier='Local Repair Shop')
+        maint = AssetMaintenance.objects.get(supplier=supplier)
         self.assertEqual(maint.cost, Decimal('250.00'))
         self.assertEqual(maint.downtime_days, 5)
         
         # 2. List View
-        response = self.client.get(reverse('assets:assetmaintenance_list'))
+        response = self.client.get(reverse('compliance:assetmaintenance_list'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Local Repair Shop")
         self.assertContains(response, "Repair")
         self.assertContains(response, "$250.00")
         
         # 3. Detail View
-        response = self.client.get(reverse('assets:assetmaintenance_detail', kwargs={'pk': maint.pk}))
+        response = self.client.get(reverse('compliance:assetmaintenance_detail', kwargs={'pk': maint.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Local Repair Shop")
         self.assertContains(response, "Fixed motherboard logic board issue")
@@ -656,22 +685,24 @@ class AssetMaintenanceAndLifecycleTestCase(TestCase):
         # 4. Update View
         update_data = {
             'asset': asset.pk,
-            'supplier': 'Local Repair Shop (Premium Center)',
+            'title': 'Fixed motherboard logic board issue and cleaned thermal paste',
+            'status': 'completed',
+            'supplier': supplier_premium.pk,
             'maintenance_type': AssetMaintenance.MAINTENANCE_TYPE_REPAIR,
             'cost': '280.00',
             'start_date': '2025-05-10',
             'completion_date': '2025-05-16',
             'notes': 'Fixed motherboard logic board issue and cleaned thermal paste'
         }
-        response = self.client.post(reverse('assets:assetmaintenance_update', kwargs={'pk': maint.pk}), data=update_data)
+        response = self.client.post(reverse('compliance:assetmaintenance_update', kwargs={'pk': maint.pk}), data=update_data)
         self.assertEqual(response.status_code, 302)
         maint.refresh_from_db()
-        self.assertEqual(maint.supplier, 'Local Repair Shop (Premium Center)')
+        self.assertEqual(maint.supplier, supplier_premium)
         self.assertEqual(maint.cost, Decimal('280.00'))
         self.assertEqual(maint.downtime_days, 6)
 
         # 5. Delete View
-        response = self.client.post(reverse('assets:assetmaintenance_delete', kwargs={'pk': maint.pk}))
+        response = self.client.post(reverse('compliance:assetmaintenance_delete', kwargs={'pk': maint.pk}))
         self.assertEqual(response.status_code, 302)
         self.assertFalse(AssetMaintenance.objects.filter(pk=maint.pk).exists())
 
@@ -728,7 +759,6 @@ class AssetMaintenanceAndLifecycleTestCase(TestCase):
             status=self.status
         )
 
-        # Retrieve the details page to ensure support card is visible and mailto links are rendered correctly
         response = self.client.get(reverse('assets:asset_detail', kwargs={'pk': asset.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Support &amp; Warranty Details')
@@ -813,7 +843,6 @@ class EnterpriseITAMTestCase(TestCase):
         import datetime
         from decimal import Decimal
 
-        # 1. Create a depreciation lifespan of 10 months
         deprec = Depreciation.objects.create(name="10 Months Schedule", months=10)
 
         asset_type = AssetType.objects.create(
@@ -824,10 +853,8 @@ class EnterpriseITAMTestCase(TestCase):
         )
 
         today = datetime.date.today()
-        # Purchase date 4 months ago
         purchase_date_4m = today - datetime.timedelta(days=4 * 30)
 
-        # 2. Create asset with $1,000 cost, $0 salvage value
         asset_mid = Asset.objects.create(
             name="Developer MacBook",
             asset_tag="MAC-001",
@@ -838,13 +865,10 @@ class EnterpriseITAMTestCase(TestCase):
             status=self.available_status
         )
 
-        # Math: 1000 - ((1000 - 0) / 10 * 4) = 600
-        # Since months calculation uses calendar years/months, let's check it:
         months_held = (today.year - purchase_date_4m.year) * 12 + today.month - purchase_date_4m.month
         expected_val = Decimal("1000.00") - (Decimal("100.00") * Decimal(str(months_held)))
         self.assertEqual(asset_mid.current_value, expected_val)
 
-        # 3. Create asset purchased 12 months ago (expired depreciation)
         purchase_date_12m = today - datetime.timedelta(days=12 * 30)
         asset_expired = Asset.objects.create(
             name="Old MacBook",
@@ -855,10 +879,8 @@ class EnterpriseITAMTestCase(TestCase):
             purchase_date=purchase_date_12m,
             status=self.available_status
         )
-        # Should cap at salvage value ($100.00)
         self.assertEqual(asset_expired.current_value, Decimal("100.00"))
 
-        # 4. Nil purchase cost returns None
         asset_free = Asset.objects.create(
             name="Free MacBook",
             asset_tag="MAC-003",
@@ -867,62 +889,68 @@ class EnterpriseITAMTestCase(TestCase):
         )
         self.assertIsNone(asset_free.current_value)
 
-        # 5. Detail page displays depreciated book value
         response = self.client.get(reverse('assets:asset_detail', kwargs={'pk': asset_mid.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Depreciated Book Value")
 
     def test_atomic_kit_checkout_flow(self):
-        from organization.models import AssetHolder
+        from organization.models import AssetHolder, Site, Location
         from software.models import Software
         from licenses.models import License
+        from inventory.models import AccessoryStock
 
-        # 1. Setup kit components
         laptop_type = AssetType.objects.create(
             manufacturer=self.manufacturer,
             model="MacBook Pro",
             slug="apple-macbook-pro"
         )
         
-        # Accessory
+        acc_cat = Category.objects.create(
+            name="Chargers",
+            slug="chargers",
+            applies_to={"accessory": True}
+        )
+
+        site = Site.objects.create(name="HQ", slug="hq")
+        location = Location.objects.create(name="Warehouse", slug="warehouse", site=site)
+
         charger = Accessory.objects.create(
             manufacturer=self.manufacturer,
             name="USB-C 96W Charger",
             slug="apple-usb-c-96w-charger",
+            category=acc_cat
+        )
+        AccessoryStock.objects.create(
+            accessory=charger,
+            location=location,
             qty=5
         )
 
-        # License
         sw = Software.objects.create(manufacturer=self.manufacturer, name="Office 365")
         license_obj = License.objects.create(software=sw, name="O365 Enterprise Seat", seats=2)
 
-        # Create Kit
         kit = Kit.objects.create(name="Developer Onboarding Kit", description="MacBook, Charger, and O365")
         
-        # Add KitItems
         KitItem.objects.create(kit=kit, asset_type=laptop_type)
         KitItem.objects.create(kit=kit, accessory=charger, qty=1)
         KitItem.objects.create(kit=kit, license=license_obj)
 
         holder = AssetHolder.objects.create(first_name="René", last_name="Rettig", upn="rene@example.com")
 
-        # 2. Checkout should FAIL/rollback initially because laptop_type has NO available assets
         checkout_data = {
+            'source_location': location.pk,
             'assigned_holder': holder.pk,
             'assigned_location': '',
             'notes': 'Onboarding René'
         }
         
-        response = self.client.post(reverse('assets:kit_checkout_modal', kwargs={'pk': kit.pk}), data=checkout_data, HTTP_HX_REQUEST='true')
-        # Should re-render form with errors
+        response = self.client.post(reverse('inventory:kit_checkout_modal', kwargs={'pk': kit.pk}), data=checkout_data, HTTP_HX_REQUEST='true')
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No available assets of type")
 
-        # Confirm rollback: NO accessory assignments or license assignments created
         self.assertEqual(AccessoryAssignment.objects.filter(accessory=charger).count(), 0)
         self.assertEqual(license_obj.assignments.count(), 0)
 
-        # 3. Supply a laptop asset of laptop_type to make checkout SUCCESSFUL
         Asset.objects.create(
             name="René MacBook Pro 16",
             asset_tag="LT-PRO-001",
@@ -930,28 +958,21 @@ class EnterpriseITAMTestCase(TestCase):
             status=self.available_status
         )
 
-        response = self.client.post(reverse('assets:kit_checkout_modal', kwargs={'pk': kit.pk}), data=checkout_data, HTTP_HX_REQUEST='true')
-        # Returns 204 No Content for successful HTMX close
+        response = self.client.post(reverse('inventory:kit_checkout_modal', kwargs={'pk': kit.pk}), data=checkout_data, HTTP_HX_REQUEST='true')
         self.assertEqual(response.status_code, 204)
 
-        # Verify all assets checked out under transaction
-        # Hardware asset is now 'in-use' (assigned)
         asset = Asset.objects.get(asset_tag="LT-PRO-001")
         self.assertEqual(asset.status, self.in_use_status)
         
-        # Accessory assignment created
         self.assertEqual(AccessoryAssignment.objects.filter(accessory=charger).count(), 1)
         self.assertEqual(charger.remaining_qty, 4)
 
-        # License seat assigned
         self.assertEqual(license_obj.assignments.count(), 1)
         self.assertEqual(license_obj.available_seats, 1)
 
-        # ActivityLog created
         self.assertTrue(ActivityLog.objects.filter(asset=asset, action='checked_out').exists())
 
     def test_itam_layouts(self):
-        # 1. Test Supplier Detail View Layout
         supplier = Supplier.objects.create(
             name="Bechtle IT-Services",
             slug="bechtle-it-services",
@@ -970,7 +991,6 @@ class EnterpriseITAMTestCase(TestCase):
         self.assertContains(response, "Supplied Assets")
         self.assertIn('assets_table', response.context)
 
-        # 2. Test Category Detail View Layout
         category = Category.objects.create(
             name="Enterprise Laptops",
             slug="enterprise-laptops",
@@ -988,11 +1008,11 @@ class EnterpriseITAMTestCase(TestCase):
         self.assertIn('asset_types_table', response.context)
         self.assertIn('accessories_table', response.context)
 
-        # 3. Test Asset Request Detail View Layout
         asset_type = AssetType.objects.create(
             manufacturer=self.manufacturer,
             model="MacBook Pro 14",
-            slug="apple-macbook-pro-14"
+            slug="apple-macbook-pro-14",
+            requestable=True
         )
         request_obj = AssetRequest.objects.create(
             requester=self.user,
@@ -1007,7 +1027,3 @@ class EnterpriseITAMTestCase(TestCase):
         self.assertContains(response, "Decision &amp; Response Details")
         self.assertContains(response, "Need a development machine.")
         self.assertContains(response, "Pending")
-
-
-
-

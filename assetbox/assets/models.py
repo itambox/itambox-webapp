@@ -3,8 +3,8 @@ from django.conf import settings
 from django.urls import reverse
 from django.utils import timezone
 from software.models import Software
-from core.models import BaseModel, ChangeLoggingMixin, AssetBoxModel
-from core.mixins import ExportableMixin, SoftDeleteMixin, CustomFieldDataMixin, JournalingMixin, TaggableMixin, AutoSlugMixin, BookmarkableMixin
+from core.models import BaseModel, ChangeLoggingMixin, StandardModel, DeletableVaultModel
+from core.mixins import CustomFieldDataMixin, JournalingMixin, TaggableMixin, AutoSlugMixin, BookmarkableMixin
 from extras.models import CustomFieldset
 from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -17,7 +17,7 @@ User = get_user_model()
 from core.managers import SoftDeleteManager, AllObjectsManager
 
 
-class StatusLabel(AutoSlugMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
+class StatusLabel(AutoSlugMixin, StandardModel):
     TYPE_DEPLOYABLE = 'deployable'
     TYPE_DEPLOYED = 'deployed'
     TYPE_PENDING = 'pending'
@@ -51,7 +51,7 @@ class StatusLabel(AutoSlugMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
 
 
 
-class AssetRole(TaggableMixin, ChangeLoggingMixin, BaseModel):
+class AssetRole(StandardModel):
     """Categorizes assets based on their functional role (e.g., Laptop, Monitor, Server)."""
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
@@ -71,7 +71,7 @@ class AssetRole(TaggableMixin, ChangeLoggingMixin, BaseModel):
         # Use standardized URL name
         return reverse('assets:assetrole_detail', args=[self.pk])
 
-class Manufacturer(ExportableMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
+class Manufacturer(StandardModel):
     name = models.CharField(max_length=255, unique=True)
     slug = models.SlugField(max_length=255, unique=True)  # Re-add unique=True
     description = models.TextField(blank=True, null=True)
@@ -102,7 +102,7 @@ class Manufacturer(ExportableMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
         
         return assignment.contact if assignment else None
 
-class Depreciation(ChangeLoggingMixin, BaseModel):
+class Depreciation(StandardModel):
     name = models.CharField(max_length=100, unique=True, verbose_name="Depreciation Name")
     months = models.PositiveIntegerField(verbose_name="Lifespan (Months)", help_text="Useful lifespan in months for straight-line calculations")
 
@@ -118,7 +118,7 @@ class Depreciation(ChangeLoggingMixin, BaseModel):
         return reverse('assets:depreciation_detail', kwargs={'pk': self.pk})
 
 
-class AssetType(AutoSlugMixin, AssetBoxModel):
+class AssetType(AutoSlugMixin, StandardModel):
     """Defines a specific type of asset (e.g., a specific laptop model)."""
     slug_source = ('manufacturer__name', 'model')
     
@@ -203,7 +203,7 @@ class AssetType(AutoSlugMixin, AssetBoxModel):
 
 
 
-class Asset(CustomFieldDataMixin, SoftDeleteMixin, BookmarkableMixin, AssetBoxModel):
+class Asset(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     
@@ -540,7 +540,7 @@ class InstalledSoftware(ChangeLoggingMixin, BaseModel):
         return self.asset.get_absolute_url()
 
 
-class Supplier(AutoSlugMixin, AssetBoxModel):
+class Supplier(AutoSlugMixin, StandardModel):
     name = models.CharField(max_length=255, unique=True)
     slug = models.SlugField(max_length=255, unique=True)
     website = models.URLField(max_length=500, blank=True, null=True)
@@ -565,7 +565,7 @@ class Supplier(AutoSlugMixin, AssetBoxModel):
 
 
 
-class Category(AutoSlugMixin, AssetBoxModel):
+class Category(AutoSlugMixin, StandardModel):
     name = models.CharField(max_length=255, unique=True)
     slug = models.SlugField(max_length=255, unique=True)
     color = models.CharField(max_length=6, blank=True, null=True, help_text="RGB color in hexadecimal (e.g. 00ff00)")
@@ -573,7 +573,7 @@ class Category(AutoSlugMixin, AssetBoxModel):
     email_on_checkout = models.BooleanField(default=False, help_text="Send email notification on asset checkout")
     email_on_checkin = models.BooleanField(default=False, help_text="Send email notification on asset checkin")
     require_acceptance = models.BooleanField(default=False, help_text="Require digital acceptance on checkout")
-    email_eula = models.BooleanField(default=False, help_text="Send EULA email on acceptance")
+    email_eula = models.TextField(blank=True, verbose_name="EULA Text")
     applies_to = models.JSONField(default=dict, blank=True, help_text="Applies to: {'asset': True, 'accessory': True, 'component': True}")
     tags = models.ManyToManyField('extras.Tag', related_name='categories', blank=True)
 
@@ -616,6 +616,23 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
     response_notes = models.TextField(blank=True, null=True)
     tags = models.ManyToManyField('extras.Tag', related_name='asset_requests_tagged', blank=True)
 
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        super().clean()
+        if not self.asset and not self.asset_type:
+            raise ValidationError("You must specify either an asset type or a specific asset.")
+        if not self.pk:
+            if self.asset and not self.asset.requestable:
+                raise ValidationError(f"The asset '{self.asset}' is not requestable.")
+            if self.asset_type and not self.asset_type.requestable:
+                raise ValidationError(f"The asset type '{self.asset_type}' is not requestable.")
+        if self.asset and self.asset_type and self.asset.asset_type != self.asset_type:
+            raise ValidationError("The selected asset does not match the requested asset type.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
     class Meta:
         ordering = ['-request_date']
         verbose_name = "Asset Request"
@@ -627,6 +644,7 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
 
     def get_absolute_url(self):
         return reverse('assets:assetrequest_detail', kwargs={'pk': self.pk})
+
 
 
 class AssetTagSequence(ChangeLoggingMixin, BaseModel):
@@ -650,6 +668,10 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel):
         self.save(update_fields=['next_value'])
         return tag
 
+    @property
+    def next_tag_preview(self):
+        return f'{self.prefix}{self.next_value:0{self.zero_padding}d}'
+
 
 class AssetAssignment(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
     asset = models.ForeignKey(
@@ -665,7 +687,7 @@ class AssetAssignment(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseMo
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='checkouts'
     )
-    checked_out_at = models.DateTimeField(auto_now_add=True)
+    checked_out_at = models.DateTimeField(default=timezone.now)
     expected_checkin_date = models.DateField(null=True, blank=True)
     is_active = models.BooleanField(default=True, db_index=True)
     checked_in_at = models.DateTimeField(null=True, blank=True)
@@ -700,3 +722,89 @@ class AssetAssignment(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseMo
 
     def get_absolute_url(self):
         return self.asset.get_absolute_url()
+
+
+# --- Audit & Campaign Models ---
+from core.mixins import SoftDeleteMixin
+
+class AuditSession(StandardModel, SoftDeleteMixin):
+    name = models.CharField(max_length=200)
+    location = models.ForeignKey(
+        'organization.Location', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        help_text="Target location expected to be audited. If omitted, applies globally."
+    )
+    status = models.CharField(
+        max_length=20, 
+        choices=[
+            ('planned', 'Planned'),
+            ('active', 'Active'),
+            ('completed', 'Completed'),
+        ], 
+        default='planned'
+    )
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='audit_sessions')
+
+    class Meta:
+        ordering = ['-started_at']
+
+    def __str__(self):
+        return f"{self.name} ({self.get_status_display()})"
+
+    def get_absolute_url(self):
+        return reverse('assets:auditsession_detail', kwargs={'pk': self.pk})
+
+    @property
+    def expected_assets_queryset(self):
+        """Returns QuerySet of Assets expected to be at this location."""
+        qs = Asset.objects.exclude(status__type=StatusLabel.TYPE_ARCHIVED)
+        if not self.location:
+            return qs.filter(status__type__in=[
+                StatusLabel.TYPE_DEPLOYABLE,
+                StatusLabel.TYPE_PENDING,
+                StatusLabel.TYPE_DEPLOYED
+            ])
+        return qs.filter(location=self.location)
+
+
+class AssetAudit(models.Model):
+    session = models.ForeignKey(
+        AuditSession, 
+        on_delete=models.CASCADE, 
+        related_name='audits', 
+        null=True, 
+        blank=True
+    )
+    asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='audits')
+    auditor = models.ForeignKey(User, on_delete=models.PROTECT, related_name='audits_performed')
+    timestamp = models.DateTimeField(auto_now_add=True)
+    location = models.ForeignKey(
+        'organization.Location', 
+        on_delete=models.PROTECT,
+        help_text="The observed physical location of the asset during audit."
+    )
+    status = models.ForeignKey(
+        StatusLabel, 
+        on_delete=models.PROTECT,
+        help_text="The observed physical status of the asset during audit."
+    )
+    notes = models.TextField(blank=True)
+    verification_method = models.CharField(
+        max_length=30,
+        choices=[
+            ('barcode', 'Barcode Scan'),
+            ('rfid', 'RFID Reader'),
+            ('manual', 'Manual Input'),
+            ('auto', 'Agent API Handshake')
+        ],
+        default='manual'
+    )
+
+    class Meta:
+        ordering = ['-timestamp']
+        unique_together = ('session', 'asset')  # Single verification per asset per campaign
+

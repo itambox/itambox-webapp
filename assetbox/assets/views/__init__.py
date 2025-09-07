@@ -36,3 +36,9 @@ from .tag_sequence_views import (
     AssetTagSequenceListView, AssetTagSequenceDetailView,
     AssetTagSequenceEditView, AssetTagSequenceDeleteView,
 )
+from .audit_views import (
+    AuditSessionListView, AuditSessionDetailView, AuditSessionCreateView,
+    AssetAuditScanView, AuditSessionCloseView, AuditSessionRehomeView,
+    AuditSessionDeleteView,
+)
+

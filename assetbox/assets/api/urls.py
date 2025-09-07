@@ -4,7 +4,7 @@ from .views import (
     InstalledSoftwareViewSet, AssetTypeViewSet, StatusLabelViewSet,
     DepreciationViewSet, SupplierViewSet, CategoryViewSet,
     AssetRequestViewSet, AssetTagSequenceViewSet, ActivityLogViewSet,
-    AssetAssignmentViewSet
+    AssetAssignmentViewSet, AuditSessionViewSet, AssetAuditViewSet
 )
 
 app_name = 'assets_api'
@@ -23,5 +23,8 @@ router.register(r'asset-requests', AssetRequestViewSet)
 router.register(r'asset-tag-sequences', AssetTagSequenceViewSet)
 router.register(r'activity-logs', ActivityLogViewSet, basename='activitylog')
 router.register(r'asset-assignments', AssetAssignmentViewSet)
+router.register(r'audit-sessions', AuditSessionViewSet)
+router.register(r'asset-audits', AssetAuditViewSet)
 
 urlpatterns = router.urls
+

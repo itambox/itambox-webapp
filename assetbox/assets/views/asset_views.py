@@ -49,6 +49,7 @@ class AssetListView(ObjectListView):
         context['asset_holders'] = AssetHolder.objects.all().order_by('last_name', 'first_name')
         return context
 
+    filterset = filters.AssetFilterSet
     filterset_form = forms.AssetFilterForm
     table = tables.AssetTable
     action_buttons = ('add',)
@@ -161,6 +162,7 @@ class AssetCheckoutView(GenericTransactionView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         del kwargs['instance']
+        kwargs['asset'] = self.get_object()
         return kwargs
 
     def get_success_message(self, result=None):
