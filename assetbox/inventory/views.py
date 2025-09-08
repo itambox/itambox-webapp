@@ -66,14 +66,14 @@ class AccessoryEditView(ObjectEditView):
     model = Accessory
     model_form = forms.AccessoryForm
     template_name = 'generic/object_edit.html'
-    default_return_url = 'assets:accessory_list'
+    default_return_url = 'inventory:accessory_list'
 
 
 class AccessoryDeleteView(ObjectDeleteView):
     queryset = Accessory.objects.all()
     model = Accessory
     template_name = 'generic/object_confirm_delete.html'
-    success_url = reverse_lazy('assets:accessory_list')
+    success_url = reverse_lazy('inventory:accessory_list')
 
     def post(self, request, *args, **kwargs):
         accessory = self.get_object()
@@ -91,7 +91,7 @@ class AccessoryCloneView(ObjectCloneView):
     model = Accessory
     model_form = forms.AccessoryForm
     template_name = 'generic/object_edit.html'
-    default_return_url = 'assets:accessory_list'
+    default_return_url = 'inventory:accessory_list'
 
 
 class ConsumableListView(ObjectListView):
@@ -129,14 +129,14 @@ class ConsumableEditView(ObjectEditView):
     model = Consumable
     model_form = forms.ConsumableForm
     template_name = 'generic/object_edit.html'
-    default_return_url = 'assets:consumable_list'
+    default_return_url = 'inventory:consumable_list'
 
 
 class ConsumableDeleteView(ObjectDeleteView):
     queryset = Consumable.objects.all()
     model = Consumable
     template_name = 'generic/object_confirm_delete.html'
-    success_url = reverse_lazy('assets:consumable_list')
+    success_url = reverse_lazy('inventory:consumable_list')
 
     def post(self, request, *args, **kwargs):
         consumable = self.get_object()
@@ -154,7 +154,7 @@ class ConsumableCloneView(ObjectCloneView):
     model = Consumable
     model_form = forms.ConsumableForm
     template_name = 'generic/object_edit.html'
-    default_return_url = 'assets:consumable_list'
+    default_return_url = 'inventory:consumable_list'
 
 
 class KitListView(ObjectListView):
@@ -166,7 +166,7 @@ class KitListView(ObjectListView):
 
 
 class KitDetailView(ObjectDetailView):
-    queryset = Kit.objects.all().prefetch_related('items__asset_type', 'items__accessory', 'items__license__software')
+    queryset = Kit.objects.all().prefetch_related('items__asset_type', 'items__accessory', 'items__license__software', 'items__consumable')
     template_name = 'assets/kits/kit_detail.html'
 
     layout = (
@@ -193,11 +193,15 @@ class KitDetailView(ObjectDetailView):
                 avail = item.license.available_seats
                 if avail < 1:
                     all_available = False
+            elif item.consumable:
+                avail = item.consumable.available
+                if avail < item.qty:
+                    all_available = False
             
             items_with_availability.append({
                 'item': item,
                 'available_count': avail,
-                'is_available': (avail >= (item.qty if item.accessory else 1))
+                'is_available': (avail >= (item.qty if (item.accessory or item.consumable) else 1))
             })
             
         context['items_with_availability'] = items_with_availability
@@ -210,14 +214,14 @@ class KitEditView(ObjectEditView):
     model = Kit
     model_form = forms.KitForm
     template_name = 'generic/object_edit.html'
-    default_return_url = 'assets:kit_list'
+    default_return_url = 'inventory:kit_list'
 
 
 class KitDeleteView(ObjectDeleteView):
     queryset = Kit.objects.all()
     model = Kit
     template_name = 'generic/object_confirm_delete.html'
-    success_url = reverse_lazy('assets:kit_list')
+    success_url = reverse_lazy('inventory:kit_list')
 
 
 class KitItemEditView(ObjectEditView):
@@ -236,7 +240,7 @@ class KitItemEditView(ObjectEditView):
     def get_success_url(self):
         if self.object and self.object.kit:
             return self.object.kit.get_absolute_url()
-        return reverse('assets:kit_list')
+        return reverse('inventory:kit_list')
 
 
 class KitItemDeleteView(ObjectDeleteView):
@@ -247,7 +251,7 @@ class KitItemDeleteView(ObjectDeleteView):
     def get_success_url(self):
         if self.object and self.object.kit:
             return self.object.kit.get_absolute_url()
-        return reverse('assets:kit_list')
+        return reverse('inventory:kit_list')
 
 
 class KitCheckoutView(GenericTransactionView):
@@ -300,7 +304,7 @@ class AccessoryCheckinView(SimplePostView):
         }
 
     def get_success_redirect(self, obj, result):
-        return redirect(result.get('redirect', obj.get_absolute_url()))
+        return redirect(result.get('redirect') or '/')
 
 
 class ConsumableCheckoutView(GenericTransactionView):
@@ -351,6 +355,8 @@ class AccessoryStockListView(ObjectListView):
     queryset = AccessoryStock.objects.select_related('accessory', 'location').all()
     table = tables.AccessoryStockTable
     action_buttons = ('add',)
+    filterset = filters.AccessoryStockFilterSet
+    filterset_form = forms.AccessoryStockFilterForm
 
 
 class AccessoryStockEditView(ObjectEditView):
@@ -358,20 +364,23 @@ class AccessoryStockEditView(ObjectEditView):
     model = AccessoryStock
     model_form = forms.AccessoryStockForm
     template_name = 'generic/object_edit.html'
-    default_return_url = 'assets:accessory_list'
+    default_return_url = 'inventory:accessory_list'
 
 
 class AccessoryStockDeleteView(ObjectDeleteView):
     queryset = AccessoryStock.objects.all()
     model = AccessoryStock
     template_name = 'generic/object_confirm_delete.html'
-    success_url = reverse_lazy('assets:accessory_list')
+    success_url = reverse_lazy('inventory:accessory_list')
 
 
 class ConsumableStockListView(ObjectListView):
     queryset = ConsumableStock.objects.select_related('consumable', 'location').all()
     table = tables.ConsumableStockTable
     action_buttons = ('add',)
+    filterset = filters.ConsumableStockFilterSet
+    filterset_form = forms.ConsumableStockFilterForm
+
 
 
 class ConsumableStockEditView(ObjectEditView):
@@ -379,11 +388,11 @@ class ConsumableStockEditView(ObjectEditView):
     model = ConsumableStock
     model_form = forms.ConsumableStockForm
     template_name = 'generic/object_edit.html'
-    default_return_url = 'assets:consumable_list'
+    default_return_url = 'inventory:consumable_list'
 
 
 class ConsumableStockDeleteView(ObjectDeleteView):
     queryset = ConsumableStock.objects.all()
     model = ConsumableStock
     template_name = 'generic/object_confirm_delete.html'
-    success_url = reverse_lazy('assets:consumable_list')
+    success_url = reverse_lazy('inventory:consumable_list')

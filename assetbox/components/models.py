@@ -1,11 +1,14 @@
-from django.db import models
+from django.db import models, transaction
 from django.urls import reverse
-from core.models import BaseModel, ChangeLoggingMixin
+from core.models import BaseModel, ChangeLoggingMixin, StandardModel
 from core.mixins import TaggableMixin, AutoSlugMixin, JournalingMixin, ImageAttachmentMixin, CloneableMixin, ExportableMixin, SoftDeleteMixin
 from core.managers import SoftDeleteManager, AllObjectsManager
 
 
-class Component(AutoSlugMixin, JournalingMixin, TaggableMixin, ImageAttachmentMixin, CloneableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
+class Component(AutoSlugMixin, SoftDeleteMixin, StandardModel, ImageAttachmentMixin):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
+
     """Catalog entry for a hardware component (e.g. 'Crucial 16GB DDR4')."""
     slug_source = ('manufacturer__name', 'name')
     name = models.CharField(max_length=255)
@@ -84,6 +87,10 @@ class ComponentAllocation(JournalingMixin, TaggableMixin, SoftDeleteMixin, BaseM
     asset = models.ForeignKey(
         'assets.Asset', on_delete=models.CASCADE, related_name='component_allocations', db_index=True
     )
+    from_location = models.ForeignKey(
+        'organization.Location', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='component_allocations', verbose_name="From Location", db_index=True
+    )
     qty_allocated = models.PositiveIntegerField(default=1)
     allocated_at = models.DateTimeField(auto_now_add=True)
     notes = models.TextField(blank=True)
@@ -101,33 +108,72 @@ class ComponentAllocation(JournalingMixin, TaggableMixin, SoftDeleteMixin, BaseM
         return self.asset.get_absolute_url()
 
 
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_save, post_delete, pre_save
 from django.dispatch import receiver
+
+
+def deduct_stock(instance):
+    target_location = instance.from_location
+    if not target_location and instance.asset:
+        target_location = instance.asset.location
+        
+    if not target_location:
+        return
+        
+    with transaction.atomic():
+        stock, _ = ComponentStock.objects.select_for_update().get_or_create(
+            component=instance.component,
+            location=target_location,
+            defaults={'qty': 0}
+        )
+        if stock.qty >= instance.qty_allocated:
+            stock.qty = stock.qty - instance.qty_allocated
+        else:
+            stock.qty = 0
+        stock.save(update_fields=['qty'])
+
+
+def return_stock(instance):
+    target_location = instance.from_location
+    if not target_location and instance.asset:
+        target_location = instance.asset.location
+        
+    if not target_location:
+        return
+        
+    with transaction.atomic():
+        stock, _ = ComponentStock.objects.select_for_update().get_or_create(
+            component=instance.component,
+            location=target_location,
+            defaults={'qty': 0}
+        )
+        stock.qty = stock.qty + instance.qty_allocated
+        stock.save(update_fields=['qty'])
 
 
 @receiver(post_save, sender=ComponentAllocation)
 def decrement_component_stock(sender, instance, created, **kwargs):
-    if not created:
-        return
-    if not instance.asset or not instance.asset.location:
-        return
-    stock, _ = ComponentStock.objects.get_or_create(
-        component=instance.component,
-        location=instance.asset.location,
-        defaults={'qty': 0}
-    )
-    stock.qty = max(0, stock.qty - instance.qty_allocated)
-    stock.save(update_fields=['qty'])
+    if created:
+        if instance.deleted_at is None:
+            deduct_stock(instance)
+
+
+@receiver(pre_save, sender=ComponentAllocation)
+def handle_component_allocation_soft_delete(sender, instance, **kwargs):
+    if instance.pk:
+        try:
+            old_instance = ComponentAllocation.all_objects.get(pk=instance.pk)
+            # Soft-deleted transition
+            if old_instance.deleted_at is None and instance.deleted_at is not None:
+                return_stock(instance)
+            # Restored transition
+            elif old_instance.deleted_at is not None and instance.deleted_at is None:
+                deduct_stock(instance)
+        except ComponentAllocation.DoesNotExist:
+            pass
 
 
 @receiver(post_delete, sender=ComponentAllocation)
 def increment_component_stock(sender, instance, **kwargs):
-    if not instance.asset or not instance.asset.location:
-        return
-    stock, _ = ComponentStock.objects.get_or_create(
-        component=instance.component,
-        location=instance.asset.location,
-        defaults={'qty': 0}
-    )
-    stock.qty = stock.qty + instance.qty_allocated
-    stock.save(update_fields=['qty'])
+    if instance.deleted_at is None:
+        return_stock(instance)

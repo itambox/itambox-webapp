@@ -1,4 +1,4 @@
-import django_tables2 as tables
+﻿import django_tables2 as tables
 from django.urls import reverse
 from django.utils.html import format_html
 from django_tables2.utils import A
@@ -10,7 +10,7 @@ from .models import Accessory, AccessoryAssignment, AccessoryStock, Consumable, 
 
 class AccessoryTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('assets:accessory_detail', args=[A('pk')], verbose_name='Name')
+    name = tables.LinkColumn('inventory:accessory_detail', args=[A('pk')], verbose_name='Name')
     manufacturer = tables.Column(linkify=True)
     category = tables.Column(verbose_name='Category')
     part_number = tables.Column(verbose_name='Part Number')
@@ -18,7 +18,7 @@ class AccessoryTable(BaseTable):
     checked_out_qty = tables.Column(accessor='checked_out_qty', verbose_name='Checked Out')
     available = tables.Column(accessor='available', verbose_name='Available')
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name='Tenant')
-    tags = TagColumn(url_name='assets:accessory_list')
+    tags = TagColumn(url_name='inventory:accessory_list')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
@@ -36,7 +36,7 @@ class AccessoryTable(BaseTable):
 
 class AccessoryStockTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    accessory = tables.LinkColumn('assets:accessory_detail', args=[A('accessory.pk')], verbose_name='Accessory')
+    accessory = tables.LinkColumn('inventory:accessory_detail', args=[A('accessory.pk')], verbose_name='Accessory')
     location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], verbose_name='Location')
     qty = tables.Column(verbose_name='Quantity')
     actions = ActionsColumn()
@@ -49,7 +49,7 @@ class AccessoryStockTable(BaseTable):
 
 class AccessoryAssignmentTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    accessory = tables.LinkColumn('assets:accessory_detail', args=[A('accessory__pk')], verbose_name='Accessory')
+    accessory = tables.LinkColumn('inventory:accessory_detail', args=[A('accessory__pk')], verbose_name='Accessory')
     assigned_to = tables.Column(verbose_name='Assigned To', orderable=False)
     qty = tables.Column(verbose_name='Qty')
     assigned_date = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name='Date')
@@ -72,7 +72,7 @@ class AccessoryAssignmentTable(BaseTable):
 
 class ConsumableTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('assets:consumable_detail', args=[A('pk')], verbose_name='Name')
+    name = tables.LinkColumn('inventory:consumable_detail', args=[A('pk')], verbose_name='Name')
     manufacturer = tables.Column(linkify=True)
     category = tables.Column(verbose_name='Category')
     part_number = tables.Column(verbose_name='Part Number')
@@ -80,7 +80,7 @@ class ConsumableTable(BaseTable):
     consumed_qty = tables.Column(accessor='consumed_qty', verbose_name='Consumed')
     available = tables.Column(accessor='available', verbose_name='Available')
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name='Tenant')
-    tags = TagColumn(url_name='assets:consumable_list')
+    tags = TagColumn(url_name='inventory:consumable_list')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
@@ -98,7 +98,7 @@ class ConsumableTable(BaseTable):
 
 class ConsumableStockTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    consumable = tables.LinkColumn('assets:consumable_detail', args=[A('consumable.pk')], verbose_name='Consumable')
+    consumable = tables.LinkColumn('inventory:consumable_detail', args=[A('consumable.pk')], verbose_name='Consumable')
     location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], verbose_name='Location')
     qty = tables.Column(verbose_name='Quantity')
     actions = ActionsColumn()
@@ -111,7 +111,7 @@ class ConsumableStockTable(BaseTable):
 
 class ConsumableAssignmentTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    consumable = tables.LinkColumn('assets:consumable_detail', args=[A('consumable__pk')], verbose_name='Consumable')
+    consumable = tables.LinkColumn('inventory:consumable_detail', args=[A('consumable__pk')], verbose_name='Consumable')
     assigned_to = tables.Column(verbose_name='Assigned To', orderable=False)
     qty = tables.Column(verbose_name='Qty')
     assigned_date = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name='Date')
@@ -134,7 +134,7 @@ class ConsumableAssignmentTable(BaseTable):
 
 class KitTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('assets:kit_detail', args=[A('pk')], verbose_name='Name')
+    name = tables.LinkColumn('inventory:kit_detail', args=[A('pk')], verbose_name='Name')
     description = tables.Column(verbose_name='Description')
     item_count = tables.Column(accessor='item_count', verbose_name='Items Count', orderable=False)
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name='Tenant')

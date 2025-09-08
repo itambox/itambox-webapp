@@ -40,6 +40,7 @@ class ComponentAllocationTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     component = tables.LinkColumn('assets:component_detail', args=[A('component.pk')], verbose_name='Component')
     asset = tables.LinkColumn('assets:asset_detail', args=[A('asset.pk')], verbose_name='Asset')
+    from_location = tables.LinkColumn('organization:location_detail', args=[A('from_location.pk')], verbose_name='From Location')
     qty_allocated = tables.Column(verbose_name='Qty Allocated')
     allocated_at = tables.DateTimeColumn(format='Y-m-d H:i', verbose_name='Allocated')
     tags = TagColumn(url_name='assets:componentallocation_list')
@@ -47,6 +48,6 @@ class ComponentAllocationTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = ComponentAllocation
-        fields = ('pk', 'component', 'asset', 'qty_allocated', 'allocated_at', 'notes', 'tags', 'actions')
-        default_columns = ('pk', 'component', 'asset', 'qty_allocated', 'allocated_at', 'tags', 'actions')
+        fields = ('pk', 'component', 'asset', 'from_location', 'qty_allocated', 'allocated_at', 'notes', 'tags', 'actions')
+        default_columns = ('pk', 'component', 'asset', 'from_location', 'qty_allocated', 'allocated_at', 'tags', 'actions')
 

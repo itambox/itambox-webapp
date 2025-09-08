@@ -122,10 +122,16 @@ class ComponentAllocationForm(forms.ModelForm):
         queryset=Asset.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
+    from_location = forms.ModelChoiceField(
+        queryset=Location.objects.all().select_related('site'),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="From Location"
+    )
 
     class Meta:
         model = ComponentAllocation
-        fields = ['component', 'asset', 'qty_allocated', 'notes']
+        fields = ['component', 'asset', 'from_location', 'qty_allocated', 'notes']
         widgets = {
             'qty_allocated': forms.NumberInput(attrs={'class': 'form-control'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
@@ -146,6 +152,7 @@ class ComponentAllocationForm(forms.ModelForm):
                 Column('asset', css_class='col-md-6')
             ),
             Row(
+                Column('from_location', css_class='col-md-6'),
                 Column('qty_allocated', css_class='col-md-6'),
             ),
             'notes',

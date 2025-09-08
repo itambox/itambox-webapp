@@ -12,10 +12,10 @@ from assets.models import Category
 
 
 def _accessory_category_queryset():
-    return Category.objects.filter(applies_to__contains={'accessory': True})
+    return Category.objects.filter(applies_to__accessory=True)
 
 def _consumable_category_queryset():
-    return Category.objects.filter(applies_to__contains={'consumable': True})
+    return Category.objects.filter(applies_to__consumable=True)
 
 
 class NestedAccessorySerializer(BaseModelSerializer):

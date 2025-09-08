@@ -61,12 +61,20 @@ class ComponentAllocationSerializer(BaseModelSerializer):
         queryset=Asset.objects.all(),
         source='asset', write_only=True
     )
+    from_location = NestedLocationSerializer(read_only=True)
+    from_location_id = serializers.PrimaryKeyRelatedField(
+        queryset=Location.objects.all(),
+        source='from_location', write_only=True,
+        required=False,
+        allow_null=True
+    )
     tags = TagSerializer(many=True, read_only=True)
 
     class Meta:
         model = ComponentAllocation
         fields = [
             'id', 'component', 'component_name', 'asset', 'asset_id',
+            'from_location', 'from_location_id',
             'qty_allocated', 'allocated_at', 'notes', 'tags',
             'created_at', 'updated_at'
         ]

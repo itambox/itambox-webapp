@@ -17,7 +17,7 @@ class AccessoryForm(SlugModelForm):
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     category = forms.ModelChoiceField(
-        queryset=Category.objects.filter(applies_to__contains={'accessory': True}),
+        queryset=Category.objects.filter(applies_to__accessory=True),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
         label="Category"
@@ -49,7 +49,7 @@ class AccessoryForm(SlugModelForm):
         self.fields['slug'].widget.attrs['slugify'] = 'name'
         
         button_text = 'Update' if self.instance.pk else 'Create'
-        cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse('assets:accessory_list')
+        cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse('inventory:accessory_list')
         
         self.helper.layout = Layout(
             Row(
@@ -87,7 +87,7 @@ class ConsumableForm(SlugModelForm):
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     category = forms.ModelChoiceField(
-        queryset=Category.objects.filter(applies_to__contains={'consumable': True}),
+        queryset=Category.objects.filter(applies_to__consumable=True),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
         label="Category"
@@ -119,7 +119,7 @@ class ConsumableForm(SlugModelForm):
         self.fields['slug'].widget.attrs['slugify'] = 'name'
         
         button_text = 'Update' if self.instance.pk else 'Create'
-        cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse('assets:consumable_list')
+        cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse('inventory:consumable_list')
         
         self.helper.layout = Layout(
             Row(
@@ -173,7 +173,7 @@ class KitForm(forms.ModelForm):
         self.helper.form_tag = True
         
         button_text = 'Update' if self.instance.pk else 'Create'
-        cancel_url = reverse('assets:kit_list')
+        cancel_url = reverse('inventory:kit_list')
         
         self.helper.layout = Layout(
             'name',
@@ -190,12 +190,13 @@ class KitForm(forms.ModelForm):
 class KitItemForm(forms.ModelForm):
     class Meta:
         model = KitItem
-        fields = ['kit', 'asset_type', 'accessory', 'license', 'qty']
+        fields = ['kit', 'asset_type', 'accessory', 'license', 'consumable', 'qty']
         widgets = {
             'kit': forms.Select(attrs={'class': 'form-select'}),
             'asset_type': forms.Select(attrs={'class': 'form-select'}),
             'accessory': forms.Select(attrs={'class': 'form-select'}),
             'license': forms.Select(attrs={'class': 'form-select'}),
+            'consumable': forms.Select(attrs={'class': 'form-select'}),
             'qty': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
         }
 
@@ -206,13 +207,14 @@ class KitItemForm(forms.ModelForm):
         self.helper.form_tag = True
         
         button_text = 'Update' if self.instance.pk else 'Create'
-        cancel_url = self.instance.kit.get_absolute_url() if (self.instance.pk and self.instance.kit) else reverse('assets:kit_list')
+        cancel_url = self.instance.kit.get_absolute_url() if (self.instance.pk and self.instance.kit) else reverse('inventory:kit_list')
         
         self.helper.layout = Layout(
             'kit',
             'asset_type',
             'accessory',
             'license',
+            'consumable',
             'qty',
             HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),
@@ -225,13 +227,14 @@ class KitItemForm(forms.ModelForm):
         asset_type = cleaned_data.get('asset_type')
         accessory = cleaned_data.get('accessory')
         license_item = cleaned_data.get('license')
+        consumable = cleaned_data.get('consumable')
 
-        targets = [asset_type, accessory, license_item]
+        targets = [asset_type, accessory, license_item, consumable]
         filled = [t for t in targets if t is not None]
         if len(filled) == 0:
-            raise ValidationError("A kit item must select either an Asset Type, Accessory, or License.")
+            raise ValidationError("A kit item must select either an Asset Type, Accessory, License, or Consumable.")
         if len(filled) > 1:
-            raise ValidationError("A kit item cannot select more than one target (must be either Asset Type OR Accessory OR License).")
+            raise ValidationError("A kit item cannot select more than one target (must be either Asset Type OR Accessory OR License OR Consumable).")
         return cleaned_data
 
 
@@ -415,7 +418,7 @@ class ConsumableCheckoutForm(BaseCheckoutForm):
         return cleaned_data
 
 
-from .filters import AccessoryFilterSet, ConsumableFilterSet, KitFilterSet
+from .filters import AccessoryFilterSet, ConsumableFilterSet, KitFilterSet, AccessoryStockFilterSet, ConsumableStockFilterSet
 
 class AccessoryFilterForm(FilterForm):
     filterset_class = AccessoryFilterSet
@@ -425,4 +428,11 @@ class ConsumableFilterForm(FilterForm):
 
 class KitFilterForm(FilterForm):
     filterset_class = KitFilterSet
+
+class AccessoryStockFilterForm(FilterForm):
+    filterset_class = AccessoryStockFilterSet
+
+class ConsumableStockFilterForm(FilterForm):
+    filterset_class = ConsumableStockFilterSet
+
 

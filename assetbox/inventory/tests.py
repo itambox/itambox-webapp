@@ -273,24 +273,24 @@ class AccessoryViewTests(TestCase):
         AccessoryStock.objects.create(accessory=self.accessory, location=self.location, qty=20)
 
     def test_list_view(self):
-        url = reverse('assets:accessory_list')
+        url = reverse('inventory:accessory_list')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'MX Master 3S')
 
     def test_detail_view(self):
-        url = reverse('assets:accessory_detail', kwargs={'pk': self.accessory.pk})
+        url = reverse('inventory:accessory_detail', kwargs={'pk': self.accessory.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'MX Master 3S')
 
     def test_create_view_get(self):
-        url = reverse('assets:accessory_create')
+        url = reverse('inventory:accessory_create')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_create_view_post(self):
-        url = reverse('assets:accessory_create')
+        url = reverse('inventory:accessory_create')
         response = self.client.post(url, {
             'manufacturer': self.manufacturer.pk,
             'name': 'K380 Keyboard',
@@ -304,12 +304,12 @@ class AccessoryViewTests(TestCase):
         self.assertTrue(Accessory.objects.filter(name='K380 Keyboard').exists())
 
     def test_edit_view_get(self):
-        url = reverse('assets:accessory_update', kwargs={'pk': self.accessory.pk})
+        url = reverse('inventory:accessory_update', kwargs={'pk': self.accessory.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_edit_view_post(self):
-        url = reverse('assets:accessory_update', kwargs={'pk': self.accessory.pk})
+        url = reverse('inventory:accessory_update', kwargs={'pk': self.accessory.pk})
         response = self.client.post(url, {
             'manufacturer': self.manufacturer.pk,
             'name': 'MX Master 3S Updated',
@@ -324,12 +324,12 @@ class AccessoryViewTests(TestCase):
         self.assertEqual(self.accessory.name, 'MX Master 3S Updated')
 
     def test_delete_view_get(self):
-        url = reverse('assets:accessory_delete', kwargs={'pk': self.accessory.pk})
+        url = reverse('inventory:accessory_delete', kwargs={'pk': self.accessory.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_delete_view_post_no_assignments(self):
-        url = reverse('assets:accessory_delete', kwargs={'pk': self.accessory.pk})
+        url = reverse('inventory:accessory_delete', kwargs={'pk': self.accessory.pk})
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
         self.assertFalse(Accessory.objects.filter(pk=self.accessory.pk).exists())
@@ -339,7 +339,7 @@ class AccessoryViewTests(TestCase):
         AccessoryAssignment.objects.create(
             accessory=self.accessory, assigned_holder=holder, from_location=self.location, qty=1
         )
-        url = reverse('assets:accessory_delete', kwargs={'pk': self.accessory.pk})
+        url = reverse('inventory:accessory_delete', kwargs={'pk': self.accessory.pk})
         response = self.client.post(url)
         self.assertTrue(Accessory.objects.filter(pk=self.accessory.pk).exists())
 
@@ -363,24 +363,24 @@ class ConsumableViewTests(TestCase):
         ConsumableStock.objects.create(consumable=self.consumable, location=self.location, qty=50)
 
     def test_list_view(self):
-        url = reverse('assets:consumable_list')
+        url = reverse('inventory:consumable_list')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'LaserJet Toner Cartridge')
 
     def test_detail_view(self):
-        url = reverse('assets:consumable_detail', kwargs={'pk': self.consumable.pk})
+        url = reverse('inventory:consumable_detail', kwargs={'pk': self.consumable.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'LaserJet Toner Cartridge')
 
     def test_create_view_get(self):
-        url = reverse('assets:consumable_create')
+        url = reverse('inventory:consumable_create')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_create_view_post(self):
-        url = reverse('assets:consumable_create')
+        url = reverse('inventory:consumable_create')
         response = self.client.post(url, {
             'manufacturer': self.manufacturer.pk,
             'name': 'Ink Cartridge Black',
@@ -394,12 +394,12 @@ class ConsumableViewTests(TestCase):
         self.assertTrue(Consumable.objects.filter(name='Ink Cartridge Black').exists())
 
     def test_edit_view_get(self):
-        url = reverse('assets:consumable_update', kwargs={'pk': self.consumable.pk})
+        url = reverse('inventory:consumable_update', kwargs={'pk': self.consumable.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_edit_view_post(self):
-        url = reverse('assets:consumable_update', kwargs={'pk': self.consumable.pk})
+        url = reverse('inventory:consumable_update', kwargs={'pk': self.consumable.pk})
         response = self.client.post(url, {
             'manufacturer': self.manufacturer.pk,
             'name': 'Updated Toner',
@@ -414,7 +414,7 @@ class ConsumableViewTests(TestCase):
         self.assertEqual(self.consumable.name, 'Updated Toner')
 
     def test_delete_view_post_no_consumptions(self):
-        url = reverse('assets:consumable_delete', kwargs={'pk': self.consumable.pk})
+        url = reverse('inventory:consumable_delete', kwargs={'pk': self.consumable.pk})
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
         self.assertFalse(Consumable.objects.filter(pk=self.consumable.pk).exists())
@@ -423,7 +423,7 @@ class ConsumableViewTests(TestCase):
         ConsumableAssignment.objects.create(
             consumable=self.consumable, assigned_location=self.location, from_location=self.location, qty=1
         )
-        url = reverse('assets:consumable_delete', kwargs={'pk': self.consumable.pk})
+        url = reverse('inventory:consumable_delete', kwargs={'pk': self.consumable.pk})
         response = self.client.post(url)
         self.assertTrue(Consumable.objects.filter(pk=self.consumable.pk).exists())
 
@@ -437,24 +437,24 @@ class KitViewTests(TestCase):
         self.kit = Kit.objects.create(name='Standard Kit', description='Basic equipment')
 
     def test_list_view(self):
-        url = reverse('assets:kit_list')
+        url = reverse('inventory:kit_list')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Standard Kit')
 
     def test_detail_view(self):
-        url = reverse('assets:kit_detail', kwargs={'pk': self.kit.pk})
+        url = reverse('inventory:kit_detail', kwargs={'pk': self.kit.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Standard Kit')
 
     def test_create_view_get(self):
-        url = reverse('assets:kit_create')
+        url = reverse('inventory:kit_create')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_create_view_post(self):
-        url = reverse('assets:kit_create')
+        url = reverse('inventory:kit_create')
         response = self.client.post(url, {
             'name': 'Developer Bundle',
             'description': 'Laptop + monitor',
@@ -463,12 +463,12 @@ class KitViewTests(TestCase):
         self.assertTrue(Kit.objects.filter(name='Developer Bundle').exists())
 
     def test_edit_view_get(self):
-        url = reverse('assets:kit_update', kwargs={'pk': self.kit.pk})
+        url = reverse('inventory:kit_update', kwargs={'pk': self.kit.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_edit_view_post(self):
-        url = reverse('assets:kit_update', kwargs={'pk': self.kit.pk})
+        url = reverse('inventory:kit_update', kwargs={'pk': self.kit.pk})
         response = self.client.post(url, {
             'name': 'Updated Kit',
             'description': 'Renamed',
@@ -478,12 +478,12 @@ class KitViewTests(TestCase):
         self.assertEqual(self.kit.name, 'Updated Kit')
 
     def test_delete_view_get(self):
-        url = reverse('assets:kit_delete', kwargs={'pk': self.kit.pk})
+        url = reverse('inventory:kit_delete', kwargs={'pk': self.kit.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_delete_view_post(self):
-        url = reverse('assets:kit_delete', kwargs={'pk': self.kit.pk})
+        url = reverse('inventory:kit_delete', kwargs={'pk': self.kit.pk})
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
         self.assertFalse(Kit.objects.filter(pk=self.kit.pk).exists())
@@ -502,12 +502,12 @@ class KitItemViewTests(TestCase):
         )
 
     def test_kit_item_create_view_get(self):
-        url = reverse('assets:kititem_create') + f'?kit={self.kit.pk}'
+        url = reverse('inventory:kititem_create') + f'?kit={self.kit.pk}'
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_kit_item_create_view_post(self):
-        url = reverse('assets:kititem_create')
+        url = reverse('inventory:kititem_create')
         response = self.client.post(url, {
             'kit': self.kit.pk,
             'asset_type': self.asset_type.pk,
@@ -518,7 +518,128 @@ class KitItemViewTests(TestCase):
 
     def test_kit_item_delete(self):
         item = KitItem.objects.create(kit=self.kit, asset_type=self.asset_type)
-        url = reverse('assets:kititem_delete', kwargs={'pk': item.pk})
+        url = reverse('inventory:kititem_delete', kwargs={'pk': item.pk})
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
         self.assertFalse(KitItem.objects.filter(pk=item.pk).exists())
+
+
+class AccessoryStockFilterSetTests(TestCase):
+    def setUp(self):
+        from assets.models import Manufacturer
+        from organization.models import Site, Location
+        from inventory.models import Accessory, AccessoryStock
+        
+        self.manufacturer = Manufacturer.objects.create(name="Logitech", slug="logitech")
+        self.site = Site.objects.create(name="Main HQ", slug="main-hq")
+        self.loc1 = Location.objects.create(name="Server Room", slug="server-room", site=self.site)
+        self.loc2 = Location.objects.create(name="Storage A", slug="storage-a", site=self.site)
+        
+        self.acc1 = Accessory.objects.create(name="Wired Mouse", slug="wired-mouse", manufacturer=self.manufacturer)
+        self.acc2 = Accessory.objects.create(name="Wireless Keyboard", slug="wireless-keyboard", manufacturer=self.manufacturer)
+        
+        self.stock1 = AccessoryStock.objects.create(accessory=self.acc1, location=self.loc1, qty=10)
+        self.stock2 = AccessoryStock.objects.create(accessory=self.acc2, location=self.loc2, qty=5)
+
+    def test_filter_by_accessory(self):
+        from inventory.filters import AccessoryStockFilterSet
+        f = AccessoryStockFilterSet({'accessory': self.acc1.pk}, queryset=AccessoryStock.objects.all())
+        self.assertTrue(f.is_valid())
+        self.assertIn(self.stock1, f.qs)
+        self.assertNotIn(self.stock2, f.qs)
+
+    def test_filter_by_location(self):
+        from inventory.filters import AccessoryStockFilterSet
+        f = AccessoryStockFilterSet({'location': self.loc2.pk}, queryset=AccessoryStock.objects.all())
+        self.assertTrue(f.is_valid())
+        self.assertIn(self.stock2, f.qs)
+        self.assertNotIn(self.stock1, f.qs)
+
+    def test_filter_search(self):
+        from inventory.filters import AccessoryStockFilterSet
+        f = AccessoryStockFilterSet({'q': 'Wireless'}, queryset=AccessoryStock.objects.all())
+        self.assertTrue(f.is_valid())
+        self.assertIn(self.stock2, f.qs)
+        self.assertNotIn(self.stock1, f.qs)
+
+
+class ConsumableStockFilterSetTests(TestCase):
+    def setUp(self):
+        from assets.models import Manufacturer
+        from organization.models import Site, Location
+        from inventory.models import Consumable, ConsumableStock
+        
+        self.manufacturer = Manufacturer.objects.create(name="Canon", slug="canon")
+        self.site = Site.objects.create(name="Main HQ", slug="main-hq")
+        self.loc1 = Location.objects.create(name="Server Room", slug="server-room", site=self.site)
+        self.loc2 = Location.objects.create(name="Storage B", slug="storage-b", site=self.site)
+        
+        self.con1 = Consumable.objects.create(name="Toner Black", slug="toner-black", manufacturer=self.manufacturer)
+        self.con2 = Consumable.objects.create(name="Toner Cyan", slug="toner-cyan", manufacturer=self.manufacturer)
+        
+        self.stock1 = ConsumableStock.objects.create(consumable=self.con1, location=self.loc1, qty=20)
+        self.stock2 = ConsumableStock.objects.create(consumable=self.con2, location=self.loc2, qty=15)
+
+    def test_filter_by_consumable(self):
+        from inventory.filters import ConsumableStockFilterSet
+        f = ConsumableStockFilterSet({'consumable': self.con1.pk}, queryset=ConsumableStock.objects.all())
+        self.assertTrue(f.is_valid())
+        self.assertIn(self.stock1, f.qs)
+        self.assertNotIn(self.stock2, f.qs)
+
+    def test_filter_by_location(self):
+        from inventory.filters import ConsumableStockFilterSet
+        f = ConsumableStockFilterSet({'location': self.loc2.pk}, queryset=ConsumableStock.objects.all())
+        self.assertTrue(f.is_valid())
+        self.assertIn(self.stock2, f.qs)
+        self.assertNotIn(self.stock1, f.qs)
+
+    def test_filter_search(self):
+        from inventory.filters import ConsumableStockFilterSet
+        f = ConsumableStockFilterSet({'q': 'Cyan'}, queryset=ConsumableStock.objects.all())
+        self.assertTrue(f.is_valid())
+        self.assertIn(self.stock2, f.qs)
+        self.assertNotIn(self.stock1, f.qs)
+
+
+class KitConsumableFulfillmentTests(TestCase):
+    def setUp(self):
+        self.manufacturer = Manufacturer.objects.create(name='Logitech', slug='logitech')
+        self.site = Site.objects.create(name='Warehouse', slug='warehouse')
+        self.location = Location.objects.create(name='Shelf A', slug='shelf-a', site=self.site)
+        self.holder = AssetHolder.objects.create(first_name='John', last_name='Smith', upn='john.smith')
+        self.cat_cable = _create_category('Cable', consumable=True)
+        self.consumable = Consumable.objects.create(
+            name='Cat6 Cable', manufacturer=self.manufacturer, category=self.cat_cable
+        )
+        self.stock = ConsumableStock.objects.create(consumable=self.consumable, location=self.location, qty=50)
+        self.kit = Kit.objects.create(name='Developer Starter Kit')
+        
+    def test_kit_item_consumable_creation_and_fulfillment(self):
+        # Create KitItem with consumable
+        item = KitItem.objects.create(kit=self.kit, consumable=self.consumable, qty=3)
+        self.assertEqual(str(item), '3x Consumable: Logitech Cat6 Cable')
+
+        # Try setting both accessory and consumable; should raise validation error
+        acc = Accessory.objects.create(name='Mouse', manufacturer=self.manufacturer)
+        item.accessory = acc
+        with self.assertRaises(ValidationError):
+            item.clean()
+
+        # Revert accessory to keep only consumable
+        item.accessory = None
+        item.clean()
+
+        # Fulfill the kit using checkout_kit service
+        from assets.services import checkout_kit
+        checkout_kit(self.kit, holder=self.holder, source_location=self.location)
+
+        # Verify consumable stock is decremented by 3
+        self.stock.refresh_from_db()
+        self.assertEqual(self.stock.qty, 47)
+        
+        # Verify ConsumableAssignment exists
+        self.assertTrue(ConsumableAssignment.objects.filter(
+            consumable=self.consumable, assigned_holder=self.holder, from_location=self.location, qty=3
+        ).exists())
+

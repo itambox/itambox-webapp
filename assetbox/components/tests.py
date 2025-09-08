@@ -215,3 +215,42 @@ class ComponentAllocationViewTests(TestCase):
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
         self.assertFalse(ComponentAllocation.objects.filter(pk=self.allocation.pk).exists())
+
+
+class ComponentWarehouseOriginTests(TestCase):
+    def setUp(self):
+        self.manufacturer = Manufacturer.objects.create(name='Samsung', slug='samsung')
+        self.category = Category.objects.create(name='Storage', slug='storage', applies_to={'component': True})
+        self.component = Component.objects.create(
+            name='990 Pro 2TB', manufacturer=self.manufacturer, category=self.category
+        )
+        self.role = AssetRole.objects.create(name='Server', slug='server')
+        self.site = Site.objects.create(name='Munich HQ', slug='munich-hq')
+        self.warehouse = Location.objects.create(name='Warehouse A', slug='warehouse-a', site=self.site)
+        self.desk = Location.objects.create(name='Desk B', slug='desk-b', site=self.site)
+        
+        self.asset = Asset.objects.create(name='SRV-100', asset_tag='TAG-100', asset_role=self.role, location=self.desk)
+        self.stock = ComponentStock.objects.create(component=self.component, location=self.warehouse, qty=10)
+
+    def test_allocation_decrements_origin_stock(self):
+        # Create allocation with from_location as warehouse
+        alloc = ComponentAllocation.objects.create(
+            component=self.component,
+            asset=self.asset,
+            from_location=self.warehouse,
+            qty_allocated=2
+        )
+        self.stock.refresh_from_db()
+        self.assertEqual(self.stock.qty, 8)
+
+        # Relocate asset
+        self.asset.location = self.desk
+        self.asset.save()
+
+        # Delete allocation; should restore to warehouse, not desk!
+        alloc.delete()
+        self.stock.refresh_from_db()
+        self.assertEqual(self.stock.qty, 10)
+        
+        # Verify no stock was created or altered at Desk B
+        self.assertFalse(ComponentStock.objects.filter(component=self.component, location=self.desk).exists())
