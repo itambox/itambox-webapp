@@ -170,4 +170,22 @@ class TableConfigForm(forms.Form):
             return None
         app_label = self.table.Meta.model._meta.app_label
         model_name = self.table.Meta.model._meta.model_name
-        return f'{app_label}.{model_name}' 
+        return f'{app_label}.{model_name}'
+
+
+class TokenForm(forms.ModelForm):
+    expires = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        help_text=_("Optional expiration date. Leave blank for a token that never expires.")
+    )
+
+    class Meta:
+        from .models import Token
+        model = Token
+        fields = ['description', 'write_enabled', 'expires']
+        widgets = {
+            'description': forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('e.g., Personal Laptop API Access')}),
+            'write_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+ 

@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.contrib.contenttypes.models import ContentType
 from .models import (
     Contact, ContactRole, ContactAssignment, Region, Site, SiteGroup,
-    Tenant, TenantGroup, Location, AssetHolder,
+    Tenant, TenantGroup, Location, AssetHolder, AssetHolderAssignment,
 )
 from assets.models import Manufacturer
 
@@ -432,3 +432,62 @@ class TenantGroupViewTests(TestCase):
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
         self.assertFalse(TenantGroup.objects.filter(pk=self.group.pk).exists())
+
+
+class AssetHolderAssignmentFilterSetTests(TestCase):
+    def setUp(self):
+        from django.contrib.contenttypes.models import ContentType
+        from organization.models import AssetHolder, AssetHolderAssignment
+        from assets.models import Asset, StatusLabel
+        
+        self.holder1 = AssetHolder.objects.create(
+            first_name='Alice', last_name='Smith', upn='alice.smith', email='alice@test.com'
+        )
+        self.holder2 = AssetHolder.objects.create(
+            first_name='Bob', last_name='Jones', upn='bob.jones', email='bob@test.com'
+        )
+        
+        self.status = StatusLabel.objects.get_or_create(
+            slug="available", defaults={'name': 'Available', 'type': StatusLabel.TYPE_DEPLOYABLE}
+        )[0]
+
+        self.asset1 = Asset.objects.create(
+            name="Laptop 1", asset_tag="TAG-1", serial_number="SN-1", status=self.status
+        )
+        self.asset2 = Asset.objects.create(
+            name="Laptop 2", asset_tag="TAG-2", serial_number="SN-2", status=self.status
+        )
+        
+        self.ct = ContentType.objects.get_for_model(Asset)
+        
+        self.assign1 = AssetHolderAssignment.objects.create(
+            asset_holder=self.holder1, content_type=self.ct, object_id=self.asset1.pk
+        )
+        self.assign2 = AssetHolderAssignment.objects.create(
+            asset_holder=self.holder2, content_type=self.ct, object_id=self.asset2.pk
+        )
+
+    def test_filter_by_asset_holder(self):
+        from organization.filters import AssetHolderAssignmentFilterSet
+        from organization.models import AssetHolderAssignment
+        f = AssetHolderAssignmentFilterSet({'asset_holder': self.holder1.pk}, queryset=AssetHolderAssignment.objects.all())
+        self.assertTrue(f.is_valid())
+        self.assertIn(self.assign1, f.qs)
+        self.assertNotIn(self.assign2, f.qs)
+
+    def test_filter_by_content_type(self):
+        from organization.filters import AssetHolderAssignmentFilterSet
+        from organization.models import AssetHolderAssignment
+        f = AssetHolderAssignmentFilterSet({'content_type': self.ct.pk}, queryset=AssetHolderAssignment.objects.all())
+        self.assertTrue(f.is_valid())
+        self.assertIn(self.assign1, f.qs)
+        self.assertIn(self.assign2, f.qs)
+
+    def test_filter_search(self):
+        from organization.filters import AssetHolderAssignmentFilterSet
+        from organization.models import AssetHolderAssignment
+        f = AssetHolderAssignmentFilterSet({'q': 'alice'}, queryset=AssetHolderAssignment.objects.all())
+        self.assertTrue(f.is_valid())
+        self.assertIn(self.assign1, f.qs)
+        self.assertNotIn(self.assign2, f.qs)
+

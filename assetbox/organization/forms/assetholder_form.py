@@ -7,7 +7,8 @@ from core.forms import FilterForm
 from extras.models import Tag
 
 from ..models import AssetHolder, Tenant
-from ..filters import AssetHolderFilterSet
+from ..filters import AssetHolderFilterSet, AssetHolderAssignmentFilterSet
+
 
 
 class AssetHolderForm(forms.ModelForm):
@@ -69,3 +70,7 @@ class AssetHolderForm(forms.ModelForm):
 
 class AssetHolderFilterForm(FilterForm):
     filterset_class = AssetHolderFilterSet
+
+class AssetHolderAssignmentFilterForm(FilterForm):
+    filterset_class = AssetHolderAssignmentFilterSet
+

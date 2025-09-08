@@ -147,7 +147,45 @@ class UserGenericTabView(LoginRequiredMixin, BaseHTMXView, TemplateView):
 
 class UserApiTokensView(UserGenericTabView):
     active_tab = 'api_tokens'
-    tab_title = 'API Tokens' # Specific title
+    tab_title = 'API Tokens'
+    template_name = 'users/api_tokens.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from .models import Token
+        from .forms import TokenForm
+        context['tokens'] = Token.objects.filter(user=self.request.user).order_by('-created')
+        if 'form' not in context:
+            context['form'] = TokenForm()
+        if 'new_token_key' in self.request.session:
+            context['new_token_key'] = self.request.session.pop('new_token_key')
+        return context
+
+    def post(self, request, *args, **kwargs):
+        from .forms import TokenForm
+        form = TokenForm(request.POST)
+        if form.is_valid():
+            token = form.save(commit=False)
+            token.user = request.user
+            if form.cleaned_data.get('expires'):
+                from django.utils import timezone
+                import datetime
+                expires_date = form.cleaned_data['expires']
+                token.expires = timezone.make_aware(
+                    datetime.datetime.combine(expires_date, datetime.time.max)
+                )
+            token.save()
+            form.save_m2m()
+            messages.success(
+                request,
+                f"API Token generated successfully! Make sure to copy your new personal access token now, as you won't be able to see it again: <code>{token.key}</code>"
+            )
+            request.session['new_token_key'] = token.key
+            return redirect('users:user_api_tokens')
+        
+        context = self.get_context_data(form=form)
+        return self.render_to_response(context)
+
 
 class UserNotificationsView(UserGenericTabView):
     active_tab = 'notifications'
@@ -172,11 +210,37 @@ def mark_notification_read(request, pk):
 
 
 @login_required
+def view_notification(request, pk):
+    from core.models import Notification
+    from django.db.models import Q
+    notification = get_object_or_404(Notification, Q(user=request.user) | Q(user__isnull=True), pk=pk)
+    
+    if notification.user == request.user:
+        notification.is_read = True
+        notification.save()
+        
+    if notification.target_url:
+        return redirect(notification.target_url)
+    return redirect('users:user_notifications')
+
+
+@login_required
 @require_POST
 def mark_all_notifications_read(request):
     from core.models import Notification
     Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
     return redirect('users:user_notifications')
+
+
+@login_required
+@require_POST
+def delete_api_token(request, pk):
+    from .models import Token
+    token = get_object_or_404(Token, pk=pk, user=request.user)
+    token.delete()
+    messages.success(request, "API Token has been revoked.")
+    return redirect('users:user_api_tokens')
+
 
 
 @login_required
@@ -201,4 +265,46 @@ def notification_poll(request):
 
 class UserSubscriptionsView(UserGenericTabView):
     active_tab = 'subscriptions'
-    tab_title = 'Subscriptions' # Specific title
+    tab_title = 'Subscriptions'
+    template_name = 'users/subscriptions.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from subscriptions.models import Subscription
+        from subscriptions.tables import SubscriptionTable
+        from django_tables2 import RequestConfig
+        
+        owned_subs = Subscription.objects.filter(owner=self.request.user).select_related('provider', 'tenant')
+        
+        # Configure SubscriptionTable for a clean read-only view
+        subs_table = SubscriptionTable(owned_subs, request=self.request)
+        subs_table.exclude = ('pk', 'actions')
+        RequestConfig(self.request, paginate={'per_page': 10}).configure(subs_table)
+        
+        context['subscriptions_table'] = subs_table
+        context['subscriptions_count'] = owned_subs.count()
+        context['active_subscriptions_count'] = owned_subs.filter(status='active').count()
+        
+        # Annual Spend calculation
+        total_annual_spend = sum(
+            sub.annual_cost for sub in owned_subs 
+            if sub.status == 'active' and sub.annual_cost is not None
+        )
+        context['total_annual_spend'] = total_annual_spend
+        
+        # Expiring in next 30 days
+        expiring_soon_count = sum(
+            1 for sub in owned_subs 
+            if sub.status == 'active' and sub.days_until_renewal is not None and 0 <= sub.days_until_renewal <= 30
+        )
+        context['expiring_soon_count'] = expiring_soon_count
+        
+        # Overdue renewals
+        overdue_count = sum(
+            1 for sub in owned_subs 
+            if sub.status == 'expired' or (sub.status == 'active' and sub.is_expired)
+        )
+        context['overdue_count'] = overdue_count
+        
+        return context
+

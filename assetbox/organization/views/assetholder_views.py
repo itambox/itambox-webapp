@@ -15,11 +15,11 @@ from assetbox.utils import get_paginate_count
 from assetbox.panels import Panel
 
 from ..models import AssetHolder, AssetHolderAssignment, ContactAssignment
-from ..forms import AssetHolderForm, AssetHolderFilterForm, ContactAssignmentForm
+from ..forms import AssetHolderForm, AssetHolderFilterForm, ContactAssignmentForm, AssetHolderAssignmentFilterForm
 from ..tables import (
     AssetHolderTable, AssetHolderAssignmentTable,
 )
-from ..filters import AssetHolderFilterSet
+from ..filters import AssetHolderFilterSet, AssetHolderAssignmentFilterSet
 from assets.forms.import_forms import AssetHolderBulkImportForm
 from django_tables2 import RequestConfig
 
@@ -95,6 +95,9 @@ class AssetHolderAssignmentListView(ObjectListView):
     queryset = AssetHolderAssignment.objects.select_related('asset_holder', 'content_type')
     table = AssetHolderAssignmentTable
     action_buttons = ()
+    filterset = AssetHolderAssignmentFilterSet
+    filterset_form = AssetHolderAssignmentFilterForm
+
 
     def get_breadcrumbs(self):
         return [

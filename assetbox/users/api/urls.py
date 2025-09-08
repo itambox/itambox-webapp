@@ -13,12 +13,26 @@ router.register(r'users', views.UserViewSet)
 router.register(r'groups', views.GroupViewSet)
 router.register(r'tokens', views.TokenViewSet, basename='token')
 
+from drf_spectacular.utils import extend_schema
+
 class UsersAPIRootView(APIView):
     _ignore_model_permissions = True
 
     def get_view_name(self):
         return "Users API Root"
 
+    @extend_schema(
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "users": {"type": "string", "format": "uri"},
+                    "groups": {"type": "string", "format": "uri"},
+                    "config": {"type": "string", "format": "uri"}
+                }
+            }
+        }
+    )
     def get(self, request, format=None):
         return Response(OrderedDict((
             ('users', reverse('api:users_api:user-list', request=request, format=format)),

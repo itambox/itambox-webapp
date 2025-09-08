@@ -4,13 +4,13 @@ from django.urls import reverse
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.conf import settings # Import settings
-from core.models import BaseModel, ChangeLoggingMixin
+from core.models import BaseModel, ChangeLoggingMixin, StandardModel, VaultModel
 from core.mixins import ExportableMixin, TaggableMixin, JournalingMixin, AutoSlugMixin, CloneableMixin, ImageAttachmentMixin, FileAttachmentMixin, BookmarkableMixin
 from django.contrib.contenttypes.fields import GenericForeignKey
 
 # Create your models here.
 
-class Location(JournalingMixin, TaggableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
+class Location(StandardModel):
     STATUS_PLANNED = 'planned'
     STATUS_STAGING = 'staging'
     STATUS_ACTIVE = 'active'
@@ -79,7 +79,7 @@ class Location(JournalingMixin, TaggableMixin, ExportableMixin, ChangeLoggingMix
     def get_absolute_url(self):
         return reverse('organization:location_detail', kwargs={'pk': self.pk})
 
-class Region(JournalingMixin, TaggableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
+class Region(StandardModel):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     parent = models.ForeignKey(
@@ -102,7 +102,7 @@ class Region(JournalingMixin, TaggableMixin, ExportableMixin, ChangeLoggingMixin
     def get_absolute_url(self):
         return reverse('organization:region_detail', kwargs={'pk': self.pk})
 
-class SiteGroup(TaggableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
+class SiteGroup(StandardModel):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     parent = models.ForeignKey(
@@ -126,7 +126,7 @@ class SiteGroup(TaggableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
     def get_absolute_url(self):
         return reverse('organization:sitegroup_detail', kwargs={'pk': self.pk})
 
-class TenantGroup(TaggableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
+class TenantGroup(StandardModel):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     parent = models.ForeignKey(
@@ -150,7 +150,7 @@ class TenantGroup(TaggableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel)
     def get_absolute_url(self):
         return reverse('organization:tenantgroup_detail', kwargs={'pk': self.pk})
 
-class Tenant(JournalingMixin, TaggableMixin, CloneableMixin, ImageAttachmentMixin, FileAttachmentMixin, BookmarkableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
+class Tenant(VaultModel, BookmarkableMixin):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     group = models.ForeignKey(
@@ -173,7 +173,7 @@ class Tenant(JournalingMixin, TaggableMixin, CloneableMixin, ImageAttachmentMixi
     def __str__(self):
         return self.name
 
-class Site(JournalingMixin, TaggableMixin, CloneableMixin, ImageAttachmentMixin, FileAttachmentMixin, BookmarkableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
+class Site(VaultModel, BookmarkableMixin):
     STATUS_PLANNED = 'planned'
     STATUS_STAGING = 'staging'
     STATUS_ACTIVE = 'active'
@@ -214,7 +214,7 @@ class Site(JournalingMixin, TaggableMixin, CloneableMixin, ImageAttachmentMixin,
         return reverse('organization:site_detail', kwargs={'pk': self.pk})
 
 # +++ AssetHolder Model +++
-class AssetHolder(JournalingMixin, TaggableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
+class AssetHolder(StandardModel):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL, # Keep holder if user is deleted, set user link to null
@@ -294,7 +294,7 @@ class AssetHolderAssignment(ChangeLoggingMixin, BaseModel):
     def __str__(self):
         return f"Assignment for {self.asset_holder} to {self.assigned_object}"
 
-class ContactRole(AutoSlugMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
+class ContactRole(AutoSlugMixin, StandardModel):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     description = models.TextField(blank=True)
@@ -311,7 +311,7 @@ class ContactRole(AutoSlugMixin, ExportableMixin, ChangeLoggingMixin, BaseModel)
         return reverse('organization:contactrole_detail', kwargs={'pk': self.pk})
 
 
-class Contact(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
+class Contact(StandardModel):
     name = models.CharField(max_length=100)
     title = models.CharField(max_length=100, blank=True)
     phone = models.CharField(max_length=50, blank=True)
