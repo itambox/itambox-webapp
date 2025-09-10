@@ -2,7 +2,7 @@ from datetime import date, timedelta
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
-from assets.models import Asset, AssetRole, StatusLabel
+from assets.models import Asset, AssetRole, StatusLabel, Supplier
 from organization.models import AssetHolder
 from .models import AssetMaintenance, CustodyReceipt
 
@@ -18,12 +18,13 @@ class AssetMaintenanceModelTests(TestCase):
         self.asset = Asset.objects.create(
             name='SRV-01', asset_tag='TAG-SRV-01', asset_role=self.role, status=self.status
         )
+        self.supplier = Supplier.objects.create(name='Dell Support', slug='dell-support')
 
     def test_maintenance_creation(self):
         maint = AssetMaintenance.objects.create(
             asset=self.asset,
             maintenance_type=AssetMaintenance.MAINTENANCE_TYPE_REPAIR,
-            supplier='Dell Support',
+            supplier=self.supplier,
             cost=150.00,
             start_date=date(2026, 1, 15),
             completion_date=date(2026, 1, 18),
@@ -31,7 +32,7 @@ class AssetMaintenanceModelTests(TestCase):
         )
         self.assertEqual(str(maint), 'Repair on SRV-01')
         self.assertEqual(maint.cost, 150.00)
-        self.assertEqual(maint.supplier, 'Dell Support')
+        self.assertEqual(maint.supplier, self.supplier)
 
     def test_maintenance_downtime_days(self):
         maint = AssetMaintenance.objects.create(
@@ -134,10 +135,11 @@ class AssetMaintenanceViewTests(TestCase):
         self.asset = Asset.objects.create(
             name='SRV-01', asset_tag='TAG-SRV-01', asset_role=self.role, status=self.status
         )
+        self.supplier = Supplier.objects.create(name='Dell', slug='dell')
         self.maintenance = AssetMaintenance.objects.create(
             asset=self.asset,
             maintenance_type=AssetMaintenance.MAINTENANCE_TYPE_REPAIR,
-            supplier='Dell',
+            supplier=self.supplier,
             cost=250.00,
             start_date=date(2026, 1, 1),
             completion_date=date(2026, 1, 5),
@@ -145,48 +147,54 @@ class AssetMaintenanceViewTests(TestCase):
         )
 
     def test_list_view(self):
-        url = reverse('assets:assetmaintenance_list')
+        url = reverse('compliance:assetmaintenance_list')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'SRV-01')
 
     def test_detail_view(self):
-        url = reverse('assets:assetmaintenance_detail', kwargs={'pk': self.maintenance.pk})
+        url = reverse('compliance:assetmaintenance_detail', kwargs={'pk': self.maintenance.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'SRV-01')
         self.assertContains(response, '250.00')
 
     def test_create_view_get(self):
-        url = reverse('assets:assetmaintenance_create')
+        url = reverse('compliance:assetmaintenance_create')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_create_view_post(self):
-        url = reverse('assets:assetmaintenance_create')
+        hp_supplier = Supplier.objects.create(name='HP Support', slug='hp-support')
+        url = reverse('compliance:assetmaintenance_create')
         response = self.client.post(url, {
             'asset': self.asset.pk,
+            'title': 'RAM upgrade to 64GB',
+            'status': 'scheduled',
             'maintenance_type': AssetMaintenance.MAINTENANCE_TYPE_UPGRADE,
-            'supplier': 'HP Support',
+            'supplier': hp_supplier.pk,
             'cost': '500.00',
             'start_date': '2026-06-01',
             'completion_date': '2026-06-03',
             'notes': 'RAM upgrade to 64GB',
         })
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(AssetMaintenance.objects.filter(supplier='HP Support').exists())
+        self.assertTrue(AssetMaintenance.objects.filter(supplier=hp_supplier).exists())
 
     def test_edit_view_get(self):
-        url = reverse('assets:assetmaintenance_update', kwargs={'pk': self.maintenance.pk})
+        url = reverse('compliance:assetmaintenance_update', kwargs={'pk': self.maintenance.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_edit_view_post(self):
-        url = reverse('assets:assetmaintenance_update', kwargs={'pk': self.maintenance.pk})
+        dell_premium = Supplier.objects.create(name='Dell Premium', slug='dell-premium')
+        url = reverse('compliance:assetmaintenance_update', kwargs={'pk': self.maintenance.pk})
         response = self.client.post(url, {
             'asset': self.asset.pk,
+            'title': 'Replaced motherboard + CPU',
+            'status': 'completed',
             'maintenance_type': AssetMaintenance.MAINTENANCE_TYPE_REPAIR,
-            'supplier': 'Dell Premium',
+            'supplier': dell_premium.pk,
             'cost': '300.00',
             'start_date': '2026-01-01',
             'completion_date': '2026-01-05',
@@ -194,16 +202,16 @@ class AssetMaintenanceViewTests(TestCase):
         })
         self.assertEqual(response.status_code, 302)
         self.maintenance.refresh_from_db()
-        self.assertEqual(self.maintenance.supplier, 'Dell Premium')
+        self.assertEqual(self.maintenance.supplier, dell_premium)
         self.assertEqual(self.maintenance.cost, 300.00)
 
     def test_delete_view_get(self):
-        url = reverse('assets:assetmaintenance_delete', kwargs={'pk': self.maintenance.pk})
+        url = reverse('compliance:assetmaintenance_delete', kwargs={'pk': self.maintenance.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_delete_view_post(self):
-        url = reverse('assets:assetmaintenance_delete', kwargs={'pk': self.maintenance.pk})
+        url = reverse('compliance:assetmaintenance_delete', kwargs={'pk': self.maintenance.pk})
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
         self.assertFalse(AssetMaintenance.objects.filter(pk=self.maintenance.pk).exists())

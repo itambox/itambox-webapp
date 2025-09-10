@@ -1,7 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.urls import reverse, NoReverseMatch
-from core.models import BaseModel, ChangeLoggingMixin
+from core.models import BaseModel, ChangeLoggingMixin, StandardModel, DeletableVaultModel
 from core.mixins import TaggableMixin, JournalingMixin, ExportableMixin, AutoSlugMixin, ImageAttachmentMixin, FileAttachmentMixin, CloneableMixin, SoftDeleteMixin, BookmarkableMixin
 from core.managers import SoftDeleteManager, AllObjectsManager
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -12,7 +12,7 @@ from django.utils.text import slugify
 from extras.models import Tag
 
 
-class Provider(AutoSlugMixin, JournalingMixin, TaggableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
+class Provider(AutoSlugMixin, StandardModel):
     """Represents the vendor/supplier of a subscription or service."""
     name = models.CharField(
         max_length=255,
@@ -104,6 +104,7 @@ class SubscriptionStatusChoices(models.TextChoices):
     PENDING = 'pending', _('Pending')
     SUSPENDED = 'suspended', _('Suspended')
     RENEWING = 'renewing', _('Renewing')
+    TRIAL = 'trial', _('Trial')
 
 
 class BillingCycleChoices(models.TextChoices):
@@ -115,7 +116,7 @@ class BillingCycleChoices(models.TextChoices):
     ONETIME = 'onetime', _('One-Time')
 
 
-class Subscription(AutoSlugMixin, JournalingMixin, TaggableMixin, ImageAttachmentMixin, FileAttachmentMixin, BookmarkableMixin, SoftDeleteMixin, CloneableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
+class Subscription(AutoSlugMixin, BookmarkableMixin, DeletableVaultModel):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
 
@@ -190,7 +191,7 @@ class Subscription(AutoSlugMixin, JournalingMixin, TaggableMixin, ImageAttachmen
         help_text="Duration of the subscription term in months"
     )
     auto_renewal = models.BooleanField(
-        default=False,
+        default=True,
         verbose_name="Auto-Renewal",
         help_text="Whether this subscription renews automatically"
     )

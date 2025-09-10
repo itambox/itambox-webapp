@@ -1,8 +1,7 @@
 from django.db import models
 from django.urls import reverse
 from extras.models import Tag
-from core.models import BaseModel, ChangeLoggingMixin
-from core.mixins import JournalingMixin, TaggableMixin, ExportableMixin, CloneableMixin, ImageAttachmentMixin, FileAttachmentMixin
+from core.models import BaseModel, ChangeLoggingMixin, VaultModel
 
 class SoftwareCategoryChoices(models.TextChoices):
     OPERATING_SYSTEM = 'operating_system', 'Operating System'
@@ -19,7 +18,7 @@ class SoftwareLicenseTypeChoices(models.TextChoices):
     SHAREWARE = 'shareware', 'Shareware'
     SUBSCRIPTION = 'subscription', 'Subscription'
 
-class Software(JournalingMixin, TaggableMixin, CloneableMixin, ImageAttachmentMixin, FileAttachmentMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
+class Software(VaultModel):
     """
     Represents a catalog entry for a software product.
     """

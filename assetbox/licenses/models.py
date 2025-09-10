@@ -4,8 +4,8 @@ from django.urls import reverse, NoReverseMatch
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
-from core.models import BaseModel, ChangeLoggingMixin
-from core.mixins import ExportableMixin, SoftDeleteMixin, CloneableMixin, TaggableMixin, JournalingMixin, ImageAttachmentMixin, FileAttachmentMixin, BookmarkableMixin
+from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel
+from core.mixins import BookmarkableMixin
 from extras.models import Tag
 from software.models import Software
 from assets.models import Asset
@@ -33,7 +33,7 @@ class AllObjectsLicenseManager(AllObjectsManager.from_queryset(LicenseQuerySet))
     pass
 
 
-class License(JournalingMixin, TaggableMixin, SoftDeleteMixin, ImageAttachmentMixin, FileAttachmentMixin, BookmarkableMixin, ExportableMixin, CloneableMixin, ChangeLoggingMixin, BaseModel):
+class License(BookmarkableMixin, DeletableVaultModel):
     """Represents the specific entitlement/purchase record for software."""
 
     name = models.CharField(

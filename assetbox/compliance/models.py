@@ -4,10 +4,19 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core.models import BaseModel, ChangeLoggingMixin
+from core.mixins import TaggableMixin, CloneableMixin, ExportableMixin, JournalingMixin, ImageAttachmentMixin, FileAttachmentMixin, SoftDeleteMixin
+from core.managers import SoftDeleteManager, AllObjectsManager
 
 
 def generate_token():
     return secrets.token_urlsafe(48)
+
+
+class MaintenanceStatusChoices(models.TextChoices):
+    SCHEDULED = 'scheduled', 'Scheduled'
+    IN_PROGRESS = 'in_progress', 'In Progress'
+    COMPLETED = 'completed', 'Completed'
+    CANCELLED = 'cancelled', 'Cancelled'
 
 
 class CustodyReceipt(ChangeLoggingMixin, BaseModel):
@@ -34,19 +43,24 @@ class CustodyReceipt(ChangeLoggingMixin, BaseModel):
     signed_at = models.DateTimeField(default=timezone.now)
     eula_version = models.CharField(max_length=10, default='1.0')
     created_date = models.DateTimeField(auto_now_add=True, null=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
 
     class Meta:
         ordering = ('-signed_at',)
         verbose_name = "Custody Receipt"
         verbose_name_plural = "Custody Receipts"
-        db_table = 'assets_custodyreceipt'
-        app_label = 'assets'
 
     def __str__(self):
         return f"Custody Receipt for {self.asset} signed by {self.holder} (EULA v{self.eula_version})"
 
 
-class AssetMaintenance(ChangeLoggingMixin, BaseModel):
+class AssetMaintenance(TaggableMixin, CloneableMixin, ExportableMixin,
+                        JournalingMixin, ImageAttachmentMixin, FileAttachmentMixin,
+                        SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
+
     MAINTENANCE_TYPE_UPGRADE = 'upgrade'
     MAINTENANCE_TYPE_REPAIR = 'repair'
     MAINTENANCE_TYPE_CALIBRATION = 'calibration'
@@ -61,12 +75,21 @@ class AssetMaintenance(ChangeLoggingMixin, BaseModel):
     ]
 
     asset = models.ForeignKey('assets.Asset', on_delete=models.CASCADE, related_name='maintenances', db_index=True)
-    supplier = models.CharField(max_length=100, blank=True, verbose_name="Supplier/Vendor")
+    title = models.CharField(max_length=200, default='Maintenance')
+    description = models.TextField(blank=True)
+    supplier = models.ForeignKey('assets.Supplier', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Supplier/Vendor")
+    performed_by = models.CharField(max_length=200, blank=True)
     maintenance_type = models.CharField(
         max_length=50,
         choices=MAINTENANCE_TYPE_CHOICES,
         default=MAINTENANCE_TYPE_REPAIR,
         verbose_name="Maintenance Type",
+        db_index=True
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=MaintenanceStatusChoices.choices,
+        default=MaintenanceStatusChoices.SCHEDULED,
         db_index=True
     )
     cost = models.DecimalField(
@@ -79,19 +102,18 @@ class AssetMaintenance(ChangeLoggingMixin, BaseModel):
     start_date = models.DateField(verbose_name="Start Date", db_index=True)
     completion_date = models.DateField(null=True, blank=True, verbose_name="Completion Date", db_index=True)
     notes = models.TextField(blank=True)
+    tags = models.ManyToManyField('extras.Tag', related_name='asset_maintenances', blank=True)
 
     class Meta:
         ordering = ['-start_date']
         verbose_name = "Asset Maintenance"
         verbose_name_plural = "Asset Maintenances"
-        db_table = 'assets_assetmaintenance'
-        app_label = 'assets'
 
     def __str__(self):
         return f"{self.get_maintenance_type_display()} on {self.asset.name}"
 
     def get_absolute_url(self):
-        return reverse('assets:assetmaintenance_detail', kwargs={'pk': self.pk})
+        return reverse('compliance:assetmaintenance_detail', kwargs={'pk': self.pk})
 
     @property
     def downtime_days(self):

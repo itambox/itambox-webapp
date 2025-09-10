@@ -1,9 +1,9 @@
-from django import forms
+﻿from django import forms
 from django.urls import reverse
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Row, Column
 from core.forms import FilterForm
-from assets.models import Asset
+from assets.models import Asset, Supplier
 from .models import AssetMaintenance
 
 class AssetMaintenanceFilterForm(FilterForm):
@@ -16,10 +16,21 @@ class AssetMaintenanceForm(forms.ModelForm):
         widget=forms.Select(attrs={'class': 'form-select'}),
         label="Asset"
     )
+    supplier = forms.ModelChoiceField(
+        queryset=Supplier.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        required=False,
+        label="Supplier"
+    )
     maintenance_type = forms.ChoiceField(
         choices=AssetMaintenance.MAINTENANCE_TYPE_CHOICES,
         widget=forms.Select(attrs={'class': 'form-select'}),
         label="Maintenance Type"
+    )
+    status = forms.ChoiceField(
+        choices=AssetMaintenance._meta.get_field('status').choices,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Status"
     )
     start_date = forms.DateField(
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
@@ -34,12 +45,15 @@ class AssetMaintenanceForm(forms.ModelForm):
     class Meta:
         model = AssetMaintenance
         fields = [
-            'asset', 'supplier', 'maintenance_type', 'cost',
-            'start_date', 'completion_date', 'notes'
+            'asset', 'title', 'supplier', 'maintenance_type', 'status',
+            'cost', 'start_date', 'completion_date', 'performed_by',
+            'description', 'notes'
         ]
         widgets = {
-            'supplier': forms.TextInput(attrs={'class': 'form-control'}),
+            'title': forms.TextInput(attrs={'class': 'form-control'}),
+            'performed_by': forms.TextInput(attrs={'class': 'form-control'}),
             'cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
 
@@ -50,21 +64,29 @@ class AssetMaintenanceForm(forms.ModelForm):
         self.helper.form_tag = True
 
         button_text = 'Update' if self.instance and self.instance.pk else 'Create'
-        cancel_url = reverse('assets:assetmaintenance_list')
+        cancel_url = reverse('compliance:assetmaintenance_list')
 
         self.helper.layout = Layout(
             Row(
                 Column('asset', css_class='col-md-6'),
-                Column('supplier', css_class='col-md-6')
+                Column('title', css_class='col-md-6')
+            ),
+            Row(
+                Column('supplier', css_class='col-md-6'),
+                Column('performed_by', css_class='col-md-6')
             ),
             Row(
                 Column('maintenance_type', css_class='col-md-6'),
-                Column('cost', css_class='col-md-6')
+                Column('status', css_class='col-md-6')
+            ),
+            Row(
+                Column('cost', css_class='col-md-6'),
             ),
             Row(
                 Column('start_date', css_class='col-md-6'),
                 Column('completion_date', css_class='col-md-6')
             ),
+            'description',
             'notes',
             HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),
