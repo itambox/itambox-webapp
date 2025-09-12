@@ -8,3 +8,5 @@ class ExtrasConfig(AppConfig):
     def ready(self):
         # Import search indexes to register them
         import extras.search
+        # Import signals to register them
+        import extras.signals

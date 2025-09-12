@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.db import IntegrityError
-from .models import Tag, CustomField, CustomFieldset, Dashboard
+from extras.models import Tag, CustomField, CustomFieldset, Dashboard
 
 User = get_user_model()
 

@@ -33,7 +33,13 @@ class DashboardWidgetAddView(LoginRequiredMixin, View):
             if widget_cls:
                 dashboard = get_dashboard(request.user, for_update=True)
                 dashboard.add_widget(widget_id, title=title or widget_cls.title)
-        return redirect('dashboard')
+            return redirect('dashboard')
+        
+        # If invalid, re-render
+        html = render_to_string('extras/dashboard/widget_add.html', {
+            'form': form,
+        }, request=request)
+        return HttpResponse(html, status=400)
 
 
 class DashboardWidgetConfigView(LoginRequiredMixin, View):
@@ -48,7 +54,7 @@ class DashboardWidgetConfigView(LoginRequiredMixin, View):
         form = DashboardWidgetConfigForm(initial={
             'title': config.get('title', ''),
             'visible': config.get('visible', True),
-        }, widget_id=widget_id, initial_config=config)
+        }, widget_id=widget_id, initial_config=config, request=request)
         html = render_to_string('extras/dashboard/widget_config.html', {
             'form': form,
             'index': index,
@@ -63,7 +69,7 @@ class DashboardWidgetConfigView(LoginRequiredMixin, View):
             return redirect('dashboard')
         config = dashboard.layout[index]
         widget_id = config.get('widget')
-        form = DashboardWidgetConfigForm(request.POST, widget_id=widget_id, initial_config=config)
+        form = DashboardWidgetConfigForm(request.POST, widget_id=widget_id, initial_config=config, request=request)
         if form.is_valid():
             update_kwargs = {
                 'title': form.cleaned_data['title'],
@@ -75,7 +81,16 @@ class DashboardWidgetConfigView(LoginRequiredMixin, View):
                 existing_cfg.update(widget_cfg)
                 update_kwargs['config'] = existing_cfg
             dashboard.update_widget(index, **update_kwargs)
-        return redirect('dashboard')
+            return redirect('dashboard')
+
+        # If invalid, re-render the modal content with form containing errors!
+        html = render_to_string('extras/dashboard/widget_config.html', {
+            'form': form,
+            'index': index,
+            'config': config,
+            'widget_config_form': form.widget_config_form,
+        }, request=request)
+        return HttpResponse(html, status=400)
 
 
 class DashboardWidgetDeleteView(LoginRequiredMixin, View):

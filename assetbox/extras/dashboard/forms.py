@@ -39,7 +39,7 @@ class DashboardWidgetConfigForm(forms.Form):
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
     )
 
-    def __init__(self, *args, widget_id=None, initial_config=None, **kwargs):
+    def __init__(self, *args, widget_id=None, initial_config=None, request=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.widget_config_form = None
         if widget_id:
@@ -47,16 +47,17 @@ class DashboardWidgetConfigForm(forms.Form):
             if widget_cls:
                 widget_instance = widget_cls(config=initial_config or {})
                 self.widget_config_form = widget_instance.get_config_form(
-                    data=self.data if self.is_bound else None
+                    data=self.data if self.is_bound else None,
+                    request=request
                 )
 
     def is_valid(self):
         valid = super().is_valid()
-        if self.widget_config_form and self.widget_config_form.declared_fields:
+        if self.widget_config_form and self.widget_config_form.fields:
             valid = valid and self.widget_config_form.is_valid()
         return valid
 
     def get_widget_config(self):
-        if self.widget_config_form and self.widget_config_form.declared_fields:
+        if self.widget_config_form and self.widget_config_form.fields:
             return self.widget_config_form.cleaned_data
         return {}

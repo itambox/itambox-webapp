@@ -12,4 +12,6 @@ urlpatterns = [
     path('tags/<int:pk>/delete/', views.TagDeleteView.as_view(), name='tag_delete'),
     # Dashboard
     path('dashboard/', include('extras.dashboard.urls')),
+    # Config Contexts
+    path('config-contexts/', include('extras.urls_contexts')),
 ]

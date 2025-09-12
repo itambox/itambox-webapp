@@ -1,6 +1,6 @@
 import re
 from django import forms
-from .models import Tag, CustomField, CustomFieldset
+from .models import Tag, CustomField, CustomFieldset, ConfigContext
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Div, Field
 from django.urls import reverse
@@ -142,4 +142,104 @@ class CustomFieldFilterForm(FilterForm):
 
 class CustomFieldsetFilterForm(FilterForm):
     from .filters import CustomFieldsetFilterSet
-    filterset_class = CustomFieldsetFilterSet
+    filterset_class = CustomFieldsetFilterSet
+
+
+# =============================================================================
+# Config Context
+# =============================================================================
+
+class ConfigContextForm(forms.ModelForm):
+    data = forms.CharField(
+        widget=forms.Textarea(attrs={'class': 'form-control font-monospace', 'rows': 10}),
+        help_text="Enter configuration data in valid JSON format."
+    )
+
+    class Meta:
+        model = ConfigContext
+        fields = ['name', 'description', 'weight', 'regions', 'sites', 'locations', 'tenants', 'data']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'weight': forms.NumberInput(attrs={'class': 'form-control'}),
+            'regions': forms.SelectMultiple(attrs={'class': 'form-select'}),
+            'sites': forms.SelectMultiple(attrs={'class': 'form-select'}),
+            'locations': forms.SelectMultiple(attrs={'class': 'form-select'}),
+            'tenants': forms.SelectMultiple(attrs={'class': 'form-select'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        if 'instance' in kwargs and kwargs['instance'] and kwargs['instance'].pk:
+            import json
+            initial = kwargs.get('initial', {})
+            initial['data'] = json.dumps(kwargs['instance'].data, indent=4)
+            kwargs['initial'] = initial
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+        button_text = 'Update' if self.instance.pk else 'Create'
+        cancel_url = reverse('extras:configcontext_list')
+        self.helper.layout = Layout(
+            'name',
+            'description',
+            'weight',
+            'regions',
+            'sites',
+            'locations',
+            'tenants',
+            'data',
+            HTML('<div class="mt-3">'),
+            Submit('submit', button_text, css_class='btn btn-primary'),
+            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+            HTML('</div>')
+        )
+
+    def clean_data(self):
+        data = self.cleaned_data.get('data')
+        try:
+            import json
+            return json.loads(data)
+        except json.JSONDecodeError as e:
+            raise forms.ValidationError(f"Invalid JSON: {e}")
+
+
+import django_filters
+from django.db.models import Q
+
+class ConfigContextFilterSet(django_filters.FilterSet):
+    q = django_filters.CharFilter(method='search', label='Search')
+
+    class Meta:
+        model = ConfigContext
+        fields = ['name', 'weight']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(description__icontains=value)
+        ).distinct()
+
+
+class ConfigContextFilterForm(FilterForm):
+    filterset_class = ConfigContextFilterSet
+
+
+import django_tables2 as tables
+from django_tables2.utils import A
+from core.tables import ActionsColumn, BaseTable, ToggleColumn
+
+class ConfigContextTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    name = tables.LinkColumn('extras:configcontext_edit', args=[A('pk')], verbose_name='Name')
+    weight = tables.Column(verbose_name='Weight')
+    description = tables.Column(verbose_name='Description')
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = ConfigContext
+        fields = ('pk', 'name', 'weight', 'description', 'actions')
+        default_columns = ('pk', 'name', 'weight', 'description', 'actions')
+

@@ -2,8 +2,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Count
-from .models import Tag, CustomField, CustomFieldset
-from .forms import TagForm, TagFilterForm, CustomFieldForm, CustomFieldFilterForm, CustomFieldsetForm, CustomFieldsetFilterForm
+from .models import Tag, CustomField, CustomFieldset, ConfigContext
+from .forms import TagForm, TagFilterForm, CustomFieldForm, CustomFieldFilterForm, CustomFieldsetForm, CustomFieldsetFilterForm, ConfigContextForm, ConfigContextFilterSet, ConfigContextFilterForm, ConfigContextTable
 from django_tables2 import RequestConfig
 from .tables import TagTable, CustomFieldTable, CustomFieldsetTable
 from .filters import TagFilter, CustomFieldFilterSet, CustomFieldsetFilterSet
@@ -129,4 +129,37 @@ class CustomFieldsetDeleteView(ObjectDeleteView):
     model = CustomFieldset
     template_name = 'generic/object_confirm_delete.html'
     success_url = reverse_lazy('assets:customfieldset_list')
+
+
+# =============================================================================
+# Config Context Views
+# =============================================================================
+
+class ConfigContextListView(ObjectListView):
+    queryset = ConfigContext.objects.all()
+    filterset = ConfigContextFilterSet
+    filterset_form = ConfigContextFilterForm
+    table = ConfigContextTable
+    action_buttons = ('add',)
+    template_name = 'generic/object_list.html'
+
+
+class ConfigContextCreateView(ObjectEditView):
+    model_form = ConfigContextForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'extras:configcontext_list'
+
+
+class ConfigContextEditView(ObjectEditView):
+    queryset = ConfigContext.objects.all()
+    model_form = ConfigContextForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'extras:configcontext_list'
+
+
+class ConfigContextDeleteView(ObjectDeleteView):
+    queryset = ConfigContext.objects.all()
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('extras:configcontext_list')
+
 

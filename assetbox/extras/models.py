@@ -64,6 +64,7 @@ class Dashboard(models.Model):
         """Update widget config at the given index."""
         if 0 <= index < len(self.layout):
             self.layout[index].update(kwargs)
+            self.layout = list(self.layout)
             self.save(update_fields=['layout'])
 
     def move_widget(self, from_index, to_index):
@@ -125,4 +126,27 @@ class CustomFieldset(ChangeLoggingMixin, BaseModel):
 
     def get_absolute_url(self):
         return reverse('assets:customfieldset_detail', kwargs={'pk': self.pk})
+
+
+class ConfigContext(ChangeLoggingMixin, BaseModel):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
+    weight = models.PositiveSmallIntegerField(
+        default=100,
+        help_text="Priority weight for dictionary merging conflict resolution"
+    )
+    regions = models.ManyToManyField('organization.Region', blank=True, related_name='config_contexts')
+    sites = models.ManyToManyField('organization.Site', blank=True, related_name='config_contexts')
+    locations = models.ManyToManyField('organization.Location', blank=True, related_name='config_contexts')
+    tenants = models.ManyToManyField('organization.Tenant', blank=True, related_name='config_contexts')
+    data = models.JSONField(help_text="Serialized configuration dictionary")
+
+    class Meta:
+        ordering = ['weight', 'name']
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse('extras:configcontext_edit', kwargs={'pk': self.pk})
 
