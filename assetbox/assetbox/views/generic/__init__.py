@@ -13,6 +13,7 @@ from django.views.generic import View, ListView, DetailView, UpdateView, DeleteV
 from django.views.generic.base import TemplateResponseMixin
 from django.contrib.contenttypes.models import ContentType
 from django.utils.http import urlencode
+from django.utils.translation import gettext as _
 from django.utils.module_loading import import_string
 from django.views.decorators.http import require_POST
 from django.db.models import ProtectedError
@@ -20,7 +21,7 @@ from django.template.loader import get_template
 from django.template import TemplateDoesNotExist
 
 from assetbox.registry import registry
-from assetbox.utils import get_model_viewname, get_table_for_model
+from assetbox.utils import get_model_viewname, get_table_for_model, get_help_url
 from core.models import ObjectChange, JournalEntry, ImageAttachment, FileAttachment
 from core.tables import ObjectChangeTable
 from core.forms import ConfirmationForm, JournalEntryForm, BulkEditForm
@@ -126,8 +127,18 @@ class ObjectListView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, 
         context['verbose_name_plural'] = _model._meta.verbose_name_plural
         context['model_name_str'] = f"{_model._meta.app_label}.{_model._meta.model_name}"
         context['table_config_key'] = f"{_model._meta.app_label}.{table.__class__.__name__}"
+        context['app_label'] = _model._meta.app_label
+        context['model_name'] = _model._meta.model_name
+        context['object_type'] = _model._meta.verbose_name
 
-        context.setdefault('title', _model._meta.verbose_name_plural.title())
+        context.setdefault('title', _model._meta.verbose_name_plural)
+
+        from core.models import ExportTemplate
+        try:
+            content_type = ContentType.objects.get_for_model(_model)
+            context['export_templates'] = list(ExportTemplate.objects.filter(content_type=content_type))
+        except Exception:
+            context['export_templates'] = []
 
         try:
             create_url_name = get_model_viewname(_model, 'create')
@@ -138,20 +149,30 @@ class ObjectListView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, 
 
         try:
             import_url_name = get_model_viewname(_model, 'import')
-            reverse(import_url_name)
-            context['import_url_name'] = import_url_name
+            context['import_url'] = reverse(import_url_name)
         except NoReverseMatch:
-            context['import_url_name'] = None
+            try:
+                context['import_url'] = reverse('generic_import', kwargs={
+                    'app_label': _model._meta.app_label,
+                    'model_name': _model._meta.model_name
+                })
+            except NoReverseMatch:
+                context['import_url'] = None
+
+        # Check permissions in Python
+        can_add = self.request.user.has_perm(f"{_model._meta.app_label}.add_{_model._meta.model_name}")
+        context['can_add'] = can_add
 
         context['action_buttons'] = self.action_buttons
         if 'add' in self.action_buttons and not context['create_url_name']:
             logger.debug("'add' action button enabled but create URL not resolvable for %s", self.model)
 
         base_breadcrumbs = [
-            (reverse('dashboard'), 'Dashboard'),
+            (reverse('dashboard'), _('Dashboard')),
             (None, context['title'])
         ]
         context['breadcrumbs'] = getattr(self, 'get_breadcrumbs', lambda: base_breadcrumbs)()
+        context['help_url'] = get_help_url(self, _model._meta.app_label, _model._meta.model_name)
         return context
 
 class ObjectDetailView(LoginRequiredMixin, BaseHTMXView, DetailView):
@@ -189,8 +210,8 @@ class ObjectDetailView(LoginRequiredMixin, BaseHTMXView, DetailView):
         obj = self.get_object()
         app_label = obj._meta.app_label
         model_name = obj._meta.model_name
-        verbose_name = obj._meta.verbose_name.title()
-        verbose_name_plural = obj._meta.verbose_name_plural.title()
+        verbose_name = obj._meta.verbose_name
+        verbose_name_plural = obj._meta.verbose_name_plural
 
         context['model'] = obj.__class__
         context['layout'] = self.layout
@@ -223,7 +244,7 @@ class ObjectDetailView(LoginRequiredMixin, BaseHTMXView, DetailView):
         
         context['title'] = str(obj)
         base_breadcrumbs = [
-            (reverse('dashboard'), 'Dashboard'),
+            (reverse('dashboard'), _('Dashboard')),
             (reverse(get_model_viewname(obj, 'list')), verbose_name_plural),
             (None, context['title'])
         ]
@@ -286,6 +307,40 @@ class ObjectDetailView(LoginRequiredMixin, BaseHTMXView, DetailView):
             ).order_by('-created')[:20]
             context['has_file_attachments'] = True
 
+        if registry.model_has_feature(obj.__class__, 'subscribable'):
+            obj_type = ContentType.objects.get_for_model(obj)
+            context['has_subscriptions'] = True
+            context['subscribable_content_type_id'] = obj_type.pk
+            
+            from subscriptions.models import SubscriptionAssignment
+            from subscriptions.tables import SubscriptionAssignmentTable
+            
+            assignments_qs = SubscriptionAssignment.objects.filter(
+                content_type=obj_type,
+                object_id=obj.pk
+            ).select_related('subscription', 'subscription__provider', 'assigned_by')
+            
+            subs_table = SubscriptionAssignmentTable(assignments_qs, request=self.request)
+            subs_table.exclude = ('content_type', 'object_id', 'assigned_object')
+            RequestConfig(self.request, paginate=False).configure(subs_table)
+            context['subscription_assignments_table'] = subs_table
+            context['subscription_assignments_count'] = assignments_qs.count()
+
+        if registry.model_has_feature(obj.__class__, 'bookmarkable'):
+            obj_type = ContentType.objects.get_for_model(obj)
+            context['is_bookmarkable'] = True
+            context['bookmark_content_type_id'] = obj_type.pk
+            if self.request.user.is_authenticated:
+                from core.models import Bookmark
+                context['is_bookmarked'] = Bookmark.objects.filter(
+                    user=self.request.user,
+                    model=obj_type,
+                    object_id=obj.pk
+                ).exists()
+            else:
+                context['is_bookmarked'] = False
+
+
         if 'related_objects_list' not in context:
             related_objects_list = []
             for relation in obj._meta.get_fields(include_parents=True):
@@ -329,6 +384,7 @@ class ObjectDetailView(LoginRequiredMixin, BaseHTMXView, DetailView):
             related_objects_list.sort(key=lambda x: x['label'])
             context['related_objects_list'] = related_objects_list
 
+        context['help_url'] = get_help_url(self, app_label, model_name)
         return context
 
 class ObjectEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, UpdateView):
@@ -464,7 +520,8 @@ class ObjectEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, 
         context['model'] = _model
         context['verbose_name'] = _model._meta.verbose_name
         context['is_editing'] = is_editing
-        context['title'] = f"{'Edit' if is_editing else 'Create'} {context['verbose_name']}"
+        action_verb = _('Edit') if is_editing else _('Create')
+        context['title'] = f"{action_verb} {context['verbose_name']}"
 
         if self.object and hasattr(self.object, 'get_absolute_url'):
             context['cancel_url'] = self.object.get_absolute_url()
@@ -476,11 +533,12 @@ class ObjectEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, 
                  context['cancel_url'] = reverse('dashboard')
         
         base_breadcrumbs = [
-            (reverse('dashboard'), 'Dashboard'),
-            (context['cancel_url'], _model._meta.verbose_name_plural.title()),
+            (reverse('dashboard'), _('Dashboard')),
+            (context['cancel_url'], _model._meta.verbose_name_plural),
             (None, context['title'])
         ]
         context['breadcrumbs'] = getattr(self, 'get_breadcrumbs', lambda: base_breadcrumbs)()
+        context['help_url'] = get_help_url(self, _model._meta.app_label, _model._meta.model_name)
         return context
 
 class ObjectCloneView(ObjectEditView):
@@ -561,7 +619,7 @@ class ObjectDeleteView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
             raise ValueError("Cannot determine model for delete view.")
         context['model'] = self.model or model
         context['verbose_name'] = model._meta.verbose_name
-        context['title'] = f"Delete {context['verbose_name']}: {self.object}"
+        context['title'] = _("Delete {verbose_name}: {object}").format(verbose_name=model._meta.verbose_name, object=self.object)
         
         if hasattr(self.object, 'get_absolute_url'):
             context['cancel_url'] = self.object.get_absolute_url()
@@ -574,11 +632,12 @@ class ObjectDeleteView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
         context['return_url'] = self.request.GET.get('return_url', context['cancel_url'])
         
         base_breadcrumbs = [
-            (reverse('dashboard'), 'Dashboard'),
-            (context['cancel_url'], model._meta.verbose_name_plural.title()),
-            (None, f"Delete {self.object}")
+            (reverse('dashboard'), _('Dashboard')),
+            (context['cancel_url'], model._meta.verbose_name_plural),
+            (None, _("Delete {object}").format(object=self.object))
         ]
         context['breadcrumbs'] = getattr(self, 'get_breadcrumbs', lambda: base_breadcrumbs)()
+        context['help_url'] = get_help_url(self, model._meta.app_label, model._meta.model_name)
         return context
 
 class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, TemplateView):
@@ -592,18 +651,107 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
         return ('',)
 
     def _get_model(self):
-        if self.model_form and hasattr(self.model_form, 'model'):
-            return self.model_form.model
+        form_cls = getattr(self, 'model_form', None)
+        if form_cls and hasattr(form_cls, 'model') and form_cls.model:
+            return form_cls.model
         if hasattr(self, 'model') and self.model:
             return self.model
         return None
 
+    def get_form_class(self):
+        if self.model_form:
+            return self.model_form
+        
+        model = self._get_model()
+        if not model:
+            raise ImproperlyConfigured(f"{self.__class__.__name__} needs a model attribute or model_form.")
+            
+        from core.forms.import_forms import BulkImportForm
+        from django.db import models
+        
+        required_fields = []
+        optional_fields = []
+        
+        for field in model._meta.fields:
+            if field.primary_key or field.auto_created or not field.editable:
+                continue
+            if isinstance(field, (models.ForeignKey, models.OneToOneField)):
+                if not field.blank and not field.null and field.default is models.NOT_PROVIDED:
+                    required_fields.append(field.name)
+                else:
+                    optional_fields.append(field.name)
+            elif not field.blank and not field.null and field.default is models.NOT_PROVIDED:
+                required_fields.append(field.name)
+            else:
+                optional_fields.append(field.name)
+                
+        target_model = model
+        target_required = list(required_fields)
+        target_optional = list(optional_fields)
+        
+        class DynamicBulkImportForm(BulkImportForm):
+            model = target_model
+            required_fields = target_required
+            optional_fields = target_optional
+            
+            def map_row(self, row):
+                mapped = {}
+                
+                # Check for primary key in the CSV/YAML row to support UPSERT (NetBox Gold Standard)
+                pk_name = self.model._meta.pk.name
+                pk_val = row.get('id') or row.get(pk_name)
+                if pk_val and pk_val.strip():
+                    mapped[pk_name] = pk_val.strip()
+
+                for k in self.field_names:
+                    if k not in row:
+                        continue
+                    val = row.get(k, '').strip()
+                    if not val:
+                        continue
+                    field = self.model._meta.get_field(k)
+                    if field.is_relation and field.many_to_one:
+                        related_model = field.related_model
+                        obj = None
+                        
+                        # 1. Primary Key Lookup
+                        if val.isdigit():
+                            obj = related_model.objects.filter(pk=int(val)).first()
+                            
+                        # 2. Case-Sensitive Attribute Lookup
+                        if not obj:
+                            lookup_fields = ['slug', 'name', 'model', 'username', 'upn']
+                            for lookup in lookup_fields:
+                                if hasattr(related_model, lookup):
+                                    obj = related_model.objects.filter(**{lookup: val}).first()
+                                    if obj:
+                                        break
+                                        
+                        # 3. Case-Insensitive Attribute Lookup (Bilingual / Human-Friendly)
+                        if not obj:
+                            for lookup in lookup_fields:
+                                if hasattr(related_model, lookup):
+                                    obj = related_model.objects.filter(**{f"{lookup}__iexact": val}).first()
+                                    if obj:
+                                        break
+                                        
+                        if obj:
+                            mapped[field.attname] = obj.pk
+                        else:
+                            mapped[field.attname] = val  # Fallback to trigger safe model clean validation error
+                    else:
+                        mapped[k] = val
+                return mapped
+
+                
+        return DynamicBulkImportForm
+
     def get(self, request, *args, **kwargs):
-        form = self.model_form()
+        form = self.get_form_class()()
         return self._render_response(request, form)
 
     def post(self, request, *args, **kwargs):
-        form = self.model_form(request.POST, request.FILES)
+        form = self.get_form_class()(request.POST, request.FILES)
 
         if '_preview' in request.POST:
             if form.is_valid():
@@ -624,7 +772,7 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
             rows = request.session.get('import_rows', [])
             if rows:
                 from django.db import transaction
-                form = self.model_form()
+                form = self.get_form_class()()
                 form._rows_data = rows
                 with transaction.atomic():
                     imported, errors = form.import_data(request=request)
@@ -645,20 +793,69 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
 
         return self._render_response(request, form)
 
+    def _get_fields_info(self):
+        model = self._get_model()
+        fields_info = []
+        if model:
+            from django.db import models
+            for field in model._meta.fields:
+                if field.primary_key or field.auto_created or not field.editable:
+                    continue
+                
+                description = field.help_text or field.verbose_name or ''
+                if description:
+                    description = str(description)
+                
+                is_relation = field.is_relation and field.many_to_one
+                accessor = ''
+                choices = []
+                if is_relation:
+                    related_model = field.related_model
+                    accessor = 'slug' if hasattr(related_model, 'slug') else 'name'
+                    description = _("Relation to {model_name} (resolves by ID, Slug or Name).").format(
+                        model_name=str(related_model._meta.verbose_name)
+                    )
+                
+                if field.choices:
+                    choices = [(val, label) for val, label in field.choices]
+                
+                if isinstance(field, models.DateField):
+                    description = f"{description} Format: YYYY-MM-DD"
+                elif isinstance(field, models.BooleanField):
+                    description = f"{description} Specify true or false"
+                
+                required = False
+                if is_relation:
+                    if not field.blank and not field.null and field.default is models.NOT_PROVIDED:
+                        required = True
+                elif not field.blank and not field.null and field.default is models.NOT_PROVIDED:
+                    required = True
+                
+                fields_info.append({
+                    'name': field.name,
+                    'required': required,
+                    'accessor': accessor,
+                    'description': description,
+                    'choices': choices,
+                })
+        return fields_info
+
     def _render_response(self, request, form, **extra_context):
         context = {
             'form': form,
             'title': self._get_title(),
             'cancel_url': self._get_cancel_url(),
+            'fields': self._get_fields_info(),
             **extra_context,
         }
         return self.render_to_response(context)
 
+
     def _get_title(self):
         model = self._get_model()
         if model:
-            return f'Import {model._meta.verbose_name_plural.title()}'
-        return 'Import Objects'
+            return _('Import {verbose_name_plural}').format(verbose_name_plural=model._meta.verbose_name_plural)
+        return _('Import Objects')
 
     def _get_cancel_url(self):
         model = self._get_model()
@@ -675,8 +872,8 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
         context['title'] = kwargs.get('title', self._get_title())
         context['cancel_url'] = kwargs.get('cancel_url', self._get_cancel_url())
         context['breadcrumbs'] = [
-            (reverse('dashboard'), 'Dashboard'),
-            (context['cancel_url'], self._get_model()._meta.verbose_name_plural.title() if self._get_model() else 'List'),
+            (reverse('dashboard'), _('Dashboard')),
+            (context['cancel_url'], self._get_model()._meta.verbose_name_plural if self._get_model() else _('List')),
             (None, context['title']),
         ]
         return context
@@ -891,3 +1088,10 @@ def table_config(request, model_name):
 
 
 from assetbox.views.features import ObjectExportView  # noqa: E402
+
+
+class GenericObjectImportView(ObjectImportView):
+    def _get_model(self):
+        app_label = self.kwargs.get('app_label')
+        model_name = self.kwargs.get('model_name')
+        return apps.get_model(app_label, model_name)

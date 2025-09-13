@@ -206,3 +206,28 @@ def build_breadcrumbs(request, obj=None):
         breadcrumbs[-1]['is_active'] = True
 
     return breadcrumbs
+
+
+def get_help_url(view_instance, app_label=None, model_name=None):
+    """
+    Resolves the local static documentation help link for a given view context.
+    Checks if the compiled HTML file or its directory index exists in static/docs.
+    """
+    doc_path = getattr(view_instance, 'document_path', None)
+    if not doc_path and app_label and model_name:
+        doc_path = f"models/{app_label}/{model_name}"
+
+    if not doc_path:
+        return None
+
+    import os
+    static_docs_dir = os.path.join(settings.BASE_DIR, 'static', 'docs')
+    
+    file_target = os.path.join(static_docs_dir, f"{doc_path}.html")
+    dir_target = os.path.join(static_docs_dir, doc_path, "index.html")
+
+    if os.path.exists(file_target):
+        return f"{settings.STATIC_URL}docs/{doc_path}.html"
+    elif os.path.exists(dir_target):
+        return f"{settings.STATIC_URL}docs/{doc_path}/index.html"
+    return None

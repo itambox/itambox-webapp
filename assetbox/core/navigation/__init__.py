@@ -25,7 +25,12 @@ class MenuItemButton:
 
     def __post_init__(self):
         if self.link:
-            self._url = reverse_lazy(self.link)
+            if isinstance(self.link, str) and '/' in self.link:
+                self._url = self.link
+            elif not isinstance(self.link, str):
+                self._url = self.link
+            else:
+                self._url = reverse_lazy(self.link)
 
     @property
     def url(self):
@@ -71,7 +76,7 @@ class Menu:
         return self.label.replace(' ', '_').replace('&', '')
 
 
-def get_model_item(app_label, model_name, label, actions=('add',)):
+def get_model_item(app_label, model_name, label, actions=('add', 'import')):
     return MenuItem(
         link=f'{app_label}:{model_name}_list',
         link_text=label,
@@ -80,7 +85,7 @@ def get_model_item(app_label, model_name, label, actions=('add',)):
     )
 
 
-def get_model_buttons(app_label, model_name, actions=('add',)):
+def get_model_buttons(app_label, model_name, actions=('add', 'import')):
     buttons = []
 
     if 'add' in actions:
@@ -90,6 +95,17 @@ def get_model_buttons(app_label, model_name, actions=('add',)):
                 title='Add',
                 icon_class='mdi mdi-plus-thick',
                 permissions=[f'{app_label}.add_{model_name}']
+            )
+        )
+
+    if 'import' in actions:
+        buttons.append(
+            MenuItemButton(
+                link=f'/import/{app_label}/{model_name}/',
+                title='Import',
+                icon_class='mdi mdi-download',
+                permissions=[f'{app_label}.add_{model_name}'],
+                color='outline text-success'
             )
         )
 

@@ -28,6 +28,7 @@ from core.forms import (
     JournalEntryForm, WebhookEndpointForm, EventRuleForm, LabelTemplateForm
 )
 from assetbox.registry import registry
+from assetbox.panels import Panel
 
 from .generic import BaseHTMXView, ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
 
@@ -98,19 +99,88 @@ class ObjectChangeView(BaseHTMXView, DetailView):
         return context
 
 
+def get_filterset_for_model(model):
+    from assetbox.registry import registry
+    fs = registry.get_filter_set(model)
+    if fs:
+        return fs
+
+    app_label = model._meta.app_label
+    model_name = model._meta.model_name
+    import importlib
+    try:
+        filters_module = importlib.import_module(f"{app_label}.filters")
+        for attr_name in dir(filters_module):
+            if attr_name.lower() == f"{model_name}filterset":
+                return getattr(filters_module, attr_name)
+    except ImportError:
+        pass
+    return None
+
+
 class ObjectExportView(LoginRequiredMixin, View):
     def get(self, request, app_label, model_name, template_id):
         model = apps.get_model(app_label, model_name)
-        content_type = ContentType.objects.get_for_model(model)
-        template = get_object_or_404(ExportTemplate, pk=template_id, content_type=content_type)
+        
+        export_format = request.GET.get('format', 'csv').lower()
+        export_scope = request.GET.get('export_scope', 'all').lower()
 
         pks = request.GET.get('pk', '')
         if pks:
             pks = [int(p) for p in pks.split(',') if p.strip()]
             queryset = model.objects.filter(pk__in=pks)
+        elif export_scope == 'filtered':
+            queryset = model.objects.all()
+            filterset_class = get_filterset_for_model(model)
+            if filterset_class:
+                filterset = filterset_class(request.GET, queryset=queryset)
+                if filterset.is_valid():
+                    queryset = filterset.qs
         else:
             queryset = model.objects.all()
 
+        if template_id == 0:
+            if export_format == 'yaml':
+                import yaml
+                fields = [f for f in model._meta.fields if not f.many_to_many]
+                export_data = []
+                for obj in queryset:
+                    row_dict = {}
+                    for field in fields:
+                        val = getattr(obj, field.name)
+                        if val is None:
+                            val = ''
+                        elif isinstance(val, (int, float, bool)):
+                            row_dict[field.name] = val
+                        else:
+                            row_dict[field.name] = str(val)
+                    export_data.append(row_dict)
+                
+                yaml_content = yaml.safe_dump(export_data, default_flow_style=False, sort_keys=False)
+                response = HttpResponse(yaml_content, content_type='text/yaml')
+                response['Content-Disposition'] = f'attachment; filename="{model_name}_export.yaml"'
+                return response
+            else:
+                import csv
+                response = HttpResponse(content_type='text/csv')
+                response['Content-Disposition'] = f'attachment; filename="{model_name}_export.csv"'
+                
+                writer = csv.writer(response)
+                fields = [f for f in model._meta.fields if not f.many_to_many]
+                writer.writerow([f.name for f in fields])
+                
+                for obj in queryset:
+                    row = []
+                    for field in fields:
+                        val = getattr(obj, field.name)
+                        if val is None:
+                            val = ''
+                        row.append(str(val))
+                    writer.writerow(row)
+                return response
+
+        content_type = ContentType.objects.get_for_model(model)
+        template = get_object_or_404(ExportTemplate, pk=template_id, content_type=content_type)
         content = template.render_queryset(queryset)
 
         response = HttpResponse(content, content_type=template.mime_type)
@@ -134,6 +204,9 @@ class ExportTemplateListView(ObjectListView):
 @method_decorator(login_required, name='dispatch')
 class ExportTemplateDetailView(ObjectDetailView):
     queryset = ExportTemplate.objects.select_related('content_type')
+    layout = (
+        ((Panel('info', 'Export Template Details'),),),
+    )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -322,6 +395,9 @@ class PermissionGroupListView(ObjectListView):
 
 class PermissionGroupDetailView(ObjectDetailView):
     queryset = PermissionGroup.objects.all()
+    layout = (
+        ((Panel('info', 'Permission Group Details'),),),
+    )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -359,6 +435,9 @@ class WebhookEndpointListView(ObjectListView):
 @method_decorator(login_required, name='dispatch')
 class WebhookEndpointDetailView(ObjectDetailView):
     queryset = WebhookEndpoint.objects.all()
+    layout = (
+        ((Panel('info', 'Webhook Endpoint Details'),),),
+    )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -467,6 +546,9 @@ class EventRuleListView(ObjectListView):
 @method_decorator(login_required, name='dispatch')
 class EventRuleDetailView(ObjectDetailView):
     queryset = EventRule.objects.select_related('model')
+    layout = (
+        ((Panel('info', 'Event Rule Details'),),),
+    )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -506,6 +588,9 @@ class LabelTemplateListView(ObjectListView):
 @method_decorator(login_required, name='dispatch')
 class LabelTemplateDetailView(ObjectDetailView):
     queryset = LabelTemplate.objects.all()
+    layout = (
+        ((Panel('info', 'Label Template Details'),),),
+    )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

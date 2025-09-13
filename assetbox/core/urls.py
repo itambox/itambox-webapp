@@ -19,6 +19,7 @@ from django.urls import path, include
 from assets import views as asset_views # Import the assets views
 from assetbox.views.generic import (
     ObjectBulkDeleteView, ObjectBulkEditView, table_config,
+    GenericObjectImportView,
 )
 from assetbox.views.features import (
     ObjectChangeListView, ObjectChangeView, ObjectExportView,
@@ -101,6 +102,9 @@ urlpatterns = [
 
     # Export View
     path('export/<str:app_label>/<str:model_name>/<int:template_id>/', ObjectExportView.as_view(), name='object_export'),
+
+    # Generic Import View
+    path('import/<str:app_label>/<str:model_name>/', GenericObjectImportView.as_view(), name='generic_import'),
 
     # i18n
     path('i18n/', include('django.conf.urls.i18n')),

@@ -2,3 +2,4 @@ node_modules/
 static/dist/
 *.css.map
 *.js.map
+static/docs/

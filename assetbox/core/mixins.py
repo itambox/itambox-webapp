@@ -291,3 +291,26 @@ class AutoSlugMixin:
                 
         super().save(*args, **kwargs)
 
+
+class SubscribableMixin(models.Model):
+    """
+    Mixin for models that can have SaaS subscriptions assigned to them.
+    Models using this mixin will have a reverse GenericRelation
+    to SubscriptionAssignment.
+    """
+    subscriptions = GenericRelation(
+        'subscriptions.SubscriptionAssignment',
+        content_type_field='content_type',
+        object_id_field='object_id',
+        related_query_name='%(app_label)s_%(class)s'
+    )
+
+    class Meta:
+        abstract = True
+
+    @classmethod
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        registry.register_feature(cls, 'subscribable')
+
+

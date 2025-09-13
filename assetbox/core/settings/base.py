@@ -146,6 +146,9 @@ STATICFILES_DIRS = [
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Local static end-user documentation root
+DOCS_ROOT = os.environ.get('ASSETBOX_DOCS_ROOT', BASE_DIR / 'docs')
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
