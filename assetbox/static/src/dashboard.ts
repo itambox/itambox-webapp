@@ -17,9 +17,14 @@
 
   function initGridStack(): void {
     try {
-      if (window.__gsInitialized) return;
       const el = document.getElementById('dashboard-grid');
       if (!el) return;
+
+      // Check DOM state instead of global window variables to prevent out-of-sync issues
+      if (el.classList.contains('grid-stack') || (el as any).gridstack) {
+        window.__gsInitialized = true;
+        return;
+      }
 
       // Collect Bootstrap cols BEFORE removing classes
       const cols: HTMLElement[] = [];
@@ -193,7 +198,6 @@
     const gridEl = document.getElementById('dashboard-grid');
     if (!gridEl) return;
     if (!gridEl.classList.contains('grid-stack')) {
-      window.__gsInitialized = false;
       gsLoaded = false;
       initGridStack();
     }

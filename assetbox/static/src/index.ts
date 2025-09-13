@@ -12,6 +12,7 @@ import './batch-actions';
 import './object-selector';
 import './table-config';
 import './form-dirty';
+import './form-submit-loading';
 import './sidebar';
 import './dashboard';
 import './modal-handler';

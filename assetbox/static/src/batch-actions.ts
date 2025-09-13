@@ -71,38 +71,40 @@
     updateBatchBar();
   }
 
-  // Bulk Assign modal submit handler
-  const assignForm = document.getElementById('bulk-assign-form') as HTMLFormElement | null;
-  if (assignForm) {
-    assignForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-      const checkboxes = document.querySelectorAll<HTMLInputElement>(
-        '#object-list-table-container input[type="checkbox"][name="pk"]',
-      );
-      const pks: string[] = [];
-      checkboxes.forEach(function (cb) {
-        if (cb.checked) pks.push(cb.value);
-      });
-      if (pks.length === 0) {
-        alert('No assets selected.');
-        return;
-      }
+  // Bulk Assign modal submit handler (using event delegation to support dynamically loaded modals)
+  document.addEventListener('submit', function (event) {
+    const target = event.target as HTMLElement;
+    const assignForm = target.closest<HTMLFormElement>('#bulk-assign-form');
+    if (!assignForm) return;
 
-      let container = assignForm.querySelector<HTMLElement>('#bulk-assign-pks');
-      if (!container) {
-        container = document.createElement('div');
-        container.id = 'bulk-assign-pks';
-        assignForm.appendChild(container);
-      }
-      container.innerHTML = '';
-      pks.forEach(function (pk) {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'pk';
-        input.value = pk;
-        container.appendChild(input);
-      });
-      assignForm.submit();
+    const checkboxes = document.querySelectorAll<HTMLInputElement>(
+      '#object-list-table-container input[type="checkbox"][name="pk"]',
+    );
+    const pks: string[] = [];
+    checkboxes.forEach(function (cb) {
+      if (cb.checked) pks.push(cb.value);
     });
-  }
+
+    if (pks.length === 0) {
+      event.preventDefault();
+      alert('No assets selected.');
+      return;
+    }
+
+    let container = assignForm.querySelector<HTMLElement>('#bulk-assign-pks');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'bulk-assign-pks';
+      assignForm.appendChild(container);
+    }
+    container.innerHTML = '';
+    pks.forEach(function (pk) {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'pk';
+      input.value = pk;
+      container.appendChild(input);
+    });
+    // Let the event bubble naturally so HTMX or the browser processes the submit
+  });
 })();

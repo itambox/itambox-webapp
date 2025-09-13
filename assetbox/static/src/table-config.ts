@@ -108,7 +108,13 @@
           .then(function () {
             const inst = bootstrap.Modal.getInstance(modal);
             if (inst) inst.hide();
-            window.location.reload();
+            
+            // Graceful AJAX swap instead of a hard reload
+            if (typeof (window as any).refreshCurrentPage === 'function') {
+              (window as any).refreshCurrentPage();
+            } else {
+              window.location.reload();
+            }
           })
           .catch(function (err: Error) {
             alert('Error saving configuration: ' + err.message);
@@ -126,7 +132,13 @@
           .then(function () {
             const inst = bootstrap.Modal.getInstance(modal);
             if (inst) inst.hide();
-            window.location.reload();
+            
+            // Graceful AJAX swap instead of a hard reload
+            if (typeof (window as any).refreshCurrentPage === 'function') {
+              (window as any).refreshCurrentPage();
+            } else {
+              window.location.reload();
+            }
           })
           .catch(function (err: Error) {
             alert('Error resetting configuration: ' + err.message);

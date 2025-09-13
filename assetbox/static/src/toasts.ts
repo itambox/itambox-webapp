@@ -65,7 +65,15 @@
     const openModalEl = document.querySelector<HTMLElement>('.modal.show');
     if (openModalEl) {
       const modalInstance = bootstrap.Modal.getInstance(openModalEl) || new bootstrap.Modal(openModalEl);
+      
+      // Defer page refresh until the modal's transition and backdrop cleanup are fully done
+      openModalEl.addEventListener('hidden.bs.modal', function () {
+        (window as unknown as Record<string, unknown>).refreshCurrentPage();
+      }, { once: true });
+      
       modalInstance.hide();
+    } else {
+      // Fallback if no modal is visible
       (window as unknown as Record<string, unknown>).refreshCurrentPage();
     }
   });

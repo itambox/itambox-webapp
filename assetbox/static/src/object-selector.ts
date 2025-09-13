@@ -22,9 +22,17 @@
 
   function initTomSelect(el: HTMLSelectElement): TomSelect | null {
     const url = el.getAttribute('data-tom-select-url');
+    const plugins = ['dropdown_input'];
+    if (el.multiple) {
+      plugins.push('remove_button');
+    } else {
+      plugins.push('clear_button');
+    }
+
     const options: TomSelectOptions = {
-      plugins: ['dropdown_input'],
+      plugins: plugins,
       create: false,
+      allowEmptyOption: true,
       render: {
         no_results: function () {
           return '<div class="no-results">No results found</div>';
@@ -52,10 +60,6 @@
             callback();
           });
       };
-    }
-
-    if (el.multiple) {
-      options.plugins!.push('remove_button');
     }
 
     return new TomSelect(el, options);

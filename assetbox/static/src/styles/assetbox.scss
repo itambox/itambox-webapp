@@ -201,20 +201,197 @@ pre.block {
 
 // Override Tabler core's scrollbar layout shift prevention
 // to resolve the 15px layout gap between fixed sidebar and page-wrapper
+// and compose the greenish style overrides using Tabler's native color classes
 html,
 :root {
     margin-left: 0px !important;
+
+    // --- Premium Midnight Sapphire Theme Overwrite ---
+    // Curated Toned-Down Slate Blue Palette (Sophisticated Slate Sapphire Accent)
+    --tblr-primary: #3f5e8a; // Muted Calm Slate Blue
+    --tblr-primary-rgb: 63, 94, 138;
+    --tblr-primary-fg: #ffffff;
+
+    // AssetBox Custom Tokens (pointing to the premium blue theme)
+    --assetbox-primary: #3f5e8a;
+    --assetbox-primary-dark: #7e97b8;
+
+    // Focus rings, links, and selections
+    --tblr-focus-ring-color: rgba(63, 94, 138, 0.25);
+    --tblr-link-color: #3f5e8a;
+    --tblr-link-hover-color: #2d3e5a; // Calm dark slate navy hover
+
+    // Alert/notification coloring overrides
+    --tblr-alert-bg: rgba(63, 94, 138, 0.05);
+    --tblr-alert-border-color: rgba(63, 94, 138, 0.15);
+    --tblr-alert-color: #3f5e8a;
+
+    // Light Mode Premium Slate-Blue background tones
+    --tblr-body-bg: #f4f6fa; // clean matte premium slate-blue
+    --tblr-bg-surface: #ffffff;
+    --tblr-bg-surface-secondary: #eaedf6;
+    --tblr-border-color: #d5dbec;
+}
+
+// Dark Mode Overrides
+[data-bs-theme="dark"] {
+    // Toned-down, calm Ice-Blue/Sapphire in dark mode for premium contrast without harshness
+    --tblr-primary: #7e97b8; // Sophisticated Ice-Slate Blue
+    --tblr-primary-rgb: 126, 151, 184;
+    --tblr-primary-fg: #ffffff;
+
+    --tblr-focus-ring-color: rgba(126, 151, 184, 0.3);
+    --tblr-link-color: #7e97b8;
+    --tblr-link-hover-color: #9fb3cd; // Elegant brighter Ice-Slate Blue hover
+
+    --tblr-alert-bg: rgba(126, 151, 184, 0.1);
+    --tblr-alert-border-color: rgba(126, 151, 184, 0.2);
+    --tblr-alert-color: #7e97b8;
+
+    // Dark Mode Premium matte Obsidian-Midnight background tones
+    --tblr-body-bg: #060814; // deep obsidian-midnight
+    --tblr-bg-surface: #0d0f22; // slightly lighter midnight-blue card surface
+    --tblr-bg-surface-secondary: #13162f;
+    --tblr-border-color: #1c203f;
+    --tblr-border-color-translucent: rgba(28, 32, 63, 0.4);
 }
 
 // ---- Specs container ----
 .specs-container {
-    background-color: #f6f8fb !important;
+    background-color: var(--tblr-bg-surface-secondary) !important;
     color: var(--tblr-body-color) !important;
+    border: 1px solid var(--tblr-border-color) !important;
 }
 
 [data-bs-theme="dark"] .specs-container {
-    background-color: #1a2538 !important;
+    background-color: var(--tblr-bg-surface-secondary) !important;
     color: var(--tblr-body-color) !important;
+    border: 1px solid var(--tblr-border-color) !important;
+}
+
+// ============================================================
+//  Premium Sidebar & Vertical Navigation Styles
+// ============================================================
+.navbar-vertical {
+    background-color: var(--tblr-bg-surface) !important;
+    border-right: 1px solid var(--tblr-border-color) !important;
+
+    // Sidebar Brand Accent Text
+    .navbar-brand {
+        font-family: inherit;
+        font-weight: 700;
+        letter-spacing: -0.025em;
+        font-size: 1.25rem;
+        background: linear-gradient(135deg, var(--tblr-primary) 0%, var(--tblr-link-hover-color) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        padding-top: 1.5rem;
+    }
+
+    // Center brand on mobile viewports
+    @media (max-width: 991.98px) {
+        .navbar-brand {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            margin: 0 !important;
+            padding-top: 0.5rem !important;
+            padding-bottom: 0.5rem !important;
+            z-index: 1;
+        }
+    }
+
+    // Sidebar Category / Dropdown Headers
+    .dropdown-header,
+    .text-info {
+        font-size: 0.68rem !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.08em !important;
+        color: var(--tblr-primary) !important;
+        opacity: 0.8;
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.2rem !important;
+        margin-top: 0.25rem !important;
+        margin-bottom: 0.25rem !important;
+        border-bottom: 1px dashed rgba(var(--tblr-primary-rgb), 0.15);
+        display: block;
+    }
+
+    // Sidebar navigation items
+    .nav-item {
+        margin: 0.125rem 0.5rem;
+
+        .nav-link {
+            font-size: 0.825rem;
+            font-weight: 500;
+            padding: 0.45rem 0.75rem;
+            color: rgba(var(--tblr-body-color-rgb), 0.65) !important;
+            border-radius: var(--tblr-border-radius-sm);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+            .nav-link-icon {
+                color: rgba(var(--tblr-body-color-rgb), 0.45);
+                transition: color 0.2s ease;
+                margin-right: 0.5rem;
+            }
+
+            &:hover {
+                background-color: rgba(var(--tblr-primary-rgb), 0.06);
+                color: var(--tblr-primary) !important;
+                padding-left: 0.95rem; // Subtle organic slide-in animation
+
+                .nav-link-icon {
+                    color: var(--tblr-primary);
+                }
+            }
+
+            &.active,
+            &.show {
+                background-color: rgba(var(--tblr-primary-rgb), 0.09) !important;
+                color: var(--tblr-primary) !important;
+                font-weight: 600;
+
+                .nav-link-icon {
+                    color: var(--tblr-primary);
+                }
+            }
+        }
+
+        // Expanded nested items
+        .dropdown-menu {
+            background-color: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 0 0 1rem !important;
+            margin: 0 !important;
+
+            .dropdown-item {
+                font-size: 0.8rem;
+                font-weight: 500;
+                padding: 0.35rem 0.75rem;
+                color: rgba(var(--tblr-body-color-rgb), 0.6) !important;
+                border-left: 2px solid transparent;
+                border-radius: 0;
+                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+                &:hover {
+                    background-color: rgba(var(--tblr-primary-rgb), 0.05);
+                    color: var(--tblr-primary) !important;
+                    border-left-color: var(--tblr-primary);
+                    padding-left: 0.95rem; // Micro-slide
+                }
+
+                &.active,
+                &:active {
+                    background-color: rgba(var(--tblr-primary-rgb), 0.08);
+                    color: var(--tblr-primary) !important;
+                    border-left-color: var(--tblr-primary);
+                    font-weight: 600;
+                }
+            }
+        }
+    }
 }
 
 // ---- Table Column Width Stabilization ----
@@ -302,10 +479,39 @@ html,
         min-width: 180px;
     }
 
+    th.col-checkout,
+    td.col-checkout {
+        position: sticky !important;
+        right: 100px !important;
+        z-index: 2 !important;
+        background-color: var(--tblr-bg-surface) !important;
+        white-space: nowrap;
+        min-width: 130px !important;
+        width: 130px !important;
+        max-width: 130px !important;
+        text-align: center;
+    }
+
+    thead th.col-checkout {
+        z-index: 4 !important;
+        background-color: var(--tblr-bg-surface-secondary, #f4f6fa) !important;
+    }
+
     th.col-actions,
     td.col-actions {
-        min-width: 90px;
+        min-width: 100px !important;
+        width: 100px !important;
+        max-width: 100px !important;
+        position: sticky !important;
+        right: 0 !important;
+        z-index: 2 !important;
+        background-color: var(--tblr-bg-surface) !important;
         text-align: right;
+    }
+
+    thead th.col-actions {
+        z-index: 4 !important;
+        background-color: var(--tblr-bg-surface-secondary, #f4f6fa) !important;
     }
 }
 
@@ -470,3 +676,10 @@ html {
         transform: translateX(0);
     }
 }
+
+// ============================================================
+//  Premium Smooth Theme Transitions
+// ============================================================
+html, body, .card, .navbar, .navbar-vertical, .page-wrapper, .form-control, .btn, .nav-link, .dropdown-item, .table, td, th, aside, footer {
+    transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+}
