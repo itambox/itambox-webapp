@@ -9,6 +9,11 @@
 
      {% crispy filter_form 'bootstrap5' exclude_field='q' %}
 
+     {% if request.GET.q %}
+         <input type="hidden" name="q" value="{{ request.GET.q }}">
+     {% endif %}
+
+
      <div class="mt-4 d-flex justify-content-between gap-2">
          <button type="submit" class="btn btn-primary w-100">Apply</button>
          <a href="{{ request.path }}" class="btn btn-outline-secondary w-100"

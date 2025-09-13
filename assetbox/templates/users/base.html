@@ -29,7 +29,7 @@
                 </a>
             </li>
             <li class="nav-item" role="presentation">
-                <a href="{% url 'users:user_subscriptions' %}" class="nav-link{% if active_tab == 'subscriptions' %} active{% endif %}">{% trans "Subscriptions" %} <span class="badge bg-secondary-lt ms-1">Dummy</span></a>
+                <a href="{% url 'users:user_subscriptions' %}" class="nav-link{% if active_tab == 'subscriptions' %} active{% endif %}">{% trans "Subscriptions" %}</a>
             </li>
             <li class="nav-item" role="presentation">
                 <a href="{% url 'users:user_preferences' %}" class="nav-link{% if active_tab == 'preferences' %} active{% endif %}">{% trans "Preferences" %}</a>
@@ -38,7 +38,7 @@
                 <a href="{% url 'users:user_password' %}" class="nav-link{% if active_tab == 'password' %} active{% endif %}">{% trans "Change Password" %}</a>
             </li>
             <li class="nav-item" role="presentation">
-                <a href="{% url 'users:user_api_tokens' %}" class="nav-link{% if active_tab == 'api_tokens' %} active{% endif %}">{% trans "API Tokens" %} <span class="badge bg-secondary-lt ms-1">Dummy</span></a>
+                <a href="{% url 'users:user_api_tokens' %}" class="nav-link{% if active_tab == 'api_tokens' %} active{% endif %}">{% trans "API Tokens" %}</a>
             </li>
         </ul>
     </div>

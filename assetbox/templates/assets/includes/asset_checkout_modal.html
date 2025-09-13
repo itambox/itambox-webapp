@@ -38,3 +38,46 @@
         </div>
     </div>
 </div>
+
+<script>
+    (function() {
+        function toggleTargetFields() {
+            var form = document.getElementById('asset-checkout-form');
+            if (!form) return;
+            var targetTypeSelect = form.querySelector('select[name=target_type]');
+            if (!targetTypeSelect) return;
+            var targetType = targetTypeSelect.value;
+            
+            var holderDiv = form.querySelector('#div_id_asset_holder');
+            var locationDiv = form.querySelector('#div_id_location');
+            var assetDiv = form.querySelector('#div_id_asset_target');
+            
+            if (holderDiv) holderDiv.style.display = (targetType === 'holder') ? '' : 'none';
+            if (locationDiv) locationDiv.style.display = (targetType === 'location') ? '' : 'none';
+            if (assetDiv) assetDiv.style.display = (targetType === 'asset') ? '' : 'none';
+        }
+        
+        // Listen to change event on the form target_type select
+        document.body.addEventListener('change', function(e) {
+            if (e.target && e.target.name === 'target_type') {
+                toggleTargetFields();
+            }
+        });
+        
+        // Run initially when modal is loaded
+        toggleTargetFields();
+        
+        // Also run after HTMX swaps inside the modal (e.g. error re-render)
+        document.body.addEventListener('htmx:afterSettle', function(e) {
+            if (e.target && e.target.id === 'asset-checkout-modal-body') {
+                toggleTargetFields();
+            }
+        });
+        
+        // Tabler/Bootstrap modal show event listener
+        var modalEl = document.getElementById('asset-checkout-modal');
+        if (modalEl) {
+            modalEl.addEventListener('shown.bs.modal', toggleTargetFields);
+        }
+    })();
+</script>

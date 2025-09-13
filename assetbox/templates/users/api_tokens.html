@@ -1,0 +1,158 @@
+{% extends 'users/base.html' %}
+{% load i18n %}
+{% load crispy_forms_tags %}
+
+{% block title_tab %}{% trans "API Tokens" %}{% endblock %}
+
+{% block content_tab %}
+<div class="mb-4">
+    <h3 class="card-title mb-0">{% trans "API Tokens" %}</h3>
+    <p class="text-muted small mb-0">{% trans "Manage personal access tokens to authenticate external integrations, API scripts, and CLI utilities." %}</p>
+</div>
+
+{# Generated Key copy-once alert block #}
+{% if new_token_key %}
+    <div class="alert alert-success alert-important" role="alert">
+        <div class="d-flex">
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                    <path d="M5 12l5 5l10 -10" />
+                </svg>
+            </div>
+            <div>
+                <h4 class="alert-title">{% trans "New API Access Token Generated Successfully!" %}</h4>
+                <div class="text-secondary mb-3">
+                    {% trans "Please copy this token key now. For your security, it will not be displayed on this page again." %}
+                </div>
+                <div class="input-group">
+                    <input type="text" class="form-control font-monospace font-weight-bold bg-white text-dark select-all" value="{{ new_token_key }}" readonly id="token-key-display">
+                    <button class="btn btn-outline-success" type="button" onclick="navigator.clipboard.writeText('{{ new_token_key }}'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy', 2000)">
+                        {% trans "Copy" %}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+<div class="row row-cards">
+    {# Left Card: Active API Tokens List #}
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">{% trans "Active Tokens" %}</h3>
+            </div>
+            {% if tokens %}
+                <div class="table-responsive">
+                    <table class="table card-table table-vcenter text-nowrap datatable">
+                        <thead>
+                            <tr>
+                                <th>{% trans "Token" %}</th>
+                                <th>{% trans "Description" %}</th>
+                                <th>{% trans "Permissions" %}</th>
+                                <th>{% trans "Created" %}</th>
+                                <th>{% trans "Expires" %}</th>
+                                <th>{% trans "Last Used" %}</th>
+                                <th class="text-end"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for token in tokens %}
+                                <tr>
+                                    <td>
+                                        <code class="font-monospace text-dark font-weight-medium" title="{{ token.key }}">{{ token.key|slice:":6" }}...</code>
+                                    </td>
+                                    <td>
+                                        <span class="text-secondary small font-weight-medium d-block">{{ token.description|default:"—" }}</span>
+                                    </td>
+                                    <td>
+                                        {% if token.write_enabled %}
+                                            <span class="badge bg-success-lt text-uppercase font-weight-bold px-2" style="font-size: 0.65rem;">{% trans "Read / Write" %}</span>
+                                        {% else %}
+                                            <span class="badge bg-info-lt text-uppercase font-weight-bold px-2" style="font-size: 0.65rem;">{% trans "Read-Only" %}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="small text-muted">{{ token.created|date:"Y-m-d" }}</span>
+                                    </td>
+                                    <td>
+                                        {% if token.expires %}
+                                            {% if token.is_expired %}
+                                                <span class="badge bg-danger-lt font-weight-medium">{% trans "Expired" %} ({{ token.expires|date:"Y-m-d" }})</span>
+                                            {% else %}
+                                                <span class="small text-muted">{{ token.expires|date:"Y-m-d" }}</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="small text-muted">{% trans "Never" %}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if token.last_used %}
+                                            <span class="small text-muted font-monospace">{{ token.last_used|date:"Y-m-d H:i" }}</span>
+                                        {% else %}
+                                            <span class="small text-muted">{% trans "Never" %}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <form method="post" action="{% url 'users:delete_api_token' pk=token.pk %}" class="d-inline" onsubmit="return confirm('{% trans "Are you sure you want to revoke this API token? External scripts using this key will immediately lose access." %}');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-ghost-danger border-0 px-2 py-1" title="{% trans "Revoke Token" %}">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash-x" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                                    <path d="M4 7h16" />
+                                                    <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" />
+                                                    <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" />
+                                                    <path d="M10 12l4 4m0 -4l-4 4" />
+                                                </svg>
+                                                <span class="d-none d-sm-inline ms-1">{% trans "Revoke" %}</span>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="py-5 text-muted text-center card border-0 bg-transparent shadow-none">
+                    <div class="card-body">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-key text-muted mb-2" width="48" height="48" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                            <path d="M16.555 3.843l3.602 3.602a2.877 2.877 0 0 1 0 4.069l-2.643 2.643a2.877 2.877 0 0 1 -4.069 0l-.301 -.301l-6.558 6.558a1 1 0 0 1 -1.414 0l-1.414 -1.414a1 1 0 0 1 0 -1.414l6.558 -6.558l-.3 -.3a2.877 2.877 0 0 1 0 -4.069l2.643 -2.643a2.877 2.877 0 0 1 4.069 0z" />
+                            <path d="M15 9h.01" />
+                            <path d="M10 14l4 4" />
+                        </svg>
+                        <p class="mb-0 small font-weight-medium">{% trans "You have not generated any API access tokens." %}</p>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Right Card: Generate New Token Form #}
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">{% trans "Generate Token" %}</h3>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    {{ form|crispy }}
+                    <div class="text-end mt-4">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                <path d="M12 5v14" />
+                                <path d="M5 12h14" />
+                            </svg>
+                            {% trans "Generate Token" %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

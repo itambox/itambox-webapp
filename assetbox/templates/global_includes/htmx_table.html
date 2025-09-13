@@ -30,7 +30,7 @@
             </tr>
         </thead>
         {% endif %}
-        <tbody>
+        <tbody hx-target="#page-content-wrapper">
             {% for row in table.page.object_list|default:table.rows %}
                 <tr {{ row.attrs.as_html }}>
                     {% for column, cell in row.items %}

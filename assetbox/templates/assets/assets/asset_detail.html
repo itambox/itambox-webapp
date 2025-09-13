@@ -1,4 +1,4 @@
-{% extends 'generic/object_detail.html' %}
+﻿{% extends 'generic/object_detail.html' %}
 {% load static %}
 {% load render_table from django_tables2 %}
 
@@ -238,7 +238,7 @@
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
                 <h3 class="card-title">Asset Repair & Upgrade History</h3>
-                <a href="{% url 'assets:assetmaintenance_create' %}?asset={{ object.pk }}" class="btn btn-sm btn-primary">
+                <a href="{% url 'compliance:assetmaintenance_create' %}?asset={{ object.pk }}" class="btn btn-sm btn-primary">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l12 0" /></svg>
                     Record Maintenance
                 </a>

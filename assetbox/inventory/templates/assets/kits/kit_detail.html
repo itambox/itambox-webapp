@@ -1,4 +1,4 @@
-{% extends 'generic/object_detail.html' %}
+﻿{% extends 'generic/object_detail.html' %}
 {% load static %}
 
 {% block title %}Kit: {{ object.name }} - AssetBox{% endblock %}
@@ -15,7 +15,7 @@
     {% if all_available %}
         <button type="button"
                 class="btn btn-success"
-                hx-get="{% url 'assets:kit_checkout_modal' pk=object.pk %}"
+                hx-get="{% url 'inventory:kit_checkout_modal' pk=object.pk %}"
                 hx-target="#modal-placeholder"
                 hx-swap="innerHTML"
                 >
@@ -28,14 +28,14 @@
             Kit Unavailable (Out of Stock)
         </button>
     {% endif %}
-    <a href="{% url 'assets:kititem_create' %}?kit={{ object.pk }}" class="btn btn-outline-primary ms-2">
+    <a href="{% url 'inventory:kititem_create' %}?kit={{ object.pk }}" class="btn btn-outline-primary ms-2">
         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
         Add Item
     </a>
-    <a href="{% url 'assets:kit_update' pk=object.pk %}" class="btn btn-outline-secondary ms-2">
+    <a href="{% url 'inventory:kit_update' pk=object.pk %}" class="btn btn-outline-secondary ms-2">
         Edit Kit
     </a>
-    <a href="{% url 'assets:kit_delete' pk=object.pk %}" class="btn btn-outline-danger ms-2">
+    <a href="{% url 'inventory:kit_delete' pk=object.pk %}" class="btn btn-outline-danger ms-2">
         Delete
     </a>
 {% endblock page_actions %}
@@ -93,8 +93,8 @@
                         </td>
                         <td>
                             <div class="btn-group">
-                                <a href="{% url 'assets:kititem_update' pk=item_info.item.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
-                                <a href="{% url 'assets:kititem_delete' pk=item_info.item.pk %}" class="btn btn-sm btn-outline-danger">Remove</a>
+                                <a href="{% url 'inventory:kititem_update' pk=item_info.item.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                <a href="{% url 'inventory:kititem_delete' pk=item_info.item.pk %}" class="btn btn-sm btn-outline-danger">Remove</a>
                             </div>
                         </td>
                     </tr>

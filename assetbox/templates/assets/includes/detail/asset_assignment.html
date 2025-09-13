@@ -1,4 +1,4 @@
-{# Panel: Assignment / Deployment details (holder, location, custody) #}
+﻿{# Panel: Assignment / Deployment details (holder, location, custody) #}
 <dl class="row mb-0">
     <dt class="col-sm-4">Assigned To:</dt>
     <dd class="col-sm-8">
@@ -58,7 +58,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-shield-check me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 12l2 2l4 -4" /><path d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3" /></svg>
                     Custody Secured
                 </span>
-                <a href="{% url 'assets:custody_eula_sign' token=eula_token %}" target="_blank" class="btn btn-sm btn-ghost-success border-0 py-1.5 px-2 ms-2 font-weight-bold align-middle">
+                <a href="{% url 'compliance:custody_eula_sign' token=eula_token %}" target="_blank" class="btn btn-sm btn-ghost-success border-0 py-1.5 px-2 ms-2 font-weight-bold align-middle">
                     View Custody Receipt
                 </a>
             {% else %}
@@ -67,7 +67,7 @@
                     Pending EULA Acceptance
                 </span>
                 <div class="mt-2 input-group input-group-flat" style="max-width: 450px;">
-                    <input type="text" class="form-control form-control-sm text-secondary small specs-container" readonly value="{{ request.scheme }}://{{ request.get_host }}{% url 'assets:custody_eula_sign' token=eula_token %}" id="eula-link-input"/>
+                    <input type="text" class="form-control form-control-sm text-secondary small specs-container" readonly value="{{ request.scheme }}://{{ request.get_host }}{% url 'compliance:custody_eula_sign' token=eula_token %}" id="eula-link-input"/>
                     <span class="input-group-text p-0 bg-transparent">
                         <button class="btn btn-sm btn-ghost-indigo font-weight-bold py-1 px-3 border-0" onclick="navigator.clipboard.writeText(document.getElementById('eula-link-input').value); alert('EULA custody sign-off link copied to clipboard!');">
                             Copy Link

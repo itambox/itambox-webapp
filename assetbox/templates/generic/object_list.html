@@ -17,7 +17,11 @@
     <div class="col-12 {% if filter_form %}col-md-9 order-2 order-md-1{% endif %}" id="object-list-main-col">
         <div class="card">
             {# Main Results Container (target for search/pagination swaps) #}
-            <div id="object-list-dynamic-content">
+            <div id="object-list-dynamic-content"
+                 hx-get="{{ request.get_full_path }}"
+                 hx-trigger="tableRefreshRequired from:body"
+                 hx-target="#object-list-dynamic-content"
+                 hx-swap="innerHTML">
                 {# Row for Search and Action Buttons #}
                 <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
                     {# Quick Search Input Group #}

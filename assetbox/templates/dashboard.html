@@ -11,6 +11,13 @@
 {% endblock %}
 
 {% block page_actions %}
+<style>
+    #dashboard-locked-controls, #dashboard-unlocked-controls {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+</style>
 <div class="btn-list" id="dashboard-controls">
     <span id="dashboard-locked-controls">
         <button id="unlock-dashboard" class="btn btn-outline-secondary d-flex align-items-center"
@@ -27,19 +34,7 @@
         </button>
     </span>
     <span id="dashboard-unlocked-controls" style="display:none">
-        <button id="lock-dashboard" class="btn btn-outline-secondary d-flex align-items-center me-1"
-            title="{% trans 'Lock dashboard' %}">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-lock me-1" width="20"
-                height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
-                stroke-linecap="round" stroke-linejoin="round">
-                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                <path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6z" />
-                <path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0" />
-                <path d="M8 11v-4a4 4 0 0 1 8 0v4" />
-            </svg>
-            {% trans 'Lock' %}
-        </button>
-        <button id="save-dashboard" class="btn btn-primary d-flex align-items-center me-1"
+        <button id="save-dashboard" class="btn btn-primary d-flex align-items-center"
             title="{% trans 'Save layout' %}">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-device-floppy me-1" width="20"
                 height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
@@ -51,7 +46,7 @@
             </svg>
             {% trans 'Save Layout' %}
         </button>
-        <button class="btn btn-outline-secondary d-flex align-items-center me-1"
+        <button class="btn btn-outline-secondary d-flex align-items-center"
             hx-get="{% url 'extras:dashboard_widget_add' %}" hx-target="#dashboard-modal-content"
             data-bs-toggle="modal" data-bs-target="#dashboard-modal">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus me-1" width="20"
@@ -62,6 +57,18 @@
                 <path d="M5 12l14 0" />
             </svg>
             {% trans 'Add Widget' %}
+        </button>
+        <button id="lock-dashboard" class="btn btn-outline-secondary d-flex align-items-center"
+            title="{% trans 'Lock dashboard' %}">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-lock me-1" width="20"
+                height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6z" />
+                <path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0" />
+                <path d="M8 11v-4a4 4 0 0 1 8 0v4" />
+            </svg>
+            {% trans 'Lock' %}
         </button>
     </span>
     <form method="post" action="{% url 'extras:dashboard_reset' %}" class="d-inline"

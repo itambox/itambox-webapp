@@ -1,4 +1,4 @@
-{% extends 'generic/object_detail.html' %}
+﻿{% extends 'generic/object_detail.html' %}
 {% load render_table from django_tables2 %}
 {% load static %}
 
@@ -16,7 +16,7 @@
 {% block extra_page_actions %}
     {% if object.allow_overallocate or object.available > 0 %}
         <button type="button" class="btn btn-info"
-                hx-get="{% url 'assets:accessory_checkout' pk=object.pk %}"
+                hx-get="{% url 'inventory:accessory_checkout' pk=object.pk %}"
                 hx-target="#modal-placeholder"
                 hx-swap="innerHTML"
                 >

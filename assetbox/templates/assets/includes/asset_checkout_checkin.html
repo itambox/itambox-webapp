@@ -1,0 +1,26 @@
+{% comment %} assetbox/templates/assets/includes/asset_checkout_checkin.html {% endcomment %}
+<div class="d-inline-block">
+    {% if record.active_assignment %}
+    <a class="btn btn-sm btn-outline-success text-success"
+       hx-post="{% url 'assets:asset_checkin' pk=record.pk %}"
+       hx-swap="none" href="#">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-back-up" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+           <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+           <path d="M9 14l-4 -4l4 -4" />
+           <path d="M5 10h11a4 4 0 1 1 0 8h-1" />
+        </svg>
+        Check-in
+    </a>
+    {% else %}
+    <a class="btn btn-sm btn-outline-primary"
+       hx-get="{% url 'assets:asset_checkout_modal' pk=record.pk %}"
+       hx-target="#modal-placeholder" hx-swap="innerHTML" href="#">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-forward-up" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+           <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+           <path d="M15 14l4 -4l-4 -4" />
+           <path d="M19 10h-11a4 4 0 1 0 0 8h1" />
+        </svg>
+        Check-out
+    </a>
+    {% endif %}
+</div>

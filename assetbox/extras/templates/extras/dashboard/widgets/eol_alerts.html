@@ -1,8 +1,8 @@
 {% load i18n %}
-<div class="text-muted small mb-2">Hardware Expiring within 90 days</div>
+<div class="text-muted small mb-2">{% blocktrans %}Hardware Expiring within {{ days_horizon }} days{% endblocktrans %}</div>
 {% if eol_alerts %}
 <div class="list-group list-group-flush" style="font-size: 0.80rem;">
-    {% for alert in eol_alerts|slice:":3" %}
+    {% for alert in eol_alerts|slice:":5" %}
     <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
         <div>
             <div><a href="{% url 'assets:asset_detail' alert.asset.pk %}" class="text-reset">{{ alert.asset.name }}</a></div>

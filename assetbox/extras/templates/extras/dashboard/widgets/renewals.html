@@ -1,5 +1,5 @@
 {% load i18n %}
-<div class="text-muted small mb-2">Active subscriptions renewing within 90 days</div>
+<div class="text-muted small mb-2">{% blocktrans %}Active subscriptions renewing within {{ days_horizon }} days{% endblocktrans %}</div>
 {% if upcoming_renewals %}
 <div class="list-group list-group-flush" style="font-size: 0.85rem;">
     {% for sub in upcoming_renewals %}
@@ -21,5 +21,5 @@
     Active subscription spend: <strong>{{ total_subscription_spend|floatformat:0 }}</strong>
 </div>
 {% else %}
-<div class="text-muted text-center py-4">No upcoming renewals within 90 days.</div>
+<div class="text-muted text-center py-4">{% blocktrans %}No upcoming renewals within {{ days_horizon }} days.{% endblocktrans %}</div>
 {% endif %}

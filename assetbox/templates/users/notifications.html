@@ -29,11 +29,13 @@
                         <div class="col">
                             <div class="d-flex align-items-center mb-1">
                                 <span class="font-weight-bold text-dark d-block">
-                                    {% if not notif.is_read %}
-                                        <strong>{{ notif.subject }}</strong>
-                                    {% else %}
-                                        <span class="text-secondary">{{ notif.subject }}</span>
-                                    {% endif %}
+                                    <a href="{% url 'users:view_notification' pk=notif.pk %}" class="text-decoration-none text-reset">
+                                        {% if not notif.is_read %}
+                                            <strong>{{ notif.subject }}</strong>
+                                        {% else %}
+                                            <span class="text-secondary">{{ notif.subject }}</span>
+                                        {% endif %}
+                                    </a>
                                 </span>
                                 <span class="ms-2 badge {% if notif.level == 'danger' %}bg-red-lt{% elif notif.level == 'warning' %}bg-warning-lt{% elif notif.level == 'success' %}bg-success-lt{% else %}bg-blue-lt{% endif %} text-uppercase px-2 py-0.5" style="font-size: 0.65rem;">
                                     {{ notif.get_level_display }}

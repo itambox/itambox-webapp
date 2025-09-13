@@ -1,5 +1,15 @@
 {% load crispy_forms_tags %}
 {% load partials %}
+
+{% startpartial checkout-modal-form %}
+    {% if form.errors %}
+        <div class="alert alert-danger">
+            Please correct the errors below.
+        </div>
+    {% endif %}
+    {% crispy form %}
+{% endpartial %}
+
 <div class="modal modal-blur fade" id="accessory-checkout-modal" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
@@ -8,19 +18,12 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="accessory-checkout-form"
-                  hx-post="{% url 'assets:accessory_checkout' pk=accessory.pk %}"
+                  hx-post="{% url 'inventory:accessory_checkout' pk=accessory.pk %}"
                   hx-target="#accessory-checkout-modal-form-container"
                   hx-swap="innerHTML">
                 {% csrf_token %}
                 <div class="modal-body" id="accessory-checkout-modal-form-container">
-                    {% startpartial checkout-modal-form %}
-                        {% if form.errors %}
-                            <div class="alert alert-danger">
-                                Please correct the errors below.
-                            </div>
-                        {% endif %}
-                        {% crispy form %}
-                    {% endpartial %}
+                    {% partial checkout-modal-form %}
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Cancel</button>
