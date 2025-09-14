@@ -5,11 +5,11 @@ from django.db.models import Q, CheckConstraint, Sum
 from django.core.exceptions import ValidationError
 
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel, StandardModel
-from core.mixins import TaggableMixin, AutoSlugMixin, SoftDeleteMixin, JournalingMixin, ImageAttachmentMixin, CloneableMixin, ExportableMixin
+from core.mixins import TaggableMixin, AutoSlugMixin, SoftDeleteMixin, JournalingMixin, ImageAttachmentMixin, CloneableMixin, ExportableMixin, SubscribableMixin
 from core.managers import SoftDeleteManager, AllObjectsManager
 
 
-class Accessory(AutoSlugMixin, DeletableVaultModel):
+class Accessory(AutoSlugMixin, SubscribableMixin, DeletableVaultModel):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
 
@@ -138,7 +138,7 @@ class AccessoryAssignment(ChangeLoggingMixin, BaseModel):
         return f"{self.qty}x {self.accessory} assigned to {recipient}"
 
 
-class Consumable(AutoSlugMixin, SoftDeleteMixin, StandardModel, ImageAttachmentMixin):
+class Consumable(AutoSlugMixin, SoftDeleteMixin, StandardModel, ImageAttachmentMixin, SubscribableMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
 

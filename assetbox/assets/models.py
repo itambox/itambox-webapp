@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.utils import timezone
 from software.models import Software
 from core.models import BaseModel, ChangeLoggingMixin, StandardModel, DeletableVaultModel
-from core.mixins import CustomFieldDataMixin, JournalingMixin, TaggableMixin, AutoSlugMixin, BookmarkableMixin
+from core.mixins import CustomFieldDataMixin, JournalingMixin, TaggableMixin, AutoSlugMixin, BookmarkableMixin, SubscribableMixin
 from extras.models import CustomFieldset
 from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -203,7 +203,7 @@ class AssetType(AutoSlugMixin, StandardModel):
 
 
 
-class Asset(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
+class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, DeletableVaultModel):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     
@@ -751,6 +751,8 @@ class AuditSession(StandardModel, SoftDeleteMixin):
 
     class Meta:
         ordering = ['-started_at']
+        verbose_name = "Audit Session"
+        verbose_name_plural = "Audit Sessions"
 
     def __str__(self):
         return f"{self.name} ({self.get_status_display()})"
@@ -807,4 +809,6 @@ class AssetAudit(models.Model):
     class Meta:
         ordering = ['-timestamp']
         unique_together = ('session', 'asset')  # Single verification per asset per campaign
+        verbose_name = "Asset Audit"
+        verbose_name_plural = "Asset Audits"
 

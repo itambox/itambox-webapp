@@ -5,12 +5,12 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.conf import settings # Import settings
 from core.models import BaseModel, ChangeLoggingMixin, StandardModel, VaultModel
-from core.mixins import ExportableMixin, TaggableMixin, JournalingMixin, AutoSlugMixin, CloneableMixin, ImageAttachmentMixin, FileAttachmentMixin, BookmarkableMixin
+from core.mixins import ExportableMixin, TaggableMixin, JournalingMixin, AutoSlugMixin, CloneableMixin, ImageAttachmentMixin, FileAttachmentMixin, BookmarkableMixin, SubscribableMixin
 from django.contrib.contenttypes.fields import GenericForeignKey
 
 # Create your models here.
 
-class Location(StandardModel):
+class Location(SubscribableMixin, StandardModel):
     STATUS_PLANNED = 'planned'
     STATUS_STAGING = 'staging'
     STATUS_ACTIVE = 'active'
@@ -214,7 +214,7 @@ class Site(VaultModel, BookmarkableMixin):
         return reverse('organization:site_detail', kwargs={'pk': self.pk})
 
 # +++ AssetHolder Model +++
-class AssetHolder(StandardModel):
+class AssetHolder(SubscribableMixin, StandardModel):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL, # Keep holder if user is deleted, set user link to null
