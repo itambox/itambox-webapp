@@ -207,50 +207,19 @@ class UserViewTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_user_subscriptions_view(self):
-        from subscriptions.models import Provider, Subscription
-        from datetime import date, timedelta
+        from core.models import Bookmark
+        from organization.models import Tenant
+        from django.contrib.contenttypes.models import ContentType
         
-        provider = Provider.objects.create(name="Adobe Inc.")
+        tenant = Tenant.objects.create(name="Adobe Inc.", slug="adobe-inc")
+        ct = ContentType.objects.get_for_model(tenant)
         
-        # Subscription 1: Active, owned by self.user, cost 120 USD/year (monthly) -> annual_cost = 1440 USD
-        sub1 = Subscription.objects.create(
-            name="Adobe Creative Cloud",
-            provider=provider,
-            type="saas",
-            status="active",
-            billing_cycle="monthly",
-            renewal_cost=120.00,
-            currency="USD",
-            owner=self.user,
-            renewal_date=date.today() + timedelta(days=15) # Expiring soon (15 days)
-        )
+        # Bookmark owned by self.user
+        b1 = Bookmark.objects.create(user=self.user, model=ct, object_id=tenant.pk)
         
-        # Subscription 2: Active, owned by self.user, cost 100 USD/year (annual) -> annual_cost = 100 USD
-        sub2 = Subscription.objects.create(
-            name="Adobe Acrobat",
-            provider=provider,
-            type="saas",
-            status="active",
-            billing_cycle="annual",
-            renewal_cost=100.00,
-            currency="USD",
-            owner=self.user,
-            renewal_date=date.today() - timedelta(days=5) # Overdue (5 days past)
-        )
-        
-        # Subscription 3: Active, owned by another user (should not show up in self.user's list)
+        # Bookmark owned by another user
         other_user = User.objects.create_user(username='otheruser2', password='testpass')
-        sub3 = Subscription.objects.create(
-            name="Adobe Photoshop",
-            provider=provider,
-            type="saas",
-            status="active",
-            billing_cycle="annual",
-            renewal_cost=200.00,
-            currency="USD",
-            owner=other_user,
-            renewal_date=date.today() + timedelta(days=45)
-        )
+        b2 = Bookmark.objects.create(user=other_user, model=ct, object_id=tenant.pk)
         
         self.client.force_login(self.user)
         url = reverse('users:user_subscriptions')
@@ -258,15 +227,11 @@ class UserViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'users/subscriptions.html')
         
-        # Verify context data metrics
-        self.assertEqual(response.context['subscriptions_count'], 2)
-        self.assertEqual(response.context['active_subscriptions_count'], 1)
-        # Annual costs: sub1 (120*12 = 1440) = 1440.0 (sub2 is expired)
-        self.assertEqual(float(response.context['total_annual_spend']), 1440.0)
-        
-        # Expiring soon count: sub1 is expiring soon, sub2 is overdue/expired
-        self.assertEqual(response.context['expiring_soon_count'], 1)
-        self.assertEqual(response.context['overdue_count'], 1)
+        # Verify context data contains our bookmark but not the other user's
+        self.assertEqual(response.context['bookmarked_count'], 1)
+        bookmarked_ids = [item['id'] for item in response.context['bookmarked_items']]
+        self.assertIn(b1.pk, bookmarked_ids)
+        self.assertNotIn(b2.pk, bookmarked_ids)
 
     def test_user_api_tokens_view(self):
         from users.models import Token
@@ -362,6 +327,166 @@ class UserViewTests(TestCase):
         
         # Verify it is NOT deleted
         self.assertTrue(Token.objects.filter(pk=token.pk).exists())
+
+
+class InternationalizationTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser', password='testpass', is_staff=True, is_superuser=True
+        )
+
+    def test_language_selection_german(self):
+        # Log in user
+        self.client.force_login(self.user)
+        # Select German language by sending POST to set_language
+        url = reverse('set_language')
+        response = self.client.post(url, {'language': 'de'}, follow=True)
+        self.assertEqual(response.status_code, 200)
+        
+        # Verify the cookie was set
+        self.assertEqual(self.client.cookies.get('django_language').value, 'de')
+
+    def test_german_translation_rendering(self):
+        self.client.force_login(self.user)
+        # Set language cookie to 'de'
+        self.client.cookies['django_language'] = 'de'
+        
+        # Access the user profile page
+        url = reverse('users:user_profile')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Verify that German strings are rendered in the response (e.g. "Benutzerprofil")
+        self.assertContains(response, "Benutzerprofil")
+        # Verify sidebar translations are rendered (e.g. "Organisation")
+        self.assertContains(response, "Organisation")
+
+    def test_german_flash_messages(self):
+        self.client.force_login(self.user)
+        self.client.cookies['django_language'] = 'de'
+        
+        # Trigger profile update to get translated success message
+        url = reverse('users:user_profile')
+        response = self.client.post(url, {
+            'first_name': 'Rene',
+            'last_name': 'Rettig',
+            'email': 'rene.rettig@example.com'
+        }, follow=True)
+        self.assertEqual(response.status_code, 200)
+        # Verify the success message is translated to German
+        self.assertContains(response, "Profil erfolgreich aktualisiert.")
+
+
+class BookmarkAndNotificationTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='bookmarkuser', password='testpass123', is_staff=True, is_superuser=True
+        )
+        # Create a Tenant which is bookmarkable
+        from organization.models import Tenant
+        self.tenant = Tenant.objects.create(name='Test Tenant', slug='test-tenant')
+        
+    def test_bookmark_toggle_view_add_and_remove(self):
+        from core.models import Bookmark
+        from django.contrib.contenttypes.models import ContentType
+        
+        self.client.force_login(self.user)
+        ct = ContentType.objects.get_for_model(self.tenant)
+        url = reverse('users:bookmark_toggle', kwargs={'content_type_id': ct.pk, 'object_id': self.tenant.pk})
+        
+        # 1. Standard POST request to toggle/create bookmark
+        response = self.client.post(url)
+        self.assertRedirects(response, self.tenant.get_absolute_url())
+        self.assertTrue(Bookmark.objects.filter(user=self.user, model=ct, object_id=self.tenant.pk).exists())
+        
+        # 2. Standard POST request to toggle/delete bookmark
+        response = self.client.post(url)
+        self.assertRedirects(response, self.tenant.get_absolute_url())
+        self.assertFalse(Bookmark.objects.filter(user=self.user, model=ct, object_id=self.tenant.pk).exists())
+
+    def test_bookmark_toggle_view_htmx_add_and_remove(self):
+        from core.models import Bookmark
+        from django.contrib.contenttypes.models import ContentType
+        
+        self.client.force_login(self.user)
+        ct = ContentType.objects.get_for_model(self.tenant)
+        url = reverse('users:bookmark_toggle', kwargs={'content_type_id': ct.pk, 'object_id': self.tenant.pk})
+        headers = {'HTTP_HX_Request': 'true'}
+        
+        # 1. HTMX POST request to toggle/create bookmark
+        response = self.client.post(url, **headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'btn-warning', response.content) # filled star class
+        self.assertIn(b'hx-target="this"', response.content)
+        self.assertIn(b'X-CSRFToken', response.content)
+        self.assertTrue(Bookmark.objects.filter(user=self.user, model=ct, object_id=self.tenant.pk).exists())
+        
+        # 2. HTMX POST request to toggle/delete bookmark
+        response = self.client.post(url, **headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'btn-outline-secondary', response.content) # outlined star class
+        self.assertIn(b'hx-target="this"', response.content)
+        self.assertIn(b'X-CSRFToken', response.content)
+        self.assertFalse(Bookmark.objects.filter(user=self.user, model=ct, object_id=self.tenant.pk).exists())
+
+    def test_bookmark_toggle_view_htmx_delete_from_subscriptions_list(self):
+        from core.models import Bookmark
+        from django.contrib.contenttypes.models import ContentType
+        
+        # First, pre-create bookmark
+        ct = ContentType.objects.get_for_model(self.tenant)
+        Bookmark.objects.create(user=self.user, model=ct, object_id=self.tenant.pk)
+        
+        self.client.force_login(self.user)
+        url = reverse('users:bookmark_toggle', kwargs={'content_type_id': ct.pk, 'object_id': self.tenant.pk})
+        
+        # HTMX request with subscriptions referer (imitating unsubscription from /user/subscriptions/)
+        headers = {
+            'HTTP_HX_Request': 'true',
+            'HTTP_REFERER': 'http://127.0.0.1:8000/user/subscriptions/'
+        }
+        response = self.client.post(url, **headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"") # Empty response to remove list element
+        self.assertFalse(Bookmark.objects.filter(user=self.user, model=ct, object_id=self.tenant.pk).exists())
+
+    def test_bookmark_change_notification_triggers(self):
+        from core.models import Bookmark, Notification
+        from django.contrib.contenttypes.models import ContentType
+        
+        # 1. Create a bookmark for the tenant
+        ct = ContentType.objects.get_for_model(self.tenant)
+        Bookmark.objects.create(user=self.user, model=ct, object_id=self.tenant.pk)
+        
+        # Clear any existing notifications
+        Notification.objects.filter(user=self.user).delete()
+        
+        # 2. Update the tenant to trigger event_on_save signal
+        self.tenant.comments = "Updated tenant comment"
+        self.tenant.save()
+        
+        # Verify notification was generated for the user
+        notifications = Notification.objects.filter(user=self.user)
+        self.assertEqual(notifications.count(), 1)
+        notif = notifications.first()
+        self.assertIn("Updated", notif.subject)
+        self.assertIn("Test Tenant", notif.message)
+        self.assertEqual(notif.target_url, self.tenant.get_absolute_url())
+        
+        # Clear notifications
+        notifications.delete()
+        
+        # 3. Delete the tenant to trigger event_on_delete signal
+        self.tenant.delete()
+        
+        # Verify notification was generated for deletion
+        notifications = Notification.objects.filter(user=self.user)
+        self.assertEqual(notifications.count(), 1)
+        notif_del = notifications.first()
+        self.assertIn("Deleted", notif_del.subject)
+        self.assertIn("Test Tenant", notif_del.message)
+        self.assertIsNone(notif_del.target_url)
+
 
 
 

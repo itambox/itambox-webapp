@@ -15,4 +15,5 @@ urlpatterns = [
     path('notifications/<int:pk>/view/', views.view_notification, name='view_notification'),
     path('notifications/read-all/', views.mark_all_notifications_read, name='mark_all_notifications_read'),
     path('subscriptions/', views.UserSubscriptionsView.as_view(), name='user_subscriptions'),
+    path('bookmarks/toggle/<int:content_type_id>/<int:object_id>/', views.bookmark_toggle, name='bookmark_toggle'),
 ] 
