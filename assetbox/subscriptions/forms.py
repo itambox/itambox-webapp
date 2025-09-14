@@ -4,7 +4,8 @@ from crispy_forms.layout import Layout, Submit, HTML, Div, Row, Column
 from django.urls import reverse
 from core.forms import FilterForm
 from organization.models import Tenant
-from .models import Provider, Subscription
+from django.db import models as db_models
+from .models import Provider, Subscription, SubscriptionAssignment
 from .filters import SubscriptionFilterSet, ProviderFilterSet
 
 
@@ -168,3 +169,68 @@ class ProviderFilterForm(FilterForm):
 
 class SubscriptionFilterForm(FilterForm):
     filterset_class = SubscriptionFilterSet
+
+
+class SubscriptionAssignmentForm(forms.ModelForm):
+    subscription = forms.ModelChoiceField(
+        queryset=Subscription.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Subscription"
+    )
+    notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        label="Notes"
+    )
+
+    class Meta:
+        model = SubscriptionAssignment
+        fields = ['subscription', 'notes']
+
+    def __init__(self, *args, **kwargs):
+        content_type = kwargs.pop('content_type', None)
+        object_id = kwargs.pop('object_id', None)
+        super().__init__(*args, **kwargs)
+        self.content_type = content_type
+        self.object_id = object_id
+
+        if content_type and object_id:
+            try:
+                target_obj = content_type.model_class().objects.get(id=object_id)
+                if hasattr(target_obj, 'tenant') and target_obj.tenant:
+                    # Filter subscriptions to active ones that belong to the same tenant or are global
+                    self.fields['subscription'].queryset = Subscription.objects.filter(
+                        db_models.Q(tenant=target_obj.tenant) | db_models.Q(tenant__isnull=True),
+                        status='active'
+                    )
+            except Exception:
+                pass
+
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+        self.helper.layout = Layout(
+            'subscription',
+            'notes',
+        )
+        
+        button_text = 'Assign'
+        self.helper.layout.append(
+            HTML('<div class="mt-4"></div>')
+        )
+        self.helper.layout.append(
+            Submit('submit', button_text, css_class='btn btn-primary')
+        )
+        self.helper.layout.append(
+            HTML('<button type="button" class="btn btn-outline-secondary ms-2" data-bs-dismiss="modal">Cancel</button>')
+        )
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if self.content_type and self.object_id:
+            instance.content_type = self.content_type
+            instance.object_id = self.object_id
+        if commit:
+            instance.save()
+        return instance
+

@@ -449,3 +449,72 @@ class ProviderViewTests(TestCase):
         resp = self.client.post(url)
         self.assertEqual(resp.status_code, 302)
         self.assertFalse(Provider.objects.filter(pk=self.provider.pk).exists())
+
+
+class SubscriptionAssignmentViewTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = get_user_model().objects.create_user(
+            username="testuser", password="testpass", is_staff=True, is_superuser=True
+        )
+        self.client.login(username="testuser", password="testpass")
+        self.provider = Provider.objects.create(name="AWS", is_active=True)
+        self.subscription = Subscription.objects.create(
+            name="AWS Business Support",
+            provider=self.provider,
+            status=SubscriptionStatusChoices.ACTIVE,
+        )
+        self.tg = TenantGroup.objects.create(name="TG1", slug="tg1")
+        self.tenant = Tenant.objects.create(name="Tenant1", slug="tenant1", group=self.tg)
+        self.site = Site.objects.create(name="Dublin", slug="dublin", tenant=self.tenant)
+        self.location = Location.objects.create(
+            name="Rack A", slug="rack-a", site=self.site, tenant=self.tenant
+        )
+        self.asset = Asset.objects.create(
+            name="Server Ireland",
+            asset_tag="SRV-IRE-01",
+            location=self.location,
+            tenant=self.tenant,
+        )
+        self.asset_ct = ContentType.objects.get_for_model(Asset)
+
+    def test_assignment_create_view_get(self):
+        url = reverse("subscriptions:subscriptionassignment_create")
+        resp = self.client.get(f"{url}?content_type={self.asset_ct.pk}&object_id={self.asset.pk}")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Assign Subscription")
+
+    def test_assignment_create_view_post(self):
+        url = reverse("subscriptions:subscriptionassignment_create")
+        post_url = f"{url}?content_type={self.asset_ct.pk}&object_id={self.asset.pk}"
+        resp = self.client.post(post_url, {
+            "subscription": self.subscription.pk,
+            "notes": "Test support assignment",
+        })
+        self.assertEqual(resp.status_code, 302)
+        
+        # Verify assignment exists
+        assignment = SubscriptionAssignment.objects.filter(
+            subscription=self.subscription,
+            content_type=self.asset_ct,
+            object_id=self.asset.pk
+        ).first()
+        self.assertIsNotNone(assignment)
+        self.assertEqual(assignment.notes, "Test support assignment")
+        self.assertEqual(assignment.assigned_by, self.user)
+
+    def test_assignment_delete_view_post(self):
+        # Create assignment first
+        assignment = SubscriptionAssignment.objects.create(
+            subscription=self.subscription,
+            content_type=self.asset_ct,
+            object_id=self.asset.pk,
+            assigned_by=self.user
+        )
+        url = reverse("subscriptions:subscriptionassignment_delete", kwargs={"pk": assignment.pk})
+        resp = self.client.post(url)
+        self.assertEqual(resp.status_code, 302)
+        
+        # Verify assignment was deleted
+        self.assertFalse(SubscriptionAssignment.objects.filter(pk=assignment.pk).exists())
+

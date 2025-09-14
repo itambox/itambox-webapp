@@ -3,7 +3,14 @@ from django_tables2 import RequestConfig
 from assetbox.views.generic import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView
 from assetbox.utils import get_paginate_count
 from assetbox.panels import Panel
-from .models import Provider, Subscription
+from django.shortcuts import render, redirect, get_object_or_404
+from django.http import HttpResponseBadRequest
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic import View
+from django.contrib import messages
+from django.urls import reverse
+from django.contrib.contenttypes.models import ContentType
+from .models import Provider, Subscription, SubscriptionAssignment
 from . import forms
 from . import tables
 from . import filters
@@ -114,3 +121,73 @@ class ProviderBulkEditView(ObjectBulkEditView):
 
 class ProviderBulkDeleteView(ObjectBulkDeleteView):
     queryset = Provider.objects.all()
+
+
+# =============================================================================
+# Subscription Assignment Views
+# =============================================================================
+
+class SubscriptionAssignmentCreateView(LoginRequiredMixin, View):
+    template_name = 'subscriptions/subscriptionassignments/subscriptionassignment_form.html'
+
+    def get(self, request, *args, **kwargs):
+        content_type_id = request.GET.get('content_type')
+        object_id = request.GET.get('object_id')
+
+        if not content_type_id or not object_id:
+            return HttpResponseBadRequest("Missing content_type or object_id")
+
+        content_type = get_object_or_404(ContentType, id=content_type_id)
+        target_obj = get_object_or_404(content_type.model_class(), id=object_id)
+
+        form = forms.SubscriptionAssignmentForm(content_type=content_type, object_id=object_id)
+        context = {
+            'form': form,
+            'target_obj': target_obj,
+            'content_type': content_type,
+            'object_id': object_id,
+            'title': f"Assign Subscription to {target_obj}",
+        }
+        return render(request, self.template_name, context)
+
+    def post(self, request, *args, **kwargs):
+        content_type_id = request.POST.get('content_type') or request.GET.get('content_type')
+        object_id = request.POST.get('object_id') or request.GET.get('object_id')
+
+        if not content_type_id or not object_id:
+            return HttpResponseBadRequest("Missing content_type or object_id")
+
+        content_type = get_object_or_404(ContentType, id=content_type_id)
+        target_obj = get_object_or_404(content_type.model_class(), id=object_id)
+
+        form = forms.SubscriptionAssignmentForm(request.POST, content_type=content_type, object_id=object_id)
+        if form.is_valid():
+            assignment = form.save(commit=False)
+            assignment.assigned_by = request.user
+            assignment.save()
+            messages.success(request, f"Assigned subscription successfully to {target_obj}.")
+            return redirect(target_obj.get_absolute_url())
+
+        context = {
+            'form': form,
+            'target_obj': target_obj,
+            'content_type': content_type,
+            'object_id': object_id,
+            'title': f"Assign Subscription to {target_obj}",
+        }
+        return render(request, self.template_name, context)
+
+
+class SubscriptionAssignmentDeleteView(ObjectDeleteView):
+    queryset = SubscriptionAssignment.objects.all()
+    template_name = 'generic/object_confirm_delete.html'
+
+    def get_success_url(self):
+        return_url = self.request.GET.get('return_url') or self.request.POST.get('return_url')
+        if return_url:
+            return return_url
+        obj = self.object
+        if obj and obj.assigned_object and hasattr(obj.assigned_object, 'get_absolute_url'):
+            return obj.assigned_object.get_absolute_url()
+        return reverse('dashboard')
+

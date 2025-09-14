@@ -21,4 +21,8 @@ urlpatterns = [
     path('subscriptions/<int:pk>/', views.SubscriptionDetailView.as_view(), name='subscription_detail'),
     path('subscriptions/<int:pk>/edit/', views.SubscriptionEditView.as_view(), name='subscription_update'),
     path('subscriptions/<int:pk>/delete/', views.SubscriptionDeleteView.as_view(), name='subscription_delete'),
+
+    # Subscription Assignments
+    path('assignments/add/', views.SubscriptionAssignmentCreateView.as_view(), name='subscriptionassignment_create'),
+    path('assignments/<int:pk>/delete/', views.SubscriptionAssignmentDeleteView.as_view(), name='subscriptionassignment_delete'),
 ]
