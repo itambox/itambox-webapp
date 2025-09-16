@@ -22,71 +22,64 @@
                  hx-trigger="tableRefreshRequired from:body"
                  hx-target="#object-list-dynamic-content"
                  hx-swap="innerHTML">
-                {# Row for Search and Action Buttons #}
-                <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
-                    {# Quick Search Input Group #}
-                    {% if filter_form.q is not None %}
-                        <div class="quicksearch-results-tab" style="flex-grow: 1; max-width: 200px; margin-right: 1rem;">
-                            <form method="get" action="" class="filter-form-inline"
-                                hx-get="{{ request.path }}"
-                                hx-target="#object-list-dynamic-content"
-                                hx-swap="innerHTML"
-                                hx-push-url="true">
-                                <div class="input-group input-group-flat">
-                                    <input type="search" name="q" class="form-control" placeholder="Search..."
-                                           value="{{ request.GET.q|default:"" }}"
-                                           hx-trigger="keyup changed delay:500ms, search">
-                                    <span class="input-group-text">
-                                        <a href="#" class="link-secondary {% if not request.GET.q %}d-none{% endif %}" title="Clear search" data-bs-toggle="tooltip"
-                                           onclick="this.closest('form').querySelector('input[name=q]').value=''; this.closest('form').dispatchEvent(new Event('submit', { bubbles: true })); return false;">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-x" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
-                                        </a>
-                                    </span>
-                                </div>
-                                {# Hidden fields from filter form #}
-                                {% for field in filter_form %}
-                                    {% if field.name != 'q' and field.value %}
-                                        <input type="hidden" name="{{ field.name }}" value="{{ field.value }}">
-                                    {% endif %}
-                                {% endfor %}
-                           </form>
-                        </div>
-                    {% else %}
-                        <div></div> {# Placeholder #}
-                    {% endif %}
-
-                    {# Action Buttons #}
-                    <div class="ms-auto d-flex gap-2">
-                        {% if table_config_key %}
-                            <button type="button" class="btn btn-outline-secondary d-flex align-items-center"
-                                    hx-get="{% url 'table_config' model_name=table_config_key %}"
-                                    hx-target="#modal-placeholder">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-settings me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" /><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" /></svg>
-                                Configure Table
-                            </button>
-                        {% endif %}
-
-                        {% if filter_form %}
-                            <button type="button" class="btn btn-outline-secondary d-flex align-items-center" id="toggle-filters-btn" title="Toggle Filters">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-filter me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                                    <path d="M5.5 5h13a1 1 0 0 1 .5 1.5l-5 5.5v5l-3 1.3v-6.3l-5 -5.5a1 1 0 0 1 .5 -1.5" />
-                                </svg>
-                                Filters
-                                <span id="filters-applied-count" class="badge bg-primary ms-2 {% if not filter_form.applied_filters %}d-none{% endif %}">
-                                    {{ filter_form.applied_filters|length|default:"0" }}
-                                </span>
-                            </button>
-                        {% endif %}
-
-                        {% if import_url_name %}
-                        <a href="{% url import_url_name %}" class="btn btn-outline-secondary d-flex align-items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-import me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 13v-8a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-5.5"/><path d="M2 19h7"/><path d="M5 16l-3 3l3 3"/></svg>
-                            Import
-                        </a>
-                        {% endif %}
-                    </div>
-                </div>
+                 {# Row for Search and Action Buttons #}
+                 <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+                     {# Quick Search Input Group #}
+                     {% if filter_form.q is not None %}
+                         <div class="quicksearch-results-tab" style="flex-grow: 1; max-width: 200px; margin-right: 1rem;">
+                             <form method="get" action="" class="filter-form-inline"
+                                 hx-get="{{ request.path }}"
+                                 hx-target="#object-list-dynamic-content"
+                                 hx-swap="innerHTML"
+                                 hx-push-url="true">
+                                 <div class="input-group input-group-flat">
+                                     <input type="search" name="q" class="form-control" placeholder="{% trans "Search..." %}"
+                                            value="{{ request.GET.q|default:"" }}"
+                                            hx-trigger="keyup changed delay:500ms, search">
+                                     <span class="input-group-text">
+                                         <a href="#" class="link-secondary {% if not request.GET.q %}d-none{% endif %}" title="{% trans "Clear search" %}" data-bs-toggle="tooltip"
+                                            onclick="this.closest('form').querySelector('input[name=q]').value=''; this.closest('form').dispatchEvent(new Event('submit', { bubbles: true })); return false;">
+                                             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-x" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
+                                         </a>
+                                     </span>
+                                 </div>
+                                 {# Hidden fields from filter form #}
+                                 {% for field in filter_form %}
+                                     {% if field.name != 'q' and field.value %}
+                                         <input type="hidden" name="{{ field.name }}" value="{{ field.value }}">
+                                     {% endif %}
+                                 {% endfor %}
+                            </form>
+                         </div>
+                     {% else %}
+                         <div></div> {# Placeholder #}
+                     {% endif %}
+ 
+                     {# Action Buttons #}
+                     <div class="ms-auto d-flex gap-2">
+                         {% if table_config_key %}
+                             <button type="button" class="btn btn-outline-secondary d-flex align-items-center"
+                                     hx-get="{% url 'table_config' model_name=table_config_key %}"
+                                     hx-target="#modal-placeholder">
+                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-settings me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" /><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" /></svg>
+                                 {% trans "Configure Table" %}
+                             </button>
+                         {% endif %}
+ 
+                         {% if filter_form %}
+                             <button type="button" class="btn btn-outline-secondary d-flex align-items-center" id="toggle-filters-btn" title="{% trans "Toggle Filters" %}">
+                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-filter me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                     <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                     <path d="M5.5 5h13a1 1 0 0 1 .5 1.5l-5 5.5v5l-3 1.3v-6.3l-5 -5.5a1 1 0 0 1 .5 -1.5" />
+                                 </svg>
+                                 {% trans "Filters" %}
+                                 <span id="filters-applied-count" class="badge bg-primary ms-2 {% if not filter_form.applied_filters %}d-none{% endif %}">
+                                     {{ filter_form.applied_filters|length|default:"0" }}
+                                 </span>
+                             </button>
+                         {% endif %}
+                     </div>
+                 </div>
 
                 {# Table Rendering Container #}
                 <div id="object-list-table-container">
@@ -220,22 +213,64 @@
     <div class="btn-list">
         {% block extra_controls %}{% endblock %}
 
-        {% if create_url_name %}
-        <a href="{% url create_url_name %}" class="btn btn-primary d-none d-sm-inline-block">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
-            Create {{ object_type|default:"Object" }}
-        </a>
-        <a href="{% url create_url_name %}" class="btn btn-primary d-sm-none btn-icon" aria-label="Create new {{ object_type|default:"object" }}">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
-        </a>
+        {% if can_add %}
+            {% if create_url_name %}
+            <a href="{% url create_url_name %}" class="btn btn-primary d-none d-sm-inline-block">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+                {% blocktranslate %}Create {{ object_type }}{% endblocktranslate %}
+            </a>
+            <a href="{% url create_url_name %}" class="btn btn-primary d-sm-none btn-icon" aria-label="{% blocktranslate %}Create new {{ object_type }}{% endblocktranslate %}">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+            </a>
+            {% endif %}
+
+            {% if import_url %}
+            <a href="{{ import_url }}" class="btn btn-secondary d-none d-sm-inline-block">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-import" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 13v-8a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-5.5"/><path d="M2 19h7"/><path d="M5 16l-3 3l3 3"/></svg>
+                {% trans "Import" %}
+            </a>
+            {% endif %}
         {% endif %}
 
-        {% if import_url_name %}
-        <a href="{% url import_url_name %}" class="btn btn-secondary d-none d-sm-inline-block">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 13v-8a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-5.5"/><path d="M2 19h7"/><path d="M5 16l-3 3l3 3"/></svg>
-            Import
-        </a>
-        {% endif %}
+        <div class="dropdown d-none d-sm-inline-block">
+            <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-download" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" /><path d="M7 11l5 5l5 -5" /><path d="M12 4l0 12" /></svg>
+                {% trans "Export" %}
+            </button>
+            <div class="dropdown-menu dropdown-menu-end">
+                <div class="dropdown-header">{% trans "Current View" %}</div>
+                <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=0 %}?format=csv&export_scope=filtered&{{ request.GET.urlencode }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-type-csv me-2 text-muted" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M5 12v-7a2 2 0 0 1 2 -2h7l5 5v4" /><path d="M7 16.5a1.5 1.5 0 0 0 -3 0v3a1.5 1.5 0 0 0 3 0" /><path d="M10 20.25c0 .414 .336 .75 .75 .75h1.25a1 1 0 0 0 1 -1v-1a1 1 0 0 0 -1 -1h-1a1 1 0 0 1 -1 -1h-1a1 1 0 0 1 1 -1h1.25c.414 0 .75 .336 .75 .75" /><path d="M17 13l2 6l2 -6" /></svg>
+                    {% trans "CSV Format" %}
+                </a>
+                <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=0 %}?format=yaml&export_scope=filtered&{{ request.GET.urlencode }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-code me-2 text-muted" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><path d="M10 13l-1.5 1.5l1.5 1.5" /><path d="M14 13l1.5 1.5l-1.5 1.5" /></svg>
+                    {% trans "YAML Format" %}
+                </a>
+
+                <div class="dropdown-divider"></div>
+                <div class="dropdown-header">{% trans "All Data" %}</div>
+                <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=0 %}?format=csv&export_scope=all">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-type-csv me-2 text-muted" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M5 12v-7a2 2 0 0 1 2 -2h7l5 5v4" /><path d="M7 16.5a1.5 1.5 0 0 0 -3 0v3a1.5 1.5 0 0 0 3 0" /><path d="M10 20.25c0 .414 .336 .75 .75 .75h1.25a1 1 0 0 0 1 -1v-1a1 1 0 0 0 -1 -1h-1a1 1 0 0 1 -1 -1h-1a1 1 0 0 1 1 -1h1.25c.414 0 .75 .336 .75 .75" /><path d="M17 13l2 6l2 -6" /></svg>
+                    {% trans "CSV Format" %}
+                </a>
+                <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=0 %}?format=yaml&export_scope=all">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-code me-2 text-muted" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><path d="M10 13l-1.5 1.5l1.5 1.5" /><path d="M14 13l1.5 1.5l-1.5 1.5" /></svg>
+                    {% trans "YAML Format" %}
+                </a>
+
+                {% if export_templates %}
+                    <div class="dropdown-divider"></div>
+                    <div class="dropdown-header">{% trans "Export Templates" %}</div>
+                    {% for template in export_templates %}
+                    <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=template.pk %}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-code me-2 text-muted" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><path d="M10 13l-1.5 1.5l1.5 1.5" /><path d="M14 13l1.5 1.5l-1.5 1.5" /></svg>
+                        {{ template.name }} ({{ template.file_extension|upper }})
+                    </a>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </div>
     </div>
 {% endblock page_actions %}
 

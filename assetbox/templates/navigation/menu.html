@@ -34,7 +34,7 @@
                   {% if buttons %}
                     <div class="btn-group ms-1">
                       {% for button in buttons %}
-                        <a href="{{ button.url }}" class="btn btn-sm btn-{{ button.color|default:'outline' }} text-primary lh-1 px-2"
+                        <a href="{{ button.url }}" class="btn btn-sm btn-{{ button.color|default:'outline text-primary' }} lh-1 px-2"
                            title="{{ button.title }}" aria-label="{{ button.title }}">
                           <i class="{{ button.icon_class }}" aria-hidden="true"></i>
                         </a>

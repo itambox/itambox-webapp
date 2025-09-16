@@ -15,7 +15,7 @@
                                hx-target="#object-list-dynamic-content"
                                hx-swap="innerHTML"
                                hx-push-url="true">
-                                {{ column.header }}
+                                {% translate column.header %}
                             </a>
                             {% if column.is_ordered %}
                                 <span class="text-muted">
@@ -24,7 +24,7 @@
                             {% endif %}
                         </th>
                     {% else %}
-                        <th {{ column.attrs.th.as_html }}>{{ column.header }}</th>
+                        <th {{ column.attrs.th.as_html }}>{% translate column.header %}</th>
                     {% endif %}
                 {% endfor %}
             </tr>

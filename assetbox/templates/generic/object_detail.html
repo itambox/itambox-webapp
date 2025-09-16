@@ -15,6 +15,19 @@
 
 {% block page_actions %}
     <div class="btn-list">
+        {% if is_bookmarkable %}
+        <button type="button" class="btn btn-icon {% if is_bookmarked %}btn-warning{% else %}btn-outline-secondary{% endif %}"
+                hx-post="{% url 'users:bookmark_toggle' content_type_id=bookmark_content_type_id object_id=object.pk %}"
+                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                hx-target="this"
+                hx-swap="outerHTML"
+                title="{% if is_bookmarked %}Remove Bookmark{% else %}Bookmark Item{% endif %}">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-star" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="{% if is_bookmarked %}currentColor{% else %}none{% endif %}" stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M12 17.75l-6.172 3.245l1.179 -6.873l-5 -4.867l6.9 -1l3.086 -6.253l3.086 6.253l6.9 1l-5 4.867l1.179 6.873z" />
+            </svg>
+        </button>
+        {% endif %}
         {# --- Standard Edit/Delete using action_urls from context --- #}
         {% if action_urls.edit %}
         <a href="{{ action_urls.edit }}" class="btn">
@@ -57,6 +70,21 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M16 7a4 4 0 1 1 -8 0a4 4 0 0 1 8 0z" /><path d="M12 14v7" /><path d="M9 18h6" /></svg>
             <span class="d-none d-xl-inline ms-1">Journal</span>
             <span class="badge bg-secondary ms-1">{{ journal_entries_count }}</span>
+        </a>
+    </li>
+    {% endif %}
+    {% if has_subscriptions %}
+    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="Subscriptions">
+        <a href="#subscriptions" class="nav-link" data-bs-toggle="tab" role="tab">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-info" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M15 21h-9a3 3 0 0 1 -3 -3v-1h10v2a2 2 0 0 0 4 0v-14a2 2 0 1 1 2 2h-2m2 -4h-11a3 3 0 0 0 -3 3v11" />
+                <path d="M9 7l4 0" />
+                <path d="M9 11l4 0" />
+                <path d="M9 15l4 0" />
+            </svg>
+            <span class="d-none d-xl-inline ms-1">Subscriptions</span>
+            <span class="badge bg-info-lt ms-1">{{ subscription_assignments_count }}</span>
         </a>
     </li>
     {% endif %}
@@ -260,6 +288,31 @@
                     </button>
                 </form>
             </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if has_subscriptions %}
+    <div class="tab-pane fade" id="subscriptions" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
+                <h3 class="card-title">Assigned SaaS & Support Licenses</h3>
+                {% if can_change %}
+                <a href="{% url 'subscriptions:subscriptionassignment_create' %}?content_type={{ subscribable_content_type_id }}&object_id={{ object.pk }}" class="btn btn-sm btn-primary">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+                    Assign Subscription
+                </a>
+                {% endif %}
+            </div>
+            {% if subscription_assignments_table.rows %}
+                <div class="table-responsive">
+                    {% render_table subscription_assignments_table %}
+                </div>
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <p class="mb-0">No active SaaS subscriptions or support agreements are assigned to this item.</p>
+                </div>
+            {% endif %}
         </div>
     </div>
     {% endif %}

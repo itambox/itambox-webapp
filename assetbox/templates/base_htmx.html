@@ -27,9 +27,9 @@
     <div class="page-header d-print-none">
         <div class="container-fluid">
             {# Render Breadcrumbs #}
-            <div id="breadcrumbs-block">
+            <div id="breadcrumbs-block" class="d-flex justify-content-between align-items-center">
                 {% if breadcrumbs %}
-                    <ol class="breadcrumb breadcrumb-arrows" aria-label="breadcrumbs">
+                    <ol class="breadcrumb breadcrumb-arrows mb-0" aria-label="breadcrumbs">
                         {% for url, label in breadcrumbs %}
                             {% if url %}
                                 <li class="breadcrumb-item"><a href="{{ url }}">{{ label }}</a></li>
@@ -38,6 +38,11 @@
                             {% endif %}
                         {% endfor %}
                     </ol>
+                {% endif %}
+                {% if help_url %}
+                    <a href="{{ help_url }}" target="_blank" class="btn btn-icon btn-ghost-info ms-auto" title="{% translate 'View Help Documentation' %}" id="help-docs-btn">
+                        <i class="mdi mdi-help-circle" style="font-size: 1.25rem;"></i>
+                    </a>
                 {% endif %}
             </div>
             {# End Breadcrumbs #}

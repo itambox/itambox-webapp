@@ -1,18 +1,26 @@
+{% load i18n %}
 {% load utility_tags %}
 
 {# Renders Bootstrap breadcrumbs based on a list of tuples passed in context #}
 {# Expected context variable: breadcrumbs = [(url, label), (url, label), ...] #}
 {# The last item is treated as the active page. #}
 
-{% if breadcrumbs %}
-<ol class="breadcrumb breadcrumb-arrows" aria-label="breadcrumbs">
-    {% for url, label in breadcrumbs %}
-        {% if not forloop.last %}
-            <li class="breadcrumb-item"><a href="{{ url|default:'#' }}">{{ label }}</a></li>
-        {% else %}
-            {# Last item is active, no link #}
-            <li class="breadcrumb-item active" aria-current="page">{{ label }}</li>
-        {% endif %}
-    {% endfor %}
-</ol>
-{% endif %} 
+<div class="d-flex justify-content-between align-items-center w-100">
+    {% if breadcrumbs %}
+    <ol class="breadcrumb breadcrumb-arrows mb-0" aria-label="breadcrumbs">
+        {% for url, label in breadcrumbs %}
+            {% if not forloop.last %}
+                <li class="breadcrumb-item"><a href="{{ url|default:'#' }}">{{ label }}</a></li>
+            {% else %}
+                {# Last item is active, no link #}
+                <li class="breadcrumb-item active" aria-current="page">{{ label }}</li>
+            {% endif %}
+        {% endfor %}
+    </ol>
+    {% endif %}
+    {% if help_url %}
+        <a href="{{ help_url }}" target="_blank" class="btn btn-icon btn-ghost-info ms-auto" title="{% translate 'View Help Documentation' %}" id="help-docs-btn">
+            <i class="mdi mdi-help-circle" style="font-size: 1.25rem;"></i>
+        </a>
+    {% endif %}
+</div> 

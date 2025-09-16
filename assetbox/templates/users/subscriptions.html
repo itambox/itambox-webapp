@@ -1,159 +1,50 @@
 {% extends 'users/base.html' %}
 {% load i18n %}
-{% load render_table from django_tables2 %}
 
 {% block title_tab %}{% trans "Subscriptions" %}{% endblock %}
 
 {% block content_tab %}
 <div class="mb-4">
-    <h3 class="card-title mb-0">{% trans "Owned Subscriptions" %}</h3>
-    <p class="text-muted small mb-0">{% trans "Overview of software licenses, recurring SaaS platforms, and service agreements you own." %}</p>
+    <h3 class="card-title mb-0">{% trans "Subscribed Objects & Change Updates" %}</h3>
+    <p class="text-muted small mb-0">{% trans "Overview of physical and logical inventory objects you have subscribed to for real-time change notifications." %}</p>
 </div>
 
-{# Dashboard Summary Cards #}
-<div class="row g-3 mb-4">
-    {# Card 1: Subscriptions Owned #}
-    <div class="col-sm-6 col-lg-3">
-        <div class="card card-sm">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-blue text-white avatar">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-license" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                                <path d="M15 21h-9a3 3 0 0 1 -3 -3v-1h10v2a2 2 0 0 0 4 0v-14a2 2 0 1 1 2 2h-2m2 -4h-11a3 3 0 0 0 -3 3v11" />
-                                <path d="M9 7l4 0" />
-                                <path d="M9 11l4 0" />
-                                <path d="M9 15l4 0" />
-                            </svg>
-                        </span>
+{# Subscribed Objects Section #}
+<div class="card border-0 shadow-sm">
+    {% if bookmarked_count > 0 %}
+        <div class="list-group list-group-flush">
+            {% for item in bookmarked_items %}
+                <div class="list-group-item d-flex justify-content-between align-items-center py-3">
+                    <div>
+                        <span class="badge bg-purple-lt me-2">{{ item.type_name }}</span>
+                        <a href="{{ item.url }}" class="font-weight-medium text-reset">{{ item.name }}</a>
+                        <div class="text-muted small mt-1">{% trans "Subscribed on" %} {{ item.created|date:"Y-m-d H:i" }}</div>
                     </div>
-                    <div class="col">
-                        <div class="font-weight-medium">
-                            {{ subscriptions_count }} {% trans "Subscriptions" %}
-                        </div>
-                        <div class="text-muted small">
-                            {{ active_subscriptions_count }} {% trans "Active" %}
-                        </div>
+                    <div>
+                        <button type="button" class="btn btn-sm btn-outline-danger"
+                                hx-post="{% url 'users:bookmark_toggle' content_type_id=item.content_type_id object_id=item.object_id %}"
+                                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                                hx-target="closest .list-group-item"
+                                hx-swap="outerHTML"
+                                title="{% trans 'Unsubscribe' %}">
+                            {% trans "Unsubscribe" %}
+                        </button>
                     </div>
                 </div>
-            </div>
+            {% endfor %}
         </div>
-    </div>
-
-    {# Card 2: Annual Cost #}
-    <div class="col-sm-6 col-lg-3">
-        <div class="card card-sm">
+    {% else %}
+        <div class="py-5 text-muted text-center border-0 bg-transparent shadow-none">
             <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-green text-white avatar">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-currency-dollar" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                                <path d="M12 3v18" />
-                                <path d="M9 8.5a3.5 3.5 0 0 1 3.5 -3.5h1a3.5 3.5 0 0 1 0 7h-2a3.5 3.5 0 0 0 0 7h2a3.5 3.5 0 0 0 3.5 -3.5" />
-                            </svg>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium">
-                            {% if total_annual_spend > 0 %}
-                                {{ total_annual_spend|floatformat:2 }} USD
-                            {% else %}
-                                0.00 USD
-                            {% endif %}
-                        </div>
-                        <div class="text-muted small">
-                            {% trans "Est. Annual Spend" %}
-                        </div>
-                    </div>
-                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-star-off text-muted mb-2" width="48" height="48" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                    <path d="M3 3l18 18" />
+                    <path d="M10.012 6.016l1.988 -4.016l3.086 6.253l6.9 1l-3.38 3.288m-1.625 2.393l1.826 1.776l-1.179 -6.873l6.172 -3.245l-5.308 1.488" />
+                </svg>
+                <p class="mb-0 small font-weight-medium">{% trans "You have not subscribed to any specific objects for updates yet." %}</p>
+                <p class="text-muted small mt-1">{% trans "Use the star icon on any hardware asset, license, or location details page to subscribe." %}</p>
             </div>
         </div>
-    </div>
-
-    {# Card 3: Expiring Soon #}
-    <div class="col-sm-6 col-lg-3">
-        <div class="card card-sm">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="{% if expiring_soon_count > 0 %}bg-warning{% else %}bg-secondary{% endif %} text-white avatar">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                                <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
-                                <path d="M18 18m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" />
-                                <path d="M15 3v4" />
-                                <path d="M7 3v4" />
-                                <path d="M3 11h16" />
-                                <path d="M18 16.496v1.504l1 1" />
-                            </svg>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium">
-                            {{ expiring_soon_count }} {% trans "Expiring Soon" %}
-                        </div>
-                        <div class="text-muted small">
-                            {% trans "Next 30 Days" %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    {# Card 4: Overdue #}
-    <div class="col-sm-6 col-lg-3">
-        <div class="card card-sm">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="{% if overdue_count > 0 %}bg-danger{% else %}bg-secondary{% endif %} text-white avatar">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-alert-triangle" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                                <path d="M12 9v4" />
-                                <path d="M12 17h.01" />
-                                <path d="M3.57 19.113l8.006 -13.694a1 1 0 0 1 1.725 0l8.006 13.694a1 1 0 0 1 -.863 1.507h-16.012a1 1 0 0 1 -.862 -1.507z" />
-                            </svg>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium">
-                            {{ overdue_count }} {% trans "Overdue" %}
-                        </div>
-                        <div class="text-muted small">
-                            {% trans "Action Required" %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% endif %}
 </div>
-
-{# Owned Subscriptions List #}
-{% if subscriptions_count > 0 %}
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title">{% trans "Active SaaS & Support Licenses" %}</h3>
-        </div>
-        <div class="table-responsive">
-            {% render_table subscriptions_table %}
-        </div>
-    </div>
-{% else %}
-    <div class="py-5 text-muted text-center card border-0 bg-transparent shadow-none">
-        <div class="card-body">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-off text-muted mb-2" width="48" height="48" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                <path d="M3 3l18 18" />
-                <path d="M7 3h10a2 2 0 0 1 2 2v10m0 4a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-14" />
-                <path d="M10 13h4" />
-                <path d="M10 17h1" />
-            </svg>
-            <p class="mb-0 small font-weight-medium">{% trans "You do not currently own any active system subscriptions." %}</p>
-        </div>
-    </div>
-{% endif %}
 {% endblock %}
