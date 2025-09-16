@@ -1,0 +1,14 @@
+# zensical.toml (AssetBox Root)
+site_name = "AssetBox End-User Documentation"
+site_url = "https://docs.assetbox.local/"
+site_dir = "static/docs"  # Outputs compiled files directly into Django's static folder
+theme = "material"
+
+[nav]
+# Define your navigation tree here (reads raw Markdown files in /docs)
+Introduction = "introduction.md"
+Features = [
+    { Assets = "features/assets.md" },
+    { Licenses = "features/licenses.md" },
+    { Components = "features/components.md" }
+]

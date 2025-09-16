@@ -1,13 +1,13 @@
 # AssetBox German translation.
 # Copyright (C) 2026
 # This file is distributed under the same license as the AssetBox project.
-#, fuzzy
+#
 msgid ""
 msgstr ""
 "Project-Id-Version: AssetBox 0.1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-05-27 12:00+0200\n"
-"PO-Revision-Date: 2026-05-27 12:00+0200\n"
+"POT-Creation-Date: 2026-05-30 08:00+0200\n"
+"PO-Revision-Date: 2026-05-30 08:00+0200\n"
 "Last-Translator: AssetBox Team\n"
 "Language-Team: German\n"
 "Language: de\n"
@@ -15,3 +15,514 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+# --- Sidebar Menus & Submenus (from core/navigation/menu.py) ---
+
+msgid "Organization"
+msgstr "Organisation"
+
+msgid "Sites & Regions"
+msgstr "Standorte & Regionen"
+
+msgid "Sites"
+msgstr "Standorte"
+
+msgid "Regions"
+msgstr "Regionen"
+
+msgid "Site Groups"
+msgstr "Standortgruppen"
+
+msgid "Locations"
+msgstr "Lagerorte"
+
+msgid "Tenancy"
+msgstr "Tenancy"
+
+msgid "Tenants"
+msgstr "Mandanten"
+
+msgid "Tenant Groups"
+msgstr "Mandantengruppen"
+
+msgid "Asset Holders"
+msgstr "Asset-Inhaber"
+
+msgid "Assignments"
+msgstr "Zuweisungen"
+
+msgid "Physical Assets"
+msgstr "Physische Assets"
+
+msgid "Hardware"
+msgstr "Hardware"
+
+msgid "Assets"
+msgstr "Assets"
+
+msgid "Asset Roles"
+msgstr "Asset-Rollen"
+
+msgid "Status Labels"
+msgstr "Status-Labels"
+
+msgid "Catalog"
+msgstr "Katalog"
+
+msgid "Asset Types"
+msgstr "Asset-Typen"
+
+msgid "Manufacturers"
+msgstr "Hersteller"
+
+msgid "Categories"
+msgstr "Kategorien"
+
+msgid "Inventory & Stock"
+msgstr "Inventar & Lager"
+
+msgid "Component Inventory"
+msgstr "Komponenten-Inventar"
+
+msgid "Components"
+msgstr "Komponenten"
+
+msgid "Component Stocks"
+msgstr "Komponentenbestände"
+
+msgid "Component Allocations"
+msgstr "Komponentenzuweisungen"
+
+msgid "Peripherals & Accessories"
+msgstr "Peripheriegeräte & Zubehör"
+
+msgid "Accessories"
+msgstr "Zubehör"
+
+msgid "Accessory Stocks"
+msgstr "Zubehörbestände"
+
+msgid "Consumables"
+msgstr "Verbrauchsmaterialien"
+
+msgid "Consumable Stocks"
+msgstr "Verbrauchsmaterialbestände"
+
+msgid "Kits & Lifecycle"
+msgstr "Kits & Lebenszyklus"
+
+msgid "Kits"
+msgstr "Kits"
+
+msgid "Depreciation"
+msgstr "Abschreibung"
+
+msgid "Software & SaaS"
+msgstr "Software & SaaS"
+
+msgid "Contracts & SaaS"
+msgstr "Verträge & SaaS"
+
+msgid "Software"
+msgstr "Software"
+
+msgid "Licenses"
+msgstr "Lizenzen"
+
+msgid "Subscriptions"
+msgstr "Abonnements"
+
+msgid "Providers"
+msgstr "Anbieter"
+
+msgid "Operations"
+msgstr "Operations"
+
+msgid "Compliance & Audits"
+msgstr "Compliance & Audits"
+
+msgid "Audit Sessions"
+msgstr "Audit-Sitzungen"
+
+msgid "Audit Session"
+msgstr "Audit-Sitzung"
+
+msgid "Asset Audits"
+msgstr "Asset-Audits"
+
+msgid "Asset Audit"
+msgstr "Asset-Audit"
+
+msgid "Maintenances"
+msgstr "Wartungen"
+
+msgid "Procurement"
+msgstr "Beschaffung"
+
+msgid "Requests"
+msgstr "Anfragen"
+
+msgid "Suppliers"
+msgstr "Lieferanten"
+
+msgid "Contacts"
+msgstr "Kontakte"
+
+msgid "Contact Roles"
+msgstr "Kontaktrollen"
+
+msgid "System Activity"
+msgstr "Systemaktivität"
+
+msgid "Changelog"
+msgstr "Änderungsprotokoll"
+
+msgid "Customization"
+msgstr "Anpassung"
+
+msgid "Custom Schemas"
+msgstr "Benutzerdefinierte Schemata"
+
+msgid "Custom Fields"
+msgstr "Benutzerdefinierte Felder"
+
+msgid "Custom Fieldsets"
+msgstr "Benutzerdefinierte Feldgruppen"
+
+msgid "Metadata"
+msgstr "Metadaten"
+
+msgid "Tags"
+msgstr "Tags"
+
+msgid "Asset Tag Sequences"
+msgstr "Asset-Tag-Sequenzen"
+
+msgid "Admin"
+msgstr "Administration"
+
+msgid "System"
+msgstr "System"
+
+msgid "Admin Panel"
+msgstr "Administration"
+
+msgid "Home"
+msgstr "Startseite"
+
+# --- Topbar & Layout UI ---
+
+msgid "Search…"
+msgstr "Suchen…"
+
+msgid "Search in website"
+msgstr "Website durchsuchen"
+
+msgid "Unread Alerts"
+msgstr "Ungelesene Benachrichtigungen"
+
+msgid "No unread notifications"
+msgstr "Keine ungelesenen Benachrichtigungen"
+
+msgid "View Notification Center"
+msgstr "Benachrichtigungscenter anzeigen"
+
+msgid "Signed in as"
+msgstr "Angemeldet als"
+
+msgid "Guest"
+msgstr "Gast"
+
+msgid "User"
+msgstr "Benutzer"
+
+msgid "Not Logged In"
+msgstr "Nicht angemeldet"
+
+msgid "Profile"
+msgstr "Profil"
+
+msgid "Notifications"
+msgstr "Benachrichtigungen"
+
+msgid "Preferences"
+msgstr "Einstellungen"
+
+msgid "API Tokens"
+msgstr "API-Token"
+
+msgid "Logout"
+msgstr "Abmelden"
+
+msgid "Login"
+msgstr "Anmelden"
+
+msgid "Overview"
+msgstr "Übersicht"
+
+msgid "Dashboard"
+msgstr "Dashboard"
+
+msgid "Docs"
+msgstr "Dokumentation"
+
+msgid "REST API"
+msgstr "REST-API"
+
+msgid "API documentation"
+msgstr "API-Dokumentation"
+
+msgid "Source Code"
+msgstr "Quellcode"
+
+# --- User Account Titles & Pretires (from views.py) ---
+
+msgid "User Profile"
+msgstr "Benutzerprofil"
+
+msgid "User Account"
+msgstr "Benutzerkonto"
+
+msgid "Change Password"
+msgstr "Kennwort ändern"
+
+msgid "User Tab"
+msgstr "Benutzer-Reiter"
+
+# --- Views Success / Error Flash Toast Messages ---
+
+msgid "Profile updated successfully."
+msgstr "Profil erfolgreich aktualisiert."
+
+msgid "Password changed successfully."
+msgstr "Passwort erfolgreich geändert."
+
+msgid "Preferences saved successfully."
+msgstr "Einstellungen erfolgreich gespeichert."
+
+msgid "There was an error saving your preferences."
+msgstr "Beim Speichern Ihrer Einstellungen ist ein Fehler aufgetreten."
+
+msgid "API Token has been revoked."
+msgstr "API-Token wurde widerrufen."
+
+msgid "API Token generated successfully! Make sure to copy your new personal access token now, as you won't be able to see it again: <code>{token_key}</code>"
+msgstr "API-Token erfolgreich generiert! Kopieren Sie jetzt Ihren persönlichen Token, da Sie ihn später nicht mehr sehen können: <code>{token_key}</code>"
+
+# --- Custom Breadcrumbs, Table Columns & Generic Buttons ---
+
+msgid "Export"
+msgstr "Exportieren"
+
+msgid "Export to CSV"
+msgstr "Als CSV exportieren"
+
+msgid "Export Templates"
+msgstr "Export-Vorlagen"
+
+msgid "Configure Table"
+msgstr "Tabelle konfigurieren"
+
+msgid "Filters"
+msgstr "Filter"
+
+msgid "Toggle Filters"
+msgstr "Filter ein-/ausblenden"
+
+msgid "Search..."
+msgstr "Suchen..."
+
+msgid "Clear search"
+msgstr "Suche löschen"
+
+msgid "Create %(object_type)s"
+msgstr "%(object_type)s erstellen"
+
+msgid "Create new %(object_type)s"
+msgstr "Neues %(object_type)s erstellen"
+
+msgid "Delete {verbose_name}: {object}"
+msgstr "{verbose_name} löschen: {object}"
+
+msgid "Delete {object}"
+msgstr "{object} löschen"
+
+msgid "List"
+msgstr "Liste"
+
+msgid "Import"
+msgstr "Importieren"
+
+msgid "Import {verbose_name_plural}"
+msgstr "{verbose_name_plural} importieren"
+
+msgid "Import Objects"
+msgstr "Objekte importieren"
+
+msgid "Edit"
+msgstr "Bearbeiten"
+
+msgid "Create"
+msgstr "Erstellen"
+
+# --- Common Table Column Headers ---
+
+msgid "Asset Tag"
+msgstr "Inventarnummer"
+
+msgid "Name"
+msgstr "Name"
+
+msgid "Model"
+msgstr "Modell"
+
+msgid "Status"
+msgstr "Status"
+
+msgid "Serial"
+msgstr "Seriennummer"
+
+msgid "Location"
+msgstr "Lagerort"
+
+msgid "Holder"
+msgstr "Besitzer"
+
+msgid "Assignee"
+msgstr "Zugewiesen an"
+
+msgid "Actions"
+msgstr "Aktionen"
+
+msgid "Created"
+msgstr "Erstellt"
+
+msgid "Description"
+msgstr "Beschreibung"
+
+msgid "Category"
+msgstr "Kategorie"
+
+msgid "Supplier"
+msgstr "Lieferant"
+
+msgid "Manufacturer"
+msgstr "Hersteller"
+
+msgid "Expires"
+msgstr "Ablaufdatum"
+
+# --- Audit Session Details Page Translations ---
+
+msgid "Audit Campaign"
+msgstr "Audit-Kampagne"
+
+msgid "Close Campaign & Reconcile"
+msgstr "Kampagne schließen & abgleichen"
+
+msgid "Bulk Re-home Mismatches"
+msgstr "Fehlplatzierungen gesammelt korrigieren"
+
+msgid "Back to Campaigns"
+msgstr "Zurück zu den Kampagnen"
+
+msgid "Campaign Status"
+msgstr "Kampagnenstatus"
+
+msgid "Expected Assets"
+msgstr "Erwartete Assets"
+
+msgid "Audited So Far"
+msgstr "Bisher geprüft"
+
+msgid "Mismatches"
+msgstr "Fehlplatzierungen"
+
+msgid "Missing Assets"
+msgstr "Fehlende Assets"
+
+msgid "Barcode Scanning Engine"
+msgstr "Barcode-Scan-Engine"
+
+msgid "Set your barcode scanner to enter/newline mode, focus on the input box below, and scan your physical assets."
+msgstr "Stellen Sie Ihren Barcodescanner auf Enter/Newline-Modus ein, fokussieren Sie das Eingabefeld unten und scannen Sie Ihre physischen Assets."
+
+msgid "Log Scanned Asset"
+msgstr "Gescanntes Asset protokollieren"
+
+msgid "Campaign Information"
+msgstr "Kampagnen-Informationen"
+
+msgid "Target Location:"
+msgstr "Ziel-Lagerort:"
+
+msgid "Created By:"
+msgstr "Erstellt von:"
+
+msgid "Started At:"
+msgstr "Gestartet am:"
+
+msgid "Completed At:"
+msgstr "Beendet am:"
+
+msgid "Global (All Locations)"
+msgstr "Global (Alle Lagerorte)"
+
+msgid "Location Mismatches"
+msgstr "Lagerort-Fehlplatzierungen"
+
+msgid "Missing Expected Assets"
+msgstr "Fehlende erwartete Assets"
+
+msgid "Verified / Matching"
+msgstr "Verifiziert / Übereinstimmend"
+
+msgid "Mismatched Assets"
+msgstr "Fehlplatzierte Assets"
+
+msgid "These assets are registered under other locations, but were physically verified at <strong>%(loc)s</strong> during this campaign."
+msgstr "Diese Assets sind an anderen Lagerorten registriert, wurden aber während dieser Kampagne physisch an <strong>%(loc)s</strong> verifiziert."
+
+msgid "Asset"
+msgstr "Asset"
+
+msgid "Registered Location"
+msgstr "Registrierter Lagerort"
+
+msgid "Auditor"
+msgstr "Prüfer"
+
+msgid "Timestamp"
+msgstr "Zeitstempel"
+
+msgid "No location mismatches found!"
+msgstr "Keine Lagerort-Fehlplatzierungen gefunden!"
+
+msgid "Every audited asset matches the expected location."
+msgstr "Jedes geprüfte Asset entspricht dem erwarteten Lagerort."
+
+msgid "These assets are registered here, but have NOT been scanned or physical-verified in this campaign."
+msgstr "Diese Assets sind hier registriert, wurden aber in dieser Kampagne NICHT gescannt oder physisch verifiziert."
+
+msgid "All assets audited!"
+msgstr "Alle Assets geprüft!"
+
+msgid "Zero missing assets. 100% campaign coverage achieved!"
+msgstr "Keine fehlenden Assets. 100 % Kampagnenabdeckung erreicht!"
+
+msgid "Verified / Matching Assets"
+msgstr "Verifizierte / Übereinstimmende Assets"
+
+msgid "These assets have been scanned and physically match the registered location in the database."
+msgstr "Diese Assets wurden gescannt und stimmen physisch mit dem registrierten Lagerort in der Datenbank überein."
+
+msgid "Method"
+msgstr "Methode"
+
+msgid "No matching assets scanned yet."
+msgstr "Noch keine übereinstimmenden Assets gescannt."
+
+msgid "Start scanning assets to physically reconcile your registry."
+msgstr "Scannen Sie Assets, um Ihre Registrierung physisch abzugleichen."
+
+

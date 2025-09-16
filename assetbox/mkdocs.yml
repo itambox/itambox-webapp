@@ -1,0 +1,94 @@
+# mkdocs.yml (AssetBox Root)
+site_name: AssetBox End-User Documentation
+site_url: https://docs.assetbox.local/
+site_dir: static/docs  # Outputs compiled files directly into Django's static folder
+use_directory_urls: false
+
+
+theme:
+  name: material  # Mirror of NetBox's gorgeous Material for MkDocs theme
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+  features:
+    - content.code.copy
+    - navigation.sections
+    - navigation.expand
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - tables
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Introduction: 'index.md'
+  - Organization & Tenancy:
+      - Sites: 'models/organization/site.md'
+      - Regions: 'models/organization/region.md'
+      - Site Groups: 'models/organization/sitegroup.md'
+      - Locations: 'models/organization/location.md'
+      - Tenants: 'models/organization/tenant.md'
+      - Tenant Groups: 'models/organization/tenantgroup.md'
+      - Asset Holders: 'models/organization/assetholder.md'
+      - Holder Assignments: 'models/organization/assetholderassignment.md'
+      - Contacts: 'models/organization/contact.md'
+      - Contact Roles: 'models/organization/contactrole.md'
+      - Contact Assignments: 'models/organization/contactassignment.md'
+  - Physical Assets:
+      - Assets: 'models/assets/asset.md'
+      - Asset Roles: 'models/assets/assetrole.md'
+      - Status Labels: 'models/assets/statuslabel.md'
+      - Asset Types: 'models/assets/assettype.md'
+      - Manufacturers: 'models/assets/manufacturer.md'
+      - Categories: 'models/assets/category.md'
+      - Depreciation Profiles: 'models/assets/depreciation.md'
+      - Asset Tag Sequences: 'models/assets/assettagsequence.md'
+      - Asset Requests: 'models/assets/assetrequest.md'
+      - Audit Sessions: 'models/assets/auditsession.md'
+      - Asset Assignments: 'models/assets/assetassignment.md'
+      - Suppliers: 'models/assets/supplier.md'
+  - Hardware Components:
+      - Components: 'models/components/component.md'
+      - Component Stock: 'models/components/componentstock.md'
+      - Component Allocations: 'models/components/componentallocation.md'
+  - Inventory & Stock:
+      - Accessories: 'models/inventory/accessory.md'
+      - Accessory Stock: 'models/inventory/accessorystock.md'
+      - Accessory Assignments: 'models/inventory/accessoryassignment.md'
+      - Consumables: 'models/inventory/consumable.md'
+      - Consumable Stock: 'models/inventory/consumablestock.md'
+      - Consumable Consumptions: 'models/inventory/consumableassignment.md'
+      - Kits: 'models/inventory/kit.md'
+      - Kit Items: 'models/inventory/kititem.md'
+  - Software & SaaS:
+      - Software Catalog: 'models/software/software.md'
+      - Software Licenses: 'models/licenses/license.md'
+      - SaaS Subscriptions: 'models/subscriptions/subscription.md'
+      - SaaS Providers: 'models/subscriptions/provider.md'
+  - Operations & Compliance:
+      - Asset Maintenances: 'models/compliance/assetmaintenance.md'
+      - Metadata Tags: 'models/extras/tag.md'
+      - Object Changelog: 'models/core/objectchange.md'
