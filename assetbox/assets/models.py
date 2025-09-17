@@ -682,6 +682,14 @@ class AssetAssignment(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseMo
     )
     assigned_to_object_id = models.PositiveIntegerField()
     assigned_to = GenericForeignKey('assigned_to_content_type', 'assigned_to_object_id')
+    pre_checkout_status = models.ForeignKey(
+        'StatusLabel',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assignment_pre_checkouts',
+        help_text="Preserved status label to revert to upon checkin."
+    )
 
     checked_out_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,

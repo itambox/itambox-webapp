@@ -65,6 +65,7 @@ class License(BookmarkableMixin, DeletableVaultModel):
     expiration_date = models.DateField(blank=True, null=True, db_index=True, help_text="For term licenses or maintenance")
     notes = models.TextField(blank=True)
     tags = models.ManyToManyField(Tag, blank=True, related_name='licenses')
+    supplier = models.ForeignKey('assets.Supplier', on_delete=models.SET_NULL, blank=True, null=True, related_name='licenses', db_index=True)
     tenant = models.ForeignKey('organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='licenses', db_index=True)
 
     objects = SoftDeleteLicenseManager()
