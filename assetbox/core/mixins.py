@@ -222,16 +222,23 @@ class SoftDeleteMixin(models.Model):
             collector.collect([self])
             collector.sort()
             
+            from django.utils import timezone
+            now = timezone.now()
+            
             for model, instances in list(collector.data.items()):
+                pks_to_soft_delete = []
                 for instance in instances:
                     if instance == self:
                         continue
                     if isinstance(instance, SoftDeleteMixin):
                         if instance.deleted_at is None:
-                            instance.delete(force_hard_delete=False)
+                            pks_to_soft_delete.append(instance.pk)
                     else:
                         if instance.pk is not None:
                             instance.delete()
+                
+                if pks_to_soft_delete:
+                    model.objects.filter(pk__in=pks_to_soft_delete).update(deleted_at=now)
             
             self.soft_delete()
 

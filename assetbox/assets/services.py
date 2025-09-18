@@ -22,6 +22,8 @@ def checkout_asset(asset, holder=None, location=None, asset_target=None, user=No
         if asset.active_assignment:
             checkin_asset(asset, user=user, notes='Auto-checkin for reassignment')
 
+        original_status = asset.status
+
         in_use_status = StatusLabel.objects.filter(type='deployed').first()
         if in_use_status:
             asset.status = in_use_status
@@ -46,6 +48,7 @@ def checkout_asset(asset, holder=None, location=None, asset_target=None, user=No
             'checked_out_by': user,
             'expected_checkin_date': expected_checkin,
             'notes': notes,
+            'pre_checkout_status': original_status,
         }
         if checkout_date:
             assignment_kwargs['checked_out_at'] = checkout_date
@@ -90,9 +93,9 @@ def checkout_asset(asset, holder=None, location=None, asset_target=None, user=No
                                 from_email=email_config.from_address,
                                 recipient_list=[recipient],
                                 fail_silently=True,
-                            )
+                             )
                 except Exception:
-                    pass
+                     pass
 
     return target
 
@@ -109,9 +112,12 @@ def checkin_asset(asset, user=None, notes=''):
                 active.notes = (active.notes + '\n' + notes).strip()
             active.save()
 
-            available_status = StatusLabel.objects.filter(type='deployable').first()
-            if available_status:
-                asset.status = available_status
+            revert_status = active.pre_checkout_status
+            if not revert_status:
+                revert_status = StatusLabel.objects.filter(type='deployable').first()
+            
+            if revert_status:
+                asset.status = revert_status
             asset._changelog_action = 'checkin'
             asset._changelog_message = f"Checked in from {target}"
             asset.save(update_fields=['status'])
@@ -213,29 +219,43 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_lo
 
     with transaction.atomic():
         allocated_assets = []
+        item_assets_map = {}
 
-        for item in kit.items.all():
+        # 1. Lock all resources first to prevent race conditions (TOCTOU)
+        for item in kit.items.select_related('asset_type', 'accessory', 'license', 'consumable').all():
             if item.asset_type:
-                asset = Asset.objects.filter(asset_type=item.asset_type, status__type='deployable').first()
+                # Lock a deployable asset immediately
+                asset = Asset.objects.filter(
+                    asset_type=item.asset_type,
+                    status__type='deployable'
+                ).select_for_update().first()
                 if not asset:
                     raise ValidationError(f"No available assets of type '{item.asset_type}' in stock.")
                 allocated_assets.append(asset)
+                item_assets_map[item.pk] = asset
             elif item.accessory:
-                rem = item.accessory.available
-                if not item.accessory.allow_overallocate and rem < item.qty:
-                    raise ValidationError(f"Insufficient stock for accessory '{item.accessory}'. Required: {item.qty}, Available: {rem}")
+                # Lock accessory stock pool
+                acc = item.accessory.__class__.objects.select_for_update().get(pk=item.accessory.pk)
+                rem = acc.available
+                if not acc.allow_overallocate and rem < item.qty:
+                    raise ValidationError(f"Insufficient stock for accessory '{acc}'. Required: {item.qty}, Available: {rem}")
             elif item.license:
-                rem = item.license.available_seats
+                # Lock license seat pool
+                lic = item.license.__class__.objects.select_for_update().get(pk=item.license.pk)
+                rem = lic.available_seats
                 if rem < 1:
-                    raise ValidationError(f"No available seats for software license '{item.license}'.")
+                    raise ValidationError(f"No available seats for software license '{lic}'.")
             elif item.consumable:
-                rem = item.consumable.available
-                if not item.consumable.allow_overallocate and rem < item.qty:
-                    raise ValidationError(f"Insufficient stock for consumable '{item.consumable}'. Required: {item.qty}, Available: {rem}")
+                # Lock consumable stock pool
+                con = item.consumable.__class__.objects.select_for_update().get(pk=item.consumable.pk)
+                rem = con.available
+                if not con.allow_overallocate and rem < item.qty:
+                    raise ValidationError(f"Insufficient stock for consumable '{con}'. Required: {item.qty}, Available: {rem}")
 
+        # 2. Perform allocations safely under active locks
         for item in kit.items.all():
             if item.asset_type:
-                asset = Asset.objects.filter(asset_type=item.asset_type, status__type='deployable').first()
+                asset = item_assets_map[item.pk]
                 asset.status = in_use_status
                 if holder:
                     asset.location = None
