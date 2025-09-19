@@ -48,3 +48,30 @@ class IsAuthenticatedOrLoginNotRequired(BasePermission):
         if not getattr(settings, 'LOGIN_REQUIRED', True):
             return True
         return request.user.is_authenticated
+
+
+class StrictTenantPermission(BasePermission):
+    """
+    Strict Tenant Security Boundary. Enforces that requests targeting
+    specific resources belong strictly to the user's assigned Tenant scope.
+    Raises Http404 on violation to prevent primary key enumeration.
+    """
+    def has_object_permission(self, request, view, obj):
+        if request.user.is_superuser:
+            return True
+            
+        profile = getattr(request.user, 'asset_holder_profile', None)
+        user_tenant = profile.tenant if profile else None
+        
+        if not user_tenant:
+            from django.http import Http404
+            raise Http404()
+            
+        # Enforce boundary: Object's tenant must match user's tenant
+        if hasattr(obj, 'tenant') and obj.tenant is not None and obj.tenant != user_tenant:
+            from django.http import Http404
+            raise Http404()
+            
+        return True
+
+

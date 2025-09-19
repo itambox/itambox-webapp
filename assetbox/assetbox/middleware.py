@@ -53,3 +53,27 @@ class CSPMiddleware(MiddlewareMixin):
             "frame-ancestors 'self'"
         )
         return response
+
+
+from core.managers import set_current_tenant
+
+class TenantMiddleware(MiddlewareMixin):
+    """
+    Middleware to automatically detect the logged-in user's tenant
+    and set it in the thread-local context variables context.
+    """
+    def process_request(self, request):
+        if hasattr(request, 'user') and request.user.is_authenticated:
+            if not request.user.is_superuser:
+                profile = getattr(request.user, 'asset_holder_profile', None)
+                if profile and profile.tenant:
+                    set_current_tenant(profile.tenant)
+                    return
+        set_current_tenant(None)
+
+    def process_response(self, request, response):
+        set_current_tenant(None)
+        return response
+
+    def process_exception(self, request, exception):
+        set_current_tenant(None)

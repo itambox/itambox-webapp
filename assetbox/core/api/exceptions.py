@@ -7,6 +7,7 @@ class QuerySetNotOrdered(Exception):
 
 
 class PreconditionFailed(Exception):
-    def __init__(self, etag=None):
+    def __init__(self, etag=None, detail=None):
         self.etag = etag
+        self.detail = detail
         super().__init__(etag)

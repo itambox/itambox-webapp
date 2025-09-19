@@ -57,6 +57,7 @@ MIDDLEWARE = [
     'django_htmx.middleware.HtmxMiddleware',
     'assetbox.middleware.CSPMiddleware',
     'assetbox.middleware.CurrentUserMiddleware',
+    'assetbox.middleware.TenantMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'

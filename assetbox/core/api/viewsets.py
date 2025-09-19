@@ -27,6 +27,9 @@ class BaseViewSet(GenericViewSet):
         qs = super().get_queryset()
         serializer_class = self.get_serializer_class()
 
+        if not hasattr(serializer_class, 'Meta') or not hasattr(serializer_class.Meta, 'model'):
+            return qs
+
         if prefetch := get_prefetches_for_serializer(serializer_class, **self.field_kwargs):
             qs = qs.prefetch_related(*prefetch)
 
