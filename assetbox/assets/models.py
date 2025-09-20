@@ -14,7 +14,7 @@ from compliance.models import generate_token
 User = get_user_model()
 
 
-from core.managers import SoftDeleteManager, AllObjectsManager
+from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager
 
 
 class StatusLabel(AutoSlugMixin, StandardModel):
@@ -204,7 +204,7 @@ class AssetType(AutoSlugMixin, StandardModel):
 
 
 class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, DeletableVaultModel):
-    objects = SoftDeleteManager()
+    objects = TenantScopingSoftDeleteManager()
     all_objects = AllObjectsManager()
     
     # --- Define choices as class attributes --- 

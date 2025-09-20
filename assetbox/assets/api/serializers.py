@@ -299,3 +299,48 @@ class AssetAuditSerializer(serializers.ModelSerializer):
             'verification_method', 'verification_method_display'
         ]
 
+
+class AssetCheckOutAPISerializer(serializers.Serializer):
+    holder_id = serializers.IntegerField(required=False, allow_null=True)
+    location_id = serializers.IntegerField(required=False, allow_null=True)
+    asset_target_id = serializers.IntegerField(required=False, allow_null=True)
+    expected_checkin = serializers.DateField(required=False, allow_null=True)
+    notes = serializers.CharField(required=False, default='', allow_blank=True)
+
+    def validate(self, data):
+        holder_id = data.get('holder_id')
+        location_id = data.get('location_id')
+        asset_target_id = data.get('asset_target_id')
+        
+        # Validate that exactly one assignment target is specified
+        targets = [holder_id, location_id, asset_target_id]
+        filled = [t for t in targets if t is not None]
+        
+        if not filled:
+            raise serializers.ValidationError("Either holder_id, location_id, or asset_target_id must be provided.")
+        if len(filled) > 1:
+            raise serializers.ValidationError("You can only check out an asset to ONE target.")
+
+        from organization.models import AssetHolder, Location
+        from assets.models import Asset
+
+        # Resolve entity references
+        if holder_id:
+            try:
+                data['holder'] = AssetHolder.objects.get(pk=holder_id)
+            except AssetHolder.DoesNotExist:
+                raise serializers.ValidationError({"holder_id": "Specified holder does not exist."})
+        elif location_id:
+            try:
+                data['location'] = Location.objects.get(pk=location_id)
+            except Location.DoesNotExist:
+                raise serializers.ValidationError({"location_id": "Specified location does not exist."})
+        elif asset_target_id:
+            try:
+                data['asset_target'] = Asset.objects.get(pk=asset_target_id)
+            except Asset.DoesNotExist:
+                raise serializers.ValidationError({"asset_target_id": "Specified target asset does not exist."})
+                
+        return data
+
+

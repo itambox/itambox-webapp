@@ -1,6 +1,10 @@
 from django.db import models
 from django.db.models import Prefetch
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from core.api.permissions import TokenPermissions, StrictTenantPermission
 
 from core.api.viewsets import AssetBoxModelViewSet, AssetBoxReadOnlyModelViewSet
 from assets.models import (
@@ -19,17 +23,55 @@ from .serializers import (
     InstalledSoftwareSerializer, StatusLabelSerializer, DepreciationSerializer,
     SupplierSerializer, CategorySerializer, AssetRequestSerializer,
     AssetTagSequenceSerializer, ActivityLogSerializer, AssetAssignmentSerializer,
-    AuditSessionSerializer, AssetAuditSerializer
+    AuditSessionSerializer, AssetAuditSerializer, AssetCheckOutAPISerializer
 )
+from assets.services import checkout_asset, checkin_asset
 
 
 class AssetViewSet(AssetBoxModelViewSet):
+    permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = Asset.objects.select_related('asset_role', 'asset_type__manufacturer', 'location').prefetch_related(
         Prefetch('assignments', queryset=AssetAssignment.objects.filter(is_active=True), to_attr='_active_assignments')
     )
     serializer_class = AssetSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = AssetFilterSet
+
+    @action(detail=True, methods=['post'], serializer_class=AssetCheckOutAPISerializer)
+    def checkout(self, request, pk=None):
+        """
+        API Action to check out an asset.
+        """
+        asset = self.get_object()
+        serializer = self.get_serializer(data=request.data, context={'asset': asset})
+        serializer.is_valid(raise_exception=True)
+        
+        target = checkout_asset(
+            asset=asset,
+            user=request.user,
+            holder=serializer.validated_data.get('holder'),
+            location=serializer.validated_data.get('location'),
+            asset_target=serializer.validated_data.get('asset_target'),
+            expected_checkin=serializer.validated_data.get('expected_checkin'),
+            notes=serializer.validated_data.get('notes', '')
+        )
+        
+        return Response(
+            {"status": "success", "message": f"Asset checked out to {target}."},
+            status=status.HTTP_200_OK
+        )
+
+    @action(detail=True, methods=['post'])
+    def checkin(self, request, pk=None):
+        """
+        API Action to check in an asset.
+        """
+        asset = self.get_object()
+        checkin_asset(asset, user=request.user, notes=request.data.get('notes', ''))
+        return Response(
+            {"status": "success", "message": f"Asset {asset.asset_tag} checked in successfully."},
+            status=status.HTTP_200_OK
+        )
 
 
 class AssetRoleViewSet(AssetBoxModelViewSet):
