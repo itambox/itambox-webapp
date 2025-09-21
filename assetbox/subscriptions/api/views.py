@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import serializers as drf_serializers
 from django_filters.rest_framework import DjangoFilterBackend
+from core.api.permissions import TokenPermissions, StrictTenantPermission
 
 from core.api.viewsets import AssetBoxReadOnlyModelViewSet
 from subscriptions.models import Provider, Subscription, SubscriptionAssignment
@@ -27,6 +28,7 @@ class ProviderViewSet(AssetBoxReadOnlyModelViewSet):
 
 
 class SubscriptionViewSet(AssetBoxReadOnlyModelViewSet):
+    permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = Subscription.objects.select_related('provider').prefetch_related('tags').all()
     serializer_class = SubscriptionSerializer
     filter_backends = (DjangoFilterBackend,)

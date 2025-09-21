@@ -17,15 +17,17 @@ class LicenseTypeChoices(models.TextChoices):
     SUBSCRIPTION_SEAT = 'subscription_seat', _('Subscription Seat')
     # Add others like 'Device', 'User CAL', 'Processor', 'Core' if needed later
 
-from core.managers import SoftDeleteQuerySet, SoftDeleteManager, AllObjectsManager
+from core.managers import SoftDeleteQuerySet, SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager
 
-class LicenseQuerySet(SoftDeleteQuerySet):
+from core.managers import TenantScopingSoftDeleteQuerySet
+
+class LicenseQuerySet(TenantScopingSoftDeleteQuerySet):
     def with_counts(self):
         from django.db.models import Count
         return self.annotate(assigned_count=Count('assignments'))
 
 
-class SoftDeleteLicenseManager(SoftDeleteManager.from_queryset(LicenseQuerySet)):
+class SoftDeleteLicenseManager(TenantScopingSoftDeleteManager.from_queryset(LicenseQuerySet)):
     pass
 
 

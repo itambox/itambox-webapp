@@ -3,7 +3,7 @@ from django.conf import settings
 from django.urls import reverse, NoReverseMatch
 from core.models import BaseModel, ChangeLoggingMixin, StandardModel, DeletableVaultModel
 from core.mixins import TaggableMixin, JournalingMixin, ExportableMixin, AutoSlugMixin, ImageAttachmentMixin, FileAttachmentMixin, CloneableMixin, SoftDeleteMixin, BookmarkableMixin
-from core.managers import SoftDeleteManager, AllObjectsManager
+from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import gettext_lazy as _
@@ -117,7 +117,7 @@ class BillingCycleChoices(models.TextChoices):
 
 
 class Subscription(AutoSlugMixin, BookmarkableMixin, DeletableVaultModel):
-    objects = SoftDeleteManager()
+    objects = TenantScopingSoftDeleteManager()
     all_objects = AllObjectsManager()
 
     """Represents a recurring service agreement (SaaS, Support, etc.)."""

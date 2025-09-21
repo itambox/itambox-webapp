@@ -86,7 +86,29 @@ class SubscriptionDetailView(ObjectDetailView):
         context = super().get_context_data(**kwargs)
         subscription = self.get_object()
 
-        assignments_qs = subscription.assignments.select_related('assigned_by')
+        # Prefetch generic foreign key content objects cleanly
+        assignments_qs = subscription.assignments.select_related('assigned_by', 'content_type')
+        
+        # 1. Map content types to primary keys to batch load related models in 1 query per type
+        gfk_mapping = {}
+        for assignment in assignments_qs:
+            gfk_mapping.setdefault(assignment.content_type, []).append(assignment.object_id)
+            
+        # Batch execute query scans per unique model class
+        prefetch_cache = {}
+        for content_type, object_ids in gfk_mapping.items():
+            model_class = content_type.model_class()
+            if model_class:
+                prefetch_cache[content_type] = {
+                    obj.pk: obj for obj in model_class.objects.filter(pk__in=object_ids)
+                }
+            
+        # 2. Re-assign resolved target objects onto assignments in-memory
+        for assignment in assignments_qs:
+            assignment.assigned_object = prefetch_cache.get(
+                assignment.content_type, {}
+            ).get(assignment.object_id)
+
         context['assignments_table'] = tables.SubscriptionAssignmentTable(assignments_qs, request=self.request)
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(
             context['assignments_table']

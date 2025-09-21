@@ -24,7 +24,7 @@ from assets.forms.import_forms import LicenseBulkImportForm
 # =============================================================================
 
 class LicenseListView(ObjectListView):
-    queryset = License.objects.select_related('software', 'software__manufacturer', 'tenant').prefetch_related('tags')
+    queryset = License.objects.select_related('software', 'software__manufacturer', 'tenant', 'supplier').prefetch_related('tags')
     filterset = filters.LicenseFilterSet
     filterset_form = forms.LicenseFilterForm
     table = tables.LicenseTable
