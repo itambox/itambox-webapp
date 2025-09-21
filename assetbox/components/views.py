@@ -20,7 +20,7 @@ from .tables import ComponentTable, ComponentStockTable, ComponentAllocationTabl
 # =============================================================================
 
 class ComponentListView(ObjectListView):
-    queryset = Component.objects.select_related('manufacturer', 'category').prefetch_related('tags', 'stocks')
+    queryset = Component.objects.with_counts().select_related('manufacturer', 'category').prefetch_related('tags')
     filterset = ComponentFilterSet
     filterset_form = ComponentFilterForm
     table = ComponentTable

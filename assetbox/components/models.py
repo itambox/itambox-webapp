@@ -2,12 +2,38 @@ from django.db import models, transaction
 from django.urls import reverse
 from core.models import BaseModel, ChangeLoggingMixin, StandardModel
 from core.mixins import TaggableMixin, AutoSlugMixin, JournalingMixin, ImageAttachmentMixin, CloneableMixin, ExportableMixin, SoftDeleteMixin
-from core.managers import SoftDeleteManager, AllObjectsManager
+from core.managers import SoftDeleteQuerySet, SoftDeleteManager, AllObjectsManager
+
+
+class ComponentQuerySet(SoftDeleteQuerySet):
+    def with_counts(self):
+        from django.db.models import Sum, OuterRef, Subquery, IntegerField
+        from django.db.models.functions import Coalesce
+
+        # Subquery to sum the quantities in ComponentStock for this component
+        total_stock_subquery = ComponentStock.objects.filter(
+            component=OuterRef('pk')
+        ).order_by().values('component').annotate(
+            total=Sum('qty')
+        ).values('total')
+
+        # Subquery to sum active qty_allocated in ComponentAllocation for this component
+        allocated_stock_subquery = ComponentAllocation.objects.filter(
+            component=OuterRef('pk'),
+            deleted_at__isnull=True
+        ).order_by().values('component').annotate(
+            total=Sum('qty_allocated')
+        ).values('total')
+
+        return self.annotate(
+            _total_stock=Coalesce(Subquery(total_stock_subquery, output_field=IntegerField()), 0),
+            _allocated_stock=Coalesce(Subquery(allocated_stock_subquery, output_field=IntegerField()), 0)
+        )
 
 
 class Component(AutoSlugMixin, SoftDeleteMixin, StandardModel, ImageAttachmentMixin):
-    objects = SoftDeleteManager()
-    all_objects = AllObjectsManager()
+    objects = SoftDeleteManager.from_queryset(ComponentQuerySet)()
+    all_objects = AllObjectsManager.from_queryset(ComponentQuerySet)()
 
     """Catalog entry for a hardware component (e.g. 'Crucial 16GB DDR4')."""
     slug_source = ('manufacturer__name', 'name')
@@ -40,10 +66,14 @@ class Component(AutoSlugMixin, SoftDeleteMixin, StandardModel, ImageAttachmentMi
 
     @property
     def total_stock(self):
+        if hasattr(self, '_total_stock'):
+            return self._total_stock
         return self.stocks.aggregate(total=models.Sum('qty'))['total'] or 0
 
     @property
     def total_allocated(self):
+        if hasattr(self, '_allocated_stock'):
+            return self._allocated_stock
         return self.allocations.filter(deleted_at__isnull=True).aggregate(
             total=models.Sum('qty_allocated')
         )['total'] or 0
