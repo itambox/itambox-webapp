@@ -3,7 +3,7 @@ from django import forms
 from django.db.models import Q
 from django.contrib.contenttypes.models import ContentType
 from assets.models import Manufacturer, AssetType
-from organization.models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, Contact, ContactRole, AssetHolderAssignment
+from organization.models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, Contact, ContactRole, AssetHolderAssignment, ContactAssignment
 
 from extras.models import Tag # Import Tag
 from crispy_forms.helper import FormHelper
@@ -282,6 +282,42 @@ class AssetHolderAssignmentFilterSet(BaseOrgFilterSet):
             Q(asset_holder__last_name__icontains=value) |
             Q(asset_holder__upn__icontains=value)
         ).distinct()
+
+
+class ContactAssignmentFilterSet(BaseOrgFilterSet):
+    tag = None  # ContactAssignment has no tags field
+    contact = django_filters.ModelChoiceFilter(
+        queryset=Contact.objects.all(),
+        label="Contact",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    role = django_filters.ModelChoiceFilter(
+        queryset=ContactRole.objects.all(),
+        label="Role",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    content_type = django_filters.ModelChoiceFilter(
+        queryset=ContentType.objects.all(),
+        label="Object Type",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    class Meta:
+        model = AssetHolderAssignment  # We use the generic pattern, but let's check what model ContactAssignment uses
+        # Wait, the model name is ContactAssignment. Let's make sure we import and use ContactAssignment.
+        # Let's verify the model name. Line 6 has `ContactAssignment` imported.
+        model = ContactAssignment
+        fields = ['contact', 'role', 'content_type', 'object_id']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(contact__name__icontains=value) |
+            Q(contact__email__icontains=value) |
+            Q(role__name__icontains=value)
+        ).distinct()
+
 
 
     

@@ -1,7 +1,7 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from core.api.viewsets import AssetBoxModelViewSet, AssetBoxReadOnlyModelViewSet
 from licenses.models import License, LicenseSeatAssignment
-from licenses.filters import LicenseFilterSet
+from licenses.filters import LicenseFilterSet, LicenseSeatAssignmentFilterSet
 from .serializers import LicenseSerializer, LicenseSeatAssignmentSerializer
 from core.api.permissions import TokenPermissions, StrictTenantPermission
 
@@ -23,6 +23,7 @@ class LicenseSeatAssignmentViewSet(AssetBoxModelViewSet):
     ).all()
     serializer_class = LicenseSeatAssignmentSerializer
     filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ['license_id', 'asset_id', 'assigned_holder_id']
+    filterset_class = LicenseSeatAssignmentFilterSet
+
 
 

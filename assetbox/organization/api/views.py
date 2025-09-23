@@ -7,7 +7,8 @@ from organization.models import (
 from organization.filters import (
     SiteFilterSet, RegionFilterSet, SiteGroupFilterSet, LocationFilterSet,
     TenantFilterSet, TenantGroupFilterSet, AssetHolderFilterSet,
-    ContactFilterSet, ContactRoleFilterSet
+    ContactFilterSet, ContactRoleFilterSet, AssetHolderAssignmentFilterSet,
+    ContactAssignmentFilterSet
 )
 from .serializers import (
     SiteSerializer, RegionSerializer, SiteGroupSerializer, LocationSerializer,
@@ -70,6 +71,9 @@ class AssetHolderAssignmentViewSet(AssetBoxReadOnlyModelViewSet):
         'asset_holder', 'content_type'
     ).prefetch_related('assigned_object')
     serializer_class = AssetHolderAssignmentSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = AssetHolderAssignmentFilterSet
+
 
 
 class ContactViewSet(AssetBoxModelViewSet):
@@ -92,4 +96,5 @@ class ContactAssignmentViewSet(AssetBoxModelViewSet):
     ).prefetch_related('contact__tags')
     serializer_class = ContactAssignmentSerializer
     filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ['contact_id', 'role_id', 'content_type_id', 'object_id']
+    filterset_class = ContactAssignmentFilterSet
+

@@ -2,9 +2,14 @@ import django_filters
 from django import forms
 from django.db.models import Q
 
-from organization.models import Tenant, Location
-from assets.models import Manufacturer
-from .models import Accessory, Consumable, Kit, AccessoryStock, ConsumableStock
+from organization.models import Tenant, Location, AssetHolder
+from assets.models import Manufacturer, AssetType
+from licenses.models import License
+from .models import (
+    Accessory, Consumable, Kit, AccessoryStock, ConsumableStock,
+    AccessoryAssignment, ConsumableAssignment, KitItem
+)
+
 
 
 class AccessoryFilterSet(django_filters.FilterSet):
@@ -148,4 +153,113 @@ class ConsumableStockFilterSet(django_filters.FilterSet):
             Q(consumable__name__icontains=value) |
             Q(location__name__icontains=value)
         ).distinct()
+
+
+class AccessoryAssignmentFilterSet(django_filters.FilterSet):
+    q = django_filters.CharFilter(method='search', label='Search')
+    accessory = django_filters.ModelChoiceFilter(
+        queryset=Accessory.objects.all(),
+        label='Accessory',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    assigned_holder = django_filters.ModelChoiceFilter(
+        queryset=AssetHolder.objects.all(),
+        label='Assigned Holder',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    assigned_location = django_filters.ModelChoiceFilter(
+        queryset=Location.objects.all(),
+        label='Assigned Location',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    from_location = django_filters.ModelChoiceFilter(
+        queryset=Location.objects.all(),
+        label='From Location',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    class Meta:
+        model = AccessoryAssignment
+        fields = ['accessory', 'assigned_holder', 'assigned_location', 'from_location']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(notes__icontains=value) |
+            Q(accessory__name__icontains=value) |
+            Q(assigned_holder__first_name__icontains=value) |
+            Q(assigned_holder__last_name__icontains=value)
+        ).distinct()
+
+
+class ConsumableAssignmentFilterSet(django_filters.FilterSet):
+    q = django_filters.CharFilter(method='search', label='Search')
+    consumable = django_filters.ModelChoiceFilter(
+        queryset=Consumable.objects.all(),
+        label='Consumable',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    assigned_holder = django_filters.ModelChoiceFilter(
+        queryset=AssetHolder.objects.all(),
+        label='Assigned Holder',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    assigned_location = django_filters.ModelChoiceFilter(
+        queryset=Location.objects.all(),
+        label='Assigned Location',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    from_location = django_filters.ModelChoiceFilter(
+        queryset=Location.objects.all(),
+        label='From Location',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    class Meta:
+        model = ConsumableAssignment
+        fields = ['consumable', 'assigned_holder', 'assigned_location', 'from_location']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(notes__icontains=value) |
+            Q(consumable__name__icontains=value) |
+            Q(assigned_holder__first_name__icontains=value) |
+            Q(assigned_holder__last_name__icontains=value)
+        ).distinct()
+
+
+class KitItemFilterSet(django_filters.FilterSet):
+    kit = django_filters.ModelChoiceFilter(
+        queryset=Kit.objects.all(),
+        label='Kit',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    asset_type = django_filters.ModelChoiceFilter(
+        queryset=AssetType.objects.all(),
+        label='Asset Type',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    accessory = django_filters.ModelChoiceFilter(
+        queryset=Accessory.objects.all(),
+        label='Accessory',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    license = django_filters.ModelChoiceFilter(
+        queryset=License.objects.all(),
+        label='License',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    consumable = django_filters.ModelChoiceFilter(
+        queryset=Consumable.objects.all(),
+        label='Consumable',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    class Meta:
+        model = KitItem
+        fields = ['kit', 'asset_type', 'accessory', 'license', 'consumable']
+
 

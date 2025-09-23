@@ -3,8 +3,10 @@ from django.db.models import Q
 from django import forms
 from extras.models import Tag
 from software.models import Software
-from organization.models import Tenant
-from .models import License, LicenseTypeChoices
+from organization.models import Tenant, AssetHolder
+from assets.models import Asset
+from .models import License, LicenseTypeChoices, LicenseSeatAssignment
+
 
 class LicenseFilterSet(django_filters.FilterSet):
     """FilterSet for querying License entitlements."""
@@ -51,3 +53,38 @@ class LicenseFilterSet(django_filters.FilterSet):
             Q(order_number__icontains=value) |
             Q(notes__icontains=value)
         ).distinct()
+
+
+class LicenseSeatAssignmentFilterSet(django_filters.FilterSet):
+    q = django_filters.CharFilter(method='search', label='Search')
+    license = django_filters.ModelChoiceFilter(
+        queryset=License.objects.all(),
+        label='License',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    asset = django_filters.ModelChoiceFilter(
+        queryset=Asset.objects.all(),
+        label='Asset',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    assigned_holder = django_filters.ModelChoiceFilter(
+        queryset=AssetHolder.objects.all(),
+        label='Assigned Holder',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    class Meta:
+        model = LicenseSeatAssignment
+        fields = ['license', 'asset', 'assigned_holder']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(notes__icontains=value) |
+            Q(license__name__icontains=value) |
+            Q(assigned_holder__first_name__icontains=value) |
+            Q(assigned_holder__last_name__icontains=value) |
+            Q(asset__name__icontains=value)
+        ).distinct()
+

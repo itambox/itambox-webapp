@@ -6,6 +6,11 @@ from inventory.models import (
     Consumable, ConsumableStock, ConsumableAssignment,
     Kit, KitItem
 )
+from inventory.filters import (
+    AccessoryFilterSet, AccessoryStockFilterSet, AccessoryAssignmentFilterSet,
+    ConsumableFilterSet, ConsumableStockFilterSet, ConsumableAssignmentFilterSet,
+    KitFilterSet, KitItemFilterSet
+)
 from .serializers import (
     AccessorySerializer, AccessoryStockSerializer, AccessoryAssignmentSerializer,
     ConsumableSerializer, ConsumableStockSerializer, ConsumableAssignmentSerializer,
@@ -17,14 +22,14 @@ class AccessoryViewSet(AssetBoxModelViewSet):
     queryset = Accessory.objects.select_related('manufacturer', 'tenant').prefetch_related('tags').all()
     serializer_class = AccessorySerializer
     filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ['manufacturer_id', 'category', 'tenant_id']
+    filterset_class = AccessoryFilterSet
 
 
 class AccessoryStockViewSet(AssetBoxModelViewSet):
     queryset = AccessoryStock.objects.select_related('accessory', 'location').all()
     serializer_class = AccessoryStockSerializer
     filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ['accessory_id', 'location_id']
+    filterset_class = AccessoryStockFilterSet
 
 
 class AccessoryAssignmentViewSet(AssetBoxModelViewSet):
@@ -33,21 +38,21 @@ class AccessoryAssignmentViewSet(AssetBoxModelViewSet):
     ).all()
     serializer_class = AccessoryAssignmentSerializer
     filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ['accessory_id', 'assigned_holder_id', 'assigned_location_id', 'from_location_id']
+    filterset_class = AccessoryAssignmentFilterSet
 
 
 class ConsumableViewSet(AssetBoxModelViewSet):
     queryset = Consumable.objects.select_related('manufacturer', 'tenant').prefetch_related('tags').all()
     serializer_class = ConsumableSerializer
     filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ['manufacturer_id', 'category', 'tenant_id']
+    filterset_class = ConsumableFilterSet
 
 
 class ConsumableStockViewSet(AssetBoxModelViewSet):
     queryset = ConsumableStock.objects.select_related('consumable', 'location').all()
     serializer_class = ConsumableStockSerializer
     filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ['consumable_id', 'location_id']
+    filterset_class = ConsumableStockFilterSet
 
 
 class ConsumableAssignmentViewSet(AssetBoxModelViewSet):
@@ -56,14 +61,14 @@ class ConsumableAssignmentViewSet(AssetBoxModelViewSet):
     ).all()
     serializer_class = ConsumableAssignmentSerializer
     filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ['consumable_id', 'assigned_holder_id', 'assigned_location_id', 'from_location_id']
+    filterset_class = ConsumableAssignmentFilterSet
 
 
 class KitViewSet(AssetBoxModelViewSet):
     queryset = Kit.objects.select_related('tenant').prefetch_related('items', 'tags').all()
     serializer_class = KitSerializer
     filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ['tenant_id']
+    filterset_class = KitFilterSet
 
 
 class KitItemViewSet(AssetBoxModelViewSet):
@@ -72,4 +77,5 @@ class KitItemViewSet(AssetBoxModelViewSet):
     ).all()
     serializer_class = KitItemSerializer
     filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ['kit_id', 'asset_type_id', 'accessory_id']
+    filterset_class = KitItemFilterSet
+
