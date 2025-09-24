@@ -204,6 +204,12 @@
 </script>
 {% endif %}
 
+<div class="mt-3 pt-2 border-top text-end">
+    <a href="{% url 'organization:tenant_list' %}" class="btn btn-sm btn-ghost-secondary p-0 px-2" style="font-size: 0.72rem;">
+        {% trans "View All Tenants" %} <i class="mdi mdi-chevron-right"></i>
+    </a>
+</div>
+
 {% else %}
 <div class="text-muted text-center py-4">{% trans "No tenant data available." %}</div>
 {% endif %}

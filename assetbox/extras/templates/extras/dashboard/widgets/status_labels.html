@@ -1,27 +1,209 @@
 {% load i18n %}
+{% load l10n %}
 {% if status_stats %}
-{% with total=total_assets %}
 <div class="d-flex align-items-baseline mb-2">
     <span class="h2 mb-0">{{ total_assets }}</span>
     <span class="text-muted small ms-2">{% trans "Total Managed Assets" %}</span>
 </div>
-<div class="progress progress-sm mb-3">
-    {% for status in status_stats %}
-    <div class="progress-bar" style="width: {% widthratio status.asset_count total 100 %}%; background-color: #{{ status.color|default:'626976' }};" role="progressbar" aria-label="{{ status.name }}">&nbsp;</div>
-    {% endfor %}
-</div>
-<div class="row g-1" style="font-size: 0.75rem;">
+
+{% if chart_type == 'list' %}
+<!-- Simple List View -->
+<div class="row g-2" style="font-size: 0.75rem;">
     {% for status in status_stats %}
     <div class="col-6">
         <a href="{% url 'assets:statuslabel_detail' status.pk %}" class="d-flex align-items-center text-reset text-decoration-none gap-1">
             <span class="badge badge-dot" style="background-color: #{{ status.color|default:'626976' }};"></span>
             <span class="text-truncate">{{ status.name }}</span>
-            <span class="ms-auto text-muted">{{ status.asset_count }}</span>
+            <span class="ms-auto text-muted fw-bold">{{ status.asset_count }}</span>
         </a>
     </div>
     {% endfor %}
 </div>
-{% endwith %}
+{% else %}
+<!-- ApexCharts Doughnut / Pie / Bar Chart -->
+<div id="chart-status-labels-{{ widget.index }}" style="min-height: 220px;"></div>
+
+<script>
+(function() {
+    const chartId = "chart-status-labels-{{ widget.index }}";
+    const container = document.getElementById(chartId);
+    if (!container) return;
+
+    const data = [
+        {% for status in status_stats %}
+        {% if status.asset_count > 0 %}
+        {
+            name: "{{ status.name|escapejs }}",
+            count: {{ status.asset_count|unlocalize }},
+            color: "#{{ status.color|default:'626976' }}"
+        },
+        {% endif %}
+        {% endfor %}
+    ];
+
+    if (data.length === 0) {
+        container.innerHTML = '<div class="text-muted text-center py-4">{% trans "No assets assigned to active status labels." %}</div>';
+        return;
+    }
+
+    const series = data.map(d => d.count);
+    const labels = data.map(d => d.name);
+    const colors = data.map(d => d.color);
+
+    const getThemeMode = () => document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'dark' : 'light';
+
+    let options = {
+        chart: {
+            type: "{{ chart_type }}" === "doughnut" ? "donut" : "{{ chart_type }}",
+            height: 200,
+            fontFamily: 'inherit',
+            background: 'transparent',
+            animations: {
+                enabled: true,
+                animateGradually: { enabled: true, delay: 150 },
+                dynamicAnimation: { enabled: true, speed: 350 }
+            },
+            toolbar: { show: false }
+        },
+        theme: {
+            mode: getThemeMode()
+        },
+        stroke: {
+            show: true,
+            width: 2,
+            colors: getThemeMode() === 'dark' ? ['#1e293b'] : ['#ffffff']
+        },
+        colors: colors,
+        labels: labels,
+        legend: {
+            show: true,
+            position: 'bottom',
+            fontSize: '11px',
+            fontFamily: 'inherit',
+            labels: {
+                colors: getThemeMode() === 'dark' ? '#94a3b8' : '#64748b'
+            },
+            markers: { width: 8, height: 8, radius: 4 }
+        },
+        dataLabels: {
+            enabled: true,
+            style: {
+                fontSize: '11px',
+                fontFamily: 'inherit',
+                fontWeight: '600'
+            },
+            dropShadow: { enabled: false }
+        },
+        tooltip: {
+            theme: getThemeMode(),
+            y: {
+                formatter: function(val) { return val + " {% trans 'assets' %}"; }
+            }
+        }
+    };
+
+    if ("{{ chart_type }}" === 'bar') {
+        options = {
+            ...options,
+            series: [{ name: "{% trans 'Assets' %}", data: series }],
+            chart: {
+                ...options.chart,
+                type: 'bar',
+                height: 180
+            },
+            plotOptions: {
+                bar: {
+                    borderRadius: 4,
+                    horizontal: true,
+                    barHeight: '60%',
+                    distributed: true
+                }
+            },
+            dataLabels: {
+                enabled: true,
+                formatter: function(val) { return val; },
+                style: { colors: ['#fff'] }
+            },
+            xaxis: {
+                categories: labels,
+                labels: {
+                    style: {
+                        colors: getThemeMode() === 'dark' ? '#94a3b8' : '#64748b',
+                        fontFamily: 'inherit'
+                    }
+                }
+            },
+            yaxis: {
+                labels: {
+                    style: {
+                        colors: getThemeMode() === 'dark' ? '#94a3b8' : '#64748b',
+                        fontFamily: 'inherit'
+                    }
+                }
+            },
+            legend: { show: false }
+        };
+    } else {
+        options.series = series;
+        if ("{{ chart_type }}" === 'doughnut') {
+            options.plotOptions = {
+                pie: {
+                    donut: {
+                        size: '65%',
+                        labels: {
+                            show: true,
+                            name: {
+                                show: true,
+                                fontSize: '12px',
+                                color: getThemeMode() === 'dark' ? '#94a3b8' : '#64748b'
+                            },
+                            value: {
+                                show: true,
+                                fontSize: '16px',
+                                fontWeight: 'bold',
+                                color: getThemeMode() === 'dark' ? '#f8fafc' : '#0f172a',
+                                formatter: function(val) { return val; }
+                            },
+                            total: {
+                                show: true,
+                                label: "{% trans 'Total' %}",
+                                color: getThemeMode() === 'dark' ? '#94a3b8' : '#64748b',
+                                formatter: function(w) {
+                                    return w.globals.seriesTotals.reduce((a, b) => a + b, 0);
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+        }
+    }
+
+    const chart = new ApexCharts(container, options);
+    chart.render();
+
+    // Theme Switcher observer
+    const observer = new MutationObserver(() => {
+        const currentTheme = getThemeMode();
+        chart.updateOptions({
+            theme: { mode: currentTheme },
+            stroke: {
+                colors: currentTheme === 'dark' ? ['#1e293b'] : ['#ffffff']
+            },
+            legend: {
+                labels: {
+                    colors: currentTheme === 'dark' ? '#94a3b8' : '#64748b'
+                }
+            },
+            tooltip: { theme: currentTheme }
+        });
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-bs-theme'] });
+})();
+</script>
+{% endif %}
+
+
 {% else %}
 <div class="text-muted text-center py-4">{% trans "No status labels configured." %}</div>
 {% endif %}

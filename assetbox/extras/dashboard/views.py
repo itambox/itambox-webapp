@@ -33,6 +33,10 @@ class DashboardWidgetAddView(LoginRequiredMixin, View):
             if widget_cls:
                 dashboard = get_dashboard(request.user, for_update=True)
                 dashboard.add_widget(widget_id, title=title or widget_cls.title)
+            if request.headers.get('HX-Request'):
+                response = HttpResponse()
+                response['HX-Redirect'] = reverse('dashboard')
+                return response
             return redirect('dashboard')
         
         # If invalid, re-render
@@ -51,9 +55,16 @@ class DashboardWidgetConfigView(LoginRequiredMixin, View):
             return HttpResponse('Widget not found', status=404)
         config = dashboard.layout[index]
         widget_id = config.get('widget')
+        
+        # Get style with fallback to the old NoteWidget-specific style for backward compatibility
+        style_val = config.get('style')
+        if not style_val:
+            style_val = config.get('config', {}).get('style', 'default')
+
         form = DashboardWidgetConfigForm(initial={
             'title': config.get('title', ''),
             'visible': config.get('visible', True),
+            'style': style_val,
         }, widget_id=widget_id, initial_config=config, request=request)
         html = render_to_string('extras/dashboard/widget_config.html', {
             'form': form,
@@ -74,6 +85,7 @@ class DashboardWidgetConfigView(LoginRequiredMixin, View):
             update_kwargs = {
                 'title': form.cleaned_data['title'],
                 'visible': form.cleaned_data['visible'],
+                'style': form.cleaned_data['style'],
             }
             widget_cfg = form.get_widget_config()
             if widget_cfg:
@@ -81,6 +93,10 @@ class DashboardWidgetConfigView(LoginRequiredMixin, View):
                 existing_cfg.update(widget_cfg)
                 update_kwargs['config'] = existing_cfg
             dashboard.update_widget(index, **update_kwargs)
+            if request.headers.get('HX-Request'):
+                response = HttpResponse()
+                response['HX-Redirect'] = reverse('dashboard')
+                return response
             return redirect('dashboard')
 
         # If invalid, re-render the modal content with form containing errors!
@@ -112,6 +128,10 @@ class DashboardWidgetDeleteView(LoginRequiredMixin, View):
     def post(self, request, index):
         dashboard = get_dashboard(request.user, for_update=True)
         dashboard.remove_widget(index)
+        if request.headers.get('HX-Request'):
+            response = HttpResponse()
+            response['HX-Redirect'] = reverse('dashboard')
+            return response
         return redirect('dashboard')
 
 

@@ -1,12 +1,14 @@
 from datetime import date, timedelta
 import json
 from django import forms
-from django.db.models import Sum, Count, Q, Avg, F, Case, When, Value, IntegerField
+from django.db.models import Sum, Count, Q, Avg, F, Case, When, Value, IntegerField, Subquery, OuterRef
 from django.db.models.functions import Extract, Coalesce
+
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django.template.loader import render_to_string
 from django.core.exceptions import PermissionDenied
+from django.utils.translation import gettext as _
 
 from assets.models import Asset, ActivityLog, StatusLabel
 from compliance.models import AssetMaintenance
@@ -188,6 +190,10 @@ class DashboardWidget:
         ctx['widget'] = self
         return render_to_string(self.get_template_name(), ctx, request=request)
 
+    def get_footer_links(self, request):
+        """Return a list of dictionaries with 'url' and 'label' for card footer buttons."""
+        return []
+
 
 # -----------------------------------------------------------------------------
 # Widget Subclasses (one per dashboard card)
@@ -206,24 +212,10 @@ class NoteWidget(DashboardWidget):
             widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 6}),
             required=False
         )
-        style = forms.ChoiceField(
-            label='Style',
-            choices=[
-                ('default', 'Default'),
-                ('info', 'Info (Blue)'),
-                ('warning', 'Warning (Yellow)'),
-                ('success', 'Success (Green)'),
-                ('danger', 'Danger (Red)'),
-            ],
-            initial='default',
-            widget=forms.Select(attrs={'class': 'form-select'}),
-            required=False
-        )
 
     def get_context(self, request):
         return {
             'content': self.get_config_value('content', ''),
-            'style': self.get_config_value('style', 'default'),
         }
 
 
@@ -347,8 +339,12 @@ class FinancialWidget(DashboardWidget):
         assets = get_scoped_queryset(Asset, request, config=self.config.get("config", {}))
         maintenances = get_scoped_queryset(AssetMaintenance, request, config=self.config.get("config", {}))
 
-        total_purchase = assets.aggregate(total=Sum('purchase_cost'))['total'] or 0.0
-        total_salvage = assets.aggregate(total=Sum('salvage_value'))['total'] or 0.0
+        asset_sums = assets.aggregate(
+            purchase_total=Sum('purchase_cost'),
+            salvage_total=Sum('salvage_value')
+        )
+        total_purchase = asset_sums['purchase_total'] or 0.0
+        total_salvage = asset_sums['salvage_total'] or 0.0
         total_maintenance = maintenances.aggregate(total=Sum('cost'))['total'] or 0.0
         total_tco = total_purchase + total_maintenance
         
@@ -365,6 +361,9 @@ class FinancialWidget(DashboardWidget):
             'currency': currency,
             'budget_limit': budget_limit,
         }
+
+    def get_footer_links(self, request):
+        return [{'url': reverse('assets:asset_list'), 'label': _('View Cost Details')}]
 
 
 @register_widget
@@ -419,6 +418,9 @@ class StatusLabelsWidget(DashboardWidget):
             'chart_type': self.get_config_value('chart_type', 'doughnut'),
         }
 
+    def get_footer_links(self, request):
+        return [{'url': reverse('assets:asset_list'), 'label': _('View All Assets')}]
+
 
 @register_widget
 class LicenseWidget(DashboardWidget):
@@ -460,6 +462,9 @@ class LicenseWidget(DashboardWidget):
             'warning_threshold': warning_threshold,
         }
 
+    def get_footer_links(self, request):
+        return [{'url': reverse('licenses:license_list'), 'label': _('View All Licenses')}]
+
 
 @register_widget
 class MaintenanceWidget(DashboardWidget):
@@ -494,6 +499,9 @@ class MaintenanceWidget(DashboardWidget):
             'highlight_overdue': self.get_config_value('highlight_overdue', True),
         }
 
+    def get_footer_links(self, request):
+        return [{'url': reverse('compliance:assetmaintenance_list'), 'label': _('View All Repairs')}]
+
 
 @register_widget
 class EOLAlertsWidget(DashboardWidget):
@@ -520,12 +528,27 @@ class EOLAlertsWidget(DashboardWidget):
         today = date.today()
         days_horizon = int(self.get_config_value('days_horizon', 90))
         alerts = []
+        
+        # 1. Resolve distinct EOL months in the catalog
+        from assets.models import AssetType
+        eol_month_values = list(AssetType.objects.filter(eol_months__isnull=False).values_list('eol_months', flat=True).distinct())
+        
+        if not eol_month_values:
+            return {'eol_alerts': [], 'days_horizon': days_horizon}
+            
+        # 2. Build pre-filtering query to filter only assets approaching EOL in the database
+        q_filter = Q()
+        for M in eol_month_values:
+            # purchase_date + M months <= today + days_horizon
+            cutoff_date = today + timedelta(days=days_horizon) - timedelta(days=int(M * 30.44))
+            q_filter |= Q(asset_type__eol_months=M, purchase_date__lte=cutoff_date)
+            
         queryset = get_scoped_queryset(Asset, request, config=self.config.get("config", {})).filter(
             purchase_date__isnull=False,
             asset_type__eol_months__isnull=False
-        ).select_related('asset_type')
+        ).filter(q_filter).select_related('asset_type', 'asset_type__manufacturer')
 
-        for asset in queryset.iterator(chunk_size=500):
+        for asset in queryset:
             eol = asset.eol_date
             if eol is None:
                 continue
@@ -538,6 +561,9 @@ class EOLAlertsWidget(DashboardWidget):
             'eol_alerts': sorted(alerts, key=lambda a: a['days_left']),
             'days_horizon': days_horizon,
         }
+
+    def get_footer_links(self, request):
+        return [{'url': reverse('assets:asset_list'), 'label': _('View All Assets')}]
 
 
 @register_widget
@@ -554,15 +580,62 @@ class ChangelogWidget(DashboardWidget):
             widget=forms.NumberInput(attrs={'class': 'form-control'}),
             required=False
         )
+        action_filter = forms.ChoiceField(
+            label='Filter by Action',
+            choices=[
+                ('', 'All Actions'),
+                ('create', 'Creations Only'),
+                ('update', 'Updates Only'),
+                ('delete', 'Deletions Only'),
+            ],
+            initial='',
+            widget=forms.Select(attrs={'class': 'form-select'}),
+            required=False
+        )
+        models = forms.MultipleChoiceField(
+            label='Filter by Object Types',
+            choices=OBJECT_COUNT_MODEL_CHOICES,
+            widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
+            required=False,
+            help_text='If none selected, changes for all object types will be shown.'
+        )
 
     def get_context(self, request):
         from core.models import ObjectChange
+        from django.contrib.contenttypes.models import ContentType
+        
         limit = self.get_config_value('limit', 10)
+        action = self.get_config_value('action_filter', '')
+        selected_models = self.get_config_value('models', [])
+        
         qs = get_scoped_queryset(ObjectChange, request, config=self.config.get("config", {}))
+        
+        if action:
+            qs = qs.filter(action=action)
+            
+        if selected_models:
+            ct_filters = Q()
+            for m_label in selected_models:
+                try:
+                    app_label, model_name = m_label.split('.')
+                    ct_filters |= Q(changed_object_type__app_label=app_label, changed_object_type__model=model_name)
+                except ValueError:
+                    continue
+            qs = qs.filter(ct_filters)
+            
         changes = qs.select_related(
             'user', 'changed_object_type'
         ).prefetch_related('changed_object')[:limit]
-        return {'recent_changes': changes}
+        
+        return {
+            'recent_changes': changes,
+            'action_filter': action,
+            'limit': limit,
+        }
+
+    def get_footer_links(self, request):
+        return [{'url': reverse('objectchange_list'), 'label': _('View Full Change Log')}]
+
 
 
 @register_widget
@@ -627,6 +700,9 @@ class RenewalsWidget(DashboardWidget):
             'days_horizon': days_horizon,
         }
 
+    def get_footer_links(self, request):
+        return [{'url': reverse('subscriptions:subscription_list'), 'label': _('View All Subscriptions')}]
+
 
 @register_widget
 class LowStockWidget(DashboardWidget):
@@ -673,74 +749,97 @@ class LowStockWidget(DashboardWidget):
         include_con = self.get_config_value('include_consumables', True)
         include_comp = self.get_config_value('include_components', True)
 
-        # Scoped Accessory calculation
+        # Scoped Accessory calculation (Annotated in single query)
         low_accessories = []
         if include_acc:
-            acc_qs = get_scoped_queryset(Accessory, request, config=self.config.get("config", {}))
-            for acc in acc_qs.filter(min_qty__gt=0):
-                # Scoped total stock in locations belonging to this tenant
-                stock_qs = acc.stocks.all()
-                if active_tenant:
-                    stock_qs = stock_qs.filter(location__tenant=active_tenant)
-                total_stock = stock_qs.aggregate(total=Sum('qty'))['total'] or 0
-
-                # Scoped checked out quantity
-                assignment_qs = acc.assignments.all()
-                if active_tenant:
-                    assignment_qs = assignment_qs.filter(
-                        Q(assigned_location__tenant=active_tenant) | Q(assigned_holder__tenant=active_tenant)
-                    )
-                checked_out = assignment_qs.aggregate(total=Sum('qty'))['total'] or 0
-
-                available = max(0, total_stock - checked_out)
+            from inventory.models import AccessoryStock, AccessoryAssignment
+            acc_qs = get_scoped_queryset(Accessory, request, config=self.config.get("config", {})).filter(min_qty__gt=0)
+            
+            # Scoped total stock subquery
+            stock_sub = AccessoryStock.objects.filter(accessory=OuterRef('pk'))
+            if active_tenant:
+                stock_sub = stock_sub.filter(location__tenant=active_tenant)
+            stock_sub = stock_sub.values('accessory').annotate(sum_qty=Sum('qty')).values('sum_qty')
+            
+            # Scoped checked out subquery
+            assignment_sub = AccessoryAssignment.objects.filter(accessory=OuterRef('pk'))
+            if active_tenant:
+                assignment_sub = assignment_sub.filter(
+                    Q(assigned_location__tenant=active_tenant) | Q(assigned_holder__tenant=active_tenant)
+                )
+            assignment_sub = assignment_sub.values('accessory').annotate(sum_qty=Sum('qty')).values('sum_qty')
+            
+            acc_qs = acc_qs.annotate(
+                _total_stock_annotated=Coalesce(Subquery(stock_sub), 0),
+                _checked_out_annotated=Coalesce(Subquery(assignment_sub), 0)
+            )
+            
+            for acc in acc_qs:
+                available = max(0, acc._total_stock_annotated - acc._checked_out_annotated)
                 if available < acc.min_qty:
                     low_accessories.append(ScopedAccessoryWrapper(acc, available))
 
-        # Scoped Consumable calculation
+        # Scoped Consumable calculation (Annotated in single query)
         low_consumables = []
         if include_con:
-            con_qs = get_scoped_queryset(Consumable, request, config=self.config.get("config", {}))
-            for con in con_qs.filter(min_qty__gt=0):
-                # Scoped total stock in locations belonging to this tenant
-                stock_qs = con.stocks.all()
-                if active_tenant:
-                    stock_qs = stock_qs.filter(location__tenant=active_tenant)
-                total_stock = stock_qs.aggregate(total=Sum('qty'))['total'] or 0
-
-                # Scoped consumed quantity
-                consumption_qs = con.consumptions.all()
-                if active_tenant:
-                    consumption_qs = consumption_qs.filter(
-                        Q(assigned_location__tenant=active_tenant) | Q(assigned_holder__tenant=active_tenant)
-                    )
-                consumed = consumption_qs.aggregate(total=Sum('qty'))['total'] or 0
-
-                available = max(0, total_stock - consumed)
+            from inventory.models import ConsumableStock, ConsumableAssignment
+            con_qs = get_scoped_queryset(Consumable, request, config=self.config.get("config", {})).filter(min_qty__gt=0)
+            
+            # Scoped total stock subquery
+            stock_sub = ConsumableStock.objects.filter(consumable=OuterRef('pk'))
+            if active_tenant:
+                stock_sub = stock_sub.filter(location__tenant=active_tenant)
+            stock_sub = stock_sub.values('consumable').annotate(sum_qty=Sum('qty')).values('sum_qty')
+            
+            # Scoped consumed subquery
+            consumption_sub = ConsumableAssignment.objects.filter(consumable=OuterRef('pk'))
+            if active_tenant:
+                consumption_sub = consumption_sub.filter(
+                    Q(assigned_location__tenant=active_tenant) | Q(assigned_holder__tenant=active_tenant)
+                )
+            consumption_sub = consumption_sub.values('consumable').annotate(sum_qty=Sum('qty')).values('sum_qty')
+            
+            con_qs = con_qs.annotate(
+                _total_stock_annotated=Coalesce(Subquery(stock_sub), 0),
+                _consumed_annotated=Coalesce(Subquery(consumption_sub), 0)
+            )
+            
+            for con in con_qs:
+                available = max(0, con._total_stock_annotated - con._consumed_annotated)
                 if available < con.min_qty:
                     low_consumables.append(ScopedConsumableWrapper(con, available))
 
-        # Scoped Component calculation
+        # Scoped Component calculation (Annotated in single query)
         low_components = []
         if include_comp:
             from components.models import Component, ComponentStock, ComponentAllocation
             comp_qs = Component.objects.filter(min_stock_level__gt=0).order_by('name')
+            
+            # Scoped total stock subquery
+            stock_sub = ComponentStock.objects.filter(component=OuterRef('pk'))
+            if active_tenant:
+                stock_sub = stock_sub.filter(location__tenant=active_tenant)
+            stock_sub = stock_sub.values('component').annotate(sum_qty=Sum('qty')).values('sum_qty')
+            
+            # Scoped allocated subquery
+            allocation_sub = ComponentAllocation.objects.filter(component=OuterRef('pk'), deleted_at__isnull=True)
+            if active_tenant:
+                allocation_sub = allocation_sub.filter(asset__tenant=active_tenant)
+            allocation_sub = allocation_sub.values('component').annotate(sum_qty=Sum('qty_allocated')).values('sum_qty')
+            
+            comp_qs = comp_qs.annotate(
+                _total_stock_annotated=Coalesce(Subquery(stock_sub), 0),
+                _total_allocated_annotated=Coalesce(Subquery(allocation_sub), 0)
+            )
+            
             for comp in comp_qs:
-                stock_filter = Q(component=comp)
-                allocation_filter = Q(component=comp, deleted_at__isnull=True)
-                if active_tenant:
-                    stock_filter &= Q(location__tenant=active_tenant)
-                    allocation_filter &= Q(asset__tenant=active_tenant)
-
-                total_stock = ComponentStock.objects.filter(stock_filter).aggregate(total=Sum('qty'))['total'] or 0
-                total_allocated = ComponentAllocation.objects.filter(allocation_filter).aggregate(total=Sum('qty_allocated'))['total'] or 0
-                
-                available = total_stock - total_allocated
+                available = comp._total_stock_annotated - comp._total_allocated_annotated
                 if available < comp.min_stock_level:
                     low_components.append({
                         'component': comp,
                         'available_stock': available,
-                        'total_stock': total_stock,
-                        'total_allocated': total_allocated,
+                        'total_stock': comp._total_stock_annotated,
+                        'total_allocated': comp._total_allocated_annotated,
                         'min_stock_level': comp.min_stock_level,
                     })
 
@@ -752,6 +851,14 @@ class LowStockWidget(DashboardWidget):
             'low_stock_consumable_count': len(low_consumables),
             'low_stock_component_count': len(low_components),
         }
+
+    def get_footer_links(self, request):
+        return [
+            {'url': reverse('assets:component_list'), 'label': _('Components')},
+            {'url': reverse('inventory:accessory_list'), 'label': _('Accessories')},
+            {'url': reverse('inventory:consumable_list'), 'label': _('Consumables')},
+        ]
+
 
 
 @register_widget
@@ -781,8 +888,11 @@ class AssetAgeWidget(DashboardWidget):
         count = 0
         buckets = {'lt1y': 0, '1_3y': 0, '3_5y': 0, '5_7y': 0, 'gt7y': 0}
 
-        for asset in assets.only('purchase_date').iterator(chunk_size=1000):
-            age_years = (today - asset.purchase_date).days / 365.25
+        # Bypasses heavy Django model object creation completely
+        purchase_dates = list(assets.values_list('purchase_date', flat=True))
+
+        for p_date in purchase_dates:
+            age_years = (today - p_date).days / 365.25
             total_age += age_years
             count += 1
             if age_years < 1:
@@ -803,6 +913,9 @@ class AssetAgeWidget(DashboardWidget):
             'chart_format': self.get_config_value('chart_format', 'bar'),
         }
 
+    def get_footer_links(self, request):
+        return [{'url': reverse('assets:asset_list'), 'label': _('View All Assets')}]
+
 
 @register_widget
 class TenantSpendWidget(DashboardWidget):
@@ -819,10 +932,53 @@ class TenantSpendWidget(DashboardWidget):
             widget=forms.NumberInput(attrs={'class': 'form-control'}),
             required=False
         )
+        chart_type = forms.ChoiceField(
+            label='Chart Type',
+            choices=[
+                ('bar', 'Horizontal Bar Chart'),
+                ('doughnut', 'Doughnut'),
+                ('pie', 'Pie'),
+                ('list', 'Simple List'),
+            ],
+            initial='bar',
+            widget=forms.Select(attrs={'class': 'form-select'}),
+            required=False
+        )
+        currency = forms.CharField(
+            label='Currency Symbol',
+            max_length=5,
+            initial='€',
+            widget=forms.TextInput(attrs={'class': 'form-control'}),
+            required=False
+        )
+        exclude_unassigned = forms.BooleanField(
+            label='Exclude Unassigned Assets',
+            initial=False,
+            widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            required=False,
+            help_text='Do not display spending for assets with no tenant.'
+        )
 
     def get_context(self, request):
         limit = self.get_config_value('limit', 8)
-        spend = Asset.objects.values('tenant__name').annotate(
+        chart_type = self.get_config_value('chart_type', 'bar')
+        currency = self.get_config_value('currency', '€')
+        exclude_unassigned = self.get_config_value('exclude_unassigned', False)
+        
+        # Build query
+        qs = Asset.objects.all()
+        if exclude_unassigned:
+            qs = qs.filter(tenant__isnull=False)
+            
+        spend = qs.values('tenant__name').annotate(
             total=Sum('purchase_cost')
         ).order_by('-total')[:limit]
-        return {'tenant_spend': list(spend)}
+        
+        return {
+            'tenant_spend': list(spend),
+            'chart_type': chart_type,
+            'currency': currency,
+        }
+
+    def get_footer_links(self, request):
+        return [{'url': reverse('organization:tenant_list'), 'label': _('View All Tenants')}]

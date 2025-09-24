@@ -38,6 +38,19 @@ class DashboardWidgetConfigForm(forms.Form):
         initial=True,
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
     )
+    style = forms.ChoiceField(
+        label=_('Header Color Style'),
+        choices=[
+            ('default', _('Default')),
+            ('info', _('Info (Blue)')),
+            ('warning', _('Warning (Yellow)')),
+            ('success', _('Success (Green)')),
+            ('danger', _('Danger (Red)')),
+        ],
+        initial='default',
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        required=False
+    )
 
     def __init__(self, *args, widget_id=None, initial_config=None, request=None, **kwargs):
         super().__init__(*args, **kwargs)

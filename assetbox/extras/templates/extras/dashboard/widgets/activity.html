@@ -1,32 +1,83 @@
-{% load i18n %}{% load utility_tags %}
+{% load i18n %}{% load utility_tags %}{% load l10n %}
 {% if recent_changes %}
-<table class="table table-vcenter table-nowrap mb-0" style="font-size: 0.78rem;">
-    <tbody>
-        {% for change in recent_changes|slice:":8" %}
-        <tr>
-            <td class="text-muted text-nowrap ps-0" style="width: 1%;">{{ change.time|date:"Y-m-d H:i" }}</td>
-            <td class="text-nowrap" style="width: 1%;">
-                {% if change.action == 'create' %}
-                <span class="badge bg-success-lt">{{ change.get_action_display }}</span>
-                {% elif change.action == 'update' %}
-                <span class="badge bg-info-lt">{{ change.get_action_display }}</span>
-                {% else %}
-                <span class="badge bg-danger-lt">{{ change.get_action_display }}</span>
-                {% endif %}
-            </td>
-            <td class="text-muted text-nowrap" style="width: 1%;">{{ change.changed_object_type.name|title }}</td>
-            <td class="text-nowrap" style="width: 1%;">{{ change.user_name }}</td>
-            <td class="text-nowrap text-truncate pe-0" style="max-width: 200px;">
-                {% if change.changed_object and change.get_changed_object_url %}
-                <a href="{{ change.get_changed_object_url }}" class="text-reset">{{ change.object_repr }}</a>
-                {% else %}
-                <span class="text-muted">{{ change.object_repr }}</span>
-                {% endif %}
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="table-responsive">
+    <table class="table table-vcenter card-table table-striped table-hover mb-0" style="font-size: 0.78rem;">
+        <thead>
+            <tr class="text-uppercase text-muted fw-bold" style="font-size: 0.65rem; letter-spacing: 0.05em;">
+                <th>{% trans "Time" %}</th>
+                <th>{% trans "Action" %}</th>
+                <th>{% trans "Category" %}</th>
+                <th>{% trans "User" %}</th>
+                <th>{% trans "Modified Object" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for change in recent_changes %}
+            <tr>
+                <!-- Time Column -->
+                <td class="text-nowrap" style="width: 15%;">
+                    <div class="d-flex align-items-center gap-1 text-secondary">
+                        <i class="mdi mdi-clock-outline text-muted fs-5"></i>
+                        <span>{{ change.time|date:"Y-m-d H:i:s" }}</span>
+                    </div>
+                </td>
+                
+                <!-- Action Column -->
+                <td style="width: 10%;">
+                    {% if change.action == 'create' %}
+                    <span class="badge badge-outline text-success d-inline-flex align-items-center gap-1 border-success-subtle bg-success-lt px-2 py-1">
+                        <i class="mdi mdi-plus-circle-outline"></i>
+                        <span>{% trans "Created" %}</span>
+                    </span>
+                    {% elif change.action == 'update' %}
+                    <span class="badge badge-outline text-info d-inline-flex align-items-center gap-1 border-info-subtle bg-info-lt px-2 py-1">
+                        <i class="mdi mdi-pencil-outline"></i>
+                        <span>{% trans "Updated" %}</span>
+                    </span>
+                    {% else %}
+                    <span class="badge badge-outline text-danger d-inline-flex align-items-center gap-1 border-danger-subtle bg-danger-lt px-2 py-1">
+                        <i class="mdi mdi-delete-outline"></i>
+                        <span>{% trans "Deleted" %}</span>
+                    </span>
+                    {% endif %}
+                </td>
+                
+                <!-- Category Column -->
+                <td class="text-nowrap text-secondary fw-semibold" style="width: 15%;">
+                    <span class="d-inline-flex align-items-center gap-1">
+                        <i class="mdi mdi-shape-outline text-muted fs-5"></i>
+                        <span>{{ change.changed_object_type.name|title }}</span>
+                    </span>
+                </td>
+                
+                <!-- User Column -->
+                <td class="text-nowrap" style="width: 15%;">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="avatar avatar-xs rounded-circle bg-primary-lt fw-bold text-uppercase" style="font-size: 0.65rem; width: 1.5rem; height: 1.5rem;">
+                            {{ change.user_name|slice:":2" }}
+                        </span>
+                        <span class="fw-medium text-body">{{ change.user_name }}</span>
+                    </div>
+                </td>
+                
+                <!-- Object Column -->
+                <td class="text-nowrap text-truncate pe-0" style="max-width: 350px;">
+                    {% if change.changed_object and change.get_changed_object_url %}
+                    <a href="{{ change.get_changed_object_url }}" class="text-primary fw-semibold text-decoration-none hover-underline">
+                        <i class="mdi mdi-link-variant text-muted me-1"></i>{{ change.object_repr }}
+                    </a>
+                    {% else %}
+                    <span class="text-muted"><i class="mdi mdi-cube-outline text-muted me-1"></i>{{ change.object_repr }}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 {% else %}
-<div class="text-muted text-center py-4">{% trans "No recent changes recorded." %}</div>
+<div class="text-muted text-center py-5 d-flex flex-column align-items-center gap-2">
+    <i class="mdi mdi-text-box-search-outline fs-1 text-muted opacity-50"></i>
+    <span>{% trans "No recent changes recorded matching search parameters." %}</span>
+</div>
 {% endif %}

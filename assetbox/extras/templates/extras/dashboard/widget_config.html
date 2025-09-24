@@ -16,16 +16,41 @@
                 <label class="form-check-label" for="{{ form.visible.id_for_label }}">{% trans "Visible" %}</label>
             </div>
         </div>
+        <div class="mb-3">
+            <label class="form-label" for="{{ form.style.id_for_label }}">{% trans "Header Color Style" %}</label>
+            {{ form.style }}
+        </div>
 
         {% if widget_config_form and widget_config_form.fields %}
         <hr class="my-3">
         <h6 class="mb-3">{% trans "Widget Settings" %}</h6>
         {% for field in widget_config_form %}
         <div class="mb-3">
-            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-            {{ field }}
+            {% if field.name == 'models' %}
+                <label class="form-label">{{ field.label }}</label>
+                <div class="row g-2">
+                    {% for checkbox in field %}
+                    <div class="col-6 col-md-4">
+                        <div class="form-check">
+                            {{ checkbox.tag }}
+                            <label class="form-check-label text-truncate" for="{{ checkbox.id_for_label }}" title="{{ checkbox.choice_label }}">
+                                {{ checkbox.choice_label }}
+                            </label>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% elif field.field.widget.input_type == 'checkbox' %}
+                <div class="form-check form-switch pt-2">
+                    {{ field }}
+                    <label class="form-check-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                </div>
+            {% else %}
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+            {% endif %}
             {% if field.help_text %}
-            <div class="form-text">{{ field.help_text }}</div>
+            <div class="form-text mt-1">{{ field.help_text }}</div>
             {% endif %}
             {% if field.errors %}
             <div class="invalid-feedback d-block">{{ field.errors|join:", " }}</div>
