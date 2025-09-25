@@ -90,14 +90,23 @@
 
 {% block content %}
 
-<div class="row row-cards" id="dashboard-grid">
+<div class="row row-cards" id="dashboard-grid" hx-history="false">
     {% for entry in dashboard_widgets %}
     <div class="col-lg-{{ entry.config.w|default:4 }} col-md-6 col-12" id="widget-{{ entry.index }}"
          data-gs-w="{{ entry.config.w|default:4 }}" data-gs-h="{{ entry.config.h|default:2 }}"
          data-gs-x="{{ entry.config.x|default_if_none:'' }}" data-gs-y="{{ entry.config.y|default_if_none:'' }}">
         <div class="card card-sm">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h3 class="card-title">{{ entry.config.title }}</h3>
+            {% if entry.config.style == 'info' %}
+                <div class="card-status-top bg-info"></div>
+            {% elif entry.config.style == 'warning' %}
+                <div class="card-status-top bg-warning"></div>
+            {% elif entry.config.style == 'success' %}
+                <div class="card-status-top bg-success"></div>
+            {% elif entry.config.style == 'danger' %}
+                <div class="card-status-top bg-danger"></div>
+            {% endif %}
+            <div class="card-header d-flex justify-content-between align-items-center{% if entry.config.style == 'info' %} bg-info-lt text-info{% elif entry.config.style == 'warning' %} bg-warning-lt text-warning{% elif entry.config.style == 'success' %} bg-success-lt text-success{% elif entry.config.style == 'danger' %} bg-danger-lt text-danger{% endif %}">
+                <h3 class="card-title{% if entry.config.style == 'info' %} text-info{% elif entry.config.style == 'warning' %} text-warning{% elif entry.config.style == 'success' %} text-success{% elif entry.config.style == 'danger' %} text-danger{% endif %}">{{ entry.config.title }}</h3>
                 <div class="card-actions d-flex gap-1">
                     <button class="btn btn-icon btn-sm btn-ghost-secondary"
                         hx-get="{% url 'extras:dashboard_widget_config' index=entry.index %}"
@@ -129,6 +138,16 @@
             <div class="card-body overflow-auto">
                 {% render_widget entry.config entry.index %}
             </div>
+            {% get_widget_footer_links entry.config entry.index as footer_links %}
+            {% if footer_links %}
+            <div class="card-footer bg-surface-secondary d-flex justify-content-end align-items-center flex-wrap gap-2" style="padding: 0.5rem 1.25rem;">
+                {% for link in footer_links %}
+                <a href="{{ link.url }}" class="btn btn-sm p-0 px-2 btn-ghost-secondary" style="font-size: 0.72rem; line-height: 1.5;">
+                    {{ link.label }} <i class="mdi mdi-chevron-right ms-1"></i>
+                </a>
+                {% endfor %}
+            </div>
+            {% endif %}
         </div>
     </div>
     {% empty %}

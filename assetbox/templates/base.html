@@ -26,6 +26,7 @@
     <link href="{% static 'dist/assetbox.css' %}?v=1.0.2" rel="stylesheet"/>
     {# HTMX (in head for early hx-* processing) #}
     <script src="{% static 'dist/vendor/htmx.min.js' %}"></script>
+    <script src="{% static 'dist/vendor/apexcharts.min.js' %}"></script>
     {% block extra_head %}{% endblock %}
 </head>
 <body class="layout-fluid layout-combo" hx-boost="true" hx-target="#page-content-wrapper" hx-indicator="#htmx-loading-indicator">

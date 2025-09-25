@@ -13,13 +13,14 @@
   },
   "devDependencies": {
     "esbuild": "^0.25.0",
-    "sass": "^1.80.0",
     "eslint": "^9.0.0",
-    "globals": "^15.0.0"
+    "globals": "^15.0.0",
+    "sass": "^1.80.0"
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",
     "@tabler/core": "^1.1.0",
+    "apexcharts": "^5.13.0",
     "bootstrap": "^5.3.3",
     "gridstack": "^10.3.0",
     "htmx.org": "^2.0.4",

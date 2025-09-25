@@ -177,6 +177,16 @@ REST_FRAMEWORK = {
     'VIEW_NAME_FUNCTION': 'assetbox.api.utils.get_view_name',
 }
 
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'AssetBox API',
+    'DESCRIPTION': 'IT Asset Management API',
+    'VERSION': '1.0.0',
+    'COMPONENT_SPLIT_REQUEST': True,  # Critical for clean client gen
+    'ENUM_ADD_EXPLICIT_BLANK_NULL_CHOICE': False,
+    'SCHEMA_PATH_PREFIX': r'/api/',
+}
+
+
 PAGINATE_COUNT = 50
 MAX_PAGE_SIZE = 1000
 

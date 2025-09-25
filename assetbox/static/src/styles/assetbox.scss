@@ -678,6 +678,21 @@ html {
 }
 
 // ============================================================
+//  Card Actions & Buttons Alignment
+// ============================================================
+.card-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+    margin-left: auto !important;
+
+    .btn {
+        position: relative !important;
+        margin: 0 !important;
+    }
+}
+
+// ============================================================
 //  Premium Smooth Theme Transitions
 // ============================================================
 html, body, .card, .navbar, .navbar-vertical, .page-wrapper, .form-control, .btn, .nav-link, .dropdown-item, .table, td, th, aside, footer {
