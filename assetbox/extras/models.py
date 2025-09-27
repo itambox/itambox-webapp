@@ -21,10 +21,25 @@ class Tag(ChangeLoggingMixin, BaseModel):
 
 
 class Dashboard(models.Model):
-    user = models.OneToOneField(
+    user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name='dashboard'
+        related_name='dashboards'
+    )
+    name = models.CharField(
+        max_length=100,
+        default='Main Dashboard'
+    )
+    is_default = models.BooleanField(
+        default=False
+    )
+    tenant = models.ForeignKey(
+        'organization.Tenant',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='dashboards',
+        help_text='Scope all widgets on this dashboard to this specific tenant context.'
     )
     layout = models.JSONField(
         default=list,
@@ -35,10 +50,12 @@ class Dashboard(models.Model):
     last_updated = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['user']
+        ordering = ['-is_default', 'name']
 
     def __str__(self):
-        return f"Dashboard for {self.user.username}"
+        if self.tenant:
+            return f"{self.name} ({self.tenant.name}) for {self.user.username}"
+        return f"{self.name} for {self.user.username}"
 
     def add_widget(self, widget_class, title=None, **config):
         """Add a new widget to the end of the layout."""
