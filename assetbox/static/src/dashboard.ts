@@ -181,6 +181,13 @@
     initGridStack();
   }
 
+  // --- HTMX lifecycle: prevent history caching for the dashboard ---
+  document.body.addEventListener('htmx:beforeHistorySave', function (evt: Event) {
+    if (document.getElementById('dashboard-grid')) {
+      evt.preventDefault();
+    }
+  });
+
   // --- HTMX lifecycle: destroy GridStack before navigating away ---
   document.body.addEventListener('htmx:beforeSwap', function (evt: Event) {
     const detail = (evt as CustomEvent).detail;
