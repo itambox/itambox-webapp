@@ -20,6 +20,7 @@
 <div class="d-grid gap-2">
     <button class="btn btn-success font-weight-bold shadow-sm"
             hx-post="{% url 'assets:asset_audit' pk=object.pk %}"
+            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
             hx-target="#asset-audit-badge-container"
             hx-swap="outerHTML"
             id="audit-verify-btn">

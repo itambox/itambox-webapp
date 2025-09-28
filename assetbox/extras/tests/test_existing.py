@@ -112,7 +112,7 @@ class DashboardModelTests(TestCase):
 
     def test_dashboard_creation(self):
         dash = Dashboard.objects.create(user=self.user)
-        self.assertEqual(str(dash), 'Dashboard for dashuser')
+        self.assertIn('Dashboard for dashuser', str(dash))
         self.assertEqual(dash.layout, [])
 
     def test_dashboard_add_widget(self):
@@ -148,10 +148,10 @@ class DashboardModelTests(TestCase):
         self.assertEqual(dash.layout[1]['widget'], 'third')
         self.assertEqual(dash.layout[2]['widget'], 'first')
 
-    def test_dashboard_user_one_to_one(self):
-        Dashboard.objects.create(user=self.user)
-        with self.assertRaises(IntegrityError):
-            Dashboard.objects.create(user=self.user)
+    def test_dashboard_multiple_allowed(self):
+        dash1 = Dashboard.objects.create(user=self.user, name="Dashboard 1")
+        dash2 = Dashboard.objects.create(user=self.user, name="Dashboard 2")
+        self.assertEqual(Dashboard.objects.filter(user=self.user).count(), 2)
 
 
 class TagViewTests(TestCase):

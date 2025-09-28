@@ -65,5 +65,40 @@
     {# Standalone OOB target for dynamic title swaps #}
     <span id="page-title-block" style="display:none" aria-hidden="true">AssetBox</span>
 
+    {# --- Premium Physical Scanning Audio Engine --- #}
+    <script>
+        (function() {
+            function playBeep(frequency, duration, type) {
+                try {
+                    var AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (!AudioCtx) return;
+                    var context = new AudioCtx();
+                    var oscillator = context.createOscillator();
+                    var gain = context.createGain();
+                    oscillator.type = type || 'sine';
+                    oscillator.frequency.value = frequency;
+                    gain.gain.setValueAtTime(0.08, context.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + duration);
+                    oscillator.connect(gain);
+                    gain.connect(context.destination);
+                    oscillator.start();
+                    oscillator.stop(context.currentTime + duration);
+                } catch(e) {
+                    console.warn("Web Audio beep failed", e);
+                }
+            }
+
+            document.addEventListener('playAuditSound', function() {
+                playBeep(1000, 0.10);
+            });
+
+            document.addEventListener('playAuditFailSound', function() {
+                playBeep(180, 0.15, 'triangle');
+                setTimeout(function() {
+                    playBeep(180, 0.15, 'triangle');
+                }, 150);
+            });
+        })();
+    </script>
 </body>
 </html>

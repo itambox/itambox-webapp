@@ -28,6 +28,15 @@
             <span class="text-muted"><i>Global (No Tenant)</i></span>
         {% endif %}
     </dd>
+    
+    <dt class="col-sm-3">Supplier / Vendor:</dt>
+    <dd class="col-sm-9">
+        {% if object.supplier %}
+            <a href="{% url 'assets:supplier_detail' pk=object.supplier.pk %}"><strong>{{ object.supplier.name }}</strong></a>
+        {% else %}
+            <span class="text-muted"><i>Not Set</i></span>
+        {% endif %}
+    </dd>
 
     <dt class="col-sm-3">Purchase Date:</dt>
     <dd class="col-sm-9 text-secondary">{{ object.purchase_date|date:"Y-m-d"|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
