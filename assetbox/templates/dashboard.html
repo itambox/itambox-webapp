@@ -19,6 +19,61 @@
     }
 </style>
 <div class="btn-list" id="dashboard-controls">
+    <!-- Dashboard Dropdown Switcher -->
+    <div class="dropdown d-inline-block">
+        <button class="btn btn-outline-primary dropdown-toggle d-flex align-items-center" type="button" id="dashboard-switcher" data-bs-toggle="dropdown" aria-expanded="false">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-layout-dashboard me-1" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M4 4h6v8h-6z" />
+                <path d="M4 16h6v4h-6z" />
+                <path d="M14 12h6v8h-6z" />
+                <path d="M14 4h6v4h-6z" />
+            </svg>
+            {{ active_dashboard.name }}
+            {% if active_dashboard.tenant %}
+                <span class="badge bg-blue-lt ms-2">{{ active_dashboard.tenant.name }}</span>
+            {% endif %}
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dashboard-switcher">
+            <li class="dropdown-header">{% trans "Switch Dashboard" %}</li>
+            {% for db in dashboards_list %}
+                <li>
+                    <a class="dropdown-item d-flex align-items-center justify-content-between {% if db.id == active_dashboard.id %}active{% endif %}"
+                       href="?dashboard={{ db.id }}"
+                       hx-get="?dashboard={{ db.id }}"
+                       hx-target="#page-content-wrapper"
+                       hx-push-url="true">
+                        <span>
+                            {{ db.name }}
+                            {% if db.is_default %}
+                                <small class="text-muted ms-1">({% trans "Default" %})</small>
+                            {% endif %}
+                        </span>
+                        {% if db.tenant %}
+                            <span class="badge bg-blue-lt ms-2">{{ db.tenant.name }}</span>
+                        {% endif %}
+                    </a>
+                </li>
+            {% endfor %}
+            <div class="dropdown-divider"></div>
+            <li>
+                <a class="dropdown-item d-flex align-items-center text-primary"
+                   hx-get="{% url 'extras:dashboard_manage_modal' %}"
+                   hx-target="#dashboard-modal-content"
+                   data-bs-toggle="modal"
+                   data-bs-target="#dashboard-modal"
+                   href="#">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-settings me-1" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                        <path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"/>
+                        <path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/>
+                    </svg>
+                    {% trans "Manage Dashboards" %}
+                </a>
+            </li>
+        </ul>
+    </div>
+
     <span id="dashboard-locked-controls">
         <button id="unlock-dashboard" class="btn btn-outline-secondary d-flex align-items-center"
             title="{% trans 'Unlock dashboard to resize and reorder widgets' %}">
@@ -47,7 +102,7 @@
             {% trans 'Save Layout' %}
         </button>
         <button class="btn btn-outline-secondary d-flex align-items-center"
-            hx-get="{% url 'extras:dashboard_widget_add' %}" hx-target="#dashboard-modal-content"
+            hx-get="{% url 'extras:dashboard_widget_add' dashboard_id=active_dashboard.id %}" hx-target="#dashboard-modal-content"
             data-bs-toggle="modal" data-bs-target="#dashboard-modal">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus me-1" width="20"
                 height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
@@ -71,7 +126,7 @@
             {% trans 'Lock' %}
         </button>
     </span>
-    <form method="post" action="{% url 'extras:dashboard_reset' %}" class="d-inline"
+    <form method="post" action="{% url 'extras:dashboard_reset' dashboard_id=active_dashboard.id %}" class="d-inline"
         onsubmit="return confirm('Reset dashboard to default layout? This cannot be undone.')">
         {% csrf_token %}
         <button type="submit" class="btn btn-outline-danger">
@@ -90,7 +145,7 @@
 
 {% block content %}
 
-<div class="row row-cards" id="dashboard-grid" hx-history="false">
+<div class="row row-cards" id="dashboard-grid" hx-history="false" data-save-url="{% url 'extras:dashboard_save_layout' dashboard_id=active_dashboard.id %}">
     {% for entry in dashboard_widgets %}
     <div class="col-lg-{{ entry.config.w|default:4 }} col-md-6 col-12" id="widget-{{ entry.index }}"
          data-gs-w="{{ entry.config.w|default:4 }}" data-gs-h="{{ entry.config.h|default:2 }}"
@@ -109,7 +164,7 @@
                 <h3 class="card-title{% if entry.config.style == 'info' %} text-info{% elif entry.config.style == 'warning' %} text-warning{% elif entry.config.style == 'success' %} text-success{% elif entry.config.style == 'danger' %} text-danger{% endif %}">{{ entry.config.title }}</h3>
                 <div class="card-actions d-flex gap-1">
                     <button class="btn btn-icon btn-sm btn-ghost-secondary"
-                        hx-get="{% url 'extras:dashboard_widget_config' index=entry.index %}"
+                        hx-get="{% url 'extras:dashboard_widget_config' dashboard_id=active_dashboard.id index=entry.index %}"
                         hx-target="#dashboard-modal-content"
                         data-bs-toggle="modal" data-bs-target="#dashboard-modal" title="{% trans 'Configure' %}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-settings" width="18"
@@ -122,7 +177,7 @@
                         </svg>
                     </button>
                     <button class="btn btn-icon btn-sm btn-ghost-danger dashboard-manage-btn d-none"
-                        hx-get="{% url 'extras:dashboard_widget_delete' index=entry.index %}"
+                        hx-get="{% url 'extras:dashboard_widget_delete' dashboard_id=active_dashboard.id index=entry.index %}"
                         hx-target="#dashboard-modal-content"
                         data-bs-toggle="modal" data-bs-target="#dashboard-modal" title="{% trans 'Remove' %}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-x" width="18"

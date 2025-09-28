@@ -130,7 +130,10 @@
       return { index: isNaN(index) ? 0 : index, x: item.x || 0, y: item.y || 0, w: item.w || 4, h: item.h || 2 };
     });
 
-    fetch('/extras/dashboard/save-layout/', {
+    const gridEl = document.getElementById('dashboard-grid');
+    const saveUrl = gridEl ? gridEl.getAttribute('data-save-url') || '/extras/dashboard/save-layout/' : '/extras/dashboard/save-layout/';
+
+    fetch(saveUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

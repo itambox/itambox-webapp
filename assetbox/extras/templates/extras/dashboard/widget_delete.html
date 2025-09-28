@@ -1,5 +1,5 @@
 {% load i18n %}
-<form method="post" action="{% url 'extras:dashboard_widget_delete' index=index %}">
+<form method="post" action="{% url 'extras:dashboard_widget_delete' dashboard_id=dashboard_id index=index %}" hx-post="{% url 'extras:dashboard_widget_delete' dashboard_id=dashboard_id index=index %}" hx-target="#dashboard-modal-content">
     {% csrf_token %}
     <div class="modal-status bg-danger"></div>
     <div class="modal-body text-center py-4">

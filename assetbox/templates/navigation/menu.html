@@ -26,13 +26,14 @@
             {% for group, items in groups %}
               <span class="dropdown-header text-info">{{ group.label }}</span>
               {% for item, buttons in items %}
-                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0">
-                  <a href="{{ item.url }}" class="d-inline-flex flex-fill py-1 text-reset text-decoration-none"
+                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 text-wrap" style="white-space: normal; min-height: 2.25rem;">
+                  <a href="{{ item.url }}" class="py-1 text-reset text-decoration-none flex-fill text-wrap lh-sm"
+                     style="min-width: 0; word-break: break-word;"
                      {% if '/admin/' in item.url %}hx-boost="false"{% endif %}>
                     {{ item.link_text }}
                   </a>
                   {% if buttons %}
-                    <div class="btn-group ms-1">
+                    <div class="btn-group ms-2 flex-shrink-0">
                       {% for button in buttons %}
                         <a href="{{ button.url }}" class="btn btn-sm btn-{{ button.color|default:'outline text-primary' }} lh-1 px-2"
                            title="{{ button.title }}" aria-label="{{ button.title }}">
