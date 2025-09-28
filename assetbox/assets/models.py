@@ -118,38 +118,16 @@ class Depreciation(StandardModel):
         return reverse('assets:depreciation_detail', kwargs={'pk': self.pk})
 
 
-class AssetType(AutoSlugMixin, StandardModel):
+class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel):
     """Defines a specific type of asset (e.g., a specific laptop model)."""
     slug_source = ('manufacturer__name', 'model')
     
-    STORAGE_SSD = 'ssd'
-    STORAGE_NVME = 'nvme'
-    STORAGE_HDD = 'hdd'
-    STORAGE_EMMC = 'emmc'
-    STORAGE_TYPE_CHOICES = [
-        (STORAGE_SSD, 'SSD'),
-        (STORAGE_NVME, 'NVMe SSD'),
-        (STORAGE_HDD, 'HDD'),
-        (STORAGE_EMMC, 'eMMC'),
-        ('', 'Other/Unknown') # Allow blank choice
-    ]
 
     manufacturer = models.ForeignKey(Manufacturer, on_delete=models.PROTECT, related_name='asset_types')
     model = models.CharField(max_length=255, db_index=True)
     slug = models.SlugField(max_length=255, unique=True)
     part_number = models.CharField(max_length=100, blank=True, db_index=True, help_text="Manufacturer part number or SKU")
 
-    # Specs
-    cpu = models.CharField(max_length=100, blank=True, db_index=True, verbose_name="Processor (CPU)")
-    ram_gb = models.PositiveIntegerField(blank=True, null=True, verbose_name="RAM (GB)")
-    storage_capacity_gb = models.PositiveIntegerField(blank=True, null=True, verbose_name="Storage (GB)")
-    storage_type = models.CharField(
-        max_length=10,
-        choices=STORAGE_TYPE_CHOICES,
-        blank=True,
-        verbose_name="Storage Type"
-    )
-    gpu = models.CharField(max_length=100, blank=True, verbose_name="Graphics (GPU)")
     eol_months = models.PositiveIntegerField(
         null=True,
         blank=True,
@@ -163,6 +141,11 @@ class AssetType(AutoSlugMixin, StandardModel):
         blank=True,
         related_name='asset_types',
         verbose_name="Custom Fieldset"
+    )
+    custom_values = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Custom Values"
     )
     depreciation = models.ForeignKey(
         Depreciation,
