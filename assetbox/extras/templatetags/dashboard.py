@@ -23,7 +23,20 @@ def render_widget(context, widget_config, index=0):
         return f'<!-- Unknown widget: {widget_id} -->'
 
     try:
-        instance = widget_cls(config=widget_config)
+        # Safe copy to prevent in-place memory overrides on layout configurations
+        cfg = dict(widget_config)
+        if 'config' not in cfg:
+            cfg['config'] = {}
+        else:
+            cfg['config'] = dict(cfg['config'])
+
+        # Intercept and override scoping boundaries if dashboard is bound to a tenant
+        active_db = context.get('active_dashboard')
+        if active_db and active_db.tenant:
+            cfg['config']['tenant_id'] = str(active_db.tenant.id)
+            cfg['tenant_id'] = str(active_db.tenant.id)
+
+        instance = widget_cls(config=cfg)
         instance.index = index
         return mark_safe(instance.render(request))
     except Exception as e:
@@ -45,7 +58,20 @@ def get_widget_footer_links(context, widget_config, index=0):
     if not widget_cls:
         return []
     try:
-        instance = widget_cls(config=widget_config)
+        # Safe copy to prevent in-place memory overrides on layout configurations
+        cfg = dict(widget_config)
+        if 'config' not in cfg:
+            cfg['config'] = {}
+        else:
+            cfg['config'] = dict(cfg['config'])
+
+        # Intercept and override scoping boundaries if dashboard is bound to a tenant
+        active_db = context.get('active_dashboard')
+        if active_db and active_db.tenant:
+            cfg['config']['tenant_id'] = str(active_db.tenant.id)
+            cfg['tenant_id'] = str(active_db.tenant.id)
+
+        instance = widget_cls(config=cfg)
         instance.index = index
         if hasattr(instance, 'get_footer_links'):
             return instance.get_footer_links(request)

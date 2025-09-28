@@ -343,9 +343,9 @@ class FinancialWidget(DashboardWidget):
             purchase_total=Sum('purchase_cost'),
             salvage_total=Sum('salvage_value')
         )
-        total_purchase = asset_sums['purchase_total'] or 0.0
-        total_salvage = asset_sums['salvage_total'] or 0.0
-        total_maintenance = maintenances.aggregate(total=Sum('cost'))['total'] or 0.0
+        total_purchase = float(asset_sums['purchase_total'] or 0.0)
+        total_salvage = float(asset_sums['salvage_total'] or 0.0)
+        total_maintenance = float(maintenances.aggregate(total=Sum('cost'))['total'] or 0.0)
         total_tco = total_purchase + total_maintenance
         
         currency = self.get_config_value('currency', '$')

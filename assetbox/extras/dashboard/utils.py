@@ -43,19 +43,38 @@ def get_default_dashboard():
     ]
 
 
-def get_dashboard(user, for_update=False):
+def get_dashboard(user, dashboard_id=None, for_update=False):
     """Get or create a dashboard for the given user.
 
     Args:
         user: The user whose dashboard to fetch.
+        dashboard_id: Optional ID of the specific dashboard to fetch.
         for_update: If True, locks the row with SELECT ... FOR UPDATE
                     to prevent concurrent mutation race conditions.
     """
-    qs = Dashboard.objects.all()
+    qs = Dashboard.objects.filter(user=user)
     if for_update:
         qs = qs.select_for_update()
-    dashboard, created = qs.get_or_create(user=user)
-    if created or not dashboard.layout:
+
+    dashboard = None
+    if dashboard_id:
+        dashboard = qs.filter(id=dashboard_id).first()
+
+    if not dashboard:
+        dashboard = qs.filter(is_default=True).first()
+
+    if not dashboard:
+        dashboard = qs.first()
+
+    if not dashboard:
+        dashboard = Dashboard.objects.create(
+            user=user,
+            name='Main Dashboard',
+            is_default=True,
+            layout=get_default_dashboard()
+        )
+    elif not dashboard.layout:
         dashboard.layout = get_default_dashboard()
         dashboard.save(update_fields=['layout'])
+
     return dashboard
