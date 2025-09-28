@@ -18,8 +18,7 @@ class AssetBulkImportForm(BulkImportForm):
 class AssetTypeBulkImportForm(BulkImportForm):
     model = AssetType
     required_fields = ['manufacturer', 'model']
-    optional_fields = ['part_number', 'cpu', 'ram_gb', 'storage_capacity_gb',
-                       'storage_type', 'gpu', 'description', 'comments']
+    optional_fields = ['part_number', 'description', 'comments']
 
     def map_row(self, row):
         return {k: row.get(k, '').strip() for k in self.field_names}

@@ -125,10 +125,12 @@ class AssetAuditScanView(View):
             ).first()
             
             if not asset:
-                return HttpResponse(
+                response = HttpResponse(
                     f"<div class='alert alert-danger mb-0'>Scanned asset tag or serial '{barcode}' not found in database.</div>", 
                     status=400
                 )
+                response['HX-Trigger'] = 'playAuditFailSound'
+                return response
             
             try:
                 # Perform physical verification, observing campaign location
@@ -142,14 +144,22 @@ class AssetAuditScanView(View):
                 )
             except ValidationError as err:
                 msg = err.message if hasattr(err, 'message') else str(err)
-                return HttpResponse(f"<div class='alert alert-danger mb-0'>{msg}</div>", status=400)
+                response = HttpResponse(f"<div class='alert alert-danger mb-0'>{msg}</div>", status=400)
+                response['HX-Trigger'] = 'playAuditFailSound'
+                return response
             
-            # HTMX triggers reload on reconciliation panel
+            # HTMX triggers reload on reconciliation panel and plays beep sound
+            import json
             response = render(request, 'assets/audits/includes/audit_scan_success.html', {'asset': asset})
-            response['HX-Trigger'] = 'updateReconciliation'
+            response['HX-Trigger'] = json.dumps({
+                'updateReconciliation': None,
+                'playAuditSound': None
+            })
             return response
             
-        return HttpResponse("<div class='alert alert-danger mb-0'>Invalid form submission.</div>", status=400)
+        response = HttpResponse("<div class='alert alert-danger mb-0'>Invalid form submission.</div>", status=400)
+        response['HX-Trigger'] = 'playAuditFailSound'
+        return response
 
 
 class AuditSessionCloseForm(forms.Form):

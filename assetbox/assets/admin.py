@@ -28,7 +28,7 @@ class ManufacturerAdmin(admin.ModelAdmin):
 @admin.register(AssetType)
 class AssetTypeAdmin(admin.ModelAdmin):
     list_display = ('manufacturer', 'model', 'slug', 'part_number')
-    list_filter = ('manufacturer', 'storage_type')
+    list_filter = ('manufacturer',)
     search_fields = ('manufacturer__name', 'model', 'slug', 'part_number')
     prepopulated_fields = {"slug": ("manufacturer", "model",)}
 

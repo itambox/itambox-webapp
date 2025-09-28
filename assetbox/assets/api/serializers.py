@@ -46,7 +46,6 @@ class AssetTypeSerializer(BaseModelSerializer):
         model = AssetType
         fields = [
             'id', 'model', 'slug', 'manufacturer', 'part_number',
-            'cpu', 'ram_gb', 'storage_capacity_gb', 'storage_type', 'gpu',
             'description', 'comments', 'created_at', 'updated_at'
         ]
         brief_fields = ['id', 'model', 'slug', 'manufacturer']

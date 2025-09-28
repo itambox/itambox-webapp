@@ -183,22 +183,67 @@ class AssetCheckinView(SimplePostView):
 @require_POST
 def asset_audit(request, pk):
     asset = get_object_or_404(Asset, pk=pk)
-    asset.last_audited = timezone.now()
-    asset.last_audited_by = request.user
-    asset._changelog_action = 'audit'
-    asset._changelog_message = f"Physical presence verified by {request.user.get_full_name() or request.user.username}."
-    asset.save(update_fields=['last_audited', 'last_audited_by'])
-    ActivityLog.objects.create(
-        asset=asset,
-        action='audited',
-        user=request.user,
-        notes=asset._changelog_message
-    )
+    
+    from ..models import AuditSession
+    from ..reconciliation import audit_asset
+    from django.core.exceptions import ValidationError
+
+    # 1. Try to find an active AuditSession campaign
+    session = None
+    if asset.location:
+        session = AuditSession.objects.filter(status='active', location=asset.location).first()
+    
+    if not session:
+        session = AuditSession.objects.filter(status='active', location__isnull=True).first()
+        
+    if not session:
+        session = AuditSession.objects.filter(status='active').first()
+
+    # 2. Determine the observed location
+    location = asset.location
+    if session and not location:
+        location = session.location
+        
+    if not location:
+        # Fallback to the first location in DB if no location is registered on the asset/session
+        from organization.models import Location
+        location = Location.objects.first()
+
+    # 3. Determine the observed status
+    status = asset.status
+    if not status:
+        status = StatusLabel.objects.filter(type=StatusLabel.TYPE_DEPLOYABLE).first()
+
+    error_message = None
+    try:
+        audit_asset(
+            asset=asset,
+            user=request.user,
+            session=session,
+            location=location,
+            status=status,
+            verification_method='manual'
+        )
+        if session:
+            message = f"Asset '{asset.name}' physically audited successfully inside campaign '{session.name}'!"
+        else:
+            message = f"Asset '{asset.name}' physically audited successfully (standalone verification)!"
+    except ValidationError as e:
+        error_message = e.message if hasattr(e, 'message') else str(e)
+        message = f"Failed to perform audit: {error_message}"
+
+    # 5. Render the audit badge response
     response = render(request, "assets/includes/asset_audit_badge.html", {'asset': asset})
-    response['HX-Trigger'] = json.dumps({
-        "playAuditSound": None,
-        "showMessage": {"message": f"Asset '{asset.name}' physically audited successfully!", "level": "success"}
-    })
+    
+    # Send HX-Trigger to display notification and play sound (if successful)
+    trigger_data = {}
+    if not error_message:
+        trigger_data["playAuditSound"] = None
+        trigger_data["showMessage"] = {"message": message, "level": "success"}
+    else:
+        trigger_data["showMessage"] = {"message": message, "level": "danger"}
+        
+    response['HX-Trigger'] = json.dumps(trigger_data)
     return response
 
 

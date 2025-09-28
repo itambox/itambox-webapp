@@ -63,6 +63,8 @@ class Command(BaseCommand):
         # Delete in reverse-dependency order
         models_to_clear = [
             # Leaf models first
+            ('components', 'ComponentAllocation'),
+            ('components', 'ComponentStock'),
             ('assets', 'ActivityLog'),
             ('compliance', 'CustodyReceipt'),
             ('core', 'ObjectChange'),
@@ -80,6 +82,7 @@ class Command(BaseCommand):
             ('inventory', 'Kit'),
             ('assets', 'Asset'),
             ('assets', 'AssetType'),
+            ('components', 'Component'),
             ('inventory', 'Accessory'),
             ('inventory', 'Consumable'),
             ('licenses', 'License'),
@@ -98,6 +101,7 @@ class Command(BaseCommand):
             ('assets', 'AssetRole'),
             ('assets', 'StatusLabel'),
             ('assets', 'Manufacturer'),
+            ('assets', 'Category'),
             ('assets', 'CustomFieldset'),
             ('assets', 'CustomField'),
             ('assets', 'Depreciation'),
@@ -199,6 +203,18 @@ class Command(BaseCommand):
             ('marcus.johnson', 'marcus.johnson@helheim.cloud', False),
             ('elena.rodriguez', 'elena.rodriguez@helheim.cloud', False),
             ('thomas.weber', 'thomas.weber@helheim.cloud', False),
+            ('oliver.smith', 'oliver.smith@helheim.cloud', False),
+            ('sophia.martinez', 'sophia.martinez@helheim.cloud', False),
+            ('lucas.muller', 'lucas.muller@helheim.cloud', False),
+            ('emma.dupont', 'emma.dupont@helheim.cloud', False),
+            ('liam.o-connor', 'liam.oconnor@helheim.cloud', False),
+            ('chloe.lefevre', 'chloe.lefevre@helheim.cloud', False),
+            ('noah.schmidt', 'noah.schmidt@helheim.cloud', False),
+            ('mia.petrov', 'mia.petrov@helheim.cloud', False),
+            ('alexander.gruber', 'alexander.gruber@helheim.cloud', False),
+            ('yasmine.al-sayed', 'yasmine.alsayed@helheim.cloud', False),
+            ('david.kim', 'david.kim@helheim.cloud', False),
+            ('wei.zhang', 'wei.zhang@helheim.cloud', False),
         ]
         self._users = []
         for username, email, is_superuser in users_data:
@@ -312,6 +328,18 @@ class Command(BaseCommand):
             ('floor', 'Floor', 'number', False, None),
             ('asset_lifecycle', 'Lifecycle Stage', 'select', False, 'Procurement\nDeployment\nActive\nMaintenance\nRetirement'),
             ('encrypted', 'Disk Encrypted', 'boolean', False, None),
+            ('cpu_architecture', 'CPU Architecture', 'select', False, 'x86_64\nARM64'),
+            ('ram_slot_count', 'RAM Slots Count', 'number', False, None),
+            ('ip_address', 'IP Address', 'text', False, None),
+            ('port_count', 'Port Count', 'number', False, None),
+            ('poe_budget_w', 'PoE Budget (Watts)', 'number', False, None),
+            ('firmware_version', 'Firmware Version', 'text', False, None),
+            ('sim_carrier', 'SIM Carrier', 'select', False, 'Deutsche Telekom\nVodafone\nO2\nSwisscom\nOrange'),
+            ('apn_profile', 'APN Profile', 'text', False, None),
+            ('puk_code', 'PUK Code', 'text', False, None),
+            ('screen_resolution', 'Screen Resolution', 'text', False, None),
+            ('input_ports', 'Input Ports', 'text', False, None),
+            ('mounted_state', 'Mounted State', 'select', False, 'Wall-Mounted\nCeiling-Mounted\nTable-Top\nMobile-Stand'),
         ]
         self._custom_fields = {}
         for name, label, ftype, required, choices in cf_data:
@@ -328,6 +356,8 @@ class Command(BaseCommand):
             self._custom_fields['os_version'],
             self._custom_fields['encrypted'],
             self._custom_fields['department'],
+            self._custom_fields['cpu_architecture'],
+            self._custom_fields['ram_slot_count'],
         )
 
         self._mobile_fieldset = CustomFieldset.objects.create(name='Mobile Device Specs')
@@ -344,6 +374,30 @@ class Command(BaseCommand):
             self._custom_fields['os_version'],
             self._custom_fields['department'],
             self._custom_fields['floor'],
+        )
+
+        self._switch_fieldset = CustomFieldset.objects.create(name='Network Switch Specs')
+        self._switch_fieldset.fields.add(
+            self._custom_fields['hostname'],
+            self._custom_fields['ip_address'],
+            self._custom_fields['port_count'],
+            self._custom_fields['poe_budget_w'],
+            self._custom_fields['firmware_version'],
+        )
+
+        self._sim_fieldset = CustomFieldset.objects.create(name='Mobile SIM Specs')
+        self._sim_fieldset.fields.add(
+            self._custom_fields['sim_number'],
+            self._custom_fields['sim_carrier'],
+            self._custom_fields['apn_profile'],
+            self._custom_fields['puk_code'],
+        )
+
+        self._av_fieldset = CustomFieldset.objects.create(name='AV & Conference Specs')
+        self._av_fieldset.fields.add(
+            self._custom_fields['screen_resolution'],
+            self._custom_fields['input_ports'],
+            self._custom_fields['mounted_state'],
         )
 
         # Depreciation schedules
@@ -441,11 +495,16 @@ class Command(BaseCommand):
             ('Helheim Cloud GmbH', 'helheim-cloud-gmbh', tg_helheim),
             ('Helheim Security AG', 'helheim-security-ag', tg_helheim),
             ('Helheim Labs Inc.', 'helheim-labs-inc', tg_helheim),
+            ('Helheim Aviation SE', 'helheim-aviation-se', tg_helheim),
             # Customer tenants
             ('Finova Capital AG', 'finova-capital-ag', tg_customers),
+            ('Finova Asset Management Ltd.', 'finova-asset-management-ltd', tg_customers),
             ('MediCare Health GmbH', 'medicare-health-gmbh', tg_customers),
+            ('MediCare Research Lab', 'medicare-research-lab', tg_customers),
             ('TechStartup.io GmbH', 'techstartup-io-gmbh', tg_customers),
             ('GreenEnergy Solutions SE', 'greenenergy-solutions-se', tg_customers),
+            ('Apex Logistics Solutions', 'apex-logistics-solutions', tg_customers),
+            ('Quantum Robotics Corp', 'quantum-robotics-corp', tg_customers),
         ]
         for name, slug, tgroup in tenant_data:
             obj, _ = Tenant.objects.get_or_create(slug=slug, defaults={'name': name, 'group': tgroup})
@@ -477,15 +536,27 @@ class Command(BaseCommand):
             ('Finova Frankfurt HQ', 'finova-frankfurt-hq', site_groups['corporate-offices'], tenants['finova-capital-ag'],
              sub_regions['western-europe'], 'Customer HQ', '50.1109', '8.6821',
              'Taunusanlage 12\n60325 Frankfurt\nGermany'),
+            ('Finova Frankfurt Office 2', 'frankfurt-hub', site_groups['corporate-offices'], tenants['finova-asset-management-ltd'],
+             sub_regions['western-europe'], 'Asset Management Center', '50.1120', '8.6800',
+             'Kaiserstrasse 15\n60311 Frankfurt\nGermany'),
             ('MediCare Munich Office', 'medicare-munich-office', site_groups['corporate-offices'], tenants['medicare-health-gmbh'],
              sub_regions['western-europe'], 'Customer Office', '48.1374', '11.5755',
              'Rosenheimer Strasse 145\n81671 Munich\nGermany'),
+            ('MediCare Research Lab Munich', 'munich-lab', site_groups['datacenters'], tenants['medicare-research-lab'],
+             sub_regions['western-europe'], 'Research Laboratory', '48.1400', '11.5800',
+             'Rosenheimer Strasse 150\n81671 Munich\nGermany'),
             ('TechStartup Berlin Hub', 'techstartup-berlin-hub', site_groups['remote-sites'], tenants['techstartup-io-gmbh'],
              sub_regions['western-europe'], 'Co-Working Hub', '52.5067', '13.3911',
              'Axel-Springer-Strasse 54\n10117 Berlin\nGermany'),
             ('GreenEnergy Hamburg', 'greenenergy-hamburg', site_groups['corporate-offices'], tenants['greenenergy-solutions-se'],
              sub_regions['northern-europe'], 'Customer HQ', '53.5511', '9.9937',
              'Am Kaiserkai 1\n20457 Hamburg\nGermany'),
+            ('Apex Frankfurt Depot', 'apex-frankfurt-depot', site_groups['remote-sites'], tenants['apex-logistics-solutions'],
+             sub_regions['western-europe'], 'Warehouse Depot', '50.0494', '8.5707',
+             'CargoCity Sued\n60549 Frankfurt Airport\nGermany'),
+            ('Boston Robotics Center', 'boston-robotics-center', site_groups['corporate-offices'], tenants['quantum-robotics-corp'],
+             sub_regions['us-east'], 'R&D Center', '42.3601', '-71.0589',
+             '250 Summer Street\nBoston, MA 02210\nUSA'),
         ]
         for name, slug, group, tenant, region, facility, lat, lon, addr in site_data:
             obj, _ = Site.objects.get_or_create(
@@ -505,21 +576,27 @@ class Command(BaseCommand):
             ('Floor 2 - Finance & HR', 'berlin-floor-2-admin', sites['berlin-hq'], tenants['helheim-cloud-gmbh']),
             ('Floor 3 - Executive', 'berlin-floor-3-exec', sites['berlin-hq'], tenants['helheim-cloud-gmbh']),
             ('Server Room A', 'berlin-server-room-a', sites['berlin-hq'], tenants['helheim-cloud-gmbh']),
+            ('Berlin Staging Row 1', 'berlin-staging-row-1', sites['berlin-hq'], tenants['helheim-cloud-gmbh']),
             ('Rack Row 1 - Compute', 'ams-rack-row-1', sites['amsterdam-dc'], tenants['helheim-cloud-gmbh']),
             ('Rack Row 2 - Storage', 'ams-rack-row-2', sites['amsterdam-dc'], tenants['helheim-cloud-gmbh']),
             ('Rack Row 3 - Network', 'ams-rack-row-3', sites['amsterdam-dc'], tenants['helheim-cloud-gmbh']),
             ('Floor 5 - Engineering', 'ny-floor-5-eng', sites['new-york-office'], tenants['helheim-labs-inc']),
             ('Floor 6 - Sales', 'ny-floor-6-sales', sites['new-york-office'], tenants['helheim-labs-inc']),
             ('Office 12A', 'munich-office-12a', sites['munich-office'], tenants['helheim-security-ag']),
+            ('Munich Staging Area', 'munich-staging-area', sites['munich-office'], tenants['helheim-security-ag']),
             # Customer Locations
             ('Floor 2 - Trading Desk', 'finova-floor-2-trading', sites['finova-frankfurt-hq'], tenants['finova-capital-ag']),
             ('Floor 3 - Risk Management', 'finova-floor-3-risk', sites['finova-frankfurt-hq'], tenants['finova-capital-ag']),
+            ('Frankfurt Hub Floor 1', 'frankfurt-hub-floor-1', sites['frankfurt-hub'], tenants['finova-asset-management-ltd']),
             ('Ward Administration', 'medicare-ward-admin', sites['medicare-munich-office'], tenants['medicare-health-gmbh']),
             ('Lab Research Suite', 'medicare-lab-research', sites['medicare-munich-office'], tenants['medicare-health-gmbh']),
+            ('Lab A Testing Bench', 'lab-a-testing-bench', sites['munich-lab'], tenants['medicare-research-lab']),
             ('Open Space Area', 'techstartup-open-space', sites['techstartup-berlin-hub'], tenants['techstartup-io-gmbh']),
             ('Engineering Lab', 'techstartup-eng-lab', sites['techstartup-berlin-hub'], tenants['techstartup-io-gmbh']),
             ('Wind Analytics Office', 'greenenergy-wind-analytics', sites['greenenergy-hamburg'], tenants['greenenergy-solutions-se']),
             ('Solar Operations Center', 'greenenergy-solar-ops', sites['greenenergy-hamburg'], tenants['greenenergy-solutions-se']),
+            ('Frankfurt Depot Shelf B', 'frankfurt-depot-shelf-b', sites['apex-frankfurt-depot'], tenants['apex-logistics-solutions']),
+            ('Boston Assembly Floor', 'boston-assembly-floor', sites['boston-robotics-center'], tenants['quantum-robotics-corp']),
         ]
         for name, slug, site, tenant in location_data:
             obj, _ = Location.objects.get_or_create(
@@ -543,15 +620,27 @@ class Command(BaseCommand):
             ('Lisa', 'Andersson', 'lisa.andersson', 'lisa.andersson@helheim.cloud', tenants['helheim-cloud-gmbh']),
             ('Carlos', 'Mendez', 'carlos.mendez', 'carlos.mendez@helheim.cloud', tenants['helheim-labs-inc']),
             ('Priya', 'Patel', 'priya.patel', 'priya.patel@helheim.cloud', tenants['helheim-cloud-gmbh']),
+            ('Oliver', 'Smith', 'oliver.smith', 'oliver.smith@helheim.cloud', tenants['helheim-aviation-se']),
+            ('Sophia', 'Martinez', 'sophia.martinez', 'sophia.martinez@helheim.cloud', tenants['helheim-aviation-se']),
             # Customer holders
             ('Klaus', 'Fischer', 'klaus.fischer', 'klaus.fischer@finova-capital.de', tenants['finova-capital-ag']),
             ('Nina', 'Bergmann', 'nina.bergmann', 'nina.bergmann@finova-capital.de', tenants['finova-capital-ag']),
+            ('Lucas', 'Müller', 'lucas.muller', 'lucas.muller@finova-asset.de', tenants['finova-asset-management-ltd']),
+            ('Emma', 'Dupont', 'emma.dupont', 'emma.dupont@finova-asset.de', tenants['finova-asset-management-ltd']),
             ('Dr. Markus', 'Wagner', 'markus.wagner', 'dr.wagner@medicare-health.de', tenants['medicare-health-gmbh']),
             ('Sophie', 'Klein', 'sophie.klein', 'sophie.klein@medicare-health.de', tenants['medicare-health-gmbh']),
+            ('Liam', 'O\'Connor', 'liam.o-connor', 'liam.oconnor@medicare-lab.de', tenants['medicare-research-lab']),
+            ('Chloe', 'Lefevre', 'chloe.lefevre', 'chloe.lefevre@medicare-lab.de', tenants['medicare-research-lab']),
             ('Felix', 'Bauer', 'felix.bauer', 'felix@techstartup.io', tenants['techstartup-io-gmbh']),
             ('Lena', 'Schulz', 'lena.schulz', 'lena@techstartup.io', tenants['techstartup-io-gmbh']),
             ('Jonas', 'Hoffmann', 'jonas.hoffmann', 'jonas.hoffmann@greenenergy-se.de', tenants['greenenergy-solutions-se']),
             ('Katja', 'Vogel', 'katja.vogel', 'katja.vogel@greenenergy-se.de', tenants['greenenergy-solutions-se']),
+            ('Noah', 'Schmidt', 'noah.schmidt', 'noah.schmidt@apex-logistics.de', tenants['apex-logistics-solutions']),
+            ('Mia', 'Petrov', 'mia.petrov', 'mia.petrov@apex-logistics.de', tenants['apex-logistics-solutions']),
+            ('Alexander', 'Gruber', 'alexander.gruber', 'alex.gruber@quantum-robotics.com', tenants['quantum-robotics-corp']),
+            ('Yasmine', 'Al-Sayed', 'yasmine.al-sayed', 'yasmine.alsayed@quantum-robotics.com', tenants['quantum-robotics-corp']),
+            ('David', 'Kim', 'david.kim', 'david.kim@quantum-robotics.com', tenants['quantum-robotics-corp']),
+            ('Wei', 'Zhang', 'wei.zhang', 'wei.zhang@quantum-robotics.com', tenants['quantum-robotics-corp']),
         ]
         self._holders = {}
         for first, last, upn, email, tenant in holder_data:
@@ -656,17 +745,23 @@ class Command(BaseCommand):
             ('Surface Pro 10', 'surface-pro-10', 'microsoft-corporation', 'SURFPRO10-I7',
              'Intel Core i7-1365U', 16, 512, 'NVMe', 'Intel Iris Xe', 36, self._laptop_fieldset, self._depreciations['3-Year Straight-Line']),
             ('Catalyst 9300', 'cisco-catalyst-9300', 'cisco-systems', 'C9300-48P',
-             None, None, None, None, None, 60, None, self._depreciations['7-Year Straight-Line']),
+             None, None, None, None, None, 60, self._switch_fieldset, self._depreciations['7-Year Straight-Line']),
             ('Meraki MR46', 'meraki-mr46', 'cisco-systems', 'MR46-HW',
              None, None, None, None, None, 60, None, self._depreciations['5-Year Straight-Line']),
             ('UniFi Dream Machine Pro', 'unifi-dream-machine-pro', 'ubiquiti-inc', 'UDM-Pro',
-             None, None, None, None, None, 48, None, self._depreciations['5-Year Straight-Line']),
+             None, None, None, None, None, 48, self._switch_fieldset, self._depreciations['5-Year Straight-Line']),
+            ('UniFi Switch Pro 48 PoE', 'unifi-switch-pro-48', 'ubiquiti-inc', 'USW-PRO-48-POE',
+             None, None, None, None, None, 48, self._switch_fieldset, self._depreciations['5-Year Straight-Line']),
             ('DiskStation DS1823xs+', 'synology-ds1823xs', 'synology-inc', 'DS1823XS+',
              'AMD Ryzen V1780B', 32, 8000, 'HDD', None, 60, None, self._depreciations['5-Year Straight-Line']),
             ('Dell P2723DE 27" Monitor', 'dell-p2723de-monitor', 'dell-technologies', 'P2723DE',
              '', None, None, '', '', 60, None, self._depreciations['5-Year Straight-Line']),
             ('Dell P2422HE 24" Monitor', 'dell-p2422he-monitor', 'dell-technologies', 'P2422HE',
              '', None, None, '', '', 60, None, self._depreciations['5-Year Straight-Line']),
+            ('Logitech MeetUp AV System', 'logitech-meetup', 'logitech-international', '960-001101',
+             None, None, None, None, None, 36, self._av_fieldset, self._depreciations['5-Year Straight-Line']),
+            ('Precision 7960 Tower', 'dell-precision-7960-tower', 'dell-technologies', 'PREC7960-TWR',
+             None, None, None, None, None, 48, self._laptop_fieldset, self._depreciations['4-Year Straight-Line']),
         ]
         self._asset_types = {}
         for data in at_data:
@@ -675,9 +770,7 @@ class Command(BaseCommand):
                 slug=slug,
                 defaults={
                     'model': model_name, 'manufacturer': self._manufacturers[mfr_slug],
-                    'part_number': data[3] or '', 'cpu': data[4] or '', 'ram_gb': data[5],
-                    'storage_capacity_gb': data[6], 'storage_type': data[7] or '',
-                    'gpu': data[8] or '', 'eol_months': data[9],
+                    'part_number': data[3] or '', 'eol_months': data[9],
                     'custom_fieldset': data[10], 'depreciation': data[11],
                 }
             )
@@ -702,11 +795,24 @@ class Command(BaseCommand):
         comp_data = [
             ('Samsung 32GB DDR5-4800', 'samsung-32gb-ddr5', 'samsung-electronics', 'ram-memory', 'M324R4GA3BB0', {'capacity_gb': 32, 'type': 'DDR5', 'speed_mhz': 4800}),
             ('Crucial 16GB DDR4-3200', 'crucial-16gb-ddr4', 'dell-technologies', 'ram-memory', 'CT16G4SFD832A', {'capacity_gb': 16, 'type': 'DDR4', 'speed_mhz': 3200}),
+            ('Corsair Vengeance 64GB DDR5-5600', 'corsair-64gb-ddr5', 'logitech-international', 'ram-memory', 'CMK64GX5M2B5600C40', {'capacity_gb': 64, 'type': 'DDR5', 'speed_mhz': 5600}),
+            ('Kingston ValueRAM 8GB DDR4-2666', 'kingston-8gb-ddr4', 'samsung-electronics', 'ram-memory', 'KVR26N19S8/8', {'capacity_gb': 8, 'type': 'DDR4', 'speed_mhz': 2666}),
             ('Samsung 1TB 990 Pro NVMe', 'samsung-1tb-nvme', 'samsung-electronics', 'ssd-nvme', 'MZ-V9P1T0B', {'capacity_gb': 1000, 'type': 'NVMe', 'interface': 'PCIe 4.0'}),
+            ('Samsung 2TB 990 Pro NVMe', 'samsung-2tb-nvme', 'samsung-electronics', 'ssd-nvme', 'MZ-V9P2T0B', {'capacity_gb': 2000, 'type': 'NVMe', 'interface': 'PCIe 4.0'}),
+            ('Kingston NV2 500GB NVMe', 'kingston-500gb-nvme', 'samsung-electronics', 'ssd-nvme', 'SNV2S/500G', {'capacity_gb': 500, 'type': 'NVMe', 'interface': 'PCIe 4.0'}),
+            ('Crucial MX500 4TB SATA SSD', 'crucial-4tb-sata', 'dell-technologies', 'ssd-nvme', 'CT4000MX500SSD1', {'capacity_gb': 4000, 'type': 'SATA', 'interface': 'SATA III'}),
             ('WD Red Pro 8TB HDD', 'wd-red-8tb', 'dell-technologies', 'hdd', 'WD8003FFBX', {'capacity_gb': 8000, 'type': 'HDD', 'interface': 'SATA'}),
+            ('Seagate IronWolf Pro 12TB HDD', 'seagate-ironwolf-12tb', 'dell-technologies', 'hdd', 'ST12000NE0008', {'capacity_gb': 12000, 'type': 'HDD', 'interface': 'SATA'}),
             ('Intel X710 10GbE NIC', 'intel-x710-nic', 'dell-technologies', 'nic', 'X710DA2', {'type': 'SFP+', 'speed': '10GbE'}),
+            ('Mellanox ConnectX-6 100GbE NIC', 'mellanox-connectx6', 'cisco-systems', 'nic', 'MCX623106AN-CDAT', {'type': 'QSFP56', 'speed': '100GbE'}),
             ('NVIDIA A100 80GB', 'nvidia-a100', 'dell-technologies', 'gpu', 'A100-80GB', {'type': 'A100', 'vram_gb': 80}),
+            ('NVIDIA GeForce RTX 4090 24GB', 'nvidia-rtx-4090', 'samsung-electronics', 'gpu', 'RTX4090-24G', {'type': 'RTX 4090', 'vram_gb': 24}),
+            ('NVIDIA RTX 6000 Ada 48GB', 'nvidia-rtx-6000', 'dell-technologies', 'gpu', 'RTX6000-ADA', {'type': 'RTX 6000 Ada', 'vram_gb': 48}),
             ('Intel Xeon Gold 6430', 'xeon-gold-6430', 'dell-technologies', 'cpu', 'SRMZS', {'type': 'Xeon Gold', 'cores': 32}),
+            ('AMD EPYC 9654 Processor', 'amd-epyc-9654', 'dell-technologies', 'cpu', '100-000000789', {'type': 'EPYC 96-Core', 'cores': 96}),
+            ('Noctua NH-D15 CPU Cooler', 'noctua-nh-d15', 'logitech-international', 'other', 'NH-D15-CH-BK', {'type': 'Air Cooler', 'fan_size': '140mm'}),
+            ('Corsair RM1000x 1000W PSU', 'corsair-rm1000x', 'logitech-international', 'other', 'CP-9020201-EU', {'type': 'Modular PSU', 'wattage': 1000}),
+            ('Dell PERC H755 RAID Controller', 'dell-perc-h755', 'dell-technologies', 'other', 'PERC-H755-FRONT', {'type': 'RAID Controller', 'interface': 'SAS 12Gb/s'}),
         ]
         self._components = {}
         for name, slug, mfr_slug, cat_slug, part_number, specs in comp_data:
@@ -784,11 +890,11 @@ class Command(BaseCommand):
         )
         from inventory.models import AccessoryAssignment, ConsumableAssignment
         from compliance.models import CustodyReceipt
-        from components.models import ComponentAllocation
+        from components.models import ComponentStock, ComponentAllocation
 
         self.stdout.write('--- Phase 3: Hardware Assets ---')
 
-        # Create 50+ assets across all types
+        # Create 60+ assets across all types
         asset_data = [
             # (name, asset_tag, asset_type_slug, asset_role_slug, status_slug, holder_upn, location_slug, serial, purchase_cost, salvage_value, purchase_date)
             ('MBP16 Rene Rettig', 'ABX-001', 'macbook-pro-16-2024', 'laptop', 'in-use', 'rene.rettig', 'berlin-floor-1-eng', 'C02ZV1R9MD6T', 3599.00, 500.00, datetime.date(2024, 3, 15)),
@@ -837,6 +943,13 @@ class Command(BaseCommand):
             ('iPhone 15 Pro Spare', 'ABX-044', 'iphone-15-pro', 'mobile-phone', 'available', None, 'berlin-floor-3-exec', 'IP15P-SP01', 1299.00, 150.00, datetime.date(2024, 11, 1)),
             ('iPad Pro Spare', 'ABX-045', 'ipad-pro-129-2024', 'tablet', 'available', None, 'ny-floor-6-sales', 'IPP-SP01', 1099.00, 100.00, datetime.date(2024, 11, 1)),
             ('OptiPlex 7010 Reception', 'ABX-046', 'dell-optiplex-7010', 'desktop', 'in-use', None, 'berlin-floor-3-exec', 'OPT-REC-01', 1299.00, 200.00, datetime.date(2024, 5, 20)),
+            # New internal networking, AV & high-end desktop workstation assets
+            ('UniFi Switch 48 Berlin HQ', 'ABX-050', 'unifi-switch-pro-48', 'network-device', 'in-use', None, 'berlin-server-room-a', 'USW-PRO-48-001', 1099.00, 100.00, datetime.date(2024, 4, 1)),
+            ('UniFi Switch 48 AMS DC', 'ABX-051', 'unifi-switch-pro-48', 'network-device', 'in-use', None, 'ams-rack-row-3', 'USW-PRO-48-002', 1099.00, 100.00, datetime.date(2024, 4, 5)),
+            ('Berlin Room 12 AV', 'ABX-052', 'logitech-meetup', 'peripheral', 'in-use', None, 'berlin-floor-1-eng', 'LOG-AV-001', 899.00, 50.00, datetime.date(2024, 6, 12)),
+            ('Munich Room A AV', 'ABX-053', 'logitech-meetup', 'peripheral', 'in-use', None, 'munich-office-12a', 'LOG-AV-002', 899.00, 50.00, datetime.date(2024, 6, 15)),
+            ('Precision 7960 Oliver', 'ABX-054', 'dell-precision-7960-tower', 'desktop', 'in-use', 'oliver.smith', 'berlin-floor-1-eng', 'PREC7960-001', 5499.00, 800.00, datetime.date(2024, 5, 1)),
+            ('Precision 7960 Sophia', 'ABX-055', 'dell-precision-7960-tower', 'desktop', 'in-use', 'sophia.martinez', 'berlin-floor-1-eng', 'PREC7960-002', 5499.00, 800.00, datetime.date(2024, 5, 1)),
             # Customer Tenant Assets
             ('Latitude 5550 Klaus', 'FIN-001', 'dell-latitude-5550', 'laptop', 'in-use', 'klaus.fischer', 'finova-floor-2-trading', 'DL5550-FIN01', 1899.00, 300.00, datetime.date(2024, 3, 1)),
             ('Latitude 5550 Nina', 'FIN-002', 'dell-latitude-5550', 'laptop', 'in-use', 'nina.bergmann', 'finova-floor-3-risk', 'DL5550-FIN02', 1899.00, 300.00, datetime.date(2024, 3, 15)),
@@ -856,6 +969,12 @@ class Command(BaseCommand):
             ('Dell P2422HE Finova 2', 'FIN-007', 'dell-p2422he-monitor', 'monitor', 'in-use', 'nina.bergmann', 'finova-floor-3-risk', 'MON-FIN02', 379.00, 30.00, datetime.date(2024, 3, 15)),
             ('Latitude 5550 GreenEnergy Spare', 'GRE-004', 'dell-latitude-5550', 'laptop', 'available', None, 'greenenergy-wind-analytics', 'DL5550-GRE01', 1899.00, 300.00, datetime.date(2024, 8, 1)),
             ('EliteBook 860 Finova Spare', 'FIN-008', 'hp-elitebook-860-g11', 'laptop', 'available', None, 'finova-floor-2-trading', 'HPEB-FIN01', 2099.00, 300.00, datetime.date(2024, 7, 1)),
+            # New Customer Tenant Assets (Apex Logistics and Quantum Robotics)
+            ('Latitude 5550 Noah', 'APX-001', 'dell-latitude-5550', 'laptop', 'in-use', 'noah.schmidt', 'frankfurt-depot-shelf-b', 'DL5550-APX01', 1899.00, 300.00, datetime.date(2024, 5, 1)),
+            ('Latitude 5550 Mia', 'APX-002', 'dell-latitude-5550', 'laptop', 'in-use', 'mia.petrov', 'frankfurt-depot-shelf-b', 'DL5550-APX02', 1899.00, 300.00, datetime.date(2024, 5, 10)),
+            ('ThinkPad X1 David', 'QNT-001', 'thinkpad-x1-carbon-g12', 'laptop', 'in-use', 'david.kim', 'boston-assembly-floor', 'TPX1-QNT01', 2199.00, 350.00, datetime.date(2024, 6, 1)),
+            ('ThinkPad X1 Wei', 'QNT-002', 'thinkpad-x1-carbon-g12', 'laptop', 'in-use', 'wei.zhang', 'boston-assembly-floor', 'TPX1-QNT02', 2199.00, 350.00, datetime.date(2024, 6, 1)),
+            ('Precision 7960 Alex', 'QNT-003', 'dell-precision-7960-tower', 'desktop', 'in-use', 'alexander.gruber', 'boston-assembly-floor', 'PREC7960-QNT01', 5499.00, 800.00, datetime.date(2024, 6, 10)),
         ]
         self._assets = {}
         for data in asset_data:
@@ -866,10 +985,53 @@ class Command(BaseCommand):
             # If checked out to a holder, physical location is None in Asset table
             base_location = None if (holder and status_slug == 'in-use') else location
 
+            # Construct dynamic custom values based on custom fieldsets
+            c_values = {}
+            asset_type = self._asset_types.get(at_slug)
+            if asset_type and asset_type.custom_fieldset:
+                fs_name = asset_type.custom_fieldset.name
+                if fs_name == 'Laptop Specs':
+                    c_values = {
+                        'hostname': f"{role_slug}-{tag.lower()}",
+                        'os_version': random.choice(['Windows 11 23H2', 'macOS Sequoia 15.1', 'Ubuntu 24.04 LTS']),
+                        'encrypted': True,
+                        'department': random.choice(['Engineering', 'Finance', 'HR', 'Marketing', 'Sales', 'Operations']),
+                        'cpu_architecture': random.choice(['x86_64', 'ARM64']),
+                        'ram_slot_count': random.choice([2, 4]),
+                    }
+                elif fs_name == 'Mobile Device Specs':
+                    c_values = {
+                        'sim_number': f"+49-170-{random.randint(1000000, 9999999)}",
+                        'imei': f"35{random.randint(100000000000, 999999999999)}",
+                        'screen_size': random.choice([6.1, 6.7, 11.0]),
+                        'os_version': random.choice(['iOS 17.5', 'Android 14']),
+                    }
+                elif fs_name == 'Server Specs':
+                    c_values = {
+                        'hostname': f"srv-{tag.lower()}.local",
+                        'os_version': random.choice(['RHEL 9.3', 'Ubuntu Server 22.04', 'Windows Server 2025']),
+                        'department': 'Operations',
+                        'floor': random.randint(1, 3),
+                    }
+                elif fs_name == 'Network Switch Specs':
+                    c_values = {
+                        'hostname': f"sw-{tag.lower()}.local",
+                        'ip_address': f"10.100.{random.randint(1, 254)}.{random.randint(1, 254)}",
+                        'port_count': random.choice([24, 48]),
+                        'poe_budget_w': random.choice([370, 740]),
+                        'firmware_version': 'v16.12.8',
+                    }
+                elif fs_name == 'AV & Conference Specs':
+                    c_values = {
+                        'screen_resolution': '3840x2160 (4K)',
+                        'input_ports': 'HDMI, DisplayPort, USB-C',
+                        'mounted_state': random.choice(['Wall-Mounted', 'Ceiling-Mounted']),
+                    }
+
             obj, created = Asset.objects.get_or_create(
                 asset_tag=tag,
                 defaults={
-                    'name': name, 'asset_type': self._asset_types.get(at_slug),
+                    'name': name, 'asset_type': asset_type,
                     'asset_role': self._asset_roles.get(role_slug),
                     'status': self._status_labels.get(status_slug),
                     'location': base_location,
@@ -878,6 +1040,7 @@ class Command(BaseCommand):
                     'salvage_value': data[9], 'purchase_date': data[10],
                     'supplier': self._suppliers.get('itz-solutions'),
                     'order_number': f'PO-2024-{random.randint(1000, 9999)}',
+                    'custom_values': c_values,
                 }
             )
             self._assets[tag] = obj
@@ -921,21 +1084,97 @@ class Command(BaseCommand):
                         }
                     )
 
+        # --- ComponentStock (NEW) ---
+        stock_data = [
+            ('samsung-32gb-ddr5', 'berlin-server-room-a', 50),
+            ('samsung-32gb-ddr5', 'ams-rack-row-1', 40),
+            ('crucial-16gb-ddr4', 'berlin-floor-1-eng', 30),
+            ('crucial-16gb-ddr4', 'ny-floor-5-eng', 25),
+            ('corsair-64gb-ddr5', 'berlin-floor-1-eng', 15),
+            ('kingston-8gb-ddr4', 'munich-staging-area', 30),
+            ('samsung-1tb-nvme', 'berlin-server-room-a', 40),
+            ('samsung-2tb-nvme', 'ams-rack-row-2', 30),
+            ('kingston-500gb-nvme', 'berlin-floor-2-admin', 20),
+            ('crucial-4tb-sata', 'ams-rack-row-2', 15),
+            ('wd-red-8tb', 'ams-rack-row-2', 50),
+            ('seagate-ironwolf-12tb', 'berlin-server-room-a', 30),
+            ('intel-x710-nic', 'berlin-server-room-a', 15),
+            ('intel-x710-nic', 'ams-rack-row-3', 20),
+            ('mellanox-connectx6', 'ams-rack-row-3', 10),
+            ('nvidia-a100', 'ams-rack-row-1', 5),
+            ('nvidia-rtx-4090', 'berlin-floor-1-eng', 8),
+            ('nvidia-rtx-6000', 'berlin-floor-1-eng', 4),
+            ('xeon-gold-6430', 'berlin-server-room-a', 10),
+            ('amd-epyc-9654', 'ams-rack-row-1', 6),
+            ('noctua-nh-d15', 'berlin-floor-1-eng', 25),
+            ('corsair-rm1000x', 'berlin-floor-1-eng', 20),
+            ('dell-perc-h755', 'berlin-server-room-a', 10),
+            # Customer stock locations
+            ('samsung-32gb-ddr5', 'frankfurt-depot-shelf-b', 15),
+            ('samsung-1tb-nvme', 'frankfurt-depot-shelf-b', 20),
+            ('crucial-16gb-ddr4', 'frankfurt-hub-floor-1', 10),
+            ('nvidia-rtx-4090', 'boston-assembly-floor', 5),
+            ('amd-epyc-9654', 'lab-a-testing-bench', 4),
+        ]
+        self._stocks = []
+        for comp_slug, loc_slug, qty in stock_data:
+            comp_obj = self._components.get(comp_slug)
+            loc_obj = self._locations.get(loc_slug)
+            if comp_obj and loc_obj:
+                stock_obj, _ = ComponentStock.objects.get_or_create(
+                    component=comp_obj,
+                    location=loc_obj,
+                    defaults={'qty': qty}
+                )
+                self._stocks.append(stock_obj)
+
         # --- ComponentAllocations ---
         alloc_data = [
             ('samsung-32gb-ddr5', 'ABX-022', 2),
             ('samsung-32gb-ddr5', 'ABX-023', 2),
             ('samsung-1tb-nvme', 'ABX-022', 1),
-            ('wd-red-8tb', 'ABX-022', 1),
-            ('wd-red-8tb', 'ABX-023', 1),
-            ('wd-red-8tb', 'ABX-025', 1),
+            ('samsung-2tb-nvme', 'ABX-023', 2),
+            ('wd-red-8tb', 'ABX-022', 2),
+            ('wd-red-8tb', 'ABX-023', 2),
+            ('wd-red-8tb', 'ABX-025', 4),
             ('intel-x710-nic', 'ABX-022', 1),
             ('intel-x710-nic', 'ABX-023', 1),
             ('nvidia-a100', 'ABX-024', 1),
             ('xeon-gold-6430', 'ABX-024', 1),
             ('crucial-16gb-ddr4', 'ABX-003', 1),
+            ('crucial-16gb-ddr4', 'ABX-004', 1),
             ('samsung-1tb-nvme', 'ABX-001', 1),
             ('samsung-1tb-nvme', 'ABX-002', 1),
+            # New allocations
+            ('corsair-64gb-ddr5', 'ABX-014', 1),
+            ('corsair-64gb-ddr5', 'ABX-015', 1),
+            ('nvidia-rtx-4090', 'ABX-014', 1),
+            ('nvidia-rtx-4090', 'ABX-015', 1),
+            ('noctua-nh-d15', 'ABX-014', 1),
+            ('corsair-rm1000x', 'ABX-014', 1),
+            ('seagate-ironwolf-12tb', 'ABX-037', 4), # Primary NAS loaded with HDDs!
+            ('dell-perc-h755', 'ABX-022', 1),
+            ('dell-perc-h755', 'ABX-023', 1),
+            ('intel-x710-nic', 'ABX-032', 1),
+            ('mellanox-connectx6', 'ABX-033', 1),
+            # New Workstations allocations
+            ('corsair-64gb-ddr5', 'ABX-054', 1),
+            ('corsair-64gb-ddr5', 'ABX-055', 1),
+            ('corsair-64gb-ddr5', 'QNT-003', 1),
+            ('nvidia-rtx-6000', 'ABX-054', 1),
+            ('nvidia-rtx-6000', 'ABX-055', 1),
+            ('nvidia-rtx-6000', 'QNT-003', 1),
+            # Customer allocations
+            ('samsung-32gb-ddr5', 'FIN-001', 1),
+            ('samsung-1tb-nvme', 'FIN-001', 1),
+            ('samsung-32gb-ddr5', 'FIN-002', 1),
+            ('samsung-1tb-nvme', 'FIN-002', 1),
+            ('crucial-16gb-ddr4', 'MED-001', 1),
+            ('crucial-16gb-ddr4', 'MED-002', 1),
+            ('samsung-1tb-nvme', 'TSI-001', 1),
+            ('samsung-1tb-nvme', 'TSI-002', 1),
+            ('corsair-64gb-ddr5', 'TSI-003', 1),
+            ('nvidia-rtx-4090', 'TSI-003', 1),
         ]
         for comp_slug, asset_tag, qty in alloc_data:
             ComponentAllocation.objects.get_or_create(

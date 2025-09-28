@@ -58,6 +58,14 @@ class AssetTypeEditView(QuickAddMixin, ObjectEditView):
     template_name = 'generic/object_edit.html'
     quick_add_target = 'id_asset_type'
 
+    def post(self, request, *args, **kwargs):
+        if request.headers.get('HX-Request') and '_reload' in request.POST:
+            self.object = self.get_object() if self.kwargs.get('pk') else None
+            form = self.get_form()
+            from django.shortcuts import render
+            return render(request, 'htmx/crispy_form.html', {'form': form})
+        return super().post(request, *args, **kwargs)
+
 
 class AssetTypeDeleteView(ObjectDeleteView):
     queryset = AssetType.objects.all()

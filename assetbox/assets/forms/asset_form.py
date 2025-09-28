@@ -252,7 +252,7 @@ class AssetForm(forms.ModelForm):
                 Fieldset(
                     'Custom Specifications',
                     *cf_divs,
-                    css_class='mb-4 border p-3 rounded bg-light'
+                    css_class='mb-4 border p-3 rounded'
                 )
             )
 

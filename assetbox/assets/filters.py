@@ -146,7 +146,7 @@ class AssetTypeFilterSet(django_filters.FilterSet):
 
     class Meta:
         model = AssetType
-        fields = ['manufacturer', 'model', 'part_number', 'cpu', 'storage_type', 'requestable']
+        fields = ['manufacturer', 'model', 'part_number', 'requestable']
 
     def search(self, queryset, name, value):
         if not value.strip():
@@ -155,8 +155,6 @@ class AssetTypeFilterSet(django_filters.FilterSet):
             Q(model__icontains=value) |
             Q(part_number__icontains=value) |
             Q(description__icontains=value) |
-            Q(cpu__icontains=value) |
-            Q(gpu__icontains=value) |
             Q(manufacturer__name__icontains=value)
         ).distinct()
 
