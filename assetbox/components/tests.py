@@ -92,24 +92,24 @@ class ComponentViewTests(TestCase):
         )
 
     def test_list_view(self):
-        url = reverse('assets:component_list')
+        url = reverse('components:component_list')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '990 Pro 2TB')
 
     def test_detail_view(self):
-        url = reverse('assets:component_detail', kwargs={'pk': self.component.pk})
+        url = reverse('components:component_detail', kwargs={'pk': self.component.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '990 Pro 2TB')
 
     def test_create_view_get(self):
-        url = reverse('assets:component_create')
+        url = reverse('components:component_create')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_create_view_post(self):
-        url = reverse('assets:component_create')
+        url = reverse('components:component_create')
         response = self.client.post(url, {
             'manufacturer': self.manufacturer.pk,
             'name': '980 Pro 1TB',
@@ -125,12 +125,12 @@ class ComponentViewTests(TestCase):
         self.assertTrue(Component.objects.filter(name='980 Pro 1TB').exists())
 
     def test_edit_view_get(self):
-        url = reverse('assets:component_update', kwargs={'pk': self.component.pk})
+        url = reverse('components:component_update', kwargs={'pk': self.component.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_edit_view_post(self):
-        url = reverse('assets:component_update', kwargs={'pk': self.component.pk})
+        url = reverse('components:component_update', kwargs={'pk': self.component.pk})
         response = self.client.post(url, {
             'manufacturer': self.manufacturer.pk,
             'name': '990 Pro 4TB',
@@ -147,7 +147,7 @@ class ComponentViewTests(TestCase):
         self.assertEqual(self.component.name, '990 Pro 4TB')
 
     def test_delete_view(self):
-        url = reverse('assets:component_delete', kwargs={'pk': self.component.pk})
+        url = reverse('components:component_delete', kwargs={'pk': self.component.pk})
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
         self.assertFalse(Component.objects.filter(pk=self.component.pk).exists())
@@ -174,17 +174,17 @@ class ComponentAllocationViewTests(TestCase):
         )
 
     def test_list_view(self):
-        url = reverse('assets:componentallocation_list')
+        url = reverse('components:componentallocation_list')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_create_view_get(self):
-        url = reverse('assets:componentallocation_create')
+        url = reverse('components:componentallocation_create')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_create_view_post(self):
-        url = reverse('assets:componentallocation_create')
+        url = reverse('components:componentallocation_create')
         response = self.client.post(url, {
             'component': self.component.pk,
             'asset': self.asset.pk,
@@ -193,12 +193,12 @@ class ComponentAllocationViewTests(TestCase):
         self.assertEqual(response.status_code, 302)
 
     def test_edit_view_get(self):
-        url = reverse('assets:componentallocation_update', kwargs={'pk': self.allocation.pk})
+        url = reverse('components:componentallocation_update', kwargs={'pk': self.allocation.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_edit_view_post(self):
-        url = reverse('assets:componentallocation_update', kwargs={'pk': self.allocation.pk})
+        url = reverse('components:componentallocation_update', kwargs={'pk': self.allocation.pk})
         response = self.client.post(url, {
             'component': self.component.pk,
             'asset': self.asset.pk,
@@ -211,7 +211,7 @@ class ComponentAllocationViewTests(TestCase):
         self.assertEqual(self.allocation.notes, 'Updated allocation')
 
     def test_delete_view(self):
-        url = reverse('assets:componentallocation_delete', kwargs={'pk': self.allocation.pk})
+        url = reverse('components:componentallocation_delete', kwargs={'pk': self.allocation.pk})
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
         self.assertFalse(ComponentAllocation.objects.filter(pk=self.allocation.pk).exists())

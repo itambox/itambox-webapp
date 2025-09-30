@@ -31,6 +31,7 @@ class ComponentDetailView(ObjectDetailView):
     queryset = Component.objects.select_related('manufacturer', 'category').prefetch_related('tags', 'stocks', 'allocations')
 
     layout = (
+        ((Panel('metrics', 'Metrics Overview'),),),
         ((Panel('info', 'Component Details'),),),
     )
 
@@ -57,21 +58,21 @@ class ComponentEditView(ObjectEditView):
     model = Component
     model_form = ComponentForm
     template_name = 'generic/object_edit.html'
-    default_return_url = 'assets:component_list'
+    default_return_url = 'components:component_list'
 
 
 class ComponentDeleteView(ObjectDeleteView):
     queryset = Component.objects.all()
     model = Component
     template_name = 'generic/object_confirm_delete.html'
-    success_url = reverse_lazy('assets:component_list')
+    success_url = reverse_lazy('components:component_list')
 
 
 class ComponentCloneView(ObjectCloneView):
     model = Component
     model_form = ComponentForm
     template_name = 'generic/object_edit.html'
-    default_return_url = 'assets:component_list'
+    default_return_url = 'components:component_list'
 
 
 class ComponentStockListView(ObjectListView):
@@ -87,14 +88,14 @@ class ComponentStockEditView(ObjectEditView):
     model = ComponentStock
     model_form = ComponentStockForm
     template_name = 'generic/object_edit.html'
-    default_return_url = 'assets:componentstock_list'
+    default_return_url = 'components:componentstock_list'
 
 
 class ComponentStockDeleteView(ObjectDeleteView):
     queryset = ComponentStock.objects.all()
     model = ComponentStock
     template_name = 'generic/object_confirm_delete.html'
-    success_url = reverse_lazy('assets:componentstock_list')
+    success_url = reverse_lazy('components:componentstock_list')
 
 
 class ComponentAllocationListView(ObjectListView):
@@ -110,11 +111,11 @@ class ComponentAllocationEditView(ObjectEditView):
     model = ComponentAllocation
     model_form = ComponentAllocationForm
     template_name = 'generic/object_edit.html'
-    default_return_url = 'assets:componentallocation_list'
+    default_return_url = 'components:componentallocation_list'
 
 
 class ComponentAllocationDeleteView(ObjectDeleteView):
     queryset = ComponentAllocation.objects.all()
     model = ComponentAllocation
     template_name = 'generic/object_confirm_delete.html'
-    success_url = reverse_lazy('assets:componentallocation_list')
+    success_url = reverse_lazy('components:componentallocation_list')

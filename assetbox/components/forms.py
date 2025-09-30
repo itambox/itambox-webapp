@@ -49,7 +49,7 @@ class ComponentForm(SlugModelForm):
         self.fields['slug'].widget.attrs['slugify'] = 'name'
 
         button_text = 'Update' if self.instance.pk else 'Create'
-        cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse('assets:component_list')
+        cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse('components:component_list')
 
         self.helper.layout = Layout(
             Row(
@@ -98,7 +98,7 @@ class ComponentStockForm(forms.ModelForm):
         self.helper.form_tag = True
 
         button_text = 'Update' if self.instance.pk else 'Create'
-        cancel_url = reverse('assets:componentstock_list')
+        cancel_url = reverse('components:componentstock_list')
 
         self.helper.layout = Layout(
             Row(
@@ -144,7 +144,7 @@ class ComponentAllocationForm(forms.ModelForm):
         self.helper.form_tag = True
 
         button_text = 'Update' if self.instance.pk else 'Create'
-        cancel_url = reverse('assets:componentallocation_list')
+        cancel_url = reverse('components:componentallocation_list')
 
         self.helper.layout = Layout(
             Row(

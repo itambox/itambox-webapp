@@ -62,7 +62,7 @@ class Component(AutoSlugMixin, SoftDeleteMixin, StandardModel, ImageAttachmentMi
         return f"{self.manufacturer.name} {self.name}"
 
     def get_absolute_url(self):
-        return reverse('assets:component_detail', kwargs={'pk': self.pk})
+        return reverse('components:component_detail', kwargs={'pk': self.pk})
 
     @property
     def total_stock(self):
