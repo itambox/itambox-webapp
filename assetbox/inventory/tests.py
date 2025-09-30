@@ -2,7 +2,8 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.core.exceptions import ValidationError
-from assets.models import Manufacturer, AssetType, AssetRole, Category
+from django.db import transaction
+from assets.models import Manufacturer, AssetType, AssetRole, Category, Asset
 from organization.models import Site, Location, AssetHolder
 from licenses.models import License
 from software.models import Software
@@ -98,6 +99,9 @@ class AccessoryAssignmentModelTests(TestCase):
         self.site = Site.objects.create(name='Office', slug='office')
         self.location = Location.objects.create(name='Room A', slug='room-a', site=self.site)
         self.holder = AssetHolder.objects.create(first_name='John', last_name='Smith', upn='john.smith')
+        self.asset_role = AssetRole.objects.create(name='Laptop', slug='laptop')
+        self.asset_type = AssetType.objects.create(manufacturer=self.manufacturer, model='Latitude 5540', slug='latitude-5540')
+        self.asset = Asset.objects.create(name='Dell Latitude', asset_tag='DELL-001', asset_type=self.asset_type, asset_role=self.asset_role)
 
     def test_assignment_to_holder(self):
         acc = Accessory.objects.create(name='Monitor', manufacturer=self.manufacturer)
@@ -114,14 +118,49 @@ class AccessoryAssignmentModelTests(TestCase):
         )
         self.assertIn('Room A', str(assignment))
 
+    def test_assignment_to_asset(self):
+        acc = Accessory.objects.create(name='USB-C Mouse', manufacturer=self.manufacturer)
+        assignment = AccessoryAssignment.objects.create(
+            accessory=acc, assigned_asset=self.asset, qty=1
+        )
+        self.assertEqual(assignment.qty, 1)
+        self.assertIn('Dell Latitude', str(assignment))
+
     def test_assignment_single_target_constraint(self):
         acc = Accessory.objects.create(name='Cable', manufacturer=self.manufacturer)
         from django.db import IntegrityError
+        
+        # Holder + Location
         with self.assertRaises(IntegrityError):
-            AccessoryAssignment.objects.create(
-                accessory=acc, assigned_holder=self.holder,
-                assigned_location=self.location, qty=1
-            )
+            with transaction.atomic():
+                AccessoryAssignment.objects.create(
+                    accessory=acc, assigned_holder=self.holder,
+                    assigned_location=self.location, qty=1
+                )
+            
+        # Holder + Asset
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                AccessoryAssignment.objects.create(
+                    accessory=acc, assigned_holder=self.holder,
+                    assigned_asset=self.asset, qty=1
+                )
+            
+        # Location + Asset
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                AccessoryAssignment.objects.create(
+                    accessory=acc, assigned_location=self.location,
+                    assigned_asset=self.asset, qty=1
+                )
+            
+        # All three
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                AccessoryAssignment.objects.create(
+                    accessory=acc, assigned_holder=self.holder,
+                    assigned_location=self.location, assigned_asset=self.asset, qty=1
+                )
 
 
 class ConsumableModelTests(TestCase):
@@ -176,6 +215,9 @@ class ConsumableAssignmentModelTests(TestCase):
         self.site = Site.objects.create(name='Site A', slug='site-a')
         self.location = Location.objects.create(name='Floor 1', slug='floor-1', site=self.site)
         self.holder = AssetHolder.objects.create(first_name='Alice', last_name='Brown', upn='alice.brown')
+        self.asset_role = AssetRole.objects.create(name='Desktop', slug='desktop')
+        self.asset_type = AssetType.objects.create(manufacturer=self.manufacturer, model='OptiPlex 7010', slug='optiplex-7010')
+        self.asset = Asset.objects.create(name='OptiPlex Desktop', asset_tag='OPTIPLEX-001', asset_type=self.asset_type, asset_role=self.asset_role)
 
     def test_consumption_to_holder(self):
         con = Consumable.objects.create(name='Toner', manufacturer=self.manufacturer)
@@ -185,14 +227,49 @@ class ConsumableAssignmentModelTests(TestCase):
         self.assertEqual(assignment.qty, 5)
         self.assertIn('Alice Brown', str(assignment))
 
+    def test_consumption_to_asset(self):
+        con = Consumable.objects.create(name='Thermal Paste', manufacturer=self.manufacturer)
+        assignment = ConsumableAssignment.objects.create(
+            consumable=con, assigned_asset=self.asset, qty=2
+        )
+        self.assertEqual(assignment.qty, 2)
+        self.assertIn('OptiPlex Desktop', str(assignment))
+
     def test_consumption_single_target_constraint(self):
         con = Consumable.objects.create(name='Ink', manufacturer=self.manufacturer)
         from django.db import IntegrityError
+        
+        # Holder + Location
         with self.assertRaises(IntegrityError):
-            ConsumableAssignment.objects.create(
-                consumable=con, assigned_holder=self.holder,
-                assigned_location=self.location, qty=1
-            )
+            with transaction.atomic():
+                ConsumableAssignment.objects.create(
+                    consumable=con, assigned_holder=self.holder,
+                    assigned_location=self.location, qty=1
+                )
+            
+        # Holder + Asset
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                ConsumableAssignment.objects.create(
+                    consumable=con, assigned_holder=self.holder,
+                    assigned_asset=self.asset, qty=1
+                )
+            
+        # Location + Asset
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                ConsumableAssignment.objects.create(
+                    consumable=con, assigned_location=self.location,
+                    assigned_asset=self.asset, qty=1
+                )
+            
+        # All three
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                ConsumableAssignment.objects.create(
+                    consumable=con, assigned_holder=self.holder,
+                    assigned_location=self.location, assigned_asset=self.asset, qty=1
+                )
 
 
 class KitModelTests(TestCase):

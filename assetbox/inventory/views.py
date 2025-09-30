@@ -44,6 +44,7 @@ class AccessoryDetailView(ObjectDetailView):
     template_name = 'assets/accessories/accessory_detail.html'
 
     layout = (
+        ((Panel('metrics', 'Metrics Overview'),),),
         ((Panel('info', 'Accessory Details'),),),
     )
 
@@ -107,6 +108,7 @@ class ConsumableDetailView(ObjectDetailView):
     template_name = 'assets/consumables/consumable_detail.html'
 
     layout = (
+        ((Panel('metrics', 'Metrics Overview'),),),
         ((Panel('info', 'Consumable Details'),),),
     )
 
@@ -283,6 +285,7 @@ class AccessoryCheckoutView(GenericTransactionView):
     form_field_map = {
         'assigned_holder': 'holder',
         'assigned_location': 'location',
+        'assigned_asset': 'asset',
         'from_location': 'source_location',
     }
 
@@ -317,6 +320,7 @@ class ConsumableCheckoutView(GenericTransactionView):
     form_field_map = {
         'assigned_holder': 'holder',
         'assigned_location': 'location',
+        'assigned_asset': 'asset',
         'from_location': 'source_location',
     }
 

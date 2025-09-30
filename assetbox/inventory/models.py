@@ -111,6 +111,7 @@ class AccessoryAssignment(ChangeLoggingMixin, BaseModel):
     accessory = models.ForeignKey(Accessory, on_delete=models.CASCADE, related_name='assignments', db_index=True)
     assigned_holder = models.ForeignKey('organization.AssetHolder', on_delete=models.SET_NULL, null=True, blank=True, related_name='accessory_assignments', db_index=True)
     assigned_location = models.ForeignKey('organization.Location', on_delete=models.SET_NULL, null=True, blank=True, related_name='accessory_assignments', db_index=True)
+    assigned_asset = models.ForeignKey('assets.Asset', on_delete=models.SET_NULL, null=True, blank=True, related_name='accessory_assignments', db_index=True)
     from_location = models.ForeignKey(
         'organization.Location', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='accessory_checkouts', verbose_name="From Location", db_index=True
@@ -126,15 +127,16 @@ class AccessoryAssignment(ChangeLoggingMixin, BaseModel):
         constraints = [
             CheckConstraint(
                 check=(
-                    Q(assigned_holder__isnull=False, assigned_location__isnull=True) |
-                    Q(assigned_holder__isnull=True, assigned_location__isnull=False)
+                    Q(assigned_holder__isnull=False, assigned_location__isnull=True, assigned_asset__isnull=True) |
+                    Q(assigned_holder__isnull=True, assigned_location__isnull=False, assigned_asset__isnull=True) |
+                    Q(assigned_holder__isnull=True, assigned_location__isnull=True, assigned_asset__isnull=False)
                 ),
                 name='chk_accessory_assignment_single_target'
             )
         ]
 
     def __str__(self):
-        recipient = self.assigned_holder or self.assigned_location or "Unknown"
+        recipient = self.assigned_holder or self.assigned_location or self.assigned_asset or "Unknown"
         return f"{self.qty}x {self.accessory} assigned to {recipient}"
 
 
@@ -231,6 +233,7 @@ class ConsumableAssignment(ChangeLoggingMixin, BaseModel):
     consumable = models.ForeignKey(Consumable, on_delete=models.CASCADE, related_name='consumptions', db_index=True)
     assigned_holder = models.ForeignKey('organization.AssetHolder', on_delete=models.SET_NULL, null=True, blank=True, related_name='consumable_consumptions', db_index=True)
     assigned_location = models.ForeignKey('organization.Location', on_delete=models.SET_NULL, null=True, blank=True, related_name='consumable_consumptions', db_index=True)
+    assigned_asset = models.ForeignKey('assets.Asset', on_delete=models.SET_NULL, null=True, blank=True, related_name='consumable_consumptions', db_index=True)
     from_location = models.ForeignKey(
         'organization.Location', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='consumable_consumptions_out', verbose_name="From Location", db_index=True
@@ -246,15 +249,16 @@ class ConsumableAssignment(ChangeLoggingMixin, BaseModel):
         constraints = [
             CheckConstraint(
                 check=(
-                    Q(assigned_holder__isnull=False, assigned_location__isnull=True) |
-                    Q(assigned_holder__isnull=True, assigned_location__isnull=False)
+                    Q(assigned_holder__isnull=False, assigned_location__isnull=True, assigned_asset__isnull=True) |
+                    Q(assigned_holder__isnull=True, assigned_location__isnull=False, assigned_asset__isnull=True) |
+                    Q(assigned_holder__isnull=True, assigned_location__isnull=True, assigned_asset__isnull=False)
                 ),
                 name='chk_consumable_assignment_single_target'
             )
         ]
 
     def __str__(self):
-        recipient = self.assigned_holder or self.assigned_location or "Unknown"
+        recipient = self.assigned_holder or self.assigned_location or self.assigned_asset or "Unknown"
         return f"{self.qty}x {self.consumable} consumed by {recipient}"
 
 

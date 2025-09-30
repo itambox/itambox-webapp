@@ -1,4 +1,4 @@
-﻿import django_tables2 as tables
+import django_tables2 as tables
 from django.urls import reverse
 from django.utils.html import format_html
 from django_tables2.utils import A
@@ -67,6 +67,9 @@ class AccessoryAssignmentTable(BaseTable):
         elif record.assigned_location:
             url = reverse('organization:location_detail', kwargs={'pk': record.assigned_location.pk})
             return format_html('<a href="{}">Location: {}</a>', url, record.assigned_location)
+        elif record.assigned_asset:
+            url = reverse('assets:asset_detail', kwargs={'pk': record.assigned_asset.pk})
+            return format_html('<a href="{}">Asset: {}</a>', url, record.assigned_asset)
         return "—"
 
 
@@ -129,6 +132,9 @@ class ConsumableAssignmentTable(BaseTable):
         elif record.assigned_location:
             url = reverse('organization:location_detail', kwargs={'pk': record.assigned_location.pk})
             return format_html('<a href="{}">Location: {}</a>', url, record.assigned_location)
+        elif record.assigned_asset:
+            url = reverse('assets:asset_detail', kwargs={'pk': record.assigned_asset.pk})
+            return format_html('<a href="{}">Asset: {}</a>', url, record.assigned_asset)
         return "—"
 
 

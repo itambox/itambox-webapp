@@ -7,7 +7,7 @@ from crispy_forms.layout import Layout, Submit, HTML, Row, Column, Div
 from core.forms import SlugModelForm, FilterForm
 from extras.models import Tag
 from organization.models import Location, AssetHolder, Tenant
-from assets.models import Manufacturer, Category
+from assets.models import Manufacturer, Category, Asset
 from .models import Accessory, Consumable, Kit, KitItem, AccessoryStock, ConsumableStock
 
 
@@ -251,6 +251,12 @@ class BaseCheckoutForm(forms.Form):
         widget=forms.Select(attrs={'class': 'form-select'}),
         label="Assign to Location"
     )
+    assigned_asset = forms.ModelChoiceField(
+        queryset=Asset.objects.all().order_by('asset_tag'),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Assign to Asset"
+    )
     notes = forms.CharField(
         required=False,
         widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
@@ -261,11 +267,13 @@ class BaseCheckoutForm(forms.Form):
         cleaned_data = super().clean()
         holder = cleaned_data.get('assigned_holder')
         location = cleaned_data.get('assigned_location')
+        asset = cleaned_data.get('assigned_asset')
 
-        if not holder and not location:
-            raise ValidationError("You must select either an Asset Holder or a Location.")
-        if holder and location:
-            raise ValidationError("Please select either an Asset Holder OR a Location, not both.")
+        filled = [t for t in [holder, location, asset] if t is not None]
+        if len(filled) == 0:
+            raise ValidationError("You must select either an Asset Holder, a Location, or an Asset.")
+        if len(filled) > 1:
+            raise ValidationError("Please select exactly one target (either Asset Holder, Location, OR Asset).")
         return cleaned_data
 
 
@@ -366,6 +374,8 @@ class AccessoryCheckoutForm(BaseCheckoutForm):
             'assigned_holder',
             HTML('<p class="text-muted text-center my-2">OR</p>'),
             'assigned_location',
+            HTML('<p class="text-muted text-center my-2">OR</p>'),
+            'assigned_asset',
             'qty',
             'notes'
         )
@@ -404,6 +414,8 @@ class ConsumableCheckoutForm(BaseCheckoutForm):
             'assigned_holder',
             HTML('<p class="text-muted text-center my-2">OR</p>'),
             'assigned_location',
+            HTML('<p class="text-muted text-center my-2">OR</p>'),
+            'assigned_asset',
             'qty',
             'notes'
         )
