@@ -280,7 +280,7 @@ class ObjectCountsWidget(DashboardWidget):
             'assets.assettype': (AssetType, 'assets:assettype_list'),
             'assets.manufacturer': (Manufacturer, 'assets:manufacturer_list'),
             'assets.statuslabel': (StatusLabel, 'assets:statuslabel_list'),
-            'components.component': (Component, 'assets:component_list'),
+            'components.component': (Component, 'components:component_list'),
             'inventory.accessory': (Accessory, 'inventory:accessory_list'),
             'inventory.consumable': (Consumable, 'inventory:consumable_list'),
             'organization.site': (Site, 'organization:site_list'),
@@ -854,7 +854,7 @@ class LowStockWidget(DashboardWidget):
 
     def get_footer_links(self, request):
         return [
-            {'url': reverse('assets:component_list'), 'label': _('Components')},
+            {'url': reverse('components:component_list'), 'label': _('Components')},
             {'url': reverse('inventory:accessory_list'), 'label': _('Accessories')},
             {'url': reverse('inventory:consumable_list'), 'label': _('Consumables')},
         ]

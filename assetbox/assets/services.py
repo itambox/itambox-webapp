@@ -145,11 +145,11 @@ def checkin_asset(asset, user=None, notes=''):
         return None
 
 
-def checkout_accessory(accessory, qty, holder=None, location=None, user=None, notes="", source_location=None, request=None, **kwargs):
+def checkout_accessory(accessory, qty, holder=None, location=None, asset=None, user=None, notes="", source_location=None, request=None, **kwargs):
     if not accessory.allow_overallocate and accessory.available < qty:
         raise ValidationError("No stock available for checkout.")
-    if not holder and not location:
-        raise ValidationError("Either holder or location must be specified.")
+    if not holder and not location and not asset:
+        raise ValidationError("Either holder, location, or asset must be specified.")
     if source_location:
         from inventory.models import AccessoryStock
         loc_stock = AccessoryStock.objects.filter(
@@ -165,6 +165,7 @@ def checkout_accessory(accessory, qty, holder=None, location=None, user=None, no
             accessory=accessory,
             assigned_holder=holder,
             assigned_location=location,
+            assigned_asset=asset,
             from_location=source_location,
             qty=qty,
             notes=notes
@@ -176,17 +177,17 @@ def checkin_accessory(assignment_pk, user=None):
     assignment = get_object_or_404(AccessoryAssignment, pk=assignment_pk)
     accessory = assignment.accessory
     qty = assignment.qty
-    recipient = assignment.assigned_holder or assignment.assigned_location
+    recipient = assignment.assigned_holder or assignment.assigned_location or assignment.assigned_asset
 
     assignment.delete()
     return accessory, qty, recipient
 
 
-def checkout_consumable(consumable, qty, holder=None, location=None, user=None, notes="", source_location=None, request=None, **kwargs):
+def checkout_consumable(consumable, qty, holder=None, location=None, asset=None, user=None, notes="", source_location=None, request=None, **kwargs):
     if not consumable.allow_overallocate and consumable.available < qty:
         raise ValidationError("No stock available for consumption checkout.")
-    if not holder and not location:
-        raise ValidationError("Either holder or location must be specified.")
+    if not holder and not location and not asset:
+        raise ValidationError("Either holder, location, or asset must be specified.")
     if source_location:
         from inventory.models import ConsumableStock
         loc_stock = ConsumableStock.objects.filter(
@@ -202,6 +203,7 @@ def checkout_consumable(consumable, qty, holder=None, location=None, user=None, 
             consumable=consumable,
             assigned_holder=holder,
             assigned_location=location,
+            assigned_asset=asset,
             from_location=source_location,
             qty=qty,
             notes=notes

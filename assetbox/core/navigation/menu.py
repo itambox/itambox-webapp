@@ -65,18 +65,18 @@ INVENTORY_MENU = Menu(
             label=_('Component Inventory'),
             items=(
                 MenuItem(
-                    link='assets:component_list',
+                    link='components:component_list',
                     link_text=_('Components'),
                     permissions=['components.view_component'],
                     buttons=(
                         MenuItemButton(
-                            link='assets:component_create',
+                            link='components:component_create',
                             title='Add',
                             icon_class='mdi mdi-plus-thick',
                             permissions=['components.add_component'],
                         ),
                         MenuItemButton(
-                            link='/import/assets/component/',
+                            link='/import/components/component/',
                             title='Import',
                             icon_class='mdi mdi-download',
                             permissions=['components.add_component'],
@@ -85,18 +85,18 @@ INVENTORY_MENU = Menu(
                     ),
                 ),
                 MenuItem(
-                    link='assets:componentstock_list',
+                    link='components:componentstock_list',
                     link_text=_('Component Stocks'),
                     permissions=['components.view_componentstock'],
                     buttons=(
                         MenuItemButton(
-                            link='assets:componentstock_create',
+                            link='components:componentstock_create',
                             title='Add',
                             icon_class='mdi mdi-plus-thick',
                             permissions=['components.add_componentstock'],
                         ),
                         MenuItemButton(
-                            link='/import/assets/componentstock/',
+                            link='/import/components/componentstock/',
                             title='Import',
                             icon_class='mdi mdi-download',
                             permissions=['components.add_componentstock'],
@@ -105,18 +105,18 @@ INVENTORY_MENU = Menu(
                     ),
                 ),
                 MenuItem(
-                    link='assets:componentallocation_list',
+                    link='components:componentallocation_list',
                     link_text=_('Component Allocations'),
                     permissions=['components.view_componentallocation'],
                     buttons=(
                         MenuItemButton(
-                            link='assets:componentallocation_create',
+                            link='components:componentallocation_create',
                             title='Add',
                             icon_class='mdi mdi-plus-thick',
                             permissions=['components.add_componentallocation'],
                         ),
                         MenuItemButton(
-                            link='/import/assets/componentallocation/',
+                            link='/import/components/componentallocation/',
                             title='Import',
                             icon_class='mdi mdi-download',
                             permissions=['components.add_componentallocation'],

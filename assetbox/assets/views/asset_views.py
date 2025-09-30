@@ -16,6 +16,8 @@ from .. import forms, tables, filters
 from ..services import checkout_asset, checkin_asset
 from software.tables import InstalledSoftwareTable
 from compliance.models import CustodyReceipt
+from inventory.models import AccessoryAssignment, ConsumableAssignment
+from inventory.tables import AccessoryAssignmentTable, ConsumableAssignmentTable
 
 from assetbox.utils import get_paginate_count
 from assetbox.panels import Panel
@@ -91,6 +93,18 @@ class AssetDetailView(ObjectDetailView):
         maint_table = tables.AssetMaintenanceTable(maint_qs, request=self.request)
         RequestConfig(self.request, paginate={'per_page': 10}).configure(maint_table)
         context['maintenances_table'] = maint_table
+
+        acc_qs = AccessoryAssignment.objects.filter(assigned_asset=asset).select_related('accessory', 'accessory__manufacturer')
+        acc_table = AccessoryAssignmentTable(acc_qs, request=self.request)
+        acc_table.exclude = ('assigned_to',)
+        RequestConfig(self.request, paginate={'per_page': 10}).configure(acc_table)
+        context['accessory_table'] = acc_table
+
+        con_qs = ConsumableAssignment.objects.filter(assigned_asset=asset).select_related('consumable', 'consumable__manufacturer')
+        con_table = ConsumableAssignmentTable(con_qs, request=self.request)
+        con_table.exclude = ('assigned_to',)
+        RequestConfig(self.request, paginate={'per_page': 10}).configure(con_table)
+        context['consumable_table'] = con_table
 
         context['eol_date'] = asset.eol_date
         context['time_to_eol'] = asset.time_to_eol

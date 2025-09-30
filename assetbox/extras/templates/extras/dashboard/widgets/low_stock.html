@@ -6,7 +6,7 @@
 <div class="text-muted small mb-1 fw-bold">Components</div>
 {% for item in low_stock_components %}
 <div class="d-flex justify-content-between small py-1">
-    <a href="{% url 'assets:component_detail' item.component.pk %}" class="text-reset">{{ item.component.name }}</a>
+    <a href="{% url 'components:component_detail' item.component.pk %}" class="text-reset">{{ item.component.name }}</a>
     <span class="badge bg-red-lt text-red">{{ item.available_stock }}/{{ item.min_stock_level }}</span>
 </div>
 {% endfor %}

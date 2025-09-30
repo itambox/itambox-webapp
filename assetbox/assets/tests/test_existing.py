@@ -60,17 +60,17 @@ class ComponentTrackingTestCase(TestCase):
 
     def test_component_detail_view(self):
         # We replace any reference to specific request views that might be affected
-        response = self.client.get(reverse('assets:component_detail', kwargs={'pk': self.component.pk}))
+        response = self.client.get(reverse('components:component_detail', kwargs={'pk': self.component.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "16GB DDR5 RAM")
 
     def test_component_list_view(self):
-        response = self.client.get(reverse('assets:component_list'))
+        response = self.client.get(reverse('components:component_list'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "16GB DDR5 RAM")
 
     def test_component_create_view(self):
-        response = self.client.get(reverse('assets:component_create'))
+        response = self.client.get(reverse('components:component_create'))
         self.assertEqual(response.status_code, 200)
 
         post_data = {
@@ -84,12 +84,12 @@ class ComponentTrackingTestCase(TestCase):
             'description': 'Samsung SSD for server storage',
             'tags': [],
         }
-        response = self.client.post(reverse('assets:component_create'), data=post_data)
+        response = self.client.post(reverse('components:component_create'), data=post_data)
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Component.objects.filter(name='2TB NVMe SSD').exists())
 
     def test_component_update_view(self):
-        response = self.client.get(reverse('assets:component_update', kwargs={'pk': self.component.pk}))
+        response = self.client.get(reverse('components:component_update', kwargs={'pk': self.component.pk}))
         self.assertEqual(response.status_code, 200)
 
         post_data = {
@@ -103,22 +103,22 @@ class ComponentTrackingTestCase(TestCase):
             'description': 'Updated spec RAM',
             'tags': [],
         }
-        response = self.client.post(reverse('assets:component_update', kwargs={'pk': self.component.pk}), data=post_data)
+        response = self.client.post(reverse('components:component_update', kwargs={'pk': self.component.pk}), data=post_data)
         self.assertEqual(response.status_code, 302)
         self.component.refresh_from_db()
         self.assertEqual(self.component.name, '16GB DDR5 RAM (Updated)')
 
     def test_component_delete_view(self):
-        response = self.client.post(reverse('assets:component_delete', kwargs={'pk': self.component.pk}))
+        response = self.client.post(reverse('components:component_delete', kwargs={'pk': self.component.pk}))
         self.assertEqual(response.status_code, 302)
         self.assertFalse(Component.objects.filter(pk=self.component.pk).exists())
 
     def test_componentallocation_list_view(self):
-        response = self.client.get(reverse('assets:componentallocation_list'))
+        response = self.client.get(reverse('components:componentallocation_list'))
         self.assertEqual(response.status_code, 200)
 
     def test_componentallocation_create_view(self):
-        response = self.client.get(reverse('assets:componentallocation_create'))
+        response = self.client.get(reverse('components:componentallocation_create'))
         self.assertEqual(response.status_code, 200)
 
         post_data = {
@@ -127,12 +127,12 @@ class ComponentTrackingTestCase(TestCase):
             'qty_allocated': 1,
             'notes': 'Secondary RAM stick'
         }
-        response = self.client.post(reverse('assets:componentallocation_create'), data=post_data)
+        response = self.client.post(reverse('components:componentallocation_create'), data=post_data)
         self.assertEqual(response.status_code, 302)
         self.assertTrue(ComponentAllocation.objects.filter(qty_allocated=1, notes='Secondary RAM stick').exists())
 
     def test_componentallocation_update_view(self):
-        response = self.client.get(reverse('assets:componentallocation_update', kwargs={'pk': self.allocation.pk}))
+        response = self.client.get(reverse('components:componentallocation_update', kwargs={'pk': self.allocation.pk}))
         self.assertEqual(response.status_code, 200)
 
         post_data = {
@@ -141,14 +141,14 @@ class ComponentTrackingTestCase(TestCase):
             'qty_allocated': 3,
             'notes': 'Updated RAM allocation'
         }
-        response = self.client.post(reverse('assets:componentallocation_update', kwargs={'pk': self.allocation.pk}), data=post_data)
+        response = self.client.post(reverse('components:componentallocation_update', kwargs={'pk': self.allocation.pk}), data=post_data)
         self.assertEqual(response.status_code, 302)
         self.allocation.refresh_from_db()
         self.assertEqual(self.allocation.qty_allocated, 3)
         self.assertEqual(self.allocation.notes, 'Updated RAM allocation')
 
     def test_componentallocation_delete_view(self):
-        response = self.client.post(reverse('assets:componentallocation_delete', kwargs={'pk': self.allocation.pk}))
+        response = self.client.post(reverse('components:componentallocation_delete', kwargs={'pk': self.allocation.pk}))
         self.assertEqual(response.status_code, 302)
         self.assertFalse(ComponentAllocation.objects.filter(pk=self.allocation.pk).exists())
 
