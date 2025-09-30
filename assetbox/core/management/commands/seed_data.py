@@ -888,7 +888,7 @@ class Command(BaseCommand):
         from assets.models import (
             Asset, InstalledSoftware,
         )
-        from inventory.models import AccessoryAssignment, ConsumableAssignment
+        from inventory.models import AccessoryAssignment, ConsumableAssignment, AccessoryStock, ConsumableStock
         from compliance.models import CustodyReceipt
         from components.models import ComponentStock, ComponentAllocation
 
@@ -1127,6 +1127,58 @@ class Command(BaseCommand):
                     defaults={'qty': qty}
                 )
                 self._stocks.append(stock_obj)
+
+        # --- AccessoryStock (NEW) ---
+        acc_stock_data = [
+            ('mx-master-3s', 'berlin-floor-1-eng', 20),
+            ('mx-master-3s', 'ny-floor-5-eng', 15),
+            ('mx-keys', 'berlin-floor-1-eng', 15),
+            ('mx-keys', 'ny-floor-5-eng', 10),
+            ('usb-c-hdmi-adapter', 'berlin-floor-1-eng', 30),
+            ('usb-c-charger-65w', 'berlin-floor-1-eng', 25),
+            ('zone-wireless-2', 'berlin-floor-1-eng', 10),
+            ('dell-p2723de', 'berlin-floor-1-eng', 12),
+            ('dell-p2422he', 'berlin-floor-2-admin', 8),
+            # Customer stocks
+            ('mx-master-3s', 'frankfurt-depot-shelf-b', 10),
+            ('usb-c-hdmi-adapter', 'frankfurt-depot-shelf-b', 15),
+        ]
+        self._acc_stocks = []
+        for acc_slug, loc_slug, qty in acc_stock_data:
+            acc_obj = self._accessories.get(acc_slug)
+            loc_obj = self._locations.get(loc_slug)
+            if acc_obj and loc_obj:
+                stock_obj, _ = AccessoryStock.objects.get_or_create(
+                    accessory=acc_obj,
+                    location=loc_obj,
+                    defaults={'qty': qty}
+                )
+                self._acc_stocks.append(stock_obj)
+
+        # --- ConsumableStock (NEW) ---
+        cons_stock_data = [
+            ('hp-26x-toner-black', 'berlin-floor-2-admin', 15),
+            ('hp-26a-toner-cyan', 'berlin-floor-2-admin', 10),
+            ('canon-pgi-280xl', 'berlin-floor-2-admin', 20),
+            ('brother-dr-241cl', 'berlin-floor-2-admin', 5),
+            ('arctic-silver-5', 'berlin-floor-1-eng', 30),
+            ('aa-batteries-24', 'berlin-floor-1-eng', 50),
+            ('whiteboard-markers-12', 'berlin-floor-2-admin', 15),
+            # Customer stocks
+            ('hp-26x-toner-black', 'frankfurt-depot-shelf-b', 5),
+            ('arctic-silver-5', 'frankfurt-depot-shelf-b', 10),
+        ]
+        self._cons_stocks = []
+        for cons_slug, loc_slug, qty in cons_stock_data:
+            cons_obj = self._consumables.get(cons_slug)
+            loc_obj = self._locations.get(loc_slug)
+            if cons_obj and loc_obj:
+                stock_obj, _ = ConsumableStock.objects.get_or_create(
+                    consumable=cons_obj,
+                    location=loc_obj,
+                    defaults={'qty': qty}
+                )
+                self._cons_stocks.append(stock_obj)
 
         # --- ComponentAllocations ---
         alloc_data = [
