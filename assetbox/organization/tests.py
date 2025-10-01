@@ -491,3 +491,106 @@ class AssetHolderAssignmentFilterSetTests(TestCase):
         self.assertIn(self.assign1, f.qs)
         self.assertNotIn(self.assign2, f.qs)
 
+
+class ContactRoleViewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='roleadmin', password='testpassword', is_staff=True, is_superuser=True)
+        self.client.force_login(self.user)
+        self.role = ContactRole.objects.create(name='Key Support', slug='key-support')
+
+    def test_update_view_post(self):
+        url = reverse('organization:contactrole_update', kwargs={'pk': self.role.pk})
+        response = self.client.post(url, {'name': 'Key Support Updated', 'slug': 'key-support-updated'})
+        self.assertEqual(response.status_code, 302)
+        self.role.refresh_from_db()
+        self.assertEqual(self.role.name, 'Key Support Updated')
+
+    def test_delete_view_post(self):
+        url = reverse('organization:contactrole_delete', kwargs={'pk': self.role.pk})
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(ContactRole.objects.filter(pk=self.role.pk).exists())
+
+
+class SiteGroupViewExpansionTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='siteadmin', password='testpassword', is_staff=True, is_superuser=True)
+        self.client.force_login(self.user)
+        self.group = SiteGroup.objects.create(name='EU DCs', slug='eu-dcs')
+
+    def test_update_view_post(self):
+        url = reverse('organization:sitegroup_update', kwargs={'pk': self.group.pk})
+        response = self.client.post(url, {'name': 'EU DCs Updated', 'slug': 'eu-dcs-updated'})
+        self.assertEqual(response.status_code, 302)
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.name, 'EU DCs Updated')
+
+
+class TenantGroupViewExpansionTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='tenantadmin', password='testpassword', is_staff=True, is_superuser=True)
+        self.client.force_login(self.user)
+        self.group = TenantGroup.objects.create(name='Premium Clients', slug='premium-clients')
+
+    def test_update_view_post(self):
+        url = reverse('organization:tenantgroup_update', kwargs={'pk': self.group.pk})
+        response = self.client.post(url, {'name': 'Premium Clients Updated', 'slug': 'premium-clients-updated'})
+        self.assertEqual(response.status_code, 302)
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.name, 'Premium Clients Updated')
+
+
+class HierarchyValidationTests(TestCase):
+    def setUp(self):
+        self.region = Region.objects.create(name='Global', slug='global')
+        self.site = Site.objects.create(name='Global HQ', slug='global-hq', status='active')
+        self.location = Location.objects.create(name='Server Room', slug='server-room', site=self.site)
+        self.site_group = SiteGroup.objects.create(name='Main HQ Sites', slug='main-hq-sites')
+        self.tenant_group = TenantGroup.objects.create(name='Internal Entities', slug='internal-entities')
+
+    def test_region_cannot_be_own_parent(self):
+        from organization.forms.region_form import RegionForm
+        form = RegionForm(instance=self.region, data={
+            'name': 'Global',
+            'slug': 'global',
+            'parent': self.region.pk,
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn('parent', form.errors)
+        self.assertEqual(form.errors['parent'][0], "A region cannot be its own parent.")
+
+    def test_location_cannot_be_own_parent(self):
+        from organization.forms.location_form import LocationForm
+        form = LocationForm(instance=self.location, data={
+            'name': 'Server Room',
+            'slug': 'server-room',
+            'site': self.site.pk,
+            'status': 'active',
+            'parent': self.location.pk,
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn('parent', form.errors)
+        self.assertEqual(form.errors['parent'][0], "A location cannot be its own parent.")
+
+    def test_site_group_cannot_be_own_parent(self):
+        from organization.forms.sitegroup_form import SiteGroupForm
+        form = SiteGroupForm(instance=self.site_group, data={
+            'name': 'Main HQ Sites',
+            'slug': 'main-hq-sites',
+            'parent': self.site_group.pk,
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn('parent', form.errors)
+        self.assertEqual(form.errors['parent'][0], "A site group cannot be its own parent.")
+
+    def test_tenant_group_cannot_be_own_parent(self):
+        from organization.forms.tenantgroup_form import TenantGroupForm
+        form = TenantGroupForm(instance=self.tenant_group, data={
+            'name': 'Internal Entities',
+            'slug': 'internal-entities',
+            'parent': self.tenant_group.pk,
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn('parent', form.errors)
+        self.assertEqual(form.errors['parent'][0], "A tenant group cannot be its own parent.")
+

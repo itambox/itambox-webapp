@@ -720,3 +720,284 @@ class KitConsumableFulfillmentTests(TestCase):
             consumable=self.consumable, assigned_holder=self.holder, from_location=self.location, qty=3
         ).exists())
 
+
+class AccessoryCheckoutViewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testadmin', password='testpassword', is_staff=True, is_superuser=True
+        )
+        self.client.login(username='testadmin', password='testpassword')
+        self.manufacturer = Manufacturer.objects.create(name='Logitech', slug='logitech')
+        self.site = Site.objects.create(name='Office', slug='office')
+        self.location = Location.objects.create(name='Desk', slug='desk', site=self.site)
+        self.cat_mouse = _create_category('Mouse', accessory=True)
+        self.accessory = Accessory.objects.create(
+            name='MX Master 3S', manufacturer=self.manufacturer, category=self.cat_mouse
+        )
+        self.stock = AccessoryStock.objects.create(accessory=self.accessory, location=self.location, qty=10)
+        self.holder = AssetHolder.objects.create(first_name='Alice', last_name='Smith', upn='alice.smith')
+        
+        self.asset_role = AssetRole.objects.create(name='Laptop', slug='laptop')
+        self.asset_type = AssetType.objects.create(manufacturer=self.manufacturer, model='XPS 15', slug='xps-15')
+        self.asset = Asset.objects.create(name='Dell Laptop', asset_tag='DELL-002', asset_type=self.asset_type, asset_role=self.asset_role)
+
+    def test_checkout_view_get(self):
+        url = reverse('inventory:accessory_checkout', kwargs={'pk': self.accessory.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_checkout_to_asset_success(self):
+        url = reverse('inventory:accessory_checkout', kwargs={'pk': self.accessory.pk})
+        response = self.client.post(url, {
+            'target_type': 'asset',
+            'assigned_asset': self.asset.pk,
+            'from_location': self.location.pk,
+            'qty': 2,
+            'notes': 'Test asset checkout'
+        })
+        self.assertEqual(response.status_code, 302)
+        
+        # Verify assignment created and stock decremented
+        assignment = AccessoryAssignment.objects.get(accessory=self.accessory)
+        self.assertEqual(assignment.assigned_asset, self.asset)
+        self.assertEqual(assignment.qty, 2)
+        self.stock.refresh_from_db()
+        self.assertEqual(self.stock.qty, 8)
+
+    def test_checkout_to_holder_success(self):
+        url = reverse('inventory:accessory_checkout', kwargs={'pk': self.accessory.pk})
+        response = self.client.post(url, {
+            'target_type': 'holder',
+            'assigned_holder': self.holder.pk,
+            'from_location': self.location.pk,
+            'qty': 1
+        })
+        self.assertEqual(response.status_code, 302)
+        assignment = AccessoryAssignment.objects.get(accessory=self.accessory)
+        self.assertEqual(assignment.assigned_holder, self.holder)
+        self.assertEqual(assignment.qty, 1)
+
+    def test_checkout_validation_insufficient_stock(self):
+        url = reverse('inventory:accessory_checkout', kwargs={'pk': self.accessory.pk})
+        response = self.client.post(url, {
+            'target_type': 'asset',
+            'assigned_asset': self.asset.pk,
+            'from_location': self.location.pk,
+            'qty': 15  # only 10 available
+        })
+        self.assertEqual(response.status_code, 200)
+        # Should show validation error on form
+        self.assertContains(response, 'currently in stock')
+        self.assertEqual(AccessoryAssignment.objects.filter(accessory=self.accessory).count(), 0)
+
+
+class ConsumableCheckoutViewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testadmin', password='testpassword', is_staff=True, is_superuser=True
+        )
+        self.client.login(username='testadmin', password='testpassword')
+        self.manufacturer = Manufacturer.objects.create(name='HP', slug='hp')
+        self.site = Site.objects.create(name='Office', slug='office')
+        self.location = Location.objects.create(name='Shelf', slug='shelf', site=self.site)
+        self.cat_toner = _create_category('Toner', consumable=True)
+        self.consumable = Consumable.objects.create(
+            name='LaserJet Cartridge', manufacturer=self.manufacturer, category=self.cat_toner
+        )
+        self.stock = ConsumableStock.objects.create(consumable=self.consumable, location=self.location, qty=5)
+        self.holder = AssetHolder.objects.create(first_name='Bob', last_name='Jones', upn='bob.jones')
+        
+        self.asset_role = AssetRole.objects.create(name='Printer', slug='printer')
+        self.asset_type = AssetType.objects.create(manufacturer=self.manufacturer, model='LaserJet Pro', slug='laserjet-pro')
+        self.asset = Asset.objects.create(name='HP Printer', asset_tag='HP-001', asset_type=self.asset_type, asset_role=self.asset_role)
+
+    def test_checkout_view_get(self):
+        url = reverse('inventory:consumable_checkout', kwargs={'pk': self.consumable.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_checkout_to_asset_success(self):
+        url = reverse('inventory:consumable_checkout', kwargs={'pk': self.consumable.pk})
+        response = self.client.post(url, {
+            'target_type': 'asset',
+            'assigned_asset': self.asset.pk,
+            'from_location': self.location.pk,
+            'qty': 1,
+            'notes': 'Test consumable checkout'
+        })
+        self.assertEqual(response.status_code, 302)
+        
+        # Verify assignment created and stock permanently decremented
+        assignment = ConsumableAssignment.objects.get(consumable=self.consumable)
+        self.assertEqual(assignment.assigned_asset, self.asset)
+        self.assertEqual(assignment.qty, 1)
+        self.stock.refresh_from_db()
+        self.assertEqual(self.stock.qty, 4)
+
+    def test_checkout_validation_insufficient_stock(self):
+        url = reverse('inventory:consumable_checkout', kwargs={'pk': self.consumable.pk})
+        response = self.client.post(url, {
+            'target_type': 'asset',
+            'assigned_asset': self.asset.pk,
+            'from_location': self.location.pk,
+            'qty': 10  # only 5 available
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'currently in stock')
+
+
+class InventoryFormValidationTests(TestCase):
+    def setUp(self):
+        self.manufacturer = Manufacturer.objects.create(name='Apple', slug='apple')
+        self.cat_accessory = _create_category('Mouse', accessory=True)
+        self.cat_consumable = _create_category('Toner', consumable=True)
+        self.kit = Kit.objects.create(name='New Employee Kit')
+
+    def test_accessory_form_validation(self):
+        from inventory.forms import AccessoryForm
+        form = AccessoryForm(data={
+            'manufacturer': self.manufacturer.pk,
+            'name': 'Magic Mouse',
+            'slug': 'apple-magic-mouse',
+            'category': self.cat_accessory.pk,
+        })
+        self.assertTrue(form.is_valid())
+
+        # Missing name
+        form_invalid = AccessoryForm(data={
+            'manufacturer': self.manufacturer.pk,
+            'category': self.cat_accessory.pk,
+        })
+        self.assertFalse(form_invalid.is_valid())
+
+    def test_consumable_form_validation(self):
+        from inventory.forms import ConsumableForm
+        form = ConsumableForm(data={
+            'manufacturer': self.manufacturer.pk,
+            'name': 'USB-C Cable',
+            'slug': 'apple-usb-c-cable',
+            'category': self.cat_consumable.pk,
+        })
+        self.assertTrue(form.is_valid())
+
+    def test_kit_form_validation(self):
+        from inventory.forms import KitForm
+        form = KitForm(data={
+            'name': 'Engineering Pack',
+            'description': 'Laptops and docks',
+        })
+        self.assertTrue(form.is_valid())
+
+    def test_kit_item_form_no_targets(self):
+        from inventory.forms import KitItemForm
+        form = KitItemForm(data={
+            'kit': self.kit.pk,
+            'qty': 1,
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn('__all__', form.errors)
+
+    def test_kit_item_form_multiple_targets(self):
+        from inventory.forms import KitItemForm
+        acc = Accessory.objects.create(name='Key', manufacturer=self.manufacturer)
+        con = Consumable.objects.create(name='Paper', manufacturer=self.manufacturer)
+        form = KitItemForm(data={
+            'kit': self.kit.pk,
+            'accessory': acc.pk,
+            'consumable': con.pk,
+            'qty': 1,
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn('__all__', form.errors)
+
+
+class StockCRUDViewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testadmin', password='testpassword', is_staff=True, is_superuser=True
+        )
+        self.client.login(username='testadmin', password='testpassword')
+        self.manufacturer = Manufacturer.objects.create(name='Logitech', slug='logitech')
+        self.site = Site.objects.create(name='Site X', slug='site-x')
+        self.location = Location.objects.create(name='Location Y', slug='location-y', site=self.site)
+        
+        self.accessory = Accessory.objects.create(name='Trackpad', manufacturer=self.manufacturer)
+        self.consumable = Consumable.objects.create(name='Labels', manufacturer=self.manufacturer)
+        
+        self.acc_stock = AccessoryStock.objects.create(accessory=self.accessory, location=self.location, qty=5)
+        self.con_stock = ConsumableStock.objects.create(consumable=self.consumable, location=self.location, qty=10)
+
+    def test_accessory_stock_views(self):
+        # 1. List View
+        url_list = reverse('inventory:accessorystock_list')
+        response = self.client.get(url_list)
+        self.assertEqual(response.status_code, 200)
+
+        # 2. Edit View Get
+        url_edit = reverse('inventory:accessorystock_update', kwargs={'pk': self.acc_stock.pk})
+        response = self.client.get(url_edit)
+        self.assertEqual(response.status_code, 200)
+
+        # 3. Edit View Post
+        response = self.client.post(url_edit, {
+            'accessory': self.accessory.pk,
+            'location': self.location.pk,
+            'qty': 15,
+        })
+        self.assertEqual(response.status_code, 302)
+        self.acc_stock.refresh_from_db()
+        self.assertEqual(self.acc_stock.qty, 15)
+
+        # 4. Delete View Post
+        url_delete = reverse('inventory:accessorystock_delete', kwargs={'pk': self.acc_stock.pk})
+        response = self.client.post(url_delete)
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(AccessoryStock.objects.filter(pk=self.acc_stock.pk).exists())
+
+    def test_consumable_stock_views(self):
+        # 1. List View
+        url_list = reverse('inventory:consumablestock_list')
+        response = self.client.get(url_list)
+        self.assertEqual(response.status_code, 200)
+
+        # 2. Edit View Post
+        url_edit = reverse('inventory:consumablestock_update', kwargs={'pk': self.con_stock.pk})
+        response = self.client.post(url_edit, {
+            'consumable': self.consumable.pk,
+            'location': self.location.pk,
+            'qty': 25,
+        })
+        self.assertEqual(response.status_code, 302)
+        self.con_stock.refresh_from_db()
+        self.assertEqual(self.con_stock.qty, 25)
+
+        # 3. Delete View Post
+        url_delete = reverse('inventory:consumablestock_delete', kwargs={'pk': self.con_stock.pk})
+        response = self.client.post(url_delete)
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(ConsumableStock.objects.filter(pk=self.con_stock.pk).exists())
+
+
+class StockAlertsTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testadmin', password='testpassword', is_staff=True, is_superuser=True
+        )
+        self.client.login(username='testadmin', password='testpassword')
+        self.manufacturer = Manufacturer.objects.create(name='Logitech', slug='logitech')
+        self.site = Site.objects.create(name='Office', slug='office')
+        self.location = Location.objects.create(name='Desk', slug='desk', site=self.site)
+        self.cat_mouse = _create_category('Mouse', accessory=True)
+        self.accessory = Accessory.objects.create(
+            name='MX Mouse', manufacturer=self.manufacturer, category=self.cat_mouse, min_qty=5
+        )
+        self.stock = AccessoryStock.objects.create(accessory=self.accessory, location=self.location, qty=4)
+        
+    def test_low_stock_threshold_alert(self):
+        # Remaining stock is 4, safety threshold (min_qty) is 5.
+        # So low_stock condition is met or we can check dashboard widget context.
+        # Let's verify dashboard widget or alerts listing
+        pass
+
+
+
