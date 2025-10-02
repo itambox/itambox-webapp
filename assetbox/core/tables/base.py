@@ -1,3 +1,7 @@
+# This file is adapted from NetBox (https://github.com/netbox-community/netbox).
+# Copyright (c) DigitalOcean, LLC.
+# Licensed under the Apache License, Version 2.0.
+
 # assetbox/core/tables/base.py
 import logging
 import django_tables2 as tables

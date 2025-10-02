@@ -1,3 +1,7 @@
+# This file is adapted from NetBox (https://github.com/netbox-community/netbox).
+# Copyright (c) DigitalOcean, LLC.
+# Licensed under the Apache License, Version 2.0.
+
 from django import template
 from django.utils import timezone
 from django.utils.html import format_html
