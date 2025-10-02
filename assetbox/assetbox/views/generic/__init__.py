@@ -1,3 +1,7 @@
+# This file is adapted from NetBox (https://github.com/netbox-community/netbox).
+# Copyright (c) DigitalOcean, LLC.
+# Licensed under the Apache License, Version 2.0.
+
 import logging
 import json
 from django.shortcuts import render, redirect, get_object_or_404

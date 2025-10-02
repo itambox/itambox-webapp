@@ -1,3 +1,7 @@
+# This file is adapted from NetBox (https://github.com/netbox-community/netbox).
+# Copyright (c) DigitalOcean, LLC.
+# Licensed under the Apache License, Version 2.0.
+
 # assetbox/templatetags/utility_tags.py
 from django import template
 from django.contrib.messages import constants as messages
