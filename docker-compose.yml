@@ -6,10 +6,19 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgres://assetbox:assetbox@db:5432/assetbox
-      - SECRET_KEY=change-me-in-production
+      - ASSETBOX_SECRET_KEY=change-me-in-production
+      - ASSETBOX_DEBUG=True
+      - ASSETBOX_DB_ENGINE=django.db.backends.postgresql
+      - ASSETBOX_DB_NAME=assetbox
+      - ASSETBOX_DB_USER=assetbox
+      - ASSETBOX_DB_PASSWORD=assetbox
+      - ASSETBOX_DB_HOST=db
+      - ASSETBOX_DB_PORT=5432
+    volumes:
+      - ./assetbox:/app
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   db:
     image: postgres:16
@@ -19,6 +28,11 @@ services:
       POSTGRES_DB: assetbox
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U assetbox -d assetbox"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
   pgdata:

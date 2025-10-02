@@ -1,0 +1,48 @@
+# ==============================================================================
+# AssetBox Git Attributes Normalization File
+# ==============================================================================
+# Forces all text files to be checked in with LF line endings, preventing
+# line-ending mismatches between Windows, Linux, and macOS environments.
+# ==============================================================================
+
+# Set default behavior to automatically normalize line endings.
+* text=auto
+
+# Python code
+*.py text eol=lf
+
+# Frontend Web Development
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+*.scss text eol=lf
+
+# Data & Configurations
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.xml text eol=lf
+.editorconfig text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+Makefile text eol=lf
+
+# Documentation
+*.md text eol=lf
+LICENSE text eol=lf
+
+# Shell & PowerShell scripts
+*.sh text eol=lf
+*.ps1 text eol=lf
+
+# Binary Assets (explicitly keep untouched)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
