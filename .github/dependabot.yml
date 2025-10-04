@@ -1,0 +1,27 @@
+# ==============================================================================
+# AssetBox Automated Dependabot Configuration
+# ==============================================================================
+# Automates weekly dependency scans for both Python packages and GitHub Actions.
+# ==============================================================================
+
+version: 2
+updates:
+  # Check for Python pip dependency updates (requirements.txt / pyproject.toml)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 5
+
+  # Check for GitHub Actions runner updates
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 3
