@@ -2,6 +2,9 @@
 
 ## Quick Start
 
+1. **Database Requirements**: AssetBox strictly requires a running PostgreSQL 15+ database. Ensure a server is active locally or accessible.
+2. **Environment Variables**: Copy `.env.example` to `.env` and configure the PostgreSQL connection credentials (e.g., `ASSETBOX_DB_ENGINE=django.db.backends.postgresql`, `ASSETBOX_DB_NAME`, `ASSETBOX_DB_USER`, `ASSETBOX_DB_PASSWORD`, `ASSETBOX_DB_HOST`, `ASSETBOX_DB_PORT`).
+
 ```bash
 # Create virtual environment
 python -m venv .venv
@@ -14,7 +17,7 @@ pip install -r requirements.txt
 cd assetbox
 python manage.py migrate
 
-# Seed sample data (407 records across 40 models)
+# Seed sample data (400+ records across all models)
 python manage.py seed_data
 
 # Start dev server

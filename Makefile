@@ -43,4 +43,3 @@ clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 	rm -rf .venv
-	rm -rf assetbox/db.sqlite3

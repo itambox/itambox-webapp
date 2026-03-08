@@ -36,7 +36,7 @@ AssetBox is an IT asset management (ITAM) and tracking application. Inspired by 
 
 *   **Backend:** Django 5.2, Python 3.11+, Django REST Framework (DRF)
 *   **Frontend:** Tabler CSS (Bootstrap 5), HTMX, django-htmx, django-template-partials
-*   **Database:** SQLite (default/development) / PostgreSQL (production support)
+*   **Database:** PostgreSQL 15+ (required for all environments)
 *   **Core Libraries:** django-tables2 (interactive grids), django-filter (filtering panels), django-crispy-forms (crispy form renderers), cryptography (symmetric AES-256)
 
 ---
@@ -92,6 +92,9 @@ docker compose exec app python manage.py seed_data
 
 ### Local Virtualenv Setup
 
+1. **Set up PostgreSQL**: Ensure a PostgreSQL 15+ server is running locally (e.g., via Docker or system service).
+2. **Configure Environment**: Copy `.env.example` to `.env` and update the database connection variables (`ASSETBOX_DB_HOST`, `ASSETBOX_DB_PORT`, etc.).
+
 ```bash
 # Set up virtual environment
 python3 -m venv .venv
@@ -100,7 +103,7 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure database and default records
+# Run migrations and seed data
 cd assetbox
 python manage.py migrate
 python manage.py seed_data
