@@ -208,39 +208,48 @@ class SoftDeleteMixin(models.Model):
         if force_hard_delete:
             super().delete(*args, **kwargs)
         else:
-            if hasattr(self, '_changelog_action'):
-                from core.choices import ObjectChangeActionChoices
-                self._changelog_action = ObjectChangeActionChoices.ACTION_DELETE
-            
-            if hasattr(self, 'snapshot') and callable(self.snapshot):
-                self.snapshot()
-            
-            # Recurse and soft-delete/hard-delete cascading relations
-            from django.db.models.deletion import Collector
-            
-            collector = Collector(using=self._state.db or 'default')
-            collector.collect([self])
-            collector.sort()
-            
-            from django.utils import timezone
-            now = timezone.now()
-            
-            for model, instances in list(collector.data.items()):
-                pks_to_soft_delete = []
-                for instance in instances:
-                    if instance == self:
-                        continue
-                    if isinstance(instance, SoftDeleteMixin):
-                        if instance.deleted_at is None:
-                            pks_to_soft_delete.append(instance.pk)
-                    else:
-                        if instance.pk is not None:
-                            instance.delete()
+            from django.db import transaction
+
+            with transaction.atomic():
+                if hasattr(self, '_changelog_action'):
+                    from core.choices import ObjectChangeActionChoices
+                    self._changelog_action = ObjectChangeActionChoices.ACTION_DELETE
                 
-                if pks_to_soft_delete:
-                    model.objects.filter(pk__in=pks_to_soft_delete).update(deleted_at=now)
-            
-            self.soft_delete()
+                if hasattr(self, 'snapshot') and callable(self.snapshot):
+                    self.snapshot()
+                
+                # Recurse and soft-delete/hard-delete cascading relations
+                from django.db.models.deletion import Collector
+                
+                collector = Collector(using=self._state.db or 'default')
+                collector.collect([self])
+                collector.sort()
+                
+                from django.utils import timezone
+                now = timezone.now()
+                
+                for model, instances in list(collector.data.items()):
+                    pks_to_soft_delete = []
+                    for instance in instances:
+                        if instance == self:
+                            continue
+                        if isinstance(instance, SoftDeleteMixin):
+                            if instance.deleted_at is None:
+                                pks_to_soft_delete.append(instance.pk)
+                                # Cascade changelog generation to prevent audit trail blind spots
+                                if hasattr(instance, '_log_change') and callable(instance._log_change):
+                                    from core.utils import serialize_object
+                                    excluded = getattr(instance, '_change_logging_excluded_fields', ['updated_at'])
+                                    prechange_data = serialize_object(instance, exclude_fields=excluded)
+                                    instance._log_change(action='delete', prechange_data=prechange_data)
+                        else:
+                            if instance.pk is not None:
+                                instance.delete()
+                    
+                    if pks_to_soft_delete:
+                        model.objects.filter(pk__in=pks_to_soft_delete).update(deleted_at=now)
+                
+                self.soft_delete()
 
     @classmethod
     def __init_subclass__(cls, **kwargs):

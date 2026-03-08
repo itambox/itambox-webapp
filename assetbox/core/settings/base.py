@@ -9,7 +9,23 @@ from django.utils.translation import gettext_lazy as _
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-VERSION = '0.1.0'
+env_path = BASE_DIR / '.env'
+if not env_path.exists():
+    env_path = BASE_DIR.parent / '.env'
+if env_path.exists():
+    with open(env_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#') or '=' not in line:
+                continue
+            k, v = line.split('=', 1)
+            k = k.strip()
+            v = v.strip()
+            if (v.startswith('"') and v.endswith('"')) or (v.startswith("'") and v.endswith("'")):
+                v = v[1:-1]
+            os.environ.setdefault(k, v)
+
+VERSION = '1.0.0-alpha'
 
 SECRET_KEY = os.environ.get('ASSETBOX_SECRET_KEY', '')
 
@@ -43,6 +59,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_spectacular',
     'users',
+    'django_q',
 ]
 
 MIDDLEWARE = [
@@ -82,6 +99,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'assetbox.context_processors.breadcrumbs',
                 'assetbox.context_processors.notifications_processor',
+                'assetbox.context_processors.tenant_switcher_processor',
             ],
             'loaders': partial_loaders,
             'libraries': {
@@ -96,26 +114,29 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
+DB_ENGINE = os.environ.get('ASSETBOX_DB_ENGINE', 'django.db.backends.postgresql')
+
+if 'sqlite' in DB_ENGINE:
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured(
+        "SQLite is strictly deprecated and not supported in AssetBox. "
+        "Please use PostgreSQL 15+ for all environments."
+    )
+
 DATABASES = {
     'default': {
-        'ENGINE': os.environ.get('ASSETBOX_DB_ENGINE', 'django.db.backends.sqlite3'),
-        'NAME': os.environ.get('ASSETBOX_DB_NAME', BASE_DIR / 'db.sqlite3'),
-    }
-}
-
-if DATABASES['default']['ENGINE'] == 'django.db.backends.postgresql':
-    DATABASES['default'].update({
-        'USER': os.environ.get('ASSETBOX_DB_USER', ''),
-        'PASSWORD': os.environ.get('ASSETBOX_DB_PASSWORD', ''),
+        'ENGINE': DB_ENGINE,
+        'NAME': os.environ.get('ASSETBOX_DB_NAME', 'assetbox'),
+        'USER': os.environ.get('ASSETBOX_DB_USER', 'assetbox'),
+        'PASSWORD': os.environ.get('ASSETBOX_DB_PASSWORD', 'assetbox'),
         'HOST': os.environ.get('ASSETBOX_DB_HOST', 'localhost'),
         'PORT': os.environ.get('ASSETBOX_DB_PORT', '5432'),
         'CONN_MAX_AGE': int(os.environ.get('ASSETBOX_DB_CONN_MAX_AGE', '300')),
         'OPTIONS': {
             'sslmode': os.environ.get('ASSETBOX_DB_SSLMODE', 'prefer'),
         },
-    })
-else:
-    DATABASES['default']['CONN_MAX_AGE'] = 60
+    }
+}
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
@@ -217,6 +238,7 @@ LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
 
 AUTHENTICATION_BACKENDS = [
+    'core.auth.TenantMembershipBackend',
     'core.auth.AssetBoxPermissionBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
@@ -254,3 +276,24 @@ try:
             SAML_IDP_ENTITY_ID = saml_config.idp_entity_id
 except Exception:
     SAML_ACTIVE = False
+
+
+# ==============================================================================
+# Django-Q2 Background Tasks Cluster Settings
+# ==============================================================================
+Q_CLUSTER = {
+    'name': 'AssetBox-Cluster',
+    'workers': 2,            # Safe count for local developer workloads
+    'recycle': 500,
+    'timeout': 600,
+    'retry': 660,
+    'compress': True,
+    'cpu_affinity': 1,
+    'label': 'Django Q Cluster',
+    'orm': 'default',        # Standard database ORM broker
+}
+
+import sys
+if 'test' in sys.argv:
+    Q_CLUSTER['sync'] = True
+

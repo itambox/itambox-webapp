@@ -19,6 +19,10 @@ def get_model_viewname(model, action):
     if app_label == 'components':
         app_label = 'assets'
     model_name = model._meta.model_name
+    if app_label == 'core':
+        # Core app URL naming traditionally registers f"{model_name}_add" for creation
+        act = 'add' if action == 'create' else action
+        return f"{model_name}_{act}"
     return f"{app_label}:{model_name}_{action}"
 
 
@@ -90,7 +94,10 @@ def serialize_object(obj: Model, extra_fields=None, exclude_fields=None) -> dict
 
         if field_name in m2m_fields:
             if hasattr(field_value, 'all'):
-                data[field_name] = sorted(list(field_value.values_list('pk', flat=True)))
+                try:
+                    data[field_name] = sorted(list(field_value.values_list('pk', flat=True)))
+                except Exception:
+                    data[field_name] = []
             else:
                 data[field_name] = []
         elif field.is_relation:
@@ -99,12 +106,16 @@ def serialize_object(obj: Model, extra_fields=None, exclude_fields=None) -> dict
             else:
                 data[field_name] = None
         else:
-            if isinstance(field_value, (datetime.date, datetime.datetime)):
+            if isinstance(field_value, (datetime.date, datetime.datetime, datetime.time)):
                 data[field_name] = field_value.isoformat()
             elif isinstance(field_value, Decimal):
                 data[field_name] = str(field_value)
             else:
-                data[field_name] = field_value
+                from django.db.models.fields.files import FieldFile
+                if isinstance(field_value, FieldFile):
+                    data[field_name] = field_value.name if field_value else None
+                else:
+                    data[field_name] = field_value
 
     return data
 

@@ -82,3 +82,16 @@ def notifications_processor(request):
         'unread_notifications_count': 0,
         'recent_unread_notifications': []
     }
+
+
+def tenant_switcher_processor(request):
+    """Context processor providing available switcher tenants globally for superusers."""
+    if request.user.is_authenticated and request.user.is_superuser:
+        from organization.models import Tenant
+        all_tenants = Tenant._base_manager.all().order_by('name')
+        return {
+            'all_tenants_switcher': all_tenants
+        }
+    return {
+        'all_tenants_switcher': []
+    }

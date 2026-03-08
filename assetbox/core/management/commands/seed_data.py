@@ -143,7 +143,7 @@ class Command(BaseCommand):
         # Default status labels
         defaults = [
             ('Available', 'available', 'deployable', '28a745'),
-            ('In Use', 'in-use', 'deployable', '007bff'),
+            ('In Use', 'in-use', 'deployed', '007bff'),
             ('Pending Repair', 'pending-repair', 'pending', 'ffc107'),
             ('Retired', 'retired', 'archived', 'dc3545'),
             ('In Transit', 'in-transit', 'pending', '6f42c1'),
@@ -233,7 +233,7 @@ class Command(BaseCommand):
         # Default status labels (idempotent)
         defaults = [
             ('Available', 'available', 'deployable', '28a745'),
-            ('In Use', 'in-use', 'deployable', '007bff'),
+            ('In Use', 'in-use', 'deployed', '007bff'),
             ('Pending Repair', 'pending-repair', 'pending', 'ffc107'),
             ('Retired', 'retired', 'archived', 'dc3545'),
             ('In Transit', 'in-transit', 'pending', '6f42c1'),

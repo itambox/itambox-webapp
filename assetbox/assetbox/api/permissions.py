@@ -46,7 +46,7 @@ class TokenPermissions(DjangoObjectPermissions):
         if not perms:
             return True
 
-        return request.user.has_perms(perms)
+        return request.user.has_perms(perms, obj=obj)
 
 
 class IsAuthenticatedOrLoginNotRequired(BasePermission):

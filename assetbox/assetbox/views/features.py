@@ -25,7 +25,7 @@ from core.tables import (
     EventRuleTable, LabelTemplateTable
 )
 from core.forms import (
-    JournalEntryForm, WebhookEndpointForm, EventRuleForm, LabelTemplateForm
+    JournalEntryForm, WebhookEndpointForm, EventRuleForm, LabelTemplateForm, PermissionGroupForm
 )
 from assetbox.registry import registry
 from assetbox.panels import Panel
@@ -407,7 +407,7 @@ class PermissionGroupDetailView(ObjectDetailView):
 
 class PermissionGroupEditView(ObjectEditView):
     queryset = PermissionGroup.objects.all()
-    fields = ['name', 'description', 'permissions', 'users']
+    model_form = PermissionGroupForm
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

@@ -55,25 +55,87 @@ class CSPMiddleware(MiddlewareMixin):
         return response
 
 
-from core.managers import set_current_tenant
+from core.managers import set_current_tenant, set_current_membership
 
 class TenantMiddleware(MiddlewareMixin):
     """
-    Middleware to automatically detect the logged-in user's tenant
-    and set it in the thread-local context variables context.
+    Middleware to resolve the active tenant from the session or switch_tenant query parameters,
+    validate user's membership for that tenant, and bind the active tenant and membership context.
     """
     def process_request(self, request):
-        if hasattr(request, 'user') and request.user.is_authenticated:
-            if not request.user.is_superuser:
-                profile = getattr(request.user, 'asset_holder_profile', None)
-                if profile and profile.tenant:
-                    set_current_tenant(profile.tenant)
-                    return
-        set_current_tenant(None)
+        if not hasattr(request, 'user') or not request.user.is_authenticated:
+            request.active_tenant = None
+            request.active_membership = None
+            set_current_tenant(None)
+            set_current_membership(None)
+            return
+
+        # 1. Resolve selected tenant ID from Session or URL Query Parameter
+        session_tenant_id = request.session.get('active_tenant_id')
+        query_tenant_id = request.GET.get('switch_tenant')
+
+        # If a query parameter was provided to switch, update it
+        if query_tenant_id is not None:
+            if query_tenant_id == '':
+                session_tenant_id = None
+            else:
+                session_tenant_id = query_tenant_id
+
+        from organization.models import TenantMembership, Tenant
+
+        active_tenant = None
+        active_membership = None
+
+        if request.user.is_superuser:
+            # Superusers can access any tenant without membership.
+            # If no tenant is selected, they default to None (Global / See All).
+            if session_tenant_id:
+                try:
+                    active_tenant = Tenant._base_manager.get(pk=session_tenant_id)
+                    request.session['active_tenant_id'] = active_tenant.id
+                except Tenant.DoesNotExist:
+                    session_tenant_id = None
+                    if 'active_tenant_id' in request.session:
+                        del request.session['active_tenant_id']
+        else:
+            # For standard users, validate membership for the selected tenant ID
+            if session_tenant_id:
+                active_membership = TenantMembership.objects.filter(
+                    user=request.user,
+                    tenant_id=session_tenant_id
+                ).select_related('tenant').first()
+
+            # If no membership is found for the selected tenant, default to their first membership
+            if not active_membership:
+                active_membership = TenantMembership.objects.filter(
+                    user=request.user
+                ).select_related('tenant').first()
+
+            if active_membership:
+                active_tenant = active_membership.tenant
+                request.session['active_tenant_id'] = active_tenant.id
+            else:
+                # User has no memberships at all
+                active_tenant = None
+                active_membership = None
+                if 'active_tenant_id' in request.session:
+                    del request.session['active_tenant_id']
+
+        # Bind to request
+        request.active_tenant = active_tenant
+        request.active_membership = active_membership
+
+        # Call core manager thread context setter
+        set_current_tenant(active_tenant)
+        set_current_membership(active_membership)
 
     def process_response(self, request, response):
         set_current_tenant(None)
+        set_current_membership(None)
         return response
 
     def process_exception(self, request, exception):
-        set_current_tenant(None)
+        set_current_tenant(None)
+        set_current_membership(None)
+
+

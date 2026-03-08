@@ -31,10 +31,25 @@ from assetbox.views.features import (
     LabelTemplateDeleteView, ImageAttachmentUploadView, ImageAttachmentDeleteView,
     FileAttachmentUploadView, FileAttachmentDeleteView, JournalEntryCreateView,
     LabelSelectView, LabelPrintView,
+    PermissionGroupListView, PermissionGroupDetailView, PermissionGroupEditView, PermissionGroupDeleteView,
 )
 from assetbox.views.utility import SearchView, health # Import core views, aliased to avoid clash
+from assetbox.views.jobs import JobListView, JobDetailView, JobCancelView
 from django.conf import settings # Import settings
 from django.conf.urls.static import static # Import static
+
+# Scheduled Reporting & Alerts Views
+from core.views.alerts import (
+    AlertRuleListView, AlertRuleDetailView, AlertRuleCreateView, AlertRuleUpdateView,
+    AlertRuleDeleteView, AlertLogListView, AlertAcknowledgeView, AlertResolveView,
+    NotificationChannelListView, NotificationChannelCreateView, NotificationChannelUpdateView, NotificationChannelDeleteView
+)
+from core.views.reports import (
+    ReportTemplateListView, ReportTemplateDetailView, ReportTemplateCreateView,
+    ReportTemplateUpdateView, ReportTemplateDeleteView, ScheduledReportListView,
+    ScheduledReportCreateView, ScheduledReportUpdateView, ScheduledReportDeleteView,
+    ReportTriggerImmediateView, ReportTemplatePreviewView, ReportTemplateDownloadView
+)
 # from django.contrib.auth import views as auth_views # Already imported
 
 # Main URL Patterns
@@ -69,6 +84,41 @@ urlpatterns = [
     path('changelog/', ObjectChangeListView.as_view(), name='objectchange_list'),
     path('changelog/<int:pk>/', ObjectChangeView.as_view(), name='objectchange'),
 
+    # Background Jobs & Tasks UI
+    path('jobs/', JobListView.as_view(), name='job_list'),
+    path('jobs/<int:pk>/', JobDetailView.as_view(), name='job_detail'),
+    path('jobs/<int:pk>/cancel/', JobCancelView.as_view(), name='job_cancel'),
+
+    # Scheduled Reporting & Alerts UI
+    path('alerts/', AlertLogListView.as_view(), name='alertlog_list'),
+    path('alerts/logs/<int:pk>/acknowledge/', AlertAcknowledgeView.as_view(), name='alertlog_acknowledge'),
+    path('alerts/logs/<int:pk>/resolve/', AlertResolveView.as_view(), name='alertlog_resolve'),
+    path('alerts/rules/', AlertRuleListView.as_view(), name='alertrule_list'),
+    path('alerts/rules/add/', AlertRuleCreateView.as_view(), name='alertrule_add'),
+    path('alerts/rules/<int:pk>/', AlertRuleDetailView.as_view(), name='alert_rule_detail'),
+    path('alerts/rules/<int:pk>/edit/', AlertRuleUpdateView.as_view(), name='alertrule_edit'),
+    path('alerts/rules/<int:pk>/delete/', AlertRuleDeleteView.as_view(), name='alertrule_delete'),
+
+    # Notification Channels
+    path('alerts/channels/', NotificationChannelListView.as_view(), name='notificationchannel_list'),
+    path('alerts/channels/add/', NotificationChannelCreateView.as_view(), name='notificationchannel_add'),
+    path('alerts/channels/<int:pk>/edit/', NotificationChannelUpdateView.as_view(), name='notificationchannel_edit'),
+    path('alerts/channels/<int:pk>/delete/', NotificationChannelDeleteView.as_view(), name='notificationchannel_delete'),
+
+    path('reports/templates/', ReportTemplateListView.as_view(), name='reporttemplate_list'),
+    path('reports/templates/preview/', ReportTemplatePreviewView.as_view(), name='reporttemplate_preview'),
+    path('reports/templates/add/', ReportTemplateCreateView.as_view(), name='reporttemplate_add'),
+    path('reports/templates/<int:pk>/', ReportTemplateDetailView.as_view(), name='report_template_detail'),
+    path('reports/templates/<int:pk>/edit/', ReportTemplateUpdateView.as_view(), name='reporttemplate_edit'),
+    path('reports/templates/<int:pk>/delete/', ReportTemplateDeleteView.as_view(), name='reporttemplate_delete'),
+    path('reports/templates/<int:pk>/download/', ReportTemplateDownloadView.as_view(), name='reporttemplate_download'),
+    
+    path('reports/schedules/', ScheduledReportListView.as_view(), name='scheduledreport_list'),
+    path('reports/schedules/add/', ScheduledReportCreateView.as_view(), name='scheduledreport_add'),
+    path('reports/schedules/<int:pk>/edit/', ScheduledReportUpdateView.as_view(), name='scheduledreport_edit'),
+    path('reports/schedules/<int:pk>/delete/', ScheduledReportDeleteView.as_view(), name='scheduledreport_delete'),
+    path('reports/schedules/<int:pk>/trigger/', ReportTriggerImmediateView.as_view(), name='scheduledreport_trigger'),
+
     # Bulk Actions
     path('bulk-delete/', ObjectBulkDeleteView.as_view(), name='bulk_delete'),
     path('bulk-edit/', ObjectBulkEditView.as_view(), name='bulk_edit'),
@@ -100,6 +150,13 @@ urlpatterns = [
     path('label-templates/<int:pk>/', LabelTemplateDetailView.as_view(), name='labeltemplate_detail'),
     path('label-templates/<int:pk>/edit/', LabelTemplateEditView.as_view(), name='labeltemplate_edit'),
     path('label-templates/<int:pk>/delete/', LabelTemplateDeleteView.as_view(), name='labeltemplate_delete'),
+
+    # Permission Groups
+    path('permission-groups/', PermissionGroupListView.as_view(), name='permissiongroup_list'),
+    path('permission-groups/add/', PermissionGroupEditView.as_view(), name='permissiongroup_add'),
+    path('permission-groups/<int:pk>/', PermissionGroupDetailView.as_view(), name='permissiongroup_detail'),
+    path('permission-groups/<int:pk>/edit/', PermissionGroupEditView.as_view(), name='permissiongroup_edit'),
+    path('permission-groups/<int:pk>/delete/', PermissionGroupDeleteView.as_view(), name='permissiongroup_delete'),
 
     # Export View
     path('export/<str:app_label>/<str:model_name>/<int:template_id>/', ObjectExportView.as_view(), name='object_export'),

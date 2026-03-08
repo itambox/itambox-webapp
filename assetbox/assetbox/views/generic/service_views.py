@@ -1,5 +1,5 @@
 import json
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db import transaction
 from django.http import HttpResponse
 from django.shortcuts import redirect, get_object_or_404
@@ -8,7 +8,7 @@ from django.views.generic import FormView, View
 from assetbox.views.htmx import BaseHTMXView
 
 
-class GenericTransactionView(LoginRequiredMixin, BaseHTMXView, FormView):
+class GenericTransactionView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, FormView):
     queryset = None
     model_form = None
     service_callable = None
@@ -17,6 +17,24 @@ class GenericTransactionView(LoginRequiredMixin, BaseHTMXView, FormView):
     hx_trigger = "tableRefreshRequired"
     form_field_map = {}
     form_exclude_fields = ()
+
+    def get_permission_required(self):
+        if self.permission_required is None:
+            return ()
+        if isinstance(self.permission_required, str):
+            return (self.permission_required,)
+        return self.permission_required
+
+    def has_permission(self):
+        perms = self.get_permission_required()
+        if not perms:
+            return True
+        obj = None
+        try:
+            obj = self.get_object()
+        except Exception:
+            pass
+        return self.request.user.has_perms(perms, obj=obj)
 
     def get_form_class(self):
         if self.model_form is not None:
@@ -80,9 +98,27 @@ class GenericTransactionView(LoginRequiredMixin, BaseHTMXView, FormView):
         return self.success_message
 
 
-class SimplePostView(LoginRequiredMixin, View):
+class SimplePostView(PermissionRequiredMixin, LoginRequiredMixin, View):
     queryset = None
     hx_trigger = "tableRefreshRequired"
+
+    def get_permission_required(self):
+        if self.permission_required is None:
+            return ()
+        if isinstance(self.permission_required, str):
+            return (self.permission_required,)
+        return self.permission_required
+
+    def has_permission(self):
+        perms = self.get_permission_required()
+        if not perms:
+            return True
+        obj = None
+        try:
+            obj = self.get_object()
+        except Exception:
+            pass
+        return self.request.user.has_perms(perms, obj=obj)
 
     def post(self, request, *args, **kwargs):
         obj = self.get_object()

@@ -131,3 +131,13 @@ def content_type_id(obj):
         return None
     from django.contrib.contenttypes.models import ContentType
     return ContentType.objects.get_for_model(obj).id
+
+
+@register.simple_tag
+def has_object_perm(user, perm, obj):
+    """
+    Checks if a user has a specific permission on a specific object.
+    """
+    if not user or not user.is_authenticated:
+        return False
+    return user.has_perm(perm, obj)

@@ -59,6 +59,9 @@ def event_on_delete(sender, instance, **kwargs):
 
 
 def _safe_dispatch(sender, instance, action, created=None):
+    from django.db import connection
+    if 'core_event' not in connection.introspection.table_names():
+        return
     try:
         dispatch_event(sender, instance, action=action, created=created)
     except DatabaseError:
@@ -68,6 +71,9 @@ def _safe_dispatch(sender, instance, action, created=None):
 
 
 def _notify_bookmark_subscribers(sender, instance, action):
+    from django.db import connection
+    if 'core_bookmark' not in connection.introspection.table_names():
+        return
     from core.models import Bookmark, Notification
     from django.contrib.contenttypes.models import ContentType
     
@@ -95,4 +101,5 @@ def _notify_bookmark_subscribers(sender, instance, action):
             level='info' if action != 'deleted' else 'warning',
             target_url=target_url
         )
+
 

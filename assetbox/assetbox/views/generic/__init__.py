@@ -36,7 +36,14 @@ from assetbox.views.htmx import BaseHTMXView
 
 logger = logging.getLogger(__name__)
 
-class ObjectListView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, ListView):
+class TenantScopingViewMixin:
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if hasattr(queryset, 'filter_by_tenant'):
+            queryset = queryset.filter_by_tenant()
+        return queryset
+
+class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, ListView):
     filterset = None
     filterset_form = None
     table = None
@@ -179,7 +186,7 @@ class ObjectListView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, 
         context['help_url'] = get_help_url(self, _model._meta.app_label, _model._meta.model_name)
         return context
 
-class ObjectDetailView(LoginRequiredMixin, BaseHTMXView, DetailView):
+class ObjectDetailView(TenantScopingViewMixin, LoginRequiredMixin, BaseHTMXView, DetailView):
     template_name = 'generic/object_detail.html'
     detail_page_body_partial_name = "htmx/detail_page_wrapper.html"
     layout = None
@@ -220,8 +227,8 @@ class ObjectDetailView(LoginRequiredMixin, BaseHTMXView, DetailView):
         context['model'] = obj.__class__
         context['layout'] = self.layout
 
-        can_change = self.request.user.has_perm(f'{app_label}.change_{model_name}')
-        can_delete = self.request.user.has_perm(f'{app_label}.delete_{model_name}')
+        can_change = self.request.user.has_perm(f'{app_label}.change_{model_name}', obj=obj)
+        can_delete = self.request.user.has_perm(f'{app_label}.delete_{model_name}', obj=obj)
         context['can_change'] = can_change
         context['can_delete'] = can_delete
         context['edit_url'] = None
@@ -391,9 +398,18 @@ class ObjectDetailView(LoginRequiredMixin, BaseHTMXView, DetailView):
         context['help_url'] = get_help_url(self, app_label, model_name)
         return context
 
-class ObjectEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, UpdateView):
+class ObjectEditView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, UpdateView):
     model_form = None
     template_name = 'generic/object_edit.html'
+
+    def has_permission(self):
+        perms = self.get_permission_required()
+        obj = None
+        try:
+            obj = self.get_object()
+        except Exception:
+            pass
+        return self.request.user.has_perms(perms, obj=obj)
 
     def get_permission_required(self):
         model = self._get_model()
@@ -489,6 +505,22 @@ class ObjectEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, 
     def form_valid(self, form):
         is_creating = self.object is None
         _model = self._get_model()
+        
+        # Enforce scoping check on the selected tenant of the object
+        if _model:
+            app_label = _model._meta.app_label
+            model_name = _model._meta.model_name
+            selected_tenant = form.cleaned_data.get('tenant')
+            if not selected_tenant and hasattr(form.instance, 'tenant'):
+                selected_tenant = getattr(form.instance, 'tenant', None)
+                
+            if selected_tenant:
+                is_creating_instance = self.object is None or self.object.pk is None
+                perm_codename = f'{app_label}.add_{model_name}' if is_creating_instance else f'{app_label}.change_{model_name}'
+                if not self.request.user.has_perm(perm_codename, obj=selected_tenant):
+                    form.add_error('tenant', f"You do not have permission to assign objects to tenant '{selected_tenant}'.")
+                    return self.form_invalid(form)
+                    
         self.object = form.save()
         msg_verb = 'Created' if is_creating else 'Modified'
         msg_link = f"<a href='{self.object.get_absolute_url()}'>{self.object}</a>" if hasattr(self.object, 'get_absolute_url') else str(self.object)
@@ -569,9 +601,18 @@ class ObjectCloneView(ObjectEditView):
     def pre_save_clone(self, original, cloned):
         pass
 
-class ObjectDeleteView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, DeleteView):
+class ObjectDeleteView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, DeleteView):
     template_name = 'generic/object_confirm_delete.html'
     form_class = ConfirmationForm
+
+    def has_permission(self):
+        perms = self.get_permission_required()
+        obj = None
+        try:
+            obj = self.get_object()
+        except Exception:
+            pass
+        return self.request.user.has_perms(perms, obj=obj)
 
     def get_permission_required(self):
         if self.model:
@@ -775,24 +816,42 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
         if '_confirm' in request.POST:
             rows = request.session.get('import_rows', [])
             if rows:
-                from django.db import transaction
-                form = self.get_form_class()()
-                form._rows_data = rows
-                with transaction.atomic():
-                    imported, errors = form.import_data(request=request)
-                context = {
-                    'form': form,
-                    'import_summary': {
-                        'imported_count': imported,
-                        'row_count': len(rows),
-                        'errors_list': errors,
-                    },
-                    'title': self._get_title(),
-                    'cancel_url': self._get_cancel_url(),
-                }
+                from django.contrib.contenttypes.models import ContentType
+                from core.models import Job
+                from django_q.tasks import async_task
+
+                model = self._get_model()
+                ct = ContentType.objects.get_for_model(model)
+                
+                # Create background Job tracker instance
+                job = Job.objects.create(
+                    name=f"Bulk Import: {model._meta.verbose_name_plural.title()}",
+                    model=ct,
+                    status=Job.STATUS_PENDING
+                )
+                
+                # Dispatch async task to worker queue
+                async_task(
+                    'core.tasks.import_csv_task',
+                    job.pk,
+                    rows,
+                    model._meta.app_label,
+                    model._meta.model_name,
+                    request.user.pk
+                )
+                
+                messages.success(
+                    request,
+                    f"Asynchronous import job '{job.name}' enqueued successfully! Tracking progress in real-time."
+                )
+                
                 request.session.pop('import_rows', None)
                 request.session.pop('import_delimiter', None)
-                return self.render_to_response(context)
+                
+                try:
+                    return redirect('job_detail', pk=job.pk)
+                except NoReverseMatch:
+                    return redirect(f"/jobs/{job.pk}/")
             return self._render_response(request, form, errors=['No import data found. Please upload a file first.'])
 
         return self._render_response(request, form)
@@ -908,6 +967,8 @@ class ObjectBulkEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXVi
 
     def _get_queryset(self, pks):
         qs = self.queryset if self.queryset is not None else self._get_model().objects.all()
+        if hasattr(qs, 'filter_by_tenant'):
+            qs = qs.filter_by_tenant()
         return qs.filter(pk__in=pks)
 
     def _get_bulk_edit_form(self, data=None, model=None):
@@ -1006,6 +1067,8 @@ class ObjectBulkDeleteView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMX
 
     def _get_queryset(self, pks):
         qs = self.queryset if self.queryset is not None else self._get_model().objects.all()
+        if hasattr(qs, 'filter_by_tenant'):
+            qs = qs.filter_by_tenant()
         return qs.filter(pk__in=pks)
 
     def post(self, request, *args, **kwargs):

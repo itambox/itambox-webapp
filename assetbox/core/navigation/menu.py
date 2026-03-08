@@ -78,7 +78,7 @@ INVENTORY_MENU = Menu(
                         MenuItemButton(
                             link='/import/components/component/',
                             title='Import',
-                            icon_class='mdi mdi-download',
+                            icon_class='mdi mdi-upload',
                             permissions=['components.add_component'],
                             color='outline text-success',
                         ),
@@ -98,7 +98,7 @@ INVENTORY_MENU = Menu(
                         MenuItemButton(
                             link='/import/components/componentstock/',
                             title='Import',
-                            icon_class='mdi mdi-download',
+                            icon_class='mdi mdi-upload',
                             permissions=['components.add_componentstock'],
                             color='outline text-success',
                         ),
@@ -118,7 +118,7 @@ INVENTORY_MENU = Menu(
                         MenuItemButton(
                             link='/import/components/componentallocation/',
                             title='Import',
-                            icon_class='mdi mdi-download',
+                            icon_class='mdi mdi-upload',
                             permissions=['components.add_componentallocation'],
                             color='outline text-success',
                         ),
@@ -144,7 +144,7 @@ INVENTORY_MENU = Menu(
                         MenuItemButton(
                             link='/import/inventory/accessorystock/',
                             title='Import',
-                            icon_class='mdi mdi-download',
+                            icon_class='mdi mdi-upload',
                             permissions=['inventory.add_accessorystock'],
                             color='outline text-success',
                         ),
@@ -165,7 +165,7 @@ INVENTORY_MENU = Menu(
                         MenuItemButton(
                             link='/import/inventory/consumablestock/',
                             title='Import',
-                            icon_class='mdi mdi-download',
+                            icon_class='mdi mdi-upload',
                             permissions=['inventory.add_consumablestock'],
                             color='outline text-success',
                         ),
@@ -220,7 +220,7 @@ OPERATIONS_MENU = Menu(
                         MenuItemButton(
                             link='/import/assets/auditsession/',
                             title='Import',
-                            icon_class='mdi mdi-download',
+                            icon_class='mdi mdi-upload',
                             permissions=['assets.add_auditsession'],
                             color='outline text-success',
                         ),
@@ -246,7 +246,7 @@ OPERATIONS_MENU = Menu(
                         MenuItemButton(
                             link='/import/assets/assetrequest/',
                             title='Import',
-                            icon_class='mdi mdi-download',
+                            icon_class='mdi mdi-upload',
                             permissions=['assets.add_assetrequest'],
                             color='outline text-success',
                         ),
@@ -266,9 +266,53 @@ OPERATIONS_MENU = Menu(
             label=_('System Activity'),
             items=(
                 MenuItem(
+                    link='alertlog_list',
+                    link_text=_('Alerts Center'),
+                    permissions=['core.view_alertlog'],
+                    buttons=(),
+                ),
+                MenuItem(
+                    link='alertrule_list',
+                    link_text=_('Alert Rules'),
+                    permissions=['core.view_alertrule'],
+                    buttons=(
+                        MenuItemButton(
+                            link='alertrule_add',
+                            title='Add',
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=['core.add_alertrule'],
+                        ),
+                    ),
+                ),
+                MenuItem(
+                    link='notificationchannel_list',
+                    link_text=_('Notification Channels'),
+                    permissions=['core.view_notificationchannel'],
+                    buttons=(
+                        MenuItemButton(
+                            link='notificationchannel_add',
+                            title='Add',
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=['core.add_notificationchannel'],
+                        ),
+                    ),
+                ),
+                MenuItem(
+                    link='scheduledreport_list',
+                    link_text=_('Scheduled Reports'),
+                    permissions=['core.view_scheduledreport'],
+                    buttons=(),
+                ),
+                MenuItem(
                     link='objectchange_list',
                     link_text=_('Changelog'),
                     permissions=['core.view_objectchange'],
+                    buttons=(),
+                ),
+                MenuItem(
+                    link='job_list',
+                    link_text=_('Background Jobs'),
+                    permissions=['core.view_job'],
                     buttons=(),
                 ),
             ),
@@ -305,7 +349,7 @@ EXTRAS_MENU = Menu(
                         MenuItemButton(
                             link='/import/assets/assettagsequence/',
                             title='Import',
-                            icon_class='mdi mdi-download',
+                            icon_class='mdi mdi-upload',
                             permissions=['assets.add_assettagsequence'],
                             color='outline text-success',
                         ),
@@ -329,6 +373,24 @@ ADMIN_MENU = Menu(
                     permissions=(),
                     staff_only=True,
                     buttons=(),
+                ),
+            ),
+        ),
+        MenuGroup(
+            label=_('Access Control'),
+            items=(
+                MenuItem(
+                    link='permissiongroup_list',
+                    link_text=_('Permission Groups'),
+                    permissions=['core.view_permissiongroup'],
+                    buttons=(
+                        MenuItemButton(
+                            link='permissiongroup_add',
+                            title='Add',
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=['core.add_permissiongroup'],
+                        ),
+                    ),
                 ),
             ),
         ),

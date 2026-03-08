@@ -103,7 +103,7 @@ def get_model_buttons(app_label, model_name, actions=('add', 'import')):
             MenuItemButton(
                 link=f'/import/{app_label}/{model_name}/',
                 title='Import',
-                icon_class='mdi mdi-download',
+                icon_class='mdi mdi-upload',
                 permissions=[f'{app_label}.add_{model_name}'],
                 color='outline text-success'
             )
