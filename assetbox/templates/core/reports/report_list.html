@@ -1,0 +1,63 @@
+{% extends "generic/object_list.html" %}
+{% load i18n %}
+
+{% block extra_controls %}
+    <a href="{% url 'reporttemplate_list' %}" class="btn btn-outline-secondary">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-text me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 12v-7a2 2 0 0 1 2 -2h7l5 5v4"/><path d="M5 12h9v9h-9z"/><path d="M5 18h6"/><path d="M5 15h6"/></svg>
+        {% trans "Manage Templates" %}
+    </a>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-3">
+    <!-- Active Schedules Count -->
+    <div class="col-sm-6 col-lg-6">
+        <div class="card card-sm">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-primary text-white avatar">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M12 7v5l3 3" /></svg>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium">
+                            {% trans "Automated Report Schedules" %}
+                        </div>
+                        <div class="text-secondary">
+                            {% trans "Hourly, nightly, or weekly runs cataloged" %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Report Templates Count -->
+    <div class="col-sm-6 col-lg-6">
+        <div class="card card-sm bg-purple-lt">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-purple text-white avatar">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-template" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 4m0 1a1 1 0 0 1 1 -1h14a1 1 0 0 1 1 1v3a1 1 0 0 1 -1 1h-14a1 1 0 0 1 -1 -1z" /><path d="M4 12m0 1a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-6a1 1 0 0 1 -1 -1z" /><path d="M14 12l6 0" /><path d="M14 16l6 0" /><path d="M14 20l6 0" /></svg>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium">
+                            <a href="{% url 'reporttemplate_list' %}" class="text-purple fw-bold">
+                                {{ templates.count|default:"3" }} {% trans "Report Templates Available" %}
+                            </a>
+                        </div>
+                        <div class="text-secondary">
+                            {% trans "Asset summary, license allocation & renewals" %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ block.super }}
+{% endblock %}

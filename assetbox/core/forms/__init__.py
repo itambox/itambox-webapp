@@ -10,6 +10,8 @@ from django.urls import reverse
 from core.search import SEARCH_INDEXES
 from core.utils import get_model_viewname
 import django_filters
+from assetbox.middleware import get_current_user
+from core.models import WebhookEndpoint, EventRule, LabelTemplate, ReportTemplate, ScheduledReport, AlertRule, NotificationChannel, PermissionGroup
 
 OBJ_TYPE_CHOICES = [
     (
@@ -118,15 +120,13 @@ class WebhookEndpointForm(BootstrapMixin, forms.ModelForm):
     )
 
     class Meta:
-        model = None
+        model = WebhookEndpoint
         fields = ['name', 'url', 'http_method', 'headers', 'secret', 'enabled', 'retry_count', 'retry_backoff']
         widgets = {
             'headers': forms.Textarea(attrs={'rows': 4}),
         }
 
     def __init__(self, *args, **kwargs):
-        from core.models import WebhookEndpoint
-        self._meta.model = WebhookEndpoint
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.headers:
             self.initial['headers'] = json.dumps(self.instance.headers, indent=2)
@@ -150,7 +150,7 @@ class EventRuleForm(BootstrapMixin, forms.ModelForm):
     )
 
     class Meta:
-        model = None
+        model = EventRule
         fields = ['name', 'model', 'events', 'conditions', 'action_type', 'action_config', 'enabled']
         widgets = {
             'events': forms.Textarea(attrs={'rows': 3}),
@@ -159,8 +159,6 @@ class EventRuleForm(BootstrapMixin, forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
-        from core.models import EventRule
-        self._meta.model = EventRule
         super().__init__(*args, **kwargs)
         if self.instance:
             if self.instance.events:
@@ -200,7 +198,7 @@ class EventRuleForm(BootstrapMixin, forms.ModelForm):
 
 class LabelTemplateForm(BootstrapMixin, forms.ModelForm):
     class Meta:
-        model = None
+        model = LabelTemplate
         fields = ['name', 'description', 'page_width', 'page_height', 'barcode_format', 'template_code', 'printer_settings']
         widgets = {
             'template_code': forms.Textarea(attrs={'rows': 10}),
@@ -208,8 +206,6 @@ class LabelTemplateForm(BootstrapMixin, forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
-        from core.models import LabelTemplate
-        self._meta.model = LabelTemplate
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.printer_settings:
             self.initial['printer_settings'] = json.dumps(self.instance.printer_settings, indent=2)
@@ -452,5 +448,274 @@ class ColorFieldFormMixin:
             return ''
         else:
             raise forms.ValidationError("Ensure the color hex code is 6 characters long.")
+
+
+class ReportTemplateForm(BootstrapMixin, forms.ModelForm):
+    COLUMN_CHOICES = [
+        # Asset Inventory Summary Columns
+        ('asset_tag', _('Asset Tag')),
+        ('name', _('Asset Name')),
+        ('manufacturer', _('Manufacturer')),
+        ('model', _('Model')),
+        ('serial_number', _('Serial Number')),
+        ('status', _('Status Label')),
+        ('location', _('Location')),
+        ('assigned_to', _('Asset Holder')),
+        ('purchase_cost', _('Purchase Cost')),
+        ('purchase_date', _('Purchase Date')),
+        ('warranty_months', _('Warranty (Months)')),
+        # License Utilization Columns
+        ('license_name', _('License Name')),
+        ('software', _('Software')),
+        ('seats', _('Total Seats')),
+        ('assigned_seats', _('Assigned Seats')),
+        ('available_seats', _('Available Seats')),
+        ('utilization_rate', _('Utilization Rate')),
+        # Subscription Renewals Columns
+        ('subscription_name', _('Subscription Name')),
+        ('provider', _('Provider')),
+        ('billing_cycle', _('Billing Cycle')),
+        ('cost', _('Cost')),
+        ('end_date', _('End Date')),
+        # Asset Maintenance Columns
+        ('maintenance_title', _('Maintenance Title')),
+        ('maintenance_asset', _('Asset')),
+        ('maintenance_type', _('Type')),
+        ('maintenance_status', _('Status')),
+        ('maintenance_cost', _('Cost')),
+        ('maintenance_start_date', _('Start Date')),
+        ('maintenance_completion_date', _('Completion Date')),
+        ('maintenance_downtime', _('Downtime (Days)')),
+    ]
+
+    included_columns = forms.MultipleChoiceField(
+        choices=COLUMN_CHOICES,
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
+        required=False,
+        label=_("Included Columns"),
+        help_text=_("Select the columns to include in your visual report grid. Only columns matching your report type will render.")
+    )
+
+    class Meta:
+        model = ReportTemplate
+        fields = [
+            'name', 'description', 'report_type', 'included_columns',
+            'include_summary_cards', 'include_distribution_chart',
+            'group_by_field', 'style_preset', 'advanced_mode', 'template_content', 'tenant', 'filter_tenants'
+        ]
+        widgets = {
+            'template_content': forms.Textarea(attrs={'rows': 15, 'style': 'font-family: monospace;'}),
+            'tenant': forms.Select(attrs={'class': 'form-select'}),
+            'filter_tenants': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''})
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        user = get_current_user()
+        if user and not (user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)):
+            if 'tenant' in self.fields:
+                self.fields.pop('tenant')
+            if 'filter_tenants' in self.fields:
+                self.fields.pop('filter_tenants')
+        else:
+            if 'tenant' in self.fields:
+                self.fields['tenant'].required = False
+                self.fields['tenant'].label = _("Scope / Tenant Filter")
+                self.fields['tenant'].empty_label = _("--------- All Tenants ---------")
+                self.fields['tenant'].help_text = _("Select a specific tenant to restrict this report's compiled data strictly to that tenant. Choose 'All Tenants' (blank) to aggregate data globally across all tenants.")
+            if 'filter_tenants' in self.fields:
+                self.fields['filter_tenants'].label = _("Filter Tenants (Scoping Constellation)")
+                self.fields['filter_tenants'].help_text = _("Select one or more specific tenants to filter this report's compiled data. If none are selected, aggregates data globally across all tenants.")
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        user = get_current_user()
+        if user and not (user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)):
+            profile = getattr(user, 'asset_holder_profile', None)
+            if profile and profile.tenant:
+                instance.tenant = profile.tenant
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
+
+
+
+class ScheduledReportForm(BootstrapMixin, forms.ModelForm):
+    class Meta:
+        model = ScheduledReport
+        fields = [
+            'name', 'report', 'recipients', 'frequency', 'cron_expression', 'start_time',
+            'format', 'channels', 'save_to_archive', 'is_active', 'tenant', 'filter_tenants'
+        ]
+        widgets = {
+            'recipients': forms.Textarea(attrs={'rows': 2, 'placeholder': 'recipient1@example.com, recipient2@example.com'}),
+            'tenant': forms.Select(attrs={'class': 'form-select'}),
+            'report': forms.Select(attrs={'class': 'form-select'}),
+            'filter_tenants': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
+            'channels': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
+            'cron_expression': forms.TextInput(attrs={'placeholder': 'e.g. 0 8 * * 1-5', 'class': 'form-control'}),
+            'start_time': forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        user = get_current_user()
+        if user and not (user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)):
+            if 'tenant' in self.fields:
+                self.fields.pop('tenant')
+            if 'filter_tenants' in self.fields:
+                self.fields.pop('filter_tenants')
+            # Filter reports and channels choices dynamically
+            profile = getattr(user, 'asset_holder_profile', None)
+            if profile and profile.tenant:
+                from core.models import ReportTemplate, NotificationChannel
+                from django.db.models import Q
+                self.fields['report'].queryset = ReportTemplate.objects.filter(
+                    Q(tenant=profile.tenant) | Q(tenant__isnull=True)
+                )
+                self.fields['channels'].queryset = NotificationChannel.objects.filter(
+                    Q(tenant=profile.tenant) | Q(tenant__isnull=True)
+                )
+        else:
+            if 'tenant' in self.fields:
+                self.fields['tenant'].required = False
+                self.fields['tenant'].label = _("Scope / Tenant Filter")
+                self.fields['tenant'].empty_label = _("--------- All Tenants ---------")
+                self.fields['tenant'].help_text = _("Select a specific tenant to restrict this scheduled report's compiled data strictly to that tenant. Choose 'All Tenants' (blank) to aggregate data globally across all tenants.")
+            if 'filter_tenants' in self.fields:
+                self.fields['filter_tenants'].label = _("Filter Tenants (Scoping Constellation)")
+                self.fields['filter_tenants'].help_text = _("Select one or more specific tenants to filter this scheduled report's compiled data. If none are selected, aggregates data globally across all tenants.")
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        user = get_current_user()
+        if user and not (user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)):
+            profile = getattr(user, 'asset_holder_profile', None)
+            if profile and profile.tenant:
+                instance.tenant = profile.tenant
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
+
+
+
+class AlertRuleForm(BootstrapMixin, forms.ModelForm):
+    class Meta:
+        model = AlertRule
+        fields = ['name', 'description', 'alert_type', 'threshold_value', 'severity', 'recipients', 'is_active', 'channels', 'tenant']
+        widgets = {
+            'recipients': forms.Textarea(attrs={'rows': 2, 'placeholder': 'admin, manager, alert@example.com'}),
+            'channels': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
+            'tenant': forms.Select(attrs={'class': 'form-select'})
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        user = get_current_user()
+        if user and not (user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)):
+            if 'tenant' in self.fields:
+                self.fields.pop('tenant')
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        user = get_current_user()
+        if user and not (user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)):
+            profile = getattr(user, 'asset_holder_profile', None)
+            if profile and profile.tenant:
+                instance.tenant = profile.tenant
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
+
+
+class NotificationChannelForm(BootstrapMixin, forms.ModelForm):
+    class Meta:
+        model = NotificationChannel
+        fields = ['name', 'channel_type', 'enabled', 'config', 'tenant']
+        widgets = {
+            'config': forms.Textarea(attrs={'rows': 5, 'placeholder': '{\n  "webhook_url": "https://hooks.slack.com/services/..."\n}', 'style': 'font-family: monospace;'}),
+            'tenant': forms.Select(attrs={'class': 'form-select'})
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.config:
+            self.initial['config'] = json.dumps(self.instance.config, indent=2)
+        user = get_current_user()
+        if user and not (user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)):
+            if 'tenant' in self.fields:
+                self.fields.pop('tenant')
+
+    def clean_config(self):
+        data = self.cleaned_data['config']
+        if isinstance(data, str):
+            try:
+                return json.loads(data)
+            except json.JSONDecodeError:
+                raise forms.ValidationError('Config must be valid JSON.')
+        return data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        user = get_current_user()
+        if user and not (user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)):
+            profile = getattr(user, 'asset_holder_profile', None)
+            if profile and profile.tenant:
+                instance.tenant = profile.tenant
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
+
+
+from django.contrib.auth.models import Permission
+
+class PermissionGroupForm(BootstrapMixin, forms.ModelForm):
+    permission_objects = forms.ModelMultipleChoiceField(
+        queryset=Permission.objects.select_related('content_type').order_by('content_type__app_label', 'codename'),
+        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tomselect': 'true'}),
+        required=False,
+        label="Permissions",
+        help_text="Select one or more permissions to assign to this group."
+    )
+
+    class Meta:
+        model = PermissionGroup
+        fields = ['name', 'description', 'users']
+        widgets = {
+            'users': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tomselect': 'true'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk and self.instance.permissions:
+            pks = []
+            for perm_str, has_perm in self.instance.permissions.items():
+                if has_perm:
+                    try:
+                        app_label, codename = perm_str.split('.')
+                        perm = Permission.objects.get(content_type__app_label=app_label, codename=codename)
+                        pks.append(perm.pk)
+                    except (ValueError, Permission.DoesNotExist):
+                        pass
+            self.fields['permission_objects'].initial = pks
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        permissions_dict = {}
+        selected_perms = self.cleaned_data.get('permission_objects', [])
+        for perm in selected_perms:
+            perm_str = f"{perm.content_type.app_label}.{perm.codename}"
+            permissions_dict[perm_str] = True
+        instance.permissions = permissions_dict
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
+
+
 
 

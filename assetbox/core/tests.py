@@ -434,3 +434,282 @@ class RotateEncryptionKeysCommandTest(TestCase):
             del os.environ['ASSETBOX_FIELD_ENCRYPTION_KEYS']
 
 
+from unittest.mock import patch, MagicMock
+from core.models import ReportTemplate, ScheduledReport, ReportGenerationArchive, NotificationChannel
+from django_q.models import Schedule
+
+class ScheduledReportingAndAlertsTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='reportuser', password='password123', is_superuser=True)
+        # Create a report template
+        self.template = ReportTemplate.objects.create(
+            name='Asset Inventory Test Report',
+            report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
+            included_columns=['asset_tag', 'name'],
+            include_summary_cards=True
+        )
+
+    def test_scheduled_report_validation_cron(self):
+        """Test cron expression validation in ScheduledReport."""
+        # 1. Valid cron
+        report = ScheduledReport(
+            name='Test Report 1',
+            report=self.template,
+            frequency='cron',
+            cron_expression='0 8 * * 1-5'
+        )
+        report.full_clean()  # should not raise
+        
+        # 2. Invalid cron
+        report_invalid = ScheduledReport(
+            name='Test Report 2',
+            report=self.template,
+            frequency='cron',
+            cron_expression='invalid_cron'
+        )
+        with self.assertRaises(ValidationError):
+            report_invalid.full_clean()
+
+    def test_scheduled_report_validation_recipients(self):
+        """Test email recipients validation."""
+        # Invalid email list
+        report = ScheduledReport(
+            name='Test Report 3',
+            report=self.template,
+            recipients='invalid_email, another_invalid'
+        )
+        with self.assertRaises(ValidationError):
+            report.full_clean()
+
+        # Valid email list
+        report_valid = ScheduledReport(
+            name='Test Report 4',
+            report=self.template,
+            recipients='test@example.com, user2@domain.co.uk'
+        )
+        report_valid.full_clean()
+
+    def test_schedule_creation_in_view(self):
+        """Test that Schedule is created or updated in ScheduledReport form_valid views."""
+        self.client.force_login(self.user)
+        url = reverse('scheduledreport_add')
+        data = {
+            'name': 'Active Weekly Report',
+            'report': self.template.pk,
+            'frequency': 'weekly',
+            'format': 'html',
+            'start_time': '09:30:00',
+            'save_to_archive': True,
+            'is_active': True,
+        }
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 302)
+        
+        # Retrieve created ScheduledReport
+        sched = ScheduledReport.objects.get(name='Active Weekly Report')
+        self.assertIsNotNone(sched.schedule)
+        self.assertEqual(sched.schedule.schedule_type, Schedule.WEEKLY)
+        self.assertEqual(sched.schedule.cron, '')
+        
+        # Verify next run is set and matches the configured time of day
+        self.assertEqual(sched.schedule.next_run.time().hour, 9)
+        self.assertEqual(sched.schedule.next_run.time().minute, 30)
+
+    @patch('django.core.mail.EmailMessage')
+    @patch('requests.post')
+    def test_generate_report_task_success(self, mock_post, mock_email_message):
+        """Test general execution of report generation task, local archiving and dispatches."""
+        # Setup channel
+        channel_webhook = NotificationChannel.objects.create(
+            name='Test Webhook Channel',
+            channel_type=NotificationChannel.TYPE_WEBHOOK,
+            enabled=True,
+            config={'url': 'http://example.com/webhook'}
+        )
+        
+        # Create a scheduled report with webhook and archive active
+        sched = ScheduledReport.objects.create(
+            name='Full Task Test Schedule',
+            report=self.template,
+            frequency='once',
+            format='html',
+            recipients='',
+            save_to_archive=True
+        )
+        sched.channels.add(channel_webhook)
+
+        # Mock the requests POST response
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_post.return_value = mock_response
+
+        # Execute task
+        from core.tasks import generate_scheduled_report_task
+        success = generate_scheduled_report_task(sched.pk)
+        
+        self.assertTrue(success)
+        
+        # Check archive entry was created
+        sched.refresh_from_db()
+        self.assertEqual(sched.last_status, 'success')
+        self.assertIsNotNone(sched.last_run)
+        
+        archive = ReportGenerationArchive.objects.filter(scheduled_report=sched).first()
+        self.assertIsNotNone(archive)
+        self.assertEqual(archive.status, 'success')
+        self.assertIsNotNone(archive.file)
+        self.assertEqual(archive.file.mime_type, 'text/html')
+        
+        # Verify webhook was called
+        mock_post.assert_called_once()
+
+    def test_asset_checkout_status_change_logged(self):
+        """Test that asset checkout changes status to 'In Use' and creates a correct ObjectChange record."""
+        from assets.models import StatusLabel, Asset, AssetRole
+        from assets.services import checkout_asset
+        from organization.models import AssetHolder
+        from core.models import ObjectChange
+        from assetbox.middleware import _current_user, _request_id
+        import uuid
+
+        # Ensure Available and In Use status labels exist
+        available_status, _ = StatusLabel.objects.get_or_create(
+            slug='available',
+            defaults={'name': 'Available', 'type': 'deployable', 'color': '28a745'}
+        )
+        in_use_status, _ = StatusLabel.objects.get_or_create(
+            slug='in-use',
+            defaults={'name': 'In Use', 'type': 'deployed', 'color': '007bff'}
+        )
+
+        role = AssetRole.objects.create(name='Test Role', slug='test-role')
+        asset = Asset.objects.create(
+            name='Test Checkout Laptop',
+            asset_tag='TAG-CHK-TEST',
+            status=available_status,
+            asset_role=role
+        )
+
+        holder = AssetHolder.objects.create(first_name='John', last_name='Tester', upn='john.tester')
+
+        # Set middleware variables
+        _current_user.set(self.user)
+        _request_id.set(uuid.uuid4())
+
+        # Perform checkout
+        checkout_asset(asset, holder=holder, user=self.user)
+
+        # Refresh from db
+        asset.refresh_from_db()
+        self.assertEqual(asset.status, in_use_status)
+
+        # Check changelog entry has difference
+        change = ObjectChange.objects.filter(changed_object_id=asset.pk, action='checkout').latest('time')
+        self.assertEqual(change.prechange_data.get('status'), available_status.pk)
+        self.assertEqual(change.postchange_data.get('status'), in_use_status.pk)
+        self.assertNotEqual(change.prechange_data, change.postchange_data)
+
+    def test_tenant_group_membership_isolation(self):
+        """Test that a user cannot edit an asset of a tenant where they are reader, even if switched to an admin tenant."""
+        from organization.models import Tenant, TenantGroup, TenantMembership, TenantRole
+        from assets.models import StatusLabel, Asset, AssetRole
+        
+        # 1. Create TenantGroup and two tenants in the same group
+        group = TenantGroup.objects.create(name='Test Group', slug='test-group')
+        tenant_admin = Tenant.objects.create(name='Admin Tenant', slug='admin-tenant', group=group)
+        tenant_readonly = Tenant.objects.create(name='Readonly Tenant', slug='readonly-tenant', group=group)
+        
+        # 2. Create status & role
+        status = StatusLabel.objects.create(name='Test Active', slug='test-active', type='deployable')
+        role = AssetRole.objects.create(name='Test Role', slug='test-role')
+        
+        from assets.models import Manufacturer, AssetType
+        mfr = Manufacturer.objects.create(name='Dell', slug='dell')
+        asset_type = AssetType.objects.create(manufacturer=mfr, model='Latitude 5550')
+        
+        # 3. Create asset belonging to the readonly tenant
+        asset_readonly = Asset.objects.create(
+            name='Protected Desktop',
+            asset_tag='TAG-PROT',
+            status=status,
+            asset_role=role,
+            tenant=tenant_readonly
+        )
+        
+        # Create a non-superuser user
+        test_user = User.objects.create_user(username='tenant_test_user', password='password123', is_superuser=False)
+        
+        # 4. Bind memberships
+        TenantMembership.objects.create(user=test_user, tenant=tenant_admin, role=TenantRole.ADMIN)
+        TenantMembership.objects.create(user=test_user, tenant=tenant_readonly, role=TenantRole.READER)
+        
+        # Set active context in test client session
+        self.client.force_login(test_user)
+        session = self.client.session
+        session['active_tenant_id'] = tenant_admin.pk
+        session.save()
+        
+        # 5. Set active context to the ADMIN tenant
+        from core.managers import set_current_tenant, set_current_membership
+        membership_admin = TenantMembership.objects.get(user=test_user, tenant=tenant_admin)
+        set_current_tenant(tenant_admin)
+        set_current_membership(membership_admin)
+        
+        # 6. Verify that the user has general 'change_asset' permission (under active context)
+        self.assertTrue(test_user.has_perm('assets.change_asset'))
+        
+        # 7. BUT verify that the user CANNOT edit the specific asset of the READONLY tenant!
+        self.assertFalse(test_user.has_perm('assets.change_asset', obj=asset_readonly))
+        
+        # 8. Test that GET/POST requests are blocked for the readonly tenant asset
+        self.client.force_login(test_user)
+        
+        # Update GET
+        url_update = reverse('assets:asset_update', kwargs={'pk': asset_readonly.pk})
+        response = self.client.get(url_update)
+        self.assertEqual(response.status_code, 403)
+        
+        # Delete GET
+        url_delete = reverse('assets:asset_delete', kwargs={'pk': asset_readonly.pk})
+        response = self.client.get(url_delete)
+        self.assertEqual(response.status_code, 403)
+        
+        # Clone GET
+        url_clone = reverse('assets:asset_clone', kwargs={'pk': asset_readonly.pk})
+        response = self.client.get(url_clone)
+        self.assertEqual(response.status_code, 403)
+        
+        # Checkout GET (modal)
+        url_checkout = reverse('assets:asset_checkout_modal', kwargs={'pk': asset_readonly.pk})
+        response = self.client.get(url_checkout)
+        self.assertEqual(response.status_code, 403)
+        
+        # Checkin POST
+        url_checkin = reverse('assets:asset_checkin', kwargs={'pk': asset_readonly.pk})
+        response = self.client.post(url_checkin)
+        self.assertEqual(response.status_code, 403)
+        
+        # 9. Test that creating an asset and assigning it to the readonly tenant is blocked by form validation
+        url_create = reverse('assets:asset_create')
+        post_data = {
+            'name': 'Illegally Assigned Laptop',
+            'asset_tag': 'TAG-ILLEGAL',
+            'status': status.pk,
+            'asset_type': asset_type.pk,
+            'asset_role': role.pk,
+            'tenant': tenant_readonly.pk,
+        }
+        response = self.client.post(url_create, data=post_data)
+        self.assertEqual(response.status_code, 200)
+        form = response.context['form']
+        self.assertIn('tenant', form.errors)
+        self.assertEqual(form.errors['tenant'][0], f"You do not have permission to assign objects to tenant '{tenant_readonly}'.")
+        
+        # Cleanup context
+        set_current_tenant(None)
+        set_current_membership(None)
+
+
+
+
+

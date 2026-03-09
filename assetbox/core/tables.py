@@ -2,7 +2,11 @@ import logging
 import django_tables2 as tables
 from django_tables2.utils import A
 from django_tables2.data import TableQuerysetData
-from .models import ObjectChange, ExportTemplate, PermissionGroup, WebhookEndpoint, EventRule, LabelTemplate
+from .models import (
+    ObjectChange, ExportTemplate, PermissionGroup, WebhookEndpoint,
+    EventRule, LabelTemplate, Job, ReportTemplate, ScheduledReport,
+    AlertRule, AlertLog, NotificationChannel
+)
 from django.utils.html import format_html, escape
 from django.urls import reverse, NoReverseMatch
 from django.utils.safestring import mark_safe
@@ -36,10 +40,8 @@ class BooleanColumn(tables.Column):
     EMPTY_MARK = mark_safe('<span class="text-muted">&mdash;</span>')
 
     def __init__(self, *args, true_mark=None, false_mark=None, **kwargs):
-        if true_mark is not None:
-            self.true_mark = true_mark
-        if false_mark is not None:
-            self.false_mark = false_mark
+        self.true_mark = true_mark if true_mark is not None else self.TRUE_MARK
+        self.false_mark = false_mark if false_mark is not None else self.FALSE_MARK
         super().__init__(*args, **kwargs)
 
     def render(self, value):
@@ -375,6 +377,8 @@ class BaseTable(tables.Table):
             for attr_key in ('th', 'td'):
                 cell_attrs = base_column.attrs.setdefault(attr_key, {})
                 current_class = cell_attrs.get('class', '')
+                if 'col-actions-wide' in current_class and width_class == 'col-actions':
+                    continue
                 cell_attrs['class'] = f"{current_class} {width_class}".strip()
 
     def _get_columns(self, visible=True):
@@ -649,3 +653,206 @@ class PermissionGroupTable(BaseTable):
             return mark_safe('<span class="text-muted">&mdash;</span>')
         items = [f'<span class="badge bg-primary me-1">{k}</span>' for k, v in value.items() if v]
         return mark_safe(' '.join(items)) if items else mark_safe('<span class="text-muted">&mdash;</span>')
+
+
+class JobTable(BaseTable):
+    name = tables.Column(linkify=True)
+    status = tables.Column(verbose_name='Status')
+    created = tables.DateTimeColumn(verbose_name='Created At', format='Y-m-d H:i:s')
+    started = tables.DateTimeColumn(verbose_name='Started At', format='Y-m-d H:i:s')
+    completed = tables.DateTimeColumn(verbose_name='Completed At', format='Y-m-d H:i:s')
+
+    class Meta(BaseTable.Meta):
+        model = Job
+        fields = ('name', 'status', 'created', 'started', 'completed')
+        sequence = ('name', 'status', 'created', 'started', 'completed')
+
+    def render_status(self, value, record):
+        color = 'secondary'
+        if value == 'pending':
+            color = 'info'
+        elif value == 'running':
+            color = 'warning'
+        elif value == 'completed':
+            color = 'success'
+        elif value == 'failed':
+            color = 'danger'
+        return format_html(
+            '<span class="badge bg-{0}">{1}</span>',
+            color,
+            record.get_status_display(),
+        )
+
+
+class ReportTemplateTable(BaseTable):
+    name = tables.Column(linkify=True)
+    report_type = tables.Column(verbose_name='Type')
+
+    class Meta(BaseTable.Meta):
+        model = ReportTemplate
+        fields = ('name', 'description', 'report_type')
+        sequence = ('name', 'description', 'report_type')
+
+
+class ScheduledReportTable(BaseTable):
+    name = tables.Column(linkify=False)
+    report = tables.Column(linkify=True)
+    recipients = tables.Column()
+    format = tables.Column()
+    is_active = BooleanColumn()
+    last_run = tables.DateTimeColumn(format='Y-m-d H:i:s')
+    last_status = tables.Column()
+    actions = tables.TemplateColumn(
+        template_code="""
+        <div class="d-flex gap-1 justify-content-end">
+            <form method="post" action="{% url 'scheduledreport_trigger' record.pk %}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+                <button type="submit" class="btn btn-sm btn-outline-primary d-flex align-items-center" title="Run Now">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-player-play" width="12" height="12" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 4v16l13 -8z" /></svg>
+                    <span class="ms-1 d-none d-md-inline">Run Now</span>
+                </button>
+            </form>
+            <a class="btn btn-sm btn-outline-secondary btn-icon" href="{% url 'scheduledreport_edit' record.pk %}" title="Edit">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-pencil" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h4l10.5 -10.5a1.5 1.5 0 0 0 -4 -4l-10.5 10.5v4" /><path d="M13.5 6.5l4 4" /></svg>
+            </a>
+            <a class="btn btn-sm btn-outline-danger btn-icon" href="{% url 'scheduledreport_delete' record.pk %}" title="Delete">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
+            </a>
+        </div>
+        """,
+        verbose_name="Actions",
+        orderable=False,
+        attrs={
+            'th': {
+                'class': 'col-actions-wide text-nowrap',
+            },
+            'td': {
+                'class': 'text-end text-nowrap noprint p-1 col-actions-wide'
+            }
+        }
+    )
+
+    class Meta(BaseTable.Meta):
+        model = ScheduledReport
+        fields = ('name', 'report', 'recipients', 'format', 'is_active', 'last_run', 'last_status', 'actions')
+        sequence = ('name', 'report', 'recipients', 'format', 'is_active', 'last_run', 'last_status', 'actions')
+
+
+class AlertRuleTable(BaseTable):
+    name = tables.Column(linkify=True)
+    alert_type = tables.Column(verbose_name='Alert Type')
+    threshold_value = tables.Column(verbose_name='Threshold')
+    severity = tables.Column()
+    is_active = BooleanColumn()
+    tenant = tables.Column(verbose_name='Tenant', accessor='tenant.name')
+
+    class Meta(BaseTable.Meta):
+        model = AlertRule
+        fields = ('name', 'alert_type', 'threshold_value', 'severity', 'is_active', 'tenant')
+        sequence = ('name', 'alert_type', 'threshold_value', 'severity', 'is_active', 'tenant')
+
+    def render_severity(self, value):
+        color = 'secondary'
+        if value == AlertRule.SEVERITY_INFO:
+            color = 'info'
+        elif value == AlertRule.SEVERITY_WARNING:
+            color = 'warning'
+        elif value == AlertRule.SEVERITY_CRITICAL:
+            color = 'danger'
+        return format_html('<span class="badge bg-{}">{}</span>', color, value.capitalize())
+
+
+class NotificationChannelTable(BaseTable):
+    name = tables.Column(linkify=True)
+    channel_type = tables.Column(verbose_name='Channel Type')
+    enabled = BooleanColumn()
+    tenant = tables.Column(verbose_name='Tenant', accessor='tenant.name')
+    actions = tables.TemplateColumn(
+        template_code="""
+        <div class="d-flex gap-1 justify-content-end">
+            <a class="btn btn-sm btn-outline-secondary btn-icon" href="{% url 'notificationchannel_edit' record.pk %}" title="Edit">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-pencil" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h4l10.5 -10.5a1.5 1.5 0 0 0 -4 -4l-10.5 10.5v4" /><path d="M13.5 6.5l4 4" /></svg>
+            </a>
+            <a class="btn btn-sm btn-outline-danger btn-icon" href="{% url 'notificationchannel_delete' record.pk %}" title="Delete">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
+            </a>
+        </div>
+        """,
+        verbose_name="Actions",
+        orderable=False,
+        attrs={
+            'th': {
+                'class': 'col-actions text-nowrap',
+            },
+            'td': {
+                'class': 'text-end text-nowrap noprint p-1 col-actions'
+            }
+        }
+    )
+
+    class Meta(BaseTable.Meta):
+        model = NotificationChannel
+        fields = ('name', 'channel_type', 'enabled', 'tenant', 'actions')
+        sequence = ('name', 'channel_type', 'enabled', 'tenant', 'actions')
+
+
+class AlertLogTable(BaseTable):
+    created_at = tables.DateTimeColumn(verbose_name='Date', format='Y-m-d H:i:s')
+    rule = tables.Column(linkify=True)
+    subject = tables.Column(linkify=False)
+    status = tables.Column()
+    actions = tables.TemplateColumn(
+        template_code="""
+        <div class="d-flex gap-1 justify-content-end">
+            {% if record.status == 'active' %}
+                <form method="post" action="{% url 'alertlog_acknowledge' record.pk %}" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+                    <button type="submit" class="btn btn-sm btn-outline-warning" title="Acknowledge">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-eye" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" /><path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6" /></svg>
+                        Acknowledge
+                    </button>
+                </form>
+            {% endif %}
+            {% if record.status != 'resolved' %}
+                <form method="post" action="{% url 'alertlog_resolve' record.pk %}" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+                    <button type="submit" class="btn btn-sm btn-outline-success" title="Resolve">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l5 5l10 -10" /></svg>
+                        Resolve
+                    </button>
+                </form>
+            {% endif %}
+        </div>
+        """,
+        verbose_name="Actions",
+        orderable=False,
+        attrs={
+            'th': {
+                'class': 'col-actions-wide text-nowrap',
+            },
+            'td': {
+                'class': 'text-end text-nowrap noprint p-1 col-actions-wide'
+            }
+        }
+    )
+
+    class Meta(BaseTable.Meta):
+        model = AlertLog
+        fields = ('created_at', 'rule', 'subject', 'status', 'actions')
+        sequence = ('created_at', 'rule', 'subject', 'status', 'actions')
+
+    def render_status(self, value):
+        color = 'secondary'
+        if value == AlertLog.STATUS_ACTIVE:
+            color = 'danger'
+        elif value == AlertLog.STATUS_ACKNOWLEDGED:
+            color = 'warning'
+        elif value == AlertLog.STATUS_RESOLVED:
+            color = 'success'
+        return format_html('<span class="badge bg-{}">{}</span>', color, value.capitalize())
+
+
+
