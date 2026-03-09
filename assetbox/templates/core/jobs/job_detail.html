@@ -1,0 +1,141 @@
+{% extends base_template|default:"layout.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="container-xl" id="job-detail-card" 
+     {% if object.status == 'pending' or object.status == 'running' %}
+     hx-get="{% url 'job_detail' object.pk %}" 
+     hx-trigger="every 3s" 
+     hx-select="#job-detail-card" 
+     hx-target="#job-detail-card" 
+     hx-swap="outerHTML"
+     {% endif %}>
+    
+    <!-- Page header -->
+    <div class="page-header d-print-none mb-3">
+        <div class="row align-items-center">
+            <div class="col">
+                <!-- Breadcrumbs -->
+                <ol class="breadcrumb" aria-label="breadcrumbs">
+                    <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">{% trans "Dashboard" %}</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'job_list' %}">{% trans "Tasks & Jobs" %}</a></li>
+                    <li class="breadcrumb-item active" aria-current="page"><a href="#">{{ object.name }}</a></li>
+                </ol>
+                <h2 class="page-title mt-2">
+                    {{ object.name }}
+                    {% if object.status == 'pending' %}
+                        <span class="badge bg-info ms-2">{% trans "Pending" %}</span>
+                    {% elif object.status == 'running' %}
+                        <span class="badge bg-warning ms-2">{% trans "Running" %}</span>
+                        <span class="spinner-border spinner-border-sm text-warning ms-1" role="status"></span>
+                    {% elif object.status == 'completed' %}
+                        <span class="badge bg-success ms-2">{% trans "Completed" %}</span>
+                    {% elif object.status == 'failed' %}
+                        <span class="badge bg-danger ms-2">{% trans "Failed" %}</span>
+                    {% endif %}
+                </h2>
+            </div>
+            
+            <!-- Actions -->
+            {% if object.status == 'pending' or object.status == 'running' %}
+                {% if perms.core.change_job %}
+                <div class="col-auto ms-auto">
+                    <form action="{% url 'job_cancel' object.pk %}" method="post" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-danger btn-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-square-x" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" /><path d="M9 9l6 6m0 -6l-6 6" />
+                            </svg>
+                            {% trans "Cancel Task" %}
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="row row-cards">
+        <!-- Details Card -->
+        <div class="col-md-4">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title">{% trans "Job Information" %}</h3>
+                </div>
+                <table class="table table-transparent table-vcenter card-table font-monospace fs-5">
+                    <tbody>
+                        <tr>
+                            <td><strong>{% trans "Created" %}:</strong></td>
+                            <td class="text-muted text-end">{{ object.created|date:"Y-m-d H:i:s" }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>{% trans "Started" %}:</strong></td>
+                            <td class="text-muted text-end">{% if object.started %}{{ object.started|date:"Y-m-d H:i:s" }}{% else %}&mdash;{% endif %}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>{% trans "Completed" %}:</strong></td>
+                            <td class="text-muted text-end">{% if object.completed %}{{ object.completed|date:"Y-m-d H:i:s" }}{% else %}&mdash;{% endif %}</td>
+                        </tr>
+                        {% if object.result %}
+                        <tr>
+                            <td colspan="2" class="border-top pt-2">
+                                <strong>{% trans "Task Result Summary" %}:</strong>
+                                <pre class="bg-surface-secondary text-primary border rounded p-2 mt-2 mb-0 fs-6">{{ object.result|json_script:"job-result-data" }}
+<script>
+    // Format JSON outcome cleanly
+    document.write(JSON.stringify(JSON.parse(document.getElementById('job-result-data').textContent), null, 2));
+</script></pre>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Zip/Label Downloads -->
+            {% if attachments %}
+            <div class="card bg-success-lt mb-3">
+                <div class="card-body">
+                    <h3 class="card-title text-success">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-download me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" /><path d="M7 11l5 5l5 -5" /><path d="M12 4l0 12" />
+                        </svg>
+                        {% trans "Generated Attachments" %}
+                    </h3>
+                    <p class="text-muted fs-5">{% trans "The background operation generated files for checkout or label template batch downloading." %}</p>
+                    {% for file in attachments %}
+                    <a href="{{ file.file.url }}" class="btn btn-success btn-sm w-100 mt-1" download>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-zip" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M16 16v-8h2a2 2 0 1 1 0 4h-2" /><path d="M12 8v8" /><path d="M4 8h4l-4 8h4" />
+                        </svg>
+                        Download {{ file.name }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Logs block -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <h3 class="card-title text-white">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-terminal-2 me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 9l3 3l-3 3" /><path d="M13 15l3 0" /><path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
+                        </svg>
+                        {% trans "Execution & Activity Logs" %}
+                    </h3>
+                    {% if object.status == 'running' %}
+                    <span class="badge bg-warning text-warning-invert spinner-border spinner-border-sm" role="status"></span>
+                    {% endif %}
+                </div>
+                <div class="card-body bg-dark text-light p-0">
+                    <pre class="bg-dark text-light border-0 rounded-0 p-3 mb-0 fs-5 font-monospace text-wrap" style="min-height: 250px; max-height: 500px; overflow-y: auto; font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;">{% if object.logs %}{{ object.logs }}{% else %}[{% trans "Waiting for task initialization..." %}]{% endif %}</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
