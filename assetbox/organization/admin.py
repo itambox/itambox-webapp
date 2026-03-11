@@ -1,6 +1,7 @@
 from django.contrib import admin
 from .models import (
-    Region, SiteGroup, Tenant, Location, TenantGroup, Site, Contact, ContactRole, ContactAssignment
+    Region, SiteGroup, Tenant, Location, TenantGroup, Site, Contact, ContactRole, ContactAssignment,
+    TenantMembership, TenantInvitation
 )
 
 
@@ -48,6 +49,17 @@ class ContactAssignmentAdmin(admin.ModelAdmin):
     list_display = ('contact', 'role', 'content_type', 'object_id', 'priority')
     list_filter = ('role', 'priority')
 
+class TenantMembershipAdmin(admin.ModelAdmin):
+    list_display = ('user', 'tenant', 'role', 'joined_at')
+    list_filter = ('tenant', 'role')
+    search_fields = ('user__username', 'user__email', 'tenant__name')
+
+class TenantInvitationAdmin(admin.ModelAdmin):
+    list_display = ('email', 'tenant', 'role', 'created_at', 'expires_at', 'accepted_at')
+    list_filter = ('tenant', 'role', 'accepted_at')
+    search_fields = ('email', 'tenant__name')
+
+
 # Now register models using admin.site.register
 admin.site.register(Site, SiteAdmin)
 admin.site.register(Region, RegionAdmin)
@@ -58,4 +70,7 @@ admin.site.register(Location, LocationAdmin)
 admin.site.register(Contact, ContactAdmin)
 admin.site.register(ContactRole, ContactRoleAdmin)
 admin.site.register(ContactAssignment, ContactAssignmentAdmin)
+admin.site.register(TenantMembership, TenantMembershipAdmin)
+admin.site.register(TenantInvitation, TenantInvitationAdmin)
+
 

@@ -42,9 +42,8 @@ class SiteDetailView(ObjectDetailView):
         context = super().get_context_data(**kwargs)
         site = self.get_object()
 
-        locations_table = SiteTable._meta.model.objects.none()
         from ..tables import LocationTable
-        locations_table = LocationTable(site.locations.all(), request=self.request)
+        locations_table = LocationTable(site.locations.select_related('site', 'parent', 'tenant'), request=self.request)
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(locations_table)
 
         site_assets = Asset.objects.filter(location__site=site).select_related('asset_role', 'asset_type', 'asset_type__manufacturer', 'location')

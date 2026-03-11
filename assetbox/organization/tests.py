@@ -594,3 +594,283 @@ class HierarchyValidationTests(TestCase):
         self.assertIn('parent', form.errors)
         self.assertEqual(form.errors['parent'][0], "A tenant group cannot be its own parent.")
 
+
+class OrganizationTenantScopingTests(TestCase):
+    def setUp(self):
+        self.tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
+        self.tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
+
+        # Sites
+        self.site_a = Site.objects.create(name="Site A", slug="site-a", tenant=self.tenant_a)
+        self.site_b = Site.objects.create(name="Site B", slug="site-b", tenant=self.tenant_b)
+        self.site_global = Site.objects.create(name="Site Global", slug="site-global", tenant=None)
+
+        # Locations (must belong to a Site)
+        self.loc_a = Location.objects.create(name="Location A", slug="loc-a", site=self.site_a, tenant=self.tenant_a)
+        self.loc_b = Location.objects.create(name="Location B", slug="loc-b", site=self.site_b, tenant=self.tenant_b)
+        self.loc_global = Location.objects.create(name="Location Global", slug="loc-global", site=self.site_global, tenant=None)
+
+        # AssetHolders
+        self.holder_a = AssetHolder.objects.create(
+            first_name="Holder", last_name="A", upn="holder.a", tenant=self.tenant_a
+        )
+        self.holder_b = AssetHolder.objects.create(
+            first_name="Holder", last_name="B", upn="holder.b", tenant=self.tenant_b
+        )
+        self.holder_global = AssetHolder.objects.create(
+            first_name="Holder", last_name="Global", upn="holder.global", tenant=None
+        )
+
+    def tearDown(self):
+        from core.managers import set_current_tenant
+        set_current_tenant(None)
+
+    def test_tenant_a_scoping(self):
+        from core.managers import set_current_tenant
+        set_current_tenant(self.tenant_a)
+
+        # Tenants
+        tenants = list(Tenant.objects.all())
+        self.assertIn(self.tenant_a, tenants)
+        self.assertNotIn(self.tenant_b, tenants)
+
+        # Sites
+        sites = list(Site.objects.all())
+        self.assertIn(self.site_a, sites)
+        self.assertIn(self.site_global, sites)
+        self.assertNotIn(self.site_b, sites)
+
+        # Locations
+        locs = list(Location.objects.all())
+        self.assertIn(self.loc_a, locs)
+        self.assertIn(self.loc_global, locs)
+        self.assertNotIn(self.loc_b, locs)
+
+        # AssetHolders
+        holders = list(AssetHolder.objects.all())
+        self.assertIn(self.holder_a, holders)
+        self.assertIn(self.holder_global, holders)
+        self.assertNotIn(self.holder_b, holders)
+
+    def test_tenant_b_scoping(self):
+        from core.managers import set_current_tenant
+        set_current_tenant(self.tenant_b)
+
+        # Tenants
+        tenants = list(Tenant.objects.all())
+        self.assertIn(self.tenant_b, tenants)
+        self.assertNotIn(self.tenant_a, tenants)
+
+        # Sites
+        sites = list(Site.objects.all())
+        self.assertIn(self.site_b, sites)
+        self.assertIn(self.site_global, sites)
+        self.assertNotIn(self.site_a, sites)
+
+        # Locations
+        locs = list(Location.objects.all())
+        self.assertIn(self.loc_b, locs)
+        self.assertIn(self.loc_global, locs)
+        self.assertNotIn(self.loc_a, locs)
+
+        # AssetHolders
+        holders = list(AssetHolder.objects.all())
+        self.assertIn(self.holder_b, holders)
+        self.assertIn(self.holder_global, holders)
+        self.assertNotIn(self.holder_a, holders)
+
+    def test_no_tenant_scoping(self):
+        from core.managers import set_current_tenant
+        set_current_tenant(None)
+
+        # Tenants
+        tenants = list(Tenant.objects.all())
+        self.assertIn(self.tenant_a, tenants)
+        self.assertIn(self.tenant_b, tenants)
+
+        # Sites
+        sites = list(Site.objects.all())
+        self.assertIn(self.site_a, sites)
+        self.assertIn(self.site_b, sites)
+        self.assertIn(self.site_global, sites)
+
+        # Locations
+        locs = list(Location.objects.all())
+        self.assertIn(self.loc_a, locs)
+        self.assertIn(self.loc_b, locs)
+        self.assertIn(self.loc_global, locs)
+
+        # AssetHolders
+        holders = list(AssetHolder.objects.all())
+        self.assertIn(self.holder_a, holders)
+        self.assertIn(self.holder_b, holders)
+        self.assertIn(self.holder_global, holders)
+
+    def test_tenant_group_sharing(self):
+        # Create a TenantGroup
+        group = TenantGroup.objects.create(name="Shared Group", slug="shared-group")
+        
+        # Associate Tenant A and a new Tenant C with the TenantGroup
+        self.tenant_a.group = group
+        self.tenant_a.save()
+        
+        tenant_c = Tenant.objects.create(name="Tenant C", slug="tenant-c", group=group)
+        
+        # Create a site for Tenant C
+        site_c = Site.objects.create(name="Site C", slug="site-c", tenant=tenant_c)
+
+        from core.managers import set_current_tenant
+        
+        # Under Tenant A context:
+        set_current_tenant(self.tenant_a)
+        
+        # Tenant A should be able to see both Tenant A and Tenant C, but NOT Tenant B
+        tenants = list(Tenant.objects.all())
+        self.assertIn(self.tenant_a, tenants)
+        self.assertIn(tenant_c, tenants)
+        self.assertNotIn(self.tenant_b, tenants)
+        
+        # Tenant A should be able to see Site A and Site C, but NOT Site B
+        sites = list(Site.objects.all())
+        self.assertIn(self.site_a, sites)
+        self.assertIn(site_c, sites)
+        self.assertNotIn(self.site_b, sites)
+
+
+class MultiTenantMembershipAndInvitationTests(TestCase):
+    def setUp(self):
+        self.tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
+        self.tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
+        
+        self.user = User.objects.create_user(
+            username='staffuser', email='staff@example.com', password='password123'
+        )
+
+    def test_tenant_membership_creation_and_string_representation(self):
+        from organization.models import TenantMembership, TenantRole
+        membership = TenantMembership.objects.create(
+            user=self.user,
+            tenant=self.tenant_a,
+            role=TenantRole.MEMBER
+        )
+        self.assertEqual(str(membership), "staffuser is Standard Member at Tenant A")
+        self.assertEqual(membership.role, TenantRole.MEMBER)
+
+    def test_invitation_acceptance_and_assetholder_linking(self):
+        from organization.models import TenantInvitation, TenantRole, TenantMembership
+        from django.utils import timezone
+        
+        # 1. Create a physical AssetHolder that doesn't have a User linked yet
+        holder = AssetHolder.objects.create(
+            first_name="Beate",
+            last_name="Office",
+            upn="beate.office",
+            email="beate@example.com",
+            tenant=self.tenant_a
+        )
+        self.assertIsNone(holder.user)
+        
+        # 2. Create the Invitation
+        invitation = TenantInvitation.objects.create(
+            email="beate@example.com",
+            tenant=self.tenant_a,
+            role=TenantRole.ADMIN,
+            expires_at=timezone.now() + timezone.timedelta(days=7)
+        )
+        self.assertTrue(invitation.is_valid)
+        self.assertEqual(str(invitation), "Invite for beate@example.com to Tenant A")
+        
+        # 3. Accept the Invitation
+        invitee_user = User.objects.create_user(
+            username='beate_user', email='beate@example.com', password='password123'
+        )
+        from organization.models import accept_invitation
+        accept_invitation(invitation, invitee_user)
+        
+        # Assert membership created
+        membership = TenantMembership.objects.get(user=invitee_user, tenant=self.tenant_a)
+        self.assertEqual(membership.role, TenantRole.ADMIN)
+        
+        # Assert invitation is no longer valid
+        invitation.refresh_from_db()
+        self.assertFalse(invitation.is_valid)
+        self.assertIsNotNone(invitation.accepted_at)
+        
+        # Assert AssetHolder is linked to the User profile
+        holder.refresh_from_db()
+        self.assertEqual(holder.user, invitee_user)
+
+    def test_tenant_membership_backend_permissions(self):
+        from organization.models import TenantMembership, TenantRole
+        from core.managers import set_current_membership
+        
+        # Reader role permissions
+        reader_mem = TenantMembership.objects.create(
+            user=self.user,
+            tenant=self.tenant_a,
+            role=TenantRole.READER
+        )
+        
+        set_current_membership(reader_mem)
+        self.assertTrue(self.user.has_perm('assets.view_asset'))
+        self.assertFalse(self.user.has_perm('assets.add_asset'))
+        
+        # Member role permissions
+        reader_mem.role = TenantRole.MEMBER
+        reader_mem.save()
+        set_current_membership(reader_mem)
+        self.assertTrue(self.user.has_perm('assets.view_asset'))
+        self.assertTrue(self.user.has_perm('assets.add_asset'))
+        self.assertFalse(self.user.has_perm('assets.delete_asset'))
+        
+        # Admin role permissions
+        reader_mem.role = TenantRole.ADMIN
+        reader_mem.save()
+        set_current_membership(reader_mem)
+        self.assertTrue(self.user.has_perm('assets.view_asset'))
+        self.assertTrue(self.user.has_perm('assets.add_asset'))
+        self.assertTrue(self.user.has_perm('assets.delete_asset'))
+        
+        set_current_membership(None)
+
+    def test_tenant_switching_middleware(self):
+        from organization.models import TenantMembership, TenantRole
+        from django.contrib.sessions.middleware import SessionMiddleware
+        from django.contrib.auth.middleware import AuthenticationMiddleware
+        from assetbox.middleware import TenantMiddleware
+        from django.test import RequestFactory
+        
+        # Make a member of Tenant A
+        TenantMembership.objects.create(
+            user=self.user,
+            tenant=self.tenant_a,
+            role=TenantRole.MEMBER
+        )
+        
+        factory = RequestFactory()
+        
+        # 1. No switch param: defaults to first membership (Tenant A)
+        request = factory.get('/')
+        request.user = self.user
+        
+        # Add session support manually to request
+        middleware = SessionMiddleware(lambda r: None)
+        middleware.process_request(request)
+        
+        tenant_middleware = TenantMiddleware(lambda r: None)
+        tenant_middleware.process_request(request)
+        
+        self.assertEqual(request.active_tenant, self.tenant_a)
+        self.assertEqual(request.session['active_tenant_id'], self.tenant_a.id)
+        
+        # 2. Switch to another tenant where user has NO membership
+        request = factory.get('/?switch_tenant={}'.format(self.tenant_b.id))
+        request.user = self.user
+        middleware.process_request(request)
+        tenant_middleware.process_request(request)
+        
+        # Should fallback to Tenant A since they have no membership for Tenant B
+        self.assertEqual(request.active_tenant, self.tenant_a)
+
+
+

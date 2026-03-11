@@ -5,12 +5,14 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.conf import settings # Import settings
 from core.models import BaseModel, ChangeLoggingMixin, StandardModel, VaultModel
+from core.managers import TenantScopingManager
 from core.mixins import ExportableMixin, TaggableMixin, JournalingMixin, AutoSlugMixin, CloneableMixin, ImageAttachmentMixin, FileAttachmentMixin, BookmarkableMixin, SubscribableMixin
 from django.contrib.contenttypes.fields import GenericForeignKey
 
 # Create your models here.
 
 class Location(SubscribableMixin, StandardModel):
+    objects = TenantScopingManager()
     STATUS_PLANNED = 'planned'
     STATUS_STAGING = 'staging'
     STATUS_ACTIVE = 'active'
@@ -151,6 +153,7 @@ class TenantGroup(StandardModel):
         return reverse('organization:tenantgroup_detail', kwargs={'pk': self.pk})
 
 class Tenant(VaultModel, BookmarkableMixin):
+    objects = TenantScopingManager()
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     group = models.ForeignKey(
@@ -174,6 +177,7 @@ class Tenant(VaultModel, BookmarkableMixin):
         return self.name
 
 class Site(VaultModel, BookmarkableMixin):
+    objects = TenantScopingManager()
     STATUS_PLANNED = 'planned'
     STATUS_STAGING = 'staging'
     STATUS_ACTIVE = 'active'
@@ -215,6 +219,7 @@ class Site(VaultModel, BookmarkableMixin):
 
 # +++ AssetHolder Model +++
 class AssetHolder(SubscribableMixin, StandardModel):
+    objects = TenantScopingManager()
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL, # Keep holder if user is deleted, set user link to null
@@ -363,4 +368,85 @@ class ContactAssignment(ChangeLoggingMixin, BaseModel):
 
     def __str__(self):
         return f"{self.contact} ({self.role}) assigned to {self.assigned_object}"
+
+
+import uuid
+from django.utils import timezone
+from django.db import transaction
+
+class TenantRole(models.TextChoices):
+    ADMIN = 'admin', 'Administrator'
+    MEMBER = 'member', 'Standard Member'
+    READER = 'reader', 'Read-Only Viewer'
+
+
+class TenantMembership(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='memberships'
+    )
+    tenant = models.ForeignKey(
+        'organization.Tenant',
+        on_delete=models.CASCADE,
+        related_name='memberships'
+    )
+    role = models.CharField(
+        max_length=50,
+        choices=TenantRole.choices,
+        default=TenantRole.MEMBER
+    )
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'tenant')
+        verbose_name = "Tenant Membership"
+        verbose_name_plural = "Tenant Memberships"
+
+    def __str__(self):
+        return f"{self.user.username} is {self.get_role_display()} at {self.tenant.name}"
+
+
+class TenantInvitation(models.Model):
+    email = models.EmailField()
+    tenant = models.ForeignKey('organization.Tenant', on_delete=models.CASCADE)
+    role = models.CharField(max_length=50, choices=TenantRole.choices, default=TenantRole.MEMBER)
+    token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    invited_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    accepted_at = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def is_valid(self):
+        return self.accepted_at is None and self.expires_at > timezone.now()
+
+    def __str__(self):
+        return f"Invite for {self.email} to {self.tenant.name}"
+
+
+@transaction.atomic
+def accept_invitation(invitation, user):
+    # 1. Create the Workspace Membership
+    TenantMembership.objects.create(
+        user=user,
+        tenant=invitation.tenant,
+        role=invitation.role
+    )
+    
+    # 2. Mark Invitation as accepted
+    invitation.accepted_at = timezone.now()
+    invitation.save()
+    
+    # 3. Match and bind the User account to their existing physical AssetHolder record (if present)
+    holder = AssetHolder.objects.filter(
+        tenant=invitation.tenant,
+        email__iexact=invitation.email,
+        user__isnull=True
+    ).first()
+    
+    if holder:
+        holder.user = user
+        holder.save()
+
 

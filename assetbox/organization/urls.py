@@ -91,5 +91,9 @@ urlpatterns = [
     # Import URLs
     path('locations/import/', views.LocationImportView.as_view(), name='location_import'),
     path('asset-holders/import/', views.AssetHolderImportView.as_view(), name='assetholder_import'),
+
+    # Invitations
+    path('invite-user/', views.InviteUserView.as_view(), name='invite_user'),
+    path('accept-invitation/<uuid:token>/', views.AcceptInvitationView.as_view(), name='accept_invitation'),
 ]
  

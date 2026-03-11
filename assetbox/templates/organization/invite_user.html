@@ -1,0 +1,31 @@
+{% extends "layout.html" %}
+{% load crispy_forms_tags %}
+{% load i18n %}
+
+{% block title %}{% trans "Invite Workspace Member" %} - AssetBox{% endblock %}
+
+{% block page_header %}
+    <div id="page-header-block">
+        <div class="page-pretitle">
+            {% trans "Workspace Onboarding" %}
+        </div>
+        <h2 class="page-title">
+            {% trans "Invite Workspace Member" %}
+        </h2>
+    </div>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-5 col-md-10">
+        <div class="card">
+            <div class="card-body">
+                <p class="text-muted mb-4">
+                    {% trans "Invite a new staff member to join your active tenant workspace. They will receive a secure token which links their account to this workspace." %}
+                </p>
+                {% crispy form %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
