@@ -24,7 +24,7 @@ class SubscriptionStatusSerializer(drf_serializers.Serializer):
 class ProviderViewSet(AssetBoxModelViewSet):
     """API ViewSet for managing subscription Providers."""
 
-    permission_classes = [TokenPermissions]
+    permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = Provider.objects.prefetch_related('tags').all()
     serializer_class = ProviderSerializer
     filter_backends = (DjangoFilterBackend,)
@@ -54,7 +54,7 @@ class SubscriptionViewSet(AssetBoxModelViewSet):
 class SubscriptionAssignmentViewSet(AssetBoxModelViewSet):
     """API ViewSet for managing Subscription assignments to assets, locations, or users."""
 
-    permission_classes = [TokenPermissions]
+    permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = SubscriptionAssignment.objects.select_related(
         'subscription__provider', 'content_type'
     ).prefetch_related('assigned_object').all()

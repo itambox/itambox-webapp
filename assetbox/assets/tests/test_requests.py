@@ -10,6 +10,7 @@ from assets.models import (
 )
 from organization.models import AssetHolder, Site, Location
 from assets.views.request_views import approve_asset_request, deny_asset_request
+from assets.services import checkout_asset
 
 User = get_user_model()
 
@@ -144,10 +145,11 @@ class RequisitionSystemTestCase(TestCase):
         self.assertEqual(req.status, AssetRequest.STATUS_PENDING)
 
         # Check out the asset to the requester (holder)
-        # Using self.asset_requestable.checkout() which triggers signals
-        assignment = self.asset_requestable.checkout(
-            target=self.holder,
-            checked_out_by=self.admin,
+        # Using checkout_asset service which triggers signals
+        checkout_asset(
+            asset=self.asset_requestable,
+            holder=self.holder,
+            user=self.admin,
             notes="Checking out standard laptop"
         )
 
@@ -168,9 +170,10 @@ class RequisitionSystemTestCase(TestCase):
         )
 
         # Check out to holder
-        self.asset_requestable.checkout(
-            target=self.holder,
-            checked_out_by=self.admin,
+        checkout_asset(
+            asset=self.asset_requestable,
+            holder=self.holder,
+            user=self.admin,
             notes="Here you go"
         )
 

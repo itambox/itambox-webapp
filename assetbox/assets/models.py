@@ -388,44 +388,16 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
         return active.assigned_to if active else None
 
     def checkout(self, target, checked_out_by, expected_checkin=None, notes=''):
-        if self.active_assignment:
-            raise ValueError(f"Asset {self.asset_tag} already has an active assignment.")
-        from organization.models import AssetHolder, Location
-        allowed_models = (AssetHolder, Location, Asset)
-        if not isinstance(target, allowed_models):
-            raise TypeError(f"Target must be one of: AssetHolder, Location, or Asset.")
-        assignment = AssetAssignment.objects.create(
-            asset=self,
-            assigned_to=target,
-            checked_out_by=checked_out_by,
-            expected_checkin_date=expected_checkin,
-            notes=notes,
+        raise NotImplementedError(
+            "checkout() on the Asset model is deprecated. "
+            "Please use assets.services.checkout_asset() instead."
         )
-        ActivityLog.objects.create(
-            asset=self,
-            action='checked_out',
-            user=checked_out_by,
-            notes=f"Checked out to {target}. {notes}"
-        )
-        return assignment
 
     def checkin(self, checked_in_by, notes=''):
-        active = self.active_assignment
-        if not active:
-            raise ValueError(f"Asset {self.asset_tag} has no active assignment.")
-        active.is_active = False
-        active.checked_in_at = timezone.now()
-        active.checked_in_by = checked_in_by
-        if notes:
-            active.notes = (active.notes + '\n' + notes).strip()
-        active.save()
-        ActivityLog.objects.create(
-            asset=self,
-            action='checked_in',
-            user=checked_in_by,
-            notes=f"Checked in from {active.assigned_to}. {notes}"
+        raise NotImplementedError(
+            "checkin() on the Asset model is deprecated. "
+            "Please use assets.services.checkin_asset() instead."
         )
-        return active
 
     def __str__(self):
         return f"{self.name} ({self.asset_tag})"
@@ -646,9 +618,10 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel):
         return reverse('assets:assettagsequence_detail', kwargs={'pk': self.pk})
 
     def next_tag(self):
+        from django.db.models import F
         tag = f'{self.prefix}{self.next_value:0{self.zero_padding}d}'
-        self.next_value += 1
-        self.save(update_fields=['next_value'])
+        type(self).objects.filter(pk=self.pk).update(next_value=F('next_value') + 1)
+        self.refresh_from_db(fields=['next_value'])
         return tag
 
     @property

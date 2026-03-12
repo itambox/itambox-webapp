@@ -1,3 +1,13 @@
+from __future__ import annotations
+
+import datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from django.contrib.auth.models import AbstractBaseUser
+    from django.http import HttpRequest
+    from organization.models import AssetHolder, Location
+
 from django.db import transaction
 from django.db.models import Sum
 from django.core.exceptions import ValidationError
@@ -13,7 +23,17 @@ from organization.models import AssetHolderAssignment
 from licenses.models import LicenseSeatAssignment
 
 
-def checkout_asset(asset, holder=None, location=None, asset_target=None, user=None, request=None, expected_checkin=None, notes='', checkout_date=None):
+def checkout_asset(
+    asset: Asset,
+    holder: AssetHolder | None = None,
+    location: Location | None = None,
+    asset_target: Asset | None = None,
+    user: AbstractBaseUser | None = None,
+    request: HttpRequest | None = None,
+    expected_checkin: datetime.date | None = None,
+    notes: str = '',
+    checkout_date: datetime.datetime | None = None
+) -> AssetHolder | Location | Asset:
     target = holder or location or asset_target
     if not target:
         raise ValidationError("Either holder, location, or asset must be specified.")
@@ -32,6 +52,8 @@ def checkout_asset(asset, holder=None, location=None, asset_target=None, user=No
             asset.location = None
         elif location:
             asset.location = location
+        elif asset_target:
+            asset.location = asset_target.location
 
         asset._changelog_action = 'checkout'
         asset._changelog_message = f"Checked out to {target}"
@@ -100,7 +122,7 @@ def checkout_asset(asset, holder=None, location=None, asset_target=None, user=No
     return target
 
 
-def checkin_asset(asset, user=None, notes=''):
+def checkin_asset(asset: Asset, user: AbstractBaseUser | None = None, notes: str = '') -> str | None:
     active = asset.active_assignment
     if active:
         target = active.assigned_to
@@ -118,9 +140,10 @@ def checkin_asset(asset, user=None, notes=''):
             
             if revert_status:
                 asset.status = revert_status
+            asset.location = None
             asset._changelog_action = 'checkin'
             asset._changelog_message = f"Checked in from {target}"
-            asset.save(update_fields=['status'])
+            asset.save(update_fields=['status', 'location'])
 
             ActivityLog.objects.create(
                 asset=asset,
@@ -143,72 +166,6 @@ def checkin_asset(asset, user=None, notes=''):
             return f"Checked in from Location: {checked_in_from}"
     else:
         return None
-
-
-def checkout_accessory(accessory, qty, holder=None, location=None, asset=None, user=None, notes="", source_location=None, request=None, **kwargs):
-    if not accessory.allow_overallocate and accessory.available < qty:
-        raise ValidationError("No stock available for checkout.")
-    if not holder and not location and not asset:
-        raise ValidationError("Either holder, location, or asset must be specified.")
-    if source_location:
-        from inventory.models import AccessoryStock
-        loc_stock = AccessoryStock.objects.filter(
-            accessory=accessory, location=source_location
-        ).aggregate(qty=Sum('qty'))['qty'] or 0
-        if not accessory.allow_overallocate and loc_stock < qty:
-            raise ValidationError(
-                f"Insufficient stock at {source_location}. Available: {loc_stock}, Requested: {qty}"
-            )
-
-    with transaction.atomic():
-        assignment = AccessoryAssignment.objects.create(
-            accessory=accessory,
-            assigned_holder=holder,
-            assigned_location=location,
-            assigned_asset=asset,
-            from_location=source_location,
-            qty=qty,
-            notes=notes
-        )
-    return assignment
-
-
-def checkin_accessory(assignment_pk, user=None):
-    assignment = get_object_or_404(AccessoryAssignment, pk=assignment_pk)
-    accessory = assignment.accessory
-    qty = assignment.qty
-    recipient = assignment.assigned_holder or assignment.assigned_location or assignment.assigned_asset
-
-    assignment.delete()
-    return accessory, qty, recipient
-
-
-def checkout_consumable(consumable, qty, holder=None, location=None, asset=None, user=None, notes="", source_location=None, request=None, **kwargs):
-    if not consumable.allow_overallocate and consumable.available < qty:
-        raise ValidationError("No stock available for consumption checkout.")
-    if not holder and not location and not asset:
-        raise ValidationError("Either holder, location, or asset must be specified.")
-    if source_location:
-        from inventory.models import ConsumableStock
-        loc_stock = ConsumableStock.objects.filter(
-            consumable=consumable, location=source_location
-        ).aggregate(qty=Sum('qty'))['qty'] or 0
-        if not consumable.allow_overallocate and loc_stock < qty:
-            raise ValidationError(
-                f"Insufficient stock at {source_location}. Available: {loc_stock}, Requested: {qty}"
-            )
-
-    with transaction.atomic():
-        assignment = ConsumableAssignment.objects.create(
-            consumable=consumable,
-            assigned_holder=holder,
-            assigned_location=location,
-            assigned_asset=asset,
-            from_location=source_location,
-            qty=qty,
-            notes=notes
-        )
-    return assignment
 
 
 def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_location=None, request=None, **kwargs):

@@ -274,11 +274,25 @@ class UserSubscriptionsView(UserGenericTabView):
         
         # --- Query bookmarked/subscribed objects ---
         from core.models import Bookmark
-        user_bookmarks = Bookmark.objects.filter(user=self.request.user).select_related('model')
+        user_bookmarks = list(Bookmark.objects.filter(user=self.request.user).select_related('model'))
         
+        # Group by ContentType to batch resolve GFKs
+        bookmarks_by_ct = {}
+        for b in user_bookmarks:
+            bookmarks_by_ct.setdefault(b.model, []).append(b)
+            
+        resolved_objects = {}
+        for ct, bookmarks in bookmarks_by_ct.items():
+            model_class = ct.model_class()
+            if model_class:
+                object_ids = [b.object_id for b in bookmarks]
+                objs = model_class.objects.filter(pk__in=object_ids)
+                for obj in objs:
+                    resolved_objects[(ct.id, obj.pk)] = obj
+                    
         bookmarked_items = []
         for b in user_bookmarks:
-            obj = b.content_object
+            obj = resolved_objects.get((b.model.id, b.object_id))
             if obj:
                 url = '#'
                 if hasattr(obj, 'get_absolute_url'):

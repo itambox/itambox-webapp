@@ -1,5 +1,6 @@
 from django.db import models
 from django_filters.rest_framework import DjangoFilterBackend
+from core.api.permissions import TokenPermissions, StrictTenantPermission
 from core.api.viewsets import AssetBoxModelViewSet
 from inventory.models import (
     Accessory, AccessoryStock, AccessoryAssignment,
@@ -19,6 +20,7 @@ from .serializers import (
 
 
 class AccessoryViewSet(AssetBoxModelViewSet):
+    permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = Accessory.objects.select_related('manufacturer', 'tenant').prefetch_related('tags').all()
     serializer_class = AccessorySerializer
     filter_backends = (DjangoFilterBackend,)
@@ -26,6 +28,7 @@ class AccessoryViewSet(AssetBoxModelViewSet):
 
 
 class AccessoryStockViewSet(AssetBoxModelViewSet):
+    permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = AccessoryStock.objects.select_related('accessory', 'location').all()
     serializer_class = AccessoryStockSerializer
     filter_backends = (DjangoFilterBackend,)
@@ -33,6 +36,7 @@ class AccessoryStockViewSet(AssetBoxModelViewSet):
 
 
 class AccessoryAssignmentViewSet(AssetBoxModelViewSet):
+    permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = AccessoryAssignment.objects.select_related(
         'accessory__manufacturer', 'assigned_holder', 'assigned_location', 'from_location'
     ).all()
@@ -42,6 +46,7 @@ class AccessoryAssignmentViewSet(AssetBoxModelViewSet):
 
 
 class ConsumableViewSet(AssetBoxModelViewSet):
+    permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = Consumable.objects.select_related('manufacturer', 'tenant').prefetch_related('tags').all()
     serializer_class = ConsumableSerializer
     filter_backends = (DjangoFilterBackend,)
@@ -49,6 +54,7 @@ class ConsumableViewSet(AssetBoxModelViewSet):
 
 
 class ConsumableStockViewSet(AssetBoxModelViewSet):
+    permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = ConsumableStock.objects.select_related('consumable', 'location').all()
     serializer_class = ConsumableStockSerializer
     filter_backends = (DjangoFilterBackend,)
@@ -56,6 +62,7 @@ class ConsumableStockViewSet(AssetBoxModelViewSet):
 
 
 class ConsumableAssignmentViewSet(AssetBoxModelViewSet):
+    permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = ConsumableAssignment.objects.select_related(
         'consumable__manufacturer', 'assigned_holder', 'assigned_location', 'from_location'
     ).all()
@@ -65,6 +72,7 @@ class ConsumableAssignmentViewSet(AssetBoxModelViewSet):
 
 
 class KitViewSet(AssetBoxModelViewSet):
+    permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = Kit.objects.select_related('tenant').prefetch_related('items', 'tags').all()
     serializer_class = KitSerializer
     filter_backends = (DjangoFilterBackend,)
@@ -72,6 +80,7 @@ class KitViewSet(AssetBoxModelViewSet):
 
 
 class KitItemViewSet(AssetBoxModelViewSet):
+    permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = KitItem.objects.select_related(
         'kit', 'asset_type__manufacturer', 'accessory__manufacturer'
     ).all()

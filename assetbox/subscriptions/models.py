@@ -293,6 +293,16 @@ class Subscription(AutoSlugMixin, BookmarkableMixin, DeletableVaultModel):
             return self.renewal_cost * 2
         return self.renewal_cost
 
+    @property
+    def end_date(self):
+        """Property alias for renewal_date for backwards/cross-module compatibility."""
+        return self.renewal_date
+
+    @property
+    def cost(self):
+        """Property alias for renewal_cost for backwards/cross-module compatibility."""
+        return self.renewal_cost
+
     def renew(self, new_renewal_date, cost=None):
         self.renewal_date = new_renewal_date
         if cost is not None:

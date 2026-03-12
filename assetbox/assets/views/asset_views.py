@@ -89,7 +89,7 @@ class AssetDetailView(ObjectDetailView):
         RequestConfig(self.request, paginate={'per_page': 10}).configure(comp_table)
         context['components_table'] = comp_table
 
-        maint_qs = asset.maintenances.all()
+        maint_qs = asset.maintenances.select_related('asset', 'supplier')
         maint_table = tables.AssetMaintenanceTable(maint_qs, request=self.request)
         RequestConfig(self.request, paginate={'per_page': 10}).configure(maint_table)
         context['maintenances_table'] = maint_table
@@ -163,6 +163,7 @@ class AssetCloneView(ObjectCloneView):
 
 
 class AssetCheckoutView(GenericTransactionView):
+    permission_required = ('assets.change_asset',)
     queryset = Asset.objects.all()
     model_form = forms.AssetCheckOutForm
     service_callable = checkout_asset
@@ -184,6 +185,7 @@ class AssetCheckoutView(GenericTransactionView):
 
 
 class AssetCheckinView(SimplePostView):
+    permission_required = ('assets.change_asset',)
     queryset = Asset.objects.all()
 
     def perform_action(self, asset, request):

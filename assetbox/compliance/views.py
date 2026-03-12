@@ -70,50 +70,52 @@ def custody_eula_sign(request, token):
     holder = receipt.holder
 
     if request.method == 'POST':
-        action = request.POST.get('action', 'accept')
-        signature_data = request.POST.get('signature_canvas')
+        from django.db import transaction
 
-        if action == 'decline':
-            receipt.acceptance_status = CustodyReceipt.STATUS_DECLINED
-            receipt.save(update_fields=['acceptance_status', 'updated_at'])
-            return render(request, "compliance/custody/sign_error.html", {"error": "You have declined the custody transfer."})
+        with transaction.atomic():
+            action = request.POST.get('action', 'accept')
+            signature_data = request.POST.get('signature_canvas')
 
-        if not signature_data or signature_data == 'empty':
-            return render(request, "compliance/custody/sign_portal.html", {
-                "asset": asset,
-                "holder": holder,
-                "token": token,
-                "receipt": receipt,
-                "error": "Please provide a valid signature."
-            })
+            if action == 'decline':
+                receipt.acceptance_status = CustodyReceipt.STATUS_DECLINED
+                receipt.save(update_fields=['acceptance_status', 'updated_at'])
+                return render(request, "compliance/custody/sign_error.html", {"error": "You have declined the custody transfer."})
 
-        timestamp_str = timezone.now().isoformat()
-        raw_to_hash = f"{holder.upn}|{asset.asset_tag}|{timestamp_str}|{signature_data}"
-        verification_hash = hashlib.sha256(raw_to_hash.encode('utf-8')).hexdigest()
+            if not signature_data or signature_data == 'empty':
+                return render(request, "compliance/custody/sign_portal.html", {
+                    "asset": asset,
+                    "holder": holder,
+                    "token": token,
+                    "receipt": receipt,
+                    "error": "Please provide a valid signature."
+                })
 
-        receipt.accepted = True
-        receipt.accepted_date = timezone.now()
-        receipt.acceptance_method = 'digital'
-        receipt.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
-        receipt.signature_canvas = signature_data
-        receipt.signature_data = signature_data
-        receipt.signature_hash = verification_hash
-        receipt.verification_hash = verification_hash
-        receipt.eula_version = '1.0'
-        receipt.signed_at = timezone.now()
-        receipt.save()
+            timestamp_str = timezone.now().isoformat()
+            raw_to_hash = f"{holder.upn}|{asset.asset_tag}|{timestamp_str}|{signature_data}"
+            verification_hash = hashlib.sha256(raw_to_hash.encode('utf-8')).hexdigest()
 
-        try:
-            from django.db import transaction
-            transaction.on_commit(lambda: _safe_dispatch_custody(receipt))
-        except Exception:
-            _safe_dispatch_custody(receipt)
+            receipt.accepted = True
+            receipt.accepted_date = timezone.now()
+            receipt.acceptance_method = 'digital'
+            receipt.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
+            receipt.signature_canvas = signature_data
+            receipt.signature_data = signature_data
+            receipt.signature_hash = verification_hash
+            receipt.verification_hash = verification_hash
+            receipt.eula_version = '1.0'
+            receipt.signed_at = timezone.now()
+            receipt.save()
 
-        asset._changelog_action = 'audit'
-        asset._changelog_message = f"EULA digital custody receipt accepted. SHA-256 Hash: {verification_hash[:16]}..."
-        asset.save()
+            try:
+                transaction.on_commit(lambda: _safe_dispatch_custody(receipt))
+            except Exception:
+                _safe_dispatch_custody(receipt)
 
-        return render(request, "compliance/custody/receipt_success.html", {"receipt": receipt, "asset": asset, "holder": holder})
+            asset._changelog_action = 'audit'
+            asset._changelog_message = f"EULA digital custody receipt accepted. SHA-256 Hash: {verification_hash[:16]}..."
+            asset.save()
+
+            return render(request, "compliance/custody/receipt_success.html", {"receipt": receipt, "asset": asset, "holder": holder})
 
     return render(request, "compliance/custody/sign_portal.html", {"asset": asset, "holder": holder, "token": token, "receipt": receipt})
 

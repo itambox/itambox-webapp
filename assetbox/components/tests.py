@@ -254,3 +254,149 @@ class ComponentWarehouseOriginTests(TestCase):
         
         # Verify no stock was created or altered at Desk B
         self.assertFalse(ComponentStock.objects.filter(component=self.component, location=self.desk).exists())
+
+    def test_allocation_update_quantity_recalculates_stock(self):
+        # Create allocation: stock goes from 10 -> 8
+        alloc = ComponentAllocation.objects.create(
+            component=self.component,
+            asset=self.asset,
+            from_location=self.warehouse,
+            qty_allocated=2
+        )
+        self.stock.refresh_from_db()
+        self.assertEqual(self.stock.qty, 8)
+
+        # Update quantity: 2 -> 5 (stock should become 5)
+        alloc.qty_allocated = 5
+        alloc.save()
+        self.stock.refresh_from_db()
+        self.assertEqual(self.stock.qty, 5)
+
+        # Update quantity down: 5 -> 1 (stock should become 9)
+        alloc.qty_allocated = 1
+        alloc.save()
+        self.stock.refresh_from_db()
+        self.assertEqual(self.stock.qty, 9)
+
+    def test_allocation_update_location_reallocates_stock(self):
+        # Create stock at Desk B (qty = 5)
+        desk_stock = ComponentStock.objects.create(component=self.component, location=self.desk, qty=5)
+
+        # Create allocation from Warehouse A (stock: 10 -> 7)
+        alloc = ComponentAllocation.objects.create(
+            component=self.component,
+            asset=self.asset,
+            from_location=self.warehouse,
+            qty_allocated=3
+        )
+        self.stock.refresh_from_db()
+        self.assertEqual(self.stock.qty, 7)
+
+        # Swap allocation source: Warehouse A -> Desk B (Warehouse A: 7 -> 10, Desk B: 5 -> 2)
+        alloc.from_location = self.desk
+        alloc.save()
+
+        self.stock.refresh_from_db()
+        desk_stock.refresh_from_db()
+        self.assertEqual(self.stock.qty, 10)
+        self.assertEqual(desk_stock.qty, 2)
+
+    def test_allocation_soft_delete_reverts_stock(self):
+        # Create allocation (stock: 10 -> 6)
+        alloc = ComponentAllocation.objects.create(
+            component=self.component,
+            asset=self.asset,
+            from_location=self.warehouse,
+            qty_allocated=4
+        )
+        self.stock.refresh_from_db()
+        self.assertEqual(self.stock.qty, 6)
+
+        # Soft delete allocation (stock: 6 -> 10)
+        alloc.delete()
+        self.stock.refresh_from_db()
+        self.assertEqual(self.stock.qty, 10)
+
+        # Restore allocation (stock: 10 -> 6)
+        alloc.restore()
+        self.stock.refresh_from_db()
+        self.assertEqual(self.stock.qty, 6)
+
+
+class ComponentTenantScopingTests(TestCase):
+    def setUp(self):
+        from organization.models import Tenant
+        self.tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
+        self.tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
+        
+        self.manufacturer = Manufacturer.objects.create(name='Samsung', slug='samsung')
+        self.category = Category.objects.create(name='Storage', slug='storage', applies_to={'component': True})
+
+        # Components
+        self.comp_a = Component.objects.create(
+            name="Component A", manufacturer=self.manufacturer, category=self.category, tenant=self.tenant_a
+        )
+        self.comp_b = Component.objects.create(
+            name="Component B", manufacturer=self.manufacturer, category=self.category, tenant=self.tenant_b
+        )
+        self.comp_global = Component.objects.create(
+            name="Component Global", manufacturer=self.manufacturer, category=self.category, tenant=None
+        )
+
+    def tearDown(self):
+        from core.managers import set_current_tenant
+        set_current_tenant(None)
+
+    def test_tenant_a_scoping(self):
+        from core.managers import set_current_tenant
+        set_current_tenant(self.tenant_a)
+
+        components = list(Component.objects.all())
+        self.assertIn(self.comp_a, components)
+        self.assertIn(self.comp_global, components)
+        self.assertNotIn(self.comp_b, components)
+
+    def test_tenant_b_scoping(self):
+        from core.managers import set_current_tenant
+        set_current_tenant(self.tenant_b)
+
+        components = list(Component.objects.all())
+        self.assertIn(self.comp_b, components)
+        self.assertIn(self.comp_global, components)
+        self.assertNotIn(self.comp_a, components)
+
+    def test_no_tenant_scoping(self):
+        from core.managers import set_current_tenant
+        set_current_tenant(None)
+
+        components = list(Component.objects.all())
+        self.assertIn(self.comp_a, components)
+        self.assertIn(self.comp_b, components)
+        self.assertIn(self.comp_global, components)
+
+    def test_tenant_group_sharing(self):
+        from organization.models import TenantGroup, Tenant
+        # Create a TenantGroup
+        group = TenantGroup.objects.create(name="Shared Group", slug="shared-group")
+        
+        # Associate Tenant A and a new Tenant C with the TenantGroup
+        self.tenant_a.group = group
+        self.tenant_a.save()
+        
+        tenant_c = Tenant.objects.create(name="Tenant C", slug="tenant-c", group=group)
+        
+        # Create a component for Tenant C
+        comp_c = Component.objects.create(
+            name="Component C", manufacturer=self.manufacturer, category=self.category, tenant=tenant_c
+        )
+
+        from core.managers import set_current_tenant
+        
+        # Under Tenant A context:
+        set_current_tenant(self.tenant_a)
+        
+        # Tenant A should be able to see Component A and Component C, but NOT Component B
+        components = list(Component.objects.all())
+        self.assertIn(self.comp_a, components)
+        self.assertIn(comp_c, components)
+        self.assertNotIn(self.comp_b, components)

@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from assets.models import Manufacturer, AssetType, AssetRole, Category, Asset
-from organization.models import Site, Location, AssetHolder
+from organization.models import Site, Location, AssetHolder, Tenant
 from licenses.models import License
 from software.models import Software
 from .models import Accessory, AccessoryStock, AccessoryAssignment, Consumable, ConsumableStock, ConsumableAssignment, Kit, KitItem
@@ -994,10 +994,148 @@ class StockAlertsTests(TestCase):
         self.stock = AccessoryStock.objects.create(accessory=self.accessory, location=self.location, qty=4)
         
     def test_low_stock_threshold_alert(self):
-        # Remaining stock is 4, safety threshold (min_qty) is 5.
-        # So low_stock condition is met or we can check dashboard widget context.
-        # Let's verify dashboard widget or alerts listing
-        pass
+        from core.models import AlertRule, AlertLog, NotificationChannel
+        from core.tasks import evaluate_alert_rules_task
+        from django.contrib.contenttypes.models import ContentType
+
+        # Create low stock alert rule (threshold 3, but accessory min_qty is 5)
+        rule = AlertRule.objects.create(
+            name="Accessory Low Stock Rule",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=3,
+            severity=AlertRule.SEVERITY_WARNING,
+            is_active=True
+        )
+
+        channel = NotificationChannel.objects.create(
+            name="In-App Channel",
+            channel_type='in_app',
+            enabled=True
+        )
+        rule.channels.add(channel)
+
+        # MX Mouse: stock is 4, safety threshold min_qty is 5 (so met)
+        triggered = evaluate_alert_rules_task()
+        self.assertGreaterEqual(triggered, 1)
+
+        ct = ContentType.objects.get_for_model(self.accessory)
+        alert_logs = AlertLog.objects.filter(rule=rule, content_type=ct, object_id=self.accessory.pk)
+        self.assertEqual(alert_logs.count(), 1)
+        
+        alert = alert_logs.first()
+        self.assertEqual(alert.status, AlertLog.STATUS_ACTIVE)
+        self.assertIn("Low Stock: MX Mouse", alert.subject)
+
+
+class InventoryTenantScopingTests(TestCase):
+    def setUp(self):
+        self.manufacturer = Manufacturer.objects.create(name='Dell', slug='dell')
+        self.tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
+        self.tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
+
+        # Accessories
+        self.acc_a = Accessory.objects.create(
+            name="Accessory A", manufacturer=self.manufacturer, tenant=self.tenant_a
+        )
+        self.acc_b = Accessory.objects.create(
+            name="Accessory B", manufacturer=self.manufacturer, tenant=self.tenant_b
+        )
+        self.acc_global = Accessory.objects.create(
+            name="Accessory Global", manufacturer=self.manufacturer, tenant=None
+        )
+
+        # Consumables
+        self.con_a = Consumable.objects.create(
+            name="Consumable A", manufacturer=self.manufacturer, tenant=self.tenant_a
+        )
+        self.con_b = Consumable.objects.create(
+            name="Consumable B", manufacturer=self.manufacturer, tenant=self.tenant_b
+        )
+        self.con_global = Consumable.objects.create(
+            name="Consumable Global", manufacturer=self.manufacturer, tenant=None
+        )
+
+        # Kits
+        self.kit_a = Kit.objects.create(
+            name="Kit A", tenant=self.tenant_a
+        )
+        self.kit_b = Kit.objects.create(
+            name="Kit B", tenant=self.tenant_b
+        )
+        self.kit_global = Kit.objects.create(
+            name="Kit Global", tenant=None
+        )
+
+    def tearDown(self):
+        from core.managers import set_current_tenant
+        set_current_tenant(None)
+
+    def test_tenant_a_scoping(self):
+        from core.managers import set_current_tenant
+        set_current_tenant(self.tenant_a)
+
+        # Accessories
+        accs = list(Accessory.objects.all())
+        self.assertIn(self.acc_a, accs)
+        self.assertIn(self.acc_global, accs)
+        self.assertNotIn(self.acc_b, accs)
+
+        # Consumables
+        cons = list(Consumable.objects.all())
+        self.assertIn(self.con_a, cons)
+        self.assertIn(self.con_global, cons)
+        self.assertNotIn(self.con_b, cons)
+
+        # Kits
+        kits = list(Kit.objects.all())
+        self.assertIn(self.kit_a, kits)
+        self.assertIn(self.kit_global, kits)
+        self.assertNotIn(self.kit_b, kits)
+
+    def test_tenant_b_scoping(self):
+        from core.managers import set_current_tenant
+        set_current_tenant(self.tenant_b)
+
+        # Accessories
+        accs = list(Accessory.objects.all())
+        self.assertIn(self.acc_b, accs)
+        self.assertIn(self.acc_global, accs)
+        self.assertNotIn(self.acc_a, accs)
+
+        # Consumables
+        cons = list(Consumable.objects.all())
+        self.assertIn(self.con_b, cons)
+        self.assertIn(self.con_global, cons)
+        self.assertNotIn(self.con_a, cons)
+
+        # Kits
+        kits = list(Kit.objects.all())
+        self.assertIn(self.kit_b, kits)
+        self.assertIn(self.kit_global, kits)
+        self.assertNotIn(self.kit_a, kits)
+
+    def test_no_tenant_scoping(self):
+        from core.managers import set_current_tenant
+        set_current_tenant(None)
+
+        # Accessories
+        accs = list(Accessory.objects.all())
+        self.assertIn(self.acc_a, accs)
+        self.assertIn(self.acc_b, accs)
+        self.assertIn(self.acc_global, accs)
+
+        # Consumables
+        cons = list(Consumable.objects.all())
+        self.assertIn(self.con_a, cons)
+        self.assertIn(self.con_b, cons)
+        self.assertIn(self.con_global, cons)
+
+        # Kits
+        kits = list(Kit.objects.all())
+        self.assertIn(self.kit_a, kits)
+        self.assertIn(self.kit_b, kits)
+        self.assertIn(self.kit_global, kits)
+
 
 
 

@@ -14,13 +14,14 @@ class ComponentTable(BaseTable):
     total_stock = tables.Column(verbose_name='Total Stock', orderable=False)
     available_stock = tables.Column(verbose_name='Available', orderable=False)
     min_stock_level = tables.Column(verbose_name='Min Stock Level')
+    tenant = tables.Column(linkify=True)
     tags = TagColumn(url_name='components:component_list')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = Component
-        fields = ('pk', 'name', 'manufacturer', 'category', 'part_number', 'total_stock', 'available_stock', 'min_stock_level', 'tags', 'actions')
-        default_columns = ('pk', 'name', 'manufacturer', 'category', 'part_number', 'total_stock', 'available_stock', 'min_stock_level', 'tags', 'actions')
+        fields = ('pk', 'name', 'manufacturer', 'category', 'part_number', 'total_stock', 'available_stock', 'min_stock_level', 'tenant', 'tags', 'actions')
+        default_columns = ('pk', 'name', 'manufacturer', 'category', 'part_number', 'total_stock', 'available_stock', 'min_stock_level', 'tenant', 'tags', 'actions')
 
 
 class ComponentStockTable(BaseTable):

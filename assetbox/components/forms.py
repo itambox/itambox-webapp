@@ -5,7 +5,7 @@ from crispy_forms.layout import Layout, Submit, HTML, Row, Column
 from core.forms import SlugModelForm, FilterForm
 from extras.models import Tag
 from assets.models import Manufacturer, Asset, Category
-from organization.models import Location
+from organization.models import Location, Tenant
 from .models import Component, ComponentStock, ComponentAllocation
 
 
@@ -18,6 +18,12 @@ class ComponentForm(SlugModelForm):
         queryset=Category.objects.filter(applies_to__component=True),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
+    tenant = forms.ModelChoiceField(
+        queryset=Tenant.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Tenant"
+    )
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
         required=False,
@@ -27,7 +33,7 @@ class ComponentForm(SlugModelForm):
 
     class Meta:
         model = Component
-        fields = ['manufacturer', 'name', 'slug', 'category', 'part_number', 'specs', 'min_stock_level', 'description', 'tags']
+        fields = ['manufacturer', 'name', 'slug', 'category', 'part_number', 'specs', 'min_stock_level', 'description', 'tenant', 'tags']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'slug': forms.TextInput(attrs={'class': 'form-control', 'slugify': 'name'}),
@@ -64,9 +70,12 @@ class ComponentForm(SlugModelForm):
                 Column('category', css_class='col-md-6'),
                 Column('min_stock_level', css_class='col-md-6')
             ),
+            Row(
+                Column('tenant', css_class='col-md-6'),
+                Column('tags', css_class='col-md-6')
+            ),
             'specs',
             'description',
-            'tags',
             HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),

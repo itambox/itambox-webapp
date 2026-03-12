@@ -1,11 +1,12 @@
 from django.db import models, transaction
 from django.urls import reverse
+from django.core.exceptions import FieldError
 from core.models import BaseModel, ChangeLoggingMixin, StandardModel
 from core.mixins import TaggableMixin, AutoSlugMixin, JournalingMixin, ImageAttachmentMixin, CloneableMixin, ExportableMixin, SoftDeleteMixin
-from core.managers import SoftDeleteQuerySet, SoftDeleteManager, AllObjectsManager
+from core.managers import SoftDeleteQuerySet, SoftDeleteManager, AllObjectsManager, TenantScopingQuerySet
 
 
-class ComponentQuerySet(SoftDeleteQuerySet):
+class ComponentQuerySet(SoftDeleteQuerySet, TenantScopingQuerySet):
     def with_counts(self):
         from django.db.models import Sum, OuterRef, Subquery, IntegerField
         from django.db.models.functions import Coalesce
@@ -31,9 +32,22 @@ class ComponentQuerySet(SoftDeleteQuerySet):
         )
 
 
+class TenantScopingComponentManager(models.Manager.from_queryset(ComponentQuerySet)):
+    def get_queryset(self):
+        qs = super().get_queryset().filter_by_tenant()
+        try:
+            return qs.filter(deleted_at__isnull=True)
+        except FieldError:
+            return qs
+
+
+class AllObjectsComponentManager(models.Manager.from_queryset(ComponentQuerySet)):
+    pass
+
+
 class Component(AutoSlugMixin, SoftDeleteMixin, StandardModel, ImageAttachmentMixin):
-    objects = SoftDeleteManager.from_queryset(ComponentQuerySet)()
-    all_objects = AllObjectsManager.from_queryset(ComponentQuerySet)()
+    objects = TenantScopingComponentManager()
+    all_objects = AllObjectsComponentManager()
 
     """Catalog entry for a hardware component (e.g. 'Crucial 16GB DDR4')."""
     slug_source = ('manufacturer__name', 'name')
@@ -50,6 +64,14 @@ class Component(AutoSlugMixin, SoftDeleteMixin, StandardModel, ImageAttachmentMi
     specs = models.JSONField(default=dict, blank=True)
     min_stock_level = models.PositiveIntegerField(default=0)
     description = models.TextField(blank=True)
+    tenant = models.ForeignKey(
+        'organization.Tenant',
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        related_name='components',
+        db_index=True
+    )
     tags = models.ManyToManyField('extras.Tag', related_name='new_components', blank=True)
 
     class Meta:
@@ -137,73 +159,71 @@ class ComponentAllocation(JournalingMixin, TaggableMixin, SoftDeleteMixin, BaseM
     def get_absolute_url(self):
         return self.asset.get_absolute_url()
 
+    def _get_target_location(self, from_location):
+        target_location = from_location
+        if not target_location and self.asset:
+            target_location = self.asset.location
+        return target_location
 
-from django.db.models.signals import post_save, post_delete, pre_save
-from django.dispatch import receiver
-
-
-def deduct_stock(instance):
-    target_location = instance.from_location
-    if not target_location and instance.asset:
-        target_location = instance.asset.location
-        
-    if not target_location:
-        return
-        
-    with transaction.atomic():
+    def _deduct_stock(self, component, from_location, qty):
+        loc = self._get_target_location(from_location)
+        if not loc:
+            return
         stock, _ = ComponentStock.objects.select_for_update().get_or_create(
-            component=instance.component,
-            location=target_location,
+            component=component,
+            location=loc,
             defaults={'qty': 0}
         )
-        if stock.qty >= instance.qty_allocated:
-            stock.qty = stock.qty - instance.qty_allocated
+        if stock.qty >= qty:
+            stock.qty -= qty
         else:
             stock.qty = 0
         stock.save(update_fields=['qty'])
 
-
-def return_stock(instance):
-    target_location = instance.from_location
-    if not target_location and instance.asset:
-        target_location = instance.asset.location
-        
-    if not target_location:
-        return
-        
-    with transaction.atomic():
+    def _return_stock(self, component, from_location, qty):
+        loc = self._get_target_location(from_location)
+        if not loc:
+            return
         stock, _ = ComponentStock.objects.select_for_update().get_or_create(
-            component=instance.component,
-            location=target_location,
+            component=component,
+            location=loc,
             defaults={'qty': 0}
         )
-        stock.qty = stock.qty + instance.qty_allocated
+        stock.qty += qty
         stock.save(update_fields=['qty'])
 
+    def save(self, *args, **kwargs):
+        from django.db import transaction
+        from django.core.exceptions import ValidationError
+        from .models import ComponentStock
 
-@receiver(post_save, sender=ComponentAllocation)
-def decrement_component_stock(sender, instance, created, **kwargs):
-    if created:
-        if instance.deleted_at is None:
-            deduct_stock(instance)
+        with transaction.atomic():
+            is_new = self.pk is None
+            if is_new:
+                if self.deleted_at is None:
+                    self._deduct_stock(self.component, self.from_location, self.qty_allocated)
+            else:
+                old = ComponentAllocation.all_objects.get(pk=self.pk)
+                
+                was_active = old.deleted_at is None
+                is_active = self.deleted_at is None
+                
+                if was_active and not is_active:
+                    # Soft-deleted: return stock
+                    self._return_stock(old.component, old.from_location, old.qty_allocated)
+                elif not was_active and is_active:
+                    # Restored: deduct stock
+                    self._deduct_stock(self.component, self.from_location, self.qty_allocated)
+                elif is_active:
+                    # Normal update: revert old, apply new!
+                    self._return_stock(old.component, old.from_location, old.qty_allocated)
+                    self._deduct_stock(self.component, self.from_location, self.qty_allocated)
+            
+            super().save(*args, **kwargs)
 
-
-@receiver(pre_save, sender=ComponentAllocation)
-def handle_component_allocation_soft_delete(sender, instance, **kwargs):
-    if instance.pk:
-        try:
-            old_instance = ComponentAllocation.all_objects.get(pk=instance.pk)
-            # Soft-deleted transition
-            if old_instance.deleted_at is None and instance.deleted_at is not None:
-                return_stock(instance)
-            # Restored transition
-            elif old_instance.deleted_at is not None and instance.deleted_at is None:
-                deduct_stock(instance)
-        except ComponentAllocation.DoesNotExist:
-            pass
-
-
-@receiver(post_delete, sender=ComponentAllocation)
-def increment_component_stock(sender, instance, **kwargs):
-    if instance.deleted_at is None:
-        return_stock(instance)
+    def delete(self, *args, force_hard_delete=False, **kwargs):
+        from django.db import transaction
+        with transaction.atomic():
+            if force_hard_delete and self.deleted_at is None:
+                self._return_stock(self.component, self.from_location, self.qty_allocated)
+            super().delete(*args, force_hard_delete=force_hard_delete, **kwargs)

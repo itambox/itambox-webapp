@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 from django.urls import reverse
 from core.models import BaseModel, ChangeLoggingMixin
+from core.managers import TenantScopingManager
 
 
 class Tag(ChangeLoggingMixin, BaseModel):
@@ -21,6 +22,7 @@ class Tag(ChangeLoggingMixin, BaseModel):
 
 
 class Dashboard(models.Model):
+    objects = TenantScopingManager()
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,

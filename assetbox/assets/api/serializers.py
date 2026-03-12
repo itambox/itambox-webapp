@@ -39,14 +39,48 @@ class ManufacturerSerializer(BaseModelSerializer):
         brief_fields = ['id', 'name', 'slug']
 
 
+class StatusLabelSerializer(BaseModelSerializer):
+    type_display = serializers.CharField(source='get_type_display', read_only=True)
+    tags = TagSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = StatusLabel
+        fields = [
+            'id', 'name', 'slug', 'type', 'type_display',
+            'description', 'color', 'tags',
+            'created_at', 'updated_at'
+        ]
+        brief_fields = ['id', 'name', 'slug', 'type', 'color']
+
+
+class DepreciationSerializer(BaseModelSerializer):
+    class Meta:
+        model = Depreciation
+        fields = ['id', 'name', 'months', 'created_at', 'updated_at']
+        brief_fields = ['id', 'name', 'months']
+
+
 class AssetTypeSerializer(BaseModelSerializer):
     manufacturer = NestedManufacturerSerializer(read_only=True)
+    manufacturer_id = serializers.PrimaryKeyRelatedField(
+        queryset=Manufacturer.objects.all(), source='manufacturer',
+        write_only=True
+    )
+    tags = TagSerializer(many=True, read_only=True)
+    depreciation = DepreciationSerializer(read_only=True)
+    depreciation_id = serializers.PrimaryKeyRelatedField(
+        queryset=Depreciation.objects.all(), source='depreciation',
+        write_only=True, required=False, allow_null=True
+    )
 
     class Meta:
         model = AssetType
         fields = [
-            'id', 'model', 'slug', 'manufacturer', 'part_number',
-            'description', 'comments', 'created_at', 'updated_at'
+            'id', 'model', 'slug', 'manufacturer', 'manufacturer_id',
+            'part_number', 'eol_months', 'category', 'depreciation',
+            'depreciation_id', 'custom_fieldset', 'custom_values',
+            'image', 'requestable', 'description', 'comments',
+            'tags', 'created_at', 'updated_at'
         ]
         brief_fields = ['id', 'model', 'slug', 'manufacturer']
 
@@ -68,16 +102,30 @@ class AssetSerializer(BaseModelSerializer):
     tenant_id = serializers.PrimaryKeyRelatedField(
         queryset=Tenant.objects.all(), source='tenant', write_only=True, required=False, allow_null=True
     )
+    supplier = serializers.StringRelatedField(read_only=True)
+    supplier_id = serializers.PrimaryKeyRelatedField(
+        queryset=Supplier.objects.all(), source='supplier',
+        write_only=True, required=False, allow_null=True
+    )
+    status = StatusLabelSerializer(read_only=True)
+    status_id = serializers.PrimaryKeyRelatedField(
+        queryset=StatusLabel.objects.all(), source='status',
+        write_only=True, required=False, allow_null=True
+    )
+    last_audited_by = serializers.StringRelatedField(read_only=True)
     tags = TagSerializer(many=True, read_only=True)
     assigned_to = serializers.SerializerMethodField()
 
     class Meta:
         model = Asset
         fields = [
-            'id', 'name', 'asset_tag', 'serial_number', 'status',
+            'id', 'name', 'asset_tag', 'serial_number', 'status', 'status_id',
             'asset_type', 'asset_type_id', 'asset_role', 'assetrole_id',
             'location', 'location_id', 'tenant', 'tenant_id',
             'purchase_date', 'warranty_expiration',
+            'purchase_cost', 'order_number', 'supplier', 'supplier_id',
+            'salvage_value', 'last_audited', 'last_audited_by',
+            'custom_values', 'requestable',
             'notes', 'tags', 'assigned_to', 'created_at', 'updated_at'
         ]
         brief_fields = ['id', 'name', 'asset_tag', 'serial_number', 'status']
@@ -126,25 +174,6 @@ class InstalledSoftwareSerializer(BaseModelSerializer):
         brief_fields = ['id', 'software_name', 'version_detected']
 
 
-class StatusLabelSerializer(BaseModelSerializer):
-    type_display = serializers.CharField(source='get_type_display', read_only=True)
-    tags = TagSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = StatusLabel
-        fields = [
-            'id', 'name', 'slug', 'type', 'type_display',
-            'description', 'color', 'tags',
-            'created_at', 'updated_at'
-        ]
-        brief_fields = ['id', 'name', 'slug', 'type', 'color']
-
-
-class DepreciationSerializer(BaseModelSerializer):
-    class Meta:
-        model = Depreciation
-        fields = ['id', 'name', 'months', 'created_at', 'updated_at']
-        brief_fields = ['id', 'name', 'months']
 
 
 class SupplierSerializer(BaseModelSerializer):

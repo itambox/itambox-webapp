@@ -6,11 +6,11 @@ from django.core.exceptions import ValidationError
 
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel, StandardModel
 from core.mixins import TaggableMixin, AutoSlugMixin, SoftDeleteMixin, JournalingMixin, ImageAttachmentMixin, CloneableMixin, ExportableMixin, SubscribableMixin
-from core.managers import SoftDeleteManager, AllObjectsManager
+from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager
 
 
 class Accessory(AutoSlugMixin, SubscribableMixin, DeletableVaultModel):
-    objects = SoftDeleteManager()
+    objects = TenantScopingSoftDeleteManager()
     all_objects = AllObjectsManager()
 
     """Bulk non-serialized returnable peripherals tracked in inventory (e.g. Dell Keyboard)."""
@@ -139,9 +139,70 @@ class AccessoryAssignment(ChangeLoggingMixin, BaseModel):
         recipient = self.assigned_holder or self.assigned_location or self.assigned_asset or "Unknown"
         return f"{self.qty}x {self.accessory} assigned to {recipient}"
 
+    def save(self, *args, **kwargs):
+        from django.db import transaction
+        from django.core.exceptions import ValidationError
+        from .models import AccessoryStock
+
+        with transaction.atomic():
+            is_new = self.pk is None
+            if is_new:
+                if self.from_location:
+                    stock, _ = AccessoryStock.objects.select_for_update().get_or_create(
+                        accessory=self.accessory,
+                        location=self.from_location,
+                        defaults={'qty': 0}
+                    )
+                    if not self.accessory.allow_overallocate and stock.qty < self.qty:
+                        raise ValidationError(
+                            f"Insufficient stock at {self.from_location}. Available: {stock.qty}, Requested: {self.qty}"
+                        )
+                    stock.qty = max(0, stock.qty - self.qty)
+                    stock.save(update_fields=['qty'])
+            else:
+                old_instance = AccessoryAssignment.objects.get(pk=self.pk)
+                # Revert old stock allocation
+                if old_instance.from_location:
+                    old_stock, _ = AccessoryStock.objects.select_for_update().get_or_create(
+                        accessory=old_instance.accessory,
+                        location=old_instance.from_location,
+                        defaults={'qty': 0}
+                    )
+                    old_stock.qty += old_instance.qty
+                    old_stock.save(update_fields=['qty'])
+                # Apply new stock allocation
+                if self.from_location:
+                    new_stock, _ = AccessoryStock.objects.select_for_update().get_or_create(
+                        accessory=self.accessory,
+                        location=self.from_location,
+                        defaults={'qty': 0}
+                    )
+                    if not self.accessory.allow_overallocate and new_stock.qty < self.qty:
+                        raise ValidationError(
+                            f"Insufficient stock at {self.from_location}. Available: {new_stock.qty}, Requested: {self.qty}"
+                        )
+                    new_stock.qty = max(0, new_stock.qty - self.qty)
+                    new_stock.save(update_fields=['qty'])
+            super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        from django.db import transaction
+        from .models import AccessoryStock
+
+        with transaction.atomic():
+            if self.from_location:
+                stock, _ = AccessoryStock.objects.select_for_update().get_or_create(
+                    accessory=self.accessory,
+                    location=self.from_location,
+                    defaults={'qty': 0}
+                )
+                stock.qty += self.qty
+                stock.save(update_fields=['qty'])
+            super().delete(*args, **kwargs)
+
 
 class Consumable(AutoSlugMixin, SoftDeleteMixin, StandardModel, ImageAttachmentMixin, SubscribableMixin):
-    objects = SoftDeleteManager()
+    objects = TenantScopingSoftDeleteManager()
     all_objects = AllObjectsManager()
 
     """Non-returnable bulk items that are permanently consumed (e.g. thermal paste, printer toner)."""
@@ -261,9 +322,70 @@ class ConsumableAssignment(ChangeLoggingMixin, BaseModel):
         recipient = self.assigned_holder or self.assigned_location or self.assigned_asset or "Unknown"
         return f"{self.qty}x {self.consumable} consumed by {recipient}"
 
+    def save(self, *args, **kwargs):
+        from django.db import transaction
+        from django.core.exceptions import ValidationError
+        from .models import ConsumableStock
+
+        with transaction.atomic():
+            is_new = self.pk is None
+            if is_new:
+                if self.from_location:
+                    stock, _ = ConsumableStock.objects.select_for_update().get_or_create(
+                        consumable=self.consumable,
+                        location=self.from_location,
+                        defaults={'qty': 0}
+                    )
+                    if not self.consumable.allow_overallocate and stock.qty < self.qty:
+                        raise ValidationError(
+                            f"Insufficient stock at {self.from_location}. Available: {stock.qty}, Requested: {self.qty}"
+                        )
+                    stock.qty = max(0, stock.qty - self.qty)
+                    stock.save(update_fields=['qty'])
+            else:
+                old_instance = ConsumableAssignment.objects.get(pk=self.pk)
+                # Revert old stock allocation
+                if old_instance.from_location:
+                    old_stock, _ = ConsumableStock.objects.select_for_update().get_or_create(
+                        consumable=old_instance.consumable,
+                        location=old_instance.from_location,
+                        defaults={'qty': 0}
+                    )
+                    old_stock.qty += old_instance.qty
+                    old_stock.save(update_fields=['qty'])
+                # Apply new stock allocation
+                if self.from_location:
+                    new_stock, _ = ConsumableStock.objects.select_for_update().get_or_create(
+                        consumable=self.consumable,
+                        location=self.from_location,
+                        defaults={'qty': 0}
+                    )
+                    if not self.consumable.allow_overallocate and new_stock.qty < self.qty:
+                        raise ValidationError(
+                            f"Insufficient stock at {self.from_location}. Available: {new_stock.qty}, Requested: {self.qty}"
+                        )
+                    new_stock.qty = max(0, new_stock.qty - self.qty)
+                    new_stock.save(update_fields=['qty'])
+            super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        from django.db import transaction
+        from .models import ConsumableStock
+
+        with transaction.atomic():
+            if self.from_location:
+                stock, _ = ConsumableStock.objects.select_for_update().get_or_create(
+                    consumable=self.consumable,
+                    location=self.from_location,
+                    defaults={'qty': 0}
+                )
+                stock.qty += self.qty
+                stock.save(update_fields=['qty'])
+            super().delete(*args, **kwargs)
+
 
 class Kit(JournalingMixin, TaggableMixin, CloneableMixin, ExportableMixin, SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
-    objects = SoftDeleteManager()
+    objects = TenantScopingSoftDeleteManager()
     all_objects = AllObjectsManager()
 
     name = models.CharField(max_length=100, unique=True, verbose_name="Kit Name")
@@ -331,76 +453,7 @@ class KitItem(ChangeLoggingMixin, BaseModel):
             raise ValidationError("A kit item cannot select more than one target (must be either Asset Type OR Accessory OR License OR Consumable).")
 
     def fulfill_for_holder(self, holder, source_location):
-        if self.accessory:
-            from assets.services import checkout_accessory
-            return checkout_accessory(
-                self.accessory, self.qty, holder=holder, location=None,
-                source_location=source_location
-            )
-        elif self.consumable:
-            from assets.services import checkout_consumable
-            return checkout_consumable(
-                self.consumable, self.qty, holder=holder, location=None,
-                source_location=source_location
-            )
-
-
-# ---------------------------------------------------------------------------
-# Signals for AccessoryAssignment and ConsumableAssignment stock management
-# ---------------------------------------------------------------------------
-from django.db.models.signals import post_save, post_delete
-from django.db.models import F
-from django.db import transaction
-from django.dispatch import receiver
-
-
-@receiver(post_save, sender=AccessoryAssignment)
-def decrement_accessory_stock(sender, instance, created, **kwargs):
-    if not created:
-        return
-    if not instance.from_location:
-        return
-    with transaction.atomic():
-        stock, _ = AccessoryStock.objects.select_for_update().get_or_create(
-            accessory=instance.accessory,
-            location=instance.from_location,
-            defaults={'qty': 0}
+        raise NotImplementedError(
+            "fulfill_for_holder() is deprecated. "
+            "Please use Kit.checkout_to_holder() instead."
         )
-        if stock.qty >= instance.qty:
-            stock.qty = stock.qty - instance.qty
-        else:
-            stock.qty = 0
-        stock.save(update_fields=['qty'])
-
-
-@receiver(post_delete, sender=AccessoryAssignment)
-def return_accessory_stock(sender, instance, **kwargs):
-    if not instance.from_location:
-        return
-    with transaction.atomic():
-        stock, _ = AccessoryStock.objects.select_for_update().get_or_create(
-            accessory=instance.accessory,
-            location=instance.from_location,
-            defaults={'qty': 0}
-        )
-        stock.qty = stock.qty + instance.qty
-        stock.save(update_fields=['qty'])
-
-
-@receiver(post_save, sender=ConsumableAssignment)
-def decrement_consumable_stock(sender, instance, created, **kwargs):
-    if not created:
-        return
-    if not instance.from_location:
-        return
-    with transaction.atomic():
-        stock, _ = ConsumableStock.objects.select_for_update().get_or_create(
-            consumable=instance.consumable,
-            location=instance.from_location,
-            defaults={'qty': 0}
-        )
-        if stock.qty >= instance.qty:
-            stock.qty = stock.qty - instance.qty
-        else:
-            stock.qty = 0
-        stock.save(update_fields=['qty'])

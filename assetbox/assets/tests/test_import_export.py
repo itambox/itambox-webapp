@@ -172,8 +172,8 @@ class AdvancedImportExportTestCase(TestCase):
         self.assertContains(response, 'TAG-003')
         
         response = self.client.post(import_url, {'_confirm': '1'})
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Import Complete')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/jobs/', response.url)
         
         self.assertTrue(Asset.objects.filter(asset_tag='TAG-003').exists())
 
@@ -198,8 +198,8 @@ Asset Delta,TAG-004,{self.status.pk},{self.asset_type.pk}"""
         self.assertContains(response, 'TAG-004')
         
         response = self.client.post(import_url, {'_confirm': '1'})
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Import Complete')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/jobs/', response.url)
         
         self.assertTrue(Asset.objects.filter(asset_tag='TAG-004').exists())
 
@@ -230,7 +230,8 @@ Asset Delta,TAG-004,{self.status.pk},{self.asset_type.pk}"""
         self.assertContains(response, 'TAG-005')
         
         response = self.client.post(import_url, {'_confirm': '1'})
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/jobs/', response.url)
         self.assertTrue(Asset.objects.filter(asset_tag='TAG-005').exists())
 
     def test_csv_import_upsert_existing(self):
@@ -254,8 +255,8 @@ Asset Delta,TAG-004,{self.status.pk},{self.asset_type.pk}"""
         self.assertContains(response, 'TAG-001-UPDATED')
         
         response = self.client.post(import_url, {'_confirm': '1'})
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Import Complete')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/jobs/', response.url)
         
         self.asset1.refresh_from_db()
         self.assertEqual(self.asset1.name, 'Asset Alpha Updated')
@@ -285,8 +286,8 @@ Asset Delta,TAG-004,{self.status.pk},{self.asset_type.pk}"""
         self.assertContains(response, 'TAG-002-UPDATED')
         
         response = self.client.post(import_url, {'_confirm': '1'})
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Import Complete')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/jobs/', response.url)
         
         self.asset2.refresh_from_db()
         self.assertEqual(self.asset2.name, 'Asset Beta Updated')
@@ -312,6 +313,11 @@ Asset Delta,TAG-004,{self.status.pk},{self.asset_type.pk}"""
         self.assertEqual(response.status_code, 200)
         
         response = self.client.post(import_url, {'_confirm': '1'})
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Object with ID 99999 does not exist')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/jobs/', response.url)
+        
+        from core.models import Job
+        job = Job.objects.latest('created')
+        self.assertEqual(job.status, Job.STATUS_FAILED)
+        self.assertIn('does not exist', job.logs)
 

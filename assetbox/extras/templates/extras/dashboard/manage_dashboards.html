@@ -64,9 +64,9 @@
             <input type="text" name="name" class="form-control" placeholder="{% trans 'e.g. Finance Board, Tenant A overview' %}" required>
         </div>
         <div class="col-md-4">
-            <label class="form-label fs-4 fw-medium text-secondary">{% trans "Target Tenant Context" %} <span class="text-muted fs-5">({% trans "Optional" %})</span></label>
-            <select name="tenant" class="form-select">
-                <option value="">{% trans "All Tenants (Global)" %}</option>
+            <label class="form-label fs-4 fw-medium text-secondary">{% trans "Target Tenant Context" %}</label>
+            <select name="tenant" class="form-select" required>
+                <option value="">-- {% trans "Select Tenant" %} --</option>
                 {% for tenant in tenants %}
                     <option value="{{ tenant.id }}">{{ tenant.name }}</option>
                 {% endfor %}

@@ -28,7 +28,8 @@ from assets.forms.import_forms import AccessoryBulkImportForm, ConsumableBulkImp
 from .models import Accessory, Consumable, Kit, KitItem, AccessoryStock, ConsumableStock, AccessoryAssignment
 from . import forms, tables, filters
 from assets.models import Asset
-from assets.services import checkout_accessory, checkin_accessory, checkout_consumable, checkout_kit
+from assets.services import checkout_kit
+from inventory.services import checkout_accessory, checkin_accessory, checkout_consumable
 
 
 class AccessoryListView(ObjectListView):
@@ -181,22 +182,71 @@ class KitDetailView(ObjectDetailView):
         items_with_availability = []
         all_available = True
         
-        for item in self.object.items.all():
+        items = list(self.object.items.all())
+        asset_type_ids = [i.asset_type_id for i in items if i.asset_type_id]
+        accessory_ids = [i.accessory_id for i in items if i.accessory_id]
+        license_ids = [i.license_id for i in items if i.license_id]
+        consumable_ids = [i.consumable_id for i in items if i.consumable_id]
+
+        # 1. Batch Asset Availability Count
+        asset_counts = {}
+        if asset_type_ids:
+            from django.db.models import Count
+            counts = Asset.objects.filter(
+                asset_type_id__in=asset_type_ids,
+                status__slug='available'
+            ).values('asset_type_id').annotate(count=Count('id'))
+            asset_counts = {c['asset_type_id']: c['count'] for c in counts}
+
+        # 2. Batch Accessory Available Qty
+        accessory_avail = {}
+        if accessory_ids:
+            from django.db.models import Sum, Coalesce, Q
+            stocks = Accessory.objects.filter(id__in=accessory_ids).annotate(
+                total_qty=Coalesce(Sum('stocks__qty'), 0),
+                undeducted_qty=Coalesce(Sum('assignments__qty', filter=Q(assignments__from_location__isnull=True)), 0)
+            ).values('id', 'total_qty', 'undeducted_qty')
+            for s in stocks:
+                accessory_avail[s['id']] = max(0, s['total_qty'] - s['undeducted_qty'])
+
+        # 3. Batch License Available Seats
+        license_avail = {}
+        if license_ids:
+            from django.db.models import Count
+            from licenses.models import License
+            licenses = License.objects.filter(id__in=license_ids).annotate(
+                assigned_count=Count('assignments')
+            ).values('id', 'seats', 'assigned_count')
+            for l in licenses:
+                license_avail[l['id']] = max(0, l['seats'] - l['assigned_count'])
+
+        # 4. Batch Consumable Available Qty
+        consumable_avail = {}
+        if consumable_ids:
+            from django.db.models import Sum, Coalesce, Q
+            stocks = Consumable.objects.filter(id__in=consumable_ids).annotate(
+                total_qty=Coalesce(Sum('stocks__qty'), 0),
+                undeducted_qty=Coalesce(Sum('consumptions__qty', filter=Q(consumptions__from_location__isnull=True)), 0)
+            ).values('id', 'total_qty', 'undeducted_qty')
+            for s in stocks:
+                consumable_avail[s['id']] = max(0, s['total_qty'] - s['undeducted_qty'])
+
+        for item in items:
             avail = 0
-            if item.asset_type:
-                avail = Asset.objects.filter(asset_type=item.asset_type, status__slug='available').count()
+            if item.asset_type_id:
+                avail = asset_counts.get(item.asset_type_id, 0)
                 if avail < 1:
                     all_available = False
-            elif item.accessory:
-                avail = item.accessory.available
+            elif item.accessory_id:
+                avail = accessory_avail.get(item.accessory_id, 0)
                 if avail < item.qty:
                     all_available = False
-            elif item.license:
-                avail = item.license.available_seats
+            elif item.license_id:
+                avail = license_avail.get(item.license_id, 0)
                 if avail < 1:
                     all_available = False
-            elif item.consumable:
-                avail = item.consumable.available
+            elif item.consumable_id:
+                avail = consumable_avail.get(item.consumable_id, 0)
                 if avail < item.qty:
                     all_available = False
             

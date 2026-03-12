@@ -58,7 +58,7 @@ def deny_asset_request(request_instance, user, request=None, **kwargs):
 class RequestListView(ObjectListView):
     queryset = AssetRequest.objects.select_related('requester', 'asset_type', 'asset', 'responded_by')
     filterset = filters.AssetRequestFilterSet
-    filterset_form = forms_filter_stub = None  # Django generic view falls back to filterset's default form
+    filterset_form = None
     table = tables.AssetRequestTable
     template_name = 'assets/requests/assetrequest_list.html'
     action_buttons = ('add',)

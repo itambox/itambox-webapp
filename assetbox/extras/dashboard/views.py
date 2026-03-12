@@ -199,9 +199,20 @@ class DashboardCreateView(LoginRequiredMixin, View):
         if not name:
             name = "New Dashboard"
 
-        tenant = None
-        if tenant_id:
-            tenant = Tenant.objects.filter(id=tenant_id).first()
+        if not tenant_id:
+            from django.contrib import messages
+            if request.headers.get('HX-Request'):
+                return HttpResponse('<div class="alert alert-danger mb-0">Tenant is required.</div>', status=400)
+            messages.error(request, "Tenant is required.")
+            return redirect('dashboard')
+
+        tenant = Tenant.objects.filter(id=tenant_id).first()
+        if not tenant:
+            from django.contrib import messages
+            if request.headers.get('HX-Request'):
+                return HttpResponse('<div class="alert alert-danger mb-0">Selected tenant does not exist.</div>', status=400)
+            messages.error(request, "Selected tenant does not exist.")
+            return redirect('dashboard')
 
         # If this is the user's first dashboard, make it the default
         is_default = not request.user.dashboards.exists()

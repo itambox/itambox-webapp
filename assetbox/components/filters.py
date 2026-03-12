@@ -2,7 +2,7 @@ import django_filters
 from django import forms
 from django.db.models import Q
 from assets.models import Manufacturer, Category, Asset
-from organization.models import Location
+from organization.models import Location, Tenant
 from .models import Component, ComponentStock, ComponentAllocation
 
 class ComponentFilterSet(django_filters.FilterSet):
@@ -21,10 +21,15 @@ class ComponentFilterSet(django_filters.FilterSet):
         label='Category',
         widget=forms.Select(attrs={'class': 'form-select'})
     )
+    tenant = django_filters.ModelChoiceFilter(
+        queryset=Tenant.objects.all(),
+        label='Tenant',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
 
     class Meta:
         model = Component
-        fields = ['manufacturer', 'category']
+        fields = ['manufacturer', 'category', 'tenant']
 
     def search(self, queryset, name, value):
         if not value.strip():
