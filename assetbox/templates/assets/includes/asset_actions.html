@@ -1,5 +1,10 @@
 {% comment %} assetbox/templates/assets/includes/asset_actions.html {% endcomment %}
+{% load utility_tags %}
+{% has_object_perm request.user 'assets.change_asset' record as can_edit %}
+{% has_object_perm request.user 'assets.delete_asset' record as can_delete %}
+{% has_object_perm request.user 'assets.add_asset' record as can_clone %}
 <div class="d-flex align-items-center gap-1 justify-content-end">
+    {% if can_clone %}
     <!-- Yellow Copy/Clone Button -->
     <a class="btn btn-sm btn-warning" href="{% url 'assets:asset_clone' pk=record.pk %}" title="Copy/Clone">
         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copy" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
@@ -8,9 +13,12 @@
             <path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2" />
         </svg>
     </a>
+    {% endif %}
 
+    {% if can_edit or can_delete %}
     <!-- Blue Edit Pen with Split Dropdown containing Delete and future actions -->
     <span class="btn-group dropdown">
+        {% if can_edit %}
         <a class="btn btn-sm btn-primary" href="{% url 'assets:asset_update' pk=record.pk %}" aria-label="Edit" title="Edit Details">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-pencil" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                 <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
@@ -18,10 +26,13 @@
                 <path d="M13.5 6.5l4 4" />
             </svg>
         </a>
+        {% endif %}
+        
         <a class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="padding-left: 2px">
             <span class="visually-hidden">Toggle Dropdown</span>
         </a>
         <ul class="dropdown-menu dropdown-menu-end">
+            {% if can_delete %}
             <li>
                 <a class="dropdown-item text-danger" href="{% url 'assets:asset_delete' pk=record.pk %}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
@@ -35,6 +46,8 @@
                     Delete
                 </a>
             </li>
+            {% endif %}
         </ul>
     </span>
+    {% endif %}
 </div>

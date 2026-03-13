@@ -80,20 +80,26 @@
       // GridStack.init succeeded — mark as loaded
       gsLoaded = true;
       window.__gsInitialized = true;
+
+      // Reveal the fully initialized dashboard grid smoothly
+      el.classList.remove('grid-stack-loading');
     } catch (e) {
       console.warn('GridStack init error — using Bootstrap grid fallback:', e);
       // Restore Bootstrap classes so the fallback layout works
       const el = document.getElementById('dashboard-grid');
-      if (el && !el.classList.contains('row')) {
-        el.classList.add('row', 'row-cards');
-        Array.from(el.children).forEach(function (child) {
-          if (!(child instanceof HTMLElement)) return;
-          const w = child.getAttribute('gs-w') || child.getAttribute('data-gs-w') || '4';
-          child.classList.add('col-lg-' + w, 'col-md-6', 'col-12');
-          child.classList.remove('grid-stack-item');
-          const card = child.querySelector<HTMLElement>('.grid-stack-item-content');
-          if (card) card.classList.remove('grid-stack-item-content');
-        });
+      if (el) {
+        el.classList.remove('grid-stack-loading');
+        if (!el.classList.contains('row')) {
+          el.classList.add('row', 'row-cards');
+          Array.from(el.children).forEach(function (child) {
+            if (!(child instanceof HTMLElement)) return;
+            const w = child.getAttribute('gs-w') || child.getAttribute('data-gs-w') || '4';
+            child.classList.add('col-lg-' + w, 'col-md-6', 'col-12');
+            child.classList.remove('grid-stack-item');
+            const card = child.querySelector<HTMLElement>('.grid-stack-item-content');
+            if (card) card.classList.remove('grid-stack-item-content');
+          });
+        }
       }
       window.__gsInitialized = false;
     }

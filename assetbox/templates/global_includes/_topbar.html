@@ -17,6 +17,67 @@
         </div>
         <div class="navbar-nav flex-row order-md-last">
             <div class="d-flex">
+                {# Workspace Switcher #}
+                {% if request.user.is_authenticated %}
+                <div class="nav-item dropdown me-3 d-none d-md-flex">
+                    <a href="#" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-briefcase" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" /><path d="M8 7v-2a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2v2" /><path d="M12 12l0 .01" /><path d="M3 13a20 20 0 0 0 18 0" /></svg>
+                        {% if request.active_tenant %}
+                            {{ request.active_tenant.name }}
+                        {% else %}
+                            {% trans "All Tenants" %}
+                        {% endif %}
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-end dropdown-menu-card dropdown-menu-arrow" style="min-width: 250px;">
+                        <div class="card">
+                            <div class="card-header py-2 bg-light">
+                                <h3 class="card-title text-reset fs-6">{% trans "Active Workspace" %}</h3>
+                            </div>
+                            <div class="list-group list-group-flush list-group-hoverable">
+                                {% if request.user.is_superuser %}
+                                    <a href="?switch_tenant=" class="list-group-item list-group-item-action py-2 {% if not request.active_tenant %}active{% endif %}">
+                                        <div class="d-flex align-items-center">
+                                            <span class="status-dot bg-blue me-2"></span>
+                                            <strong>{% trans "All Tenants (Global)" %}</strong>
+                                        </div>
+                                    </a>
+                                    {% for tenant in all_tenants_switcher %}
+                                        <a href="?switch_tenant={{ tenant.id }}" class="list-group-item list-group-item-action py-2 {% if request.active_tenant.id == tenant.id %}active{% endif %}">
+                                            <div class="d-flex align-items-center">
+                                                <span class="status-dot bg-secondary me-2"></span>
+                                                <span>{{ tenant.name }}</span>
+                                            </div>
+                                        </a>
+                                    {% endfor %}
+                                {% else %}
+                                    {% for membership in request.user.memberships.all %}
+                                        <a href="?switch_tenant={{ membership.tenant.id }}" class="list-group-item list-group-item-action py-2 {% if request.active_tenant.id == membership.tenant.id %}active{% endif %}">
+                                            <div class="d-flex align-items-center">
+                                                <span class="status-dot {% if membership.role == 'admin' %}bg-red{% elif membership.role == 'member' %}bg-green{% else %}bg-orange{% endif %} me-2"></span>
+                                                <span class="text-truncate" style="max-width: 130px;">{{ membership.tenant.name }}</span>
+                                                <span class="badge bg-secondary-lt ms-auto">{{ membership.get_role_display }}</span>
+                                            </div>
+                                        </a>
+                                    {% empty %}
+                                        <div class="list-group-item text-muted text-center py-3">
+                                            {% trans "No workspace memberships" %}
+                                        </div>
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                            {% if request.user.is_superuser or request.active_membership.role == 'admin' %}
+                                <div class="card-footer text-center py-2 bg-light">
+                                    <a href="{% url 'organization:invite_user' %}" class="small font-weight-bold d-flex align-items-center justify-content-center gap-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user-plus" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M16 19h6" /><path d="M19 16v6" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4" /></svg>
+                                        {% trans "Invite Member" %}
+                                    </a>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
                 {% get_available_languages as LANGUAGES %}
                 {% get_current_language as CURRENT_LANG %}
                 {% if LANGUAGES|length > 1 %}

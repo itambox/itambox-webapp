@@ -145,7 +145,7 @@
 
 {% block content %}
 
-<div class="row row-cards" id="dashboard-grid" hx-history="false" data-save-url="{% url 'extras:dashboard_save_layout' dashboard_id=active_dashboard.id %}">
+<div class="row row-cards grid-stack-loading" id="dashboard-grid" hx-history="false" data-save-url="{% url 'extras:dashboard_save_layout' dashboard_id=active_dashboard.id %}">
     {% for entry in dashboard_widgets %}
     <div class="col-lg-{{ entry.config.w|default:4 }} col-md-6 col-12" id="widget-{{ entry.index }}"
          data-gs-w="{{ entry.config.w|default:4 }}" data-gs-h="{{ entry.config.h|default:2 }}"

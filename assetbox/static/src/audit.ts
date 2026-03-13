@@ -16,7 +16,7 @@
     const audio = document.getElementById('audit-success-audio') as HTMLAudioElement | null;
     if (audio) {
       audio.play().catch(function (_e) {
-        console.log('Audio play blocked by browser autoplay restrictions: ', _e);
+        console.warn('Audio play blocked by browser autoplay restrictions: ', _e);
       });
     }
     // Spring tactile animation on the verify button

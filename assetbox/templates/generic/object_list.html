@@ -114,6 +114,9 @@
                                 <input type="hidden" name="pk" value="" id="bulk-edit-pks">
                                 <button type="button" class="btn btn-sm btn-outline-primary"
                                         onclick="var form=document.getElementById('bulk-edit-form');form.querySelector('#bulk-edit-pks').value=Array.from(document.querySelectorAll('#object-list-table-container input[type=checkbox][name=pk]:checked')).map(function(cb){return cb.value;}).join(',');form.submit();">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-pencil me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/></svg>
+                                    Edit Selected
+                                </button>
                             </form>
                         </div>
                     </div>
@@ -215,18 +218,15 @@
 
         {% if can_add %}
             {% if create_url_name %}
-            <a href="{% url create_url_name %}" class="btn btn-primary d-none d-sm-inline-block">
+            <a href="{% url create_url_name %}" class="btn btn-primary">
                 <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
                 {% blocktranslate %}Create {{ object_type }}{% endblocktranslate %}
-            </a>
-            <a href="{% url create_url_name %}" class="btn btn-primary d-sm-none btn-icon" aria-label="{% blocktranslate %}Create new {{ object_type }}{% endblocktranslate %}">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
             </a>
             {% endif %}
 
             {% if import_url %}
             <a href="{{ import_url }}" class="btn btn-secondary d-none d-sm-inline-block">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-import" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 13v-8a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-5.5"/><path d="M2 19h7"/><path d="M5 16l-3 3l3 3"/></svg>
+                <i class="mdi mdi-upload me-1"></i>
                 {% trans "Import" %}
             </a>
             {% endif %}
@@ -234,7 +234,7 @@
 
         <div class="dropdown d-none d-sm-inline-block">
             <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-download" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" /><path d="M7 11l5 5l5 -5" /><path d="M12 4l0 12" /></svg>
+                <i class="mdi mdi-download me-1"></i>
                 {% trans "Export" %}
             </button>
             <div class="dropdown-menu dropdown-menu-end">

@@ -509,7 +509,20 @@ html,
         text-align: right;
     }
 
-    thead th.col-actions {
+    th.col-actions-wide,
+    td.col-actions-wide {
+        min-width: 180px !important;
+        width: 180px !important;
+        max-width: 180px !important;
+        position: sticky !important;
+        right: 0 !important;
+        z-index: 2 !important;
+        background-color: var(--tblr-bg-surface) !important;
+        text-align: right;
+    }
+
+    thead th.col-actions,
+    thead th.col-actions-wide {
         z-index: 4 !important;
         background-color: var(--tblr-bg-surface-secondary, #f4f6fa) !important;
     }
@@ -539,11 +552,30 @@ html,
 
 // ---- GridStack ----
 
+#dashboard-grid {
+    transition: opacity 0.18s ease-in-out;
+
+    &.grid-stack-loading {
+        opacity: 0 !important;
+    }
+}
+
 #dashboard-grid.grid-stack {
     max-width: 100%;
     width: 100%;
     margin: 0;
     padding: 0;
+}
+
+// Uninitialized state height preservation (eliminates vertical layout shift)
+#dashboard-grid:not(.grid-stack) {
+    @for $h from 1 through 12 {
+        [data-gs-h="#{$h}"] {
+            .card {
+                height: ($h * 100px) + (($h - 1) * 8px) !important;
+            }
+        }
+    }
 }
 
 // ---- Modal layout fixes ----
