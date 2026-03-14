@@ -40,3 +40,16 @@ test_holders.csv
 # Internal design documents (external repo: ../assetbox-internal-docs)
 internal-docs/
 
+# Environment variables
+.env
+
+# Coverage reports
+.coverage
+coverage_report*.txt
+
+# Scratch files
+scratch_page.html
+
+# Root-level templates directory (not part of project structure)
+/templates/
+
