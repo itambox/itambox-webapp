@@ -2,7 +2,7 @@
 {# HTMX poll target for notification bell dropdown content #}
 <div class="card" hx-swap-oob="true" id="notification-dropdown-content">
     <div class="card-header">
-        <h3 class="card-title">Unread Alerts (<span id="unread-count">{{ unread_notifications_count }}</span>)</h3>
+        <h3 class="card-title">{% translate "Unread Alerts (" %}<span id="unread-count">{{ unread_notifications_count }}</span>)</h3>
     </div>
     <div class="list-group list-group-flush list-group-hoverable">
         {% if recent_unread_notifications %}
@@ -23,13 +23,13 @@
             {% endfor %}
         {% else %}
             <div class="list-group-item text-muted text-center py-3">
-                No unread notifications
+                {% translate "No unread notifications" %}
             </div>
         {% endif %}
     </div>
     {% if unread_notifications_count > 0 %}
         <div class="card-footer text-center py-2">
-            <a href="{% url 'users:user_notifications' %}" class="small font-weight-bold">View Notification Center</a>
+            <a href="{% url 'users:user_notifications' %}" class="small font-weight-bold">{% translate "View Notification Center" %}</a>
         </div>
     {% endif %}
 </div>

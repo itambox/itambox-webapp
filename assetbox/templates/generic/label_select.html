@@ -1,9 +1,10 @@
 {% extends base_template|default:"layout.html" %}
+{% load i18n %}
 
-{% block title %}{{ title|default:"Select Label Template" }} - AssetBox{% endblock %}
+{% block title %}{{ title|default:"Select Label Template" }} {% translate "- AssetBox" %}{% endblock %}
 
 {% block page_header %}
-<div class="page-pretitle">Label Printing</div>
+<div class="page-pretitle">{% translate "Label Printing" %}</div>
 <h2 class="page-title">{{ title|default:"Select Label Template" }}</h2>
 {% endblock %}
 
@@ -12,7 +13,7 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <h3 class="card-title">Available Label Templates</h3>
+                <h3 class="card-title">{% translate "Available Label Templates" %}</h3>
             </div>
             <div class="card-body">
                 {% if label_templates %}
@@ -24,17 +25,17 @@
                             {% if tpl.description %}
                             <br><small class="text-muted">{{ tpl.description }}</small>
                             {% endif %}
-                            <br><small class="text-muted">{{ tpl.page_width }}×{{ tpl.page_height }} in | {{ tpl.get_barcode_format_display }}</small>
+                            <br><small class="text-muted">{{ tpl.page_width }}×{{ tpl.page_height }} {% translate "in |" %} {{ tpl.get_barcode_format_display }}</small>
                         </div>
                         <a href="{% url 'label_print' template_id=tpl.pk object_id=object_id %}" class="btn btn-sm btn-primary" target="_blank">
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-printer" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2" /><path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4" /><path d="M7 13m0 2a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2z" /></svg>
-                            Print
+                            {% translate "Print" %}
                         </a>
                     </div>
                     {% endfor %}
                 </div>
                 {% else %}
-                <p class="text-muted">No label templates configured. <a href="{% url 'labeltemplate_add' %}">Create one</a>.</p>
+                <p class="text-muted">{% translate "No label templates configured." %} <a href="{% url 'labeltemplate_add' %}">{% translate "Create one" %}</a>.</p>
                 {% endif %}
             </div>
         </div>

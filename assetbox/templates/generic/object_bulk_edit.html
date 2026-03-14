@@ -2,7 +2,7 @@
 {% load i18n %}
 {% load crispy_forms_tags %}
 
-{% block title %}{{ title }} - AssetBox{% endblock %}
+{% block title %}{{ title }} {% translate "- AssetBox" %}{% endblock %}
 
 {% block page_header %}
     <div class="page-pretitle">{{ model_verbose_name_plural }}</div>
@@ -22,7 +22,7 @@
         <div class="col-md-8 offset-md-2">
             <div class="card mb-4">
                 <div class="card-header">
-                    <h3 class="card-title">Selected Objects ({{ objects|length }})</h3>
+                    <h3 class="card-title">{% translate "Selected Objects (" %}{{ objects|length }})</h3>
                 </div>
                 <div class="card-body">
                     <ul class="list-group list-group-flush mb-0" style="max-height:200px;overflow-y:auto;">
@@ -35,7 +35,7 @@
 
             <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title">Fields to Update</h3>
+                    <h3 class="card-title">{% translate "Fields to Update" %}</h3>
                 </div>
                 <div class="card-body">
                     {% if form.fields %}
@@ -62,14 +62,14 @@
                         </div>
                         {% endfor %}
                     {% else %}
-                        <p class="text-muted mb-0">This model has no fields available for bulk editing.</p>
+                        <p class="text-muted mb-0">{% translate "This model has no fields available for bulk editing." %}</p>
                     {% endif %}
                 </div>
                 <div class="card-footer text-end">
-                    <a href="{{ return_url }}" class="btn btn-secondary">Cancel</a>
+                    <a href="{{ return_url }}" class="btn btn-secondary">{% translate "Cancel" %}</a>
                     <button type="submit" name="_apply" class="btn btn-primary">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
-                        Apply Changes
+                        {% translate "Apply Changes" %}
                     </button>
                 </div>
             </div>

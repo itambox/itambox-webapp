@@ -20,7 +20,7 @@
         {% if filter_form %}
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="filters-tab" data-bs-toggle="tab" data-bs-target="#tab-filters" type="button" role="tab" aria-controls="filters" aria-selected="false">
-                <i class="mdi mdi-filter-variant"></i> Filters
+                <i class="mdi mdi-filter-variant"></i> {% translate "Filters" %}
                 <span id="filters-applied-count" class="badge rounded-pill {% if filter_form.applied_filters %}bg-primary{% else %}bg-secondary{% endif %}">
                     {{ filter_form.applied_filters|length }}
                 </span>

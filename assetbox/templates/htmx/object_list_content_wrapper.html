@@ -9,10 +9,10 @@
 {# Partial for Filters Tab Badge (OOB Candidate) #}
 {% startpartial filters-tab-content %}
     <span id="filters-tab-content" hx-swap-oob="true">
-        Filters
+        {% translate "Filters" %}
         {% get_active_filters as active_filters_present %}
         {% if active_filters_present %}
-            <span class="badge bg-info-lt ms-1">Active</span>
+            <span class="badge bg-info-lt ms-1">{% translate "Active" %}</span>
         {% endif %}
     </span>
 {% endpartial %}

@@ -1,3 +1,4 @@
+{% load i18n %}
 {% load crispy_forms_tags %}
 {% load utility_tags %}
 
@@ -15,11 +16,11 @@
 
 
      <div class="mt-4 d-flex justify-content-between gap-2">
-         <button type="submit" class="btn btn-primary w-100">Apply</button>
+         <button type="submit" class="btn btn-primary w-100">{% translate "Apply" %}</button>
          <a href="{{ request.path }}" class="btn btn-outline-secondary w-100"
             hx-get="{{ request.path }}"
             hx-target="#object-list-dynamic-content"
             hx-swap="innerHTML"
-            hx-push-url="true">Reset</a>
+            hx-push-url="true">{% translate "Reset" %}</a>
      </div>
 </form>

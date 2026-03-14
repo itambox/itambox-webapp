@@ -1,3 +1,4 @@
+{% load i18n %}
 <div class="card mb-3 shadow-sm">
     {% if panel.display_label %}
     <div class="card-header border-0 bg-transparent pb-0">
@@ -11,7 +12,7 @@
         {% if panel_template %}
             {% include panel_template %}
         {% else %}
-            <p class="text-muted"><em>No template found for panel "{{ panel.name }}".</em></p>
+            <p class="text-muted"><em>{% translate 'No template found for panel "' %}{{ panel.name }}".</em></p>
         {% endif %}
     </div>
 </div>

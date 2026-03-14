@@ -1,3 +1,4 @@
+{% load i18n %}
 {% load crispy_forms_tags %}
 <div class="modal modal-blur fade" id="quick-add-modal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -7,8 +8,8 @@
                   hx-swap="innerHTML">
                 {% csrf_token %}
                 <div class="modal-header">
-                    <h5 class="modal-title">Add {{ model_label }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <h5 class="modal-title">{% translate "Add" %} {{ model_label }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
                 </div>
                 <div class="modal-body" id="quick-add-modal-content">
                     {% crispy quick_add_form %}

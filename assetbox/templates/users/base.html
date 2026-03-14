@@ -1,11 +1,11 @@
 {% extends base_template|default:"layout.html" %}
 {% load i18n %}
 
-{% block title %}{% block title_tab %}{% trans "User Account" %}{% endblock %} - AssetBox{% endblock %}
+{% block title %}{% block title_tab %}{% trans "User Account" %}{% endblock %} {% translate "- AssetBox" %}{% endblock %}
 
 {% block page_header %}
     <div class="page-pretitle">
-        User Account
+        {% translate "User Account" %}
     </div>
     <h2 class="page-title">
         {% block page_title %}{% if user.get_full_name %}{{ user.get_full_name }}{% else %}{{ user.username }}{% endif %}{% endblock %}

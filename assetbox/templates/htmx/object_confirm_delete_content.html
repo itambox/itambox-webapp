@@ -1,3 +1,4 @@
+{% load i18n %}
 {% comment %}
     Content partial for the generic object deletion confirmation modal.
     Included by _modal_base.html.
@@ -5,7 +6,7 @@
     Relies on the surrounding <form> provided by _modal_base.html.
 {% endcomment %}
 
-<p>Are you sure you want to delete <strong>{{ object }}</strong>?</p>
+<p>{% translate "Are you sure you want to delete" %} <strong>{{ object }}</strong>?</p>
 
 {# Render the form if provided (e.g., ConfirmationForm from base view) #}
 {% if form %}

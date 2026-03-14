@@ -87,13 +87,13 @@
                     {# Batch Actions Bar — Top #}
                     <div id="batch-actions-bar-top" class="batch-actions-bar d-none">
                         <div class="d-flex align-items-center gap-2 px-3 py-2 bg-body-tertiary border-bottom">
-                            <span id="batch-selected-count" class="fw-bold me-2">0 selected</span>
+                            <span id="batch-selected-count" class="fw-bold me-2">{% translate "0 selected" %}</span>
                             {% if model_name_str == 'assets.asset' %}
                             <button type="button" class="btn btn-sm btn-primary" id="btn-bulk-assign"
                                     data-bs-toggle="modal" data-bs-target="#bulk-assign-modal"
-                                    title="Assign selected assets to a holder">
+                                    title="{% translate 'Assign selected assets to a holder' %}">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user-plus me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M16 19h6" /><path d="M19 16v6" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4" /></svg>
-                                Assign Selected
+                                {% translate "Assign Selected" %}
                             </button>
                             {% endif %}
                             <form id="bulk-delete-form" method="post" action="{{ bulk_delete_url }}" class="d-inline">
@@ -104,7 +104,7 @@
                                 <button type="button" class="btn btn-sm btn-outline-danger"
                                         onclick="if(!confirm('Delete selected items? This cannot be undone.'))return false;var form=document.getElementById('bulk-delete-form');form.querySelector('#bulk-delete-pks').value=Array.from(document.querySelectorAll('#object-list-table-container input[type=checkbox][name=pk]:checked')).map(function(cb){return cb.value;}).join(',');form.submit();">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
-                                    Delete Selected
+                                    {% translate "Delete Selected" %}
                                 </button>
                             </form>
                             <form id="bulk-edit-form" method="post" action="{{ bulk_edit_url }}" class="d-inline">
@@ -115,7 +115,7 @@
                                 <button type="button" class="btn btn-sm btn-outline-primary"
                                         onclick="var form=document.getElementById('bulk-edit-form');form.querySelector('#bulk-edit-pks').value=Array.from(document.querySelectorAll('#object-list-table-container input[type=checkbox][name=pk]:checked')).map(function(cb){return cb.value;}).join(',');form.submit();">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-pencil me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/></svg>
-                                    Edit Selected
+                                    {% translate "Edit Selected" %}
                                 </button>
                             </form>
                         </div>
@@ -126,7 +126,7 @@
                            {% render_table table "global_includes/htmx_table.html" %}
                        {% else %}
                            <div class="p-3">
-                               <p class="text-muted mb-0">No table data available.</p>
+                               <p class="text-muted mb-0">{% translate "No table data available." %}</p>
                            </div>
                        {% endif %}
                     </div>
@@ -136,24 +136,24 @@
             {# Batch Actions Bar — Bottom #}
             <div id="batch-actions-bar-bottom" class="batch-actions-bar d-none">
                 <div class="d-flex align-items-center gap-2 px-3 py-2 bg-body-tertiary border-top">
-                    <span class="batch-selected-count-bottom fw-bold me-2">0 selected</span>
+                    <span class="batch-selected-count-bottom fw-bold me-2">{% translate "0 selected" %}</span>
                     {% if model_name_str == 'assets.asset' %}
                     <button type="button" class="btn btn-sm btn-primary btn-bulk-assign-bottom"
                             data-bs-toggle="modal" data-bs-target="#bulk-assign-modal"
-                            title="Assign selected assets to a holder">
+                            title="{% translate 'Assign selected assets to a holder' %}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user-plus me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M16 19h6" /><path d="M19 16v6" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4" /></svg>
-                        Assign Selected
+                        {% translate "Assign Selected" %}
                     </button>
                     {% endif %}
                     <button type="button" class="btn btn-sm btn-outline-danger btn-bulk-delete-bottom"
                             onclick="var form=document.getElementById('bulk-delete-form'); if(!confirm('Delete selected items? This cannot be undone.'))return false; form.querySelector('#bulk-delete-pks').value=Array.from(document.querySelectorAll('#object-list-table-container input[type=checkbox][name=pk]:checked')).map(function(cb){return cb.value;}).join(','); form.submit();">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
-                        Delete Selected
+                        {% translate "Delete Selected" %}
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-primary btn-bulk-edit-bottom"
                             onclick="var form=document.getElementById('bulk-edit-form'); form.querySelector('#bulk-edit-pks').value=Array.from(document.querySelectorAll('#object-list-table-container input[type=checkbox][name=pk]:checked')).map(function(cb){return cb.value;}).join(','); form.submit();">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-pencil me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/></svg>
-                        Edit Selected
+                        {% translate "Edit Selected" %}
                     </button>
                 </div>
             </div>
@@ -174,9 +174,9 @@
             <div class="card-header d-flex justify-content-between align-items-center p-3">
                 <h3 class="card-title text-secondary d-flex align-items-center m-0">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-adjustments-horizontal me-2 text-muted" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 6m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M4 6l8 0" /><path d="M16 6l4 0" /><path d="M8 12m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M4 12l2 0" /><path d="M10 12l10 0" /><path d="M17 18m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M4 18l11 0" /><path d="M19 18l1 0" /></svg>
-                    Filters
+                    {% translate "Filters" %}
                 </h3>
-                <a href="#" class="link-secondary ms-auto d-flex align-items-center" onclick="window.toggleFilters(); return false;" title="Collapse Panel">
+                <a href="#" class="link-secondary ms-auto d-flex align-items-center" onclick="window.toggleFilters(); return false;" title="{% translate 'Collapse Panel' %}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
                         <path d="M9 6l6 6l-6 6" />
@@ -201,7 +201,7 @@
     {% endif %}
 {% endblock modals %}
 
-{% block title %}{{ title|default:"List View" }} - AssetBox{% endblock %}
+{% block title %}{{ title|default:"List View" }} {% translate "- AssetBox" %}{% endblock %}
 
 {% block page_header %}
     <div class="page-pretitle">
@@ -284,22 +284,22 @@
             <form id="bulk-assign-form" method="post" action="{% url 'assets:asset_bulk_assign' %}">
                 {% csrf_token %}
                 <div class="modal-header">
-                    <h5 class="modal-title" id="bulkAssignModalLabel">Bulk Assign Assets</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <h5 class="modal-title" id="bulkAssignModalLabel">{% translate "Bulk Assign Assets" %}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="text-muted">Select an Asset Holder to assign the selected assets to:</p>
-                    <label for="bulk-assign-holder" class="form-label">Asset Holder</label>
+                    <p class="text-muted">{% translate "Select an Asset Holder to assign the selected assets to:" %}</p>
+                    <label for="bulk-assign-holder" class="form-label">{% translate "Asset Holder" %}</label>
                     <select name="holder_id" id="bulk-assign-holder" class="form-select" required>
-                        <option value="">— Select an Asset Holder —</option>
+                        <option value="">{% translate "— Select an Asset Holder —" %}</option>
                         {% for holder in asset_holders %}
                         <option value="{{ holder.pk }}">{{ holder }}</option>
                         {% endfor %}
                     </select>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Assign</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                    <button type="submit" class="btn btn-primary">{% translate "Assign" %}</button>
                 </div>
             </form>
         </div>

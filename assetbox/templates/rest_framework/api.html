@@ -7,9 +7,9 @@
   <link rel="icon" type="image/png" href="{% static 'favicon.ico' %}" />
 {% endblock head %}
 
-{% block title %}{% if name %}{{ name }} | {% endif %}AssetBox {% trans "REST API" %}{% endblock %}
+{% block title %}{% if name %}{{ name }} | {% endif %}{% translate "AssetBox" %} {% trans "REST API" %}{% endblock %}
 
 {% block branding %}
   {# Link to the AssetBox dashboard #}
-  <a class="navbar-brand" href="{% url 'dashboard' %}">AssetBox</a>
+  <a class="navbar-brand" href="{% url 'dashboard' %}">{% translate "AssetBox" %}</a>
 {% endblock branding %} 

@@ -1,10 +1,11 @@
+{% load i18n %}
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
     <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
-    <title>{% block title %}AssetBox{% endblock %}</title>
+    <title>{% block title %}{% translate "AssetBox" %}{% endblock %}</title>
     {# <!-- CSS files --> #}
     {% load static %}
     <link rel="stylesheet" href="{% static 'dist/vendor/tabler/css/tabler.min.css' %}">

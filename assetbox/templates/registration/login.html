@@ -2,14 +2,14 @@
 {% load i18n %}
 {% load crispy_forms_tags %}
 
-{% block title %}{% trans "Log In" %} - AssetBox{% endblock %}
+{% block title %}{% trans "Log In" %} {% translate "- AssetBox" %}{% endblock %}
 
 {% block content %}
 <div class="container-tight py-4">
     <div class="text-center mb-4">
         {# Placeholder for AssetBox logo if you have one #}
         {# <a href="." class="navbar-brand navbar-brand-autodark"><img src="./static/logo.svg" height="36" alt=""></a> #}
-        <h1 class="navbar-brand navbar-brand-autodark">AssetBox</h1>
+        <h1 class="navbar-brand navbar-brand-autodark">{% translate "AssetBox" %}</h1>
     </div>
     <div class="card card-md">
         <div class="card-body">
@@ -56,15 +56,15 @@
 
         </div>
         {# Optional: Add links like "Forgot password?" if needed later #}
-        <div class="hr-text">or</div>
+        <div class="hr-text">{% translate "or" %}</div>
         <div class="card-body">
             <span>
-                <a href="#">Login with SSO (dummy)</a>
+                <a href="#">{% translate "Login with SSO (dummy)" %}</a>
             </span>
         </div>
     </div>
     <div class="text-center text-muted mt-3">
-      Don't have account yet? <a href="./sign-up.html" tabindex="-1">Sign up</a>
+      {% translate "Don't have account yet?" %} <a href="./sign-up.html" tabindex="-1">{% translate "Sign up" %}</a>
     </div>
 </div>
 {% endblock %} 

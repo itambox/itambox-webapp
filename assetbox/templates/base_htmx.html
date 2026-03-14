@@ -4,7 +4,7 @@
 {# --- Out-of-Band (OOB) Swaps --- #}
 
 {# 1. Browser Title #}
-<title hx-swap-oob="true">{% block title %}AssetBox{% endblock %}</title>
+<title hx-swap-oob="true">{% block title %}{% translate "AssetBox" %}{% endblock %}</title>
 
 {# 2. Page Title (hidden span target — uses same value via context) #}
 <span id="page-title-block" hx-swap-oob="true" style="display:none" aria-hidden="true">{{ title|default:"AssetBox" }}</span>
@@ -29,7 +29,7 @@
             {# Render Breadcrumbs #}
             <div id="breadcrumbs-block" class="d-flex justify-content-between align-items-center">
                 {% if breadcrumbs %}
-                    <ol class="breadcrumb breadcrumb-arrows mb-0" aria-label="breadcrumbs">
+                    <ol class="breadcrumb breadcrumb-arrows mb-0" aria-label="{% translate 'breadcrumbs' %}">
                         {% for url, label in breadcrumbs %}
                             {% if url %}
                                 <li class="breadcrumb-item"><a href="{{ url }}">{{ label }}</a></li>

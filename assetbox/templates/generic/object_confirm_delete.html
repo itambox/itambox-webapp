@@ -1,10 +1,11 @@
 {% extends base_template|default:"layout.html" %}
+{% load i18n %}
 
-{% block title %}Confirm Deletion - {{ object }} - AssetBox{% endblock %}
+{% block title %}{% translate "Confirm Deletion -" %} {{ object }} {% translate "- AssetBox" %}{% endblock %}
 
 {% block page_header %}
     <h2 class="page-title">
-       Confirm Deletion: {{ object }}
+       {% translate "Confirm Deletion:" %} {{ object }}
     </h2>
 {% endblock %}
 
@@ -13,7 +14,7 @@
     {% if return_url %}
     <a href="{{ return_url }}" class="btn btn-outline-secondary">
         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l14 0" /><path d="M5 12l6 6" /><path d="M5 12l6 -6" /></svg>
-        Cancel
+        {% translate "Cancel" %}
     </a>
     {% endif %}
 {% endblock page_actions %}
@@ -23,10 +24,10 @@
     <div class="col-md-6">
         <div class="card border-danger">
             <div class="card-header bg-danger text-white">
-                <h3 class="card-title">Confirm Deletion</h3>
+                <h3 class="card-title">{% translate "Confirm Deletion" %}</h3>
             </div>
             <div class="card-body">
-                <p>Are you sure you want to delete <strong>{{ object }}</strong>?</p>
+                <p>{% translate "Are you sure you want to delete" %} <strong>{{ object }}</strong>?</p>
                 {# Remove related_objects_count check, as deletion is blocked in the view's post method #}
                 <form method="post">
                     {% csrf_token %}
@@ -53,11 +54,11 @@
                     {# Buttons always shown now #}
                     <button type="submit" class="btn btn-danger">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
-                        Confirm Deletion
+                        {% translate "Confirm Deletion" %}
                     </button>
                      {# Use return_url for cancel button #}
                     {% if return_url %}
-                    <a href="{{ return_url }}" class="btn btn-outline-secondary ms-2">Cancel</a>
+                    <a href="{{ return_url }}" class="btn btn-outline-secondary ms-2">{% translate "Cancel" %}</a>
                     {% endif %}
                 </form>
             </div>

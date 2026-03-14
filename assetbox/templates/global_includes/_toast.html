@@ -1,3 +1,4 @@
+{% load i18n %}
 {% load utility_tags %}
 
 {# Note: Using Tabler icons instead of MDI directly #}
@@ -15,7 +16,7 @@
        <path d="M12 16l.01 0"></path>
     </svg>
     <strong class="me-auto">{{ title|default:status|capfirst }}</strong>
-    <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+    <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="{% translate 'Close' %}"></button>
   </div>
   <div class="toast-body">
     {{ message }}

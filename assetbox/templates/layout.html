@@ -9,12 +9,12 @@
     {# Sidebar #}
     <aside class="navbar navbar-vertical navbar-expand-lg">
         <div class="container-fluid">
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu" aria-controls="sidebar-menu" aria-expanded="false" aria-label="Toggle navigation">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu" aria-controls="sidebar-menu" aria-expanded="false" aria-label="{% translate 'Toggle navigation' %}">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <h1 class="navbar-brand navbar-brand-autodark">
                  <a href="{% url 'dashboard' %}">
-                      AssetBox
+                      {% translate "AssetBox" %}
                  </a>
             </h1>
 
@@ -25,7 +25,7 @@
                 {% get_current_language as CURRENT_LANG %}
                 {% if LANGUAGES|length > 1 %}
                 <div class="nav-item dropdown">
-                    <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" aria-label="Change language">
+                    <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" aria-label="{% translate 'Change language' %}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" /><path d="M3.6 9h16.8" /><path d="M3.6 15h16.8" /><path d="M11.5 3a17 17 0 0 0 0 18" /><path d="M12.5 3a17 17 0 0 1 0 18" /></svg>
                     </a>
                     <form action="{% url 'set_language' %}" method="post" class="dropdown-menu dropdown-menu-end dropdown-menu-arrow py-1" hx-boost="false">
@@ -43,16 +43,16 @@
                 {% endif %}
 
                 {# Mobile Theme Switcher #}
-                <button class="nav-link px-0 color-mode-toggle hide-theme-dark" title="Enable dark mode">
+                <button class="nav-link px-0 color-mode-toggle hide-theme-dark" title="{% translate 'Enable dark mode' %}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" /></svg>
                 </button>
-                <button class="nav-link px-0 color-mode-toggle hide-theme-light" title="Enable light mode">
+                <button class="nav-link px-0 color-mode-toggle hide-theme-light" title="{% translate 'Enable light mode' %}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" /><path d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7" /></svg>
                 </button>
 
                 {# Mobile Notifications Dropdown #}
                 <div class="nav-item dropdown">
-                    <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" aria-label="Show notifications">
+                    <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" aria-label="{% translate 'Show notifications' %}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6" /><path d="M9 17v1a3 3 0 0 0 6 0v-1" /></svg>
                         {% if unread_notifications_count > 0 %}
                             <span class="badge bg-red"></span>
@@ -61,7 +61,7 @@
                     <div class="dropdown-menu dropdown-menu-end dropdown-menu-card dropdown-menu-arrow">
                         <div class="card" style="width: 250px;">
                             <div class="card-header py-2">
-                                <h3 class="card-title text-reset fs-6">Unread Alerts ({{ unread_notifications_count }})</h3>
+                                <h3 class="card-title text-reset fs-6">{% translate "Unread Alerts (" %}{{ unread_notifications_count }})</h3>
                             </div>
                             <div class="list-group list-group-flush">
                                 {% if recent_unread_notifications %}
@@ -74,11 +74,11 @@
                                         </a>
                                     {% endfor %}
                                 {% else %}
-                                    <div class="list-group-item text-muted text-center py-3">No unread notifications</div>
+                                    <div class="list-group-item text-muted text-center py-3">{% translate "No unread notifications" %}</div>
                                 {% endif %}
                             </div>
                             <div class="card-footer text-center py-2">
-                                <a href="{% url 'users:user_notifications' %}" class="small font-weight-bold">View Notification Center</a>
+                                <a href="{% url 'users:user_notifications' %}" class="small font-weight-bold">{% translate "View Notification Center" %}</a>
                             </div>
                         </div>
                     </div>
@@ -86,24 +86,24 @@
 
                 {# Mobile User Profile Dropdown #}
                 <div class="nav-item dropdown">
-                    <a href="#" class="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown" aria-label="Open user menu">
+                    <a href="#" class="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown" aria-label="{% translate 'Open user menu' %}">
                         <div class="ps-2 text-end">
-                            <div class="font-weight-bold">{% if user.is_authenticated %}{{ user.get_full_name|default:user.username }}{% else %}Guest{% endif %}</div>
-                            <div class="mt-1 small text-muted fs-7">{% if user.is_staff %}Admin{% elif user.is_authenticated %}User{% else %}Not Logged In{% endif %}</div>
+                            <div class="font-weight-bold">{% if user.is_authenticated %}{{ user.get_full_name|default:user.username }}{% else %}{% translate "Guest" %}{% endif %}</div>
+                            <div class="mt-1 small text-muted fs-7">{% if user.is_staff %}{% translate "Admin" %}{% elif user.is_authenticated %}{% translate "User" %}{% else %}{% translate "Not Logged In" %}{% endif %}</div>
                         </div>
                     </a>
                     <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
                         {% if user.is_authenticated %}
-                            <div class="dropdown-header text-muted">Signed in as <strong class="text-reset">{{ user.get_full_name|default:user.username }}</strong></div>
-                            <a href="{% url 'users:user_profile' %}" class="dropdown-item">Profile</a>
-                            <a href="{% url 'users:user_preferences' %}" class="dropdown-item">Preferences</a>
+                            <div class="dropdown-header text-muted">{% translate "Signed in as" %} <strong class="text-reset">{{ user.get_full_name|default:user.username }}</strong></div>
+                            <a href="{% url 'users:user_profile' %}" class="dropdown-item">{% translate "Profile" %}</a>
+                            <a href="{% url 'users:user_preferences' %}" class="dropdown-item">{% translate "Preferences" %}</a>
                             <div class="dropdown-divider"></div>
                             <form action="{% url 'logout' %}" method="post" class="w-100" hx-boost="false">
                                 {% csrf_token %}
-                                <button type="submit" class="dropdown-item">Logout</button>
+                                <button type="submit" class="dropdown-item">{% translate "Logout" %}</button>
                             </form>
                         {% else %}
-                            <a href="{% url 'login' %}" class="dropdown-item">Login</a>
+                            <a href="{% url 'login' %}" class="dropdown-item">{% translate "Login" %}</a>
                         {% endif %}
                     </div>
                 </div>
@@ -117,7 +117,7 @@
                             <span class="input-icon-addon">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" /><path d="M21 21l-6 -6" /></svg>
                             </span>
-                            <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="form-control" placeholder="Search…" aria-label="Search">
+                            <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="form-control" placeholder="{% translate 'Search…' %}" aria-label="{% translate 'Search' %}">
                         </div>
                     </form>
                 </div>
@@ -138,7 +138,7 @@
                 <div class="container-fluid">
                     <div id="breadcrumbs-block" class="d-flex justify-content-between align-items-center">
                     {% if breadcrumbs %}
-                        <ol class="breadcrumb breadcrumb-arrows mb-0" aria-label="breadcrumbs">
+                        <ol class="breadcrumb breadcrumb-arrows mb-0" aria-label="{% translate 'breadcrumbs' %}">
                             {% for url, label in breadcrumbs %}
                                 {% if url %}
                                     <li class="breadcrumb-item"><a href="{{ url }}">{% translate label %}</a></li>
@@ -217,7 +217,7 @@
                     <li class="list-inline-item">{% now 'Y-m-d H:i:s T' %}</li>
                     <li class="list-inline-item">v{{ settings.VERSION }}</li>
                     <li class="list-inline-item">
-                       Theme by <a href="https://tabler.io" class="link-secondary" rel="noopener">Tabler</a>
+                       {% translate "Theme by" %} <a href="https://tabler.io" class="link-secondary" rel="noopener">{% translate "Tabler" %}</a>
                     </li>
                 </ul>
             </div>

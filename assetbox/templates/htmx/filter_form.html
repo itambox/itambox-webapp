@@ -1,3 +1,4 @@
+{% load i18n %}
 {% load helpers %}
 {% load django_htmx %}
 {% load crispy_forms_tags %}
@@ -17,10 +18,10 @@
 
   <div class="mt-3">
       <button type="submit" name="_apply" class="btn btn-primary">
-          <i class="mdi mdi-filter-variant"></i> Apply Filter
+          <i class="mdi mdi-filter-variant"></i> {% translate "Apply Filter" %}
       </button>
       <a href="{{ request.path }}" class="btn btn-outline-secondary">
-          <i class="mdi mdi-close"></i> Clear Filters
+          <i class="mdi mdi-close"></i> {% translate "Clear Filters" %}
       </a>
   </div>
 </form>

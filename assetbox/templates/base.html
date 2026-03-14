@@ -10,7 +10,7 @@
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
     <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
-    <title>{% block title %}AssetBox{% endblock %}</title>
+    <title>{% block title %}{% translate "AssetBox" %}{% endblock %}</title>
     {# FOUC prevention: apply stored theme before CSS loads #}
     <script>
         (function(){try{var t=localStorage.getItem('assetbox.theme');if(t)document.documentElement.setAttribute('data-bs-theme',t);else if(window.matchMedia('(prefers-color-scheme:dark)').matches)document.documentElement.setAttribute('data-bs-theme','dark');}catch(e){}})();
@@ -63,7 +63,7 @@
     {% block javascript %}{% endblock javascript %}
 
     {# Standalone OOB target for dynamic title swaps #}
-    <span id="page-title-block" style="display:none" aria-hidden="true">AssetBox</span>
+    <span id="page-title-block" style="display:none" aria-hidden="true">{% translate "AssetBox" %}</span>
 
     {# --- Premium Physical Scanning Audio Engine --- #}
     <script>

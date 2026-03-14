@@ -1,3 +1,4 @@
+{% load i18n %}
 {% load render_table from django_tables2 %}
 {# Table rendering block for HTMX list views #}
 {# Expects context: table #}
@@ -7,7 +8,7 @@
            {% render_table table "global_includes/htmx_table.html" %}
        {% else %}
            <div class="p-3">
-               <p class="text-muted mb-0">No table data available.</p>
+               <p class="text-muted mb-0">{% translate "No table data available." %}</p>
            </div>
        {% endif %}
     </div>

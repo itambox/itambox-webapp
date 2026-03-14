@@ -1,6 +1,7 @@
+{% load i18n %}
 {# --- OOB Block: Page Title --- #}
 <span id="page-title-block" hx-swap-oob="true">
-    {{ title|default:"List View" }} - AssetBox
+    {{ title|default:"List View" }} {% translate "- AssetBox" %}
 </span>
 
 {# --- OOB Block: Page Header --- #}
@@ -19,13 +20,13 @@
         {% if create_url_name %}
         <a href="{% url create_url_name %}" class="btn btn-primary">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
-            Create {{ object_type|default:"Object" }}
+            {% translate "Create" %} {{ object_type|default:"Object" }}
         </a>
         {% endif %}
         {% if export_url_name %}
         <a href="#" class="btn btn-secondary d-none d-sm-inline-block">
             <i class="mdi mdi-download me-1"></i>
-            Export
+            {% translate "Export" %}
         </a>
         {% endif %}
     </div>

@@ -1,7 +1,7 @@
 {% extends base_template|default:"layout.html" %}
 {% load i18n %}
 
-{% block title %}{{ title }} - AssetBox{% endblock %}
+{% block title %}{{ title }} {% translate "- AssetBox" %}{% endblock %}
 
 {% block page_header %}
     <h2 class="page-title">
@@ -124,14 +124,14 @@
                                 <input type="radio" name="import_format" value="csv" class="form-selectgroup-input" checked id="format-csv">
                                 <span class="form-selectgroup-label d-flex align-items-center gap-1">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-type-csv me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M5 12v-7a2 2 0 0 1 2 -2h7l5 5v4" /><path d="M7 16.5a1.5 1.5 0 0 0 -3 0v3a1.5 1.5 0 0 0 3 0" /><path d="M10 20.25c0 .414 .336 .75 .75 .75h1.25a1 1 0 0 0 1 -1v-1a1 1 0 0 0 -1 -1h-1a1 1 0 0 1 -1 -1h-1a1 1 0 0 1 1 -1h1.25c.414 0 .75 .336 .75 .75" /><path d="M17 13l2 6l2 -6" /></svg>
-                                    CSV
+                                    {% translate "CSV" %}
                                 </span>
                             </label>
                             <label class="form-selectgroup-item">
                                 <input type="radio" name="import_format" value="yaml" class="form-selectgroup-input" id="format-yaml">
                                 <span class="form-selectgroup-label d-flex align-items-center gap-1">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-code me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><path d="M10 13l-1.5 1.5l1.5 1.5" /><path d="M14 13l1.5 1.5l-1.5 1.5" /></svg>
-                                    YAML
+                                    {% translate "YAML" %}
                                 </span>
                             </label>
                         </div>

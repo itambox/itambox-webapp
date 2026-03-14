@@ -14,7 +14,7 @@
 {# 1. Breadcrumbs #}
 {% startpartial breadcrumbs-block hx-swap-oob="true" %}
     {% if breadcrumbs %}
-        <ol class="breadcrumb breadcrumb-arrows" aria-label="breadcrumbs">
+        <ol class="breadcrumb breadcrumb-arrows" aria-label="{% translate 'breadcrumbs' %}">
             {% for url, label in breadcrumbs %}
                 {% if url %}
                     <li class="breadcrumb-item"><a href="{{ url }}">{{ label }}</a></li>
@@ -58,7 +58,7 @@
         {% render_partial content_template_name "content_tab" %}
         {# <p>DEBUG: Rendering partial for {{ content_template_name }} would go here.</p> #} {# Removed debug text #}
     {% else %}
-        <p class="text-danger">Error: content_template_name not provided to user page wrapper.</p>
+        <p class="text-danger">{% translate "Error: content_template_name not provided to user page wrapper." %}</p>
     {% endif %}
 </div>
 
