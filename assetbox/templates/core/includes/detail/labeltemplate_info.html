@@ -1,14 +1,15 @@
+{% load i18n %}
 <dl class="row mb-0">
-    <dt class="col-sm-3">Template Name:</dt>
+    <dt class="col-sm-3">{% translate "Template Name:" %}</dt>
     <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
 
-    <dt class="col-sm-3">Description:</dt>
+    <dt class="col-sm-3">{% translate "Description:" %}</dt>
     <dd class="col-sm-9 text-secondary">{{ object.description|default:"—" }}</dd>
 
-    <dt class="col-sm-3">Label Size:</dt>
-    <dd class="col-sm-9">{{ object.page_width }}″ width × {{ object.page_height }}″ height</dd>
+    <dt class="col-sm-3">{% translate "Label Size:" %}</dt>
+    <dd class="col-sm-9">{{ object.page_width }}{% translate "″ width ×" %} {{ object.page_height }}{% translate "″ height" %}</dd>
 
-    <dt class="col-sm-3">Barcode Format:</dt>
+    <dt class="col-sm-3">{% translate "Barcode Format:" %}</dt>
     <dd class="col-sm-9">
         <span class="badge bg-blue-lt px-2.5 py-1 text-uppercase font-weight-bold">
             {{ object.get_barcode_format_display }}
@@ -16,14 +17,14 @@
     </dd>
 
     {% if object.template_code %}
-    <dt class="col-sm-3">Template HTML/Jinja Code:</dt>
+    <dt class="col-sm-3">{% translate "Template HTML/Jinja Code:" %}</dt>
     <dd class="col-sm-9">
         <pre class="bg-dark text-light p-3 rounded font-monospace" style="max-height: 250px; overflow-y: auto; font-size: 8.5pt;">{{ object.template_code }}</pre>
     </dd>
     {% endif %}
 
     {% if object.printer_settings %}
-    <dt class="col-sm-3">Printer Settings:</dt>
+    <dt class="col-sm-3">{% translate "Printer Settings:" %}</dt>
     <dd class="col-sm-9">
         <pre class="bg-dark text-light p-3 rounded font-monospace" style="max-height: 150px; overflow-y: auto; font-size: 8.5pt;">{{ object.printer_settings }}</pre>
     </dd>

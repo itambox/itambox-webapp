@@ -1,20 +1,21 @@
+{% load i18n %}
 <dl class="row mb-0">
-    <dt class="col-sm-3">Name:</dt>
+    <dt class="col-sm-3">{% translate "Name:" %}</dt>
     <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
 
-    <dt class="col-sm-3">Description:</dt>
+    <dt class="col-sm-3">{% translate "Description:" %}</dt>
     <dd class="col-sm-9 text-secondary">{{ object.description|default:"—" }}</dd>
 
-    <dt class="col-sm-3">Content Type:</dt>
+    <dt class="col-sm-3">{% translate "Content Type:" %}</dt>
     <dd class="col-sm-9"><span class="badge bg-secondary-lt font-monospace">{{ object.content_type }}</span></dd>
 
-    <dt class="col-sm-3">MIME Type:</dt>
+    <dt class="col-sm-3">{% translate "MIME Type:" %}</dt>
     <dd class="col-sm-9"><code>{{ object.mime_type }}</code></dd>
 
-    <dt class="col-sm-3">File Extension:</dt>
+    <dt class="col-sm-3">{% translate "File Extension:" %}</dt>
     <dd class="col-sm-9"><code>.{{ object.file_extension }}</code></dd>
     
-    <dt class="col-sm-3">Template Code:</dt>
+    <dt class="col-sm-3">{% translate "Template Code:" %}</dt>
     <dd class="col-sm-9">
         <pre class="bg-dark text-light p-3 rounded font-monospace" style="max-height: 200px; overflow-y: auto; font-size: 8.5pt;">{{ object.template_code }}</pre>
     </dd>

@@ -1,11 +1,12 @@
+{% load i18n %}
 <dl class="row mb-0">
-    <dt class="col-sm-3">Group Name:</dt>
+    <dt class="col-sm-3">{% translate "Group Name:" %}</dt>
     <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
 
-    <dt class="col-sm-3">Description:</dt>
+    <dt class="col-sm-3">{% translate "Description:" %}</dt>
     <dd class="col-sm-9 text-secondary">{{ object.description|default:"—" }}</dd>
 
-    <dt class="col-sm-3">Assigned Users ({{ object.users.count }}):</dt>
+    <dt class="col-sm-3">{% translate "Assigned Users (" %}{{ object.users.count }}):</dt>
     <dd class="col-sm-9">
         {% if object.users.all %}
             <div class="d-flex flex-wrap gap-1 mt-1">
@@ -14,19 +15,19 @@
                 {% endfor %}
             </div>
         {% else %}
-            <span class="text-muted"><i>No users assigned to this group.</i></span>
+            <span class="text-muted"><i>{% translate "No users assigned to this group." %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Configured Permissions:</dt>
+    <dt class="col-sm-3">{% translate "Configured Permissions:" %}</dt>
     <dd class="col-sm-9">
         {% if object.permissions %}
             <div class="table-responsive mt-1 border rounded">
                 <table class="table table-vcenter card-table table-hover">
                     <thead>
                         <tr>
-                            <th>Permission Key</th>
-                            <th class="text-end">Status</th>
+                            <th>{% translate "Permission Key" %}</th>
+                            <th class="text-end">{% translate "Status" %}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -35,9 +36,9 @@
                                 <td><code>{{ perm }}</code></td>
                                 <td class="text-end">
                                     {% if val %}
-                                        <span class="badge bg-success">Granted</span>
+                                        <span class="badge bg-success">{% translate "Granted" %}</span>
                                     {% else %}
-                                        <span class="badge bg-danger">Revoked</span>
+                                        <span class="badge bg-danger">{% translate "Revoked" %}</span>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -46,7 +47,7 @@
                 </table>
             </div>
         {% else %}
-            <span class="text-muted"><i>No permissions configured in this group.</i></span>
+            <span class="text-muted"><i>{% translate "No permissions configured in this group." %}</i></span>
         {% endif %}
     </dd>
 </dl>

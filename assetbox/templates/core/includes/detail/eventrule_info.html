@@ -1,20 +1,21 @@
+{% load i18n %}
 <dl class="row mb-0">
-    <dt class="col-sm-3">Rule Name:</dt>
+    <dt class="col-sm-3">{% translate "Rule Name:" %}</dt>
     <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
 
-    <dt class="col-sm-3">Target Model:</dt>
+    <dt class="col-sm-3">{% translate "Target Model:" %}</dt>
     <dd class="col-sm-9"><span class="badge bg-secondary-lt font-monospace">{{ object.model }}</span></dd>
 
-    <dt class="col-sm-3">Status:</dt>
+    <dt class="col-sm-3">{% translate "Status:" %}</dt>
     <dd class="col-sm-9">
         {% if object.enabled %}
-            <span class="badge bg-success">Active / Enabled</span>
+            <span class="badge bg-success">{% translate "Active / Enabled" %}</span>
         {% else %}
-            <span class="badge bg-secondary">Disabled</span>
+            <span class="badge bg-secondary">{% translate "Disabled" %}</span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Trigger Events:</dt>
+    <dt class="col-sm-3">{% translate "Trigger Events:" %}</dt>
     <dd class="col-sm-9">
         {% if object.events %}
             <div class="d-flex flex-wrap gap-1 mt-1">
@@ -23,22 +24,22 @@
                 {% endfor %}
             </div>
         {% else %}
-            <span class="text-muted"><i>No events configured</i></span>
+            <span class="text-muted"><i>{% translate "No events configured" %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Action Type:</dt>
+    <dt class="col-sm-3">{% translate "Action Type:" %}</dt>
     <dd class="col-sm-9"><span class="badge bg-purple-lt px-2.5 py-1 text-uppercase">{{ object.get_action_type_display }}</span></dd>
 
     {% if object.conditions %}
-    <dt class="col-sm-3">Matching Conditions:</dt>
+    <dt class="col-sm-3">{% translate "Matching Conditions:" %}</dt>
     <dd class="col-sm-9">
         <pre class="bg-dark text-light p-3 rounded font-monospace" style="max-height: 150px; overflow-y: auto; font-size: 8.5pt;">{{ object.conditions }}</pre>
     </dd>
     {% endif %}
 
     {% if object.action_config %}
-    <dt class="col-sm-3">Action Configuration:</dt>
+    <dt class="col-sm-3">{% translate "Action Configuration:" %}</dt>
     <dd class="col-sm-9">
         <pre class="bg-dark text-light p-3 rounded font-monospace" style="max-height: 200px; overflow-y: auto; font-size: 8.5pt;">{{ object.action_config }}</pre>
     </dd>

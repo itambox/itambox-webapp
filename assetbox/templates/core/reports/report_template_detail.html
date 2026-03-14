@@ -1,7 +1,7 @@
 {% extends base_template|default:"layout.html" %}
 {% load i18n %}
 
-{% block title %}{% trans "Report Template" %}: {{ object.name }} - AssetBox{% endblock %}
+{% block title %}{% trans "Report Template" %}: {{ object.name }} {% translate "- AssetBox" %}{% endblock %}
 
 {% block page_header %}
     <div class="page-pretitle">{% trans "Operations" %}</div>
@@ -88,9 +88,9 @@
                             <td class="text-wrap text-break">{{ sched.get_format_display }}</td>
                             <td>
                                 {% if sched.is_active %}
-                                    <span class="badge bg-success">Active</span>
+                                    <span class="badge bg-success">{% translate "Active" %}</span>
                                 {% else %}
-                                    <span class="badge bg-secondary">Inactive</span>
+                                    <span class="badge bg-secondary">{% translate "Inactive" %}</span>
                                 {% endif %}
                             </td>
                         </tr>

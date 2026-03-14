@@ -57,7 +57,7 @@
                             <div class="card-header">
                                 <h3 class="card-title">{{ data.verbose_name_plural }}</h3>
                                 <div class="card-actions">
-                                    <span class="badge bg-cyan text-cyan-fg">{{ data.count }} found</span>
+                                    <span class="badge bg-cyan text-cyan-fg">{{ data.count }} {% translate "found" %}</span>
                                 </div>
                             </div>
                             <div class="table-responsive">
@@ -65,7 +65,7 @@
                             </div>
                             {% if data.count > 10 %}
                             <div class="card-footer">
-                                <a href="{{ data.list_url }}?q={{ query|urlencode }}">View all {{ data.count }} {{ data.verbose_name_plural }}</a>
+                                <a href="{{ data.list_url }}?q={{ query|urlencode }}">{% translate "View all" %} {{ data.count }} {{ data.verbose_name_plural }}</a>
                             </div>
                              {% endif %}
                         </div>

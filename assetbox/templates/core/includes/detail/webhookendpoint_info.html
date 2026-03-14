@@ -1,5 +1,6 @@
+{% load i18n %}
 <dl class="row mb-0">
-    <dt class="col-sm-3">Endpoint Name:</dt>
+    <dt class="col-sm-3">{% translate "Endpoint Name:" %}</dt>
     <dd class="col-sm-9">
         <strong>{{ object.name }}</strong>
         <span class="float-end">
@@ -7,41 +8,41 @@
                 {% csrf_token %}
                 <button type="submit" name="test_webhook" class="btn btn-sm btn-outline-primary py-0.5 px-2">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-send" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 14l11 -11" /><path d="M21 3l-6.5 18a.55 .55 0 0 1 -1 0l-3.5 -7l-7 -3.5a.55 .55 0 0 1 0 -1l18 -6.5" /></svg>
-                    Send Test Webhook
+                    {% translate "Send Test Webhook" %}
                 </button>
             </form>
         </span>
     </dd>
 
-    <dt class="col-sm-3">Target URL:</dt>
+    <dt class="col-sm-3">{% translate "Target URL:" %}</dt>
     <dd class="col-sm-9"><a href="{{ object.url }}" target="_blank" class="font-monospace text-decoration-none">{{ object.url }}</a></dd>
 
-    <dt class="col-sm-3">HTTP Method:</dt>
+    <dt class="col-sm-3">{% translate "HTTP Method:" %}</dt>
     <dd class="col-sm-9"><span class="badge bg-purple-lt font-weight-bold">{{ object.http_method }}</span></dd>
 
-    <dt class="col-sm-3">Status:</dt>
+    <dt class="col-sm-3">{% translate "Status:" %}</dt>
     <dd class="col-sm-9">
         {% if object.enabled %}
-            <span class="badge bg-success">Active / Enabled</span>
+            <span class="badge bg-success">{% translate "Active / Enabled" %}</span>
         {% else %}
-            <span class="badge bg-secondary">Disabled</span>
+            <span class="badge bg-secondary">{% translate "Disabled" %}</span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Shared Secret:</dt>
+    <dt class="col-sm-3">{% translate "Shared Secret:" %}</dt>
     <dd class="col-sm-9">
         {% if object.secret %}
-            <code>••••••••••••••••</code> <span class="text-secondary small">(HMAC Signature Secret Configured)</span>
+            <code>••••••••••••••••</code> <span class="text-secondary small">{% translate "(HMAC Signature Secret Configured)" %}</span>
         {% else %}
-            <span class="text-muted"><i>None Configured</i></span>
+            <span class="text-muted"><i>{% translate "None Configured" %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Retry Policy:</dt>
-    <dd class="col-sm-9">Max {{ object.retry_count }} retry attempts with {{ object.retry_backoff }}s backoff interval.</dd>
+    <dt class="col-sm-3">{% translate "Retry Policy:" %}</dt>
+    <dd class="col-sm-9">{% translate "Max" %} {{ object.retry_count }} {% translate "retry attempts with" %} {{ object.retry_backoff }}{% translate "s backoff interval." %}</dd>
 
     {% if object.headers %}
-    <dt class="col-sm-3">Custom HTTP Headers:</dt>
+    <dt class="col-sm-3">{% translate "Custom HTTP Headers:" %}</dt>
     <dd class="col-sm-9">
         <pre class="bg-dark text-light p-3 rounded font-monospace" style="max-height: 150px; overflow-y: auto; font-size: 8.5pt;">{{ object.headers }}</pre>
     </dd>

@@ -1,7 +1,7 @@
 {% extends base_template|default:"layout.html" %}
 {% load i18n %}
 
-{% block title %}{% trans "Alert Rule" %}: {{ object.name }} - AssetBox{% endblock %}
+{% block title %}{% trans "Alert Rule" %}: {{ object.name }} {% translate "- AssetBox" %}{% endblock %}
 
 {% block page_header %}
     <div class="page-pretitle">{% trans "Operations" %}</div>
@@ -64,11 +64,11 @@
                             <td class="text-secondary fw-bold">{% trans "Severity" %}</td>
                             <td>
                                 {% if object.severity == 'info' %}
-                                    <span class="badge bg-info">Info</span>
+                                    <span class="badge bg-info">{% translate "Info" %}</span>
                                 {% elif object.severity == 'warning' %}
-                                    <span class="badge bg-warning">Warning</span>
+                                    <span class="badge bg-warning">{% translate "Warning" %}</span>
                                 {% else %}
-                                    <span class="badge bg-danger">Critical</span>
+                                    <span class="badge bg-danger">{% translate "Critical" %}</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -112,9 +112,9 @@
                             <td>{{ chan.get_channel_type_display }}</td>
                             <td>
                                 {% if chan.enabled %}
-                                    <span class="badge bg-success-lt">Enabled</span>
+                                    <span class="badge bg-success-lt">{% translate "Enabled" %}</span>
                                 {% else %}
-                                    <span class="badge bg-secondary-lt">Disabled</span>
+                                    <span class="badge bg-secondary-lt">{% translate "Disabled" %}</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -179,11 +179,11 @@
                                 </td>
                                 <td>
                                     {% if log.status == 'active' %}
-                                        <span class="badge bg-danger">Active</span>
+                                        <span class="badge bg-danger">{% translate "Active" %}</span>
                                     {% elif log.status == 'acknowledged' %}
-                                        <span class="badge bg-warning">Acknowledged</span>
+                                        <span class="badge bg-warning">{% translate "Acknowledged" %}</span>
                                     {% else %}
-                                        <span class="badge bg-success">Resolved</span>
+                                        <span class="badge bg-success">{% translate "Resolved" %}</span>
                                     {% endif %}
                                 </td>
                                 <td class="text-end">
@@ -192,14 +192,14 @@
                                             <form method="post" action="{% url 'alertlog_acknowledge' log.pk %}">
                                                 {% csrf_token %}
                                                 <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
-                                                <button type="submit" class="btn btn-sm btn-outline-warning" title="Acknowledge">Acknowledge</button>
+                                                <button type="submit" class="btn btn-sm btn-outline-warning" title="{% translate 'Acknowledge' %}">{% translate "Acknowledge" %}</button>
                                             </form>
                                         {% endif %}
                                         {% if log.status != 'resolved' %}
                                             <form method="post" action="{% url 'alertlog_resolve' log.pk %}">
                                                 {% csrf_token %}
                                                 <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
-                                                <button type="submit" class="btn btn-sm btn-outline-success" title="Resolve">Resolve</button>
+                                                <button type="submit" class="btn btn-sm btn-outline-success" title="{% translate 'Resolve' %}">{% translate "Resolve" %}</button>
                                             </form>
                                         {% endif %}
                                     </div>
