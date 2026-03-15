@@ -1,3 +1,4 @@
+{% load i18n %}
 <div class="row g-3 mb-4">
     <div class="col-sm-6">
         <div class="card card-sm bg-blue-lt border-0 shadow-none">
@@ -9,7 +10,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-blue small uppercase font-sans">Meta Type</div>
+                        <div class="font-weight-medium text-blue small uppercase font-sans">{% translate "Meta Type" %}</div>
                         <div class="text-blue h2 mb-0 font-weight-bold" style="line-height: 1.2;">{{ object.get_type_display }}</div>
                     </div>
                 </div>
@@ -26,7 +27,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-green small uppercase font-sans">Total Assets Assigned</div>
+                        <div class="font-weight-medium text-green small uppercase font-sans">{% translate "Total Assets Assigned" %}</div>
                         <div class="text-green h1 mb-0 font-weight-bold">{{ assets_table.rows|length }}</div>
                     </div>
                 </div>

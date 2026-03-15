@@ -1,57 +1,58 @@
+{% load i18n %}
 <dl class="row mb-0">
-    <dt class="col-sm-3">Manufacturer:</dt>
+    <dt class="col-sm-3">{% translate "Manufacturer:" %}</dt>
     <dd class="col-sm-9">
         {% if object.manufacturer %}
             <a href="{% url 'assets:manufacturer_detail' pk=object.manufacturer.pk %}">{{ object.manufacturer.name }}</a>
         {% else %}
-            <span class="text-muted"><i>None</i></span>
+            <span class="text-muted"><i>{% translate "None" %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Model Name:</dt>
+    <dt class="col-sm-3">{% translate "Model Name:" %}</dt>
     <dd class="col-sm-9"><strong>{{ object.model }}</strong></dd>
 
-    <dt class="col-sm-3">Slug:</dt>
+    <dt class="col-sm-3">{% translate "Slug:" %}</dt>
     <dd class="col-sm-9"><code>{{ object.slug }}</code></dd>
 
-    <dt class="col-sm-3">Part Number:</dt>
+    <dt class="col-sm-3">{% translate "Part Number:" %}</dt>
     <dd class="col-sm-9">{{ object.part_number|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
 
-    <dt class="col-sm-3">Category:</dt>
+    <dt class="col-sm-3">{% translate "Category:" %}</dt>
     <dd class="col-sm-9">
         {% if object.category %}
             <span class="badge" style="background-color: #{{ object.category.color }}1a; color: #{{ object.category.color }}; border: 1px solid #{{ object.category.color }}33;">
                 {{ object.category.name }}
             </span>
         {% else %}
-            <span class="text-muted"><i>Not Set</i></span>
+            <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Custom Fieldset:</dt>
+    <dt class="col-sm-3">{% translate "Custom Fieldset:" %}</dt>
     <dd class="col-sm-9">
         {% if object.custom_fieldset %}
             <a href="{% url 'assets:customfieldset_detail' pk=object.custom_fieldset.pk %}">{{ object.custom_fieldset.name }}</a>
         {% else %}
-            <span class="text-muted"><i>None</i></span>
+            <span class="text-muted"><i>{% translate "None" %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Depreciation Policy:</dt>
+    <dt class="col-sm-3">{% translate "Depreciation Policy:" %}</dt>
     <dd class="col-sm-9">
         {% if object.depreciation %}
             <a href="{% url 'assets:depreciation_detail' pk=object.depreciation.pk %}">{{ object.depreciation.name }}</a>
         {% else %}
-            <span class="text-muted"><i>No Depreciation</i></span>
+            <span class="text-muted"><i>{% translate "No Depreciation" %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Requestable:</dt>
+    <dt class="col-sm-3">{% translate "Requestable:" %}</dt>
     <dd class="col-sm-9">
         {% if object.requestable %}
-            <span class="badge bg-success-lt text-success">Yes (Users can request this model)</span>
+            <span class="badge bg-success-lt text-success">{% translate "Yes (Users can request this model)" %}</span>
         {% else %}
-            <span class="badge bg-secondary-lt text-secondary">No</span>
+            <span class="badge bg-secondary-lt text-secondary">{% translate "No" %}</span>
         {% endif %}
     </dd>
 </dl>

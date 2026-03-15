@@ -1,21 +1,22 @@
+{% load i18n %}
 {# Panel: Asset core information (tag, serial, type, manufacturer, role, status, purchase info) #}
 <dl class="row mb-0">
-    <dt class="col-sm-3">Asset Tag:</dt>
+    <dt class="col-sm-3">{% translate "Asset Tag:" %}</dt>
     <dd class="col-sm-9"><span class="badge bg-blue-lt px-2.5 py-1"><strong>{{ object.asset_tag }}</strong></span></dd>
 
-    <dt class="col-sm-3">Serial Number:</dt>
+    <dt class="col-sm-3">{% translate "Serial Number:" %}</dt>
     <dd class="col-sm-9"><code>{{ object.serial_number|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</code></dd>
     
-    <dt class="col-sm-3">Asset Type / Model:</dt>
+    <dt class="col-sm-3">{% translate "Asset Type / Model:" %}</dt>
     <dd class="col-sm-9">
         {% if object.asset_type %}
             <a href="{% url 'assets:assettype_detail' pk=object.asset_type.pk %}">{{ object.asset_type }}</a>
         {% else %}
-             <span class="text-muted"><i>Not Set</i></span>
+             <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Manufacturer:</dt>
+    <dt class="col-sm-3">{% translate "Manufacturer:" %}</dt>
     <dd class="col-sm-9">
          {% if object.manufacturer %}
             <a href="{% url 'assets:manufacturer_detail' pk=object.manufacturer.pk %}">{{ object.manufacturer }}</a>
@@ -24,16 +25,16 @@
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Asset Role:</dt>
+    <dt class="col-sm-3">{% translate "Asset Role:" %}</dt>
     <dd class="col-sm-9">
         {% if object.asset_role %}
             <a href="{% url 'assets:assetrole_detail' pk=object.asset_role.pk %}">{{ object.asset_role }}</a>
         {% else %}
-             <span class="text-muted"><i>Not Set</i></span>
+             <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Status:</dt>
+    <dt class="col-sm-3">{% translate "Status:" %}</dt>
     <dd class="col-sm-9">
         {% if object.status %}
             <a href="{% url 'assets:statuslabel_detail' pk=object.status.pk %}" class="text-decoration-none">
@@ -46,45 +47,45 @@
         {% endif %}
     </dd>
     
-    <dt class="col-sm-3">Requestable Status:</dt>
+    <dt class="col-sm-3">{% translate "Requestable Status:" %}</dt>
     <dd class="col-sm-9">
         {% if object.requestable %}
             <span class="badge bg-green-lt text-success d-inline-flex align-items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-checkbox me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 11l3 3l8 -8" /><path d="M20 12v6a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h9" /></svg>
-                Requestable by Staff
+                {% translate "Requestable by Staff" %}
             </span>
         {% else %}
             <span class="badge bg-secondary-lt text-secondary d-inline-flex align-items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-lock me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 11m0 2a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2z" /><path d="M12 16m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M8 11v-4a4 4 0 0 1 8 0v4" /></svg>
-                Administrative Custody Only
+                {% translate "Administrative Custody Only" %}
             </span>
         {% endif %}
     </dd>
     
-    <dt class="col-sm-3">Purchase Date:</dt>
+    <dt class="col-sm-3">{% translate "Purchase Date:" %}</dt>
     <dd class="col-sm-9 text-secondary">{{ object.purchase_date|date:"Y-m-d"|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
 
-    <dt class="col-sm-3">Warranty Expiration:</dt>
+    <dt class="col-sm-3">{% translate "Warranty Expiration:" %}</dt>
     <dd class="col-sm-9 text-secondary">{{ object.warranty_expiration|date:"Y-m-d"|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
 
-    <dt class="col-sm-3">Purchase Cost:</dt>
+    <dt class="col-sm-3">{% translate "Purchase Cost:" %}</dt>
     <dd class="col-sm-9 text-secondary">
         {% if object.purchase_cost %}
             ${{ object.purchase_cost|floatformat:2 }}
         {% else %}
-            <span class="text-muted"><i>Not Set</i></span>
+            <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Supplier:</dt>
+    <dt class="col-sm-3">{% translate "Supplier:" %}</dt>
     <dd class="col-sm-9 text-secondary">{{ object.supplier|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
 
-    <dt class="col-sm-3">Order Number:</dt>
+    <dt class="col-sm-3">{% translate "Order Number:" %}</dt>
     <dd class="col-sm-9 text-secondary">
         {% if object.order_number %}
             <code>{{ object.order_number }}</code>
         {% else %}
-            <span class="text-muted"><i>Not Set</i></span>
+            <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
         {% endif %}
     </dd>
 </dl>

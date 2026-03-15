@@ -1,3 +1,4 @@
+{% load i18n %}
 {# Panel: Audit & Compliance Control #}
 {% load utility_tags %}
 <h4 class="card-title text-success mb-3 d-flex align-items-center">
@@ -7,11 +8,11 @@
         <path d="M9 3m0 2a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2z" />
         <path d="M9 14l2 2l4 -4" />
     </svg>
-    Audit & Compliance Control
+    {% translate "Audit & Compliance Control" %}
 </h4>
 
 <div class="mb-3">
-    <span class="text-muted small d-block">Physical Audit State</span>
+    <span class="text-muted small d-block">{% translate "Physical Audit State" %}</span>
     <div id="asset-audit-badge-container" class="mt-1">
         {% include 'assets/includes/asset_audit_badge.html' with asset=object %}
     </div>
@@ -28,7 +29,7 @@
             <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
             <path d="M5 12l5 5l10 -10" />
         </svg>
-        Verify Physical Presence
+        {% translate "Verify Physical Presence" %}
     </button>
 
     <a href="{% url 'assets:asset_label_print' pk=object.pk %}" 
@@ -42,7 +43,7 @@
             <path d="M16 21h2a2 2 0 0 0 2 -2v-2" />
             <path d="M5 12h14" />
         </svg>
-        Print Asset Label
+        {% translate "Print Asset Label" %}
     </a>
 </div>
 {% if object.tags.all %}

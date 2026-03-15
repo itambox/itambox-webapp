@@ -1,6 +1,7 @@
+{% load i18n %}
 ﻿{# Panel: Assignment / Deployment details (holder, location, custody) #}
 <dl class="row mb-0">
-    <dt class="col-sm-4">Assigned To:</dt>
+    <dt class="col-sm-4">{% translate "Assigned To:" %}</dt>
     <dd class="col-sm-8">
         {% if assignment and assignment.assigned_to %}
             {% if assignment.assigned_to_type == 'asset' %}
@@ -20,25 +21,25 @@
                 </a>
             {% endif %}
         {% else %}
-            <span class="text-muted"><i>No active assignment</i></span>
+            <span class="text-muted"><i>{% translate "No active assignment" %}</i></span>
         {% endif %}
     </dd>
 
     {% if assignment and assignment.is_active %}
-    <dt class="col-sm-4">Checked Out:</dt>
+    <dt class="col-sm-4">{% translate "Checked Out:" %}</dt>
     <dd class="col-sm-8">
         <span class="text-body">{{ assignment.checked_out_at|date:"Y-m-d H:i" }}</span>
         {% if assignment.checked_out_by %}
-            <span class="text-muted"> by {{ assignment.checked_out_by }}</span>
+            <span class="text-muted"> {% translate "by" %} {{ assignment.checked_out_by }}</span>
         {% endif %}
     </dd>
     {% if assignment.expected_checkin_date %}
-    <dt class="col-sm-4">Expected Return:</dt>
+    <dt class="col-sm-4">{% translate "Expected Return:" %}</dt>
     <dd class="col-sm-8">{{ assignment.expected_checkin_date }}</dd>
     {% endif %}
     {% endif %}
 
-    <dt class="col-sm-4">Physical Location:</dt>
+    <dt class="col-sm-4">{% translate "Physical Location:" %}</dt>
     <dd class="col-sm-8">
          {% if object.location %}
             <a href="{% url 'organization:location_detail' pk=object.location.pk %}" class="badge bg-azure-lt px-2 py-1">
@@ -46,31 +47,31 @@
                 {{ object.location }}
             </a>
         {% else %}
-            <span class="text-muted"><i>Not Set</i></span>
+            <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
         {% endif %}
     </dd>
 
     {% if assignment and assignment.assigned_to and assignment.assigned_to_type == 'assetholder' %}
-        <dt class="col-sm-4">Custody Status:</dt>
+        <dt class="col-sm-4">{% translate "Custody Status:" %}</dt>
         <dd class="col-sm-8">
             {% if custody_receipt %}
                 <span class="badge bg-success-lt text-success font-weight-bold px-2 py-1 align-middle">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-shield-check me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 12l2 2l4 -4" /><path d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3" /></svg>
-                    Custody Secured
+                    {% translate "Custody Secured" %}
                 </span>
                 <a href="{% url 'compliance:custody_eula_sign' token=eula_token %}" target="_blank" class="btn btn-sm btn-ghost-success border-0 py-1.5 px-2 ms-2 font-weight-bold align-middle">
-                    View Custody Receipt
+                    {% translate "View Custody Receipt" %}
                 </a>
             {% else %}
                 <span class="badge bg-warning-lt text-warning font-weight-bold px-2 py-1 align-middle">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-alert-triangle me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9v4" /><path d="M12 17h.01" /><path d="M5 19h14a2 2 0 0 0 1.84 -2.75l-7.1 -12.25a2 2 0 0 0 -3.5 0l-7.1 12.25a2 2 0 0 0 1.75 2.75" /></svg>
-                    Pending EULA Acceptance
+                    {% translate "Pending EULA Acceptance" %}
                 </span>
                 <div class="mt-2 input-group input-group-flat" style="max-width: 450px;">
                     <input type="text" class="form-control form-control-sm text-secondary small specs-container" readonly value="{{ request.scheme }}://{{ request.get_host }}{% url 'compliance:custody_eula_sign' token=eula_token %}" id="eula-link-input"/>
                     <span class="input-group-text p-0 bg-transparent">
                         <button class="btn btn-sm btn-ghost-indigo font-weight-bold py-1 px-3 border-0" onclick="navigator.clipboard.writeText(document.getElementById('eula-link-input').value); alert('EULA custody sign-off link copied to clipboard!');">
-                            Copy Link
+                            {% translate "Copy Link" %}
                         </button>
                     </span>
                 </div>

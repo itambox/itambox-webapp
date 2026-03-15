@@ -1,18 +1,19 @@
 {% extends 'generic/object_confirm_delete.html' %}
+{% load i18n %}
 
-{% block title %}Delete Asset Type - AssetBox{% endblock %}
+{% block title %}{% translate "Delete Asset Type - AssetBox" %}{% endblock %}
 
 {% block page_header %}
-    <div class="page-pretitle">Assets</div>
-    <h2 class="page-title">Delete Asset Type</h2>
+    <div class="page-pretitle">{% translate "Assets" %}</div>
+    <h2 class="page-title">{% translate "Delete Asset Type" %}</h2>
 {% endblock %}
 
 {% block message %}
-    <p>Are you sure you want to delete the asset type <strong>{{ object }}</strong>?</p>
+    <p>{% translate "Are you sure you want to delete the asset type" %} <strong>{{ object }}</strong>?</p>
     {% if object.assets.exists %}
     <div class="alert alert-warning">
-        <h4 class="alert-heading">Warning:</h4>
-        <p>This asset type is currently assigned to {{ object.assets.count }} asset(s).</p>
+        <h4 class="alert-heading">{% translate "Warning:" %}</h4>
+        <p>{% translate "This asset type is currently assigned to" %} {{ object.assets.count }} {% translate "asset(s)." %}</p>
     </div>
     {% endif %}
 {% endblock %} 

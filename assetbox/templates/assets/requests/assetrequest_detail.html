@@ -1,8 +1,9 @@
 {% extends 'generic/object_detail.html' %}
+{% load i18n %}
 
-{% block title %}Request Details - AssetBox{% endblock %}
+{% block title %}{% translate "Request Details - AssetBox" %}{% endblock %}
 
-{% block page_pretitle %}Asset Request{% endblock %}
+{% block page_pretitle %}{% translate "Asset Request" %}{% endblock %}
 
 {% block page_actions %}
 <div class="btn-list">
@@ -12,14 +13,14 @@
                 hx-target="#modal-placeholder"
                 hx-swap="innerHTML">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l5 5l10 -10" /></svg>
-            Approve...
+            {% translate "Approve..." %}
         </button>
         <button type="button" class="btn btn-danger"
                 hx-get="{% url 'assets:request_deny' pk=object.pk %}"
                 hx-target="#modal-placeholder"
                 hx-swap="innerHTML">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-x" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
-            Deny...
+            {% translate "Deny..." %}
         </button>
     {% endif %}
 
@@ -29,7 +30,7 @@
                 {% csrf_token %}
                 <button type="submit" class="btn btn-outline-secondary" onclick="return confirm('Are you sure you want to cancel this request?')">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-ban" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M5.7 5.7l12.6 12.6" /></svg>
-                    Cancel Request
+                    {% translate "Cancel Request" %}
                 </button>
             </form>
         {% endif %}
@@ -42,28 +43,28 @@
     <div class="col-lg-8 col-12">
         <div class="card shadow-sm border-0 mb-3">
             <div class="card-header border-0 bg-transparent pb-0">
-                <h3 class="card-title text-secondary">Request Details</h3>
+                <h3 class="card-title text-secondary">{% translate "Request Details" %}</h3>
             </div>
             <div class="card-body">
                 <div class="datagrid">
                     <div class="datagrid-item">
-                        <div class="datagrid-title">Requester</div>
+                        <div class="datagrid-title">{% translate "Requester" %}</div>
                         <div class="datagrid-content">
                             <strong>{{ object.requester }}</strong>
                         </div>
                     </div>
                     <div class="datagrid-item">
-                        <div class="datagrid-title">Requested Asset Type</div>
+                        <div class="datagrid-title">{% translate "Requested Asset Type" %}</div>
                         <div class="datagrid-content">
                             {% if object.asset_type %}
                                 <a href="{{ object.asset_type.get_absolute_url }}">{{ object.asset_type }}</a>
                             {% else %}
-                                <span class="text-muted">Any Asset Type</span>
+                                <span class="text-muted">{% translate "Any Asset Type" %}</span>
                             {% endif %}
                         </div>
                     </div>
                     <div class="datagrid-item">
-                        <div class="datagrid-title">Requested Specific Asset</div>
+                        <div class="datagrid-title">{% translate "Requested Specific Asset" %}</div>
                         <div class="datagrid-content">
                             {% if object.asset %}
                                 <a href="{{ object.asset.get_absolute_url }}">{{ object.asset }}</a>
@@ -73,23 +74,23 @@
                         </div>
                     </div>
                     <div class="datagrid-item">
-                        <div class="datagrid-title">Status</div>
+                        <div class="datagrid-title">{% translate "Status" %}</div>
                         <div class="datagrid-content">
                             {% if object.status == 'pending' %}
-                                <span class="badge bg-warning text-warning-fg">Pending</span>
+                                <span class="badge bg-warning text-warning-fg">{% translate "Pending" %}</span>
                             {% elif object.status == 'approved' %}
-                                <span class="badge bg-info text-info-fg">Approved</span>
+                                <span class="badge bg-info text-info-fg">{% translate "Approved" %}</span>
                             {% elif object.status == 'fulfilled' %}
-                                <span class="badge bg-success text-success-fg">Fulfilled</span>
+                                <span class="badge bg-success text-success-fg">{% translate "Fulfilled" %}</span>
                             {% elif object.status == 'denied' %}
-                                <span class="badge bg-danger text-danger-fg">Denied</span>
+                                <span class="badge bg-danger text-danger-fg">{% translate "Denied" %}</span>
                             {% elif object.status == 'cancelled' %}
-                                <span class="badge bg-secondary text-secondary-fg">Cancelled</span>
+                                <span class="badge bg-secondary text-secondary-fg">{% translate "Cancelled" %}</span>
                             {% endif %}
                         </div>
                     </div>
                     <div class="datagrid-item">
-                        <div class="datagrid-title">Request Date</div>
+                        <div class="datagrid-title">{% translate "Request Date" %}</div>
                         <div class="datagrid-content">
                             {{ object.request_date|date:"Y-m-d H:i" }}
                         </div>
@@ -117,13 +118,13 @@
             <div class="card-body">
                 <div class="datagrid mb-3">
                     <div class="datagrid-item">
-                        <div class="datagrid-title">Responded By</div>
+                        <div class="datagrid-title">{% translate "Responded By" %}</div>
                         <div class="datagrid-content">
                             <strong>{{ object.responded_by|default:"System / Automated" }}</strong>
                         </div>
                     </div>
                     <div class="datagrid-item">
-                        <div class="datagrid-title">Response Date</div>
+                        <div class="datagrid-title">{% translate "Response Date" %}</div>
                         <div class="datagrid-content">
                             {{ object.response_date|date:"Y-m-d H:i"|default:"—" }}
                         </div>
@@ -131,7 +132,7 @@
                 </div>
                 {% if object.response_notes %}
                     <div class="mt-2">
-                        <div class="text-muted small fw-bold">Decision Notes</div>
+                        <div class="text-muted small fw-bold">{% translate "Decision Notes" %}</div>
                         <p class="text-secondary mb-0 mt-1">{{ object.response_notes|linebreaksbr }}</p>
                     </div>
                 {% endif %}
@@ -143,11 +144,11 @@
     <div class="col-lg-4 col-12">
         <div class="card shadow-sm border-0 mb-3">
             <div class="card-body">
-                <h3 class="card-title text-muted mb-2">Metadata</h3>
+                <h3 class="card-title text-muted mb-2">{% translate "Metadata" %}</h3>
                 <p class="text-secondary small mb-0">
-                    <strong>Created:</strong> {{ object.request_date|date:"Y-m-d H:i" }}<br>
+                    <strong>{% translate "Created:" %}</strong> {{ object.request_date|date:"Y-m-d H:i" }}<br>
                     {% if object.response_date %}
-                        <strong>Responded:</strong> {{ object.response_date|date:"Y-m-d H:i" }}
+                        <strong>{% translate "Responded:" %}</strong> {{ object.response_date|date:"Y-m-d H:i" }}
                     {% endif %}
                 </p>
             </div>

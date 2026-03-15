@@ -1,8 +1,9 @@
+{% load i18n %}
 <dl class="row mb-0">
-    <dt class="col-sm-3">Fieldset Name:</dt>
+    <dt class="col-sm-3">{% translate "Fieldset Name:" %}</dt>
     <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
 
-    <dt class="col-sm-3">Custom Fields ({{ object.fields.count }}):</dt>
+    <dt class="col-sm-3">{% translate "Custom Fields (" %}{{ object.fields.count }}):</dt>
     <dd class="col-sm-9">
         {% if object.fields.all %}
             <ul class="list-unstyled mb-0 mt-1">
@@ -17,7 +18,7 @@
                 {% endfor %}
             </ul>
         {% else %}
-            <span class="text-muted"><i>No custom fields assigned.</i></span>
+            <span class="text-muted"><i>{% translate "No custom fields assigned." %}</i></span>
         {% endif %}
     </dd>
 </dl>

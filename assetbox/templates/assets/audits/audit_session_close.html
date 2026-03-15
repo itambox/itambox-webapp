@@ -1,13 +1,14 @@
 {% extends base_template|default:'layout.html' %}
+{% load i18n %}
 
-{% block title %}Close Audit Campaign - {{ object.name }} - AssetBox{% endblock %}
+{% block title %}{% translate "Close Audit Campaign -" %} {{ object.name }} {% translate "- AssetBox" %}{% endblock %}
 
 {% block page_header %}
     <div class="page-pretitle">
-        Audit Campaigns
+        {% translate "Audit Campaigns" %}
     </div>
     <h2 class="page-title">
-        Close Campaign
+        {% translate "Close Campaign" %}
     </h2>
 {% endblock %}
 
@@ -15,17 +16,17 @@
 <div class="col-md-6">
     <div class="card border-warning">
         <div class="card-header">
-            <h3 class="card-title">Close Audit Campaign</h3>
+            <h3 class="card-title">{% translate "Close Audit Campaign" %}</h3>
         </div>
         <div class="card-body">
-            <p>Are you sure you want to close and reconcile the audit campaign: <strong>{{ object.name }}</strong>?</p>
-            <p class="text-secondary small">This will lock the campaign from further physical scanning and finalize the discrepancy and mismatch lists.</p>
+            <p>{% translate "Are you sure you want to close and reconcile the audit campaign:" %} <strong>{{ object.name }}</strong>?</p>
+            <p class="text-secondary small">{% translate "This will lock the campaign from further physical scanning and finalize the discrepancy and mismatch lists." %}</p>
             
             <form method="post">
                 {% csrf_token %}
                 <div class="d-flex justify-content-end mt-3">
-                    <a href="{% url 'assets:auditsession_detail' pk=object.pk %}" class="btn btn-link me-2">Cancel</a>
-                    <button type="submit" class="btn btn-warning">Close & Reconcile</button>
+                    <a href="{% url 'assets:auditsession_detail' pk=object.pk %}" class="btn btn-link me-2">{% translate "Cancel" %}</a>
+                    <button type="submit" class="btn btn-warning">{% translate "Close & Reconcile" %}</button>
                 </div>
             </form>
         </div>

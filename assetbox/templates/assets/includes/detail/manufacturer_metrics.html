@@ -1,3 +1,4 @@
+{% load i18n %}
 <div class="row g-3 mb-4">
     <div class="col-sm-6">
         <div class="card card-sm bg-blue-lt border-0 shadow-none">
@@ -9,7 +10,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-blue small uppercase font-sans">Asset Types (Models)</div>
+                        <div class="font-weight-medium text-blue small uppercase font-sans">{% translate "Asset Types (Models)" %}</div>
                         <div class="text-blue h1 mb-0 font-weight-bold">{{ asset_types_table.rows|length }}</div>
                     </div>
                 </div>
@@ -26,7 +27,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-green small uppercase font-sans">Total Physical Assets</div>
+                        <div class="font-weight-medium text-green small uppercase font-sans">{% translate "Total Physical Assets" %}</div>
                         <div class="text-green h1 mb-0 font-weight-bold">{{ assets_table.rows|length }}</div>
                     </div>
                 </div>

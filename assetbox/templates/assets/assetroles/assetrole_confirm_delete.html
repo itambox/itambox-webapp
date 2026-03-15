@@ -1,27 +1,28 @@
 {% extends 'generic/object_confirm_delete.html' %}
+{% load i18n %}
 
-{% block title %}Confirm Delete - {{ object.name }} - AssetBox{% endblock %}
+{% block title %}{% translate "Confirm Delete -" %} {{ object.name }} {% translate "- AssetBox" %}{% endblock %}
 
 {% block page_header %}
-    <div class="page-pretitle">Assets / Asset Roles</div>
-    <h2 class="page-title">Confirm Deletion</h2>
+    <div class="page-pretitle">{% translate "Assets / Asset Roles" %}</div>
+    <h2 class="page-title">{% translate "Confirm Deletion" %}</h2>
 {% endblock %}
 
 {% block message %}
     {# Use the generic object passed in context #}
-    <p>Are you sure you want to delete the asset role: <strong>{{ object.name }}</strong>?</p>
+    <p>{% translate "Are you sure you want to delete the asset role:" %} <strong>{{ object.name }}</strong>?</p>
 
     {% if related_objects_count > 0 %}
         <div class="alert alert-danger" role="alert">
-            <h4 class="alert-title">Warning: Related Assets</h4>
+            <h4 class="alert-title">{% translate "Warning: Related Assets" %}</h4>
             <div class="text-secondary">
-                There are <strong>{{ related_objects_count }}</strong> asset(s) assigned to this role.
+                {% translate "There are" %} <strong>{{ related_objects_count }}</strong> {% translate "asset(s) assigned to this role.
                 Deleting this role will prevent these assets from being properly categorized.
-                Consider reassigning assets before deleting this role.
+                Consider reassigning assets before deleting this role." %}
             </div>
         </div>
     {% else %}
-        <p class="text-muted">This asset role is not currently assigned to any assets.</p>
+        <p class="text-muted">{% translate "This asset role is not currently assigned to any assets." %}</p>
     {% endif %}
 {% endblock message %}
 

@@ -1,19 +1,20 @@
 {% extends 'generic/object_detail.html' %}
+{% load i18n %}
 {% load static %}
 {% load utility_tags %}
 {% load render_table from django_tables2 %}
 
 {# --- Page Title and Header --- #}
-{% block title %}{{ object.manufacturer.name }} {{ object.model }} - Asset Type - AssetBox{% endblock %}
+{% block title %}{{ object.manufacturer.name }} {{ object.model }} {% translate "- Asset Type - AssetBox" %}{% endblock %}
 
-{% block page_pretitle %}Assets / Asset Types{% endblock %}
+{% block page_pretitle %}{% translate "Assets / Asset Types" %}{% endblock %}
 
 {# --- Tabs Hook --- #}
 {% block extra_tabs %}
     <li class="nav-item" role="presentation">
         <a href="#related-assets" class="nav-link" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-purple" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l18 0" /><path d="M9 8l1 0" /><path d="M9 12l1 0" /><path d="M9 16l1 0" /><path d="M14 8l1 0" /><path d="M14 12l1 0" /><path d="M14 16l1 0" /><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16" /></svg>
-            Related Assets <span class="badge bg-purple-lt ms-2">{{ assets_table.rows|length }}</span>
+            {% translate "Related Assets" %} <span class="badge bg-purple-lt ms-2">{{ assets_table.rows|length }}</span>
         </a>
     </li>
 {% endblock extra_tabs %}
@@ -26,7 +27,7 @@
     <div class="tab-pane fade" id="related-assets" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">Assets of this Model / Type</h3>
+                <h3 class="card-title">{% translate "Assets of this Model / Type" %}</h3>
             </div>
             {% if assets_table.rows %}
                 <div class="table-responsive">
@@ -36,7 +37,7 @@
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-ban text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M5.7 5.7l12.6 12.6" /></svg>
-                    <p class="mb-0">No physical assets registered under this type/model yet.</p>
+                    <p class="mb-0">{% translate "No physical assets registered under this type/model yet." %}</p>
                 </div>
             {% endif %}
         </div>

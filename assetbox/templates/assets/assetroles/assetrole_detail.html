@@ -1,13 +1,14 @@
 {% extends 'generic/object_detail.html' %}
+{% load i18n %}
 {% load render_table from django_tables2 %}
 {% load static %}
 {% load utility_tags %}
 
 {# --- Page Title --- #}
-{% block title %}{{ object.name }} - Asset Role Details - AssetBox{% endblock %}
+{% block title %}{{ object.name }} {% translate "- Asset Role Details - AssetBox" %}{% endblock %}
 
 {# --- Page Header (from base) --- #}
-{% block page_pretitle %}Assets / Asset Roles{% endblock %}
+{% block page_pretitle %}{% translate "Assets / Asset Roles" %}{% endblock %}
 
 {# Object details rendered via panel layout #}
 
@@ -21,7 +22,7 @@
     <div class="tab-pane fade" id="assets-tab" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">Assets in this Role</h3>
+                <h3 class="card-title">{% translate "Assets in this Role" %}</h3>
             </div>
             {% if assets_table and assets_table.rows %}
                 <div class="table-responsive">
@@ -31,7 +32,7 @@
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-device-laptop text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 19l18 0" /><path d="M5 6m0 1a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v8a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1z" /></svg>
-                    <p class="mb-0">No assets have been assigned this role yet.</p>
+                    <p class="mb-0">{% translate "No assets have been assigned this role yet." %}</p>
                 </div>
             {% endif %}
         </div>

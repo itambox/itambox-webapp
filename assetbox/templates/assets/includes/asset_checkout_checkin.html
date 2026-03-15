@@ -1,3 +1,4 @@
+{% load i18n %}
 {% comment %} assetbox/templates/assets/includes/asset_checkout_checkin.html {% endcomment %}
 {% load utility_tags %}
 {% has_object_perm request.user 'assets.change_asset' record as can_change %}
@@ -12,7 +13,7 @@
                <path d="M9 14l-4 -4l4 -4" />
                <path d="M5 10h11a4 4 0 1 1 0 8h-1" />
             </svg>
-            Check-in
+            {% translate "Check-in" %}
         </a>
         {% else %}
         <a class="btn btn-sm btn-outline-primary"
@@ -23,7 +24,7 @@
                <path d="M15 14l4 -4l-4 -4" />
                <path d="M19 10h-11a4 4 0 1 0 0 8h1" />
             </svg>
-            Check-out
+            {% translate "Check-out" %}
         </a>
         {% endif %}
     {% else %}

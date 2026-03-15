@@ -1,3 +1,4 @@
+{% load i18n %}
 <div class="row g-3 mb-4">
     <div class="col-sm-12">
         <div class="card card-sm bg-green-lt border-0 shadow-none">
@@ -9,7 +10,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-green small uppercase font-sans">Assets Supplied</div>
+                        <div class="font-weight-medium text-green small uppercase font-sans">{% translate "Assets Supplied" %}</div>
                         <div class="text-green h1 mb-0 font-weight-bold">{{ assets_table.rows|length }}</div>
                     </div>
                 </div>

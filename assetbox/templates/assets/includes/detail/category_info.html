@@ -1,76 +1,77 @@
+{% load i18n %}
 <dl class="row mb-0">
-    <dt class="col-sm-4">Name:</dt>
+    <dt class="col-sm-4">{% translate "Name:" %}</dt>
     <dd class="col-sm-8"><strong>{{ object.name }}</strong></dd>
 
-    <dt class="col-sm-4">Slug:</dt>
+    <dt class="col-sm-4">{% translate "Slug:" %}</dt>
     <dd class="col-sm-8"><code>{{ object.slug }}</code></dd>
 
-    <dt class="col-sm-4">Color:</dt>
+    <dt class="col-sm-4">{% translate "Color:" %}</dt>
     <dd class="col-sm-8">
         {% if object.color %}
             <span class="badge" style="background-color: #{{ object.color }}; width: 24px; height: 16px; display: inline-block; vertical-align: middle;"></span>
             <code class="ms-1">#{{ object.color }}</code>
         {% else %}
-            <span class="text-muted small"><i>None</i></span>
+            <span class="text-muted small"><i>{% translate "None" %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-4">Applies To:</dt>
+    <dt class="col-sm-4">{% translate "Applies To:" %}</dt>
     <dd class="col-sm-8">
         {% if object.applies_to %}
             {% for scope in object.applies_to %}
                 <span class="badge bg-secondary-lt text-capitalize">{{ scope }}</span>
             {% endfor %}
         {% else %}
-            <span class="text-muted small"><i>All</i></span>
+            <span class="text-muted small"><i>{% translate "All" %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-4">Description:</dt>
+    <dt class="col-sm-4">{% translate "Description:" %}</dt>
     <dd class="col-sm-8 text-secondary">{{ object.description|linebreaksbr|default:"—" }}</dd>
 
     <hr class="my-3 text-muted">
     <h4 class="text-secondary mb-2 uppercase font-sans small font-weight-bold" style="letter-spacing: 0.05em;">Checkout &amp; EULA Settings</h4>
 
-    <dt class="col-sm-4">Email on Checkout:</dt>
+    <dt class="col-sm-4">{% translate "Email on Checkout:" %}</dt>
     <dd class="col-sm-8">
         {% if object.email_on_checkout %}
-            <span class="badge bg-green-lt">Enabled</span>
+            <span class="badge bg-green-lt">{% translate "Enabled" %}</span>
         {% else %}
-            <span class="badge bg-secondary-lt">Disabled</span>
+            <span class="badge bg-secondary-lt">{% translate "Disabled" %}</span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-4">Email on Checkin:</dt>
+    <dt class="col-sm-4">{% translate "Email on Checkin:" %}</dt>
     <dd class="col-sm-8">
         {% if object.email_on_checkin %}
-            <span class="badge bg-green-lt">Enabled</span>
+            <span class="badge bg-green-lt">{% translate "Enabled" %}</span>
         {% else %}
-            <span class="badge bg-secondary-lt">Disabled</span>
+            <span class="badge bg-secondary-lt">{% translate "Disabled" %}</span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-4">Require Acceptance:</dt>
+    <dt class="col-sm-4">{% translate "Require Acceptance:" %}</dt>
     <dd class="col-sm-8">
         {% if object.require_acceptance %}
-            <span class="badge bg-red-lt">Required</span>
+            <span class="badge bg-red-lt">{% translate "Required" %}</span>
         {% else %}
-            <span class="badge bg-secondary-lt">Optional</span>
+            <span class="badge bg-secondary-lt">{% translate "Optional" %}</span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-4">Email EULA:</dt>
+    <dt class="col-sm-4">{% translate "Email EULA:" %}</dt>
     <dd class="col-sm-8">
         {% if object.email_eula %}
-            <span class="badge bg-green-lt">Enabled</span>
+            <span class="badge bg-green-lt">{% translate "Enabled" %}</span>
         {% else %}
-            <span class="badge bg-secondary-lt">Disabled</span>
+            <span class="badge bg-secondary-lt">{% translate "Disabled" %}</span>
         {% endif %}
     </dd>
 
     {% if object.tags.all %}
     <hr class="my-3 text-muted">
-    <dt class="col-sm-4">Tags:</dt>
+    <dt class="col-sm-4">{% translate "Tags:" %}</dt>
     <dd class="col-sm-8">
         {% for tag in object.tags.all %}
             {% include 'inc/tags.html' with tag=tag %}

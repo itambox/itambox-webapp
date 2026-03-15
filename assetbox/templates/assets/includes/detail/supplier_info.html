@@ -1,32 +1,33 @@
+{% load i18n %}
 <dl class="row mb-0">
-    <dt class="col-sm-3">Name:</dt>
+    <dt class="col-sm-3">{% translate "Name:" %}</dt>
     <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
 
-    <dt class="col-sm-3">Slug:</dt>
+    <dt class="col-sm-3">{% translate "Slug:" %}</dt>
     <dd class="col-sm-9"><code>{{ object.slug }}</code></dd>
 
-    <dt class="col-sm-3">Contact Person:</dt>
+    <dt class="col-sm-3">{% translate "Contact Person:" %}</dt>
     <dd class="col-sm-9">{{ object.contact_name|default:"—" }}</dd>
 
-    <dt class="col-sm-3">Email:</dt>
+    <dt class="col-sm-3">{% translate "Email:" %}</dt>
     <dd class="col-sm-9">
         {% if object.contact_email %}
             <a href="mailto:{{ object.contact_email }}" class="text-secondary font-weight-medium">{{ object.contact_email }}</a>
         {% else %}
-            <span class="text-muted small"><i>Not configured</i></span>
+            <span class="text-muted small"><i>{% translate "Not configured" %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Phone:</dt>
+    <dt class="col-sm-3">{% translate "Phone:" %}</dt>
     <dd class="col-sm-9">
         {% if object.contact_phone %}
             <a href="tel:{{ object.contact_phone }}" class="text-secondary font-weight-medium">{{ object.contact_phone }}</a>
         {% else %}
-            <span class="text-muted small"><i>Not configured</i></span>
+            <span class="text-muted small"><i>{% translate "Not configured" %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Website:</dt>
+    <dt class="col-sm-3">{% translate "Website:" %}</dt>
     <dd class="col-sm-9">
         {% if object.website %}
             <a href="{{ object.website }}" target="_blank" class="link-primary font-weight-medium d-inline-flex align-items-center">
@@ -34,18 +35,18 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-external-link ms-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6" /><path d="M11 13l9 -9" /><path d="M15 4h5v5" /></svg>
             </a>
         {% else %}
-            <span class="text-muted small"><i>Not configured</i></span>
+            <span class="text-muted small"><i>{% translate "Not configured" %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Address:</dt>
+    <dt class="col-sm-3">{% translate "Address:" %}</dt>
     <dd class="col-sm-9 text-secondary">{{ object.address|linebreaksbr|default:"—" }}</dd>
 
-    <dt class="col-sm-3">Notes:</dt>
+    <dt class="col-sm-3">{% translate "Notes:" %}</dt>
     <dd class="col-sm-9 text-secondary">{{ object.notes|linebreaksbr|default:"—" }}</dd>
 
     {% if object.tags.all %}
-    <dt class="col-sm-3">Tags:</dt>
+    <dt class="col-sm-3">{% translate "Tags:" %}</dt>
     <dd class="col-sm-9">
         {% for tag in object.tags.all %}
             {% include 'inc/tags.html' with tag=tag %}

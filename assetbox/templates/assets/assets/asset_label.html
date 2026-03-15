@@ -1,9 +1,10 @@
+{% load i18n %}
 {# templates/assets/assets/asset_label.html #}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Print Asset Label: {{ asset.asset_tag }}</title>
+    <title>{% translate "Print Asset Label:" %} {{ asset.asset_tag }}</title>
     <style>
         /* CSS reset & thermal roll optimization */
         body {
@@ -119,10 +120,10 @@
 <body>
 
     <div class="print-helper">
-        <h3>Thermal Label Preview</h3>
-        <p>Pre-formatted for <strong>2.25" x 1.25"</strong> thermal rolls. Clicking print will launch the print settings modal.</p>
-        <button class="print-btn" onclick="window.print()">Print Label</button>
-        <p style="font-size: 8pt; color: #777; margin-top: 10px;">Ensure margins are set to "None" in your print options.</p>
+        <h3>{% translate "Thermal Label Preview" %}</h3>
+        <p>{% translate "Pre-formatted for" %} <strong>2.25" x 1.25"</strong> {% translate "thermal rolls. Clicking print will launch the print settings modal." %}</p>
+        <button class="print-btn" onclick="window.print()">{% translate "Print Label" %}</button>
+        <p style="font-size: 8pt; color: #777; margin-top: 10px;">{% translate 'Ensure margins are set to "None" in your print options.' %}</p>
     </div>
 
     <div class="label-container">

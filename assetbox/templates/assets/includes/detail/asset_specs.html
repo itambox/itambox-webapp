@@ -1,10 +1,11 @@
+{% load i18n %}
 {% load utility_tags %}
 
 {# Panel: Hardware specs #}
 {% if object.asset_type and object.asset_type.custom_fieldset and object.asset_type.custom_fieldset.fields.exists %}
 <h4 class="h4 card-title text-secondary mb-3 d-flex align-items-center">
     <svg xmlns="http://www.w3.org/2000/svg" class="icon me-2 text-primary" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 5m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" /><path d="M6 13h12" /><path d="M12 9v8" /></svg>
-    Assigned System Hardware Specifications
+    {% translate "Assigned System Hardware Specifications" %}
 </h4>
 <div class="row g-3">
     {% for field in object.asset_type.custom_fieldset.fields.all %}
@@ -24,7 +25,7 @@
                 </div>
                 <div class="ms-7 font-weight-medium">
                     {% if field.field_type == 'boolean' %}
-                        {% if val %}<span class="badge bg-green">Yes</span>{% else %}<span class="badge bg-secondary">No</span>{% endif %}
+                        {% if val %}<span class="badge bg-green">{% translate "Yes" %}</span>{% else %}<span class="badge bg-secondary">{% translate "No" %}</span>{% endif %}
                     {% else %}
                         {{ val }}
                     {% endif %}

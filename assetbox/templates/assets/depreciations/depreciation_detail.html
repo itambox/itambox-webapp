@@ -1,5 +1,6 @@
 {% extends 'generic/object_detail.html' %}
+{% load i18n %}
 
-{% block title %}{{ object.name }} - Depreciation Rule - AssetBox{% endblock %}
+{% block title %}{{ object.name }} {% translate "- Depreciation Rule - AssetBox" %}{% endblock %}
 
-{% block page_pretitle %}Assets / Depreciation Rules{% endblock %}
+{% block page_pretitle %}{% translate "Assets / Depreciation Rules" %}{% endblock %}

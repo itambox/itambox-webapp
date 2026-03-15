@@ -1,13 +1,14 @@
 {% extends base_template|default:'layout.html' %}
+{% load i18n %}
 
-{% block title %}Confirm Delete Manufacturer{% endblock %}
+{% block title %}{% translate "Confirm Delete Manufacturer" %}{% endblock %}
 
 {% block page_header %}
     <div class="page-pretitle">
-        Assets / Manufacturers
+        {% translate "Assets / Manufacturers" %}
     </div>
     <h2 class="page-title">
-        Confirm Deletion
+        {% translate "Confirm Deletion" %}
     </h2>
 {% endblock %}
 
@@ -16,17 +17,17 @@
     <div class="col-12">
         <div class="card">
             <div class="card-body">
-                <p>Are you sure you want to delete the manufacturer "<strong>{{ object.name }}</strong>"?</p>
+                <p>{% translate 'Are you sure you want to delete the manufacturer "' %}<strong>{{ object.name }}</strong>"?</p>
                 {% if related_assets_count > 0 %}
                     <div class="alert alert-danger" role="alert">
-                        <h4 class="alert-title">Warning!</h4>
-                        <div class="text-secondary">This manufacturer is associated with {{ related_assets_count }} asset{{ related_assets_count|pluralize }}. Deleting it might cause issues.</div>
+                        <h4 class="alert-title">{% translate "Warning!" %}</h4>
+                        <div class="text-secondary">{% translate "This manufacturer is associated with" %} {{ related_assets_count }} {% translate "asset" %}{{ related_assets_count|pluralize }}. Deleting it might cause issues.</div>
                     </div>
                 {% endif %}
                 <form method="post">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-danger">Confirm Delete</button>
-                    <a href="{% url 'assets:manufacturer_list' %}" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-danger">{% translate "Confirm Delete" %}</button>
+                    <a href="{% url 'assets:manufacturer_list' %}" class="btn btn-secondary">{% translate "Cancel" %}</a>
                 </form>
             </div>
         </div>
