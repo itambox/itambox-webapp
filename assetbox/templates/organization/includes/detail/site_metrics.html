@@ -1,3 +1,4 @@
+{% load i18n %}
 {# Panel: Site metrics (locations + assets count) #}
 <div class="row g-3 mb-4">
     <div class="col-sm-6">
@@ -10,7 +11,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-purple small uppercase font-sans">Locations</div>
+                        <div class="font-weight-medium text-purple small uppercase font-sans">{% translate "Locations" %}</div>
                         <div class="text-purple h1 mb-0 font-weight-bold">{{ locations_table.rows|length }}</div>
                     </div>
                 </div>
@@ -27,7 +28,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-green small uppercase font-sans">Total Physical Assets</div>
+                        <div class="font-weight-medium text-green small uppercase font-sans">{% translate "Total Physical Assets" %}</div>
                         <div class="text-green h1 mb-0 font-weight-bold">{{ assets_table.rows|length }}</div>
                     </div>
                 </div>

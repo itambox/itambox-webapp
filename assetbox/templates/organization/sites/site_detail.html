@@ -1,11 +1,12 @@
 {% extends 'generic/object_detail.html' %}
+{% load i18n %}
 {% load render_table from django_tables2 %}
 
 {# --- Page Title and Header --- #}
-{% block title %}{{ object.name }} - Site Details - AssetBox{% endblock %}
+{% block title %}{{ object.name }} {% translate "- Site Details - AssetBox" %}{% endblock %}
 
 {% block page_header %}
-    <div class="page-pretitle">Organization / Sites</div>
+    <div class="page-pretitle">{% translate "Organization / Sites" %}</div>
     <h2 class="page-title">{{ object.name }}</h2>
 {% endblock %}
 
@@ -14,13 +15,13 @@
     <li class="nav-item" role="presentation">
         <a href="#locations" class="nav-link" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-purple" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M3 21v-2a4 4 0 0 1 4 -4h10a4 4 0 0 1 4 4v2" /></svg>
-            Locations <span class="badge bg-purple-lt ms-2">{{ locations_table.rows|length }}</span>
+            {% translate "Locations" %} <span class="badge bg-purple-lt ms-2">{{ locations_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
         <a href="#assets" class="nav-link" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-green" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l18 0" /><path d="M9 8l1 0" /><path d="M9 12l1 0" /><path d="M9 16l1 0" /><path d="M14 8l1 0" /><path d="M14 12l1 0" /><path d="M14 16l1 0" /><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16" /></svg>
-            Assets <span class="badge bg-green-lt ms-2">{{ assets_table.rows|length }}</span>
+            {% translate "Assets" %} <span class="badge bg-green-lt ms-2">{{ assets_table.rows|length }}</span>
         </a>
     </li>
 {% endblock extra_tabs %}
@@ -32,7 +33,7 @@
     <div class="tab-pane fade" id="locations" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">Locations in this Site</h3>
+                <h3 class="card-title">{% translate "Locations in this Site" %}</h3>
             </div>
             {% if locations_table.rows %}
                 <div class="table-responsive">
@@ -41,7 +42,7 @@
                 {% include 'generic/includes/table_pagination.html' with table=locations_table %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
-                    <p class="mb-0">No locations defined under this site.</p>
+                    <p class="mb-0">{% translate "No locations defined under this site." %}</p>
                 </div>
             {% endif %}
         </div>
@@ -50,7 +51,7 @@
     <div class="tab-pane fade" id="assets" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">Assets Physical-Located inside this Site</h3>
+                <h3 class="card-title">{% translate "Assets Physical-Located inside this Site" %}</h3>
             </div>
             {% if assets_table.rows %}
                 <div class="table-responsive">
@@ -59,7 +60,7 @@
                 {% include 'generic/includes/table_pagination.html' with table=assets_table %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
-                    <p class="mb-0">No assets currently located at this site.</p>
+                    <p class="mb-0">{% translate "No assets currently located at this site." %}</p>
                 </div>
             {% endif %}
         </div>

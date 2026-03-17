@@ -1,3 +1,4 @@
+{% load i18n %}
 <div class="row g-3 mb-4">
     <div class="col-12">
         <div class="card card-sm bg-indigo-lt border-0 shadow-none">
@@ -9,7 +10,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-indigo small uppercase font-sans">Checked Out Assets Assigned</div>
+                        <div class="font-weight-medium text-indigo small uppercase font-sans">{% translate "Checked Out Assets Assigned" %}</div>
                         <div class="text-indigo h1 mb-0 font-weight-bold">{{ assignments_table.rows|length }}</div>
                     </div>
                 </div>
@@ -28,7 +29,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-teal small uppercase font-sans">Accessories</div>
+                        <div class="font-weight-medium text-teal small uppercase font-sans">{% translate "Accessories" %}</div>
                         <div class="text-teal h3 mb-0 font-weight-bold">{{ object.accessory_assignments.count }}</div>
                     </div>
                 </div>
@@ -45,7 +46,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-cyan small uppercase font-sans">Consumable Usage</div>
+                        <div class="font-weight-medium text-cyan small uppercase font-sans">{% translate "Consumable Usage" %}</div>
                         <div class="text-cyan h3 mb-0 font-weight-bold">{{ object.consumable_consumptions.count }}</div>
                     </div>
                 </div>
@@ -62,7 +63,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-blue small uppercase font-sans">License Seats</div>
+                        <div class="font-weight-medium text-blue small uppercase font-sans">{% translate "License Seats" %}</div>
                         <div class="text-blue h3 mb-0 font-weight-bold">{{ object.license_assignments.count }}</div>
                     </div>
                 </div>

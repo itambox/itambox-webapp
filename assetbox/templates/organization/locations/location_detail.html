@@ -4,10 +4,10 @@
 {% load i18n %}
 
 {# --- Page Title and Header --- #}
-{% block title %}{{ object.name }} - Location Details - AssetBox{% endblock %}
+{% block title %}{{ object.name }} {% translate "- Location Details - AssetBox" %}{% endblock %}
 
 {% block page_header %}
-    <div class="page-pretitle">Organization / Locations</div>
+    <div class="page-pretitle">{% translate "Organization / Locations" %}</div>
     <h2 class="page-title">
         {{ object.name }}
     </h2>
@@ -18,11 +18,11 @@
     <div class="btn-list">
         <a href="{% url 'organization:location_update' pk=object.pk %}" class="btn">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-pencil" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" /><path d="M13.5 6.5l4 4" /></svg>
-            Edit
+            {% translate "Edit" %}
         </a>
         <a href="{% url 'organization:location_delete' pk=object.pk %}" class="btn btn-danger">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
-            Delete
+            {% translate "Delete" %}
         </a>
     </div>
 {% endblock %}
@@ -32,13 +32,13 @@
     <li class="nav-item" role="presentation">
         <a href="#assets" class="nav-link" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-green" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l18 0" /><path d="M9 8l1 0" /><path d="M9 12l1 0" /><path d="M9 16l1 0" /><path d="M14 8l1 0" /><path d="M14 12l1 0" /><path d="M14 16l1 0" /><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16" /></svg>
-            Assets <span class="badge bg-green-lt ms-2">{{ assets_table.rows|length }}</span>
+            {% translate "Assets" %} <span class="badge bg-green-lt ms-2">{{ assets_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
         <a href="#child-locations" class="nav-link" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-azure" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M3 21v-2a4 4 0 0 1 4 -4h10a4 4 0 0 1 4 4v2" /></svg>
-            Child Locations <span class="badge bg-azure-lt ms-2">{{ object.children.count }}</span>
+            {% translate "Child Locations" %} <span class="badge bg-azure-lt ms-2">{{ object.children.count }}</span>
         </a>
     </li>
 {% endblock extra_tabs %}
@@ -51,7 +51,7 @@
     <div class="tab-pane fade" id="assets" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">Assets Located in this Specific Location</h3>
+                <h3 class="card-title">{% translate "Assets Located in this Specific Location" %}</h3>
             </div>
             {% if assets_table.rows %}
                 <div class="table-responsive">
@@ -61,7 +61,7 @@
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-devices text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M13 9a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-6a1 1 0 0 1 -1 -1v-10z" /><path d="M18 8v-3a1 1 0 0 0 -1 -1h-13a1 1 0 0 0 -1 1v12a1 1 0 0 0 1 1h9" /><path d="M16 9h2" /></svg>
-                    <p class="mb-0">No assets assigned to this specific location.</p>
+                    <p class="mb-0">{% translate "No assets assigned to this specific location." %}</p>
                 </div>
             {% endif %}
         </div>
@@ -71,7 +71,7 @@
     <div class="tab-pane fade" id="child-locations" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">Child Locations</h3>
+                <h3 class="card-title">{% translate "Child Locations" %}</h3>
             </div>
             {% if object.children.all %}
                 <div class="list-group list-group-flush list-group-hoverable">
@@ -81,14 +81,14 @@
                                <strong>{{ child_loc.name }}</strong>
                                <span class="text-muted small ms-2">({{ child_loc.slug }})</span>
                            </div>
-                           <span class="badge bg-azure-lt">View Detail</span>
+                           <span class="badge bg-azure-lt">{% translate "View Detail" %}</span>
                         </a>
                     {% endfor %}
                 </div>
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hierarchy-2 text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 3h4v4h-4z" /><path d="M3 17h4v4h-4z" /><path d="M17 17h4v4h-4z" /><path d="M7 17l5 -4l5 4" /><path d="M12 7l0 6" /></svg>
-                    <p class="mb-0">No child locations defined under this location.</p>
+                    <p class="mb-0">{% translate "No child locations defined under this location." %}</p>
                 </div>
             {% endif %}
         </div>

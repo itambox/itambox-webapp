@@ -1,52 +1,53 @@
+{% load i18n %}
 <dl class="row mb-0">
-    <dt class="col-sm-3">Name:</dt>
+    <dt class="col-sm-3">{% translate "Name:" %}</dt>
     <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
 
-    <dt class="col-sm-3">Slug:</dt>
+    <dt class="col-sm-3">{% translate "Slug:" %}</dt>
     <dd class="col-sm-9"><code>{{ object.slug }}</code></dd>
 
-    <dt class="col-sm-3">Site:</dt>
+    <dt class="col-sm-3">{% translate "Site:" %}</dt>
     <dd class="col-sm-9">
         {% if object.site %}
             <a href="{% url 'organization:site_detail' pk=object.site.pk %}">{{ object.site }}</a>
         {% else %}
-             <span class="text-muted"><i>None</i></span>
+             <span class="text-muted"><i>{% translate "None" %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Parent Location:</dt>
+    <dt class="col-sm-3">{% translate "Parent Location:" %}</dt>
     <dd class="col-sm-9">
         {% if object.parent %}
             <a href="{% url 'organization:location_detail' pk=object.parent.pk %}">{{ object.parent }}</a>
         {% else %}
-             <span class="text-muted"><i>None</i></span>
+             <span class="text-muted"><i>{% translate "None" %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Tenant:</dt>
+    <dt class="col-sm-3">{% translate "Tenant:" %}</dt>
     <dd class="col-sm-9">
         {% if object.tenant %}
             <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant }}</a>
         {% else %}
-             <span class="text-muted"><i>None</i></span>
+             <span class="text-muted"><i>{% translate "None" %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Status:</dt>
+    <dt class="col-sm-3">{% translate "Status:" %}</dt>
     <dd class="col-sm-9">
         <span class="badge {% if object.status == 'active' %}bg-success-lt text-success{% elif object.status == 'planned' %}bg-info-lt text-info{% else %}bg-secondary-lt text-secondary{% endif %} px-2.5 py-1 text-uppercase">
             {{ object.get_status_display }}
         </span>
     </dd>
 
-    <dt class="col-sm-3">Facility:</dt>
+    <dt class="col-sm-3">{% translate "Facility:" %}</dt>
     <dd class="col-sm-9">{{ object.facility|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
 
-    <dt class="col-sm-3">Description:</dt>
+    <dt class="col-sm-3">{% translate "Description:" %}</dt>
     <dd class="col-sm-9 text-secondary">{{ object.description|linebreaksbr|default:"<span class='text-muted'><i>No description provided.</i></span>"|safe }}</dd>
 
     {% if object.tags.all %}
-    <dt class="col-sm-3">Tags:</dt>
+    <dt class="col-sm-3">{% translate "Tags:" %}</dt>
     <dd class="col-sm-9">
         {% for tag in object.tags.all %}
             {% include 'inc/tags.html' with tag=tag %}

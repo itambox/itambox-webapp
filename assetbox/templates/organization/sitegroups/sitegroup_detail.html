@@ -1,10 +1,11 @@
 {% extends 'generic/object_detail.html' %}
+{% load i18n %}
 {% load render_table from django_tables2 %}
 
-{% block title %}{{ object.name }} - Site Group Details - AssetBox{% endblock %}
+{% block title %}{{ object.name }} {% translate "- Site Group Details - AssetBox" %}{% endblock %}
 
 {% block page_header %}
-    <div class="page-pretitle">Organization / Site Groups</div>
+    <div class="page-pretitle">{% translate "Organization / Site Groups" %}</div>
     <h2 class="page-title">
         {{ object.name }}
     </h2>
@@ -15,7 +16,7 @@
 {% block full_width_content %}
     {% if sites_table %}
     <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">Sites in this Group ({{ sites_table.rows|length }})</h3></div>
+        <div class="card-header"><h3 class="card-title">{% translate "Sites in this Group (" %}{{ sites_table.rows|length }})</h3></div>
         <div class="table-responsive">
             {% render_table sites_table %}
         </div>
@@ -24,7 +25,7 @@
     {% endif %}
     {% if children_table and children_table.rows %}
     <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">Child Groups ({{ children_table.rows|length }})</h3></div>
+        <div class="card-header"><h3 class="card-title">{% translate "Child Groups (" %}{{ children_table.rows|length }})</h3></div>
         <div class="table-responsive">
             {% render_table children_table %}
         </div>

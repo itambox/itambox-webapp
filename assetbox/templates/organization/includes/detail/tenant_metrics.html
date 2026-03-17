@@ -1,3 +1,4 @@
+{% load i18n %}
 <div class="row g-3 mb-4">
     <div class="col-sm-4">
         <div class="card card-sm bg-purple-lt border-0 shadow-none">
@@ -9,7 +10,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-purple small uppercase font-sans">Sites</div>
+                        <div class="font-weight-medium text-purple small uppercase font-sans">{% translate "Sites" %}</div>
                         <div class="text-purple h1 mb-0 font-weight-bold">{{ sites_table.rows|length }}</div>
                     </div>
                 </div>
@@ -26,7 +27,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-azure small uppercase font-sans">Locations</div>
+                        <div class="font-weight-medium text-azure small uppercase font-sans">{% translate "Locations" %}</div>
                         <div class="text-azure h1 mb-0 font-weight-bold">{{ locations_table.rows|length }}</div>
                     </div>
                 </div>
@@ -43,7 +44,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-indigo small uppercase font-sans">Asset Holders</div>
+                        <div class="font-weight-medium text-indigo small uppercase font-sans">{% translate "Asset Holders" %}</div>
                         <div class="text-indigo h1 mb-0 font-weight-bold">{{ assetholders_table.rows|length }}</div>
                     </div>
                 </div>
@@ -62,7 +63,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-green small uppercase font-sans">Assets</div>
+                        <div class="font-weight-medium text-green small uppercase font-sans">{% translate "Assets" %}</div>
                         <div class="text-green h3 mb-0 font-weight-bold">{{ tenant_asset_count }}</div>
                     </div>
                 </div>
@@ -79,7 +80,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-teal small uppercase font-sans">Accessories</div>
+                        <div class="font-weight-medium text-teal small uppercase font-sans">{% translate "Accessories" %}</div>
                         <div class="text-teal h3 mb-0 font-weight-bold">{{ tenant_accessory_count }}</div>
                     </div>
                 </div>
@@ -96,7 +97,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-cyan small uppercase font-sans">Consumables</div>
+                        <div class="font-weight-medium text-cyan small uppercase font-sans">{% translate "Consumables" %}</div>
                         <div class="text-cyan h3 mb-0 font-weight-bold">{{ tenant_consumable_count }}</div>
                     </div>
                 </div>
@@ -113,7 +114,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-blue small uppercase font-sans">Licenses</div>
+                        <div class="font-weight-medium text-blue small uppercase font-sans">{% translate "Licenses" %}</div>
                         <div class="text-blue h3 mb-0 font-weight-bold">{{ tenant_license_count }}</div>
                     </div>
                 </div>
@@ -132,7 +133,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-orange small uppercase font-sans">Kits</div>
+                        <div class="font-weight-medium text-orange small uppercase font-sans">{% translate "Kits" %}</div>
                         <div class="text-orange h3 mb-0 font-weight-bold">{{ tenant_kit_count }}</div>
                     </div>
                 </div>
@@ -149,7 +150,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-pink small uppercase font-sans">Subscriptions</div>
+                        <div class="font-weight-medium text-pink small uppercase font-sans">{% translate "Subscriptions" %}</div>
                         <div class="text-pink h3 mb-0 font-weight-bold">{{ tenant_subscription_count }}</div>
                     </div>
                 </div>

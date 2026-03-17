@@ -1,14 +1,15 @@
 {% extends base_template|default:"layout.html" %}
+{% load i18n %}
 {% load crispy_forms_tags %}
 
-{% block title %}Assign Contact to {{ target_obj }} - AssetBox{% endblock %}
+{% block title %}{% translate "Assign Contact to" %} {{ target_obj }} {% translate "- AssetBox" %}{% endblock %}
 
 {% block page_header %}
     <div class="page-pretitle">
-        Organization / Contacts
+        {% translate "Organization / Contacts" %}
     </div>
     <h2 class="page-title">
-        Assign Contact to {{ target_obj }}
+        {% translate "Assign Contact to" %} {{ target_obj }}
     </h2>
 {% endblock %}
 

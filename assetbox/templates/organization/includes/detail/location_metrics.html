@@ -1,3 +1,4 @@
+{% load i18n %}
 <div class="row g-3 mb-4">
     <div class="col-sm-6">
         <div class="card card-sm bg-green-lt border-0 shadow-none">
@@ -9,7 +10,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-green small uppercase font-sans">Physical Assets</div>
+                        <div class="font-weight-medium text-green small uppercase font-sans">{% translate "Physical Assets" %}</div>
                         <div class="text-green h1 mb-0 font-weight-bold">{{ assets_table.rows|length }}</div>
                     </div>
                 </div>
@@ -26,7 +27,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-azure small uppercase font-sans">Child Locations</div>
+                        <div class="font-weight-medium text-azure small uppercase font-sans">{% translate "Child Locations" %}</div>
                         <div class="text-azure h1 mb-0 font-weight-bold">{{ object.children.count }}</div>
                     </div>
                 </div>
@@ -45,7 +46,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-teal small uppercase font-sans">Accessory Checkouts</div>
+                        <div class="font-weight-medium text-teal small uppercase font-sans">{% translate "Accessory Checkouts" %}</div>
                         <div class="text-teal h3 mb-0 font-weight-bold">{{ object.accessory_assignments.count }}</div>
                     </div>
                 </div>
@@ -62,7 +63,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-cyan small uppercase font-sans">Consumable Usage</div>
+                        <div class="font-weight-medium text-cyan small uppercase font-sans">{% translate "Consumable Usage" %}</div>
                         <div class="text-cyan h3 mb-0 font-weight-bold">{{ object.consumable_consumptions.count }}</div>
                     </div>
                 </div>

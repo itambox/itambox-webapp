@@ -1,61 +1,62 @@
+{% load i18n %}
 {# Panel: Site basic information #}
 <dl class="row mb-0">
-    <dt class="col-sm-3">Name:</dt>
+    <dt class="col-sm-3">{% translate "Name:" %}</dt>
     <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
 
-    <dt class="col-sm-3">Slug:</dt>
+    <dt class="col-sm-3">{% translate "Slug:" %}</dt>
     <dd class="col-sm-9"><code>{{ object.slug }}</code></dd>
 
-    <dt class="col-sm-3">Status:</dt>
+    <dt class="col-sm-3">{% translate "Status:" %}</dt>
     <dd class="col-sm-9">
         <span class="badge {% if object.status == 'active' %}bg-success-lt text-success{% elif object.status == 'planned' %}bg-info-lt text-info{% else %}bg-secondary-lt text-secondary{% endif %} px-2.5 py-1 text-uppercase">
             {{ object.get_status_display }}
         </span>
     </dd>
 
-    <dt class="col-sm-3">Region:</dt>
+    <dt class="col-sm-3">{% translate "Region:" %}</dt>
     <dd class="col-sm-9">
         {% if object.region %}
             <a href="{% url 'organization:region_detail' pk=object.region.pk %}">{{ object.region }}</a>
         {% else %}
-             <span class="text-muted"><i>None</i></span>
+             <span class="text-muted"><i>{% translate "None" %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Site Group:</dt>
+    <dt class="col-sm-3">{% translate "Site Group:" %}</dt>
     <dd class="col-sm-9">
         {% if object.group %}
             <a href="{% url 'organization:sitegroup_detail' pk=object.group.pk %}">{{ object.group }}</a>
         {% else %}
-             <span class="text-muted"><i>None</i></span>
+             <span class="text-muted"><i>{% translate "None" %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Tenant:</dt>
+    <dt class="col-sm-3">{% translate "Tenant:" %}</dt>
     <dd class="col-sm-9">
         {% if object.tenant %}
             <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant }}</a>
         {% else %}
-             <span class="text-muted"><i>None</i></span>
+             <span class="text-muted"><i>{% translate "None" %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Description:</dt>
+    <dt class="col-sm-3">{% translate "Description:" %}</dt>
     <dd class="col-sm-9 text-secondary">{{ object.description|linebreaksbr|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
 
-    <dt class="col-sm-3">Facility:</dt>
+    <dt class="col-sm-3">{% translate "Facility:" %}</dt>
     <dd class="col-sm-9">{{ object.facility|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
 
-    <dt class="col-sm-3">Time Zone:</dt>
+    <dt class="col-sm-3">{% translate "Time Zone:" %}</dt>
     <dd class="col-sm-9"><span class="badge bg-purple-lt">{{ object.time_zone|default:"UTC" }}</span></dd>
 
-    <dt class="col-sm-3">Physical Address:</dt>
+    <dt class="col-sm-3">{% translate "Physical Address:" %}</dt>
     <dd class="col-sm-9 text-secondary">{{ object.physical_address|linebreaksbr|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
 
-    <dt class="col-sm-3">Shipping Address:</dt>
+    <dt class="col-sm-3">{% translate "Shipping Address:" %}</dt>
     <dd class="col-sm-9 text-secondary">{{ object.shipping_address|linebreaksbr|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
 
-    <dt class="col-sm-3">GPS Coordinates:</dt>
+    <dt class="col-sm-3">{% translate "GPS Coordinates:" %}</dt>
     <dd class="col-sm-9">
         {% if object.latitude and object.longitude %}
             <span class="badge bg-blue-lt">
@@ -63,15 +64,15 @@
                 {{ object.latitude }}, {{ object.longitude }}
             </span>
         {% else %}
-            <span class="text-muted"><i>Not Set</i></span>
+            <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Comments:</dt>
+    <dt class="col-sm-3">{% translate "Comments:" %}</dt>
     <dd class="col-sm-9 text-secondary">{{ object.comments|linebreaksbr|default:"<span class='text-muted'><i>None</i></span>"|safe }}</dd>
 
     {% if object.tags.all %}
-    <dt class="col-sm-3">Tags:</dt>
+    <dt class="col-sm-3">{% translate "Tags:" %}</dt>
     <dd class="col-sm-9">
         {% for tag in object.tags.all %}
             {% include 'inc/tags.html' with tag=tag %}

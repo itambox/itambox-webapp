@@ -1,75 +1,76 @@
 {% extends 'generic/object_detail.html' %}
+{% load i18n %}
 {% load render_table from django_tables2 %}
 {% load static %}
 
 {# --- Page Title --- #}
-{% block title %}{{ object.name }} - Tenant Details - AssetBox{% endblock %}
+{% block title %}{{ object.name }} {% translate "- Tenant Details - AssetBox" %}{% endblock %}
 
 {# --- Page Header --- #}
-{% block page_pretitle %}Organization / Tenants{% endblock %}
+{% block page_pretitle %}{% translate "Organization / Tenants" %}{% endblock %}
 
 {# --- Tabs Hook --- #}
 {% block extra_tabs %}
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="Sites">
+    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Sites' %}">
         <a href="#sites" class="nav-link" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon text-purple" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l18 0" /><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16" /></svg>
-            <span class="d-none d-xl-inline ms-1">Sites</span>
+            <span class="d-none d-xl-inline ms-1">{% translate "Sites" %}</span>
             <span class="badge bg-purple-lt ms-2">{{ sites_table.rows|length }}</span>
         </a>
     </li>
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="Locations">
+    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Locations' %}">
         <a href="#locations" class="nav-link" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon text-azure" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M3 21v-2a4 4 0 0 1 4 -4h10a4 4 0 0 1 4 4v2" /></svg>
-            <span class="d-none d-xl-inline ms-1">Locations</span>
+            <span class="d-none d-xl-inline ms-1">{% translate "Locations" %}</span>
             <span class="badge bg-azure-lt ms-2">{{ locations_table.rows|length }}</span>
         </a>
     </li>
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="Asset Holders">
+    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Asset Holders' %}">
         <a href="#asset-holders" class="nav-link" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon text-indigo" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /></svg>
-            <span class="d-none d-xl-inline ms-1">Asset Holders</span>
+            <span class="d-none d-xl-inline ms-1">{% translate "Asset Holders" %}</span>
             <span class="badge bg-indigo-lt ms-2">{{ assetholders_table.rows|length }}</span>
         </a>
     </li>
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="Assets">
+    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Assets' %}">
         <a href="#assets" class="nav-link" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon text-green" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 19l18 0" /><path d="M5 6m0 1a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v8a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1z" /><path d="M12 16l0 3" /></svg>
-            <span class="d-none d-xl-inline ms-1">Assets</span>
+            <span class="d-none d-xl-inline ms-1">{% translate "Assets" %}</span>
             <span class="badge bg-green-lt ms-2">{{ tenant_asset_count }}</span>
         </a>
     </li>
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="Accessories">
+    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Accessories' %}">
         <a href="#accessories" class="nav-link" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon text-teal" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2 -2v-10a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2z" /><path d="M6 10h.01" /><path d="M10 10h.01" /><path d="M14 10h.01" /><path d="M18 10h.01" /><path d="M7 14h10" /></svg>
-            <span class="d-none d-xl-inline ms-1">Accessories</span>
+            <span class="d-none d-xl-inline ms-1">{% translate "Accessories" %}</span>
             <span class="badge bg-teal-lt ms-2">{{ tenant_accessory_count }}</span>
         </a>
     </li>
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="Consumables">
+    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Consumables' %}">
         <a href="#consumables" class="nav-link" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon text-cyan" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3l1.2 1.78a8 8 0 1 1 -2.4 0l1.2 -1.78z" /></svg>
-            <span class="d-none d-xl-inline ms-1">Consumables</span>
+            <span class="d-none d-xl-inline ms-1">{% translate "Consumables" %}</span>
             <span class="badge bg-cyan-lt ms-2">{{ tenant_consumable_count }}</span>
         </a>
     </li>
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="Licenses">
+    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Licenses' %}">
         <a href="#licenses" class="nav-link" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon text-blue" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M16.555 3.843a8 8 0 1 0-.342 15.228l-1.213-1.213a6 6 0 1 1 .184-11.83l1.371-2.185z" /><path d="M19 16v4" /><path d="M17 18h4" /></svg>
-            <span class="d-none d-xl-inline ms-1">Licenses</span>
+            <span class="d-none d-xl-inline ms-1">{% translate "Licenses" %}</span>
             <span class="badge bg-blue-lt ms-2">{{ tenant_license_count }}</span>
         </a>
     </li>
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="Kits">
+    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Kits' %}">
         <a href="#kits" class="nav-link" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon text-orange" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5" /><path d="M12 12l8 -4.5" /><path d="M12 12l0 9" /><path d="M12 12l-8 -4.5" /></svg>
-            <span class="d-none d-xl-inline ms-1">Kits</span>
+            <span class="d-none d-xl-inline ms-1">{% translate "Kits" %}</span>
             <span class="badge bg-orange-lt ms-2">{{ tenant_kit_count }}</span>
         </a>
     </li>
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="Subscriptions">
+    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Subscriptions' %}">
         <a href="#subscriptions" class="nav-link" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon text-pink" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><path d="M8 11l8 0" /><path d="M8 15l6 0" /></svg>
-            <span class="d-none d-xl-inline ms-1">Subscriptions</span>
+            <span class="d-none d-xl-inline ms-1">{% translate "Subscriptions" %}</span>
             <span class="badge bg-pink-lt ms-2">{{ tenant_subscription_count }}</span>
         </a>
     </li>
@@ -88,7 +89,7 @@
     <div class="tab-pane fade" id="sites" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">Associated Sites</h3>
+                <h3 class="card-title">{% translate "Associated Sites" %}</h3>
             </div>
             {% if sites_table.rows %}
                 <div class="table-responsive">
@@ -98,7 +99,7 @@
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-building text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l18 0" /><path d="M9 8l1 0" /><path d="M9 12l1 0" /><path d="M9 16l1 0" /><path d="M14 8l1 0" /><path d="M14 12l1 0" /><path d="M14 16l1 0" /><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16" /></svg>
-                    <p class="mb-0">No sites found for this tenant.</p>
+                    <p class="mb-0">{% translate "No sites found for this tenant." %}</p>
                 </div>
             {% endif %}
         </div>
@@ -108,7 +109,7 @@
     <div class="tab-pane fade" id="locations" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">Associated Locations</h3>
+                <h3 class="card-title">{% translate "Associated Locations" %}</h3>
             </div>
             {% if locations_table.rows %}
                 <div class="table-responsive">
@@ -118,7 +119,7 @@
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-map-pin text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" /><path d="M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0z" /></svg>
-                    <p class="mb-0">No locations found for this tenant.</p>
+                    <p class="mb-0">{% translate "No locations found for this tenant." %}</p>
                 </div>
             {% endif %}
         </div>
@@ -128,7 +129,7 @@
     <div class="tab-pane fade" id="asset-holders" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">Associated Asset Holders</h3>
+                <h3 class="card-title">{% translate "Associated Asset Holders" %}</h3>
             </div>
             {% if assetholders_table.rows %}
                 <div class="table-responsive">
@@ -138,7 +139,7 @@
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-users text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /></svg>
-                    <p class="mb-0">No asset holders found for this tenant.</p>
+                    <p class="mb-0">{% translate "No asset holders found for this tenant." %}</p>
                 </div>
             {% endif %}
         </div>
@@ -148,7 +149,7 @@
     <div class="tab-pane fade" id="assets" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">Associated Assets</h3>
+                <h3 class="card-title">{% translate "Associated Assets" %}</h3>
             </div>
             {% if assets_table.rows %}
                 <div class="table-responsive">
@@ -158,7 +159,7 @@
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-device-laptop text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 19l18 0" /><path d="M5 6m0 1a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v8a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1z" /><path d="M12 16l0 3" /></svg>
-                    <p class="mb-0">No assets found for this tenant.</p>
+                    <p class="mb-0">{% translate "No assets found for this tenant." %}</p>
                 </div>
             {% endif %}
         </div>
@@ -168,7 +169,7 @@
     <div class="tab-pane fade" id="accessories" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">Associated Accessories</h3>
+                <h3 class="card-title">{% translate "Associated Accessories" %}</h3>
             </div>
             {% if accessories_table.rows %}
                 <div class="table-responsive">
@@ -178,7 +179,7 @@
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-keyboard text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2 -2v-10a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2z" /><path d="M6 10h.01" /><path d="M10 10h.01" /><path d="M14 10h.01" /><path d="M18 10h.01" /><path d="M7 14h10" /></svg>
-                    <p class="mb-0">No accessories found for this tenant.</p>
+                    <p class="mb-0">{% translate "No accessories found for this tenant." %}</p>
                 </div>
             {% endif %}
         </div>
@@ -188,7 +189,7 @@
     <div class="tab-pane fade" id="consumables" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">Associated Consumables</h3>
+                <h3 class="card-title">{% translate "Associated Consumables" %}</h3>
             </div>
             {% if consumables_table.rows %}
                 <div class="table-responsive">
@@ -198,7 +199,7 @@
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-droplet text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3l1.2 1.78a8 8 0 1 1 -2.4 0l1.2 -1.78z" /></svg>
-                    <p class="mb-0">No consumables found for this tenant.</p>
+                    <p class="mb-0">{% translate "No consumables found for this tenant." %}</p>
                 </div>
             {% endif %}
         </div>
@@ -208,7 +209,7 @@
     <div class="tab-pane fade" id="licenses" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">Associated Licenses</h3>
+                <h3 class="card-title">{% translate "Associated Licenses" %}</h3>
             </div>
             {% if licenses_table.rows %}
                 <div class="table-responsive">
@@ -218,7 +219,7 @@
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-key text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M16.555 3.843a8 8 0 1 0-.342 15.228l-1.213-1.213a6 6 0 1 1 .184-11.83l1.371-2.185z" /><path d="M19 16v4" /><path d="M17 18h4" /></svg>
-                    <p class="mb-0">No licenses found for this tenant.</p>
+                    <p class="mb-0">{% translate "No licenses found for this tenant." %}</p>
                 </div>
             {% endif %}
         </div>
@@ -228,7 +229,7 @@
     <div class="tab-pane fade" id="kits" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">Associated Kits</h3>
+                <h3 class="card-title">{% translate "Associated Kits" %}</h3>
             </div>
             {% if kits_table.rows %}
                 <div class="table-responsive">
@@ -238,7 +239,7 @@
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-package text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5" /><path d="M12 12l8 -4.5" /><path d="M12 12l0 9" /><path d="M12 12l-8 -4.5" /></svg>
-                    <p class="mb-0">No kits found for this tenant.</p>
+                    <p class="mb-0">{% translate "No kits found for this tenant." %}</p>
                 </div>
             {% endif %}
         </div>
@@ -248,7 +249,7 @@
     <div class="tab-pane fade" id="subscriptions" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">Associated Subscriptions</h3>
+                <h3 class="card-title">{% translate "Associated Subscriptions" %}</h3>
             </div>
             {% if subscriptions_table.rows %}
                 <div class="table-responsive">
@@ -258,7 +259,7 @@
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-invoice text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><path d="M8 11l8 0" /><path d="M8 15l6 0" /></svg>
-                    <p class="mb-0">No subscriptions found for this tenant.</p>
+                    <p class="mb-0">{% translate "No subscriptions found for this tenant." %}</p>
                 </div>
             {% endif %}
         </div>

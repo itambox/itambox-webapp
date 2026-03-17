@@ -1,15 +1,16 @@
+{% load i18n %}
 <dl class="row mb-0">
-    <dt class="col-sm-3">Name:</dt>
+    <dt class="col-sm-3">{% translate "Name:" %}</dt>
     <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
 
-    <dt class="col-sm-3">Slug:</dt>
+    <dt class="col-sm-3">{% translate "Slug:" %}</dt>
     <dd class="col-sm-9"><code>{{ object.slug }}</code></dd>
 
-    <dt class="col-sm-3">Description:</dt>
+    <dt class="col-sm-3">{% translate "Description:" %}</dt>
     <dd class="col-sm-9 text-secondary">{{ object.description|linebreaksbr|default:"<i>No description provided.</i>"|safe }}</dd>
 
     {% if object.tags.all %}
-    <dt class="col-sm-3">Tags:</dt>
+    <dt class="col-sm-3">{% translate "Tags:" %}</dt>
     <dd class="col-sm-9">
         {% for tag in object.tags.all %}
             {% include 'inc/tags.html' with tag=tag %}

@@ -4,10 +4,10 @@
 {% load i18n %}
 
 {# --- Page Title --- #}
-{% block title %}{{ object.name }} - Tenant Group Details - AssetBox{% endblock %}
+{% block title %}{{ object.name }} {% translate "- Tenant Group Details - AssetBox" %}{% endblock %}
 
 {# --- Page Header (from base) --- #}
-{% block page_pretitle %}Organization / Tenant Groups{% endblock %}
+{% block page_pretitle %}{% translate "Organization / Tenant Groups" %}{% endblock %}
 
 {# --- Page Actions (from base) --- #}
 
@@ -23,7 +23,7 @@
     {# Render Tenants table #}
     {% if tenants_table and tenants_table.rows %}
     <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">Tenants in this Group ({{ tenants_table.page.paginator.count }})</h3></div>
+        <div class="card-header"><h3 class="card-title">{% translate "Tenants in this Group (" %}{{ tenants_table.page.paginator.count }})</h3></div>
         <div class="table-responsive">
             {% render_table tenants_table %}
         </div>
@@ -41,15 +41,15 @@
     </div>
      {% elif tenants_table %}
      <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">Tenants in this Group (0)</h3></div>
+        <div class="card-header"><h3 class="card-title">{% translate "Tenants in this Group (0)" %}</h3></div>
          <div class="card-body">
-            <p class="text-muted">No tenants found in this group.</p>
+            <p class="text-muted">{% translate "No tenants found in this group." %}</p>
          </div>
     </div>
     {% endif %}
     {% if children_table and children_table.rows %}
     <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">Child Groups ({{ children_table.rows|length }})</h3></div>
+        <div class="card-header"><h3 class="card-title">{% translate "Child Groups (" %}{{ children_table.rows|length }})</h3></div>
         <div class="table-responsive">
             {% render_table children_table %}
         </div>

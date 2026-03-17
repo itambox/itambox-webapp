@@ -1,4 +1,5 @@
 {% extends 'generic/object_detail.html' %}
+{% load i18n %}
 {% load render_table from django_tables2 %}
 
 {# Object details rendered via panel layout #}
@@ -7,7 +8,7 @@
 {% block full_width_content %}
     {% if sites_table %}
     <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">Sites in this Region ({{ sites_table.rows|length }})</h3></div>
+        <div class="card-header"><h3 class="card-title">{% translate "Sites in this Region (" %}{{ sites_table.rows|length }})</h3></div>
         <div class="table-responsive">
             {% render_table sites_table %}
         </div>
@@ -16,7 +17,7 @@
     {% endif %}
     {% if children_table and children_table.rows %}
     <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">Child Regions ({{ children_table.rows|length }})</h3></div>
+        <div class="card-header"><h3 class="card-title">{% translate "Child Regions (" %}{{ children_table.rows|length }})</h3></div>
         <div class="table-responsive">
             {% render_table children_table %}
         </div>
