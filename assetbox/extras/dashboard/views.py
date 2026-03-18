@@ -58,10 +58,7 @@ class DashboardWidgetConfigView(LoginRequiredMixin, View):
         config = dashboard.layout[index]
         widget_id = config.get('widget')
         
-        # Get style with fallback to the old NoteWidget-specific style for backward compatibility
-        style_val = config.get('style')
-        if not style_val:
-            style_val = config.get('config', {}).get('style', 'default')
+        style_val = config.get('style', 'default')
 
         form = DashboardWidgetConfigForm(initial={
             'title': config.get('title', ''),

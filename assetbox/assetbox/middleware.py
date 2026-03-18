@@ -1,6 +1,5 @@
 import uuid
 import contextvars
-from django.utils.deprecation import MiddlewareMixin
 
 _current_user = contextvars.ContextVar('current_user', default=None)
 _request_id = contextvars.ContextVar('request_id', default=None)
@@ -11,12 +10,24 @@ def get_current_request_id():
 def get_current_user():
     return _current_user.get()
 
-class CurrentUserMiddleware(MiddlewareMixin):
+class CurrentUserMiddleware:
     """
     Middleware to store the current user and a unique request ID in context variables.
     This makes them easily accessible throughout the request lifecycle, especially
     for logging changes, and is fully thread-safe and async-safe.
     """
+    def __init__(self, get_response=None):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        self.process_request(request)
+        try:
+            response = self.get_response(request)
+        except Exception as e:
+            self.process_response(request, None)
+            raise e
+        return self.process_response(request, response)
+
     def process_request(self, request):
         user = request.user if hasattr(request, 'user') and request.user.is_authenticated else None
         _current_user.set(user)
@@ -27,12 +38,8 @@ class CurrentUserMiddleware(MiddlewareMixin):
         _request_id.set(None)
         return response
 
-    def process_exception(self, request, exception):
-        _current_user.set(None)
-        _request_id.set(None)
 
-
-class CSPMiddleware(MiddlewareMixin):
+class CSPMiddleware:
     """
     Adds Content-Security-Policy headers to all responses.
     
@@ -41,6 +48,13 @@ class CSPMiddleware(MiddlewareMixin):
     inline script is replaced with a CSP nonce-based approach, the
     'unsafe-inline' allowance can be removed from script-src.
     """
+    def __init__(self, get_response=None):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        return self.process_response(request, response)
+
     def process_response(self, request, response):
         response['Content-Security-Policy'] = (
             "default-src 'self'; "
@@ -57,11 +71,23 @@ class CSPMiddleware(MiddlewareMixin):
 
 from core.managers import set_current_tenant, set_current_membership
 
-class TenantMiddleware(MiddlewareMixin):
+class TenantMiddleware:
     """
     Middleware to resolve the active tenant from the session or switch_tenant query parameters,
     validate user's membership for that tenant, and bind the active tenant and membership context.
     """
+    def __init__(self, get_response=None):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        self.process_request(request)
+        try:
+            response = self.get_response(request)
+        except Exception as e:
+            self.process_response(request, None)
+            raise e
+        return self.process_response(request, response)
+
     def process_request(self, request):
         if not hasattr(request, 'user') or not request.user.is_authenticated:
             request.active_tenant = None
@@ -133,9 +159,3 @@ class TenantMiddleware(MiddlewareMixin):
         set_current_tenant(None)
         set_current_membership(None)
         return response
-
-    def process_exception(self, request, exception):
-        set_current_tenant(None)
-        set_current_membership(None)
-
-

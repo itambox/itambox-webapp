@@ -387,17 +387,7 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
         active = self.active_assignment
         return active.assigned_to if active else None
 
-    def checkout(self, target, checked_out_by, expected_checkin=None, notes=''):
-        raise NotImplementedError(
-            "checkout() on the Asset model is deprecated. "
-            "Please use assets.services.checkout_asset() instead."
-        )
 
-    def checkin(self, checked_in_by, notes=''):
-        raise NotImplementedError(
-            "checkin() on the Asset model is deprecated. "
-            "Please use assets.services.checkin_asset() instead."
-        )
 
     def __str__(self):
         return f"{self.name} ({self.asset_tag})"

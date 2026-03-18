@@ -103,35 +103,6 @@ class LicenseEncryptionTests(TestCase):
         form = response.context['form']
         self.assertEqual(form.fields['product_key'].initial, raw_key)
 
-    def test_plaintext_fallback_backwards_compatibility(self):
-        # 1. Manually insert a raw plaintext key into the database (bypassing model .save())
-        raw_key = "LEGACY-PLAINTEXT-KEY"
-        license_id = License.objects.create(
-            name="Legacy Office 2019",
-            software=self.software,
-            license_type=LicenseTypeChoices.PERPETUAL_SEAT,
-            seats=5
-        ).pk
-        
-        # Perform raw update to bypass the custom overridden .save() method
-        License.objects.filter(pk=license_id).update(product_key=raw_key)
-
-        # 2. Verify that retrieval returns the plaintext key perfectly via the property (backwards-compatibility)
-        db_record = License.objects.get(pk=license_id)
-        self.assertEqual(db_record.product_key, raw_key)
-        self.assertEqual(db_record.decrypted_product_key, raw_key)
-
-        # 3. Verify details view successfully displays the plaintext key without errors
-        detail_url = reverse('licenses:license_detail', kwargs={'pk': license_id})
-        response = self.client.get(detail_url)
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, raw_key)
-
-        # 4. Save the license again, and verify it automatically encrypts the plaintext key at rest!
-        db_record.save()
-        db_record.refresh_from_db()
-        self.assertTrue(db_record.product_key.startswith("enc$"))
-        self.assertEqual(db_record.decrypted_product_key, raw_key)
 
 
 class LicenseSeatAssignmentTests(TestCase):

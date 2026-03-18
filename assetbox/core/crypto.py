@@ -55,8 +55,7 @@ def encrypt_string(plain_text: str) -> str:
 def decrypt_string(cipher_text: str) -> str:
     """
     Decrypt a cipher string starting with the 'enc$' prefix sentinel.
-    If the string does not start with the prefix, it is treated as a plaintext
-    value for backwards-compatibility.
+    Raises ValueError if a non-encrypted string is passed.
     
     If decryption fails, returns the original cipher_text to avoid data loss.
     """
@@ -64,8 +63,7 @@ def decrypt_string(cipher_text: str) -> str:
         return ""
     
     if not cipher_text.startswith("enc$"):
-        # Backwards-compatibility fallback: treated as plaintext
-        return cipher_text
+        raise ValueError("Provided value is not encrypted (missing 'enc$' prefix).")
     
     fernet = get_fernet()
     try:

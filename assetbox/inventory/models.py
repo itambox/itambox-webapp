@@ -452,8 +452,4 @@ class KitItem(ChangeLoggingMixin, BaseModel):
         if len(filled) > 1:
             raise ValidationError("A kit item cannot select more than one target (must be either Asset Type OR Accessory OR License OR Consumable).")
 
-    def fulfill_for_holder(self, holder, source_location):
-        raise NotImplementedError(
-            "fulfill_for_holder() is deprecated. "
-            "Please use Kit.checkout_to_holder() instead."
-        )
+

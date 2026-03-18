@@ -695,9 +695,9 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
         total_monthly_spend = 0.0
         provider_costs = {}
         for sub in subs_qs:
-            if sub.cost is None:
+            if sub.renewal_cost is None:
                 continue
-            cost_val = float(sub.cost)
+            cost_val = float(sub.renewal_cost)
             
             # Amortize based on billing cycle to get monthly equivalent
             if sub.billing_cycle == 'monthly':
@@ -733,9 +733,9 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
             if 'billing_cycle' in active_cols:
                 row[_('Billing Cycle')] = sub.get_billing_cycle_display()
             if 'cost' in active_cols:
-                row[_('Cost')] = f"${sub.cost:,.2f}"
+                row[_('Cost')] = f"${sub.renewal_cost:,.2f}" if sub.renewal_cost is not None else '-'
             if 'end_date' in active_cols:
-                row[_('End Date')] = sub.end_date.strftime('%Y-%m-%d') if sub.end_date else '-'
+                row[_('End Date')] = sub.renewal_date.strftime('%Y-%m-%d') if sub.renewal_date else '-'
                 
             row['_group_by'] = sub.provider.name if (template.group_by_field == 'provider' and sub.provider) else 'General'
             rows.append(row)

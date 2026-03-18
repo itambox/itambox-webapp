@@ -782,20 +782,7 @@ class LabelTemplate(ChangeLoggingMixin, BaseModel):
 
 
 
-# DEPRECATED — replaced by StandardModel/VaultModel/DeletableVaultModel.
-# Kept temporarily for backward compatibility during Phase 1 transition.
-class AssetBoxModel(
-    JournalingMixin,
-    TaggableMixin,
-    ImageAttachmentMixin,
-    FileAttachmentMixin,
-    ExportableMixin,
-    CloneableMixin,
-    ChangeLoggingMixin,
-    BaseModel
-):
-    class Meta:
-        abstract = True
+
 
 
 class StandardModel(JournalingMixin, TaggableMixin, ExportableMixin,
