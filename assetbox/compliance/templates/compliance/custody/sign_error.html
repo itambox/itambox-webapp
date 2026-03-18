@@ -1,3 +1,4 @@
+{% load i18n %}
 {# templates/assets/custody/sign_error.html #}
 {% load static %}
 <!doctype html>
@@ -5,7 +6,7 @@
 <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-    <title>Link Validation Failure - AssetBox</title>
+    <title>{% translate "Link Validation Failure - AssetBox" %}</title>
     <link href="{% static 'dist/vendor/tabler/css/tabler.min.css' %}" rel="stylesheet"/>
     <style>
         body {
@@ -36,11 +37,11 @@
                 </svg>
             </span>
             
-            <h2 class="text-danger mb-2">Custody Signoff Failed</h2>
+            <h2 class="text-danger mb-2">{% translate "Custody Signoff Failed" %}</h2>
             <p class="text-muted">{{ error|default:"The EULA checkout link is invalid or has expired." }}</p>
 
             <div class="mt-4">
-                <p class="text-muted small">EULA custody links expire automatically after 7 days to preserve organizational security. Please contact your IT administrator to request a fresh transfer link.</p>
+                <p class="text-muted small">{% translate "EULA custody links expire automatically after 7 days to preserve organizational security. Please contact your IT administrator to request a fresh transfer link." %}</p>
             </div>
         </div>
     </div>

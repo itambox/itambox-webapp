@@ -1,3 +1,4 @@
+{% load i18n %}
 <div class="row g-3 mb-4">
     <div class="col-sm-6">
         <div class="card card-sm {% if object.status == 'installed' %}bg-success-lt{% elif object.status == 'in_stock' %}bg-yellow-lt{% else %}bg-danger-lt{% endif %} border-0 shadow-none">
@@ -15,7 +16,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium {% if object.status == 'installed' %}text-success{% elif object.status == 'in_stock' %}text-yellow{% else %}text-danger{% endif %} small uppercase font-sans">Status</div>
+                        <div class="font-weight-medium {% if object.status == 'installed' %}text-success{% elif object.status == 'in_stock' %}text-yellow{% else %}text-danger{% endif %} small uppercase font-sans">{% translate "Status" %}</div>
                         <div class="{% if object.status == 'installed' %}text-success{% elif object.status == 'in_stock' %}text-yellow{% else %}text-danger{% endif %} h2 mb-0 font-weight-bold" style="line-height: 1.2;">{{ object.get_status_display }}</div>
                     </div>
                 </div>
@@ -32,12 +33,12 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-blue small uppercase font-sans">Asset Assignment</div>
+                        <div class="font-weight-medium text-blue small uppercase font-sans">{% translate "Asset Assignment" %}</div>
                         <div class="text-blue h2 mb-0 font-weight-bold" style="line-height: 1.2;">
                             {% if object.parent_asset %}
                                 <a href="{{ object.parent_asset.get_absolute_url }}" class="text-blue text-decoration-none">{{ object.parent_asset.name }}</a>
                             {% else %}
-                                <i>Unassigned / In Stock</i>
+                                <i>{% translate "Unassigned / In Stock" %}</i>
                             {% endif %}
                         </div>
                     </div>

@@ -1,3 +1,4 @@
+{% load i18n %}
 <div class="row g-3 mb-4">
     <div class="col-sm-4">
         <div class="card card-sm bg-blue-lt border-0 shadow-none">
@@ -9,7 +10,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-blue small uppercase font-sans">Total Purchased</div>
+                        <div class="font-weight-medium text-blue small uppercase font-sans">{% translate "Total Purchased" %}</div>
                         <div class="text-blue h1 mb-0 font-weight-bold">{{ object.total_stock }}</div>
                     </div>
                 </div>
@@ -26,7 +27,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-purple small uppercase font-sans">Consumed</div>
+                        <div class="font-weight-medium text-purple small uppercase font-sans">{% translate "Consumed" %}</div>
                         <div class="text-purple h1 mb-0 font-weight-bold">{{ object.consumed_qty }}</div>
                     </div>
                 </div>
@@ -43,7 +44,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium {% if object.available <= 0 %}text-danger{% elif object.available < object.min_qty %}text-warning{% else %}text-success{% endif %} small uppercase font-sans">Remaining Stock</div>
+                        <div class="font-weight-medium {% if object.available <= 0 %}text-danger{% elif object.available < object.min_qty %}text-warning{% else %}text-success{% endif %} small uppercase font-sans">{% translate "Remaining Stock" %}</div>
                         <div class="{% if object.available <= 0 %}text-danger{% elif object.available < object.min_qty %}text-warning{% else %}text-success{% endif %} h1 mb-0 font-weight-bold">
                             {{ object.available }}
                         </div>

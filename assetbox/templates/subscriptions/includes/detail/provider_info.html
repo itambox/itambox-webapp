@@ -1,24 +1,25 @@
+{% load i18n %}
 <dl class="row mb-0">
     {% if object.is_active %}
-    <dt class="col-sm-3">Status:</dt>
-    <dd class="col-sm-9"><span class="badge bg-success">Active</span></dd>
+    <dt class="col-sm-3">{% translate "Status:" %}</dt>
+    <dd class="col-sm-9"><span class="badge bg-success">{% translate "Active" %}</span></dd>
     {% else %}
-    <dt class="col-sm-3">Status:</dt>
-    <dd class="col-sm-9"><span class="badge bg-secondary">Inactive</span></dd>
+    <dt class="col-sm-3">{% translate "Status:" %}</dt>
+    <dd class="col-sm-9"><span class="badge bg-secondary">{% translate "Inactive" %}</span></dd>
     {% endif %}
 
     {% if object.account_id %}
-    <dt class="col-sm-3">Account ID:</dt>
+    <dt class="col-sm-3">{% translate "Account ID:" %}</dt>
     <dd class="col-sm-9"><code>{{ object.account_id }}</code></dd>
     {% endif %}
 
     {% if object.website %}
-    <dt class="col-sm-3">Website:</dt>
+    <dt class="col-sm-3">{% translate "Website:" %}</dt>
     <dd class="col-sm-9"><a href="{{ object.website }}" target="_blank" rel="noopener">{{ object.website }}</a></dd>
     {% endif %}
 
     {% if object.portal_url %}
-    <dt class="col-sm-3">Admin Portal:</dt>
+    <dt class="col-sm-3">{% translate "Admin Portal:" %}</dt>
     <dd class="col-sm-9"><a href="{{ object.portal_url }}" target="_blank" rel="noopener">{{ object.portal_url }}</a></dd>
     {% endif %}
 </dl>
@@ -32,21 +33,21 @@
                 <path d="M15 7a2 2 0 0 1 2 2" />
                 <path d="M15 3a6 6 0 0 1 6 6" />
             </svg>
-            Contact Information
+            {% translate "Contact Information" %}
         </h3>
     </div>
     <div class="card-body">
         <dl class="row mb-0">
             {% if object.contact_email %}
-            <dt class="col-sm-4">Email:</dt>
+            <dt class="col-sm-4">{% translate "Email:" %}</dt>
             <dd class="col-sm-8"><a href="mailto:{{ object.contact_email }}">{{ object.contact_email }}</a></dd>
             {% endif %}
             {% if object.contact_phone %}
-            <dt class="col-sm-4">Phone:</dt>
+            <dt class="col-sm-4">{% translate "Phone:" %}</dt>
             <dd class="col-sm-8"><a href="tel:{{ object.contact_phone }}">{{ object.contact_phone }}</a></dd>
             {% endif %}
             {% if object.support_contact %}
-            <dt class="col-sm-4">Support:</dt>
+            <dt class="col-sm-4">{% translate "Support:" %}</dt>
             <dd class="col-sm-8"><small class="text-muted">{{ object.support_contact|linebreaksbr }}</small></dd>
             {% endif %}
         </dl>

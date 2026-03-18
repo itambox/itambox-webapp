@@ -1,3 +1,4 @@
+{% load i18n %}
 <div class="row g-3 mb-4">
     <div class="col-sm-6">
         <div class="card card-sm bg-blue-lt border-0 shadow-none">
@@ -14,7 +15,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-blue small uppercase font-sans">Maintenance Cost</div>
+                        <div class="font-weight-medium text-blue small uppercase font-sans">{% translate "Maintenance Cost" %}</div>
                         <div class="text-blue h1 mb-0 font-weight-bold">
                             {% if object.cost %}
                                 ${{ object.cost|floatformat:2 }}
@@ -50,16 +51,16 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium {% if object.completion_date %}text-success{% else %}text-warning{% endif %} small uppercase font-sans">Downtime Duration</div>
+                        <div class="font-weight-medium {% if object.completion_date %}text-success{% else %}text-warning{% endif %} small uppercase font-sans">{% translate "Downtime Duration" %}</div>
                         <div class="{% if object.completion_date %}text-success{% else %}text-warning{% endif %} h1 mb-0 font-weight-bold">
                             {% if object.completion_date %}
                                 {% if object.downtime_days == 0 %}
-                                    Same Day Service
+                                    {% translate "Same Day Service" %}
                                 {% else %}
-                                    {{ object.downtime_days }} Day{{ object.downtime_days|pluralize }}
+                                    {{ object.downtime_days }} {% translate "Day" %}{{ object.downtime_days|pluralize }}
                                 {% endif %}
                             {% else %}
-                                In Progress (Out of Service)
+                                {% translate "In Progress (Out of Service)" %}
                             {% endif %}
                         </div>
                     </div>

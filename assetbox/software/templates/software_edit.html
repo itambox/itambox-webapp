@@ -1,12 +1,13 @@
 {% extends 'generic/object_edit.html' %}
+{% load i18n %}
 
-{% block title %}{% if object.pk %}Edit {{ object }}{% else %}Add Software{% endif %}{% endblock %}
+{% block title %}{% if object.pk %}{% translate "Edit" %} {{ object }}{% else %}{% translate "Add Software" %}{% endif %}{% endblock %}
 
 {% block form %}
     {# Define the form fields here; crispy in base template will render them #}
     <div class="card">
         <h5 class="card-header">
-            Software Details
+            {% translate "Software Details" %}
         </h5>
         <div class="card-body">
             {{ form.name|as_crispy_field }}
@@ -16,7 +17,7 @@
     </div>
     <div class="card">
         <h5 class="card-header">
-            Tags
+            {% translate "Tags" %}
         </h5>
         <div class="card-body">
             {{ form.tags|as_crispy_field }}

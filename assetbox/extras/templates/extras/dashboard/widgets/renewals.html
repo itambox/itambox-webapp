@@ -18,7 +18,7 @@
     {% endfor %}
 </div>
 <div class="text-muted small mt-2">
-    Active subscription spend: <strong>{{ total_subscription_spend|floatformat:0 }}</strong>
+    {% translate "Active subscription spend:" %} <strong>{{ total_subscription_spend|floatformat:0 }}</strong>
 </div>
 {% else %}
 <div class="text-muted text-center py-4">{% blocktrans %}No upcoming renewals within {{ days_horizon }} days.{% endblocktrans %}</div>

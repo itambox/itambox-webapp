@@ -1,22 +1,23 @@
+{% load i18n %}
 {% load render_table from django_tables2 %}
 
 <dl class="row mb-0">
-    <dt class="col-sm-3">Name:</dt>
+    <dt class="col-sm-3">{% translate "Name:" %}</dt>
     <dd class="col-sm-9">{{ object.name }}</dd>
 
-    <dt class="col-sm-3">Slug:</dt>
+    <dt class="col-sm-3">{% translate "Slug:" %}</dt>
     <dd class="col-sm-9">{{ object.slug }}</dd>
 
-    <dt class="col-sm-3">Color:</dt>
+    <dt class="col-sm-3">{% translate "Color:" %}</dt>
     <dd class="col-sm-9">
         {% if object.color %}
             <span class="badge">&nbsp;</span>
             #{{ object.color }}
         {% else %}
-            <i>Not Set</i>
+            <i>{% translate "Not Set" %}</i>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Description:</dt>
+    <dt class="col-sm-3">{% translate "Description:" %}</dt>
     <dd class="col-sm-9">{{ object.description|linebreaksbr|default:"<i>Not Set</i>"|safe }}</dd>
 </dl>

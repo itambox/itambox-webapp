@@ -1,3 +1,4 @@
+{% load i18n %}
 <div class="row g-3 mb-4">
     <div class="col-sm-6">
         <div class="card card-sm bg-purple-lt border-0 shadow-none">
@@ -9,7 +10,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-purple small uppercase font-sans">Physical Parts</div>
+                        <div class="font-weight-medium text-purple small uppercase font-sans">{% translate "Physical Parts" %}</div>
                         <div class="text-purple h1 mb-0 font-weight-bold">{{ instances_table.rows|length }}</div>
                     </div>
                 </div>
@@ -26,7 +27,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-blue small uppercase font-sans">Category</div>
+                        <div class="font-weight-medium text-blue small uppercase font-sans">{% translate "Category" %}</div>
                         <div class="text-blue h2 mb-0 font-weight-bold" style="line-height: 1.2;">{{ object.get_category_display }}</div>
                     </div>
                 </div>

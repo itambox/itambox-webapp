@@ -1,12 +1,13 @@
 ﻿{% extends 'generic/object_detail.html' %}
+{% load i18n %}
 {% load static %}
 
-{% block title %}Kit: {{ object.name }} - AssetBox{% endblock %}
+{% block title %}{% translate "Kit:" %} {{ object.name }} {% translate "- AssetBox" %}{% endblock %}
 
 {% block page_header %}
-    <div class="page-pretitle">Assets / Kits</div>
+    <div class="page-pretitle">{% translate "Assets / Kits" %}</div>
     <h2 class="page-title">
-        Kit: {{ object.name }}
+        {% translate "Kit:" %} {{ object.name }}
     </h2>
     <div class="text-muted mt-1">{{ object.description }}</div>
 {% endblock %}
@@ -20,41 +21,41 @@
                 hx-swap="innerHTML"
                 >
             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-circle-check" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M9 12l2 2l4 -4" /></svg>
-            Deploy / Checkout Kit
+            {% translate "Deploy / Checkout Kit" %}
         </button>
     {% else %}
-        <button type="button" class="btn btn-secondary" disabled title="Some items are out of stock">
+        <button type="button" class="btn btn-secondary" disabled title="{% translate 'Some items are out of stock' %}">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-alert-circle" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
-            Kit Unavailable (Out of Stock)
+            {% translate "Kit Unavailable (Out of Stock)" %}
         </button>
     {% endif %}
     <a href="{% url 'inventory:kititem_create' %}?kit={{ object.pk }}" class="btn btn-outline-primary ms-2">
         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
-        Add Item
+        {% translate "Add Item" %}
     </a>
     <a href="{% url 'inventory:kit_update' pk=object.pk %}" class="btn btn-outline-secondary ms-2">
-        Edit Kit
+        {% translate "Edit Kit" %}
     </a>
     <a href="{% url 'inventory:kit_delete' pk=object.pk %}" class="btn btn-outline-danger ms-2">
-        Delete
+        {% translate "Delete" %}
     </a>
 {% endblock page_actions %}
 
 {% block full_width_content %}
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">Kit Components</h3>
+        <h3 class="card-title">{% translate "Kit Components" %}</h3>
     </div>
     <div class="table-responsive">
         <table class="table table-vcenter card-table table-striped">
             <thead>
                 <tr>
-                    <th>Item Type</th>
-                    <th>Target Model / Catalog Item</th>
-                    <th>Quantity Required</th>
-                    <th>In-Stock / Available</th>
-                    <th>Status</th>
-                    <th class="w-1">Actions</th>
+                    <th>{% translate "Item Type" %}</th>
+                    <th>{% translate "Target Model / Catalog Item" %}</th>
+                    <th>{% translate "Quantity Required" %}</th>
+                    <th>{% translate "In-Stock / Available" %}</th>
+                    <th>{% translate "Status" %}</th>
+                    <th class="w-1">{% translate "Actions" %}</th>
                 </tr>
             </thead>
             <tbody>
@@ -62,11 +63,11 @@
                     <tr>
                         <td>
                             {% if item_info.item.asset_type %}
-                                <span class="badge bg-blue-lt">Hardware Asset</span>
+                                <span class="badge bg-blue-lt">{% translate "Hardware Asset" %}</span>
                             {% elif item_info.item.accessory %}
-                                <span class="badge bg-green-lt">Accessory</span>
+                                <span class="badge bg-green-lt">{% translate "Accessory" %}</span>
                             {% elif item_info.item.license %}
-                                <span class="badge bg-purple-lt">License</span>
+                                <span class="badge bg-purple-lt">{% translate "License" %}</span>
                             {% endif %}
                         </td>
                         <td>
@@ -86,22 +87,22 @@
                         </td>
                         <td>
                             {% if item_info.is_available %}
-                                <span class="badge bg-success-lt">Available</span>
+                                <span class="badge bg-success-lt">{% translate "Available" %}</span>
                             {% else %}
-                                <span class="badge bg-danger-lt">Unavailable</span>
+                                <span class="badge bg-danger-lt">{% translate "Unavailable" %}</span>
                             {% endif %}
                         </td>
                         <td>
                             <div class="btn-group">
-                                <a href="{% url 'inventory:kititem_update' pk=item_info.item.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
-                                <a href="{% url 'inventory:kititem_delete' pk=item_info.item.pk %}" class="btn btn-sm btn-outline-danger">Remove</a>
+                                <a href="{% url 'inventory:kititem_update' pk=item_info.item.pk %}" class="btn btn-sm btn-outline-secondary">{% translate "Edit" %}</a>
+                                <a href="{% url 'inventory:kititem_delete' pk=item_info.item.pk %}" class="btn btn-sm btn-outline-danger">{% translate "Remove" %}</a>
                             </div>
                         </td>
                     </tr>
                 {% empty %}
                     <tr>
                         <td colspan="6" class="text-center text-muted py-4">
-                            No components added to this kit yet. Click "Add Item" above to construct the bundle.
+                            {% translate 'No components added to this kit yet. Click "Add Item" above to construct the bundle.' %}
                         </td>
                     </tr>
                 {% endfor %}

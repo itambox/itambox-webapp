@@ -1,3 +1,4 @@
+{% load i18n %}
 {% load utility_tags %}
 
 <div class="row g-3 mb-4">
@@ -11,7 +12,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium text-blue small uppercase font-sans">Total Purchased Seats</div>
+                        <div class="font-weight-medium text-blue small uppercase font-sans">{% translate "Total Purchased Seats" %}</div>
                         <div class="text-blue h1 mb-0 font-weight-bold">{{ object.seats }}</div>
                     </div>
                 </div>
@@ -29,7 +30,7 @@
                             </span>
                         </div>
                         <div class="col">
-                            <div class="font-weight-medium text-green small uppercase font-sans">Available Seats</div>
+                            <div class="font-weight-medium text-green small uppercase font-sans">{% translate "Available Seats" %}</div>
                             <div class="text-green h1 mb-0 font-weight-bold">{{ object.available_seats }}</div>
                         </div>
                     </div>
@@ -45,8 +46,8 @@
                             </span>
                         </div>
                         <div class="col">
-                            <div class="font-weight-medium text-red small uppercase font-sans">Available Seats</div>
-                            <div class="text-red h1 mb-0 font-weight-bold">0 (Fully Allocated)</div>
+                            <div class="font-weight-medium text-red small uppercase font-sans">{% translate "Available Seats" %}</div>
+                            <div class="text-red h1 mb-0 font-weight-bold">{% translate "0 (Fully Allocated)" %}</div>
                         </div>
                     </div>
                 </div>

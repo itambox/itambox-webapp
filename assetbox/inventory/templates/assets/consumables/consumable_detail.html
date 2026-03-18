@@ -1,12 +1,13 @@
 ﻿{% extends 'generic/object_detail.html' %}
+{% load i18n %}
 {% load render_table from django_tables2 %}
 {% load static %}
 
 {# --- Page Title and Header --- #}
-{% block title %}{{ object }} - Consumable Details - AssetBox{% endblock %}
+{% block title %}{{ object }} {% translate "- Consumable Details - AssetBox" %}{% endblock %}
 
 {% block page_header %}
-    <div class="page-pretitle">Assets / Consumables</div>
+    <div class="page-pretitle">{% translate "Assets / Consumables" %}</div>
     <h2 class="page-title">
         {{ object }}
     </h2>
@@ -21,7 +22,7 @@
                 hx-swap="innerHTML"
                 >
             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-minus" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l14 0" /></svg>
-            Consume Item...
+            {% translate "Consume Item..." %}
         </button>
     {% endif %}
 {% endblock extra_page_actions %}
@@ -31,7 +32,7 @@
     <li class="nav-item" role="presentation">
         <a href="#consumption-log" class="nav-link" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-purple" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 7m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /><path d="M16 11l2 2l4 -4" /></svg>
-            Consumption Log <span class="badge bg-purple-lt ms-2">{{ consumptions_table.rows|length }}</span>
+            {% translate "Consumption Log" %} <span class="badge bg-purple-lt ms-2">{{ consumptions_table.rows|length }}</span>
         </a>
     </li>
 {% endblock extra_tabs %}
@@ -44,7 +45,7 @@
     <div class="tab-pane fade" id="consumption-log" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">Consumption & Debit History Log</h3>
+                <h3 class="card-title">{% translate "Consumption & Debit History Log" %}</h3>
             </div>
             {% if consumptions_table.rows %}
                 <div class="table-responsive">
@@ -57,7 +58,7 @@
                         <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
                         <path d="M12 3l1.2 1.78a8 8 0 1 1 -2.4 0l1.2 -1.78z" />
                     </svg>
-                    <p class="mb-0">No permanent stock consumption debits recorded yet for this item.</p>
+                    <p class="mb-0">{% translate "No permanent stock consumption debits recorded yet for this item." %}</p>
                 </div>
             {% endif %}
         </div>

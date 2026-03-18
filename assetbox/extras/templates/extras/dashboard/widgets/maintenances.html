@@ -1,5 +1,5 @@
 {% load i18n %}
-<div class="text-muted small mb-2">Ongoing Repairs (Downtime): <span class="h4 text-orange ms-1">{{ active_maintenance_count }}</span></div>
+<div class="text-muted small mb-2">{% translate "Ongoing Repairs (Downtime):" %} <span class="h4 text-orange ms-1">{{ active_maintenance_count }}</span></div>
 {% if active_maintenances %}
 <div class="list-group list-group-flush" style="font-size: 0.85rem;">
     {% for maint in active_maintenances %}
@@ -10,12 +10,12 @@
         </div>
         <div class="d-flex justify-content-between text-muted small">
             <span>{{ maint.get_maintenance_type_display }} ({{ maint.supplier|default:"Internal" }})</span>
-            <span>Started: {{ maint.start_date|date:"Y-m-d" }}</span>
+            <span>{% translate "Started:" %} {{ maint.start_date|date:"Y-m-d" }}</span>
         </div>
     </div>
     {% endfor %}
 </div>
 {% else %}
-<div class="text-muted text-center py-4">No active maintenance tasks recorded.</div>
+<div class="text-muted text-center py-4">{% translate "No active maintenance tasks recorded." %}</div>
 {% endif %}
 

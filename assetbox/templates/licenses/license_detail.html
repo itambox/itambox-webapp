@@ -1,20 +1,21 @@
 {% extends 'generic/object_detail.html' %}
+{% load i18n %}
 {% load static %}
 {% load utility_tags %}
 {% load render_table from django_tables2 %}
 
 {# --- Page Title --- #}
-{% block title %}{{ object.name }} - Licenses - AssetBox{% endblock %}
+{% block title %}{{ object.name }} {% translate "- Licenses - AssetBox" %}{% endblock %}
 
 {# --- Page Header --- #}
-{% block page_pretitle %}Licenses / License Entitlements{% endblock %}
+{% block page_pretitle %}{% translate "Licenses / License Entitlements" %}{% endblock %}
 
 {# --- Tabs Hook --- #}
 {% block extra_tabs %}
     <li class="nav-item" role="presentation">
         <a href="#seats" class="nav-link" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-purple" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M6 18a6 6 0 0 1 12 0" /></svg>
-            Seat Assignments <span class="badge bg-purple-lt ms-2">{{ assignments_table.rows|length }}</span>
+            {% translate "Seat Assignments" %} <span class="badge bg-purple-lt ms-2">{{ assignments_table.rows|length }}</span>
         </a>
     </li>
 {% endblock extra_tabs %}
@@ -27,7 +28,7 @@
     <div class="tab-pane fade" id="seats" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">Active License Seat Allocations</h3>
+                <h3 class="card-title">{% translate "Active License Seat Allocations" %}</h3>
             </div>
             {% if assignments_table.rows %}
                 <div class="table-responsive">
@@ -37,7 +38,7 @@
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-users-minus text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4c.348 0 .686 .045 1 .13" /><path d="M16 19h6" /></svg>
-                    <p class="mb-0">No active seats assigned for this license entitlement.</p>
+                    <p class="mb-0">{% translate "No active seats assigned for this license entitlement." %}</p>
                 </div>
             {% endif %}
         </div>

@@ -1,13 +1,14 @@
 {% extends 'generic/object_detail.html' %}
+{% load i18n %}
 {% load static %}
 
 {# --- Page Title and Header --- #}
-{% block title %}Maintenance on {{ object.asset.name }} - Details - AssetBox{% endblock %}
+{% block title %}{% translate "Maintenance on" %} {{ object.asset.name }} {% translate "- Details - AssetBox" %}{% endblock %}
 
 {% block page_header %}
-    <div class="page-pretitle">Assets / Maintenances</div>
+    <div class="page-pretitle">{% translate "Assets / Maintenances" %}</div>
     <h2 class="page-title">
-        Maintenance Details: {{ object.get_maintenance_type_display }}
+        {% translate "Maintenance Details:" %} {{ object.get_maintenance_type_display }}
     </h2>
 {% endblock %}
 

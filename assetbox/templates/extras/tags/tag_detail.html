@@ -1,4 +1,5 @@
 {% extends 'generic/object_detail.html' %}
+{% load i18n %}
 {% load static %}
 {% load render_table from django_tables2 %}
 
@@ -14,7 +15,7 @@
     {# Render Assets table if it exists #}
     {% if assets_table %}
     <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">Assets with this Tag ({{ assets_table.rows|length }})</h3></div>
+        <div class="card-header"><h3 class="card-title">{% translate "Assets with this Tag (" %}{{ assets_table.rows|length }})</h3></div>
         <div class="table-responsive">
             {% render_table assets_table %}
         </div>

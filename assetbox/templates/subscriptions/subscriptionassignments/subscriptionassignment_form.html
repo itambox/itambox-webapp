@@ -1,14 +1,15 @@
 {% extends base_template|default:"layout.html" %}
+{% load i18n %}
 {% load crispy_forms_tags %}
 
-{% block title %}Assign Subscription to {{ target_obj }} - AssetBox{% endblock %}
+{% block title %}{% translate "Assign Subscription to" %} {{ target_obj }} {% translate "- AssetBox" %}{% endblock %}
 
 {% block page_header %}
     <div class="page-pretitle">
-        Subscriptions / Assignments
+        {% translate "Subscriptions / Assignments" %}
     </div>
     <h2 class="page-title">
-        Assign Subscription to {{ target_obj }}
+        {% translate "Assign Subscription to" %} {{ target_obj }}
     </h2>
 {% endblock %}
 

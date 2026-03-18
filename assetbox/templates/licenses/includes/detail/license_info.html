@@ -1,64 +1,65 @@
+{% load i18n %}
 {% load utility_tags %}
 
 <dl class="row mb-0">
-    <dt class="col-sm-3">Name:</dt>
+    <dt class="col-sm-3">{% translate "Name:" %}</dt>
     <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
 
-    <dt class="col-sm-3">Software Catalog:</dt>
+    <dt class="col-sm-3">{% translate "Software Catalog:" %}</dt>
     <dd class="col-sm-9">
          {% if object.software %}
             <a href="{% url 'software:software_detail' pk=object.software.pk %}">
                 <span class="badge bg-purple-lt">{{ object.software }}</span>
             </a>
          {% else %}
-             <span class="text-muted"><i>None</i></span>
+             <span class="text-muted"><i>{% translate "None" %}</i></span>
          {% endif %}
     </dd>
 
-    <dt class="col-sm-3">License Type:</dt>
+    <dt class="col-sm-3">{% translate "License Type:" %}</dt>
     <dd class="col-sm-9">
         <span class="badge bg-blue-lt text-uppercase">{{ object.get_license_type_display }}</span>
     </dd>
 
-    <dt class="col-sm-3">Assigned Tenant:</dt>
+    <dt class="col-sm-3">{% translate "Assigned Tenant:" %}</dt>
     <dd class="col-sm-9">
         {% if object.tenant %}
             <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}"><strong>{{ object.tenant.name }}</strong></a>
         {% else %}
-            <span class="text-muted"><i>Global (No Tenant)</i></span>
+            <span class="text-muted"><i>{% translate "Global (No Tenant)" %}</i></span>
         {% endif %}
     </dd>
     
-    <dt class="col-sm-3">Supplier / Vendor:</dt>
+    <dt class="col-sm-3">{% translate "Supplier / Vendor:" %}</dt>
     <dd class="col-sm-9">
         {% if object.supplier %}
             <a href="{% url 'assets:supplier_detail' pk=object.supplier.pk %}"><strong>{{ object.supplier.name }}</strong></a>
         {% else %}
-            <span class="text-muted"><i>Not Set</i></span>
+            <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Purchase Date:</dt>
+    <dt class="col-sm-3">{% translate "Purchase Date:" %}</dt>
     <dd class="col-sm-9 text-secondary">{{ object.purchase_date|date:"Y-m-d"|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
 
-    <dt class="col-sm-3">Purchase Cost:</dt>
+    <dt class="col-sm-3">{% translate "Purchase Cost:" %}</dt>
     <dd class="col-sm-9 text-secondary">
         {% if object.purchase_cost %}
             ${{ object.purchase_cost }}
         {% else %}
-            <span class="text-muted"><i>Not Set</i></span>
+            <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">Order Number:</dt>
+    <dt class="col-sm-3">{% translate "Order Number:" %}</dt>
     <dd class="col-sm-9 text-secondary"><code>{{ object.order_number|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</code></dd>
 
-    <dt class="col-sm-3">Expiration Date:</dt>
+    <dt class="col-sm-3">{% translate "Expiration Date:" %}</dt>
     <dd class="col-sm-9 text-secondary">
         {% if object.expiration_date %}
             {{ object.expiration_date|date:"Y-m-d" }}
         {% else %}
-            <span class="text-muted"><i>Non-expiring / Perpetual</i></span>
+            <span class="text-muted"><i>{% translate "Non-expiring / Perpetual" %}</i></span>
         {% endif %}
     </dd>
 </dl>

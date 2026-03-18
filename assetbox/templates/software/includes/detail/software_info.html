@@ -1,17 +1,18 @@
+{% load i18n %}
 {% load utility_tags %}
 
 <dl class="row mb-0">
-    <dt class="col-sm-3">Name:</dt>
+    <dt class="col-sm-3">{% translate "Name:" %}</dt>
     <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
 
-    <dt class="col-sm-3">Manufacturer:</dt>
+    <dt class="col-sm-3">{% translate "Manufacturer:" %}</dt>
     <dd class="col-sm-9">
          {% if object.manufacturer %}
             <a href="{% url 'assets:manufacturer_detail' pk=object.manufacturer.pk %}">
                 <span class="badge bg-blue-lt">{{ object.manufacturer }}</span>
             </a>
          {% else %}
-             <span class="text-muted"><i>None</i></span>
+             <span class="text-muted"><i>{% translate "None" %}</i></span>
          {% endif %}
     </dd>
 </dl>

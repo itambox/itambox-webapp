@@ -1,3 +1,4 @@
+{% load i18n %}
 {# templates/assets/custody/sign_portal.html #}
 {% load static %}
 <!doctype html>
@@ -5,7 +6,7 @@
 <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-    <title>Custody Signoff & EULA Acceptance - AssetBox</title>
+    <title>{% translate "Custody Signoff & EULA Acceptance - AssetBox" %}</title>
     <link href="{% static 'dist/vendor/tabler/css/tabler.min.css' %}" rel="stylesheet"/>
     <style>
         body {
@@ -42,8 +43,8 @@
     <div class="card sign-card">
         <div class="card-header bg-primary text-white py-3">
             <div>
-                <h3 class="card-title text-white mb-1">Equipment Transfer & Custody Agreement</h3>
-                <p class="card-subtitle text-white-50 mb-0">EULA Acceptance Portal</p>
+                <h3 class="card-title text-white mb-1">{% translate "Equipment Transfer & Custody Agreement" %}</h3>
+                <p class="card-subtitle text-white-50 mb-0">{% translate "EULA Acceptance Portal" %}</p>
             </div>
         </div>
         <div class="card-body">
@@ -59,7 +60,7 @@
             {% endif %}
 
             <div class="mb-4">
-                <label class="form-label text-muted">Asset Assigned for Custody</label>
+                <label class="form-label text-muted">{% translate "Asset Assigned for Custody" %}</label>
                 <div class="bg-light p-3 rounded d-flex justify-content-between align-items-center">
                     <div>
                         <h4 class="mb-1 text-dark">{{ asset.name }}</h4>
@@ -70,7 +71,7 @@
             </div>
 
             <div class="mb-4">
-                <label class="form-label text-muted">Custodian / Asset Holder</label>
+                <label class="form-label text-muted">{% translate "Custodian / Asset Holder" %}</label>
                 <div class="bg-light p-3 rounded">
                     <h4 class="mb-1 text-dark">{{ holder.first_name }} {{ holder.last_name }}</h4>
                     <span class="text-muted small">{{ holder.upn }} | {{ holder.email|default:"No Email" }}</span>
@@ -78,12 +79,12 @@
             </div>
 
             <div class="mb-4">
-                <label class="form-label text-muted">Custody Terms & Conditions (EULA)</label>
+                <label class="form-label text-muted">{% translate "Custody Terms & Conditions (EULA)" %}</label>
                 <div class="border p-3 rounded bg-white text-muted" style="height: 120px; overflow-y: auto; font-size: 8.5pt; line-height: 1.4;">
-                    <p><strong>1. Custody & Care:</strong> The Custodian agrees to maintain and operate the assigned equipment in a safe, secure, and responsible manner, in compliance with organizational policies.</p>
-                    <p><strong>2. Return Policy:</strong> The equipment remains the sole property of the organization and must be returned in good condition upon request, termination of service, or transfer of role.</p>
-                    <p><strong>3. Reporting Incidents:</strong> Any physical damage, technical failure, loss, or theft of the assigned equipment must be reported to the IT department within 24 hours of occurrence.</p>
-                    <p><strong>4. Modification Prohibited:</strong> No physical modifications, hardware upgrades, or unapproved firmware changes may be made to the equipment without written authorization.</p>
+                    <p><strong>{% translate "1. Custody & Care:" %}</strong> {% translate "The Custodian agrees to maintain and operate the assigned equipment in a safe, secure, and responsible manner, in compliance with organizational policies." %}</p>
+                    <p><strong>{% translate "2. Return Policy:" %}</strong> {% translate "The equipment remains the sole property of the organization and must be returned in good condition upon request, termination of service, or transfer of role." %}</p>
+                    <p><strong>{% translate "3. Reporting Incidents:" %}</strong> {% translate "Any physical damage, technical failure, loss, or theft of the assigned equipment must be reported to the IT department within 24 hours of occurrence." %}</p>
+                    <p><strong>{% translate "4. Modification Prohibited:" %}</strong> {% translate "No physical modifications, hardware upgrades, or unapproved firmware changes may be made to the equipment without written authorization." %}</p>
                 </div>
             </div>
 
@@ -93,9 +94,9 @@
                 
                 <div class="mb-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <label class="form-label mb-0">Draw Signature Below</label>
+                        <label class="form-label mb-0">{% translate "Draw Signature Below" %}</label>
                         <button type="button" class="btn btn-sm btn-link link-secondary text-decoration-none" id="clear-canvas-btn">
-                            Clear Pad
+                            {% translate "Clear Pad" %}
                         </button>
                     </div>
                     <div class="signature-container">
@@ -105,10 +106,10 @@
 
                 <div class="d-flex justify-content-between gap-2 mt-4">
                     <button type="submit" name="action" value="decline" class="btn btn-outline-danger px-4" id="decline-btn">
-                        Decline
+                        {% translate "Decline" %}
                     </button>
                     <button type="submit" name="action" value="accept" class="btn btn-primary px-4" id="submit-sign-btn">
-                        I Agree & Accept Custody
+                        {% translate "I Agree & Accept Custody" %}
                     </button>
                 </div>
             </form>

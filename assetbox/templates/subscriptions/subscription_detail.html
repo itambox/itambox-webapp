@@ -1,10 +1,11 @@
 {% extends 'generic/object_detail.html' %}
+{% load i18n %}
 {% load static %}
 {% load render_table from django_tables2 %}
 
-{% block title %}{{ object.name }} — Subscription — AssetBox{% endblock %}
+{% block title %}{{ object.name }} {% translate "— Subscription — AssetBox" %}{% endblock %}
 
-{% block page_pretitle %}Subscription Details{% endblock %}
+{% block page_pretitle %}{% translate "Subscription Details" %}{% endblock %}
 
 {# Object details rendered via panel layout #}
 
@@ -17,33 +18,33 @@
                 <path d="M14.8 9A2 2 0 0 0 13 8h-2a2 2 0 0 0 0 4h2a2 2 0 0 1 0 4h-2a2 2 0 0 1 -1.8 -1" />
                 <path d="M12 6v2m0 8v2" />
             </svg>
-            Financial Details
+            {% translate "Financial Details" %}
         </h3>
     </div>
     <div class="card-body">
         <dl class="row mb-0">
-            <dt class="col-5">Renewal Cost:</dt>
+            <dt class="col-5">{% translate "Renewal Cost:" %}</dt>
             <dd class="col-7">
                 {% if object.renewal_cost %}
                     <strong>{{ object.renewal_cost|floatformat:2 }} {{ object.currency }}</strong>
                 {% else %}—{% endif %}
             </dd>
 
-            <dt class="col-5">Billing Cycle:</dt>
+            <dt class="col-5">{% translate "Billing Cycle:" %}</dt>
             <dd class="col-7 text-secondary">{{ object.get_billing_cycle_display|default:"—" }}</dd>
 
             {% if object.annual_cost %}
-            <dt class="col-5">Est. Annual:</dt>
+            <dt class="col-5">{% translate "Est. Annual:" %}</dt>
             <dd class="col-7"><strong>{{ object.annual_cost|floatformat:2 }} {{ object.currency }}</strong></dd>
             {% endif %}
 
             {% if object.licensed_quantity %}
-            <dt class="col-5">Licensed Qty:</dt>
+            <dt class="col-5">{% translate "Licensed Qty:" %}</dt>
             <dd class="col-7{% if object.licensed_quantity < 10 %} text-warning{% endif %}"><strong>{{ object.licensed_quantity }}</strong></dd>
             {% endif %}
 
             {% if object.licensed_quantity and assignment_count %}
-            <dt class="col-5">Assigned:</dt>
+            <dt class="col-5">{% translate "Assigned:" %}</dt>
             <dd class="col-7">
                 <span class="badge bg-primary">{{ assignment_count }}</span>
             </dd>
@@ -59,7 +60,7 @@
         <path d="M11 13l9 -9" />
         <path d="M15 4h5v5" />
     </svg>
-    Open Provider Portal
+    {% translate "Open Provider Portal" %}
 </a>
 {% endif %}
 {% endblock extra_cards_right %}
@@ -74,7 +75,7 @@
                 <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
                 <path d="M16 11l2 2l4 -4" />
             </svg>
-            Assignments
+            {% translate "Assignments" %}
         </h3>
         <span class="badge bg-indigo-lt">{{ assignment_count }}</span>
     </div>
@@ -89,7 +90,7 @@
             <path d="M10 14a3.5 3.5 0 0 1 -5 -4l4 -4a3.5 3.5 0 0 1 5 4m-4 4l-4 4a3.5 3.5 0 0 0 5 4l4 -4" />
             <path d="M16 16l3 3" />
         </svg>
-        <p class="mb-0">No assets, holders, or locations are currently assigned to this subscription.</p>
+        <p class="mb-0">{% translate "No assets, holders, or locations are currently assigned to this subscription." %}</p>
     </div>
     {% endif %}
 </div>
