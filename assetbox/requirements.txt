@@ -17,7 +17,7 @@ psycopg2-binary>=2.9,<3.0
 segno>=1.6,<2.0
 python-barcode>=0.15,<1.0
 markdown>=3.10,<3.11
-mkdocs>=1.6,<2.0
+mkdocs>=1.6.1,<2.0
 mkdocs-material>=9.5
 croniter>=6.0,<7.0
 
