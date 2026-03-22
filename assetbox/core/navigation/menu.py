@@ -127,7 +127,7 @@ INVENTORY_MENU = Menu(
             ),
         ),
         MenuGroup(
-            label=_('Peripherals & Accessories'),
+            label=_('Accessory Inventory'),
             items=(
                 get_model_item('inventory', 'accessory', _('Accessories')),
                 MenuItem(
@@ -150,6 +150,17 @@ INVENTORY_MENU = Menu(
                         ),
                     ),
                 ),
+                MenuItem(
+                    link='inventory:accessoryassignment_list',
+                    link_text=_('Accessory Assignments'),
+                    permissions=['inventory.view_accessoryassignment'],
+                    buttons=(),
+                ),
+            ),
+        ),
+        MenuGroup(
+            label=_('Consumable Inventory'),
+            items=(
                 get_model_item('inventory', 'consumable', _('Consumables')),
                 MenuItem(
                     link='inventory:consumablestock_list',
@@ -170,6 +181,12 @@ INVENTORY_MENU = Menu(
                             color='outline text-success',
                         ),
                     ),
+                ),
+                MenuItem(
+                    link='inventory:consumableassignment_list',
+                    link_text=_('Consumable Consumptions'),
+                    permissions=['inventory.view_consumableassignment'],
+                    buttons=(),
                 ),
             ),
         ),

@@ -129,6 +129,17 @@ class CoreRefactoringTestCase(TestCase):
         self.assertIn(b'hx-swap-oob="true"', response.content)
         self.assertIn(b'id="page-title-block"', response.content)
         self.assertIn(b'id="breadcrumbs-block"', response.content)
+        
+        # 3. HTMX History Restore GET request
+        history_headers = {
+            'HTTP_HX_Request': 'true',
+            'HTTP_HX_History_Restore_Request': 'true',
+        }
+        response = self.client.get(url, **history_headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context.get('base_template'), 'base_htmx.html')
+        self.assertIn(b'<form', response.content)
+        self.assertIn(b'hx-swap-oob="true"', response.content)
 
     def test_change_logging_create_on_save(self):
         request = self.factory.get('/')

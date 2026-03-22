@@ -24,6 +24,7 @@ class BaseHTMXView:
 
             target = getattr(request.htmx, 'target', '') or ''
             is_boosted_main_swap = getattr(request.htmx, 'boosted', False) or \
+                                   getattr(request.htmx, 'history_restore_request', False) or \
                                    target in ('page-content-wrapper', '#page-content-wrapper', 'page-body-main', '#page-body-main')
 
             if is_boosted_main_swap:
