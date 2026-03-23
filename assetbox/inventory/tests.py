@@ -1137,5 +1137,87 @@ class InventoryTenantScopingTests(TestCase):
         self.assertIn(self.kit_global, kits)
 
 
+class InventorySymmetryAndHTMXTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testadmin', password='testpassword', is_staff=True, is_superuser=True
+        )
+        self.client.login(username='testadmin', password='testpassword')
+        self.manufacturer = Manufacturer.objects.create(name='SymmetryLogitech', slug='symmetrylogitech')
+        self.site = Site.objects.create(name='OfficeSymmetry', slug='officesymmetry')
+        self.location = Location.objects.create(name='DeskSymmetry', slug='desksymmetry', site=self.site)
+        self.cat_mouse = _create_category('MouseSymmetry', accessory=True)
+        self.cat_toner = _create_category('TonerSymmetry', consumable=True)
+        
+        self.accessory = Accessory.objects.create(
+            name='MX Master 3S Symmetry', manufacturer=self.manufacturer, category=self.cat_mouse
+        )
+        self.acc_stock = AccessoryStock.objects.create(accessory=self.accessory, location=self.location, qty=10)
+        
+        self.consumable = Consumable.objects.create(
+            name='LaserJet Toner Cartridge Symmetry', manufacturer=self.manufacturer, category=self.cat_toner
+        )
+        self.con_stock = ConsumableStock.objects.create(consumable=self.consumable, location=self.location, qty=5)
+        
+        self.holder = AssetHolder.objects.create(first_name='AliceSym', last_name='SmithSym', upn='alicesym.smithsym')
+        
+        # Create assignments (this automatically deducts stock via model saves!)
+        self.acc_assignment = AccessoryAssignment.objects.create(
+            accessory=self.accessory, assigned_holder=self.holder, from_location=self.location, qty=2
+        )
+        self.con_assignment = ConsumableAssignment.objects.create(
+            consumable=self.consumable, assigned_holder=self.holder, from_location=self.location, qty=1
+        )
+
+    def test_global_accessory_assignment_list_view(self):
+        url = reverse('inventory:accessoryassignment_list')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'MX Master 3S Symmetry')
+
+    def test_global_consumable_consumption_list_view(self):
+        url = reverse('inventory:consumableassignment_list')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'LaserJet Toner Cartridge Symmetry')
+
+    def test_accessory_stock_adjust_increment(self):
+        # Initial 10 - 2 assigned = 8 remaining in database
+        url = reverse('inventory:accessorystock_adjust', kwargs={'pk': self.acc_stock.pk}) + '?action=increment'
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 200)
+        self.acc_stock.refresh_from_db()
+        self.assertEqual(self.acc_stock.qty, 9)
+        self.assertContains(response, '9')
+
+    def test_accessory_stock_adjust_decrement(self):
+        # Initial 10 - 2 assigned = 8 remaining in database
+        url = reverse('inventory:accessorystock_adjust', kwargs={'pk': self.acc_stock.pk}) + '?action=decrement'
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 200)
+        self.acc_stock.refresh_from_db()
+        self.assertEqual(self.acc_stock.qty, 7)
+        self.assertContains(response, '7')
+
+    def test_consumable_stock_adjust_increment(self):
+        # Initial 5 - 1 assigned = 4 remaining in database
+        url = reverse('inventory:consumablestock_adjust', kwargs={'pk': self.con_stock.pk}) + '?action=increment'
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 200)
+        self.con_stock.refresh_from_db()
+        self.assertEqual(self.con_stock.qty, 5)
+        self.assertContains(response, '5')
+
+    def test_consumable_stock_adjust_decrement(self):
+        # Initial 5 - 1 assigned = 4 remaining in database
+        url = reverse('inventory:consumablestock_adjust', kwargs={'pk': self.con_stock.pk}) + '?action=decrement'
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 200)
+        self.con_stock.refresh_from_db()
+        self.assertEqual(self.con_stock.qty, 3)
+        self.assertContains(response, '3')
+
+
+
 
 

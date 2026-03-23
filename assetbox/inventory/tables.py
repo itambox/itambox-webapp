@@ -46,6 +46,24 @@ class AccessoryStockTable(BaseTable):
         fields = ('pk', 'accessory', 'location', 'qty', 'actions')
         default_columns = ('pk', 'accessory', 'location', 'qty', 'actions')
 
+    def render_qty(self, value, record):
+        return format_html(
+            '<div class="d-flex align-items-center justify-content-start">'
+            '  <button class="btn btn-sm btn-icon btn-outline-secondary me-2 px-1 py-0 lh-1" '
+            '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
+            '    <i class="mdi mdi-minus" style="font-size: 0.75rem;"></i>'
+            '  </button>'
+            '  <span class="badge bg-blue-lt text-blue font-weight-bold px-2 py-1" style="font-size: 0.85rem;">{}</span>'
+            '  <button class="btn btn-sm btn-icon btn-outline-secondary ms-2 px-1 py-0 lh-1" '
+            '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
+            '    <i class="mdi mdi-plus" style="font-size: 0.75rem;"></i>'
+            '  </button>'
+            '</div>',
+            reverse('inventory:accessorystock_adjust', kwargs={'pk': record.pk}) + '?action=decrement',
+            value,
+            reverse('inventory:accessorystock_adjust', kwargs={'pk': record.pk}) + '?action=increment'
+        )
+
 
 class AccessoryAssignmentTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
@@ -110,6 +128,24 @@ class ConsumableStockTable(BaseTable):
         model = ConsumableStock
         fields = ('pk', 'consumable', 'location', 'qty', 'actions')
         default_columns = ('pk', 'consumable', 'location', 'qty', 'actions')
+
+    def render_qty(self, value, record):
+        return format_html(
+            '<div class="d-flex align-items-center justify-content-start">'
+            '  <button class="btn btn-sm btn-icon btn-outline-secondary me-2 px-1 py-0 lh-1" '
+            '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
+            '    <i class="mdi mdi-minus" style="font-size: 0.75rem;"></i>'
+            '  </button>'
+            '  <span class="badge bg-blue-lt text-blue font-weight-bold px-2 py-1" style="font-size: 0.85rem;">{}</span>'
+            '  <button class="btn btn-sm btn-icon btn-outline-secondary ms-2 px-1 py-0 lh-1" '
+            '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
+            '    <i class="mdi mdi-plus" style="font-size: 0.75rem;"></i>'
+            '  </button>'
+            '</div>',
+            reverse('inventory:consumablestock_adjust', kwargs={'pk': record.pk}) + '?action=decrement',
+            value,
+            reverse('inventory:consumablestock_adjust', kwargs={'pk': record.pk}) + '?action=increment'
+        )
 
 
 class ConsumableAssignmentTable(BaseTable):

@@ -9,6 +9,7 @@ urlpatterns = [
     path('accessories/add/', views.AccessoryEditView.as_view(), name='accessory_create'),
     path('accessories/edit/', views.AccessoryBulkEditView.as_view(), name='accessory_bulk_edit'),
     path('accessories/delete/', views.AccessoryBulkDeleteView.as_view(), name='accessory_bulk_delete'),
+    path('accessories/assignments/', views.AccessoryAssignmentListView.as_view(), name='accessoryassignment_list'),
     path('accessories/<int:pk>/', views.AccessoryDetailView.as_view(), name='accessory_detail'),
     path('accessories/<int:pk>/edit/', views.AccessoryEditView.as_view(), name='accessory_update'),
     path('accessories/<int:pk>/delete/', views.AccessoryDeleteView.as_view(), name='accessory_delete'),
@@ -20,12 +21,14 @@ urlpatterns = [
     path('accessory-stocks/add/', views.AccessoryStockEditView.as_view(), name='accessorystock_create'),
     path('accessory-stocks/<int:pk>/edit/', views.AccessoryStockEditView.as_view(), name='accessorystock_update'),
     path('accessory-stocks/<int:pk>/delete/', views.AccessoryStockDeleteView.as_view(), name='accessorystock_delete'),
+    path('accessory-stocks/<int:pk>/adjust/', views.AccessoryStockAdjustView.as_view(), name='accessorystock_adjust'),
 
     # Consumables
     path('consumables/', views.ConsumableListView.as_view(), name='consumable_list'),
     path('consumables/add/', views.ConsumableEditView.as_view(), name='consumable_create'),
     path('consumables/edit/', views.ConsumableBulkEditView.as_view(), name='consumable_bulk_edit'),
     path('consumables/delete/', views.ConsumableBulkDeleteView.as_view(), name='consumable_bulk_delete'),
+    path('consumables/consumptions/', views.ConsumableAssignmentListView.as_view(), name='consumableassignment_list'),
     path('consumables/<int:pk>/', views.ConsumableDetailView.as_view(), name='consumable_detail'),
     path('consumables/<int:pk>/edit/', views.ConsumableEditView.as_view(), name='consumable_update'),
     path('consumables/<int:pk>/delete/', views.ConsumableDeleteView.as_view(), name='consumable_delete'),
@@ -36,6 +39,7 @@ urlpatterns = [
     path('consumable-stocks/add/', views.ConsumableStockEditView.as_view(), name='consumablestock_create'),
     path('consumable-stocks/<int:pk>/edit/', views.ConsumableStockEditView.as_view(), name='consumablestock_update'),
     path('consumable-stocks/<int:pk>/delete/', views.ConsumableStockDeleteView.as_view(), name='consumablestock_delete'),
+    path('consumable-stocks/<int:pk>/adjust/', views.ConsumableStockAdjustView.as_view(), name='consumablestock_adjust'),
 
     # Kits
     path('kits/', views.KitListView.as_view(), name='kit_list'),

@@ -263,6 +263,12 @@ class BaseCheckoutForm(forms.Form):
         label="Notes"
     )
 
+    def __init__(self, *args, **kwargs):
+        tenant = kwargs.pop('tenant', None)
+        super().__init__(*args, **kwargs)
+        if tenant:
+            self.fields['assigned_holder'].queryset = AssetHolder.objects.filter(tenant=tenant).order_by('last_name', 'first_name')
+
     def clean(self):
         cleaned_data = super().clean()
         holder = cleaned_data.get('assigned_holder')
@@ -286,7 +292,9 @@ class KitCheckoutForm(BaseCheckoutForm):
     )
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        self.kit = kwargs.pop('kit', None)
+        tenant = self.kit.tenant if self.kit else None
+        super().__init__(*args, tenant=tenant, **kwargs)
         self.helper = FormHelper()
         self.helper.form_tag = False
         self.helper.layout = Layout(
@@ -366,7 +374,8 @@ class AccessoryCheckoutForm(BaseCheckoutForm):
 
     def __init__(self, *args, **kwargs):
         self.accessory = kwargs.pop('accessory', None)
-        super().__init__(*args, **kwargs)
+        tenant = self.accessory.tenant if self.accessory else None
+        super().__init__(*args, tenant=tenant, **kwargs)
         self.helper = FormHelper()
         self.helper.form_tag = False
         self.helper.layout = Layout(
@@ -406,7 +415,8 @@ class ConsumableCheckoutForm(BaseCheckoutForm):
 
     def __init__(self, *args, **kwargs):
         self.consumable = kwargs.pop('consumable', None)
-        super().__init__(*args, **kwargs)
+        tenant = self.consumable.tenant if self.consumable else None
+        super().__init__(*args, tenant=tenant, **kwargs)
         self.helper = FormHelper()
         self.helper.form_tag = False
         self.helper.layout = Layout(
@@ -430,7 +440,7 @@ class ConsumableCheckoutForm(BaseCheckoutForm):
         return cleaned_data
 
 
-from .filters import AccessoryFilterSet, ConsumableFilterSet, KitFilterSet, AccessoryStockFilterSet, ConsumableStockFilterSet
+from .filters import AccessoryFilterSet, ConsumableFilterSet, KitFilterSet, AccessoryStockFilterSet, ConsumableStockFilterSet, AccessoryAssignmentFilterSet, ConsumableAssignmentFilterSet
 
 class AccessoryFilterForm(FilterForm):
     filterset_class = AccessoryFilterSet
@@ -446,5 +456,12 @@ class AccessoryStockFilterForm(FilterForm):
 
 class ConsumableStockFilterForm(FilterForm):
     filterset_class = ConsumableStockFilterSet
+
+class AccessoryAssignmentFilterForm(FilterForm):
+    filterset_class = AccessoryAssignmentFilterSet
+
+class ConsumableAssignmentFilterForm(FilterForm):
+    filterset_class = ConsumableAssignmentFilterSet
+
 
 

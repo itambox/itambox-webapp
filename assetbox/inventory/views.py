@@ -25,7 +25,7 @@ from assetbox.panels import Panel
 from assets.forms.import_forms import AccessoryBulkImportForm, ConsumableBulkImportForm
 
 # Inventory models, forms, tables, filters
-from .models import Accessory, Consumable, Kit, KitItem, AccessoryStock, ConsumableStock, AccessoryAssignment
+from .models import Accessory, Consumable, Kit, KitItem, AccessoryStock, ConsumableStock, AccessoryAssignment, ConsumableAssignment
 from . import forms, tables, filters
 from assets.models import Asset
 from assets.services import checkout_kit
@@ -322,6 +322,7 @@ class KitCheckoutView(GenericTransactionView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         del kwargs['instance']
+        kwargs['kit'] = self.get_object()
         return kwargs
 
 
@@ -450,3 +451,93 @@ class ConsumableStockDeleteView(ObjectDeleteView):
     model = ConsumableStock
     template_name = 'generic/object_confirm_delete.html'
     success_url = reverse_lazy('inventory:consumable_list')
+
+
+class AccessoryAssignmentListView(ObjectListView):
+    queryset = AccessoryAssignment.objects.select_related(
+        'accessory', 'assigned_holder', 'assigned_location', 'assigned_asset'
+    ).all()
+    table = tables.AccessoryAssignmentTable
+    action_buttons = ()
+    filterset = filters.AccessoryAssignmentFilterSet
+    filterset_form = forms.AccessoryAssignmentFilterForm
+
+
+class ConsumableAssignmentListView(ObjectListView):
+    queryset = ConsumableAssignment.objects.select_related(
+        'consumable', 'assigned_holder', 'assigned_location', 'assigned_asset'
+    ).all()
+    table = tables.ConsumableAssignmentTable
+    action_buttons = ()
+    filterset = filters.ConsumableAssignmentFilterSet
+    filterset_form = forms.ConsumableAssignmentFilterForm
+
+
+class AccessoryStockAdjustView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        from django.http import HttpResponse
+        from django.utils.html import format_html
+        
+        stock = get_object_or_404(AccessoryStock, pk=pk)
+        action = request.GET.get('action')
+        
+        if action == 'increment':
+            stock.qty += 1
+            stock.save()
+        elif action == 'decrement':
+            if stock.qty > 0:
+                stock.qty -= 1
+                stock.save()
+                
+        return HttpResponse(format_html(
+            '<div class="d-flex align-items-center justify-content-start">'
+            '  <button class="btn btn-sm btn-icon btn-outline-secondary me-2 px-1 py-0 lh-1" '
+            '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
+            '    <i class="mdi mdi-minus" style="font-size: 0.75rem;"></i>'
+            '  </button>'
+            '  <span class="badge bg-blue-lt text-blue font-weight-bold px-2 py-1" style="font-size: 0.85rem;">{}</span>'
+            '  <button class="btn btn-sm btn-icon btn-outline-secondary ms-2 px-1 py-0 lh-1" '
+            '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
+            '    <i class="mdi mdi-plus" style="font-size: 0.75rem;"></i>'
+            '  </button>'
+            '</div>',
+            reverse('inventory:accessorystock_adjust', kwargs={'pk': stock.pk}) + '?action=decrement',
+            stock.qty,
+            reverse('inventory:accessorystock_adjust', kwargs={'pk': stock.pk}) + '?action=increment'
+        ))
+
+
+class ConsumableStockAdjustView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        from django.http import HttpResponse
+        from django.utils.html import format_html
+        
+        stock = get_object_or_404(ConsumableStock, pk=pk)
+        action = request.GET.get('action')
+        
+        if action == 'increment':
+            stock.qty += 1
+            stock.save()
+        elif action == 'decrement':
+            if stock.qty > 0:
+                stock.qty -= 1
+                stock.save()
+                
+        return HttpResponse(format_html(
+            '<div class="d-flex align-items-center justify-content-start">'
+            '  <button class="btn btn-sm btn-icon btn-outline-secondary me-2 px-1 py-0 lh-1" '
+            '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
+            '    <i class="mdi mdi-minus" style="font-size: 0.75rem;"></i>'
+            '  </button>'
+            '  <span class="badge bg-blue-lt text-blue font-weight-bold px-2 py-1" style="font-size: 0.85rem;">{}</span>'
+            '  <button class="btn btn-sm btn-icon btn-outline-secondary ms-2 px-1 py-0 lh-1" '
+            '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
+            '    <i class="mdi mdi-plus" style="font-size: 0.75rem;"></i>'
+            '  </button>'
+            '</div>',
+            reverse('inventory:consumablestock_adjust', kwargs={'pk': stock.pk}) + '?action=decrement',
+            stock.qty,
+            reverse('inventory:consumablestock_adjust', kwargs={'pk': stock.pk}) + '?action=increment'
+        ))
+
+
