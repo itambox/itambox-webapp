@@ -400,3 +400,36 @@ class ComponentTenantScopingTests(TestCase):
         self.assertIn(self.comp_a, components)
         self.assertIn(comp_c, components)
         self.assertNotIn(self.comp_b, components)
+
+
+class ComponentStockAdjustViewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testadmin', password='testpassword', is_staff=True, is_superuser=True
+        )
+        self.client.login(username='testadmin', password='testpassword')
+        self.manufacturer = Manufacturer.objects.create(name='SamsungSym', slug='samsungsym')
+        self.category = Category.objects.create(name='StorageSym', slug='storagesym', applies_to={'component': True})
+        self.component = Component.objects.create(
+            name='990 Pro 2TB Sym', manufacturer=self.manufacturer, category=self.category
+        )
+        self.site = Site.objects.create(name='OfficeSym', slug='officesym')
+        self.location = Location.objects.create(name='DeskSym', slug='desksym', site=self.site)
+        self.stock = ComponentStock.objects.create(component=self.component, location=self.location, qty=10)
+
+    def test_component_stock_adjust_increment(self):
+        url = reverse('components:componentstock_adjust', kwargs={'pk': self.stock.pk}) + '?action=increment'
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 200)
+        self.stock.refresh_from_db()
+        self.assertEqual(self.stock.qty, 11)
+        self.assertContains(response, '11')
+
+    def test_component_stock_adjust_decrement(self):
+        url = reverse('components:componentstock_adjust', kwargs={'pk': self.stock.pk}) + '?action=decrement'
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 200)
+        self.stock.refresh_from_db()
+        self.assertEqual(self.stock.qty, 9)
+        self.assertContains(response, '9')
+

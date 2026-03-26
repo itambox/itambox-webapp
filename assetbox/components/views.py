@@ -1,4 +1,6 @@
 from django.urls import reverse_lazy
+from django.views import View
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django_tables2 import RequestConfig
 from assetbox.utils import get_paginate_count
 from assetbox.panels import Panel
@@ -119,3 +121,40 @@ class ComponentAllocationDeleteView(ObjectDeleteView):
     model = ComponentAllocation
     template_name = 'generic/object_confirm_delete.html'
     success_url = reverse_lazy('components:componentallocation_list')
+
+
+class ComponentStockAdjustView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        from django.shortcuts import get_object_or_404
+        from django.http import HttpResponse
+        from django.utils.html import format_html
+        from django.urls import reverse
+        
+        stock = get_object_or_404(ComponentStock, pk=pk)
+        action = request.GET.get('action')
+        
+        if action == 'increment':
+            stock.qty += 1
+            stock.save()
+        elif action == 'decrement':
+            if stock.qty > 0:
+                stock.qty -= 1
+                stock.save()
+                
+        return HttpResponse(format_html(
+            '<div class="d-flex align-items-center justify-content-start">'
+            '  <button class="btn btn-sm btn-icon btn-outline-secondary me-2 px-1 py-0 lh-1" '
+            '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
+            '    <i class="mdi mdi-minus" style="font-size: 0.75rem;"></i>'
+            '  </button>'
+            '  <span class="badge bg-blue-lt text-blue font-weight-bold px-2 py-1" style="font-size: 0.85rem;">{}</span>'
+            '  <button class="btn btn-sm btn-icon btn-outline-secondary ms-2 px-1 py-0 lh-1" '
+            '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
+            '    <i class="mdi mdi-plus" style="font-size: 0.75rem;"></i>'
+            '  </button>'
+            '</div>',
+            reverse('components:componentstock_adjust', kwargs={'pk': stock.pk}) + '?action=decrement',
+            stock.qty,
+            reverse('components:componentstock_adjust', kwargs={'pk': stock.pk}) + '?action=increment'
+        ))
+

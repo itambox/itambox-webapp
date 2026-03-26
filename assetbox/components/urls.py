@@ -17,6 +17,7 @@ urlpatterns = [
     path('stocks/add/', views.ComponentStockEditView.as_view(), name='componentstock_create'),
     path('stocks/<int:pk>/edit/', views.ComponentStockEditView.as_view(), name='componentstock_update'),
     path('stocks/<int:pk>/delete/', views.ComponentStockDeleteView.as_view(), name='componentstock_delete'),
+    path('stocks/<int:pk>/adjust/', views.ComponentStockAdjustView.as_view(), name='componentstock_adjust'),
 
     # Component Allocations
     path('allocations/', views.ComponentAllocationListView.as_view(), name='componentallocation_list'),
