@@ -13,7 +13,7 @@
             {% for n in page_lengths %}
             <li>
                 <a href="#"
-                   hx-get="{% update_querystring request per_page=n page=1 %}"
+                   hx-get="{{ request.path }}{% update_querystring request per_page=n page=1 %}"
                    hx-target="#object-list-dynamic-content"
                    hx-swap="innerHTML"
                    hx-push-url="true"
@@ -37,7 +37,7 @@
             {% for count, label in choices %}
             <li>
                 <a href="#"
-                   hx-get="{% update_querystring request per_page=count page=1 %}"
+                   hx-get="{{ request.path }}{% update_querystring request per_page=count page=1 %}"
                    hx-target="#object-list-dynamic-content"
                    hx-swap="innerHTML"
                    hx-push-url="true"

@@ -19,7 +19,6 @@
 </div>
 
 {# --- Main Content Swap (Targets #page-content-wrapper) --- #}
-<div id="page-content-wrapper">
     <!-- Top Navbar -->
     {% include "global_includes/_topbar.html" %}
 
@@ -81,7 +80,6 @@
     {# --- Scripts (must be inside #page-content-wrapper so HTMX processes them during swaps) --- #}
     {% block javascript %}{% endblock %}
     {% block extra_scripts %}{% endblock %}
-</div>
 
 {# --- Out-of-band target for page scripts that need to persist --- #}
 {% block javascript_oob %}{% endblock %}

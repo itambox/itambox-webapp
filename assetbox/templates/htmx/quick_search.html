@@ -4,15 +4,15 @@
       hx-target="{{ hx_target|default:'#object-list-dynamic-content' }}"
       hx-swap="innerHTML"
       hx-push-url="true">
-    <div class="input-group input-group-flat">
-        <input type="search" name="q" class="form-control" placeholder="{% translate 'Search...' %}"
+    <div class="input-group input-group-flat input-group-sm">
+        <input type="search" name="q" class="form-control form-control-sm" placeholder="{% translate 'Search...' %}"
                value="{{ request.GET.q|default:'' }}"
                hx-trigger="keyup changed delay:500ms, search">
         <span class="input-group-text">
             <a href="#" class="link-secondary {% if not request.GET.q %}d-none{% endif %}"
                title="{% translate 'Clear search' %}" data-bs-toggle="tooltip"
                onclick="this.closest('form').querySelector('input[name=q]').value=''; this.closest('form').dispatchEvent(new Event('submit', { bubbles: true })); return false;">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-x" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-x" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
             </a>
         </span>
     </div>

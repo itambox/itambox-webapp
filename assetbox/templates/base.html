@@ -68,6 +68,11 @@
     {# --- Premium Physical Scanning Audio Engine --- #}
     <script>
         (function() {
+            // Global HTMX CSRF Token Integration
+            document.addEventListener('htmx:configRequest', function(event) {
+                event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+            });
+
             function playBeep(frequency, duration, type) {
                 try {
                     var AudioCtx = window.AudioContext || window.webkitAudioContext;

@@ -13,7 +13,7 @@
             {% if page_obj.has_previous %}
             <li class="page-item">
                 <a href="#"
-                   hx-get="{% update_querystring request page=page_obj.previous_page_number %}"
+                   hx-get="{{ request.path }}{% update_querystring request page=page_obj.previous_page_number %}"
                    class="page-link" aria-label="{% trans "Previous page" %}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-left" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 6l-6 6l6 6" /></svg>
                 </a>
@@ -24,7 +24,7 @@
             <li class="page-item{% if page_obj.number == p %} active{% endif %}"{% if page_obj.number == p %} aria-current="page"{% endif %}>
                 {% if p %}
                 <a href="#"
-                   hx-get="{% update_querystring request page=p %}"
+                   hx-get="{{ request.path }}{% update_querystring request page=p %}"
                    class="page-link" aria-label="{% blocktrans with num=p %}Page {{ num }}{% endblocktrans %}">
                     {{ p }}
                 </a>
@@ -37,7 +37,7 @@
             {% if page_obj.has_next %}
             <li class="page-item">
                 <a href="#"
-                   hx-get="{% update_querystring request page=page_obj.next_page_number %}"
+                   hx-get="{{ request.path }}{% update_querystring request page=page_obj.next_page_number %}"
                    class="page-link" aria-label="{% trans "Next page" %}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-right" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 6l6 6l-6 6" /></svg>
                 </a>
