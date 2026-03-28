@@ -75,6 +75,8 @@ class AssetCheckOutForm(forms.Form):
         super().__init__(*args, **kwargs)
         if asset:
             self.fields['asset_target'].queryset = Asset.objects.exclude(pk=asset.pk).exclude(status__type='undeployable').order_by('name')
+            if asset.tenant:
+                self.fields['asset_holder'].queryset = AssetHolder.objects.filter(tenant=asset.tenant).order_by('last_name', 'first_name')
         self.helper = FormHelper()
         self.helper.form_tag = False
         self.helper.layout = Layout(

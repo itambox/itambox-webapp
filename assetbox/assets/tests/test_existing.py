@@ -1027,3 +1027,66 @@ class EnterpriseITAMTestCase(TestCase):
         self.assertContains(response, "Decision &amp; Response Details")
         self.assertContains(response, "Need a development machine.")
         self.assertContains(response, "Pending")
+
+    def test_tenant_scoped_checkout_holders(self):
+        from organization.models import Tenant, AssetHolder
+        from assets.forms import AssetCheckOutForm
+        from inventory.forms import AccessoryCheckoutForm, ConsumableCheckoutForm, KitCheckoutForm
+
+        # Create two tenants
+        tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
+        tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
+
+        # Create asset holders for each tenant
+        holder_a = AssetHolder.objects.create(first_name="Alice", last_name="A", upn="alice.a@example.com", tenant=tenant_a)
+        holder_b = AssetHolder.objects.create(first_name="Bob", last_name="B", upn="bob.b@example.com", tenant=tenant_b)
+
+        # 1. Test Asset checkout form filtering
+        asset_a = Asset.objects.create(
+            name="Laptop A",
+            asset_tag="TAG-A",
+            status=self.available_status,
+            tenant=tenant_a
+        )
+        form = AssetCheckOutForm(asset=asset_a)
+        holders_qs = form.fields['asset_holder'].queryset
+        self.assertIn(holder_a, holders_qs)
+        self.assertNotIn(holder_b, holders_qs)
+
+        # 2. Test Accessory checkout form filtering
+        from inventory.models import Accessory
+        acc = Accessory.objects.create(
+            manufacturer=self.manufacturer,
+            name="Accessory A",
+            slug="acc-a",
+            tenant=tenant_b
+        )
+        form_acc = AccessoryCheckoutForm(accessory=acc)
+        holders_qs_acc = form_acc.fields['assigned_holder'].queryset
+        self.assertIn(holder_b, holders_qs_acc)
+        self.assertNotIn(holder_a, holders_qs_acc)
+
+        # 3. Test Consumable checkout form filtering
+        from inventory.models import Consumable
+        con = Consumable.objects.create(
+            manufacturer=self.manufacturer,
+            name="Consumable A",
+            slug="con-a",
+            tenant=tenant_a
+        )
+        form_con = ConsumableCheckoutForm(consumable=con)
+        holders_qs_con = form_con.fields['assigned_holder'].queryset
+        self.assertIn(holder_a, holders_qs_con)
+        self.assertNotIn(holder_b, holders_qs_con)
+
+        # 4. Test Kit checkout form filtering
+        from inventory.models import Kit
+        kit = Kit.objects.create(
+            name="Kit A",
+            tenant=tenant_b
+        )
+        form_kit = KitCheckoutForm(kit=kit)
+        holders_qs_kit = form_kit.fields['assigned_holder'].queryset
+        self.assertIn(holder_b, holders_qs_kit)
+        self.assertNotIn(holder_a, holders_qs_kit)
+
