@@ -389,6 +389,101 @@ class CoreRefactoringTestCase(TestCase):
         if 'ASSETBOX_FIELD_ENCRYPTION_KEYS' in os.environ:
             del os.environ['ASSETBOX_FIELD_ENCRYPTION_KEYS']
 
+    def test_objectchange_resolved_data(self):
+        """Test that the ObjectChange detail view successfully resolves primary keys to string representations."""
+        from core.models import ObjectChange
+        from assets.models import Manufacturer, AssetRole, AssetType, Asset
+        
+        self.client.force_login(self.user)
+        
+        request = self.factory.get('/')
+        request.user = self.user
+        middleware = CurrentUserMiddleware(get_response=lambda r: None)
+        middleware.process_request(request)
+        
+        mfr = Manufacturer.objects.create(name="Microsoft unique-test-change", slug="microsoft-unique-test-change")
+        role = AssetRole.objects.create(name="Laptop unique-test-change", slug="laptop-unique-test-change")
+        asset_type = AssetType.objects.create(manufacturer=mfr, model="Surface Book unique-test-change", slug="surface-book-unique-test-change")
+        
+        asset = Asset.objects.create(
+            name="Alice Surface",
+            asset_tag="SRF-001",
+            asset_type=asset_type,
+            asset_role=role
+        )
+        
+        middleware.process_response(request, None)
+        
+        change = ObjectChange.objects.filter(changed_object_id=asset.pk).latest('time')
+        
+        response = self.client.get(reverse('objectchange', args=[change.pk]))
+        self.assertEqual(response.status_code, 200)
+        
+        self.assertContains(response, "Microsoft unique-test-change")
+        self.assertContains(response, "Laptop unique-test-change")
+        self.assertContains(response, "Surface Book unique-test-change")
+
+    def test_objectchange_filtering(self):
+        """Test that the ObjectChange list view can be searched and filtered by action, name, etc."""
+        from core.models import ObjectChange
+        from assets.models import Manufacturer
+        
+        self.client.force_login(self.user)
+        
+        request = self.factory.get('/')
+        request.user = self.user
+        middleware = CurrentUserMiddleware(get_response=lambda r: None)
+        middleware.process_request(request)
+        
+        mfr1 = Manufacturer.objects.create(name="Intel unique-filter-1", slug="intel-unique-filter-1")
+        mfr2 = Manufacturer.objects.create(name="AMD unique-filter-2", slug="amd-unique-filter-2")
+        
+        middleware.process_response(request, None)
+        
+        # Verify base view renders without error
+        response = self.client.get(reverse('objectchange_list'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Intel unique-filter-1")
+        self.assertContains(response, "AMD unique-filter-2")
+        
+        # Verify search query filtering (q) for mfr1
+        response = self.client.get(reverse('objectchange_list') + "?q=Intel")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Intel unique-filter-1")
+        self.assertNotContains(response, "AMD unique-filter-2")
+        
+        # Verify search query filtering (q) for mfr2
+        response = self.client.get(reverse('objectchange_list') + "?q=AMD")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "AMD unique-filter-2")
+        self.assertNotContains(response, "Intel unique-filter-1")
+        
+        # Verify action filtering
+        response = self.client.get(reverse('objectchange_list') + "?action=create")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Intel unique-filter-1")
+        
+        # Verify filtering with multiple actions (both matching)
+        response = self.client.get(reverse('objectchange_list') + "?action=create&action=update")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Intel unique-filter-1")
+        self.assertContains(response, "AMD unique-filter-2")
+        
+        # Verify filtering with a non-matching action list
+        response = self.client.get(reverse('objectchange_list') + "?action=update&action=delete")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Intel unique-filter-1")
+        self.assertNotContains(response, "AMD unique-filter-2")
+        
+        # Verify filtering with multiple content types
+        from django.contrib.contenttypes.models import ContentType
+        ct_mfr = ContentType.objects.get_for_model(Manufacturer)
+        response = self.client.get(reverse('objectchange_list') + f"?changed_object_type={ct_mfr.pk}")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Intel unique-filter-1")
+
+
+
 
 class RotateEncryptionKeysCommandTest(TestCase):
     def test_rotate_encryption_keys_command(self):

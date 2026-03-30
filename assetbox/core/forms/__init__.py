@@ -717,5 +717,11 @@ class PermissionGroupForm(BootstrapMixin, forms.ModelForm):
         return instance
 
 
+class ObjectChangeFilterForm(FilterForm):
+    from core.filters import ObjectChangeFilterSet
+    filterset_class = ObjectChangeFilterSet
+
+
+
 
 

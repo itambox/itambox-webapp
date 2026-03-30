@@ -25,8 +25,10 @@ from core.tables import (
     EventRuleTable, LabelTemplateTable
 )
 from core.forms import (
-    JournalEntryForm, WebhookEndpointForm, EventRuleForm, LabelTemplateForm, PermissionGroupForm
+    JournalEntryForm, WebhookEndpointForm, EventRuleForm, LabelTemplateForm, PermissionGroupForm,
+    ObjectChangeFilterForm
 )
+from core.filters import ObjectChangeFilterSet
 from assetbox.registry import registry
 from assetbox.panels import Panel
 
@@ -40,6 +42,8 @@ class ObjectChangeListView(ObjectListView):
     queryset = ObjectChange.objects.prefetch_related(
         'user', 'changed_object_type', 'related_object_type'
     )
+    filterset = ObjectChangeFilterSet
+    filterset_form = ObjectChangeFilterForm
     table = ObjectChangeTable
     template_name = 'core/objectchange/objectchange_list.html'
     action_buttons = ()
@@ -56,6 +60,65 @@ class ObjectChangeListView(ObjectListView):
         return context
 
 
+def resolve_serialized_data(model_class, data):
+    if not model_class or not data:
+        return data
+
+    resolved_data = {}
+    for k, v in data.items():
+        if v is None:
+            resolved_data[k] = v
+            continue
+
+        try:
+            field = model_class._meta.get_field(k)
+        except Exception:
+            resolved_data[k] = v
+            continue
+
+        if field.is_relation and field.related_model:
+            related_model = field.related_model
+            if isinstance(v, list):
+                resolved_list = []
+                for item_id in v:
+                    try:
+                        related_obj = related_model.objects.get(pk=item_id)
+                        resolved_list.append(str(related_obj))
+                    except Exception:
+                        resolved_list.append(f"{related_model._meta.model_name} #{item_id} (deleted)")
+                resolved_data[k] = resolved_list
+            else:
+                try:
+                    related_obj = related_model.objects.get(pk=v)
+                    resolved_data[k] = str(related_obj)
+                except Exception:
+                    resolved_data[k] = f"{related_model._meta.model_name} #{v} (deleted)"
+        else:
+            resolved_data[k] = v
+
+    # Resolve generic foreign keys if present
+    try:
+        from django.contrib.contenttypes.fields import GenericForeignKey
+        for gfk in [f for f in model_class._meta.private_fields if isinstance(f, GenericForeignKey)]:
+            ct_field = gfk.ct_field
+            fk_field = gfk.fk_field
+            if ct_field in resolved_data and fk_field in resolved_data:
+                ct_val = data.get(ct_field)
+                fk_val = data.get(fk_field)
+                if ct_val and fk_val:
+                    try:
+                        ct = ContentType.objects.get(pk=ct_val)
+                        related_model = ct.model_class()
+                        related_obj = related_model.objects.get(pk=fk_val)
+                        resolved_data[fk_field] = str(related_obj)
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+
+    return resolved_data
+
+
 @method_decorator(login_required, name='dispatch')
 class ObjectChangeView(BaseHTMXView, DetailView):
     model = ObjectChange
@@ -65,8 +128,9 @@ class ObjectChangeView(BaseHTMXView, DetailView):
         context = super().get_context_data(**kwargs)
         obj = self.get_object()
 
-        prechange_data = obj.prechange_data or {}
-        postchange_data = obj.postchange_data or {}
+        model_class = obj.changed_object_type.model_class()
+        prechange_data = resolve_serialized_data(model_class, obj.prechange_data or {})
+        postchange_data = resolve_serialized_data(model_class, obj.postchange_data or {})
 
         prechange_string = json.dumps(prechange_data, cls=DjangoJSONEncoder, indent=2, sort_keys=True)
         postchange_string = json.dumps(postchange_data, cls=DjangoJSONEncoder, indent=2, sort_keys=True)
