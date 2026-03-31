@@ -9,17 +9,7 @@
 {# --- Page Header --- #}
 {% block page_pretitle %}{% translate "Asset Details" %}{% endblock %}
 
-{# --- Page Actions --- #}
 {% block extra_page_actions %}
-    {# Check Out Button (always visible — reassigns if already assigned) #}
-    <button type="button" class="btn btn-info"
-            hx-get="{% url 'assets:asset_checkout_modal' pk=object.pk %}"
-            hx-target="#modal-placeholder"
-            hx-swap="innerHTML">
-        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-upload" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" /><path d="M7 9l5 -5l5 5" /><path d="M12 4l0 12" /></svg>
-        {% translate "Check Out..." %}
-    </button>
-
     {# Check In Button (if assigned) #}
     {% if assignment and assignment.is_active %}
         <form method="post" action="{% url 'assets:asset_checkin' pk=object.pk %}" class="d-inline">
@@ -29,6 +19,15 @@
                 {% translate "Check In" %}
             </button>
         </form>
+    {% else %}
+        {# Check Out Button (only visible if not checked out) #}
+        <button type="button" class="btn btn-info"
+                hx-get="{% url 'assets:asset_checkout_modal' pk=object.pk %}"
+                hx-target="#modal-placeholder"
+                hx-swap="innerHTML">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-upload" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" /><path d="M7 9l5 -5l5 5" /><path d="M12 4l0 12" /></svg>
+            {% translate "Check Out..." %}
+        </button>
     {% endif %}
 {% endblock extra_page_actions %}
 

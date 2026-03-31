@@ -152,6 +152,28 @@ class ComponentTrackingTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertFalse(ComponentAllocation.objects.filter(pk=self.allocation.pk).exists())
 
+    def test_checkout_checkin_button_visibility(self):
+        from assets.services import checkout_asset
+        from organization.models import AssetHolder
+
+        # 1. When the asset is available (not checked out)
+        response = self.client.get(reverse('assets:asset_detail', kwargs={'pk': self.asset.pk}))
+        self.assertEqual(response.status_code, 200)
+        # Check Out... button is visible, but Check In button is NOT visible
+        self.assertContains(response, "Check Out...")
+        self.assertNotContains(response, "Check In")
+
+        # 2. Check out the asset to a holder
+        holder = AssetHolder.objects.create(first_name="John", last_name="Doe", upn="john@example.com")
+        checkout_asset(self.asset, holder=holder, user=self.user)
+
+        # 3. Reload detail page: asset is now checked out
+        response = self.client.get(reverse('assets:asset_detail', kwargs={'pk': self.asset.pk}))
+        self.assertEqual(response.status_code, 200)
+        # Check In button is visible, but Check Out... button is NOT visible
+        self.assertContains(response, "Check In")
+        self.assertNotContains(response, "Check Out...")
+
     def test_asset_detail_view_components_integration(self):
         response = self.client.get(reverse('assets:asset_detail', kwargs={'pk': self.asset.pk}))
         self.assertEqual(response.status_code, 200)
