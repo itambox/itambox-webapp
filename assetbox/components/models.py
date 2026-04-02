@@ -1,4 +1,5 @@
 from django.db import models, transaction
+from django.utils.translation import gettext_lazy as _
 from django.urls import reverse
 from django.core.exceptions import FieldError
 from core.models import BaseModel, ChangeLoggingMixin, StandardModel
@@ -77,8 +78,8 @@ class Component(AutoSlugMixin, SoftDeleteMixin, StandardModel, ImageAttachmentMi
     class Meta:
         ordering = ('manufacturer', 'name')
         unique_together = ('manufacturer', 'name')
-        verbose_name = "Component (Catalog)"
-        verbose_name_plural = "Components (Catalog)"
+        verbose_name = _("Component (Catalog)")
+        verbose_name_plural = _("Components (Catalog)")
 
     def __str__(self):
         return f"{self.manufacturer.name} {self.name}"
@@ -118,8 +119,8 @@ class ComponentStock(ChangeLoggingMixin, BaseModel):
     class Meta:
         ordering = ('component', 'location')
         unique_together = ('component', 'location')
-        verbose_name = "Component Stock"
-        verbose_name_plural = "Component Stocks"
+        verbose_name = _("Component Stock")
+        verbose_name_plural = _("Component Stocks")
 
     def __str__(self):
         return f"{self.component.name} @ {self.location.name}: {self.qty}"
@@ -150,8 +151,8 @@ class ComponentAllocation(JournalingMixin, TaggableMixin, SoftDeleteMixin, BaseM
 
     class Meta:
         ordering = ('-allocated_at',)
-        verbose_name = "Component Allocation"
-        verbose_name_plural = "Component Allocations"
+        verbose_name = _("Component Allocation")
+        verbose_name_plural = _("Component Allocations")
 
     def __str__(self):
         return f"{self.component.name} → {self.asset.name} (qty: {self.qty_allocated})"

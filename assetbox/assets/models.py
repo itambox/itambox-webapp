@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 from django.conf import settings
 from django.urls import reverse
 from django.utils import timezone
@@ -40,8 +41,8 @@ class StatusLabel(AutoSlugMixin, StandardModel):
 
     class Meta:
         ordering = ['name']
-        verbose_name = "Status Label"
-        verbose_name_plural = "Status Labels"
+        verbose_name = _("Status Label")
+        verbose_name_plural = _("Status Labels")
 
     def __str__(self):
         return f"{self.name} ({self.get_type_display()})"
@@ -64,6 +65,10 @@ class AssetRole(StandardModel):
         blank=True
     )
 
+    class Meta:
+        verbose_name = _("Asset Role")
+        verbose_name_plural = _("Asset Roles")
+
     def __str__(self):
         return self.name
 
@@ -81,6 +86,8 @@ class Manufacturer(StandardModel):
 
     class Meta:
         ordering = ['name']
+        verbose_name = _("Manufacturer")
+        verbose_name_plural = _("Manufacturers")
 
     def __str__(self):
         return self.name
@@ -108,8 +115,8 @@ class Depreciation(StandardModel):
 
     class Meta:
         ordering = ['name']
-        verbose_name = "Depreciation"
-        verbose_name_plural = "Depreciations"
+        verbose_name = _("Depreciation")
+        verbose_name_plural = _("Depreciations")
 
     def __str__(self):
         return f"{self.name} ({self.months} months)"
@@ -175,8 +182,8 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel):
 
     class Meta:
         unique_together = ('manufacturer', 'model')
-        verbose_name = "Asset Type"
-        verbose_name_plural = "Asset Types"
+        verbose_name = _("Asset Type")
+        verbose_name_plural = _("Asset Types")
 
     def __str__(self):
         return f"{self.manufacturer.name} {self.model}"
@@ -389,6 +396,10 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
 
 
 
+    class Meta:
+        verbose_name = _("Asset")
+        verbose_name_plural = _("Assets")
+
     def __str__(self):
         return f"{self.name} ({self.asset_tag})"
 
@@ -422,6 +433,8 @@ class ActivityLog(models.Model):
 
     class Meta:
         ordering = ['-timestamp'] # Show newest logs first
+        verbose_name = _("Activity Log")
+        verbose_name_plural = _("Activity Logs")
 
     def __str__(self):
         return f"{self.asset} - {self.get_action_display()} by {self.user or 'System'} on {self.timestamp.strftime('%Y-%m-%d %H:%M')}"
@@ -473,8 +486,8 @@ class InstalledSoftware(ChangeLoggingMixin, BaseModel):
     class Meta:
         unique_together = ('asset', 'software', 'version_detected') # Allow tracking same sw multiple times if version changes
         ordering = ['asset', 'software', '-last_seen_date']
-        verbose_name = "Installed Software Instance"
-        verbose_name_plural = "Installed Software Instances"
+        verbose_name = _("Installed Software Instance")
+        verbose_name_plural = _("Installed Software Instances")
 
     def __str__(self):
         version_part = f" (v{self.version_detected})" if self.version_detected else ""
@@ -498,8 +511,8 @@ class Supplier(AutoSlugMixin, StandardModel):
 
     class Meta:
         ordering = ['name']
-        verbose_name = "Supplier"
-        verbose_name_plural = "Suppliers"
+        verbose_name = _("Supplier")
+        verbose_name_plural = _("Suppliers")
 
     def __str__(self):
         return self.name
@@ -524,8 +537,8 @@ class Category(AutoSlugMixin, StandardModel):
 
     class Meta:
         ordering = ['name']
-        verbose_name = "Category"
-        verbose_name_plural = "Categories"
+        verbose_name = _("Category")
+        verbose_name_plural = _("Categories")
 
     def __str__(self):
         return self.name
@@ -580,8 +593,8 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
 
     class Meta:
         ordering = ['-request_date']
-        verbose_name = "Asset Request"
-        verbose_name_plural = "Asset Requests"
+        verbose_name = _("Asset Request")
+        verbose_name_plural = _("Asset Requests")
 
     def __str__(self):
         target = str(self.asset) if self.asset else str(self.asset_type) if self.asset_type else "Any Asset"
@@ -598,8 +611,8 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel):
     zero_padding = models.PositiveSmallIntegerField(default=6)
 
     class Meta:
-        verbose_name = "Asset Tag Sequence"
-        verbose_name_plural = "Asset Tag Sequences"
+        verbose_name = _("Asset Tag Sequence")
+        verbose_name_plural = _("Asset Tag Sequences")
 
     def __str__(self):
         return f'{self.prefix} (next: {self.next_value:0{self.zero_padding}d})'
@@ -664,8 +677,8 @@ class AssetAssignment(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseMo
                 name='unique_active_assignment_per_asset'
             ),
         ]
-        verbose_name = "Asset Assignment"
-        verbose_name_plural = "Asset Assignments"
+        verbose_name = _("Asset Assignment")
+        verbose_name_plural = _("Asset Assignments")
 
     @property
     def assigned_to_type(self):
@@ -705,8 +718,8 @@ class AuditSession(StandardModel, SoftDeleteMixin):
 
     class Meta:
         ordering = ['-started_at']
-        verbose_name = "Audit Session"
-        verbose_name_plural = "Audit Sessions"
+        verbose_name = _("Audit Session")
+        verbose_name_plural = _("Audit Sessions")
 
     def __str__(self):
         return f"{self.name} ({self.get_status_display()})"
@@ -763,6 +776,6 @@ class AssetAudit(models.Model):
     class Meta:
         ordering = ['-timestamp']
         unique_together = ('session', 'asset')  # Single verification per asset per campaign
-        verbose_name = "Asset Audit"
-        verbose_name_plural = "Asset Audits"
+        verbose_name = _("Asset Audit")
+        verbose_name_plural = _("Asset Audits")
 

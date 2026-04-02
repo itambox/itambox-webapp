@@ -75,8 +75,8 @@ class License(BookmarkableMixin, DeletableVaultModel):
 
     class Meta:
         ordering = ('software__manufacturer', 'software__name', 'name')
-        verbose_name = "License"
-        verbose_name_plural = "Licenses"
+        verbose_name = _("License")
+        verbose_name_plural = _("Licenses")
 
     def __str__(self):
         return f"{self.software.name} - {self.name} ({self.seats} seats)"
@@ -136,8 +136,8 @@ class LicenseSeatAssignment(ChangeLoggingMixin, BaseModel):
 
     class Meta:
         ordering = ('license', 'asset', 'assigned_holder')
-        verbose_name = "License Seat Assignment"
-        verbose_name_plural = "License Seat Assignments"
+        verbose_name = _("License Seat Assignment")
+        verbose_name_plural = _("License Seat Assignments")
         constraints = [
             CheckConstraint(
                 check=Q(asset__isnull=False, assigned_holder__isnull=True) | 

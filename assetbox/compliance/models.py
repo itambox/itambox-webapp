@@ -1,5 +1,6 @@
 import secrets
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 from django.urls import reverse
 from django.utils import timezone
 
@@ -48,8 +49,8 @@ class CustodyReceipt(ChangeLoggingMixin, BaseModel):
 
     class Meta:
         ordering = ('-signed_at',)
-        verbose_name = "Custody Receipt"
-        verbose_name_plural = "Custody Receipts"
+        verbose_name = _("Custody Receipt")
+        verbose_name_plural = _("Custody Receipts")
 
     def __str__(self):
         return f"Custody Receipt for {self.asset} signed by {self.holder} (EULA v{self.eula_version})"
@@ -106,8 +107,8 @@ class AssetMaintenance(TaggableMixin, CloneableMixin, ExportableMixin,
 
     class Meta:
         ordering = ['-start_date']
-        verbose_name = "Asset Maintenance"
-        verbose_name_plural = "Asset Maintenances"
+        verbose_name = _("Asset Maintenance")
+        verbose_name_plural = _("Asset Maintenances")
 
     def __str__(self):
         return f"{self.get_maintenance_type_display()} on {self.asset.name}"

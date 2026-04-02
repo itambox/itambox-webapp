@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 import secrets
 
@@ -29,6 +30,8 @@ class UserPreference(models.Model):
 
     class Meta:
         ordering = ('user',)
+        verbose_name = _("User Preference")
+        verbose_name_plural = _("User Preferences")
 
 
 class Token(models.Model):
@@ -49,6 +52,8 @@ class Token(models.Model):
 
     class Meta:
         ordering = ['-created']
+        verbose_name = _("Token")
+        verbose_name_plural = _("Tokens")
 
     def __str__(self):
         return f"{self.user.username}: {self.key[:6]}..."

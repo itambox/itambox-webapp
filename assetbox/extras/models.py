@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
 from core.models import BaseModel, ChangeLoggingMixin
 from core.managers import TenantScopingManager
 
@@ -13,6 +14,8 @@ class Tag(ChangeLoggingMixin, BaseModel):
 
     class Meta:
         ordering = ['name']
+        verbose_name = _("Tag")
+        verbose_name_plural = _("Tags")
 
     def __str__(self):
         return self.name
@@ -53,6 +56,8 @@ class Dashboard(models.Model):
 
     class Meta:
         ordering = ['-is_default', 'name']
+        verbose_name = _("Dashboard")
+        verbose_name_plural = _("Dashboards")
 
     def __str__(self):
         if self.tenant:
@@ -117,8 +122,8 @@ class CustomField(ChangeLoggingMixin, BaseModel):
 
     class Meta:
         ordering = ['label']
-        verbose_name = "Custom Field"
-        verbose_name_plural = "Custom Fields"
+        verbose_name = _("Custom Field")
+        verbose_name_plural = _("Custom Fields")
         db_table = 'assets_customfield'
         app_label = 'assets'
 
@@ -135,8 +140,8 @@ class CustomFieldset(ChangeLoggingMixin, BaseModel):
 
     class Meta:
         ordering = ['name']
-        verbose_name = "Custom Fieldset"
-        verbose_name_plural = "Custom Fieldsets"
+        verbose_name = _("Custom Fieldset")
+        verbose_name_plural = _("Custom Fieldsets")
         db_table = 'assets_customfieldset'
         app_label = 'assets'
 
@@ -162,6 +167,8 @@ class ConfigContext(ChangeLoggingMixin, BaseModel):
 
     class Meta:
         ordering = ['weight', 'name']
+        verbose_name = _("Config Context")
+        verbose_name_plural = _("Config Contexts")
 
     def __str__(self):
         return self.name

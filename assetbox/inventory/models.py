@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 from django.urls import reverse
 from django.utils import timezone
 from django.db.models import Q, CheckConstraint, Sum
@@ -48,8 +49,8 @@ class Accessory(AutoSlugMixin, SubscribableMixin, DeletableVaultModel):
     class Meta:
         ordering = ('manufacturer', 'name')
         unique_together = ('manufacturer', 'name')
-        verbose_name = "Accessory"
-        verbose_name_plural = "Accessories"
+        verbose_name = _("Accessory")
+        verbose_name_plural = _("Accessories")
 
     def __str__(self):
         return f"{self.manufacturer.name} {self.name}"
@@ -96,8 +97,8 @@ class AccessoryStock(ChangeLoggingMixin, BaseModel):
     class Meta:
         ordering = ('accessory', 'location')
         unique_together = ('accessory', 'location')
-        verbose_name = "Accessory Stock"
-        verbose_name_plural = "Accessory Stocks"
+        verbose_name = _("Accessory Stock")
+        verbose_name_plural = _("Accessory Stocks")
 
     def __str__(self):
         return f"{self.accessory.name} @ {self.location.name}: {self.qty}"
@@ -122,8 +123,8 @@ class AccessoryAssignment(ChangeLoggingMixin, BaseModel):
 
     class Meta:
         ordering = ('-assigned_date',)
-        verbose_name = "Accessory Assignment"
-        verbose_name_plural = "Accessory Assignments"
+        verbose_name = _("Accessory Assignment")
+        verbose_name_plural = _("Accessory Assignments")
         constraints = [
             CheckConstraint(
                 check=(
@@ -231,8 +232,8 @@ class Consumable(AutoSlugMixin, SoftDeleteMixin, StandardModel, ImageAttachmentM
     class Meta:
         ordering = ('manufacturer', 'name')
         unique_together = ('manufacturer', 'name')
-        verbose_name = "Consumable"
-        verbose_name_plural = "Consumables"
+        verbose_name = _("Consumable")
+        verbose_name_plural = _("Consumables")
 
     def __str__(self):
         return f"{self.manufacturer.name} {self.name}"
@@ -279,8 +280,8 @@ class ConsumableStock(ChangeLoggingMixin, BaseModel):
     class Meta:
         ordering = ('consumable', 'location')
         unique_together = ('consumable', 'location')
-        verbose_name = "Consumable Stock"
-        verbose_name_plural = "Consumable Stocks"
+        verbose_name = _("Consumable Stock")
+        verbose_name_plural = _("Consumable Stocks")
 
     def __str__(self):
         return f"{self.consumable.name} @ {self.location.name}: {self.qty}"
@@ -305,8 +306,8 @@ class ConsumableAssignment(ChangeLoggingMixin, BaseModel):
 
     class Meta:
         ordering = ('-assigned_date',)
-        verbose_name = "Consumable Consumption"
-        verbose_name_plural = "Consumable Consumptions"
+        verbose_name = _("Consumable Consumption")
+        verbose_name_plural = _("Consumable Consumptions")
         constraints = [
             CheckConstraint(
                 check=(
@@ -395,8 +396,8 @@ class Kit(JournalingMixin, TaggableMixin, CloneableMixin, ExportableMixin, SoftD
 
     class Meta:
         ordering = ['name']
-        verbose_name = "Kit"
-        verbose_name_plural = "Kits"
+        verbose_name = _("Kit")
+        verbose_name_plural = _("Kits")
 
     def __str__(self):
         return self.name
@@ -418,8 +419,8 @@ class KitItem(ChangeLoggingMixin, BaseModel):
     qty = models.PositiveIntegerField(default=1, verbose_name="Quantity", help_text="Quantity to checkout (applies to Accessories and Consumables)")
 
     class Meta:
-        verbose_name = "Kit Item"
-        verbose_name_plural = "Kit Items"
+        verbose_name = _("Kit Item")
+        verbose_name_plural = _("Kit Items")
         constraints = [
             CheckConstraint(
                 check=(

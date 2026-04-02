@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 from django.urls import reverse
 from extras.models import Tag
 from core.models import BaseModel, ChangeLoggingMixin, VaultModel
@@ -66,8 +67,8 @@ class Software(VaultModel):
 
     class Meta:
         ordering = ('manufacturer', 'name')
-        verbose_name = "Software"
-        verbose_name_plural = "Software"
+        verbose_name = _("Software")
+        verbose_name_plural = _("Software")
 
     def __str__(self):
         return f"{self.manufacturer.name} - {self.name}"

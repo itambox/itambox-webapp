@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 from django.utils.text import slugify # For potential slug generation
 from django.urls import reverse
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -70,8 +71,8 @@ class Location(SubscribableMixin, StandardModel):
         # ]
         # Decided against constraints for now, slug is already unique globally.
         # Can add site-specific constraints later if needed.
-        verbose_name = "Location"
-        verbose_name_plural = "Locations"
+        verbose_name = _("Location")
+        verbose_name_plural = _("Locations")
 
 
     def __str__(self):
@@ -97,6 +98,8 @@ class Region(StandardModel):
 
     class Meta:
         ordering = ['name']
+        verbose_name = _("Region")
+        verbose_name_plural = _("Regions")
 
     def __str__(self):
         return self.name
@@ -119,8 +122,8 @@ class SiteGroup(StandardModel):
 
     class Meta:
         ordering = ['name']
-        verbose_name = "Site Group"
-        verbose_name_plural = "Site Groups"
+        verbose_name = _("Site Group")
+        verbose_name_plural = _("Site Groups")
 
     def __str__(self):
         return self.name
@@ -143,8 +146,8 @@ class TenantGroup(StandardModel):
 
     class Meta:
         ordering = ['name']
-        verbose_name = "Tenant Group"
-        verbose_name_plural = "Tenant Groups"
+        verbose_name = _("Tenant Group")
+        verbose_name_plural = _("Tenant Groups")
 
     def __str__(self):
         return self.name
@@ -169,6 +172,8 @@ class Tenant(VaultModel, BookmarkableMixin):
 
     class Meta:
         ordering = ['name']
+        verbose_name = _("Tenant")
+        verbose_name_plural = _("Tenants")
 
     def get_absolute_url(self):
         return reverse('organization:tenant_detail', kwargs={'pk': self.pk})
@@ -210,6 +215,8 @@ class Site(VaultModel, BookmarkableMixin):
 
     class Meta:
         ordering = ['name']
+        verbose_name = _("Site")
+        verbose_name_plural = _("Sites")
 
     def __str__(self):
         return self.name
@@ -248,8 +255,8 @@ class AssetHolder(SubscribableMixin, StandardModel):
         constraints = [
             models.UniqueConstraint(fields=['upn'], name='organization_assetholder_unique_upn')
         ]
-        verbose_name = "Asset Holder"
-        verbose_name_plural = "Asset Holders"
+        verbose_name = _("Asset Holder")
+        verbose_name_plural = _("Asset Holders")
 
     @property
     def checked_out_assets(self):
@@ -293,8 +300,8 @@ class AssetHolderAssignment(ChangeLoggingMixin, BaseModel):
                 name='organization_assetholderassignment_unique'
             )
         ]
-        verbose_name = "Asset Holder Assignment"
-        verbose_name_plural = "Asset Holder Assignments"
+        verbose_name = _("Asset Holder Assignment")
+        verbose_name_plural = _("Asset Holder Assignments")
 
     def __str__(self):
         return f"Assignment for {self.asset_holder} to {self.assigned_object}"
@@ -306,8 +313,8 @@ class ContactRole(AutoSlugMixin, StandardModel):
 
     class Meta:
         ordering = ['name']
-        verbose_name = "Contact Role"
-        verbose_name_plural = "Contact Roles"
+        verbose_name = _("Contact Role")
+        verbose_name_plural = _("Contact Roles")
 
     def __str__(self):
         return self.name
@@ -328,8 +335,8 @@ class Contact(StandardModel):
 
     class Meta:
         ordering = ['name']
-        verbose_name = "Contact"
-        verbose_name_plural = "Contacts"
+        verbose_name = _("Contact")
+        verbose_name_plural = _("Contacts")
 
     def __str__(self):
         return self.name
@@ -363,8 +370,8 @@ class ContactAssignment(ChangeLoggingMixin, BaseModel):
                 name='organization_contactassignment_unique'
             )
         ]
-        verbose_name = "Contact Assignment"
-        verbose_name_plural = "Contact Assignments"
+        verbose_name = _("Contact Assignment")
+        verbose_name_plural = _("Contact Assignments")
 
     def __str__(self):
         return f"{self.contact} ({self.role}) assigned to {self.assigned_object}"
@@ -400,8 +407,8 @@ class TenantMembership(models.Model):
 
     class Meta:
         unique_together = ('user', 'tenant')
-        verbose_name = "Tenant Membership"
-        verbose_name_plural = "Tenant Memberships"
+        verbose_name = _("Tenant Membership")
+        verbose_name_plural = _("Tenant Memberships")
 
     def __str__(self):
         return f"{self.user.username} is {self.get_role_display()} at {self.tenant.name}"
@@ -420,6 +427,10 @@ class TenantInvitation(models.Model):
     @property
     def is_valid(self):
         return self.accepted_at is None and self.expires_at > timezone.now()
+
+    class Meta:
+        verbose_name = _("Tenant Invitation")
+        verbose_name_plural = _("Tenant Invitations")
 
     def __str__(self):
         return f"Invite for {self.email} to {self.tenant.name}"

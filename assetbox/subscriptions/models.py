@@ -76,8 +76,8 @@ class Provider(AutoSlugMixin, StandardModel):
 
     class Meta:
         ordering = ('name',)
-        verbose_name = "Provider"
-        verbose_name_plural = "Providers"
+        verbose_name = _("Provider")
+        verbose_name_plural = _("Providers")
 
     def __str__(self):
         return self.name
@@ -252,8 +252,8 @@ class Subscription(AutoSlugMixin, BookmarkableMixin, DeletableVaultModel):
 
     class Meta:
         ordering = ('-renewal_date', 'provider', 'name')
-        verbose_name = "Subscription"
-        verbose_name_plural = "Subscriptions"
+        verbose_name = _("Subscription")
+        verbose_name_plural = _("Subscriptions")
 
     def __str__(self):
         return f"{self.provider} - {self.name}"
@@ -349,8 +349,8 @@ class SubscriptionAssignment(ChangeLoggingMixin, BaseModel):
 
     class Meta:
         ordering = ('-assigned_date',)
-        verbose_name = "Subscription Assignment"
-        verbose_name_plural = "Subscription Assignments"
+        verbose_name = _("Subscription Assignment")
+        verbose_name_plural = _("Subscription Assignments")
         constraints = [
             models.UniqueConstraint(
                 fields=['subscription', 'content_type', 'object_id'],
