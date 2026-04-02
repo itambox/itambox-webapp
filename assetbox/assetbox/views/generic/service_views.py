@@ -41,9 +41,21 @@ class GenericTransactionView(PermissionRequiredMixin, LoginRequiredMixin, BaseHT
             return self.model_form
         return super().get_form_class()
 
+    def get_queryset(self):
+        if self.queryset is None:
+            from django.core.exceptions import ImproperlyConfigured
+            raise ImproperlyConfigured(
+                f"{self.__class__.__name__} is missing a QuerySet. Define "
+                f"{self.__class__.__name__}.queryset."
+            )
+        queryset = self.queryset.all()
+        if hasattr(queryset, 'filter_by_tenant'):
+            queryset = queryset.filter_by_tenant()
+        return queryset
+
     def get_object(self):
         pk = self.kwargs.get('pk')
-        return get_object_or_404(self.queryset, pk=pk)
+        return get_object_or_404(self.get_queryset(), pk=pk)
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -127,10 +139,22 @@ class SimplePostView(PermissionRequiredMixin, LoginRequiredMixin, View):
             return self._htmx_success_response(obj, result)
         return self.get_success_redirect(obj, result)
 
+    def get_queryset(self):
+        if self.queryset is None:
+            from django.core.exceptions import ImproperlyConfigured
+            raise ImproperlyConfigured(
+                f"{self.__class__.__name__} is missing a QuerySet. Define "
+                f"{self.__class__.__name__}.queryset."
+            )
+        queryset = self.queryset.all()
+        if hasattr(queryset, 'filter_by_tenant'):
+            queryset = queryset.filter_by_tenant()
+        return queryset
+
     def get_object(self):
         pk = self.kwargs.get('pk')
-        if self.queryset is not None and pk is not None:
-            return get_object_or_404(self.queryset, pk=pk)
+        if pk is not None:
+            return get_object_or_404(self.get_queryset(), pk=pk)
         raise NotImplementedError(
             f"{self.__class__.__name__} must define 'queryset' or override get_object()"
         )

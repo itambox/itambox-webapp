@@ -72,7 +72,7 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         if model:
             app_label = model._meta.app_label
             model_name = model._meta.model_name
-            plural_name = model._meta.verbose_name_plural.lower().replace(' ', '')
+            plural_name = str(model._meta.verbose_name_plural).lower().replace(' ', '')
 
             templates_to_try = [
                 f'{app_label}/{plural_name}/{model_name}_list.html',
@@ -199,7 +199,7 @@ class ObjectDetailView(TenantScopingViewMixin, LoginRequiredMixin, BaseHTMXView,
         if obj:
             app_label = obj._meta.app_label
             model_name = obj._meta.model_name
-            plural_name = obj._meta.verbose_name_plural.lower().replace(" ", "")
+            plural_name = str(obj._meta.verbose_name_plural).lower().replace(" ", "")
 
             templates_to_try = [
                 f"{app_label}/{plural_name}/{model_name}_detail.html",
@@ -382,7 +382,7 @@ class ObjectDetailView(TenantScopingViewMixin, LoginRequiredMixin, BaseHTMXView,
                             filter_field_name = relation.remote_field.name if relation.remote_field else obj._meta.model_name
                             filter_val = getattr(obj, 'slug', obj.pk)
                             url = f"{base_url}?{filter_field_name}={filter_val}"
-                            label = related_model._meta.verbose_name_plural.title()
+                            label = str(related_model._meta.verbose_name_plural).title()
                             
                             related_objects_list.append({
                                 'label': label,
@@ -825,7 +825,7 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
                 
                 # Create background Job tracker instance
                 job = Job.objects.create(
-                    name=f"Bulk Import: {model._meta.verbose_name_plural.title()}",
+                    name=f"Bulk Import: {str(model._meta.verbose_name_plural).title()}",
                     model=ct,
                     status=Job.STATUS_PENDING
                 )
@@ -1039,10 +1039,10 @@ class ObjectBulkEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXVi
             'return_url': return_url,
             'verbose_name': model._meta.verbose_name,
             'verbose_name_plural': model._meta.verbose_name_plural,
-            'title': f'Bulk Edit {model._meta.verbose_name_plural.title()}',
+            'title': f'Bulk Edit {str(model._meta.verbose_name_plural).title()}',
             'breadcrumbs': [
                 (reverse('dashboard'), 'Dashboard'),
-                (return_url, model._meta.verbose_name_plural.title()),
+                (return_url, str(model._meta.verbose_name_plural).title()),
                 (None, f'Bulk Edit ({len(pks)})'),
             ],
         }
@@ -1122,7 +1122,7 @@ class ObjectBulkDeleteView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMX
                 'title': f'Confirm Bulk Deletion',
                 'breadcrumbs': [
                     (reverse('dashboard'), 'Dashboard'),
-                    (return_url, model._meta.verbose_name_plural.title()),
+                    (return_url, str(model._meta.verbose_name_plural).title()),
                     (None, f'Delete ({len(objects_to_delete)})'),
                 ],
             }
@@ -1136,7 +1136,7 @@ def table_config(request, model_name):
     TableClass = getattr(table_module, table_part)
     
     table = TableClass([])
-    table_verbose_name = TableClass.Meta.model._meta.verbose_name_plural.title()
+    table_verbose_name = str(TableClass.Meta.model._meta.verbose_name_plural).title()
     
     prefs, _ = UserPreference.objects.get_or_create(user=request.user)
     table_key_for_form = f'{app_label}.{table_part}'

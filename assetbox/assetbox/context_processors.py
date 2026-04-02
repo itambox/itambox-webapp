@@ -85,13 +85,73 @@ def notifications_processor(request):
 
 
 def tenant_switcher_processor(request):
-    """Context processor providing available switcher tenants globally for superusers."""
-    if request.user.is_authenticated and request.user.is_superuser:
-        from organization.models import Tenant
+    """Context processor providing structured tenants and memberships grouped by TenantGroup."""
+    if not request.user.is_authenticated:
+        return {
+            'all_tenants_switcher': [],
+            'grouped_tenants_switcher': [],
+            'grouped_memberships_switcher': []
+        }
+
+    from organization.models import Tenant, TenantMembership
+    from collections import defaultdict
+
+    grouped_tenants_switcher = []
+    grouped_memberships_switcher = []
+
+    if request.user.is_superuser:
+        # 1. Fetch all tenants ordered by group and name
+        tenants = Tenant._base_manager.all().select_related('group').order_by('group__name', 'name')
+        
+        # Group by group
+        group_map = defaultdict(list)
+        for t in tenants:
+            group_map[t.group].append(t)
+            
+        # Separate group list to sort properly (groups with name first, None group last)
+        sorted_groups = sorted([g for g in group_map.keys() if g is not None], key=lambda g: g.name.lower())
+        
+        for g in sorted_groups:
+            grouped_tenants_switcher.append({
+                'group': g,
+                'tenants': group_map[g]
+            })
+        if None in group_map:
+            grouped_tenants_switcher.append({
+                'group': None,
+                'tenants': group_map[None]
+            })
+            
         all_tenants = Tenant._base_manager.all().order_by('name')
         return {
-            'all_tenants_switcher': all_tenants
+            'all_tenants_switcher': all_tenants,
+            'grouped_tenants_switcher': grouped_tenants_switcher,
+            'grouped_memberships_switcher': []
         }
-    return {
-        'all_tenants_switcher': []
-    }
+    else:
+        # 2. Fetch standard user memberships
+        memberships = TenantMembership.objects.filter(user=request.user).select_related('tenant', 'tenant__group').order_by('tenant__group__name', 'tenant__name')
+        
+        # Group by group
+        group_map = defaultdict(list)
+        for m in memberships:
+            group_map[m.tenant.group].append(m)
+            
+        sorted_groups = sorted([g for g in group_map.keys() if g is not None], key=lambda g: g.name.lower())
+        
+        for g in sorted_groups:
+            grouped_memberships_switcher.append({
+                'group': g,
+                'memberships': group_map[g]
+            })
+        if None in group_map:
+            grouped_memberships_switcher.append({
+                'group': None,
+                'memberships': group_map[None]
+            })
+
+        return {
+            'all_tenants_switcher': [],
+            'grouped_tenants_switcher': [],
+            'grouped_memberships_switcher': grouped_memberships_switcher
+        }
