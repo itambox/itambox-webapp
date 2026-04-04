@@ -725,6 +725,39 @@ html {
 }
 
 // ============================================================
+//  Premium Dropdown & Card Styling (Dark Mode Harmony)
+// ============================================================
+.dropdown-menu-card {
+    .card {
+        background-color: var(--tblr-bg-surface) !important;
+        border: 1px solid var(--tblr-border-color) !important;
+        box-shadow: var(--tblr-box-shadow-lg) !important;
+        
+        .card-header {
+            background-color: var(--tblr-bg-surface) !important;
+            border-bottom: 1px solid var(--tblr-border-color) !important;
+        }
+
+        .list-group-header {
+            background-color: var(--tblr-bg-surface-secondary) !important;
+            border-bottom: 1px solid var(--tblr-border-color) !important;
+            border-top: 1px solid var(--tblr-border-color) !important;
+            margin-top: -1px; // prevent double borders
+            color: var(--tblr-secondary-color) !important;
+            
+            &.active {
+                background-color: rgba(var(--tblr-primary-rgb), 0.1) !important;
+            }
+        }
+
+        .card-footer {
+            background-color: var(--tblr-bg-surface) !important;
+            border-top: 1px solid var(--tblr-border-color) !important;
+        }
+    }
+}
+
+// ============================================================
 //  Premium Smooth Theme Transitions
 // ============================================================
 html, body, .card, .navbar, .navbar-vertical, .page-wrapper, .form-control, .btn, .nav-link, .dropdown-item, .table, td, th, aside, footer {
