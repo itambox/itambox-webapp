@@ -34,8 +34,8 @@ class ImportExportPermissionTestCase(TestCase):
         # Verify can_add is False in context
         self.assertFalse(response.context['can_add'])
         
-        # Verify that "Create asset" or "Import" links are NOT present in the HTML output
-        self.assertNotContains(response, 'Create asset')
+        # Verify that "Create Asset" or "Import" links are NOT present in the HTML output
+        self.assertNotContains(response, 'Create Asset')
         self.assertNotContains(response, 'Import')
         # Export should be present since it only requires view permission
         self.assertContains(response, 'Export')
@@ -55,7 +55,7 @@ class ImportExportPermissionTestCase(TestCase):
         self.assertTrue(response.context['can_add'])
         
         # Verify that Create and Import action buttons are present in HTML output
-        self.assertContains(response, 'Create asset')
+        self.assertContains(response, 'Create Asset')
         self.assertContains(response, 'Import')
         self.assertContains(response, 'Export')
 
@@ -68,7 +68,7 @@ class ImportExportPermissionTestCase(TestCase):
         
         # Superuser should always have add permission
         self.assertTrue(response.context['can_add'])
-        self.assertContains(response, 'Create asset')
+        self.assertContains(response, 'Create Asset')
         self.assertContains(response, 'Import')
         self.assertContains(response, 'Export')
 

@@ -719,22 +719,45 @@ class OrganizationTenantScopingTests(TestCase):
         # Create a site for Tenant C
         site_c = Site.objects.create(name="Site C", slug="site-c", tenant=tenant_c)
 
-        from core.managers import set_current_tenant
+        from core.managers import set_current_tenant, set_current_tenant_group
         
-        # Under Tenant A context:
+        # 1. Under Tenant A context (strict isolation):
         set_current_tenant(self.tenant_a)
+        set_current_tenant_group(None)
         
-        # Tenant A should be able to see both Tenant A and Tenant C, but NOT Tenant B
+        # Tenant A should strictly only be able to see Tenant A, and NOT Tenant C (even if they share a TenantGroup)
+        tenants = list(Tenant.objects.all())
+        self.assertIn(self.tenant_a, tenants)
+        self.assertNotIn(tenant_c, tenants)
+        self.assertNotIn(self.tenant_b, tenants)
+        
+        # Tenant A should strictly only be able to see Site A and Site Global, but NOT Site C
+        sites = list(Site.objects.all())
+        self.assertIn(self.site_a, sites)
+        self.assertIn(self.site_global, sites)
+        self.assertNotIn(site_c, sites)
+        self.assertNotIn(self.site_b, sites)
+
+        # 2. Under Tenant Group context (group aggregation):
+        set_current_tenant(None)
+        set_current_tenant_group(group)
+
+        # The Group should be able to see both Tenant A and Tenant C, but NOT Tenant B
         tenants = list(Tenant.objects.all())
         self.assertIn(self.tenant_a, tenants)
         self.assertIn(tenant_c, tenants)
         self.assertNotIn(self.tenant_b, tenants)
-        
-        # Tenant A should be able to see Site A and Site C, but NOT Site B
+
+        # The Group should be able to see Site A, Site Global, and Site C, but NOT Site B
         sites = list(Site.objects.all())
         self.assertIn(self.site_a, sites)
+        self.assertIn(self.site_global, sites)
         self.assertIn(site_c, sites)
         self.assertNotIn(self.site_b, sites)
+
+        # Clean up context
+        set_current_tenant(None)
+        set_current_tenant_group(None)
 
 
 class MultiTenantMembershipAndInvitationTests(TestCase):

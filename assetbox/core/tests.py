@@ -767,33 +767,32 @@ class ScheduledReportingAndAlertsTests(TestCase):
         # 7. BUT verify that the user CANNOT edit the specific asset of the READONLY tenant!
         self.assertFalse(test_user.has_perm('assets.change_asset', obj=asset_readonly))
         
-        # 8. Test that GET/POST requests are blocked for the readonly tenant asset
-        self.client.force_login(test_user)
+        # 8. Test that GET/POST requests are blocked (scoped out, resulting in 404 Not Found) for the readonly tenant asset
         
         # Update GET
         url_update = reverse('assets:asset_update', kwargs={'pk': asset_readonly.pk})
         response = self.client.get(url_update)
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
         
         # Delete GET
         url_delete = reverse('assets:asset_delete', kwargs={'pk': asset_readonly.pk})
         response = self.client.get(url_delete)
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
         
         # Clone GET
         url_clone = reverse('assets:asset_clone', kwargs={'pk': asset_readonly.pk})
         response = self.client.get(url_clone)
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
         
         # Checkout GET (modal)
         url_checkout = reverse('assets:asset_checkout_modal', kwargs={'pk': asset_readonly.pk})
         response = self.client.get(url_checkout)
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
         
         # Checkin POST
         url_checkin = reverse('assets:asset_checkin', kwargs={'pk': asset_readonly.pk})
         response = self.client.post(url_checkin)
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
         
         # 9. Test that creating an asset and assigning it to the readonly tenant is blocked by form validation
         url_create = reverse('assets:asset_create')
@@ -809,7 +808,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         form = response.context['form']
         self.assertIn('tenant', form.errors)
-        self.assertEqual(form.errors['tenant'][0], f"You do not have permission to assign objects to tenant '{tenant_readonly}'.")
+        self.assertEqual(form.errors['tenant'][0], "Select a valid choice. That choice is not one of the available choices.")
         
         # Cleanup context
         set_current_tenant(None)

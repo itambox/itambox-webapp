@@ -390,16 +390,33 @@ class ComponentTenantScopingTests(TestCase):
             name="Component C", manufacturer=self.manufacturer, category=self.category, tenant=tenant_c
         )
 
-        from core.managers import set_current_tenant
+        from core.managers import set_current_tenant, set_current_tenant_group
         
-        # Under Tenant A context:
+        # 1. Under Tenant A context (strict isolation):
         set_current_tenant(self.tenant_a)
+        set_current_tenant_group(None)
         
-        # Tenant A should be able to see Component A and Component C, but NOT Component B
+        # Tenant A should strictly only be able to see Component A and Component Global, and NOT Component C (even if they share a TenantGroup)
         components = list(Component.objects.all())
         self.assertIn(self.comp_a, components)
+        self.assertIn(self.comp_global, components)
+        self.assertNotIn(comp_c, components)
+        self.assertNotIn(self.comp_b, components)
+
+        # 2. Under Tenant Group context (group aggregation):
+        set_current_tenant(None)
+        set_current_tenant_group(group)
+
+        # The Group should be able to see Component A, Component Global, and Component C, but NOT Component B
+        components = list(Component.objects.all())
+        self.assertIn(self.comp_a, components)
+        self.assertIn(self.comp_global, components)
         self.assertIn(comp_c, components)
         self.assertNotIn(self.comp_b, components)
+
+        # Clean up context
+        set_current_tenant(None)
+        set_current_tenant_group(None)
 
 
 class ComponentStockAdjustViewTests(TestCase):
