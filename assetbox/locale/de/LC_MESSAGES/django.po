@@ -641,13 +641,128 @@ msgid "ADDED OR MODIFIED STATE"
 msgstr "ADDED OR MODIFIED STATE"
 
 msgid "Accessor"
+
+# --- Automated Remediation Translations (AssetBox Audit) ---
+
+msgid "(Detail block override missing)"
+msgstr "(Detail block override missing)"
+
+msgid "(HMAC Signature Secret Configured)"
+msgstr "(HMAC Signature Secret Configured)"
+
+msgid "(user deleted)"
+msgstr "(user deleted)"
+
+msgid ") - AssetBox"
+msgstr "- ) - AssetBox"
+
+msgid ") successfully!"
+msgstr ") successfully!"
+
+msgid "- Accessory Details - AssetBox"
+msgstr "- Accessory Details - AssetBox"
+
+msgid "- Asset Holder - AssetBox"
+msgstr "- Asset-Inhaber - AssetBox"
+
+msgid "- Asset Role Details - AssetBox"
+msgstr "- Asset Role Details - AssetBox"
+
+msgid "- Asset Type - AssetBox"
+msgstr "- Asset-Typ - AssetBox"
+
+msgid "- AssetBox"
+msgstr "- AssetBox"
+
+msgid "- Category Details - AssetBox"
+msgstr "- Category Details - AssetBox"
+
+msgid "- Component Details - AssetBox"
+msgstr "- Component Details - AssetBox"
+
+msgid "- Component Type Details - AssetBox"
+msgstr "- Component Type Details - AssetBox"
+
+msgid "- Consumable Details - AssetBox"
+msgstr "- Consumable Details - AssetBox"
+
+msgid "- Contact Details - AssetBox"
+msgstr "- Contact Details - AssetBox"
+
+msgid "- Contact Role Details - AssetBox"
+msgstr "- Contact Role Details - AssetBox"
+
+msgid "- Custom Field - AssetBox"
+msgstr "- Custom Field - AssetBox"
+
+msgid "- Custom Field Set - AssetBox"
+msgstr "- Custom Field Set - AssetBox"
+
+msgid "- Depreciation Rule - AssetBox"
+msgstr "- Abschreibungsregel - AssetBox"
+
+msgid "- Details - AssetBox"
+msgstr "- Details - AssetBox"
+
+msgid "- Licenses - AssetBox"
+msgstr "- Lizenzen - AssetBox"
+
+msgid "- Location Details - AssetBox"
+msgstr "- Location Details - AssetBox"
+
+msgid "- Manufacturer Details - AssetBox"
+msgstr "- Manufacturer Details - AssetBox"
+
+msgid "- Site Details - AssetBox"
+msgstr "- Site Details - AssetBox"
+
+msgid "- Site Group Details - AssetBox"
+msgstr "- Site Group Details - AssetBox"
+
+msgid "- Software Catalog - AssetBox"
+msgstr "- Software Catalog - AssetBox"
+
+msgid "- Status Label Details - AssetBox"
+msgstr "- Status Label Details - AssetBox"
+
+msgid "- Supplier Details - AssetBox"
+msgstr "- Supplier Details - AssetBox"
+
+msgid "- Tenant Details - AssetBox"
+msgstr "- Tenant Details - AssetBox"
+
+msgid "- Tenant Group Details - AssetBox"
+msgstr "- Tenant Group Details - AssetBox"
+
+msgid "0 (Fully Allocated)"
+msgstr "0 (Fully Allocated)"
+
+msgid "0 selected"
+msgstr "0 selected"
+
+msgid "1. Custody & Care:"
+msgstr "1. Verwahrung & Sorgfalt:"
+
+msgid "2. Return Policy:"
+msgstr "2. Rückgaberecht:"
+
+msgid "3. Reporting Incidents:"
+msgstr "3. Meldung von Vorfällen:"
+
+msgid "4. Modification Prohibited:"
+msgstr "4. Modifikation verboten:"
+
+msgid "ADDED OR MODIFIED STATE"
+msgstr "ADDED OR MODIFIED STATE"
+
+msgid "Accessor"
 msgstr "Accessor"
 
 msgid "Accessories Monitored under"
 msgstr "Accessories Monitored under"
 
 msgid "Accessory"
-msgstr "Accessory"
+msgstr "Zubehör"
 
 msgid "Accessory Checkouts"
 msgstr "Accessory Checkouts"
@@ -881,7 +996,7 @@ msgid "Asset Repair & Upgrade History"
 msgstr "Asset Repair & Upgrade History"
 
 msgid "Asset Request"
-msgstr "Asset Request"
+msgstr "Asset-Anforderung"
 
 msgid "Asset Requests - AssetBox"
 msgstr "- Asset-Anfragen - AssetBox"
@@ -1358,7 +1473,7 @@ msgid "Consumption Log"
 msgstr "Consumption Log"
 
 msgid "Contact"
-msgstr "Contact"
+msgstr "Kontakt"
 
 msgid "Contact Assignments"
 msgstr "Contact Assignments"
@@ -1895,7 +2010,7 @@ msgid "Leave blank to use the default title."
 msgstr "Leave blank to use the default title."
 
 msgid "License"
-msgstr "License"
+msgstr "Lizenz"
 
 msgid "License Seats"
 msgstr "License Seats"
@@ -3429,3 +3544,246 @@ msgstr "″ height"
 
 msgid "″ width ×"
 msgstr "″ width ×"
+
+msgid "Assets"
+msgstr "Assets"
+
+msgid "Asset Role"
+msgstr "Asset-Rolle"
+
+msgid "Asset Roles"
+msgstr "Asset-Rollen"
+
+msgid "Manufacturer"
+msgstr "Hersteller"
+
+msgid "Manufacturers"
+msgstr "Hersteller"
+
+msgid "Location"
+msgstr "Lagerort"
+
+msgid "Locations"
+msgstr "Lagerorte"
+
+msgid "Site"
+msgstr "Standort"
+
+msgid "Sites"
+msgstr "Standorte"
+
+msgid "Tenant"
+msgstr "Mandant"
+
+msgid "Tenants"
+msgstr "Mandanten"
+
+msgid "Component (Catalog)"
+msgstr "Komponente (Katalog)"
+
+msgid "Components (Catalog)"
+msgstr "Komponenten (Katalog)"
+
+msgid "Component Stock"
+msgstr "Komponentenbestand"
+
+msgid "Component Stocks"
+msgstr "Komponentenbestände"
+
+msgid "Component Allocation"
+msgstr "Komponentenzuweisung"
+
+msgid "Component Allocations"
+msgstr "Komponentenzuweisungen"
+
+msgid "Accessory"
+msgstr "Zubehör"
+
+msgid "Accessories"
+msgstr "Zubehör"
+
+msgid "Accessory Stock"
+msgstr "Zubehörbestand"
+
+msgid "Accessory Stocks"
+msgstr "Zubehörbestände"
+
+msgid "Accessory Assignment"
+msgstr "Zubehörzuweisung"
+
+msgid "Accessory Assignments"
+msgstr "Zubehörzuweisungen"
+
+msgid "Consumable"
+msgstr "Verbrauchsmaterial"
+
+msgid "Consumables"
+msgstr "Verbrauchsmaterialien"
+
+msgid "Consumable Stock"
+msgstr "Verbrauchsmaterialbestand"
+
+msgid "Consumable Stocks"
+msgstr "Verbrauchsmaterialbestände"
+
+msgid "Consumable Assignment"
+msgstr "Verbrauchsmaterialzuweisung"
+
+msgid "Consumable Assignments"
+msgstr "Verbrauchsmaterialzuweisungen"
+
+msgid "Kit"
+msgstr "Kit"
+
+msgid "Kits"
+msgstr "Kits"
+
+msgid "Kit Item"
+msgstr "Kit-Element"
+
+msgid "Kit Items"
+msgstr "Kit-Elemente"
+
+msgid "License"
+msgstr "Lizenz"
+
+msgid "Licenses"
+msgstr "Lizenzen"
+
+msgid "License Seat Assignment"
+msgstr "Lizenzplatzzuweisung"
+
+msgid "License Seat Assignments"
+msgstr "Lizenzplatzzuweisungen"
+
+msgid "Software"
+msgstr "Software"
+
+msgid "Provider"
+msgstr "Anbieter"
+
+msgid "Providers"
+msgstr "Anbieter"
+
+msgid "Subscription"
+msgstr "Abonnement"
+
+msgid "Subscriptions"
+msgstr "Abonnements"
+
+msgid "Subscription Assignment"
+msgstr "Abonnementszuweisung"
+
+msgid "Subscription Assignments"
+msgstr "Abonnementszuweisungen"
+
+msgid "Tenant Group"
+msgstr "Mandantengruppe"
+
+msgid "Tenant Groups"
+msgstr "Mandantengruppen"
+
+msgid "Site Group"
+msgstr "Standortgruppe"
+
+msgid "Site Groups"
+msgstr "Standortgruppen"
+
+msgid "Region"
+msgstr "Region"
+
+msgid "Regions"
+msgstr "Regionen"
+
+msgid "Tenant Invitation"
+msgstr "Mandanten-Einladung"
+
+msgid "Tenant Invitations"
+msgstr "Mandanten-Einladungen"
+
+msgid "Status Label"
+msgstr "Status-Label"
+
+msgid "Depreciations"
+msgstr "Abschreibungen"
+
+msgid "Activity Log"
+msgstr "Aktivitätsprotokoll"
+
+msgid "Activity Logs"
+msgstr "Aktivitätsprotokolle"
+
+msgid "Installed Software Instance"
+msgstr "Installierte Software-Instanz"
+
+msgid "Installed Software Instances"
+msgstr "Installierte Software-Instanzen"
+
+msgid "Asset Requests"
+msgstr "Asset-Anforderungen"
+
+msgid "Asset Tag Sequence"
+msgstr "Asset-Tag-Sequenz"
+
+msgid "Asset Assignments"
+msgstr "Asset-Zuweisungen"
+
+msgid "Tag"
+msgstr "Tag"
+
+msgid "Dashboards"
+msgstr "Dashboards"
+
+msgid "Custom Field"
+msgstr "Benutzerdefiniertes Feld"
+
+msgid "Custom Fieldset"
+msgstr "Benutzerdefiniertes Feldset"
+
+msgid "Config Context"
+msgstr "Konfigurationskontext"
+
+msgid "Config Contexts"
+msgstr "Konfigurationskontexte"
+
+msgid "Asset Holder Assignment"
+msgstr "Asset-Inhaber-Zuweisung"
+
+msgid "Asset Holder Assignments"
+msgstr "Asset-Inhaber-Zuweisungen"
+
+msgid "Contact Role"
+msgstr "Kontaktrolle"
+
+msgid "Contact Assignment"
+msgstr "Kontaktzuweisung"
+
+msgid "Tenant Membership"
+msgstr "Mandanten-Mitgliedschaft"
+
+msgid "Tenant Memberships"
+msgstr "Mandanten-Mitgliedschaften"
+
+msgid "Consumable Consumption"
+msgstr "Verbrauchsmaterial-Verbrauch"
+
+msgid "Consumable Consumptions"
+msgstr "Verbrauchsmaterial-Verbräuche"
+
+msgid "Custody Receipt"
+msgstr "Übergabeprotokoll"
+
+msgid "Custody Receipts"
+msgstr "Übergabeprotokolle"
+
+msgid "Asset Maintenance"
+msgstr "Asset-Wartung"
+
+msgid "Asset Maintenances"
+msgstr "Asset-Wartungen"
+
+msgid "User Preference"
+msgstr "Benutzerpräferenz"
+
+msgid "Tokens"
+msgstr "Token"
