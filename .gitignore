@@ -53,3 +53,8 @@ scratch_page.html
 # Root-level templates directory (not part of project structure)
 /templates/
 
+# E2E test artifacts
+tests/e2e/node_modules/
+tests/e2e/test-results/
+tests/e2e/storageState.json
+
