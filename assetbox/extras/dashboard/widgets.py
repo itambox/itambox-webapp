@@ -10,7 +10,7 @@ from django.template.loader import render_to_string
 from django.core.exceptions import PermissionDenied
 from django.utils.translation import gettext as _
 
-from assets.models import Asset, ActivityLog, StatusLabel
+from assets.models import Asset, StatusLabel
 from compliance.models import AssetMaintenance
 from inventory.models import Accessory, Consumable
 from licenses.models import License

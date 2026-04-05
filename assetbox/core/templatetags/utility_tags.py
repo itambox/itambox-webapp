@@ -52,20 +52,19 @@ def status_from_tag(tag):
 @register.filter
 def icon_from_status(status):
     """
-    Map Bootstrap alert class/status to a Tabler icon name.
-    (Using Tabler icons which are often based on MDI names)
+    Map Bootstrap alert class/status to an MDI icon name.
     """
     if status == 'secondary': # debug
-        return 'bug' # Tabler 'bug' icon
+        return 'mdi-bug'
     elif status == 'info':
-        return 'info-circle' # Tabler 'info-circle' icon
+        return 'mdi-information-outline'
     elif status == 'success':
-        return 'circle-check' # Tabler 'circle-check' icon
+        return 'mdi-check-circle-outline'
     elif status == 'warning':
-        return 'alert-triangle' # Tabler 'alert-triangle' icon
+        return 'mdi-alert-outline'
     elif status == 'danger': # error
-        return 'alert-circle' # Tabler 'alert-circle' icon
-    return 'info-circle' # Default
+        return 'mdi-alert-circle-outline'
+    return 'mdi-information-outline' # Default
 
 @register.simple_tag()
 def update_querystring(request, **kwargs):

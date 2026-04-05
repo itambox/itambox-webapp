@@ -65,7 +65,6 @@ class Command(BaseCommand):
             # Leaf models first
             ('components', 'ComponentAllocation'),
             ('components', 'ComponentStock'),
-            ('assets', 'ActivityLog'),
             ('compliance', 'CustodyReceipt'),
             ('core', 'ObjectChange'),
             ('core', 'Notification'),
@@ -185,6 +184,9 @@ class Command(BaseCommand):
             # Phase 6: Kits, Maintenance, Activity
             self._seed_phase6()
 
+            # Phase 7: Missing Demo Features
+            self._seed_phase7()
+
     # ─────────────────────────────────────────
     # Phase 0: Users, Tags, StatusLabels
     # ─────────────────────────────────────────
@@ -198,23 +200,23 @@ class Command(BaseCommand):
 
         # Users
         users_data = [
-            ('rene.rettig', 'rene.rettig@helheim.cloud', True),
-            ('sarah.chen', 'sarah.chen@helheim.cloud', False),
-            ('marcus.johnson', 'marcus.johnson@helheim.cloud', False),
-            ('elena.rodriguez', 'elena.rodriguez@helheim.cloud', False),
-            ('thomas.weber', 'thomas.weber@helheim.cloud', False),
-            ('oliver.smith', 'oliver.smith@helheim.cloud', False),
-            ('sophia.martinez', 'sophia.martinez@helheim.cloud', False),
-            ('lucas.muller', 'lucas.muller@helheim.cloud', False),
-            ('emma.dupont', 'emma.dupont@helheim.cloud', False),
-            ('liam.o-connor', 'liam.oconnor@helheim.cloud', False),
-            ('chloe.lefevre', 'chloe.lefevre@helheim.cloud', False),
-            ('noah.schmidt', 'noah.schmidt@helheim.cloud', False),
-            ('mia.petrov', 'mia.petrov@helheim.cloud', False),
-            ('alexander.gruber', 'alexander.gruber@helheim.cloud', False),
-            ('yasmine.al-sayed', 'yasmine.alsayed@helheim.cloud', False),
-            ('david.kim', 'david.kim@helheim.cloud', False),
-            ('wei.zhang', 'wei.zhang@helheim.cloud', False),
+            ('alex.admin', 'alex.admin@acme.corp', True),
+            ('sarah.chen', 'sarah.chen@acme.corp', False),
+            ('marcus.johnson', 'marcus.johnson@acme.corp', False),
+            ('elena.rodriguez', 'elena.rodriguez@acme.corp', False),
+            ('thomas.weber', 'thomas.weber@acme.corp', False),
+            ('oliver.smith', 'oliver.smith@acme.corp', False),
+            ('sophia.martinez', 'sophia.martinez@acme.corp', False),
+            ('lucas.muller', 'lucas.muller@acme.corp', False),
+            ('emma.dupont', 'emma.dupont@acme.corp', False),
+            ('liam.o-connor', 'liam.oconnor@acme.corp', False),
+            ('chloe.lefevre', 'chloe.lefevre@acme.corp', False),
+            ('noah.schmidt', 'noah.schmidt@acme.corp', False),
+            ('mia.petrov', 'mia.petrov@acme.corp', False),
+            ('alexander.gruber', 'alexander.gruber@acme.corp', False),
+            ('yasmine.al-sayed', 'yasmine.alsayed@acme.corp', False),
+            ('david.kim', 'david.kim@acme.corp', False),
+            ('wei.zhang', 'wei.zhang@acme.corp', False),
         ]
         self._users = []
         for username, email, is_superuser in users_data:
@@ -481,30 +483,38 @@ class Command(BaseCommand):
             obj, _ = SiteGroup.objects.get_or_create(slug=slug, defaults={'name': name})
             site_groups[slug] = obj
 
-        # TenantGroups & Tenants
-        tg_helheim, _ = TenantGroup.objects.get_or_create(
-            slug='helheim-group', defaults={'name': 'Helheim Group'}
-        )
-        tg_customers, _ = TenantGroup.objects.get_or_create(
-            slug='customer-tenants', defaults={'name': 'Customer Tenants'}
-        )
+        # TenantGroups
+        tg_acme, _ = TenantGroup.objects.get_or_create(slug='acme-corp', defaults={'name': 'Acme Corporation'})
+        tg_globex, _ = TenantGroup.objects.get_or_create(slug='globex-inc', defaults={'name': 'Globex Inc'})
+        tg_stark, _ = TenantGroup.objects.get_or_create(slug='stark-industries', defaults={'name': 'Stark Industries'})
+        tg_soylent, _ = TenantGroup.objects.get_or_create(slug='soylent-corp', defaults={'name': 'Soylent Corp'})
+        tg_initech, _ = TenantGroup.objects.get_or_create(slug='initech-llc', defaults={'name': 'Initech LLC'})
 
         tenants = {}
         tenant_data = [
-            # Internal (Helheim Group)
-            ('Helheim Cloud GmbH', 'helheim-cloud-gmbh', tg_helheim),
-            ('Helheim Security AG', 'helheim-security-ag', tg_helheim),
-            ('Helheim Labs Inc.', 'helheim-labs-inc', tg_helheim),
-            ('Helheim Aviation SE', 'helheim-aviation-se', tg_helheim),
-            # Customer tenants
-            ('Finova Capital AG', 'finova-capital-ag', tg_customers),
-            ('Finova Asset Management Ltd.', 'finova-asset-management-ltd', tg_customers),
-            ('MediCare Health GmbH', 'medicare-health-gmbh', tg_customers),
-            ('MediCare Research Lab', 'medicare-research-lab', tg_customers),
-            ('TechStartup.io GmbH', 'techstartup-io-gmbh', tg_customers),
-            ('GreenEnergy Solutions SE', 'greenenergy-solutions-se', tg_customers),
-            ('Apex Logistics Solutions', 'apex-logistics-solutions', tg_customers),
-            ('Quantum Robotics Corp', 'quantum-robotics-corp', tg_customers),
+            # Acme Corporation (Internal/Host Demo)
+            ('Acme North America', 'acme-north-america', tg_acme),
+            ('Acme Europe', 'acme-europe', tg_acme),
+            ('Acme Labs', 'acme-labs', tg_acme),
+            
+            # Globex Inc
+            ('Globex Retail', 'globex-retail', tg_globex),
+            ('Globex Manufacturing', 'globex-manufacturing', tg_globex),
+            
+            # Stark Industries
+            ('Stark Defense', 'stark-defense', tg_stark),
+            ('Stark Energy', 'stark-energy', tg_stark),
+            
+            # Soylent Corp
+            ('Soylent Operations', 'soylent-operations', tg_soylent),
+            ('Soylent Research', 'soylent-research', tg_soylent),
+            
+            # Initech LLC
+            ('Initech Software', 'initech-software', tg_initech),
+            ('Initech Consulting', 'initech-consulting', tg_initech),
+            
+            # Additional generic tenant
+            ('Umbrella Corp', 'umbrella-corp', tg_acme), # Assigning to Acme for variety, or leave it. Let's make it its own or under Initech
         ]
         for name, slug, tgroup in tenant_data:
             obj, _ = Tenant.objects.get_or_create(slug=slug, defaults={'name': name, 'group': tgroup})
@@ -514,47 +524,47 @@ class Command(BaseCommand):
         # Sites
         sites = {}
         site_data = [
-            ('Berlin HQ', 'berlin-hq', site_groups['corporate-offices'], tenants['helheim-cloud-gmbh'],
+            ('Berlin HQ', 'berlin-hq', site_groups['corporate-offices'], tenants['acme-north-america'],
              sub_regions['western-europe'], 'Central Office', '52.5200', '13.4050',
              'Mauerstrasse 42\n10117 Berlin\nGermany'),
-            ('Munich Office', 'munich-office', site_groups['corporate-offices'], tenants['helheim-security-ag'],
+            ('Munich Office', 'munich-office', site_groups['corporate-offices'], tenants['acme-europe'],
              sub_regions['western-europe'], 'Satellite Office', '48.1351', '11.5820',
              'Leopoldstrasse 88\n80802 Munich\nGermany'),
-            ('Amsterdam DC', 'amsterdam-dc', site_groups['datacenters'], tenants['helheim-cloud-gmbh'],
+            ('Amsterdam DC', 'amsterdam-dc', site_groups['datacenters'], tenants['acme-north-america'],
              sub_regions['western-europe'], 'Primary Datacenter', '52.3105', '4.7683',
              'Science Park 400\n1098 XH Amsterdam\nNetherlands'),
-            ('New York Office', 'new-york-office', site_groups['corporate-offices'], tenants['helheim-labs-inc'],
+            ('New York Office', 'new-york-office', site_groups['corporate-offices'], tenants['acme-labs'],
              sub_regions['us-east'], 'US Headquarters', '40.7128', '-74.0060',
              '350 Fifth Avenue\nNew York, NY 10118\nUSA'),
-            ('San Francisco Office', 'san-francisco-office', site_groups['corporate-offices'], tenants['helheim-labs-inc'],
+            ('San Francisco Office', 'san-francisco-office', site_groups['corporate-offices'], tenants['acme-labs'],
              sub_regions['us-west'], 'West Coast Office', '37.7749', '-122.4194',
              '1 Market Street\nSan Francisco, CA 94105\nUSA'),
-            ('Singapore Office', 'singapore-office', site_groups['remote-sites'], tenants['helheim-cloud-gmbh'],
+            ('Singapore Office', 'singapore-office', site_groups['remote-sites'], tenants['acme-north-america'],
              sub_regions['southeast-asia'], 'APAC Hub', '1.3521', '103.8198',
              '8 Marina Boulevard\nSingapore 018981'),
             # Customer Sites
-            ('Finova Frankfurt HQ', 'finova-frankfurt-hq', site_groups['corporate-offices'], tenants['finova-capital-ag'],
+            ('Globex Frankfurt HQ', 'globex-frankfurt-hq', site_groups['corporate-offices'], tenants['globex-retail'],
              sub_regions['western-europe'], 'Customer HQ', '50.1109', '8.6821',
              'Taunusanlage 12\n60325 Frankfurt\nGermany'),
-            ('Finova Frankfurt Office 2', 'frankfurt-hub', site_groups['corporate-offices'], tenants['finova-asset-management-ltd'],
+            ('Globex Frankfurt Office 2', 'frankfurt-hub', site_groups['corporate-offices'], tenants['globex-manufacturing'],
              sub_regions['western-europe'], 'Asset Management Center', '50.1120', '8.6800',
              'Kaiserstrasse 15\n60311 Frankfurt\nGermany'),
-            ('MediCare Munich Office', 'medicare-munich-office', site_groups['corporate-offices'], tenants['medicare-health-gmbh'],
+            ('MediCare Munich Office', 'medicare-munich-office', site_groups['corporate-offices'], tenants['stark-defense'],
              sub_regions['western-europe'], 'Customer Office', '48.1374', '11.5755',
              'Rosenheimer Strasse 145\n81671 Munich\nGermany'),
-            ('MediCare Research Lab Munich', 'munich-lab', site_groups['datacenters'], tenants['medicare-research-lab'],
+            ('Stark Energy Munich', 'munich-lab', site_groups['datacenters'], tenants['stark-energy'],
              sub_regions['western-europe'], 'Research Laboratory', '48.1400', '11.5800',
              'Rosenheimer Strasse 150\n81671 Munich\nGermany'),
-            ('TechStartup Berlin Hub', 'techstartup-berlin-hub', site_groups['remote-sites'], tenants['techstartup-io-gmbh'],
+            ('TechStartup Berlin Hub', 'techstartup-berlin-hub', site_groups['remote-sites'], tenants['soylent-operations'],
              sub_regions['western-europe'], 'Co-Working Hub', '52.5067', '13.3911',
              'Axel-Springer-Strasse 54\n10117 Berlin\nGermany'),
-            ('GreenEnergy Hamburg', 'greenenergy-hamburg', site_groups['corporate-offices'], tenants['greenenergy-solutions-se'],
+            ('GreenEnergy Hamburg', 'greenenergy-hamburg', site_groups['corporate-offices'], tenants['soylent-research'],
              sub_regions['northern-europe'], 'Customer HQ', '53.5511', '9.9937',
              'Am Kaiserkai 1\n20457 Hamburg\nGermany'),
-            ('Apex Frankfurt Depot', 'apex-frankfurt-depot', site_groups['remote-sites'], tenants['apex-logistics-solutions'],
+            ('Apex Frankfurt Depot', 'apex-frankfurt-depot', site_groups['remote-sites'], tenants['initech-consulting'],
              sub_regions['western-europe'], 'Warehouse Depot', '50.0494', '8.5707',
              'CargoCity Sued\n60549 Frankfurt Airport\nGermany'),
-            ('Boston Robotics Center', 'boston-robotics-center', site_groups['corporate-offices'], tenants['quantum-robotics-corp'],
+            ('Boston Robotics Center', 'boston-robotics-center', site_groups['corporate-offices'], tenants['umbrella-corp'],
              sub_regions['us-east'], 'R&D Center', '42.3601', '-71.0589',
              '250 Summer Street\nBoston, MA 02210\nUSA'),
         ]
@@ -572,31 +582,31 @@ class Command(BaseCommand):
         # Locations (rooms/floors within sites)
         locations = {}
         location_data = [
-            ('Floor 1 - Engineering', 'berlin-floor-1-eng', sites['berlin-hq'], tenants['helheim-cloud-gmbh']),
-            ('Floor 2 - Finance & HR', 'berlin-floor-2-admin', sites['berlin-hq'], tenants['helheim-cloud-gmbh']),
-            ('Floor 3 - Executive', 'berlin-floor-3-exec', sites['berlin-hq'], tenants['helheim-cloud-gmbh']),
-            ('Server Room A', 'berlin-server-room-a', sites['berlin-hq'], tenants['helheim-cloud-gmbh']),
-            ('Berlin Staging Row 1', 'berlin-staging-row-1', sites['berlin-hq'], tenants['helheim-cloud-gmbh']),
-            ('Rack Row 1 - Compute', 'ams-rack-row-1', sites['amsterdam-dc'], tenants['helheim-cloud-gmbh']),
-            ('Rack Row 2 - Storage', 'ams-rack-row-2', sites['amsterdam-dc'], tenants['helheim-cloud-gmbh']),
-            ('Rack Row 3 - Network', 'ams-rack-row-3', sites['amsterdam-dc'], tenants['helheim-cloud-gmbh']),
-            ('Floor 5 - Engineering', 'ny-floor-5-eng', sites['new-york-office'], tenants['helheim-labs-inc']),
-            ('Floor 6 - Sales', 'ny-floor-6-sales', sites['new-york-office'], tenants['helheim-labs-inc']),
-            ('Office 12A', 'munich-office-12a', sites['munich-office'], tenants['helheim-security-ag']),
-            ('Munich Staging Area', 'munich-staging-area', sites['munich-office'], tenants['helheim-security-ag']),
+            ('Floor 1 - Engineering', 'berlin-floor-1-eng', sites['berlin-hq'], tenants['acme-north-america']),
+            ('Floor 2 - Finance & HR', 'berlin-floor-2-admin', sites['berlin-hq'], tenants['acme-north-america']),
+            ('Floor 3 - Executive', 'berlin-floor-3-exec', sites['berlin-hq'], tenants['acme-north-america']),
+            ('Server Room A', 'berlin-server-room-a', sites['berlin-hq'], tenants['acme-north-america']),
+            ('Berlin Staging Row 1', 'berlin-staging-row-1', sites['berlin-hq'], tenants['acme-north-america']),
+            ('Rack Row 1 - Compute', 'ams-rack-row-1', sites['amsterdam-dc'], tenants['acme-north-america']),
+            ('Rack Row 2 - Storage', 'ams-rack-row-2', sites['amsterdam-dc'], tenants['acme-north-america']),
+            ('Rack Row 3 - Network', 'ams-rack-row-3', sites['amsterdam-dc'], tenants['acme-north-america']),
+            ('Floor 5 - Engineering', 'ny-floor-5-eng', sites['new-york-office'], tenants['acme-labs']),
+            ('Floor 6 - Sales', 'ny-floor-6-sales', sites['new-york-office'], tenants['acme-labs']),
+            ('Office 12A', 'munich-office-12a', sites['munich-office'], tenants['acme-europe']),
+            ('Munich Staging Area', 'munich-staging-area', sites['munich-office'], tenants['acme-europe']),
             # Customer Locations
-            ('Floor 2 - Trading Desk', 'finova-floor-2-trading', sites['finova-frankfurt-hq'], tenants['finova-capital-ag']),
-            ('Floor 3 - Risk Management', 'finova-floor-3-risk', sites['finova-frankfurt-hq'], tenants['finova-capital-ag']),
-            ('Frankfurt Hub Floor 1', 'frankfurt-hub-floor-1', sites['frankfurt-hub'], tenants['finova-asset-management-ltd']),
-            ('Ward Administration', 'medicare-ward-admin', sites['medicare-munich-office'], tenants['medicare-health-gmbh']),
-            ('Lab Research Suite', 'medicare-lab-research', sites['medicare-munich-office'], tenants['medicare-health-gmbh']),
-            ('Lab A Testing Bench', 'lab-a-testing-bench', sites['munich-lab'], tenants['medicare-research-lab']),
-            ('Open Space Area', 'techstartup-open-space', sites['techstartup-berlin-hub'], tenants['techstartup-io-gmbh']),
-            ('Engineering Lab', 'techstartup-eng-lab', sites['techstartup-berlin-hub'], tenants['techstartup-io-gmbh']),
-            ('Wind Analytics Office', 'greenenergy-wind-analytics', sites['greenenergy-hamburg'], tenants['greenenergy-solutions-se']),
-            ('Solar Operations Center', 'greenenergy-solar-ops', sites['greenenergy-hamburg'], tenants['greenenergy-solutions-se']),
-            ('Frankfurt Depot Shelf B', 'frankfurt-depot-shelf-b', sites['apex-frankfurt-depot'], tenants['apex-logistics-solutions']),
-            ('Boston Assembly Floor', 'boston-assembly-floor', sites['boston-robotics-center'], tenants['quantum-robotics-corp']),
+            ('Floor 2 - Trading Desk', 'globex-floor-2-trading', sites['globex-frankfurt-hq'], tenants['globex-retail']),
+            ('Floor 3 - Risk Management', 'globex-floor-3-risk', sites['globex-frankfurt-hq'], tenants['globex-retail']),
+            ('Frankfurt Hub Floor 1', 'frankfurt-hub-floor-1', sites['frankfurt-hub'], tenants['globex-manufacturing']),
+            ('Ward Administration', 'medicare-ward-admin', sites['medicare-munich-office'], tenants['stark-defense']),
+            ('Lab Research Suite', 'medicare-lab-research', sites['medicare-munich-office'], tenants['stark-defense']),
+            ('Lab A Testing Bench', 'lab-a-testing-bench', sites['munich-lab'], tenants['stark-energy']),
+            ('Open Space Area', 'techstartup-open-space', sites['techstartup-berlin-hub'], tenants['soylent-operations']),
+            ('Engineering Lab', 'techstartup-eng-lab', sites['techstartup-berlin-hub'], tenants['soylent-operations']),
+            ('Wind Analytics Office', 'greenenergy-wind-analytics', sites['greenenergy-hamburg'], tenants['soylent-research']),
+            ('Solar Operations Center', 'greenenergy-solar-ops', sites['greenenergy-hamburg'], tenants['soylent-research']),
+            ('Frankfurt Depot Shelf B', 'frankfurt-depot-shelf-b', sites['apex-frankfurt-depot'], tenants['initech-consulting']),
+            ('Boston Assembly Floor', 'boston-assembly-floor', sites['boston-robotics-center'], tenants['umbrella-corp']),
         ]
         for name, slug, site, tenant in location_data:
             obj, _ = Location.objects.get_or_create(
@@ -608,39 +618,39 @@ class Command(BaseCommand):
 
         # AssetHolders (employees)
         holder_data = [
-            ('Rene', 'Rettig', 'rene.rettig', 'rene.rettig@helheim.cloud', tenants['helheim-cloud-gmbh']),
-            ('Sarah', 'Chen', 'sarah.chen', 'sarah.chen@helheim.cloud', tenants['helheim-cloud-gmbh']),
-            ('Marcus', 'Johnson', 'marcus.johnson', 'marcus.johnson@helheim.cloud', tenants['helheim-labs-inc']),
-            ('Elena', 'Rodriguez', 'elena.rodriguez', 'elena.rodriguez@helheim.cloud', tenants['helheim-security-ag']),
-            ('Thomas', 'Weber', 'thomas.weber', 'thomas.weber@helheim.cloud', tenants['helheim-cloud-gmbh']),
-            ('Anna', 'Schmidt', 'anna.schmidt', 'anna.schmidt@helheim.cloud', tenants['helheim-cloud-gmbh']),
-            ('James', 'Wilson', 'james.wilson', 'james.wilson@helheim.cloud', tenants['helheim-labs-inc']),
-            ('Yuki', 'Tanaka', 'yuki.tanaka', 'yuki.tanaka@helheim.cloud', tenants['helheim-cloud-gmbh']),
-            ('Omar', 'Hassan', 'omar.hassan', 'omar.hassan@helheim.cloud', tenants['helheim-security-ag']),
-            ('Lisa', 'Andersson', 'lisa.andersson', 'lisa.andersson@helheim.cloud', tenants['helheim-cloud-gmbh']),
-            ('Carlos', 'Mendez', 'carlos.mendez', 'carlos.mendez@helheim.cloud', tenants['helheim-labs-inc']),
-            ('Priya', 'Patel', 'priya.patel', 'priya.patel@helheim.cloud', tenants['helheim-cloud-gmbh']),
-            ('Oliver', 'Smith', 'oliver.smith', 'oliver.smith@helheim.cloud', tenants['helheim-aviation-se']),
-            ('Sophia', 'Martinez', 'sophia.martinez', 'sophia.martinez@helheim.cloud', tenants['helheim-aviation-se']),
+            ('Alex', 'Rettig', 'alex.admin', 'alex.admin@acme.corp', tenants['acme-north-america']),
+            ('Sarah', 'Chen', 'sarah.chen', 'sarah.chen@acme.corp', tenants['acme-north-america']),
+            ('Marcus', 'Johnson', 'marcus.johnson', 'marcus.johnson@acme.corp', tenants['acme-labs']),
+            ('Elena', 'Rodriguez', 'elena.rodriguez', 'elena.rodriguez@acme.corp', tenants['acme-europe']),
+            ('Thomas', 'Weber', 'thomas.weber', 'thomas.weber@acme.corp', tenants['acme-north-america']),
+            ('Anna', 'Schmidt', 'anna.schmidt', 'anna.schmidt@acme.corp', tenants['acme-north-america']),
+            ('James', 'Wilson', 'james.wilson', 'james.wilson@acme.corp', tenants['acme-labs']),
+            ('Yuki', 'Tanaka', 'yuki.tanaka', 'yuki.tanaka@acme.corp', tenants['acme-north-america']),
+            ('Omar', 'Hassan', 'omar.hassan', 'omar.hassan@acme.corp', tenants['acme-europe']),
+            ('Lisa', 'Andersson', 'lisa.andersson', 'lisa.andersson@acme.corp', tenants['acme-north-america']),
+            ('Carlos', 'Mendez', 'carlos.mendez', 'carlos.mendez@acme.corp', tenants['acme-labs']),
+            ('Priya', 'Patel', 'priya.patel', 'priya.patel@acme.corp', tenants['acme-north-america']),
+            ('Oliver', 'Smith', 'oliver.smith', 'oliver.smith@acme.corp', tenants['initech-software']),
+            ('Sophia', 'Martinez', 'sophia.martinez', 'sophia.martinez@acme.corp', tenants['initech-software']),
             # Customer holders
-            ('Klaus', 'Fischer', 'klaus.fischer', 'klaus.fischer@finova-capital.de', tenants['finova-capital-ag']),
-            ('Nina', 'Bergmann', 'nina.bergmann', 'nina.bergmann@finova-capital.de', tenants['finova-capital-ag']),
-            ('Lucas', 'Müller', 'lucas.muller', 'lucas.muller@finova-asset.de', tenants['finova-asset-management-ltd']),
-            ('Emma', 'Dupont', 'emma.dupont', 'emma.dupont@finova-asset.de', tenants['finova-asset-management-ltd']),
-            ('Dr. Markus', 'Wagner', 'markus.wagner', 'dr.wagner@medicare-health.de', tenants['medicare-health-gmbh']),
-            ('Sophie', 'Klein', 'sophie.klein', 'sophie.klein@medicare-health.de', tenants['medicare-health-gmbh']),
-            ('Liam', 'O\'Connor', 'liam.o-connor', 'liam.oconnor@medicare-lab.de', tenants['medicare-research-lab']),
-            ('Chloe', 'Lefevre', 'chloe.lefevre', 'chloe.lefevre@medicare-lab.de', tenants['medicare-research-lab']),
-            ('Felix', 'Bauer', 'felix.bauer', 'felix@techstartup.io', tenants['techstartup-io-gmbh']),
-            ('Lena', 'Schulz', 'lena.schulz', 'lena@techstartup.io', tenants['techstartup-io-gmbh']),
-            ('Jonas', 'Hoffmann', 'jonas.hoffmann', 'jonas.hoffmann@greenenergy-se.de', tenants['greenenergy-solutions-se']),
-            ('Katja', 'Vogel', 'katja.vogel', 'katja.vogel@greenenergy-se.de', tenants['greenenergy-solutions-se']),
-            ('Noah', 'Schmidt', 'noah.schmidt', 'noah.schmidt@apex-logistics.de', tenants['apex-logistics-solutions']),
-            ('Mia', 'Petrov', 'mia.petrov', 'mia.petrov@apex-logistics.de', tenants['apex-logistics-solutions']),
-            ('Alexander', 'Gruber', 'alexander.gruber', 'alex.gruber@quantum-robotics.com', tenants['quantum-robotics-corp']),
-            ('Yasmine', 'Al-Sayed', 'yasmine.al-sayed', 'yasmine.alsayed@quantum-robotics.com', tenants['quantum-robotics-corp']),
-            ('David', 'Kim', 'david.kim', 'david.kim@quantum-robotics.com', tenants['quantum-robotics-corp']),
-            ('Wei', 'Zhang', 'wei.zhang', 'wei.zhang@quantum-robotics.com', tenants['quantum-robotics-corp']),
+            ('Klaus', 'Fischer', 'klaus.fischer', 'klaus.fischer@globex-capital.de', tenants['globex-retail']),
+            ('Nina', 'Bergmann', 'nina.bergmann', 'nina.bergmann@globex-capital.de', tenants['globex-retail']),
+            ('Lucas', 'Müller', 'lucas.muller', 'lucas.muller@globex-asset.de', tenants['globex-manufacturing']),
+            ('Emma', 'Dupont', 'emma.dupont', 'emma.dupont@globex-asset.de', tenants['globex-manufacturing']),
+            ('Dr. Markus', 'Wagner', 'markus.wagner', 'dr.wagner@medicare-health.de', tenants['stark-defense']),
+            ('Sophie', 'Klein', 'sophie.klein', 'sophie.klein@medicare-health.de', tenants['stark-defense']),
+            ('Liam', 'O\'Connor', 'liam.o-connor', 'liam.oconnor@medicare-lab.de', tenants['stark-energy']),
+            ('Chloe', 'Lefevre', 'chloe.lefevre', 'chloe.lefevre@medicare-lab.de', tenants['stark-energy']),
+            ('Felix', 'Bauer', 'felix.bauer', 'felix@techstartup.io', tenants['soylent-operations']),
+            ('Lena', 'Schulz', 'lena.schulz', 'lena@techstartup.io', tenants['soylent-operations']),
+            ('Jonas', 'Hoffmann', 'jonas.hoffmann', 'jonas.hoffmann@greenenergy-se.de', tenants['soylent-research']),
+            ('Katja', 'Vogel', 'katja.vogel', 'katja.vogel@greenenergy-se.de', tenants['soylent-research']),
+            ('Noah', 'Schmidt', 'noah.schmidt', 'noah.schmidt@apex-logistics.de', tenants['initech-consulting']),
+            ('Mia', 'Petrov', 'mia.petrov', 'mia.petrov@apex-logistics.de', tenants['initech-consulting']),
+            ('Alexander', 'Gruber', 'alexander.gruber', 'alex.gruber@quantum-robotics.com', tenants['umbrella-corp']),
+            ('Yasmine', 'Al-Sayed', 'yasmine.al-sayed', 'yasmine.alsayed@quantum-robotics.com', tenants['umbrella-corp']),
+            ('David', 'Kim', 'david.kim', 'david.kim@quantum-robotics.com', tenants['umbrella-corp']),
+            ('Wei', 'Zhang', 'wei.zhang', 'wei.zhang@quantum-robotics.com', tenants['umbrella-corp']),
         ]
         self._holders = {}
         for first, last, upn, email, tenant in holder_data:
@@ -670,7 +680,7 @@ class Command(BaseCommand):
             ('John Vendor', 'Dell Account Manager', '+1-512-555-0100', 'john.vendor@dell.com', 'https://dell.com'),
             ('Lisa Support', 'Apple Enterprise Support', '+1-408-555-0200', 'lisa.support@apple.com', 'https://apple.com'),
             ('Mike Tech', 'Cisco TAC Lead', '+1-408-555-0300', 'mike.tech@cisco.com', 'https://cisco.com'),
-            ('Sandra Sales', 'HP Renewals', '+1-650-555-0400', 'sandra.sales@hp.com', 'https://hp.com'),
+            ('Sandra Sales', 'HP Alexwals', '+1-650-555-0400', 'sandra.sales@hp.com', 'https://hp.com'),
             ('Alex Distributor', 'Lenovo Channel Manager', '+49-30-555-0500', 'alex.dist@lenovo.com', 'https://lenovo.com'),
         ]
         self._contacts = []
@@ -848,7 +858,7 @@ class Command(BaseCommand):
                     'name': name, 'manufacturer': self._manufacturers[mfr_slug],
                     'category': self._categories.get(cat_slug), 'part_number': part_number,
                     'min_qty': min_qty,
-                    'tenant': self._tenants.get('helheim-cloud-gmbh'),
+                    'tenant': self._tenants.get('acme-north-america'),
                 }
             )
             self._accessories[slug] = obj
@@ -871,7 +881,7 @@ class Command(BaseCommand):
                     'name': name, 'manufacturer': self._manufacturers[mfr_slug],
                     'category': self._categories.get(cat_slug), 'part_number': part_number,
                     'min_qty': min_qty,
-                    'tenant': self._tenants.get('helheim-cloud-gmbh'),
+                    'tenant': self._tenants.get('acme-north-america'),
                 }
             )
             self._consumables[slug] = obj
@@ -897,7 +907,7 @@ class Command(BaseCommand):
         # Create 60+ assets across all types
         asset_data = [
             # (name, asset_tag, asset_type_slug, asset_role_slug, status_slug, holder_upn, location_slug, serial, purchase_cost, salvage_value, purchase_date)
-            ('MBP16 Rene Rettig', 'ABX-001', 'macbook-pro-16-2024', 'laptop', 'in-use', 'rene.rettig', 'berlin-floor-1-eng', 'C02ZV1R9MD6T', 3599.00, 500.00, datetime.date(2024, 3, 15)),
+            ('MBP16 Alex Admin', 'ABX-001', 'macbook-pro-16-2024', 'laptop', 'in-use', 'alex.admin', 'berlin-floor-1-eng', 'C02ZV1R9MD6T', 3599.00, 500.00, datetime.date(2024, 3, 15)),
             ('MBP16 Sarah Chen', 'ABX-002', 'macbook-pro-16-2024', 'laptop', 'in-use', 'sarah.chen', 'berlin-floor-1-eng', 'C02ZV2T8MD7U', 3599.00, 500.00, datetime.date(2024, 4, 10)),
             ('Latitude 5550 Marcus', 'ABX-003', 'dell-latitude-5550', 'laptop', 'in-use', 'marcus.johnson', 'ny-floor-5-eng', 'DL5550-001', 1899.00, 300.00, datetime.date(2024, 6, 1)),
             ('Latitude 5550 Elena', 'ABX-004', 'dell-latitude-5550', 'laptop', 'in-use', 'elena.rodriguez', 'munich-office-12a', 'DL5550-002', 1899.00, 300.00, datetime.date(2024, 7, 20)),
@@ -922,7 +932,7 @@ class Command(BaseCommand):
             ('PowerEdge R760 Prod-2', 'ABX-023', 'dell-poweredge-r760', 'server', 'in-use', None, 'ams-rack-row-1', 'SRV-PROD-02', 18500.00, 2000.00, datetime.date(2024, 1, 10)),
             ('ProLiant DL380 Dev-1', 'ABX-024', 'hpe-proliant-dl380-g11', 'server', 'in-use', None, 'ams-rack-row-2', 'SRV-DEV-01', 12500.00, 1500.00, datetime.date(2024, 3, 20)),
             ('PowerEdge R760 Backup', 'ABX-025', 'dell-poweredge-r760', 'server', 'available', None, 'ams-rack-row-2', 'SRV-BACKUP-01', 18500.00, 2000.00, datetime.date(2024, 6, 1)),
-            ('iPhone 15 Pro Rene', 'ABX-026', 'iphone-15-pro', 'mobile-phone', 'in-use', 'rene.rettig', 'berlin-floor-1-eng', 'IP15P-001', 1299.00, 150.00, datetime.date(2024, 9, 22)),
+            ('iPhone 15 Pro Alex', 'ABX-026', 'iphone-15-pro', 'mobile-phone', 'in-use', 'alex.admin', 'berlin-floor-1-eng', 'IP15P-001', 1299.00, 150.00, datetime.date(2024, 9, 22)),
             ('iPhone 15 Pro Sarah', 'ABX-027', 'iphone-15-pro', 'mobile-phone', 'in-use', 'sarah.chen', 'berlin-floor-1-eng', 'IP15P-002', 1299.00, 150.00, datetime.date(2024, 9, 22)),
             ('iPhone 15 Pro Marcus', 'ABX-028', 'iphone-15-pro', 'mobile-phone', 'in-use', 'marcus.johnson', 'ny-floor-5-eng', 'IP15P-003', 1299.00, 150.00, datetime.date(2024, 9, 25)),
             ('Galaxy S24 Elena', 'ABX-029', 'galaxy-s24-ultra', 'mobile-phone', 'in-use', 'elena.rodriguez', 'munich-office-12a', 'S24U-001', 1249.00, 150.00, datetime.date(2024, 10, 5)),
@@ -934,7 +944,7 @@ class Command(BaseCommand):
             ('Meraki MR46 AP-2', 'ABX-035', 'meraki-mr46', 'network-device', 'in-use', None, 'berlin-floor-2-admin', 'MR46-AP-02', 1200.00, 100.00, datetime.date(2024, 3, 5)),
             ('UDM Pro Gateway', 'ABX-036', 'unifi-dream-machine-pro', 'network-device', 'in-use', None, 'berlin-server-room-a', 'UDM-PRO-01', 379.00, 50.00, datetime.date(2024, 1, 15)),
             ('Synology NAS Primary', 'ABX-037', 'synology-ds1823xs', 'storage-device', 'in-use', None, 'ams-rack-row-2', 'NAS-PRIMARY-01', 4200.00, 400.00, datetime.date(2024, 5, 10)),
-            ('Dell P2723DE Monitor-1', 'ABX-038', 'dell-p2723de-monitor', 'monitor', 'in-use', 'rene.rettig', 'berlin-floor-1-eng', 'MON-DELL-01', 499.00, 50.00, datetime.date(2024, 3, 15)),
+            ('Dell P2723DE Monitor-1', 'ABX-038', 'dell-p2723de-monitor', 'monitor', 'in-use', 'alex.admin', 'berlin-floor-1-eng', 'MON-DELL-01', 499.00, 50.00, datetime.date(2024, 3, 15)),
             ('Dell P2723DE Monitor-2', 'ABX-039', 'dell-p2723de-monitor', 'monitor', 'in-use', 'sarah.chen', 'berlin-floor-1-eng', 'MON-DELL-02', 499.00, 50.00, datetime.date(2024, 4, 10)),
             ('Latitude 5550 Spare-1', 'ABX-040', 'dell-latitude-5550', 'laptop', 'available', None, 'berlin-floor-1-eng', 'DL5550-SP01', 1899.00, 300.00, datetime.date(2024, 10, 1)),
             ('Latitude 5550 Spare-2', 'ABX-041', 'dell-latitude-5550', 'laptop', 'available', None, 'ny-floor-5-eng', 'DL5550-SP02', 1899.00, 300.00, datetime.date(2024, 10, 1)),
@@ -951,24 +961,24 @@ class Command(BaseCommand):
             ('Precision 7960 Oliver', 'ABX-054', 'dell-precision-7960-tower', 'desktop', 'in-use', 'oliver.smith', 'berlin-floor-1-eng', 'PREC7960-001', 5499.00, 800.00, datetime.date(2024, 5, 1)),
             ('Precision 7960 Sophia', 'ABX-055', 'dell-precision-7960-tower', 'desktop', 'in-use', 'sophia.martinez', 'berlin-floor-1-eng', 'PREC7960-002', 5499.00, 800.00, datetime.date(2024, 5, 1)),
             # Customer Tenant Assets
-            ('Latitude 5550 Klaus', 'FIN-001', 'dell-latitude-5550', 'laptop', 'in-use', 'klaus.fischer', 'finova-floor-2-trading', 'DL5550-FIN01', 1899.00, 300.00, datetime.date(2024, 3, 1)),
-            ('Latitude 5550 Nina', 'FIN-002', 'dell-latitude-5550', 'laptop', 'in-use', 'nina.bergmann', 'finova-floor-3-risk', 'DL5550-FIN02', 1899.00, 300.00, datetime.date(2024, 3, 15)),
+            ('Latitude 5550 Klaus', 'FIN-001', 'dell-latitude-5550', 'laptop', 'in-use', 'klaus.fischer', 'globex-floor-2-trading', 'DL5550-FIN01', 1899.00, 300.00, datetime.date(2024, 3, 1)),
+            ('Latitude 5550 Nina', 'FIN-002', 'dell-latitude-5550', 'laptop', 'in-use', 'nina.bergmann', 'globex-floor-3-risk', 'DL5550-FIN02', 1899.00, 300.00, datetime.date(2024, 3, 15)),
             ('EliteBook 860 Dr. Wagner', 'MED-001', 'hp-elitebook-860-g11', 'laptop', 'in-use', 'markus.wagner', 'medicare-ward-admin', 'HPEB-MED01', 2099.00, 300.00, datetime.date(2024, 4, 1)),
             ('EliteBook 860 Sophie', 'MED-002', 'hp-elitebook-860-g11', 'laptop', 'in-use', 'sophie.klein', 'medicare-lab-research', 'HPEB-MED02', 2099.00, 300.00, datetime.date(2024, 4, 15)),
             ('MB Air 15 Felix', 'TSI-001', 'macbook-air-15-2024', 'laptop', 'in-use', 'felix.bauer', 'techstartup-open-space', 'MBA-TSI01', 1499.00, 200.00, datetime.date(2024, 5, 1)),
             ('MB Air 15 Lena', 'TSI-002', 'macbook-air-15-2024', 'laptop', 'in-use', 'lena.schulz', 'techstartup-eng-lab', 'MBA-TSI02', 1499.00, 200.00, datetime.date(2024, 5, 10)),
             ('ThinkPad X1 Jonas', 'GRE-001', 'thinkpad-x1-carbon-g12', 'laptop', 'in-use', 'jonas.hoffmann', 'greenenergy-wind-analytics', 'TPX1-GRE01', 2199.00, 350.00, datetime.date(2024, 6, 1)),
             ('ThinkPad X1 Katja', 'GRE-002', 'thinkpad-x1-carbon-g12', 'laptop', 'in-use', 'katja.vogel', 'greenenergy-solar-ops', 'TPX1-GRE02', 2199.00, 350.00, datetime.date(2024, 6, 1)),
-            ('OptiPlex 7010 Finova-1', 'FIN-003', 'dell-optiplex-7010', 'desktop', 'in-use', None, 'finova-floor-2-trading', 'OPT-FIN01', 1299.00, 200.00, datetime.date(2024, 2, 15)),
-            ('OptiPlex 7010 Finova-2', 'FIN-004', 'dell-optiplex-7010', 'desktop', 'in-use', None, 'finova-floor-3-risk', 'OPT-FIN02', 1299.00, 200.00, datetime.date(2024, 2, 15)),
+            ('OptiPlex 7010 Globex-1', 'FIN-003', 'dell-optiplex-7010', 'desktop', 'in-use', None, 'globex-floor-2-trading', 'OPT-FIN01', 1299.00, 200.00, datetime.date(2024, 2, 15)),
+            ('OptiPlex 7010 Globex-2', 'FIN-004', 'dell-optiplex-7010', 'desktop', 'in-use', None, 'globex-floor-3-risk', 'OPT-FIN02', 1299.00, 200.00, datetime.date(2024, 2, 15)),
             ('Mac Studio TechStartup', 'TSI-003', 'mac-studio-2024', 'desktop', 'in-use', None, 'techstartup-eng-lab', 'MST-TSI01', 6999.00, 1000.00, datetime.date(2024, 6, 15)),
-            ('iPhone 15 Pro Klaus', 'FIN-005', 'iphone-15-pro', 'mobile-phone', 'in-use', 'klaus.fischer', 'finova-floor-2-trading', 'IP15P-FIN01', 1299.00, 150.00, datetime.date(2024, 10, 1)),
+            ('iPhone 15 Pro Klaus', 'FIN-005', 'iphone-15-pro', 'mobile-phone', 'in-use', 'klaus.fischer', 'globex-floor-2-trading', 'IP15P-FIN01', 1299.00, 150.00, datetime.date(2024, 10, 1)),
             ('iPad Pro Medicare', 'MED-003', 'ipad-pro-129-2024', 'tablet', 'in-use', 'markus.wagner', 'medicare-ward-admin', 'IPP-MED01', 1099.00, 100.00, datetime.date(2024, 8, 1)),
             ('Surface Pro GreenEnergy', 'GRE-003', 'surface-pro-10', 'tablet', 'in-use', 'jonas.hoffmann', 'greenenergy-wind-analytics', 'SP10-GRE01', 1799.00, 200.00, datetime.date(2024, 7, 15)),
-            ('Dell P2422HE Finova 1', 'FIN-006', 'dell-p2422he-monitor', 'monitor', 'in-use', 'klaus.fischer', 'finova-floor-2-trading', 'MON-FIN01', 379.00, 30.00, datetime.date(2024, 3, 1)),
-            ('Dell P2422HE Finova 2', 'FIN-007', 'dell-p2422he-monitor', 'monitor', 'in-use', 'nina.bergmann', 'finova-floor-3-risk', 'MON-FIN02', 379.00, 30.00, datetime.date(2024, 3, 15)),
+            ('Dell P2422HE Globex 1', 'FIN-006', 'dell-p2422he-monitor', 'monitor', 'in-use', 'klaus.fischer', 'globex-floor-2-trading', 'MON-FIN01', 379.00, 30.00, datetime.date(2024, 3, 1)),
+            ('Dell P2422HE Globex 2', 'FIN-007', 'dell-p2422he-monitor', 'monitor', 'in-use', 'nina.bergmann', 'globex-floor-3-risk', 'MON-FIN02', 379.00, 30.00, datetime.date(2024, 3, 15)),
             ('Latitude 5550 GreenEnergy Spare', 'GRE-004', 'dell-latitude-5550', 'laptop', 'available', None, 'greenenergy-wind-analytics', 'DL5550-GRE01', 1899.00, 300.00, datetime.date(2024, 8, 1)),
-            ('EliteBook 860 Finova Spare', 'FIN-008', 'hp-elitebook-860-g11', 'laptop', 'available', None, 'finova-floor-2-trading', 'HPEB-FIN01', 2099.00, 300.00, datetime.date(2024, 7, 1)),
+            ('EliteBook 860 Globex Spare', 'FIN-008', 'hp-elitebook-860-g11', 'laptop', 'available', None, 'globex-floor-2-trading', 'HPEB-FIN01', 2099.00, 300.00, datetime.date(2024, 7, 1)),
             # New Customer Tenant Assets (Apex Logistics and Quantum Robotics)
             ('Latitude 5550 Noah', 'APX-001', 'dell-latitude-5550', 'laptop', 'in-use', 'noah.schmidt', 'frankfurt-depot-shelf-b', 'DL5550-APX01', 1899.00, 300.00, datetime.date(2024, 5, 1)),
             ('Latitude 5550 Mia', 'APX-002', 'dell-latitude-5550', 'laptop', 'in-use', 'mia.petrov', 'frankfurt-depot-shelf-b', 'DL5550-APX02', 1899.00, 300.00, datetime.date(2024, 5, 10)),
@@ -976,6 +986,37 @@ class Command(BaseCommand):
             ('ThinkPad X1 Wei', 'QNT-002', 'thinkpad-x1-carbon-g12', 'laptop', 'in-use', 'wei.zhang', 'boston-assembly-floor', 'TPX1-QNT02', 2199.00, 350.00, datetime.date(2024, 6, 1)),
             ('Precision 7960 Alex', 'QNT-003', 'dell-precision-7960-tower', 'desktop', 'in-use', 'alexander.gruber', 'boston-assembly-floor', 'PREC7960-QNT01', 5499.00, 800.00, datetime.date(2024, 6, 10)),
         ]
+
+        # Dynamically generate 800 additional assets spread across companies
+        at_slugs = list(self._asset_types.keys())
+        role_slugs = ['laptop', 'desktop', 'monitor', 'mobile-phone', 'tablet', 'network-device', 'server']
+        loc_slugs = list(self._locations.keys())
+        
+        for i in range(1, 801):
+            tag = f'GEN-{i:04d}'
+            at_slug = random.choice(at_slugs)
+            role_slug = random.choice(role_slugs)
+            status_slug = random.choice(['in-use', 'in-use', 'in-use', 'available', 'available', 'pending-repair', 'retired'])
+            
+            location_slug = random.choice(loc_slugs)
+            loc_obj = self._locations[location_slug]
+            tenant_obj = loc_obj.tenant
+            
+            tenant_holders = [upn for upn, h in self._holders.items() if h.tenant == tenant_obj]
+            
+            holder_upn = None
+            if status_slug == 'in-use' and tenant_holders and random.choice([True, False]):
+                holder_upn = random.choice(tenant_holders)
+            
+            purchase_cost = round(random.uniform(300.0, 5000.0), 2)
+            salvage_value = round(purchase_cost * 0.1, 2)
+            p_date = datetime.date(random.choice([2021, 2022, 2023, 2024]), random.randint(1, 12), random.randint(1, 28))
+            
+            name = f'{self._asset_types[at_slug].model} {tag}'
+            serial = f'SN-{random.randint(10000000, 99999999)}'
+            
+            asset_data.append((name, tag, at_slug, role_slug, status_slug, holder_upn, location_slug, serial, purchase_cost, salvage_value, p_date))
+
         self._assets = {}
         for data in asset_data:
             name, tag, at_slug, role_slug, status_slug = data[0], data[1], data[2], data[3], data[4]
@@ -1052,11 +1093,9 @@ class Command(BaseCommand):
                 
                 # Case A: Checked out to a Holder
                 if holder and status_slug == 'in-use':
-                    ct_holder = ContentType.objects.get_for_model(AssetHolder)
                     AssetAssignment.objects.get_or_create(
                         asset=obj,
-                        assigned_to_content_type=ct_holder,
-                        assigned_to_object_id=holder.pk,
+                        assigned_user=holder,
                         defaults={
                             'checked_out_by': self._users[0],
                             'is_active': True,
@@ -1072,11 +1111,9 @@ class Command(BaseCommand):
                 
                 # Case B: Checked out to a Location
                 elif not holder and status_slug == 'in-use' and location:
-                    ct_loc = ContentType.objects.get_for_model(Location)
                     AssetAssignment.objects.get_or_create(
                         asset=obj,
-                        assigned_to_content_type=ct_loc,
-                        assigned_to_object_id=location.pk,
+                        assigned_location=location,
                         defaults={
                             'checked_out_by': self._users[0],
                             'is_active': True,
@@ -1237,7 +1274,7 @@ class Command(BaseCommand):
 
         # --- AccessoryAssignments ---
         for acc_slug, holder_upn, qty in [
-            ('usb-c-charger-65w', 'rene.rettig', 1),
+            ('usb-c-charger-65w', 'alex.admin', 1),
             ('usb-c-charger-65w', 'sarah.chen', 1),
             ('mx-master-3s', 'marcus.johnson', 1),
             ('mx-keys', 'elena.rodriguez', 1),
@@ -1278,7 +1315,7 @@ class Command(BaseCommand):
             )
 
         # --- CustodyReceipt ---
-        for tag, holder_upn in [('ABX-001', 'rene.rettig'), ('ABX-002', 'sarah.chen'), ('ABX-003', 'marcus.johnson'),
+        for tag, holder_upn in [('ABX-001', 'alex.admin'), ('ABX-002', 'sarah.chen'), ('ABX-003', 'marcus.johnson'),
                                  ('FIN-001', 'klaus.fischer'), ('MED-001', 'markus.wagner'), ('GRE-001', 'jonas.hoffmann')]:
             h = self._holders[holder_upn]
             hash_val = hashlib.sha256(f"{tag}-{h.pk}-{timezone.now()}".encode()).hexdigest()[:64]
@@ -1331,24 +1368,24 @@ class Command(BaseCommand):
 
         # Licenses
         license_data = [
-            ('Win11-Ent-Vol-001', 'Windows 11 Enterprise', 'perpetual_seat', 'W11ENT-XXXX-YYYY-ZZZZ-AAAA', 150, None, datetime.date(2024, 1, 1), 'helheim-cloud-gmbh'),
-            ('M365-E5-Vol', 'Microsoft 365 E5', 'subscription_seat', None, 150, 22500.00, datetime.date(2024, 1, 1), 'helheim-cloud-gmbh'),
-            ('Office2024-Vol', 'Microsoft Office 2024 LTSC', 'perpetual_seat', 'OFF2024-XXXX-YYYY-ZZZZ-BBBB', 100, None, datetime.date(2024, 3, 1), 'helheim-cloud-gmbh'),
-            ('Adobe-CC-Team', 'Adobe Creative Cloud', 'subscription_seat', None, 25, 15000.00, datetime.date(2024, 2, 1), 'helheim-labs-inc'),
-            ('IntelliJ-Ultimate-50', 'JetBrains IntelliJ IDEA Ultimate', 'subscription_seat', None, 50, 8500.00, datetime.date(2024, 4, 1), 'helheim-labs-inc'),
-            ('Docker-Enterprise', 'Docker Desktop Enterprise', 'subscription_seat', None, 30, 4500.00, datetime.date(2024, 5, 1), 'helheim-labs-inc'),
-            ('vSphere-Ent-8', 'VMware vSphere 8 Enterprise Plus', 'subscription_seat', None, 10, 35000.00, datetime.date(2024, 2, 15), 'helheim-labs-inc'),
-            ('Slack-Ent', 'Slack Enterprise Grid', 'subscription_seat', None, 150, 18000.00, datetime.date(2024, 1, 1), 'helheim-labs-inc'),
-            ('Zoom-Ent', 'Zoom Enterprise', 'subscription_seat', None, 150, 12000.00, datetime.date(2024, 1, 1), 'helheim-cloud-gmbh'),
-            ('1Password-Biz', '1Password Business', 'subscription_seat', None, 150, 12000.00, datetime.date(2024, 1, 1), 'helheim-cloud-gmbh'),
-            ('S1-Complete-1000', 'SentinelOne Singularity', 'subscription_seat', None, 1000, 45000.00, datetime.date(2024, 1, 1), 'helheim-security-ag'),
-            ('CS-Falcon-1000', 'CrowdStrike Falcon', 'subscription_seat', None, 1000, 55000.00, datetime.date(2024, 1, 1), 'helheim-security-ag'),
-            ('Cisco-AnyConnect', 'Cisco AnyConnect VPN', 'subscription_seat', None, 200, 8000.00, datetime.date(2024, 1, 1), 'helheim-cloud-gmbh'),
+            ('Win11-Ent-Vol-001', 'Windows 11 Enterprise', 'perpetual_seat', 'W11ENT-XXXX-YYYY-ZZZZ-AAAA', 150, None, datetime.date(2024, 1, 1), 'acme-north-america'),
+            ('M365-E5-Vol', 'Microsoft 365 E5', 'subscription_seat', None, 150, 22500.00, datetime.date(2024, 1, 1), 'acme-north-america'),
+            ('Office2024-Vol', 'Microsoft Office 2024 LTSC', 'perpetual_seat', 'OFF2024-XXXX-YYYY-ZZZZ-BBBB', 100, None, datetime.date(2024, 3, 1), 'acme-north-america'),
+            ('Adobe-CC-Team', 'Adobe Creative Cloud', 'subscription_seat', None, 25, 15000.00, datetime.date(2024, 2, 1), 'acme-labs'),
+            ('IntelliJ-Ultimate-50', 'JetBrains IntelliJ IDEA Ultimate', 'subscription_seat', None, 50, 8500.00, datetime.date(2024, 4, 1), 'acme-labs'),
+            ('Docker-Enterprise', 'Docker Desktop Enterprise', 'subscription_seat', None, 30, 4500.00, datetime.date(2024, 5, 1), 'acme-labs'),
+            ('vSphere-Ent-8', 'VMware vSphere 8 Enterprise Plus', 'subscription_seat', None, 10, 35000.00, datetime.date(2024, 2, 15), 'acme-labs'),
+            ('Slack-Ent', 'Slack Enterprise Grid', 'subscription_seat', None, 150, 18000.00, datetime.date(2024, 1, 1), 'acme-labs'),
+            ('Zoom-Ent', 'Zoom Enterprise', 'subscription_seat', None, 150, 12000.00, datetime.date(2024, 1, 1), 'acme-north-america'),
+            ('1Password-Biz', '1Password Business', 'subscription_seat', None, 150, 12000.00, datetime.date(2024, 1, 1), 'acme-north-america'),
+            ('S1-Complete-1000', 'SentinelOne Singularity', 'subscription_seat', None, 1000, 45000.00, datetime.date(2024, 1, 1), 'acme-europe'),
+            ('CS-Falcon-1000', 'CrowdStrike Falcon', 'subscription_seat', None, 1000, 55000.00, datetime.date(2024, 1, 1), 'acme-europe'),
+            ('Cisco-AnyConnect', 'Cisco AnyConnect VPN', 'subscription_seat', None, 200, 8000.00, datetime.date(2024, 1, 1), 'acme-north-america'),
             # Customer Licenses
-            ('Finova-M365-E3', 'Microsoft 365 E5', 'subscription_seat', None, 75, 11250.00, datetime.date(2024, 5, 1), 'finova-capital-ag'),
-            ('MediCare-Office-50', 'Microsoft Office 2024 LTSC', 'perpetual_seat', 'MED-OFF2024-XXXX-YYYY', 50, None, datetime.date(2024, 6, 1), 'medicare-health-gmbh'),
-            ('TechStartup-JetBrains', 'JetBrains IntelliJ IDEA Ultimate', 'subscription_seat', None, 10, 1700.00, datetime.date(2024, 8, 1), 'techstartup-io-gmbh'),
-            ('GreenEnergy-Win11', 'Windows 11 Enterprise', 'perpetual_seat', 'GRE-W11ENT-XXXX-YYYY', 30, None, datetime.date(2024, 9, 1), 'greenenergy-solutions-se'),
+            ('Globex-M365-E3', 'Microsoft 365 E5', 'subscription_seat', None, 75, 11250.00, datetime.date(2024, 5, 1), 'globex-retail'),
+            ('MediCare-Office-50', 'Microsoft Office 2024 LTSC', 'perpetual_seat', 'MED-OFF2024-XXXX-YYYY', 50, None, datetime.date(2024, 6, 1), 'stark-defense'),
+            ('TechStartup-JetBrains', 'JetBrains IntelliJ IDEA Ultimate', 'subscription_seat', None, 10, 1700.00, datetime.date(2024, 8, 1), 'soylent-operations'),
+            ('GreenEnergy-Win11', 'Windows 11 Enterprise', 'perpetual_seat', 'GRE-W11ENT-XXXX-YYYY', 30, None, datetime.date(2024, 9, 1), 'soylent-research'),
         ]
         self._licenses = []
         for name, sw_name, ltype, key, seats, cost, purchase_date, tenant_slug in license_data:
@@ -1435,11 +1472,11 @@ class Command(BaseCommand):
 
         # Providers
         provider_data = [
-            ('Amazon Web Services', 'aws-helheim', 'https://aws.amazon.com/console'),
-            ('Microsoft Azure', 'az-helheim', 'https://portal.azure.com'),
-            ('Google Cloud Platform', 'gcp-helheim', 'https://console.cloud.google.com'),
-            ('GitHub Enterprise', 'gh-helheim', 'https://github.com/enterprises/helheim'),
-            ('Cloudflare', 'cf-helheim', 'https://dash.cloudflare.com'),
+            ('Amazon Web Services', 'aws-acme', 'https://aws.amazon.com/console'),
+            ('Microsoft Azure', 'az-acme', 'https://portal.azure.com'),
+            ('Google Cloud Platform', 'gcp-acme', 'https://console.cloud.google.com'),
+            ('GitHub Enterprise', 'gh-acme', 'https://github.com/enterprises/acme'),
+            ('Cloudflare', 'cf-acme', 'https://dash.cloudflare.com'),
         ]
         self._providers = {}
         for name, acct_id, url in provider_data:
@@ -1451,18 +1488,18 @@ class Command(BaseCommand):
 
         # Subscriptions
         sub_data = [
-            ('AWS Production Account', 'Amazon Web Services', 'saas', datetime.date(2024, 1, 1), datetime.date(2025, 1, 1), 120000.00, 12, 'helheim-cloud-gmbh'),
-            ('Azure Enterprise Agreement', 'Microsoft Azure', 'saas', datetime.date(2024, 3, 1), datetime.date(2027, 3, 1), 250000.00, 36, 'helheim-cloud-gmbh'),
-            ('GCP Starter', 'Google Cloud Platform', 'saas', datetime.date(2024, 6, 1), datetime.date(2025, 6, 1), 36000.00, 12, 'helheim-cloud-gmbh'),
-            ('GitHub Enterprise Cloud', 'GitHub Enterprise', 'saas', datetime.date(2024, 1, 1), datetime.date(2025, 1, 1), 42000.00, 12, 'helheim-labs-inc'),
-            ('Cloudflare Enterprise', 'Cloudflare', 'support', datetime.date(2024, 2, 1), datetime.date(2025, 2, 1), 24000.00, 12, 'helheim-security-ag'),
-            ('AWS Dev/Test Sandbox', 'Amazon Web Services', 'saas', datetime.date(2024, 4, 1), datetime.date(2025, 4, 1), 18000.00, 12, 'helheim-labs-inc'),
+            ('AWS Production Account', 'Amazon Web Services', 'saas', datetime.date(2024, 1, 1), datetime.date(2025, 1, 1), 120000.00, 12, 'acme-north-america'),
+            ('Azure Enterprise Agreement', 'Microsoft Azure', 'saas', datetime.date(2024, 3, 1), datetime.date(2027, 3, 1), 250000.00, 36, 'acme-north-america'),
+            ('GCP Starter', 'Google Cloud Platform', 'saas', datetime.date(2024, 6, 1), datetime.date(2025, 6, 1), 36000.00, 12, 'acme-north-america'),
+            ('GitHub Enterprise Cloud', 'GitHub Enterprise', 'saas', datetime.date(2024, 1, 1), datetime.date(2025, 1, 1), 42000.00, 12, 'acme-labs'),
+            ('Cloudflare Enterprise', 'Cloudflare', 'support', datetime.date(2024, 2, 1), datetime.date(2025, 2, 1), 24000.00, 12, 'acme-europe'),
+            ('AWS Dev/Test Sandbox', 'Amazon Web Services', 'saas', datetime.date(2024, 4, 1), datetime.date(2025, 4, 1), 18000.00, 12, 'acme-labs'),
             # Customer Subscriptions
-            ('Finova AWS Workloads', 'Amazon Web Services', 'saas', datetime.date(2024, 5, 1), datetime.date(2025, 5, 1), 85000.00, 12, 'finova-capital-ag'),
-            ('Finova Azure Backup', 'Microsoft Azure', 'saas', datetime.date(2024, 6, 1), datetime.date(2026, 6, 1), 48000.00, 24, 'finova-capital-ag'),
-            ('MediCare GCP Analytics', 'Google Cloud Platform', 'saas', datetime.date(2024, 7, 1), datetime.date(2025, 7, 1), 32000.00, 12, 'medicare-health-gmbh'),
-            ('TechStartup GitHub Team', 'GitHub Enterprise', 'saas', datetime.date(2024, 8, 1), datetime.date(2025, 8, 1), 4800.00, 12, 'techstartup-io-gmbh'),
-            ('GreenEnergy Cloudflare Pro', 'Cloudflare', 'support', datetime.date(2024, 9, 1), datetime.date(2025, 9, 1), 12000.00, 12, 'greenenergy-solutions-se'),
+            ('Globex AWS Workloads', 'Amazon Web Services', 'saas', datetime.date(2024, 5, 1), datetime.date(2025, 5, 1), 85000.00, 12, 'globex-retail'),
+            ('Globex Azure Backup', 'Microsoft Azure', 'saas', datetime.date(2024, 6, 1), datetime.date(2026, 6, 1), 48000.00, 24, 'globex-retail'),
+            ('MediCare GCP Analytics', 'Google Cloud Platform', 'saas', datetime.date(2024, 7, 1), datetime.date(2025, 7, 1), 32000.00, 12, 'stark-defense'),
+            ('TechStartup GitHub Team', 'GitHub Enterprise', 'saas', datetime.date(2024, 8, 1), datetime.date(2025, 8, 1), 4800.00, 12, 'soylent-operations'),
+            ('GreenEnergy Cloudflare Pro', 'Cloudflare', 'support', datetime.date(2024, 9, 1), datetime.date(2025, 9, 1), 12000.00, 12, 'soylent-research'),
         ]
         self._subscriptions = []
         for name, prov_name, stype, start, renewal, cost, term, tenant_slug in sub_data:
@@ -1494,7 +1531,7 @@ class Command(BaseCommand):
     # ─────────────────────────────────────────
 
     def _seed_phase6(self):
-        from assets.models import Asset, ActivityLog
+        from assets.models import Asset
         from inventory.models import Kit, KitItem
         from compliance.models import AssetMaintenance
         from licenses.models import License
@@ -1502,32 +1539,32 @@ class Command(BaseCommand):
         self.stdout.write('--- Phase 6: Kits, Maintenance, Activities ---')
 
         # Kits
-        kit1 = Kit.objects.create(name='Developer Onboarding Kit', description='All essentials for a new developer.', tenant=self._tenants.get('helheim-cloud-gmbh'))
+        kit1 = Kit.objects.create(name='Developer Onboarding Kit', description='All essentials for a new developer.', tenant=self._tenants.get('acme-north-america'))
         KitItem.objects.create(kit=kit1, asset_type=self._asset_types['dell-latitude-5550'], qty=1)
         KitItem.objects.create(kit=kit1, accessory=self._accessories['mx-master-3s'], qty=1)
         KitItem.objects.create(kit=kit1, accessory=self._accessories['mx-keys'], qty=1)
         KitItem.objects.create(kit=kit1, accessory=self._accessories['usb-c-hdmi-adapter'], qty=1)
         KitItem.objects.create(kit=kit1, license=self._licenses[0], qty=1)
 
-        kit2 = Kit.objects.create(name='Executive Onboarding Kit', description='Premium onboarding package for executives.', tenant=self._tenants.get('helheim-cloud-gmbh'))
+        kit2 = Kit.objects.create(name='Executive Onboarding Kit', description='Premium onboarding package for executives.', tenant=self._tenants.get('acme-north-america'))
         KitItem.objects.create(kit=kit2, asset_type=self._asset_types['macbook-pro-16-2024'], qty=1)
         KitItem.objects.create(kit=kit2, asset_type=self._asset_types['iphone-15-pro'], qty=1)
         KitItem.objects.create(kit=kit2, accessory=self._accessories['usb-c-charger-65w'], qty=2)
         KitItem.objects.create(kit=kit2, accessory=self._accessories['magic-mouse'], qty=1)
         KitItem.objects.create(kit=kit2, license=self._licenses[1], qty=1)
 
-        kit3 = Kit.objects.create(name='Sales Representative Kit', description='Standard kit for sales team members.', tenant=self._tenants.get('helheim-labs-inc'))
+        kit3 = Kit.objects.create(name='Sales Representative Kit', description='Standard kit for sales team members.', tenant=self._tenants.get('acme-labs'))
         KitItem.objects.create(kit=kit3, asset_type=self._asset_types['thinkpad-x1-carbon-g12'], qty=1)
         KitItem.objects.create(kit=kit3, accessory=self._accessories['zone-wireless-2'], qty=1)
         KitItem.objects.create(kit=kit3, accessory=self._accessories['webcam-c920s'], qty=1)
         KitItem.objects.create(kit=kit3, license=self._licenses[7], qty=1)  # Zoom
 
-        kit4 = Kit.objects.create(name='Server Provisioning Bundle', description='Rack-ready server hardware bundle.', tenant=self._tenants.get('helheim-cloud-gmbh'))
+        kit4 = Kit.objects.create(name='Server Provisioning Bundle', description='Rack-ready server hardware bundle.', tenant=self._tenants.get('acme-north-america'))
         KitItem.objects.create(kit=kit4, asset_type=self._asset_types['dell-poweredge-r760'], qty=1)
         KitItem.objects.create(kit=kit4, accessory=self._accessories['thunderbolt-4-cable'], qty=2)
 
         # Customer Kit
-        kit5 = Kit.objects.create(name='Finova Trader Setup', description='Standard trading desk setup for Finova Capital.', tenant=self._tenants.get('finova-capital-ag'))
+        kit5 = Kit.objects.create(name='Globex Trader Setup', description='Standard trading desk setup for Globex Capital.', tenant=self._tenants.get('globex-retail'))
         KitItem.objects.create(kit=kit5, asset_type=self._asset_types['dell-latitude-5550'], qty=1)
         KitItem.objects.create(kit=kit5, accessory=self._accessories['mx-master-3s'], qty=1)
         KitItem.objects.create(kit=kit5, accessory=self._accessories['dell-p2723de'], qty=2)
@@ -1564,29 +1601,99 @@ class Command(BaseCommand):
                 notes=notes,
             )
 
-        # ActivityLogs
-        log_data = [
-            ('ABX-001', 'checked_out', self._users[0], 'Checked out to Rene Rettig'),
-            ('ABX-002', 'checked_out', self._users[0], 'Checked out to Sarah Chen'),
-            ('ABX-003', 'checked_out', self._users[0], 'Checked out to Marcus Johnson'),
-            ('ABX-003', 'audited', self._users[0], 'Annual audit completed'),
-            ('ABX-022', 'updated_at', self._users[0], 'RAM upgraded from 128GB to 256GB'),
-            ('ABX-042', 'updated_at', self._users[0], 'Status changed to Pending Repair'),
-            ('ABX-001', 'audited', self._users[1], 'Quarterly audit completed'),
-            ('ABX-007', 'checked_out', self._users[1], 'Checked out to James Wilson'),
-            ('FIN-001', 'checked_out', self._users[0], 'Checked out to Klaus Fischer (Finova)'),
-            ('MED-001', 'checked_out', self._users[0], 'Checked out to Dr. Markus Wagner (MediCare)'),
-            ('GRE-001', 'checked_out', self._users[1], 'Checked out to Jonas Hoffmann (GreenEnergy)'),
-            ('TSI-001', 'checked_out', self._users[1], 'Checked out to Felix Bauer (TechStartup)'),
-            ('FIN-003', 'audited', self._users[0], 'Quarterly compliance audit'),
-            ('MED-003', 'audited', self._users[0], 'Device inventory verification'),
-        ]
-        for tag, action, user, notes in log_data:
-            ActivityLog.objects.create(
-                asset=self._assets[tag],
-                action=action,
-                user=user,
-                notes=notes,
+        self.stdout.write('  5 kits, 14 maintenance records.')
+
+    def _seed_phase7(self):
+        from core.models import PermissionGroup, WebhookEndpoint, ReportTemplate, LabelTemplate, JournalEntry
+        from assets.models import AssetRequest, AuditSession, AssetAudit, Asset, AssetType
+        from django.contrib.contenttypes.models import ContentType
+        from django.contrib.auth import get_user_model
+        
+        User = get_user_model()
+        
+        self.stdout.write('--- Phase 7: Demo Features (Requests, Webhooks, Templates, Audits) ---')
+
+        # 1. Permission Groups
+        pg1, _ = PermissionGroup.objects.get_or_create(name='Helpdesk Tier 1', description='Basic read and request access')
+        pg2, _ = PermissionGroup.objects.get_or_create(name='Auditor', description='Can perform asset audits')
+        pg3, _ = PermissionGroup.objects.get_or_create(name='Read-Only', description='Global read-only access')
+        
+        # 2. Webhook Endpoints
+        WebhookEndpoint.objects.get_or_create(
+            name='Slack Hardware Alerts',
+            url='https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX',
+            secret='demo_secret_12345',
+            enabled=True
+        )
+        
+        # 3. Templates
+        ReportTemplate.objects.get_or_create(
+            name='Monthly Asset Depreciation',
+            description='Standard report showing all assets and their current written down value.',
+            template_content='<h1>Monthly Asset Depreciation Report</h1><p>Date: {{ date }}</p>'
+        )
+        LabelTemplate.objects.get_or_create(
+            name='Standard QR Label',
+            description='2x1 inch label with QR code',
+            template_code='^XA^FO50,50^BQN,2,10^FDQA,{{ asset.tag }}^FS^XZ'
+        )
+
+        # 4. Asset Requests
+        user1 = User.objects.filter(is_superuser=False).first()
+        if not user1:
+            user1 = User.objects.first()
+            
+        atype1 = AssetType.objects.first()
+        if atype1:
+            atype1.requestable = True
+            atype1.save()
+
+        AssetRequest.objects.get_or_create(
+            requester=user1,
+            asset_type=atype1,
+            notes='My current laptop battery is failing.',
+            status='pending',
+        )
+        AssetRequest.objects.get_or_create(
+            requester=user1,
+            asset_type=atype1,
+            notes='Need a secondary monitor for home office.',
+            status='approved',
+        )
+
+        from assets.models import AssetRequest, AuditSession, AssetAudit, Asset, AssetType, StatusLabel
+        
+        # ... (other imports)
+        # 5. Audits
+        audit_session, _ = AuditSession.objects.get_or_create(
+            name='Q2 Annual Hardware Audit',
+            status='in_progress',
+            created_by=user1
+        )
+        assets = Asset.objects.exclude(location__isnull=True)[:3]
+        if not assets:
+            assets = Asset.objects.all()[:3]
+        status1 = StatusLabel.objects.first()
+        from organization.models import Location
+        loc1 = Location.objects.first()
+        for a in assets:
+            AssetAudit.objects.get_or_create(
+                session=audit_session,
+                asset=a,
+                status=status1,
+                auditor=user1,
+                location=a.location or loc1
             )
 
-        self.stdout.write('  5 kits, 14 maintenance records, 14 activity logs.')
+        # 6. Journal Entries
+        if assets:
+            JournalEntry.objects.create(
+                content_object=assets[0],
+                user=user1,
+                comment='Device inspected. Small scratch on the top lid, otherwise fine.'
+            )
+            JournalEntry.objects.create(
+                content_object=assets[0],
+                user=user1,
+                comment='User reported the fan is getting loud under heavy load.'
+            )

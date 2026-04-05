@@ -264,8 +264,7 @@ class AssetHolder(SubscribableMixin, StandardModel):
         from assets.models import AssetAssignment
         holder_ct = ContentType.objects.get_for_model(AssetHolder)
         return AssetAssignment.objects.filter(
-            assigned_to_content_type=holder_ct,
-            assigned_to_object_id=self.pk,
+            assigned_user=self,
             is_active=True
         )
 

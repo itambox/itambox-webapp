@@ -27,14 +27,12 @@ logger = logging.getLogger(__name__)
 class BooleanColumn(tables.Column):
     TRUE_MARK = mark_safe(
         '<span class="text-success">'
-        '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-circle-check" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">'
-        '<path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M9 12l2 2l4 -4" /></svg>'
+        '<i class="mdi mdi-check-circle-outline"></i>'
         '</span>'
     )
     FALSE_MARK = mark_safe(
         '<span class="text-danger">'
-        '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-circle-x" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">'
-        '<path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M10 10l4 4m0 -4l-4 4" /></svg>'
+        '<i class="mdi mdi-close-circle-outline"></i>'
         '</span>'
     )
     EMPTY_MARK = mark_safe('<span class="text-muted">&mdash;</span>')
@@ -114,8 +112,8 @@ class ActionsColumn(tables.Column):
 
         model = type(record)
 
-        icon_edit = '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-pencil" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h4l10.5 -10.5a1.5 1.5 0 0 0 -4 -4l-10.5 10.5v4" /><path d="M13.5 6.5l4 4" /></svg>'
-        icon_delete = '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>'
+        icon_edit = '<i class="mdi mdi-pencil-outline"></i>'
+        icon_delete = '<i class="mdi mdi-trash-can-outline"></i>'
 
         icons = {
             'edit': icon_edit,
@@ -279,34 +277,53 @@ class AssigneeColumn(tables.Column):
             if hasattr(AssignmentModel, 'is_active'):
                 filter_kwargs['is_active'] = True
 
-            assignments = AssignmentModel.objects.filter(**filter_kwargs).select_related(
-                'assigned_to_content_type'
-            )
-            assigned_to_ids_by_ct = {}
-            for a in assignments:
-                ct_id = a.assigned_to_content_type_id
-                if ct_id not in assigned_to_ids_by_ct:
-                    assigned_to_ids_by_ct[ct_id] = []
-                parent_id = getattr(a, f"{fk_field.name}_id")
-                assigned_to_ids_by_ct[ct_id].append((parent_id, a.assigned_to_object_id))
+            select_rels = []
+            for f in AssignmentModel._meta.fields:
+                if f.name in ('assigned_user', 'assigned_location', 'assigned_asset', 'assigned_holder'):
+                    select_rels.append(f.name)
+            assignments = AssignmentModel.objects.filter(**filter_kwargs)
+            if select_rels:
+                assignments = assignments.select_related(*select_rels)
+            elif hasattr(AssignmentModel, 'assigned_to_content_type'):
+                assignments = assignments.select_related('assigned_to_content_type')
 
-            ct_map = {}
-            for ct_id in assigned_to_ids_by_ct:
-                ct = ContentType.objects.get_for_id(ct_id)
-                ct_map[ct_id] = ct
+            if hasattr(AssignmentModel, 'assigned_to_content_type') and not select_rels:
+                # Handle old GenericForeignKey case
+                assigned_to_ids_by_ct = {}
+                for a in assignments:
+                    ct_id = getattr(a, 'assigned_to_content_type_id', None)
+                    if not ct_id:
+                        continue
+                    if ct_id not in assigned_to_ids_by_ct:
+                        assigned_to_ids_by_ct[ct_id] = []
+                    parent_id = getattr(a, f"{fk_field.name}_id")
+                    assigned_to_ids_by_ct[ct_id].append((parent_id, getattr(a, 'assigned_to_object_id')))
 
-            for ct_id, entries in assigned_to_ids_by_ct.items():
-                ct = ct_map.get(ct_id)
-                if ct is None:
-                    continue
-                model = ct.model_class()
-                if model is None:
-                    continue
-                obj_ids = [e[1] for e in entries]
-                instances = model.objects.filter(pk__in=obj_ids)
-                instance_map = {obj.pk: obj for obj in instances}
-                for parent_id, obj_id in entries:
-                    cache[parent_id] = instance_map.get(obj_id)
+                ct_map = {}
+                for ct_id in assigned_to_ids_by_ct:
+                    ct = ContentType.objects.get_for_id(ct_id)
+                    ct_map[ct_id] = ct
+
+                for ct_id, entries in assigned_to_ids_by_ct.items():
+                    ct = ct_map.get(ct_id)
+                    if ct is None:
+                        continue
+                    model = ct.model_class()
+                    if model is None:
+                        continue
+                    obj_ids = [e[1] for e in entries]
+                    instances = model.objects.filter(pk__in=obj_ids)
+                    instance_map = {obj.pk: obj for obj in instances}
+                    for parent_id, obj_id in entries:
+                        cache[parent_id] = instance_map.get(obj_id)
+            else:
+                # Handle explicit FKs case
+                for a in assignments:
+                    parent_id = getattr(a, f"{fk_field.name}_id")
+                    target = getattr(a, 'assigned_target', None)
+                    if target is None:
+                        target = getattr(a, 'assigned_holder', None) or getattr(a, 'assigned_user', None) or getattr(a, 'assigned_location', None) or getattr(a, 'assigned_asset', None)
+                    cache[parent_id] = target
 
         else:
             ct = ContentType.objects.get_for_model(model_class)
@@ -709,15 +726,15 @@ class ScheduledReportTable(BaseTable):
                 {% csrf_token %}
                 <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
                 <button type="submit" class="btn btn-sm btn-outline-primary d-flex align-items-center" title="Run Now">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-player-play" width="12" height="12" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 4v16l13 -8z" /></svg>
+                    <i class="mdi mdi-play"></i>
                     <span class="ms-1 d-none d-md-inline">Run Now</span>
                 </button>
             </form>
             <a class="btn btn-sm btn-outline-secondary btn-icon" href="{% url 'scheduledreport_edit' record.pk %}" title="Edit">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-pencil" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h4l10.5 -10.5a1.5 1.5 0 0 0 -4 -4l-10.5 10.5v4" /><path d="M13.5 6.5l4 4" /></svg>
+                <i class="mdi mdi-pencil-outline"></i>
             </a>
             <a class="btn btn-sm btn-outline-danger btn-icon" href="{% url 'scheduledreport_delete' record.pk %}" title="Delete">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
+                <i class="mdi mdi-trash-can-outline"></i>
             </a>
         </div>
         """,
@@ -772,10 +789,10 @@ class NotificationChannelTable(BaseTable):
         template_code="""
         <div class="d-flex gap-1 justify-content-end">
             <a class="btn btn-sm btn-outline-secondary btn-icon" href="{% url 'notificationchannel_edit' record.pk %}" title="Edit">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-pencil" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h4l10.5 -10.5a1.5 1.5 0 0 0 -4 -4l-10.5 10.5v4" /><path d="M13.5 6.5l4 4" /></svg>
+                <i class="mdi mdi-pencil-outline"></i>
             </a>
             <a class="btn btn-sm btn-outline-danger btn-icon" href="{% url 'notificationchannel_delete' record.pk %}" title="Delete">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
+                <i class="mdi mdi-trash-can-outline"></i>
             </a>
         </div>
         """,
@@ -810,7 +827,7 @@ class AlertLogTable(BaseTable):
                     {% csrf_token %}
                     <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
                     <button type="submit" class="btn btn-sm btn-outline-warning" title="Acknowledge">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-eye" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" /><path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6" /></svg>
+                        <i class="mdi mdi-eye-outline"></i>
                         Acknowledge
                     </button>
                 </form>
@@ -820,7 +837,7 @@ class AlertLogTable(BaseTable):
                     {% csrf_token %}
                     <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
                     <button type="submit" class="btn btn-sm btn-outline-success" title="Resolve">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l5 5l10 -10" /></svg>
+                        <i class="mdi mdi-check"></i>
                         Resolve
                     </button>
                 </form>

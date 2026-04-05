@@ -6,20 +6,25 @@ from .models import AccessoryAssignment, ConsumableAssignment, AccessoryStock, C
 
 
 def checkout_accessory(accessory, qty, holder=None, location=None, asset=None, user=None, notes="", source_location=None, request=None, **kwargs):
-    if not accessory.allow_overallocate and accessory.available < qty:
-        raise ValidationError("No stock available for checkout.")
     if not holder and not location and not asset:
         raise ValidationError("Either holder, location, or asset must be specified.")
-    if source_location:
-        loc_stock = AccessoryStock.objects.filter(
-            accessory=accessory, location=source_location
-        ).aggregate(qty=Sum('qty'))['qty'] or 0
-        if not accessory.allow_overallocate and loc_stock < qty:
-            raise ValidationError(
-                f"Insufficient stock at {source_location}. Available: {loc_stock}, Requested: {qty}"
-            )
 
     with transaction.atomic():
+        # Lock the accessory row to prevent concurrent overallocation
+        accessory = type(accessory).objects.select_for_update().get(pk=accessory.pk)
+
+        if not accessory.allow_overallocate and accessory.available < qty:
+            raise ValidationError("No stock available for checkout.")
+            
+        if source_location:
+            loc_stock = AccessoryStock.objects.filter(
+                accessory=accessory, location=source_location
+            ).aggregate(qty=Sum('qty'))['qty'] or 0
+            if not accessory.allow_overallocate and loc_stock < qty:
+                raise ValidationError(
+                    f"Insufficient stock at {source_location}. Available: {loc_stock}, Requested: {qty}"
+                )
+
         assignment = AccessoryAssignment.objects.create(
             accessory=accessory,
             assigned_holder=holder,
@@ -43,20 +48,25 @@ def checkin_accessory(assignment_pk, user=None):
 
 
 def checkout_consumable(consumable, qty, holder=None, location=None, asset=None, user=None, notes="", source_location=None, request=None, **kwargs):
-    if not consumable.allow_overallocate and consumable.available < qty:
-        raise ValidationError("No stock available for consumption checkout.")
     if not holder and not location and not asset:
         raise ValidationError("Either holder, location, or asset must be specified.")
-    if source_location:
-        loc_stock = ConsumableStock.objects.filter(
-            consumable=consumable, location=source_location
-        ).aggregate(qty=Sum('qty'))['qty'] or 0
-        if not consumable.allow_overallocate and loc_stock < qty:
-            raise ValidationError(
-                f"Insufficient stock at {source_location}. Available: {loc_stock}, Requested: {qty}"
-            )
 
     with transaction.atomic():
+        # Lock the consumable row to prevent concurrent overallocation
+        consumable = type(consumable).objects.select_for_update().get(pk=consumable.pk)
+
+        if not consumable.allow_overallocate and consumable.available < qty:
+            raise ValidationError("No stock available for consumption checkout.")
+            
+        if source_location:
+            loc_stock = ConsumableStock.objects.filter(
+                consumable=consumable, location=source_location
+            ).aggregate(qty=Sum('qty'))['qty'] or 0
+            if not consumable.allow_overallocate and loc_stock < qty:
+                raise ValidationError(
+                    f"Insufficient stock at {source_location}. Available: {loc_stock}, Requested: {qty}"
+                )
+
         assignment = ConsumableAssignment.objects.create(
             consumable=consumable,
             assigned_holder=holder,

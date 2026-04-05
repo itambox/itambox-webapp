@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'django_filters',
     'crispy_forms',
     'crispy_bootstrap5',
+    'debug_toolbar',
     'assetbox.apps.AssetBoxConfig',
     'core.apps.CoreConfig',
     'extras.apps.ExtrasConfig',
@@ -75,6 +76,11 @@ MIDDLEWARE = [
     'assetbox.middleware.CSPMiddleware',
     'assetbox.middleware.CurrentUserMiddleware',
     'assetbox.middleware.TenantMiddleware',
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
+]
+
+INTERNAL_IPS = [
+    "127.0.0.1",
 ]
 
 ROOT_URLCONF = 'core.urls'

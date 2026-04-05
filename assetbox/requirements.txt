@@ -22,3 +22,5 @@ mkdocs-material>=9.5
 croniter>=6.0,<7.0
 
 
+
+django-debug-toolbar

@@ -79,7 +79,7 @@ class LocationTable(BaseTable):
 
 class TenantGroupTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('organization:tenantgroup_update', args=[A('pk')], verbose_name='Name')
+    name = tables.LinkColumn('organization:tenantgroup_detail', args=[A('pk')], verbose_name='Name')
     tenant_count = tables.Column(verbose_name='Tenants', orderable=False)
     tags = TagColumn(url_name='organization:tenantgroup_list')
     actions = ActionsColumn()
@@ -185,14 +185,7 @@ class ContactAssignmentTable(BaseTable):
     actions = tables.TemplateColumn(
         template_code='''
         <a href="{% url 'organization:contactassignment_delete' record.pk %}?return_url={{ request.path }}" class="btn btn-sm btn-danger px-2" title="Delete">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash m-0" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                <path d="M4 7l16 0"></path>
-                <path d="M10 11l0 6"></path>
-                <path d="M14 11l0 6"></path>
-                <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"></path>
-                <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"></path>
-            </svg>
+            <i class="mdi mdi-trash-can-outline m-0"></i>
         </a>
         ''',
         verbose_name='Actions',

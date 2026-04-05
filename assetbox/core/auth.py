@@ -69,9 +69,17 @@ class TenantMembershipBackend:
                 
             if obj_tenant is not None:
                 from organization.models import TenantMembership
-                try:
-                    membership = TenantMembership.objects.get(user=user_obj, tenant=obj_tenant)
-                except TenantMembership.DoesNotExist:
+                cache_key = f'_tenant_membership_{obj_tenant.pk}'
+                if not hasattr(user_obj, cache_key):
+                    try:
+                        membership = TenantMembership.objects.get(user=user_obj, tenant=obj_tenant)
+                        setattr(user_obj, cache_key, membership)
+                    except TenantMembership.DoesNotExist:
+                        setattr(user_obj, cache_key, None)
+                
+                membership = getattr(user_obj, cache_key)
+                
+                if membership is None:
                     # If they don't have membership in the target tenant, deny permission
                     return False
 
