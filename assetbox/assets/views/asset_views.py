@@ -11,7 +11,7 @@ from django.contrib.auth import get_user_model
 from django_tables2 import RequestConfig
 from django.db.models import Count
 
-from ..models import Asset, InstalledSoftware, StatusLabel, ActivityLog, AssetAssignment
+from ..models import Asset, InstalledSoftware, StatusLabel, AssetAssignment
 from .. import forms, tables, filters
 from ..services import checkout_asset, checkin_asset
 from software.tables import InstalledSoftwareTable
@@ -44,6 +44,7 @@ class AssetListView(ObjectListView):
         'location',
         'tenant',
         'status',
+        'supplier',
     ).prefetch_related('tags', 'maintenances', 'assignments')
 
     def get_context_data(self, **kwargs):
@@ -112,11 +113,11 @@ class AssetDetailView(ObjectDetailView):
 
         custody_receipt = None
         eula_token = None
-        if active_assignment and active_assignment.assigned_to:
+        if active_assignment and active_assignment.assigned_target:
             from organization.models import AssetHolder
-            if isinstance(active_assignment.assigned_to, AssetHolder):
+            if isinstance(active_assignment.assigned_target, AssetHolder):
                 custody_receipt = CustodyReceipt.objects.filter(
-                    asset=asset, holder=active_assignment.assigned_to
+                    asset=asset, holder=active_assignment.assigned_target
                 ).first()
                 if custody_receipt:
                     eula_token = custody_receipt.token

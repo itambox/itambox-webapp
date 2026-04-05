@@ -10,7 +10,7 @@ from core.api.viewsets import AssetBoxModelViewSet, AssetBoxReadOnlyModelViewSet
 from assets.models import (
     Asset, AssetRole, Manufacturer, AssetType, InstalledSoftware,
     StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence,
-    ActivityLog, AssetAssignment, AuditSession, AssetAudit
+    AssetAssignment, AuditSession, AssetAudit
 )
 from assets.filters import (
     AssetFilterSet, AssetRoleFilterSet, ManufacturerFilterSet,
@@ -22,7 +22,7 @@ from .serializers import (
     AssetSerializer, AssetRoleSerializer, ManufacturerSerializer, AssetTypeSerializer,
     InstalledSoftwareSerializer, StatusLabelSerializer, DepreciationSerializer,
     SupplierSerializer, CategorySerializer, AssetRequestSerializer,
-    AssetTagSequenceSerializer, ActivityLogSerializer, AssetAssignmentSerializer,
+    AssetTagSequenceSerializer, AssetAssignmentSerializer,
     AuditSessionSerializer, AssetAuditSerializer, AssetCheckOutAPISerializer
 )
 from assets.services import checkout_asset, checkin_asset
@@ -152,16 +152,10 @@ class AssetTagSequenceViewSet(AssetBoxModelViewSet):
     filterset_class = AssetTagSequenceFilterSet
 
 
-class ActivityLogViewSet(AssetBoxReadOnlyModelViewSet):
-    queryset = ActivityLog.objects.select_related('asset', 'user').all()
-    serializer_class = ActivityLogSerializer
-    filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ['asset_id', 'user_id', 'action']
-
 
 class AssetAssignmentViewSet(AssetBoxModelViewSet):
     queryset = AssetAssignment.objects.select_related(
-        'asset', 'checked_out_by', 'checked_in_by', 'assigned_to_content_type'
+        'asset', 'checked_out_by', 'checked_in_by', 'assigned_user', 'assigned_location', 'assigned_asset'
     ).prefetch_related('tags')
     serializer_class = AssetAssignmentSerializer
     filter_backends = (DjangoFilterBackend,)

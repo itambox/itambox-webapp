@@ -3,7 +3,7 @@ from .views import (
     AssetViewSet, AssetRoleViewSet, ManufacturerViewSet,
     InstalledSoftwareViewSet, AssetTypeViewSet, StatusLabelViewSet,
     DepreciationViewSet, SupplierViewSet, CategoryViewSet,
-    AssetRequestViewSet, AssetTagSequenceViewSet, ActivityLogViewSet,
+    AssetRequestViewSet, AssetTagSequenceViewSet,
     AssetAssignmentViewSet, AuditSessionViewSet, AssetAuditViewSet
 )
 
@@ -21,7 +21,6 @@ router.register(r'suppliers', SupplierViewSet)
 router.register(r'categories', CategoryViewSet)
 router.register(r'asset-requests', AssetRequestViewSet)
 router.register(r'asset-tag-sequences', AssetTagSequenceViewSet)
-router.register(r'activity-logs', ActivityLogViewSet, basename='activitylog')
 router.register(r'asset-assignments', AssetAssignmentViewSet)
 router.register(r'audit-sessions', AuditSessionViewSet)
 router.register(r'asset-audits', AssetAuditViewSet)

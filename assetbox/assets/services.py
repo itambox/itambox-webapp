@@ -16,7 +16,7 @@ from django.urls import reverse
 from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from .models import Asset, StatusLabel, ActivityLog, AssetAssignment
+from .models import Asset, StatusLabel, AssetAssignment
 from compliance.models import CustodyReceipt
 from inventory.models import AccessoryAssignment, ConsumableAssignment
 from organization.models import AssetHolderAssignment
@@ -39,6 +39,9 @@ def checkout_asset(
         raise ValidationError("Either holder, location, or asset must be specified.")
 
     with transaction.atomic():
+        # Lock the asset row to prevent concurrent overallocation or state issues
+        asset = Asset.objects.select_for_update().get(pk=asset.pk)
+
         if asset.active_assignment:
             checkin_asset(asset, user=user, notes='Auto-checkin for reassignment')
 
@@ -66,23 +69,22 @@ def checkout_asset(
 
         assignment_kwargs = {
             'asset': asset,
-            'assigned_to': target,
             'checked_out_by': user,
             'expected_checkin_date': expected_checkin,
             'notes': notes,
             'pre_checkout_status': original_status,
         }
+        if holder:
+            assignment_kwargs['assigned_user'] = holder
+        elif location:
+            assignment_kwargs['assigned_location'] = location
+        elif asset_target:
+            assignment_kwargs['assigned_asset'] = asset_target
+
         if checkout_date:
             assignment_kwargs['checked_out_at'] = checkout_date
 
         assignment = AssetAssignment.objects.create(**assignment_kwargs)
-
-        ActivityLog.objects.create(
-            asset=asset,
-            action='checked_out',
-            user=user,
-            notes=f"Checked out to {target}. {notes}".strip()
-        )
 
         category = asset.asset_type.category if asset.asset_type else None
         if holder and category and category.require_acceptance:
@@ -125,7 +127,7 @@ def checkout_asset(
 def checkin_asset(asset: Asset, user: AbstractBaseUser | None = None, notes: str = '') -> str | None:
     active = asset.active_assignment
     if active:
-        target = active.assigned_to
+        target = active.assigned_target
         with transaction.atomic():
             active.is_active = False
             active.checked_in_at = timezone.now()
@@ -144,13 +146,6 @@ def checkin_asset(asset: Asset, user: AbstractBaseUser | None = None, notes: str
             asset._changelog_action = 'checkin'
             asset._changelog_message = f"Checked in from {target}"
             asset.save(update_fields=['status', 'location'])
-
-            ActivityLog.objects.create(
-                asset=asset,
-                action='checked_in',
-                user=user,
-                notes=f"Checked in from {target}. {notes}".strip()
-            )
 
             return f"Checked in from: {target}"
     elif asset.location:
@@ -225,25 +220,23 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_lo
                 asset._changelog_message = f"Checked out via Kit '{kit.name}'. {notes}"
                 asset.save(update_fields=['status', 'location'])
 
-                ActivityLog.objects.create(
-                    asset=asset,
-                    action='checked_out',
-                    user=user,
-                    notes=f"Checked out via Kit '{kit.name}'. {notes}"
-                )
-
                 target = holder or location
                 AssetHolderAssignment.objects.filter(
                     content_type=ContentType.objects.get_for_model(Asset),
                     object_id=asset.pk
                 ).delete()
 
-                AssetAssignment.objects.create(
-                    asset=asset,
-                    assigned_to=target,
-                    checked_out_by=user,
-                    notes=f"Checked out via Kit '{kit.name}'. {notes}"
-                )
+                assignment_kwargs = {
+                    'asset': asset,
+                    'checked_out_by': user,
+                    'notes': f"Checked out via Kit '{kit.name}'. {notes}"
+                }
+                if holder:
+                    assignment_kwargs['assigned_user'] = holder
+                elif location:
+                    assignment_kwargs['assigned_location'] = location
+                    
+                AssetAssignment.objects.create(**assignment_kwargs)
 
             elif item.accessory:
                 AccessoryAssignment.objects.create(

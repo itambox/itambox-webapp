@@ -9,7 +9,7 @@ from core.api.nested_serializers import (
     NestedAssetTypeSerializer
 )
 from assets.models import (
-    Asset, AssetRole, Manufacturer, ActivityLog, AssetType, InstalledSoftware,
+    Asset, AssetRole, Manufacturer, AssetType, InstalledSoftware,
     StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence,
     AssetAssignment, AuditSession, AssetAudit
 )
@@ -143,7 +143,7 @@ class AssetSerializer(BaseModelSerializer):
             return None
         return {
             'id': target.pk,
-            'type': active.assigned_to_content_type.model,
+            'type': active.assigned_to_type,
             'name': str(target),
             'is_active': active.is_active,
             'checked_out_at': active.checked_out_at,
@@ -239,33 +239,21 @@ class AssetTagSequenceSerializer(BaseModelSerializer):
         brief_fields = ['id', 'prefix', 'next_value']
 
 
-class ActivityLogSerializer(serializers.ModelSerializer):
-    action_display = serializers.CharField(source='get_action_display', read_only=True)
-    user = serializers.StringRelatedField(read_only=True)
-
-    class Meta:
-        model = ActivityLog
-        fields = [
-            'id', 'asset', 'action', 'action_display',
-            'user', 'timestamp', 'notes'
-        ]
-        brief_fields = ['id', 'asset', 'action', 'user', 'timestamp']
-
 
 class AssetAssignmentSerializer(BaseModelSerializer):
     asset = NestedAssetSerializer(read_only=True)
     asset_id = serializers.PrimaryKeyRelatedField(
         queryset=Asset.objects.all(), source='asset', write_only=True
     )
-    assigned_to_type = serializers.CharField(source='assigned_to_content_type.model', read_only=True)
+    assigned_to_type = serializers.CharField(read_only=True)
     assigned_to_name = serializers.SerializerMethodField()
     checked_out_by_name = serializers.CharField(source='checked_out_by.username', read_only=True)
 
     class Meta:
         model = AssetAssignment
         fields = [
-            'id', 'asset', 'asset_id', 'assigned_to_content_type',
-            'assigned_to_object_id', 'assigned_to_type', 'assigned_to_name',
+            'id', 'asset', 'asset_id', 'assigned_user', 'assigned_location', 'assigned_asset',
+            'assigned_to_type', 'assigned_to_name',
             'checked_out_by', 'checked_out_by_name', 'checked_out_at',
             'expected_checkin_date', 'is_active', 'checked_in_at',
             'checked_in_by', 'notes', 'created_at', 'updated_at'

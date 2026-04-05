@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.conf import settings
@@ -16,6 +17,23 @@ User = get_user_model()
 
 
 from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager
+
+
+class AssetStateMachine:
+    ALLOWED_TRANSITIONS = {
+        'pending': ['deployable', 'undeployable', 'archived'],
+        'deployable': ['pending', 'undeployable', 'archived', 'deployed'],
+        'deployed': ['deployable', 'undeployable', 'archived'],
+        'undeployable': ['pending', 'deployable', 'archived'],
+        'archived': ['pending']
+    }
+
+    @staticmethod
+    def validate_transition(current_status_type, new_status_type, is_checked_out):
+        if new_status_type not in AssetStateMachine.ALLOWED_TRANSITIONS.get(current_status_type, []):
+            raise ValidationError(f"Illegal state transition from {current_status_type} to {new_status_type}")
+        if is_checked_out and new_status_type in ['undeployable', 'archived']:
+            raise ValidationError("Cannot mark an actively checked-out asset as undeployable or archived. Check it in first.")
 
 
 class StatusLabel(AutoSlugMixin, StandardModel):
@@ -226,6 +244,14 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
         blank=True,
         verbose_name="Purchase Cost"
     )
+    current_book_value = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Materialized depreciation value"
+    )
+    depreciation_updated_at = models.DateTimeField(null=True, blank=True)
     order_number = models.CharField(
         max_length=100,
         blank=True,
@@ -387,12 +413,15 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
 
     @property
     def active_assignment(self):
-        return self.assignments.filter(is_active=True).first()
+        for assignment in self.assignments.all():
+            if assignment.is_active:
+                return assignment
+        return None
 
     @property
     def assigned_to(self):
         active = self.active_assignment
-        return active.assigned_to if active else None
+        return active.assigned_target if active else None
 
 
 
@@ -407,6 +436,20 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
         """Return the canonical URL for the asset."""
         return reverse('assets:asset_detail', kwargs={'pk': self.pk})
 
+    def clean(self):
+        super().clean()
+        if self.pk and self.status_id:
+            try:
+                old_asset = Asset.objects.get(pk=self.pk)
+                if old_asset.status_id and old_asset.status != self.status:
+                    AssetStateMachine.validate_transition(
+                        old_asset.status.type,
+                        self.status.type,
+                        self.assignments.filter(is_active=True).exists()
+                    )
+            except Asset.DoesNotExist:
+                pass
+
     def save(self, *args, **kwargs):
         if not self.asset_tag:
             sequence, _ = AssetTagSequence.objects.get_or_create(
@@ -416,28 +459,6 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
             self.asset_tag = sequence.next_tag()
         super().save(*args, **kwargs)
 
-class ActivityLog(models.Model):
-    ACTION_CHOICES = [
-        ('created_at', 'Created'),
-        ('updated_at', 'Updated'),
-        ('checked_out', 'Checked Out'),
-        ('checked_in', 'Checked In'),
-        ('audited', 'Audited'),
-    ]
-
-    asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='logs', db_index=True)
-    action = models.CharField(max_length=50, choices=ACTION_CHOICES, db_index=True)
-    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, db_index=True)
-    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
-    notes = models.TextField(blank=True, null=True)
-
-    class Meta:
-        ordering = ['-timestamp'] # Show newest logs first
-        verbose_name = _("Activity Log")
-        verbose_name_plural = _("Activity Logs")
-
-    def __str__(self):
-        return f"{self.asset} - {self.get_action_display()} by {self.user or 'System'} on {self.timestamp.strftime('%Y-%m-%d %H:%M')}"
 
 class InstalledSoftware(ChangeLoggingMixin, BaseModel):
     """
@@ -636,11 +657,15 @@ class AssetAssignment(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseMo
     asset = models.ForeignKey(
         Asset, on_delete=models.CASCADE, related_name='assignments', db_index=True
     )
-    assigned_to_content_type = models.ForeignKey(
-        ContentType, on_delete=models.CASCADE, related_name='asset_assignments'
+    assigned_user = models.ForeignKey(
+        'organization.AssetHolder', on_delete=models.CASCADE, null=True, blank=True, related_name='asset_assignments'
     )
-    assigned_to_object_id = models.PositiveIntegerField()
-    assigned_to = GenericForeignKey('assigned_to_content_type', 'assigned_to_object_id')
+    assigned_location = models.ForeignKey(
+        'organization.Location', on_delete=models.CASCADE, null=True, blank=True, related_name='asset_assignments'
+    )
+    assigned_asset = models.ForeignKey(
+        'self', on_delete=models.CASCADE, null=True, blank=True, related_name='child_assignments'
+    )
     pre_checkout_status = models.ForeignKey(
         'StatusLabel',
         on_delete=models.SET_NULL,
@@ -667,25 +692,37 @@ class AssetAssignment(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseMo
 
     class Meta:
         ordering = ['-checked_out_at']
-        indexes = [
-            models.Index(fields=['assigned_to_content_type', 'assigned_to_object_id']),
-        ]
         constraints = [
             models.UniqueConstraint(
                 fields=['asset'],
                 condition=models.Q(is_active=True),
                 name='unique_active_assignment_per_asset'
             ),
+            models.CheckConstraint(
+                check=(
+                    models.Q(assigned_user__isnull=False, assigned_location__isnull=True, assigned_asset__isnull=True) |
+                    models.Q(assigned_user__isnull=True, assigned_location__isnull=False, assigned_asset__isnull=True) |
+                    models.Q(assigned_user__isnull=True, assigned_location__isnull=True, assigned_asset__isnull=False)
+                ),
+                name='exactly_one_assignment_target'
+            )
         ]
         verbose_name = _("Asset Assignment")
         verbose_name_plural = _("Asset Assignments")
 
     @property
+    def assigned_target(self):
+        return self.assigned_user or self.assigned_location or self.assigned_asset
+
+    @property
     def assigned_to_type(self):
-        return self.assigned_to_content_type.model if self.assigned_to_content_type else None
+        if self.assigned_user: return 'assetholder'
+        if self.assigned_location: return 'location'
+        if self.assigned_asset: return 'asset'
+        return None
 
     def __str__(self):
-        return f"{self.asset} → {self.assigned_to} ({'active' if self.is_active else 'inactive'})"
+        return f"{self.asset} → {self.assigned_target} ({'active' if self.is_active else 'inactive'})"
 
     def get_absolute_url(self):
         return self.asset.get_absolute_url()

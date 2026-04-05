@@ -1,7 +1,7 @@
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
-from assets.models import Manufacturer, Asset, AssetType, AssetRole, ActivityLog, StatusLabel, Depreciation, Supplier, Category, AssetRequest
+from assets.models import Manufacturer, Asset, AssetType, AssetRole, StatusLabel, Depreciation, Supplier, Category, AssetRequest
 from components.models import Component, ComponentAllocation
 from inventory.models import Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, Kit, KitItem
 from compliance.models import CustodyReceipt, AssetMaintenance
@@ -323,7 +323,6 @@ class ComponentTrackingTestCase(TestCase):
         self.asset.refresh_from_db()
         self.assertIsNotNone(self.asset.last_audited)
         self.assertEqual(self.asset.last_audited_by, self.user)
-        self.assertTrue(ActivityLog.objects.filter(asset=self.asset, action='audited').exists())
 
     def test_asset_label_print_view(self):
         response = self.client.get(reverse('assets:asset_label_print', kwargs={'pk': self.asset.pk}))
@@ -991,8 +990,6 @@ class EnterpriseITAMTestCase(TestCase):
 
         self.assertEqual(license_obj.assignments.count(), 1)
         self.assertEqual(license_obj.available_seats, 1)
-
-        self.assertTrue(ActivityLog.objects.filter(asset=asset, action='checked_out').exists())
 
     def test_itam_layouts(self):
         supplier = Supplier.objects.create(

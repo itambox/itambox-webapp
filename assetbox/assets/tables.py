@@ -23,19 +23,19 @@ class AssetTable(BaseTable): # Inherit from BaseTable
     supplier = tables.LinkColumn('assets:supplier_detail', args=[A('supplier.pk')], accessor='supplier.name', verbose_name='Supplier')
     tags = TagColumn(url_name='assets:asset_list')
     requestable = tables.BooleanColumn(verbose_name='Requestable', yesno='Yes,No')
-    checkout_checkin = tables.TemplateColumn(
-        template_name='assets/includes/asset_checkout_checkin.html',
+    checkout_checkin = tables.Column(
         verbose_name='',
         orderable=False,
+        empty_values=(),
         attrs={
             'th': {'class': 'col-checkout text-nowrap'},
             'td': {'class': 'text-center text-nowrap noprint p-1 col-checkout'}
         },
     )
-    actions = tables.TemplateColumn(
-        template_name='assets/includes/asset_actions.html',
+    actions = tables.Column(
         verbose_name='',
         orderable=False,
+        empty_values=(),
         attrs={
             'th': {'class': 'col-actions text-nowrap'},
             'td': {'class': 'text-end text-nowrap noprint p-1 col-actions'}
@@ -79,6 +79,60 @@ class AssetTable(BaseTable): # Inherit from BaseTable
     def value_purchase_date(self, value):
         # Format date if it exists
         return value.strftime("%Y-%m-%d") if value else "—"
+
+    def render_checkout_checkin(self, record):
+        request = getattr(self, 'request', None)
+        if not request or not request.user.has_perm('assets.change_asset', record):
+            return mark_safe('<span class="text-muted small">—</span>')
+        
+        if record.active_assignment:
+            url = reverse('assets:asset_checkin', kwargs={'pk': record.pk})
+            return format_html(
+                '<div class="d-inline-block"><a class="btn btn-sm btn-outline-success text-success" hx-post="{}" hx-swap="none" href="#">'
+                '<i class="mdi mdi-keyboard-return"></i> Check-in</a></div>', url
+            )
+        else:
+            url = reverse('assets:asset_checkout_modal', kwargs={'pk': record.pk})
+            return format_html(
+                '<div class="d-inline-block"><a class="btn btn-sm btn-outline-primary" hx-get="{}" hx-target="#modal-placeholder" hx-swap="innerHTML" href="#">'
+                '<i class="mdi mdi-keyboard-tab-reverse"></i> Check-out</a></div>', url
+            )
+
+    def render_actions(self, record):
+        request = getattr(self, 'request', None)
+        if not request:
+            return ""
+
+        can_edit = request.user.has_perm('assets.change_asset', record)
+        can_delete = request.user.has_perm('assets.delete_asset', record)
+        can_clone = request.user.has_perm('assets.add_asset', record)
+        
+        if not can_edit and not can_delete and not can_clone:
+            return ""
+
+        html = '<div class="d-flex align-items-center gap-1 justify-content-end">'
+        
+        if can_clone:
+            clone_url = reverse('assets:asset_clone', kwargs={'pk': record.pk})
+            html += f'<a class="btn btn-sm btn-warning" href="{clone_url}" title="Copy/Clone"><i class="mdi mdi-content-copy"></i></a>'
+            
+        if can_edit or can_delete:
+            html += '<span class="btn-group dropdown">'
+            if can_edit:
+                edit_url = reverse('assets:asset_update', kwargs={'pk': record.pk})
+                html += f'<a class="btn btn-sm btn-primary" href="{edit_url}" title="Edit Details"><i class="mdi mdi-pencil-outline"></i></a>'
+            
+            html += '<a class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="padding-left: 2px"><span class="visually-hidden">Toggle Dropdown</span></a>'
+            html += '<ul class="dropdown-menu dropdown-menu-end">'
+            
+            if can_delete:
+                del_url = reverse('assets:asset_delete', kwargs={'pk': record.pk})
+                html += f'<li><a class="dropdown-item text-danger" href="{del_url}"><i class="mdi mdi-trash-can-outline me-1"></i>Delete</a></li>'
+            
+            html += '</ul></span>'
+            
+        html += '</div>'
+        return mark_safe(html)
 
 class StatusLabelTable(BaseTable):
     pk = ToggleColumn(accessor='pk')

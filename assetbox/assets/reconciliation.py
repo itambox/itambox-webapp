@@ -1,7 +1,7 @@
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from .models import Asset, AuditSession, AssetAudit, StatusLabel, ActivityLog
+from .models import Asset, AuditSession, AssetAudit, StatusLabel
 
 @transaction.atomic
 def audit_asset(asset: Asset, user=None, session=None, location=None, status=None, notes='', verification_method='manual', request=None, **kwargs) -> AssetAudit:
@@ -45,13 +45,7 @@ def audit_asset(asset: Asset, user=None, session=None, location=None, status=Non
     
     asset.save(update_fields=['last_audited', 'last_audited_by', 'location', 'status'])
 
-    # Log to ActivityLog
-    ActivityLog.objects.create(
-        asset=asset,
-        action='audited',
-        user=user,
-        notes=f"Physically verified at location '{location.name}' with status '{status.name}'. Method: {verification_method}."
-    )
+
     return audit_record
 
 @transaction.atomic
@@ -105,9 +99,4 @@ def rehome_audit_session_mismatches(session: AuditSession, user=None, request=No
         asset.location = session.location
         asset.save(update_fields=['location'])
         
-        ActivityLog.objects.create(
-            asset=asset,
-            action='audited',
-            user=user,
-            notes=f"Reconciled location mismatch during audit session '{session.name}'. Bulk re-homed from '{original_loc.name if original_loc else 'None'}' to verified physical location '{session.location.name if session.location else 'None'}'."
-        )
+

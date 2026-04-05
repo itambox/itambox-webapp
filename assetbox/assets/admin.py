@@ -1,7 +1,7 @@
 from django.contrib import admin
 # Import models from this app
 from .models import (
-    Asset, AssetRole, Manufacturer, AssetType, ActivityLog, InstalledSoftware
+    Asset, AssetRole, Manufacturer, AssetType, InstalledSoftware
 )
 
 # Register your models here.
@@ -37,13 +37,6 @@ class AssetAdmin(admin.ModelAdmin):
     list_display = ('name', 'asset_tag', 'status', 'tenant', 'manufacturer', 'model', 'asset_role', 'location')
     list_filter = ('status', 'asset_role', 'asset_type__manufacturer', 'location', 'asset_type', 'tenant')
     search_fields = ('name', 'asset_tag', 'serial_number', 'asset_type__model', 'tenant__name')
-
-@admin.register(ActivityLog)
-class ActivityLogAdmin(admin.ModelAdmin):
-    list_display = ('asset', 'action', 'user', 'timestamp')
-    list_filter = ('action', 'user')
-    search_fields = ('asset__name', 'asset__asset_tag', 'notes')
-    readonly_fields = ('asset', 'user', 'action', 'timestamp')
 
 @admin.register(InstalledSoftware)
 class InstalledSoftwareAdmin(admin.ModelAdmin):

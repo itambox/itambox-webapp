@@ -89,7 +89,7 @@ def auto_fulfill_asset_requests(sender, instance, created, **kwargs):
         from organization.models import AssetHolder
         
         asset = instance.asset
-        assignee = instance.assigned_to
+        assignee = instance.assigned_target
         
         if isinstance(assignee, AssetHolder) and assignee.user:
             user = assignee.user
