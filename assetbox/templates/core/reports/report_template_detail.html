@@ -11,7 +11,7 @@
 {% block page_actions %}
     <div class="btn-list">
         <a href="{% url 'reporttemplate_download' object.pk %}?print=true" target="_blank" class="btn btn-outline-secondary d-none d-sm-inline-block">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-printer" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2" /><path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4" /><path d="M7 13m0 2a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2z" /></svg>
+            <i class="mdi mdi-printer"></i>
             {% trans "Print Report" %}
         </a>
         <a href="{% url 'reporttemplate_download' object.pk %}?format=html" class="btn btn-outline-info d-none d-sm-inline-block">
@@ -23,11 +23,11 @@
             {% trans "Export CSV" %}
         </a>
         <a href="{% url 'reporttemplate_edit' object.pk %}" class="btn btn-primary d-none d-sm-inline-block">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-pencil" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h4l10.5 -10.5a1.5 1.5 0 0 0 -4 -4l-10.5 10.5v4" /><path d="M13.5 6.5l4 4" /></svg>
+            <i class="mdi mdi-pencil-outline"></i>
             {% trans "Edit Template" %}
         </a>
         <a href="{% url 'reporttemplate_delete' object.pk %}" class="btn btn-outline-danger d-none d-sm-inline-block">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
+            <i class="mdi mdi-trash-can-outline"></i>
             {% trans "Delete" %}
         </a>
     </div>
@@ -120,7 +120,7 @@
                     <pre class="m-0 p-3 bg-dark text-light rounded-bottom" style="font-family: monospace; font-size: 11px; max-height: 500px; overflow-y: auto;"><code>{{ object.template_content }}</code></pre>
                 {% else %}
                     <div class="p-4 text-center text-muted">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-info-circle mb-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" /><path d="M12 9h.01" /><path d="M11 12h1v4h1" /></svg>
+                        <i class="mdi mdi-information-outline mb-2"></i>
                         <p class="mb-0">{% trans "Advanced mode enabled, but template content is empty. Falling back to default layout." %}</p>
                     </div>
                 {% endif %}
@@ -138,7 +138,7 @@
                         <div class="text-secondary small fw-bold mb-1">{% trans "LAYOUT PRESET" %}</div>
                         <div class="d-flex align-items-center">
                             <span class="badge bg-primary-lt px-2 py-1 fs-4">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-template me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 4m0 1a1 1 0 0 1 1 -1h14a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-14a1 1 0 0 1 -1 -1z" /><path d="M4 14l16 0" /><path d="M14 14l0 6" /><path d="M14 4l0 10" /></svg>
+                                <i class="mdi mdi-view-dashboard-outline me-1"></i>
                                 {{ object.get_style_preset_display }}
                             </span>
                         </div>
@@ -149,7 +149,7 @@
                         <div>
                             {% if object.group_by_field %}
                                 <span class="badge bg-purple-lt px-2 py-1">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-layout-columns me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" /><path d="M12 4l0 16" /></svg>
+                                    <i class="mdi mdi-view-column-outline me-1"></i>
                                     <code>{{ object.group_by_field }}</code>
                                 </span>
                             {% else %}
@@ -167,11 +167,11 @@
                                 <div class="card card-sm border-0 bg-body-secondary p-2 d-flex flex-row align-items-center">
                                     {% if object.include_summary_cards %}
                                         <span class="text-success me-2">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-circle-check-filled" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" fill="currentColor"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M17.004 3.651a1 1 0 0 1 .92 .597l.007 .017l.007 .03a10.084 10.084 0 0 1 -.02 6.314a1 1 0 0 1 -1.808 -.831a8.078 8.078 0 0 0 .006 -4.723l-.113 .098a1 1 0 0 1 -1.372 -1.414l.085 -.082l.09 -.074a1 1 0 0 1 .632 -.23l.113 .007zm-5.004 4.349a1 1 0 0 1 .993 .883l.007 .117v4a1 1 0 0 1 -.883 .993l-.117 .007h-4a1 1 0 0 1 -.117 -1.993l.117 -.007h3v-3a1 1 0 0 1 .883 -.993l.117 -.007z"/></svg>
+                                            <i class="mdi mdi-check-circle"></i>
                                         </span>
                                     {% else %}
                                         <span class="text-secondary me-2">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-circle-x-filled" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" fill="currentColor"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 2c5.523 0 10 4.477 10 10s-4.477 10-10 10s-10-4.477-10-10s4.477-10 10-10zm2.293 7.293a1 1 0 0 0 -1.414 0l-1.586 1.586l-1.586 -1.586a1 1 0 0 0 -1.414 1.414l1.586 1.586l-1.586 1.586a1 1 0 0 0 1.414 1.414l1.586 -1.586l1.586 1.586a1 1 0 0 0 1.414 -1.414l-1.586 -1.586l1.586 -1.586a1 1 0 0 0 0 -1.414z"/></svg>
+                                            <i class="mdi mdi-close-circle"></i>
                                         </span>
                                     {% endif %}
                                     <div class="small fw-semibold">{% trans "Summary Cards Total Summary" %}</div>
@@ -181,11 +181,11 @@
                                 <div class="card card-sm border-0 bg-body-secondary p-2 d-flex flex-row align-items-center">
                                     {% if object.include_distribution_chart %}
                                         <span class="text-success me-2">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-circle-check-filled" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" fill="currentColor"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M17.004 3.651a1 1 0 0 1 .92 .597l.007 .017l.007 .03a10.084 10.084 0 0 1 -.02 6.314a1 1 0 0 1 -1.808 -.831a8.078 8.078 0 0 0 .006 -4.723l-.113 .098a1 1 0 0 1 -1.372 -1.414l.085 -.082l.09 -.074a1 1 0 0 1 .632 -.23l.113 .007zm-5.004 4.349a1 1 0 0 1 .993 .883l.007 .117v4a1 1 0 0 1 -.883 .993l-.117 .007h-4a1 1 0 0 1 -.117 -1.993l.117 -.007h3v-3a1 1 0 0 1 .883 -.993l.117 -.007z"/></svg>
+                                            <i class="mdi mdi-check-circle"></i>
                                         </span>
                                     {% else %}
                                         <span class="text-secondary me-2">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-circle-x-filled" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" fill="currentColor"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 2c5.523 0 10 4.477 10 10s-4.477 10-10 10s-10-4.477-10-10s4.477-10 10-10zm2.293 7.293a1 1 0 0 0 -1.414 0l-1.586 1.586l-1.586 -1.586a1 1 0 0 0 -1.414 1.414l1.586 1.586l-1.586 1.586a1 1 0 0 0 1.414 1.414l1.586 -1.586l1.586 1.586a1 1 0 0 0 1.414 -1.414l-1.586 -1.586l1.586 -1.586a1 1 0 0 0 0 -1.414z"/></svg>
+                                            <i class="mdi mdi-close-circle"></i>
                                         </span>
                                     {% endif %}
                                     <div class="small fw-semibold">{% trans "Spend Distribution Chart" %}</div>
@@ -201,7 +201,7 @@
                         <div class="d-flex flex-wrap gap-2">
                             {% for col in object.included_columns %}
                                 <span class="badge bg-indigo-lt px-2 py-1 fs-5">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-table" width="14" height="14" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14z" /><path d="M3 10h18" /><path d="M3 15h18" /><path d="M10 3v18" /></svg>
+                                    <i class="mdi mdi-table"></i>
                                     {{ col|title }}
                                 </span>
                             {% empty %}

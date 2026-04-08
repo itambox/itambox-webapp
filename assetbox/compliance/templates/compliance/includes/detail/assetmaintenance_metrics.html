@@ -6,12 +6,7 @@
                 <div class="row align-items-center">
                     <div class="col-auto">
                         <span class="bg-blue text-white avatar rounded shadow-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-coin" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                                <circle cx="12" cy="12" r="9" />
-                                <path d="M14.8 9A2 2 0 0 0 13 8h-2a2 2 0 0 0 0 4h2a2 2 0 0 1 0 4h-2a2 2 0 0 1 -1.8 -1" />
-                                <path d="M12 6v2m0 8v2" />
-                            </svg>
+                            <i class="mdi mdi-currency-usd"></i>
                         </span>
                     </div>
                     <div class="col">
@@ -36,17 +31,9 @@
                     <div class="col-auto">
                         <span class="{% if object.completion_date %}bg-success{% else %}bg-warning{% endif %} text-white avatar rounded shadow-sm">
                             {% if object.completion_date %}
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-circle-check" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                                    <circle cx="12" cy="12" r="9" />
-                                    <path d="M9 12l2 2l4 -4" />
-                                </svg>
+                                <i class="mdi mdi-check-circle-outline"></i>
                             {% else %}
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                                    <circle cx="12" cy="12" r="9" />
-                                    <polyline points="12 7 12 12 15 15" />
-                                </svg>
+                                <i class="mdi mdi-clock-outline"></i>
                             {% endif %}
                         </span>
                     </div>

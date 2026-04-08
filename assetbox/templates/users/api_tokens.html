@@ -98,13 +98,7 @@
                                         <form method="post" action="{% url 'users:delete_api_token' pk=token.pk %}" class="d-inline" onsubmit="return confirm('{% trans "Are you sure you want to revoke this API token? External scripts using this key will immediately lose access." %}');">
                                             {% csrf_token %}
                                             <button type="submit" class="btn btn-sm btn-ghost-danger border-0 px-2 py-1" title="{% trans "Revoke Token" %}">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash-x" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                                                    <path d="M4 7h16" />
-                                                    <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" />
-                                                    <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" />
-                                                    <path d="M10 12l4 4m0 -4l-4 4" />
-                                                </svg>
+                                                <i class="mdi mdi-delete-forever-outline"></i>
                                                 <span class="d-none d-sm-inline ms-1">{% trans "Revoke" %}</span>
                                             </button>
                                         </form>
@@ -117,12 +111,7 @@
             {% else %}
                 <div class="py-5 text-muted text-center card border-0 bg-transparent shadow-none">
                     <div class="card-body">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-key text-muted mb-2" width="48" height="48" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                            <path d="M16.555 3.843l3.602 3.602a2.877 2.877 0 0 1 0 4.069l-2.643 2.643a2.877 2.877 0 0 1 -4.069 0l-.301 -.301l-6.558 6.558a1 1 0 0 1 -1.414 0l-1.414 -1.414a1 1 0 0 1 0 -1.414l6.558 -6.558l-.3 -.3a2.877 2.877 0 0 1 0 -4.069l2.643 -2.643a2.877 2.877 0 0 1 4.069 0z" />
-                            <path d="M15 9h.01" />
-                            <path d="M10 14l4 4" />
-                        </svg>
+                        <i class="mdi mdi-key-outline text-muted mb-2"></i>
                         <p class="mb-0 small font-weight-medium">{% trans "You have not generated any API access tokens." %}</p>
                     </div>
                 </div>

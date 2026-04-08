@@ -86,10 +86,7 @@
     {% include 'generic/includes/table_pagination.html' with table=assignments_table %}
     {% else %}
     <div class="card-body py-5 text-muted text-center">
-        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link-off text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M10 14a3.5 3.5 0 0 1 -5 -4l4 -4a3.5 3.5 0 0 1 5 4m-4 4l-4 4a3.5 3.5 0 0 0 5 4l4 -4" />
-            <path d="M16 16l3 3" />
-        </svg>
+        <i class="mdi mdi-link-variant-off text-muted mb-2"></i>
         <p class="mb-0">{% translate "No assets, holders, or locations are currently assigned to this subscription." %}</p>
     </div>
     {% endif %}

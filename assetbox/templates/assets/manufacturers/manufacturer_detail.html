@@ -54,7 +54,7 @@
                 {% include 'generic/includes/table_pagination.html' with table=asset_types_table %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-ban text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M5.7 5.7l12.6 12.6" /></svg>
+                    <i class="mdi mdi-cancel text-muted mb-2"></i>
                     <p class="mb-0">{% translate "No asset types defined for this manufacturer yet." %}</p>
                 </div>
             {% endif %}
@@ -74,7 +74,7 @@
                 {% include 'generic/includes/table_pagination.html' with table=assets_table %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-devices text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M13 9a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-6a1 1 0 0 1 -1 -1v-10z" /><path d="M18 8v-3a1 1 0 0 0 -1 -1h-13a1 1 0 0 0 -1 1v12a1 1 0 0 0 1 1h9" /><path d="M16 9h2" /></svg>
+                    <i class="mdi mdi-devices text-muted mb-2"></i>
                     <p class="mb-0">{% translate "No physical assets found for this manufacturer." %}</p>
                 </div>
             {% endif %}
@@ -88,7 +88,7 @@
                 <h3 class="card-title">{% translate "Assigned Contacts" %}</h3>
                 {% with mfr_ct=object|content_type_id %}
                 <a href="{% url 'organization:contactassignment_create' %}?content_type={{ mfr_ct }}&object_id={{ object.pk }}" class="btn btn-sm btn-primary">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+                    <i class="mdi mdi-plus"></i>
                     {% translate "Assign Contact" %}
                 </a>
                 {% endwith %}
@@ -129,7 +129,7 @@
                                 <td>{{ assignment.contact.email|default:"—" }}</td>
                                 <td>
                                     <a href="{% url 'organization:contactassignment_delete' assignment.pk %}?return_url={{ request.path }}" class="btn btn-sm btn-danger px-2" title="{% translate 'Delete' %}">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash m-0" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
+                                        <i class="mdi mdi-trash-can-outline m-0"></i>
                                     </a>
                                 </td>
                             </tr>
@@ -139,7 +139,7 @@
                 </div>
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-users text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /></svg>
+                    <i class="mdi mdi-account-group-outline text-muted mb-2"></i>
                     <p class="mb-0">{% translate "No contacts are assigned to this manufacturer yet." %}</p>
                 </div>
             {% endif %}

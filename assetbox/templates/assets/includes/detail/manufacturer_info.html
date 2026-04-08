@@ -40,7 +40,7 @@
             {% if support_contact.web_url %}
                 <a href="{{ support_contact.web_url }}" target="_blank" class="link-primary font-weight-medium d-inline-flex align-items-center">
                     {{ support_contact.web_url }}
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-external-link ms-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6" /><path d="M11 13l9 -9" /><path d="M15 4h5v5" /></svg>
+                    <i class="mdi mdi-open-in-new ms-1"></i>
                 </a>
             {% else %}
                 <span class="text-muted small"><i>{% translate "Not configured" %}</i></span>

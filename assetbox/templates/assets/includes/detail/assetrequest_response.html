@@ -2,7 +2,7 @@
 <dl class="row mb-0">
     {% if object.status == 'pending' %}
         <dd class="col-sm-12 text-muted py-4 text-center">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hourglass text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M6 20v-2a6 6 0 1 1 12 0v2a1 1 0 0 1 -1 1h-10a1 1 0 0 1 -1 -1z" /><path d="M6 4v2a6 6 0 1 0 12 0v-2a1 1 0 0 0 -1 -1h-10a1 1 0 0 0 -1 1z" /></svg>
+            <i class="mdi mdi-hourglass-empty text-muted mb-2"></i>
             <p class="mb-0">{% translate "This asset request is currently pending administrative review." %}</p>
         </dd>
     {% else %}

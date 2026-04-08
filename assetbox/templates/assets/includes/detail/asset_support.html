@@ -31,7 +31,7 @@
                 {% if support_contact.web_url %}
                     <a href="{{ support_contact.web_url }}" target="_blank" class="link-primary font-weight-medium d-inline-flex align-items-center">
                         {% translate "Visit Support Portal" %}
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-external-link ms-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6" /><path d="M11 13l9 -9" /><path d="M15 4h5v5" /></svg>
+                        <i class="mdi mdi-open-in-new ms-1"></i>
                     </a>
                 {% else %}
                     <span class="text-muted small"><i>{% translate "Not configured" %}</i></span>
@@ -43,20 +43,14 @@
             <div class="mt-3">
                 <a href="mailto:{{ support_contact.email }}?subject=Warranty%20Claim%3A%20{{ object.asset_type.manufacturer.name }}%20{{ object.asset_type.model }}%20%28S%2FN%3A%20{{ object.serial_number|default:'N/A' }}%29&body=Dear%20Support%20Team%2C%0A%0AI%20would%20like%20to%20file%20a%20warranty%20claim%20for%20our%20{{ object.asset_type.manufacturer.name }}%20{{ object.asset_type.model }}%20hardware%20unit.%0A%0AHere%20are%20the%20technical%20details%20for%20cross-referencing%3A%0A-%20Asset%20Model%3A%20{{ object.asset_type.model }}%0A-%20Asset%20Tag%3A%20{{ object.asset_tag }}%0A-%20Serial%20Number%3A%20{{ object.serial_number|default:'N/A' }}%0A-%20Purchase%20Date%3A%20{{ object.purchase_date|default:'N/A' }}%0A%0APlease%20let%20us%20know%20how%20we%20should%20proceed%20with%20the%20warranty%20coverage.%0A%0ABest%20regards%2C%0AIT%20Operations%20Team" 
                    class="btn btn-sm btn-outline-primary d-inline-flex align-items-center w-100 justify-content-center p-2 mt-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-mail-forward me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 18h-7a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v7.5" /><path d="M3 6l9 6l9 -6" /><path d="M15 18h6" /><path d="M18 15l3 3l-3 3" /></svg>
+                    <i class="mdi mdi-email-fast-outline me-1"></i>
                     {% translate "Generate Warranty Claim Email" %}
                 </a>
             </div>
         {% endif %}
     {% else %}
         <div class="text-center py-4">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-headset text-muted mb-2" width="32" height="32" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                <path d="M4 14v-3a8 8 0 1 1 16 0v3" />
-                <path d="M18 19c0 1.657 -2.686 3 -6 3c-3.314 0 -6 -1.343 -6 -3" />
-                <path d="M4 14a2 2 0 0 1 2 -2h1a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2h-1a2 2 0 0 1 -2 -2z" />
-                <path d="M15 14a2 2 0 0 1 2 -2h1a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2h-1a2 2 0 0 1 -2 -2z" />
-            </svg>
+            <i class="mdi mdi-headset text-muted mb-2"></i>
             <p class="text-muted small mb-0">{% translate "No active support contact is configured for" %} {{ object.asset_type.manufacturer.name }}.</p>
             {% if request.user.is_staff or request.user.is_superuser %}
                 <a href="{% url 'assets:manufacturer_detail' pk=object.asset_type.manufacturer.pk %}#contacts" class="btn btn-sm btn-outline-secondary mt-2">

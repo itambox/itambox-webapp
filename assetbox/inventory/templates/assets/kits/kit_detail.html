@@ -20,17 +20,17 @@
                 hx-target="#modal-placeholder"
                 hx-swap="innerHTML"
                 >
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-circle-check" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M9 12l2 2l4 -4" /></svg>
+            <i class="mdi mdi-check-circle-outline"></i>
             {% translate "Deploy / Checkout Kit" %}
         </button>
     {% else %}
         <button type="button" class="btn btn-secondary" disabled title="{% translate 'Some items are out of stock' %}">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-alert-circle" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
+            <i class="mdi mdi-alert-circle-outline"></i>
             {% translate "Kit Unavailable (Out of Stock)" %}
         </button>
     {% endif %}
     <a href="{% url 'inventory:kititem_create' %}?kit={{ object.pk }}" class="btn btn-outline-primary ms-2">
-        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+        <i class="mdi mdi-plus"></i>
         {% translate "Add Item" %}
     </a>
     <a href="{% url 'inventory:kit_update' pk=object.pk %}" class="btn btn-outline-secondary ms-2">

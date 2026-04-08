@@ -33,7 +33,7 @@
         <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
             <div class="modal-header bg-dark text-white border-0 py-3 d-flex align-items-center">
                 <h5 class="modal-title fw-bold d-flex align-items-center" id="previewModalLabel" style="font-size: 16px; letter-spacing: -0.2px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-eye-check me-2" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8; vertical-align: text-bottom;"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" /><path d="M11.102 17.957c-3.003 -.368 -5.602 -2.357 -7.602 -5.957c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6a19.5 19.5 0 0 1 -1.458 2.052" /><path d="M15 19l2 2l4 -4" /></svg>
+                    <i class="mdi mdi-eye-check-outline me-2"></i>
                     {% translate "Live Report Template Preview" %}
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
@@ -368,7 +368,7 @@
                         <div class="row">
                             <div class="col-md-6 mb-3 mb-md-0">
                                 <div class="text-secondary small fw-bold mb-2 uppercase text-uppercase d-flex align-items-center">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrows-sort me-1 text-primary" width="14" height="14" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: text-bottom;"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 9l4 -4l4 4" /><path d="M7 5v14" /><path d="M21 15l-4 4l-4 -4" /><path d="M17 19v-14" /></svg>
+                                    <i class="mdi mdi-sort me-1 text-primary"></i>
                                     Selected Sequence (Orderable)
                                 </div>
                                 <div id="active-cols-list" class="d-flex flex-column gap-2 p-2 bg-body rounded border" style="min-height: 120px; max-height: 280px; overflow-y: auto;">
@@ -491,7 +491,7 @@
                             availPill.style.fontSize = '11px';
                             availPill.style.fontWeight = '500';
                             availPill.innerHTML = `
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus me-1" width="12" height="12" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+                                <i class="mdi mdi-plus me-1"></i>
                                 ${labelText}
                             `;
                             
@@ -537,7 +537,7 @@
             regenBtn.type = 'button';
             regenBtn.className = 'btn btn-sm btn-outline-primary mb-2';
             regenBtn.style.fontSize = '12px';
-            regenBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-refresh" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: text-bottom; margin-right: 4px;"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -5v5h5" /><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 5v-5h-5" /></svg> Bootstrap from Visual Builder';
+            regenBtn.innerHTML = '<i class="mdi mdi-refresh"></i> Bootstrap from Visual Builder';
             
             if (templateGroup) {
                 templateGroup.insertBefore(regenBtn, templateContentDiv);
@@ -582,7 +582,7 @@
             previewBtn.className = 'btn btn-outline-info ms-2';
             previewBtn.style.borderRadius = '6px';
             previewBtn.style.fontWeight = '600';
-            previewBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-eye me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: text-bottom; margin-right: 4px;"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" /><path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6" /></svg> Preview Report';
+            previewBtn.innerHTML = '<i class="mdi mdi-eye-outline me-1"></i> Preview Report';
             
             submitBtn.parentNode.insertBefore(previewBtn, submitBtn.nextSibling);
             

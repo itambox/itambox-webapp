@@ -21,7 +21,7 @@
                 hx-target="#modal-placeholder"
                 hx-swap="innerHTML"
                 >
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-minus" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l14 0" /></svg>
+            <i class="mdi mdi-minus"></i>
             {% translate "Consume Item..." %}
         </button>
     {% endif %}
@@ -54,10 +54,7 @@
                 {% include 'generic/includes/table_pagination.html' with table=consumptions_table %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-droplet text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                        <path d="M12 3l1.2 1.78a8 8 0 1 1 -2.4 0l1.2 -1.78z" />
-                    </svg>
+                    <i class="mdi mdi-water-outline text-muted mb-2"></i>
                     <p class="mb-0">{% translate "No permanent stock consumption debits recorded yet for this item." %}</p>
                 </div>
             {% endif %}

@@ -98,7 +98,7 @@
                 {% include 'generic/includes/table_pagination.html' with table=sites_table %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-building text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l18 0" /><path d="M9 8l1 0" /><path d="M9 12l1 0" /><path d="M9 16l1 0" /><path d="M14 8l1 0" /><path d="M14 12l1 0" /><path d="M14 16l1 0" /><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16" /></svg>
+                    <i class="mdi mdi-office-building text-muted mb-2"></i>
                     <p class="mb-0">{% translate "No sites found for this tenant." %}</p>
                 </div>
             {% endif %}
@@ -118,7 +118,7 @@
                 {% include 'generic/includes/table_pagination.html' with table=locations_table %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-map-pin text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" /><path d="M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0z" /></svg>
+                    <i class="mdi mdi-map-marker-outline text-muted mb-2"></i>
                     <p class="mb-0">{% translate "No locations found for this tenant." %}</p>
                 </div>
             {% endif %}
@@ -138,7 +138,7 @@
                 {% include 'generic/includes/table_pagination.html' with table=assetholders_table %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-users text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /></svg>
+                    <i class="mdi mdi-account-group-outline text-muted mb-2"></i>
                     <p class="mb-0">{% translate "No asset holders found for this tenant." %}</p>
                 </div>
             {% endif %}
@@ -158,7 +158,7 @@
                 {% include 'generic/includes/table_pagination.html' with table=assets_table %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-device-laptop text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 19l18 0" /><path d="M5 6m0 1a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v8a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1z" /><path d="M12 16l0 3" /></svg>
+                    <i class="mdi mdi-laptop text-muted mb-2"></i>
                     <p class="mb-0">{% translate "No assets found for this tenant." %}</p>
                 </div>
             {% endif %}
@@ -178,7 +178,7 @@
                 {% include 'generic/includes/table_pagination.html' with table=accessories_table %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-keyboard text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2 -2v-10a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2z" /><path d="M6 10h.01" /><path d="M10 10h.01" /><path d="M14 10h.01" /><path d="M18 10h.01" /><path d="M7 14h10" /></svg>
+                    <i class="mdi mdi-keyboard-outline text-muted mb-2"></i>
                     <p class="mb-0">{% translate "No accessories found for this tenant." %}</p>
                 </div>
             {% endif %}
@@ -198,7 +198,7 @@
                 {% include 'generic/includes/table_pagination.html' with table=consumables_table %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-droplet text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3l1.2 1.78a8 8 0 1 1 -2.4 0l1.2 -1.78z" /></svg>
+                    <i class="mdi mdi-water-outline text-muted mb-2"></i>
                     <p class="mb-0">{% translate "No consumables found for this tenant." %}</p>
                 </div>
             {% endif %}
@@ -218,7 +218,7 @@
                 {% include 'generic/includes/table_pagination.html' with table=licenses_table %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-key text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M16.555 3.843a8 8 0 1 0-.342 15.228l-1.213-1.213a6 6 0 1 1 .184-11.83l1.371-2.185z" /><path d="M19 16v4" /><path d="M17 18h4" /></svg>
+                    <i class="mdi mdi-key-outline text-muted mb-2"></i>
                     <p class="mb-0">{% translate "No licenses found for this tenant." %}</p>
                 </div>
             {% endif %}
@@ -238,7 +238,7 @@
                 {% include 'generic/includes/table_pagination.html' with table=kits_table %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-package text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5" /><path d="M12 12l8 -4.5" /><path d="M12 12l0 9" /><path d="M12 12l-8 -4.5" /></svg>
+                    <i class="mdi mdi-package-variant text-muted mb-2"></i>
                     <p class="mb-0">{% translate "No kits found for this tenant." %}</p>
                 </div>
             {% endif %}
@@ -258,7 +258,7 @@
                 {% include 'generic/includes/table_pagination.html' with table=subscriptions_table %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-invoice text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><path d="M8 11l8 0" /><path d="M8 15l6 0" /></svg>
+                    <i class="mdi mdi-file-document-outline text-muted mb-2"></i>
                     <p class="mb-0">{% translate "No subscriptions found for this tenant." %}</p>
                 </div>
             {% endif %}

@@ -39,7 +39,7 @@
                 {% include 'generic/includes/table_pagination.html' with table=assignments_table %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clipboard-off text-muted mb-2" width="40" height="40" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5.575 5.579a2 2 0 0 0 -.575 1.421v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2m0 -4v-8a2 2 0 0 0 -2 -2h-2m-3.8 0h-2.2a2 2 0 0 0 -2 2v0a2 2 0 0 0 2 2h1.8" /><path d="M3 3l18 18" /></svg>
+                    <i class="mdi mdi-clipboard-off-outline text-muted mb-2"></i>
                     <p class="mb-0">{% translate "No checked out assets assigned to this holder." %}</p>
                 </div>
             {% endif %}

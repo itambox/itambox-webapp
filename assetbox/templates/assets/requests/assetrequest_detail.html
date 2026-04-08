@@ -12,14 +12,14 @@
                 hx-get="{% url 'assets:request_approve' pk=object.pk %}"
                 hx-target="#modal-placeholder"
                 hx-swap="innerHTML">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l5 5l10 -10" /></svg>
+            <i class="mdi mdi-check"></i>
             {% translate "Approve..." %}
         </button>
         <button type="button" class="btn btn-danger"
                 hx-get="{% url 'assets:request_deny' pk=object.pk %}"
                 hx-target="#modal-placeholder"
                 hx-swap="innerHTML">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-x" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
+            <i class="mdi mdi-close"></i>
             {% translate "Deny..." %}
         </button>
     {% endif %}
@@ -29,7 +29,7 @@
             <form method="post" action="{% url 'assets:request_cancel' pk=object.pk %}" class="d-inline">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-outline-secondary" onclick="return confirm('Are you sure you want to cancel this request?')">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-ban" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M5.7 5.7l12.6 12.6" /></svg>
+                    <i class="mdi mdi-cancel"></i>
                     {% translate "Cancel Request" %}
                 </button>
             </form>
