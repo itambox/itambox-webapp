@@ -15,7 +15,7 @@
                 <a href="#"
                    hx-get="{{ request.path }}{% update_querystring request page=page_obj.previous_page_number %}"
                    class="page-link" aria-label="{% trans "Previous page" %}">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-left" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 6l-6 6l6 6" /></svg>
+                    <i class="mdi mdi-chevron-left"></i>
                 </a>
             </li>
             {% endif %}
@@ -39,7 +39,7 @@
                 <a href="#"
                    hx-get="{{ request.path }}{% update_querystring request page=page_obj.next_page_number %}"
                    class="page-link" aria-label="{% trans "Next page" %}">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-right" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 6l6 6l-6 6" /></svg>
+                    <i class="mdi mdi-chevron-right"></i>
                 </a>
             </li>
             {% endif %}

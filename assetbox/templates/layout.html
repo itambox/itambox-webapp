@@ -115,7 +115,7 @@
                     <form hx-get="{% url 'search' %}" hx-target="#page-content-wrapper" hx-push-url="true" autocomplete="off" class="w-100">
                         <div class="input-icon">
                             <span class="input-icon-addon">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" /><path d="M21 21l-6 -6" /></svg>
+                                <i class="mdi mdi-magnify"></i>
                             </span>
                             <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="form-control" placeholder="{% translate 'Search…' %}" aria-label="{% translate 'Search' %}">
                         </div>
@@ -194,22 +194,22 @@
                 <ul class="list-inline mb-0 fs-2">
                     <li class="list-inline-item">
                       <a href="{% static 'docs/index.html' %}" target="_blank" class="link-secondary" rel="noopener" aria-label="{% trans "Docs" %}" title="{% trans "Docs" %}" data-bs-placement="top" data-bs-toggle="tooltip">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-book" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0" /><path d="M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0" /><path d="M3 6l0 13" /><path d="M12 6l0 13" /><path d="M21 6l0 13" /></svg>
+                        <i class="mdi mdi-book-outline"></i>
                       </a>
                     </li>
                     <li class="list-inline-item">
                       <a href="{% url 'api:api-root' %}" target="_blank" class="link-secondary" rel="noopener" aria-label="{% trans "REST API" %}" title="{% trans "REST API" %}" data-bs-placement="top" data-bs-toggle="tooltip">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cloud-code" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 18a4.6 4.4 0 0 1 0 -9a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-1" /><path d="M10 15l-1 1l1 1" /><path d="M14 15l1 1l-1 1" /><path d="M12 18v-3" /></svg>
+                        <i class="mdi mdi-cloud-tags"></i>
                       </a>
                     </li>
                      <li class="list-inline-item">
                         <a href="{% url 'api:swagger-ui' %}" target="_blank" class="link-secondary" rel="noopener" aria-label="{% trans "API documentation" %}" title="{% trans "API documentation" %}" data-bs-placement="top" data-bs-toggle="tooltip">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-code" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><path d="M10 13l-1.5 1.5l1.5 1.5" /><path d="M14 13l1.5 1.5l-1.5 1.5" /></svg>
+                            <i class="mdi mdi-file-code-outline"></i>
                         </a>
                     </li>
                     <li class="list-inline-item">
                       <a href="https://github.com/your-repo" target="_blank" class="link-secondary" rel="noopener" aria-label="{% trans "Source Code" %}" title="{% trans "Source Code" %}" data-bs-placement="top" data-bs-toggle="tooltip">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" /></svg>
+                        <i class="mdi mdi-github"></i>
                       </a>
                     </li>
                 </ul>

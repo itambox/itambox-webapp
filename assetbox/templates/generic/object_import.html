@@ -11,7 +11,7 @@
 
 {% block page_actions %}
     <a href="{{ cancel_url }}" class="btn btn-outline-secondary">
-        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l14 0" /><path d="M5 12l6 6" /><path d="M5 12l6 -6" /></svg>
+        <i class="mdi mdi-arrow-left"></i>
         {% trans "Cancel" %}
     </a>
 {% endblock %}
@@ -86,7 +86,7 @@
                     {% csrf_token %}
                     <div class="d-flex gap-2">
                         <button type="submit" name="_confirm" class="btn btn-success">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l5 5l10 -10" /></svg>
+                            <i class="mdi mdi-check"></i>
                             {% blocktranslate with count=preview_rows|length %}Confirm Import ({{ count }} rows){% endblocktranslate %}
                         </button>
                         <a href="{{ request.path }}" class="btn btn-outline-secondary">{% trans "Back to Upload" %}</a>
@@ -104,13 +104,13 @@
                     <ul class="nav nav-tabs card-header-tabs m-0 border-0" data-bs-toggle="tabs" role="tablist">
                         <li class="nav-item" role="presentation">
                             <a href="#tab-upload" class="nav-link active py-3 px-4 border-0 d-flex align-items-center gap-2 font-weight-medium" data-bs-toggle="tab" role="tab" aria-selected="true" id="btn-tab-upload">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-upload" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><path d="M12 11v6" /><path d="M9.5 13.5l2.5 -2.5l2.5 2.5" /></svg>
+                                <i class="mdi mdi-file-upload-outline"></i>
                                 {% trans "File Upload" %}
                             </a>
                         </li>
                         <li class="nav-item" role="presentation">
                             <a href="#tab-editor" class="nav-link py-3 px-4 border-0 d-flex align-items-center gap-2 font-weight-medium" data-bs-toggle="tab" role="tab" aria-selected="false" tabindex="-1" id="btn-tab-editor">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-edit-circle" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 15l8.385 -8.415a2.1 2.1 0 0 0 -2.97 -2.97l-8.415 8.385v3h3z" /><path d="M16 5l3 3" /><path d="M9 7.07a7 7 0 0 0 1 13.93a7 7 0 0 0 6.929 -6" /></svg>
+                                <i class="mdi mdi-circle-edit-outline"></i>
                                 {% trans "Direct Editor" %}
                             </a>
                         </li>
@@ -123,14 +123,14 @@
                             <label class="form-selectgroup-item">
                                 <input type="radio" name="import_format" value="csv" class="form-selectgroup-input" checked id="format-csv">
                                 <span class="form-selectgroup-label d-flex align-items-center gap-1">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-type-csv me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M5 12v-7a2 2 0 0 1 2 -2h7l5 5v4" /><path d="M7 16.5a1.5 1.5 0 0 0 -3 0v3a1.5 1.5 0 0 0 3 0" /><path d="M10 20.25c0 .414 .336 .75 .75 .75h1.25a1 1 0 0 0 1 -1v-1a1 1 0 0 0 -1 -1h-1a1 1 0 0 1 -1 -1h-1a1 1 0 0 1 1 -1h1.25c.414 0 .75 .336 .75 .75" /><path d="M17 13l2 6l2 -6" /></svg>
+                                    <i class="mdi mdi-file-delimited-outline me-1"></i>
                                     {% translate "CSV" %}
                                 </span>
                             </label>
                             <label class="form-selectgroup-item">
                                 <input type="radio" name="import_format" value="yaml" class="form-selectgroup-input" id="format-yaml">
                                 <span class="form-selectgroup-label d-flex align-items-center gap-1">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-code me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><path d="M10 13l-1.5 1.5l1.5 1.5" /><path d="M14 13l1.5 1.5l-1.5 1.5" /></svg>
+                                    <i class="mdi mdi-file-code-outline me-1"></i>
                                     {% translate "YAML" %}
                                 </span>
                             </label>
@@ -178,7 +178,7 @@
 
                     <div class="mt-4">
                         <button type="submit" name="_preview" class="btn btn-primary d-flex align-items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-eye" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" /><path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6" /></svg>
+                            <i class="mdi mdi-eye-outline"></i>
                             {% trans "Preview" %}
                         </button>
                     </div>
@@ -226,7 +226,7 @@
                                 {% if f.choices %}
                                 <div class="mt-2">
                                     <button class="btn btn-xs btn-outline-secondary py-0 px-2 d-flex align-items-center gap-1" type="button" data-bs-toggle="collapse" data-bs-target="#choices-{{ f.name }}" aria-expanded="false" aria-controls="choices-{{ f.name }}">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-list-details" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M13 5h8" /><path d="M13 9h5" /><path d="M13 15h8" /><path d="M13 19h5" /><path d="M3 4m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" /><path d="M3 14m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" /></svg>
+                                        <i class="mdi mdi-format-list-bulleted"></i>
                                         {% trans "Show Choices" %}
                                     </button>
                                     <div class="collapse mt-2" id="choices-{{ f.name }}">

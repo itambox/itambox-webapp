@@ -4,17 +4,7 @@
 {# Note: Using Tabler icons instead of MDI directly #}
 <div class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000" data-bs-autohide="true">
   <div class="toast-header text-bg-{{ status|default:'info' }}">
-    {# Using inline SVG for Tabler icons included with the theme #}
-    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-{{ status|icon_from_status }} me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-       <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-       {# The specific path for the icon will depend on the status, #}
-       {# but Tabler's JS usually handles replacing this if icons are loaded. #}
-       {# Or manually map paths if needed, but let's rely on CSS classes first. #}
-       {# Placeholder path - actual rendering relies on Tabler's icon sprite or JS #}
-       <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"></path>
-       <path d="M12 8l0 4"></path>
-       <path d="M12 16l.01 0"></path>
-    </svg>
+    <i class="mdi {{ status|icon_from_status }} me-2"></i>
     <strong class="me-auto">{{ title|default:status|capfirst }}</strong>
     <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="{% translate 'Close' %}"></button>
   </div>
