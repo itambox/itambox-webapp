@@ -54,7 +54,7 @@ scratch_page.html
 /templates/
 
 # E2E test artifacts
-tests/e2e/node_modules/
-tests/e2e/test-results/
-tests/e2e/storageState.json
+**/tests/e2e/node_modules/
+**/tests/e2e/test-results/
+**/tests/e2e/storageState.json
 
