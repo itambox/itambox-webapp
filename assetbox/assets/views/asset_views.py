@@ -29,7 +29,7 @@ from assetbox.views.generic import (
 from assetbox.views.generic.service_views import GenericTransactionView, SimplePostView
 from assetbox.quick_add import QuickAddMixin
 
-from organization.models import AssetHolderAssignment, AssetHolder
+from organization.models import AssetHolder
 
 import segno
 
@@ -196,72 +196,74 @@ class AssetCheckinView(SimplePostView):
         return {'message': f"No active assignment for '{asset}'."}
 
 
-@login_required
-@require_POST
-def asset_audit(request, pk):
-    asset = get_object_or_404(Asset, pk=pk)
-    
-    from ..models import AuditSession
-    from ..reconciliation import audit_asset
-    from django.core.exceptions import ValidationError
+class AssetAuditView(SimplePostView):
+    queryset = Asset.objects.all()
+    permission_required = 'assets.change_asset'
 
-    # 1. Try to find an active AuditSession campaign
-    session = None
-    if asset.location:
-        session = AuditSession.objects.filter(status='active', location=asset.location).first()
-    
-    if not session:
-        session = AuditSession.objects.filter(status='active', location__isnull=True).first()
+    def post(self, request, *args, **kwargs):
+        asset = self.get_object()
         
-    if not session:
-        session = AuditSession.objects.filter(status='active').first()
+        from ..models import AuditSession
+        from ..reconciliation import audit_asset
+        from django.core.exceptions import ValidationError
 
-    # 2. Determine the observed location
-    location = asset.location
-    if session and not location:
-        location = session.location
+        # 1. Try to find an active AuditSession campaign
+        session = None
+        if asset.location:
+            session = AuditSession.objects.filter(status='active', location=asset.location).first()
         
-    if not location:
-        # Fallback to the first location in DB if no location is registered on the asset/session
-        from organization.models import Location
-        location = Location.objects.first()
+        if not session:
+            session = AuditSession.objects.filter(status='active', location__isnull=True).first()
+            
+        if not session:
+            session = AuditSession.objects.filter(status='active').first()
 
-    # 3. Determine the observed status
-    status = asset.status
-    if not status:
-        status = StatusLabel.objects.filter(type=StatusLabel.TYPE_DEPLOYABLE).first()
+        # 2. Determine the observed location
+        location = asset.location
+        if session and not location:
+            location = session.location
+            
+        if not location:
+            # Fallback to the first location in DB if no location is registered on the asset/session
+            from organization.models import Location
+            location = Location.objects.first()
 
-    error_message = None
-    try:
-        audit_asset(
-            asset=asset,
-            user=request.user,
-            session=session,
-            location=location,
-            status=status,
-            verification_method='manual'
-        )
-        if session:
-            message = f"Asset '{asset.name}' physically audited successfully inside campaign '{session.name}'!"
+        # 3. Determine the observed status
+        status = asset.status
+        if not status:
+            status = StatusLabel.objects.filter(type=StatusLabel.TYPE_DEPLOYABLE).first()
+
+        error_message = None
+        try:
+            audit_asset(
+                asset=asset,
+                user=request.user,
+                session=session,
+                location=location,
+                status=status,
+                verification_method='manual'
+            )
+            if session:
+                message = f"Asset '{asset.name}' physically audited successfully inside campaign '{session.name}'!"
+            else:
+                message = f"Asset '{asset.name}' physically audited successfully (standalone verification)!"
+        except ValidationError as e:
+            error_message = e.message if hasattr(e, 'message') else str(e)
+            message = f"Failed to perform audit: {error_message}"
+
+        # 5. Render the audit badge response
+        response = render(request, "assets/includes/asset_audit_badge.html", {'asset': asset})
+        
+        # Send HX-Trigger to display notification and play sound (if successful)
+        trigger_data = {}
+        if not error_message:
+            trigger_data["playAuditSound"] = None
+            trigger_data["showMessage"] = {"message": message, "level": "success"}
         else:
-            message = f"Asset '{asset.name}' physically audited successfully (standalone verification)!"
-    except ValidationError as e:
-        error_message = e.message if hasattr(e, 'message') else str(e)
-        message = f"Failed to perform audit: {error_message}"
-
-    # 5. Render the audit badge response
-    response = render(request, "assets/includes/asset_audit_badge.html", {'asset': asset})
-    
-    # Send HX-Trigger to display notification and play sound (if successful)
-    trigger_data = {}
-    if not error_message:
-        trigger_data["playAuditSound"] = None
-        trigger_data["showMessage"] = {"message": message, "level": "success"}
-    else:
-        trigger_data["showMessage"] = {"message": message, "level": "danger"}
-        
-    response['HX-Trigger'] = json.dumps(trigger_data)
-    return response
+            trigger_data["showMessage"] = {"message": message, "level": "danger"}
+            
+        response['HX-Trigger'] = json.dumps(trigger_data)
+        return response
 
 
 @login_required
@@ -317,9 +319,7 @@ def bulk_assign_assets(request):
                     skipped += 1
                     continue
 
-            AssetHolderAssignment.objects.filter(
-                content_type=ct, object_id=asset.pk
-            ).delete()
+
 
             if in_use_status:
                 asset.status = in_use_status
@@ -330,7 +330,7 @@ def bulk_assign_assets(request):
 
             AssetAssignment.objects.create(
                 asset=asset,
-                assigned_to=holder,
+                assigned_user=holder,
                 checked_out_by=request.user,
                 notes=f'Bulk assigned to {holder}'
             )

@@ -74,7 +74,7 @@ urlpatterns = [
     path('component-allocations/<int:pk>/delete/', component_views.ComponentAllocationDeleteView.as_view(), name='componentallocation_delete'),
 
     # Phase 4 Audits & Barcoding
-    path('<int:pk>/audit/', views.asset_audit, name='asset_audit'),
+    path('<int:pk>/audit/', views.AssetAuditView.as_view(), name='asset_audit'),
     path('<int:pk>/print/', views.asset_label_print, name='asset_label_print'),
     path('<int:pk>/print/<int:template_id>/', views.asset_label_print, name='asset_label_print_template'),
 

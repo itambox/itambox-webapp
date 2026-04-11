@@ -19,7 +19,6 @@ from django.utils import timezone
 from .models import Asset, StatusLabel, AssetAssignment
 from compliance.models import CustodyReceipt
 from inventory.models import AccessoryAssignment, ConsumableAssignment
-from organization.models import AssetHolderAssignment
 from licenses.models import LicenseSeatAssignment
 
 
@@ -62,10 +61,7 @@ def checkout_asset(
         asset._changelog_message = f"Checked out to {target}"
         asset.save(update_fields=['status', 'location'])
 
-        AssetHolderAssignment.objects.filter(
-            content_type=ContentType.objects.get_for_model(Asset),
-            object_id=asset.pk
-        ).delete()
+
 
         assignment_kwargs = {
             'asset': asset,
@@ -221,10 +217,7 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_lo
                 asset.save(update_fields=['status', 'location'])
 
                 target = holder or location
-                AssetHolderAssignment.objects.filter(
-                    content_type=ContentType.objects.get_for_model(Asset),
-                    object_id=asset.pk
-                ).delete()
+
 
                 assignment_kwargs = {
                     'asset': asset,

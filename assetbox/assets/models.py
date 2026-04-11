@@ -664,7 +664,7 @@ class AssetAssignment(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseMo
         'organization.Location', on_delete=models.CASCADE, null=True, blank=True, related_name='asset_assignments'
     )
     assigned_asset = models.ForeignKey(
-        'self', on_delete=models.CASCADE, null=True, blank=True, related_name='child_assignments'
+        'Asset', on_delete=models.CASCADE, null=True, blank=True, related_name='child_assignments'
     )
     pre_checkout_status = models.ForeignKey(
         'StatusLabel',

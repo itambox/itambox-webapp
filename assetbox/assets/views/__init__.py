@@ -2,7 +2,7 @@ from .dashboard import DashboardView
 from .asset_views import (
     AssetListView, AssetDetailView, AssetEditView, AssetDeleteView,
     AssetCloneView, AssetImportView, AssetBulkEditView, AssetBulkDeleteView,
-    AssetCheckoutView, AssetCheckinView, asset_audit, asset_label_print,
+    AssetCheckoutView, AssetCheckinView, AssetAuditView, asset_label_print,
     bulk_assign_assets,
 )
 from .assetrole_views import (

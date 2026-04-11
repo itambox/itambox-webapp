@@ -13,14 +13,15 @@ class AssetTable(BaseTable): # Inherit from BaseTable
     name = tables.LinkColumn('assets:asset_detail', args=[A('pk')], verbose_name='Name')
     manufacturer = tables.Column(accessor='asset_type.manufacturer', linkify=True, verbose_name='Manufacturer')
     model = tables.Column(accessor='asset_type.model', linkify=True, verbose_name='Model')
-    asset_type = tables.LinkColumn('assets:assettype_detail', args=[A('asset_type.pk')], verbose_name='Asset Type')
+    asset_type = tables.LinkColumn('assets:assettype_detail', args=[A('asset_type_id')], verbose_name='Asset Type')
     assignee = AssigneeColumn(
         location_field='location',
         assignment_model_path='assets.AssetAssignment',
     )
-    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name='Tenant')
-    location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], accessor='location.name', verbose_name='Location')
-    supplier = tables.LinkColumn('assets:supplier_detail', args=[A('supplier.pk')], accessor='supplier.name', verbose_name='Supplier')
+    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant.name', verbose_name='Tenant')
+    location = tables.LinkColumn('organization:location_detail', args=[A('location_id')], accessor='location.name', verbose_name='Location')
+    supplier = tables.LinkColumn('assets:supplier_detail', args=[A('supplier_id')], accessor='supplier.name', verbose_name='Supplier')
+
     tags = TagColumn(url_name='assets:asset_list')
     requestable = tables.BooleanColumn(verbose_name='Requestable', yesno='Yes,No')
     checkout_checkin = tables.Column(
@@ -285,7 +286,8 @@ class CategoryTable(BaseTable):
 class AssetRequestTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     requester = tables.Column(accessor='requester.username', verbose_name='Requester')
-    asset = tables.LinkColumn('assets:asset_detail', args=[A('asset.pk')], verbose_name='Asset')
+    asset = tables.LinkColumn('assets:asset_detail', args=[A('asset_id')], verbose_name='Asset')
+
     asset_type = tables.Column(accessor='asset_type.model', verbose_name='Asset Type')
     status = tables.Column(verbose_name='Status')
     request_date = tables.Column(verbose_name='Request Date')
