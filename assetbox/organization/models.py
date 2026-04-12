@@ -279,31 +279,7 @@ class AssetHolder(SubscribableMixin, StandardModel):
         # Assuming you'll have a detail view named 'assetholder_detail'
         return reverse('organization:assetholder_detail', kwargs={'pk': self.pk})
 
-# +++ AssetHolderAssignment Model +++
-class AssetHolderAssignment(ChangeLoggingMixin, BaseModel):
-    asset_holder = models.ForeignKey(
-        AssetHolder,
-        on_delete=models.CASCADE,
-        related_name='assignments'
-    )
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    object_id = models.PositiveIntegerField()
-    assigned_object = GenericForeignKey('content_type', 'object_id')
-    tags = models.ManyToManyField('extras.Tag', blank=True, related_name='organization_assetholderassignments') # M2M to extras.Tag
 
-    class Meta:
-        ordering = ['asset_holder', 'content_type', 'object_id']
-        constraints = [
-            models.UniqueConstraint(
-                fields=['asset_holder', 'content_type', 'object_id'],
-                name='organization_assetholderassignment_unique'
-            )
-        ]
-        verbose_name = _("Asset Holder Assignment")
-        verbose_name_plural = _("Asset Holder Assignments")
-
-    def __str__(self):
-        return f"Assignment for {self.asset_holder} to {self.assigned_object}"
 
 class ContactRole(AutoSlugMixin, StandardModel):
     name = models.CharField(max_length=100, unique=True)

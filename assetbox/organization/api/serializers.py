@@ -6,7 +6,7 @@ from assetbox.api.fields import ContentTypeField
 from assetbox.api.serializers import GenericObjectSerializer
 from organization.models import (
     Site, Region, SiteGroup, Location, Tenant, TenantGroup,
-    AssetHolder, AssetHolderAssignment, Contact, ContactRole, ContactAssignment
+    AssetHolder, Contact, ContactRole, ContactAssignment
 )
 from extras.api.serializers import TagSerializer
 
@@ -203,23 +203,6 @@ class AssetHolderSerializer(BaseModelSerializer):
         ]
         brief_fields = ['id', 'url', 'upn', 'email']
 
-
-class AssetHolderAssignmentSerializer(BaseModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:assetholderassignment-detail')
-    asset_holder = AssetHolderSerializer(read_only=True)
-    assigned_object_type = ContentTypeField(
-        queryset=ContentType.objects.all()
-    )
-    assigned_object = GenericObjectSerializer(read_only=True)
-
-    class Meta:
-        model = AssetHolderAssignment
-        fields = [
-            'id', 'url', 'asset_holder', 'assigned_object_type', 'object_id',
-            'assigned_object', 'created_at', 'updated_at'
-        ]
-        read_only_fields = fields
-        brief_fields = ['id', 'url', 'asset_holder']
 
 
 class ContactRoleSerializer(BaseModelSerializer):

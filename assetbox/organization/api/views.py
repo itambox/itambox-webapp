@@ -3,17 +3,16 @@ from core.api.permissions import TokenPermissions, StrictTenantPermission
 from core.api.viewsets import AssetBoxModelViewSet, AssetBoxReadOnlyModelViewSet
 from organization.models import (
     Site, Region, SiteGroup, Location, Tenant, TenantGroup,
-    AssetHolder, AssetHolderAssignment, Contact, ContactRole, ContactAssignment
+    AssetHolder, Contact, ContactRole, ContactAssignment
 )
 from organization.filters import (
     SiteFilterSet, RegionFilterSet, SiteGroupFilterSet, LocationFilterSet,
     TenantFilterSet, TenantGroupFilterSet, AssetHolderFilterSet,
-    ContactFilterSet, ContactRoleFilterSet, AssetHolderAssignmentFilterSet,
-    ContactAssignmentFilterSet
+    ContactFilterSet, ContactRoleFilterSet, ContactAssignmentFilterSet
 )
 from .serializers import (
     SiteSerializer, RegionSerializer, SiteGroupSerializer, LocationSerializer,
-    TenantSerializer, TenantGroupSerializer, AssetHolderSerializer, AssetHolderAssignmentSerializer,
+    TenantSerializer, TenantGroupSerializer, AssetHolderSerializer,
     ContactSerializer, ContactRoleSerializer, ContactAssignmentSerializer
 )
 
@@ -68,20 +67,11 @@ class TenantViewSet(AssetBoxModelViewSet):
 
 class AssetHolderViewSet(AssetBoxModelViewSet):
     permission_classes = [TokenPermissions, StrictTenantPermission]
-    queryset = AssetHolder.objects.select_related('tenant').prefetch_related('assignments')
+    queryset = AssetHolder.objects.select_related('tenant').prefetch_related('asset_assignments')
     serializer_class = AssetHolderSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = AssetHolderFilterSet
 
-
-class AssetHolderAssignmentViewSet(AssetBoxReadOnlyModelViewSet):
-    permission_classes = [TokenPermissions, StrictTenantPermission]
-    queryset = AssetHolderAssignment.objects.select_related(
-        'asset_holder', 'content_type'
-    ).prefetch_related('assigned_object')
-    serializer_class = AssetHolderAssignmentSerializer
-    filter_backends = (DjangoFilterBackend,)
-    filterset_class = AssetHolderAssignmentFilterSet
 
 
 

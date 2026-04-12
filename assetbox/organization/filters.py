@@ -3,7 +3,7 @@ from django import forms
 from django.db.models import Q
 from django.contrib.contenttypes.models import ContentType
 from assets.models import Manufacturer, AssetType
-from organization.models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, Contact, ContactRole, AssetHolderAssignment, ContactAssignment
+from organization.models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, Contact, ContactRole, ContactAssignment
 
 from extras.models import Tag # Import Tag
 from crispy_forms.helper import FormHelper
@@ -252,34 +252,6 @@ class ContactRoleFilterSet(BaseOrgFilterSet):
         ).distinct()
 
 
-# --- AssetHolderAssignment Filter ---
-class AssetHolderAssignmentFilterSet(BaseOrgFilterSet):
-    tag = None  # Disable standard tags filtering if not needed or model has none
-    asset_holder = django_filters.ModelChoiceFilter(
-        queryset=AssetHolder.objects.all(),
-        label="Asset Holder",
-        widget=forms.Select(attrs={'class': 'form-select'})
-    )
-    content_type = django_filters.ModelChoiceFilter(
-        queryset=ContentType.objects.filter(
-            model__in=['asset', 'license', 'accessory', 'consumable']
-        ),
-        label="Object Type",
-        widget=forms.Select(attrs={'class': 'form-select'})
-    )
-
-    class Meta:
-        model = AssetHolderAssignment
-        fields = ['asset_holder', 'content_type']
-
-    def search(self, queryset, name, value):
-        if not value.strip():
-            return queryset
-        return queryset.filter(
-            Q(asset_holder__first_name__icontains=value) |
-            Q(asset_holder__last_name__icontains=value) |
-            Q(asset_holder__upn__icontains=value)
-        ).distinct()
 
 
 class ContactAssignmentFilterSet(BaseOrgFilterSet):
@@ -301,9 +273,6 @@ class ContactAssignmentFilterSet(BaseOrgFilterSet):
     )
 
     class Meta:
-        model = AssetHolderAssignment  # We use the generic pattern, but let's check what model ContactAssignment uses
-        # Wait, the model name is ContactAssignment. Let's make sure we import and use ContactAssignment.
-        # Let's verify the model name. Line 6 has `ContactAssignment` imported.
         model = ContactAssignment
         fields = ['contact', 'role', 'content_type', 'object_id']
 

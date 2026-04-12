@@ -63,8 +63,6 @@ urlpatterns = [
     path('asset-holders/<int:pk>/edit/', views.AssetHolderEditView.as_view(), name='assetholder_update'),
     path('asset-holders/<int:pk>/delete/', views.AssetHolderDeleteView.as_view(), name='assetholder_delete'),
 
-    # Asset Holder Assignments (List only - Refactored to CBV)
-    path('asset-holder-assignments/', views.AssetHolderAssignmentListView.as_view(), name='assetholderassignment_list'),
 
     # Contacts
     path('contacts/', views.ContactListView.as_view(), name='contact_list'),

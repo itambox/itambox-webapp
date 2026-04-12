@@ -19,7 +19,7 @@ from .tenant_views import (
 )
 from .assetholder_views import (
     AssetHolderListView, AssetHolderDetailView, AssetHolderEditView, AssetHolderDeleteView,
-    AssetHolderAssignmentListView, AssetHolderImportView, AssetHolderBulkEditView, AssetHolderBulkDeleteView,
+    AssetHolderImportView, AssetHolderBulkEditView, AssetHolderBulkDeleteView,
 )
 from .contact_views import (
     ContactListView, ContactDetailView, ContactEditView, ContactDeleteView, ContactBulkEditView, ContactBulkDeleteView,

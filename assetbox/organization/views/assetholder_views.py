@@ -5,7 +5,7 @@ from django.views.generic import View
 from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Count
+from django.db.models import Count, Q
 
 from assetbox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
@@ -14,19 +14,19 @@ from assetbox.views.generic import (
 from assetbox.utils import get_paginate_count
 from assetbox.panels import Panel
 
-from ..models import AssetHolder, AssetHolderAssignment, ContactAssignment
-from ..forms import AssetHolderForm, AssetHolderFilterForm, ContactAssignmentForm, AssetHolderAssignmentFilterForm
+from ..models import AssetHolder, ContactAssignment
+from ..forms import AssetHolderForm, AssetHolderFilterForm, ContactAssignmentForm
 from ..tables import (
-    AssetHolderTable, AssetHolderAssignmentTable,
+    AssetHolderTable, AssetAssignmentTable,
 )
-from ..filters import AssetHolderFilterSet, AssetHolderAssignmentFilterSet
+from ..filters import AssetHolderFilterSet
 from assets.forms.import_forms import AssetHolderBulkImportForm
 from django_tables2 import RequestConfig
 
 
 class AssetHolderListView(ObjectListView):
     queryset = AssetHolder.objects.select_related('tenant').prefetch_related('tags').annotate(
-        assignment_count=Count('assignments'),
+        assignment_count=Count('asset_assignments', filter=Q(asset_assignments__is_active=True)),
     )
     filterset = AssetHolderFilterSet
     filterset_form = AssetHolderFilterForm
@@ -36,7 +36,7 @@ class AssetHolderListView(ObjectListView):
 
 class AssetHolderDetailView(ObjectDetailView):
     queryset = AssetHolder.objects.select_related('tenant', 'user').prefetch_related(
-        'assignments__assigned_object', 'assignments__content_type', 'tags'
+        'asset_assignments__asset', 'asset_assignments__asset__status', 'tags'
     )
 
     layout = (
@@ -47,20 +47,10 @@ class AssetHolderDetailView(ObjectDetailView):
         context = super().get_context_data(**kwargs)
         assetholder = self.get_object()
 
-        assignments_table = AssetHolderAssignmentTable(assetholder.assignments.all(), request=self.request)
+        assignments_table = AssetAssignmentTable(assetholder.checked_out_assets, request=self.request)
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assignments_table)
 
-        related_objects_list = []
-        assignment_count = assetholder.assignments.count()
-        if assignment_count:
-            related_objects_list.append({
-                'label': 'Assignments',
-                'count': assignment_count,
-                'url': f"{reverse('organization:assetholderassignment_list')}?asset_holder={assetholder.pk}"
-            })
-
         context['assignments_table'] = assignments_table
-        context['related_objects_list'] = related_objects_list
         return context
 
 
@@ -79,37 +69,16 @@ class AssetHolderDeleteView(ObjectDeleteView):
 
     def post(self, request, *args, **kwargs):
         assetholder = self.get_object()
-        assignment_count = assetholder.assignments.count()
+        assignment_count = assetholder.asset_assignments.filter(is_active=True).count()
 
         if assignment_count > 0:
             messages.error(
                 request,
-                f"Cannot delete asset holder '{assetholder}': It has {assignment_count} assignment{'s' if assignment_count != 1 else ''}."
+                f"Cannot delete asset holder '{assetholder}': It has {assignment_count} active assignment{'s' if assignment_count != 1 else ''}."
             )
             return redirect(assetholder.get_absolute_url())
 
         return super().post(request, *args, **kwargs)
-
-
-class AssetHolderAssignmentListView(ObjectListView):
-    queryset = AssetHolderAssignment.objects.select_related('asset_holder', 'content_type')
-    table = AssetHolderAssignmentTable
-    action_buttons = ()
-    filterset = AssetHolderAssignmentFilterSet
-    filterset_form = AssetHolderAssignmentFilterForm
-
-
-    def get_breadcrumbs(self):
-        return [
-            (reverse('dashboard'), 'Dashboard'),
-            (reverse('organization:assetholder_list'), 'Asset Holders'),
-            (None, 'Assignments')
-        ]
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['title'] = 'Asset Holder Assignments'
-        return context
 
 
 class AssetHolderImportView(ObjectImportView):
