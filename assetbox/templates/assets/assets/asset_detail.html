@@ -96,7 +96,7 @@
             </div>
 
             {# 3. Hardware Specifications Card (Conditional Check) #}
-            {% if object.asset_type and object.asset_type.custom_fieldset and object.asset_type.custom_fieldset.fields.exists %}
+            {% if object.asset_type and object.asset_type.custom_fieldset and object.asset_type.custom_fieldset.fields.exists or object.component_allocations.all %}
             <div class="card mb-3 shadow-sm">
                 <div class="card-body">
                     {% include 'assets/includes/detail/asset_specs.html' %}

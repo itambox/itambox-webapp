@@ -60,9 +60,18 @@ class AssetListView(ObjectListView):
 
 class AssetDetailView(ObjectDetailView):
     queryset = Asset.objects.select_related(
-        'asset_role', 'location', 'asset_type', 'asset_type__manufacturer'
+        'asset_role',
+        'location',
+        'asset_type',
+        'asset_type__manufacturer',
+        'asset_type__custom_fieldset',
     ).prefetch_related(
-        'tags', 'maintenances', 'assignments'
+        'tags',
+        'maintenances',
+        'assignments',
+        'asset_type__custom_fieldset__fields',
+        'component_allocations__component',
+        'component_allocations__component__manufacturer',
     )
 
     layout = (

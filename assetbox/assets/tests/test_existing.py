@@ -183,6 +183,25 @@ class ComponentTrackingTestCase(TestCase):
         comp_table = response.context['components_table']
         self.assertEqual(len(comp_table.rows), 1)
 
+    def test_asset_detail_shows_allocated_components_in_specs_card(self):
+        response = self.client.get(reverse('assets:asset_detail', kwargs={'pk': self.asset.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Assigned System Hardware Specifications")
+        self.assertContains(response, "Active Hardware Modifications & Upgrades")
+        self.assertContains(response, "16GB DDR5 RAM")
+        self.assertContains(response, "Qty: <strong>2</strong>")
+
+    def test_asset_detail_without_custom_fieldset_shows_specs_card(self):
+        self.assertIsNone(self.asset_type.custom_fieldset)
+        response = self.client.get(reverse('assets:asset_detail', kwargs={'pk': self.asset.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Assigned System Hardware Specifications")
+        
+        self.asset.component_allocations.all().delete()
+        response = self.client.get(reverse('assets:asset_detail', kwargs={'pk': self.asset.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Assigned System Hardware Specifications")
+
     def test_accessory_crud_and_checkout_views(self):
         from inventory.models import AccessoryStock
         # Create Accessory

@@ -22,6 +22,10 @@ inspiration/*
 # Kilo
 .kilo/
 
+# AI agents
+.agents/
+.agent/
+
 # Playwright browser artifacts
 .playwright-mcp/
 
@@ -36,9 +40,6 @@ media/
 # Project scratch files
 scratch/
 test_holders.csv
-
-# Internal design documents (external repo: ../assetbox-internal-docs)
-internal-docs/
 
 # Environment variables
 .env
