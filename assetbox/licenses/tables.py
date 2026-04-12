@@ -53,7 +53,29 @@ class LicenseSeatAssignmentTable(BaseTable):
     )
     assigned_date = tables.DateTimeColumn(verbose_name=_("Assigned At"), format='Y-m-d H:i')
     notes = tables.Column(verbose_name=_("Notes"))
-    actions = ActionsColumn()
+    actions = tables.TemplateColumn(
+        template_code="""
+        {% load i18n %}
+        <div class="d-flex gap-1 justify-content-end">
+            <button hx-post="{% url 'licenses:license_seat_checkin' record.pk %}"
+                    hx-confirm="Are you sure you want to check in this software license seat?"
+                    class="btn btn-sm btn-outline-danger d-flex align-items-center" title="Check In">
+                <i class="mdi mdi-account-minus-outline me-1"></i>
+                {% translate "Check In" %}
+            </button>
+        </div>
+        """,
+        verbose_name=_("Actions"),
+        orderable=False,
+        attrs={
+            'th': {
+                'class': 'col-actions text-nowrap',
+            },
+            'td': {
+                'class': 'text-end text-nowrap noprint p-1 col-actions'
+            }
+        }
+    )
 
     class Meta(BaseTable.Meta):
         model = LicenseSeatAssignment

@@ -18,6 +18,8 @@ from . import forms
 from . import tables
 from . import filters
 from assets.forms.import_forms import LicenseBulkImportForm
+from assetbox.views.generic.service_views import GenericTransactionView, SimplePostView
+from .services import checkout_license, checkin_license_seat
 
 # =============================================================================
 # License Entitlement Views
@@ -36,6 +38,7 @@ class LicenseDetailView(ObjectDetailView):
     template_name = 'licenses/license_detail.html'
 
     layout = (
+        ((Panel('metrics', 'License Overview'),),),
         ((Panel('info', 'License Details'),),),
     )
 
@@ -88,3 +91,35 @@ class LicenseBulkEditView(ObjectBulkEditView):
 
 class LicenseBulkDeleteView(ObjectBulkDeleteView):
     queryset = License.objects.all()
+
+
+class LicenseCheckoutView(GenericTransactionView):
+    permission_required = ('licenses.change_license',)
+    queryset = License.objects.all()
+    model_form = forms.LicenseCheckOutForm
+    service_callable = checkout_license
+    context_object_name = 'license'
+    template_name = 'licenses/includes/license_checkout_modal.html'
+    success_message = "License checked out successfully."
+    hx_trigger = "licenseUpdated"
+    form_field_map = {}
+    form_exclude_fields = ('target_type',)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        del kwargs['instance']
+        kwargs['license'] = self.get_object()
+        return kwargs
+
+    def get_success_message(self, result=None):
+        target = result.asset or result.assigned_holder
+        return f"License seat for '{self.get_object().name}' checked out to {target}."
+
+
+class LicenseCheckinView(SimplePostView):
+    permission_required = ('licenses.delete_licenseseatassignment',)
+    queryset = LicenseSeatAssignment.objects.select_related('license', 'asset', 'assigned_holder').all()
+    hx_trigger = "licenseUpdated"
+
+    def perform_action(self, assignment, request):
+        return checkin_license_seat(assignment, user=request.user)

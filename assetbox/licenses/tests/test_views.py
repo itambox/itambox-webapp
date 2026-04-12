@@ -78,3 +78,53 @@ class LicenseViewTests(TestCase):
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
         self.assertFalse(License.objects.filter(pk=self.license.pk).exists())
+
+    def test_license_checkout_view_get(self):
+        """Verify checkout form modal view loads successfully."""
+        url = reverse('licenses:license_checkout', kwargs={'pk': self.license.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'licenses/includes/license_checkout_modal.html')
+
+    def test_license_checkout_view_post_holder(self):
+        """Verify checking out a license seat to an AssetHolder successfully."""
+        holder = baker.make('organization.AssetHolder', first_name='John', last_name='Doe')
+        url = reverse('licenses:license_checkout', kwargs={'pk': self.license.pk})
+        
+        # Test HTTP POST to checkout to holder
+        response = self.client.post(url, {
+            'target_type': 'holder',
+            'assigned_holder': holder.pk,
+            'notes': 'Test assign to holder',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.license.available_seats, 49)
+
+    def test_license_checkout_view_post_asset(self):
+        """Verify checking out a license seat to an Asset successfully."""
+        asset = baker.make('assets.Asset', name='Test Laptop', status__type='deployable')
+        url = reverse('licenses:license_checkout', kwargs={'pk': self.license.pk})
+        
+        # Test HTTP POST to checkout to asset
+        response = self.client.post(url, {
+            'target_type': 'asset',
+            'asset': asset.pk,
+            'notes': 'Test assign to asset',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.license.available_seats, 49)
+
+    def test_license_checkin_view_post(self):
+        """Verify checking in (deleting) an active license assignment seat."""
+        holder = baker.make('organization.AssetHolder', first_name='John', last_name='Doe')
+        assignment = baker.make(
+            'licenses.LicenseSeatAssignment',
+            license=self.license,
+            assigned_holder=holder
+        )
+        self.assertEqual(self.license.available_seats, 49)
+
+        url = reverse('licenses:license_seat_checkin', kwargs={'pk': assignment.pk})
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.license.available_seats, 50)

@@ -8,6 +8,8 @@ from .models import License, LicenseSeatAssignment
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Div
 from django.urls import reverse
+from assets.models import Asset
+from organization.models import AssetHolder
 
 class LicenseForm(BootstrapMixin, forms.ModelForm):
     """Form for creating and updating License entitlements."""
@@ -75,3 +77,65 @@ class LicenseForm(BootstrapMixin, forms.ModelForm):
 
 class LicenseFilterForm(FilterForm):
     filterset_class = LicenseFilterSet
+
+
+class LicenseCheckOutForm(forms.Form):
+    TARGET_CHOICES = [
+        ('holder', _('Asset Holder')),
+        ('asset', _('Hardware Asset')),
+    ]
+
+    target_type = forms.ChoiceField(
+        choices=TARGET_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label=_("Assign to")
+    )
+    assigned_holder = forms.ModelChoiceField(
+        queryset=AssetHolder.objects.all().order_by('last_name', 'first_name'),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label=_("Asset Holder")
+    )
+    asset = forms.ModelChoiceField(
+        queryset=Asset.objects.exclude(status__type='undeployable').order_by('name'),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label=_("Hardware Asset")
+    )
+    notes = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
+        required=False,
+        label=_("Notes")
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        target_type = cleaned_data.get('target_type')
+        holder = cleaned_data.get('assigned_holder')
+        asset = cleaned_data.get('asset')
+
+        if target_type == 'holder' and not holder:
+            raise forms.ValidationError(_("Must select an Asset Holder."), code='holder_required')
+        if target_type == 'asset' and not asset:
+            raise forms.ValidationError(_("Must select a Hardware Asset."), code='asset_required')
+        if not target_type:
+            raise forms.ValidationError(_("Must select a target type."), code='target_type_required')
+        return cleaned_data
+
+    def __init__(self, *args, **kwargs):
+        license_obj = kwargs.pop('license', None)
+        super().__init__(*args, **kwargs)
+        
+        # If tenant is restricted, filter candidates
+        if license_obj and license_obj.tenant:
+            self.fields['assigned_holder'].queryset = AssetHolder.objects.filter(tenant=license_obj.tenant).order_by('last_name', 'first_name')
+            self.fields['asset'].queryset = Asset.objects.filter(tenant=license_obj.tenant).exclude(status__type='undeployable').order_by('name')
+            
+        self.helper = FormHelper()
+        self.helper.form_tag = False
+        self.helper.layout = Layout(
+            'target_type',
+            'assigned_holder',
+            'asset',
+            'notes',
+        )
