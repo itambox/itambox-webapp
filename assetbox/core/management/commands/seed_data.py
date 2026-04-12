@@ -70,7 +70,6 @@ class Command(BaseCommand):
             ('core', 'Notification'),
             ('users', 'UserPreference'),
             ('organization', 'ContactAssignment'),
-            ('organization', 'AssetHolderAssignment'),
             ('licenses', 'LicenseSeatAssignment'),
             ('subscriptions', 'SubscriptionAssignment'),
             ('inventory', 'AccessoryAssignment'),
@@ -1102,12 +1101,7 @@ class Command(BaseCommand):
                             'notes': 'Initial seed checkout to holder',
                         }
                     )
-                    # Support legacy direct GFK queries
-                    from organization.models import AssetHolderAssignment
-                    ct_asset = ContentType.objects.get_for_model(Asset)
-                    AssetHolderAssignment.objects.get_or_create(
-                        asset_holder=holder, content_type=ct_asset, object_id=obj.pk,
-                    )
+
                 
                 # Case B: Checked out to a Location
                 elif not holder and status_slug == 'in-use' and location:

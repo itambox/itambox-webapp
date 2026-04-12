@@ -179,8 +179,8 @@ class ActionsColumn(tables.Column):
 
 class AssigneeColumn(tables.Column):
     """
-    A reusable column that resolves an AssetHolder (via AssetHolderAssignment
-    GenericForeignKey) for each row, falling back to a named model field
+    A reusable column that resolves an AssetHolder (via AssetAssignment
+    ForeignKey) for each row, falling back to a named model field
     (e.g., ``location``) when no holder is assigned.
 
     The bulk assignment lookup is cached on the parent table instance so
@@ -195,7 +195,7 @@ class AssigneeColumn(tables.Column):
             when no AssetHolder is assigned.
         empty_text (str): Displayed when no holder or location is available.
         assignment_model_path (str): Dotted app-model path to the
-            AssetHolderAssignment-like model.
+            AssetAssignment-like model.
     """
 
     EMPTY_MARK = mark_safe('<span class="text-muted">&mdash;</span>')
@@ -205,7 +205,7 @@ class AssigneeColumn(tables.Column):
         *args,
         location_field=None,
         empty_text=None,
-        assignment_model_path='organization.AssetHolderAssignment',
+        assignment_model_path='assets.AssetAssignment',
         **kwargs,
     ):
         kwargs.setdefault('verbose_name', 'Assignee')
@@ -219,6 +219,14 @@ class AssigneeColumn(tables.Column):
     def _get_assignment_model(self):
         from django.apps import apps
         return apps.get_model(self._assignment_model_path)
+
+    def get_prefetch_fields(self):
+        return [
+            'assignments',
+            'assignments__assigned_user',
+            'assignments__assigned_location',
+            'assignments__assigned_asset',
+        ]
 
     def render(self, value, record, bound_column, table=None):
         if table is None:
@@ -442,13 +450,20 @@ class BaseTable(tables.Table):
         if not isinstance(self.data, TableQuerysetData):
             return
 
-        prefetch_fields = []
+        select_related_fields = []
+        prefetch_related_fields = []
+
         for column in self.columns.iterall():
             if columns is not None:
                 if column.name not in columns:
                     continue
             elif not column.visible:
                 continue
+
+            # Add any explicit prefetches declared by the column class itself
+            if hasattr(column.column, 'get_prefetch_fields'):
+                prefetch_related_fields.extend(column.column.get_prefetch_fields())
+
             model = getattr(self.Meta, 'model', None)
             if model is None:
                 continue
@@ -456,20 +471,49 @@ class BaseTable(tables.Table):
             if accessor.startswith('custom_field_data__'):
                 continue
             prefetch_path = []
-            for field_name in accessor.split(accessor.SEPARATOR):
+            use_select_related = True
+
+            # Normalize and split relation path using both dot (.) and double-underscore (__) separators
+            path_parts = str(accessor).replace('__', '.').split('.')
+            for field_name in path_parts:
                 try:
                     field = model._meta.get_field(field_name)
                 except Exception:
                     break
                 if hasattr(field, 'remote_field') and field.remote_field:
                     prefetch_path.append(field_name)
+                    # If this step in the path is a many-to-many or reverse foreign key relation,
+                    # we must fetch this entire path branch using prefetch_related.
+                    if getattr(field, 'many_to_many', False) or getattr(field, 'one_to_many', False):
+                        use_select_related = False
                     model = field.remote_field.model
                 else:
                     break
+
             if prefetch_path:
-                prefetch_fields.append('__'.join(prefetch_path))
-        if prefetch_fields:
-            self.data.data = self.data.data.prefetch_related(*prefetch_fields)
+                full_path = '__'.join(prefetch_path)
+                if use_select_related:
+                    select_related_fields.append(full_path)
+                else:
+                    prefetch_related_fields.append(full_path)
+
+        if select_related_fields:
+            # Special optimization for AssetType: since AssetType.__str__ accesses its related manufacturer,
+            # we must always select_related manufacturer when select_related-ing asset_type.
+            extended_select = []
+            for path in select_related_fields:
+                extended_select.append(path)
+                if path == 'asset_type':
+                    extended_select.append('asset_type__manufacturer')
+                elif path.endswith('__asset_type'):
+                    extended_select.append(path + '__manufacturer')
+            unique_select = list(set(extended_select))
+            self.data.data = self.data.data.select_related(*unique_select)
+        if prefetch_related_fields:
+            unique_prefetch = list(set(prefetch_related_fields))
+            self.data.data = self.data.data.prefetch_related(*unique_prefetch)
+
+
 
     def configure(self, request):
         columns = None

@@ -23,12 +23,6 @@ ORGANIZATION_MENU = Menu(
                 get_model_item('organization', 'tenant', _('Tenants')),
                 get_model_item('organization', 'tenantgroup', _('Tenant Groups')),
                 get_model_item('organization', 'assetholder', _('Asset Holders')),
-                MenuItem(
-                    link='organization:assetholderassignment_list',
-                    link_text=_('Assignments'),
-                    permissions=['organization.view_assetholderassignment'],
-                    buttons=(),
-                ),
             ),
         ),
     ),

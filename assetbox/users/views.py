@@ -200,47 +200,44 @@ class UserNotificationsView(UserGenericTabView):
         return context
 
 
-@login_required
-@require_POST
-def mark_notification_read(request, pk):
-    from core.models import Notification
-    notification = get_object_or_404(Notification, pk=pk, user=request.user)
-    notification.is_read = True
-    notification.save()
-    return redirect('users:user_notifications')
-
-
-@login_required
-def view_notification(request, pk):
-    from core.models import Notification
-    from django.db.models import Q
-    notification = get_object_or_404(Notification, Q(user=request.user) | Q(user__isnull=True), pk=pk)
-    
-    if notification.user == request.user:
+class MarkNotificationReadView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        from core.models import Notification
+        notification = get_object_or_404(Notification, pk=pk, user=request.user)
         notification.is_read = True
         notification.save()
+        return redirect('users:user_notifications')
+
+
+class ViewNotificationView(LoginRequiredMixin, View):
+    def get(self, request, pk):
+        from core.models import Notification
+        from django.db.models import Q
+        notification = get_object_or_404(Notification, Q(user=request.user) | Q(user__isnull=True), pk=pk)
         
-    if notification.target_url:
-        return redirect(notification.target_url)
-    return redirect('users:user_notifications')
+        if notification.user == request.user:
+            notification.is_read = True
+            notification.save()
+            
+        if notification.target_url:
+            return redirect(notification.target_url)
+        return redirect('users:user_notifications')
 
 
-@login_required
-@require_POST
-def mark_all_notifications_read(request):
-    from core.models import Notification
-    Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
-    return redirect('users:user_notifications')
+class MarkAllNotificationsReadView(LoginRequiredMixin, View):
+    def post(self, request):
+        from core.models import Notification
+        Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+        return redirect('users:user_notifications')
 
 
-@login_required
-@require_POST
-def delete_api_token(request, pk):
-    from .models import Token
-    token = get_object_or_404(Token, pk=pk, user=request.user)
-    token.delete()
-    messages.success(request, _("API Token has been revoked."))
-    return redirect('users:user_api_tokens')
+class DeleteApiTokenView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        from .models import Token
+        token = get_object_or_404(Token, pk=pk, user=request.user)
+        token.delete()
+        messages.success(request, _("API Token has been revoked."))
+        return redirect('users:user_api_tokens')
 
 
 
@@ -316,72 +313,71 @@ class UserSubscriptionsView(UserGenericTabView):
         return context
 
 
-@login_required
-@require_POST
-def bookmark_toggle(request, content_type_id, object_id):
+class BookmarkToggleView(LoginRequiredMixin, View):
     """
     Toggle a user bookmark for a generic object (used via HTMX).
     Returns the updated HTMX button state or an empty response on list page delete.
     """
-    import json
-    from core.models import Bookmark
-    from django.contrib.contenttypes.models import ContentType
-    
-    content_type = get_object_or_404(ContentType, id=content_type_id)
-    target_obj = get_object_or_404(content_type.model_class(), id=object_id)
-    
-    bookmark_qs = Bookmark.objects.filter(
-        user=request.user,
-        model=content_type,
-        object_id=object_id
-    )
-    
-    if bookmark_qs.exists():
-        bookmark_qs.delete()
-        is_bookmarked = False
-    else:
-        Bookmark.objects.create(
+    def post(self, request, content_type_id, object_id):
+        import json
+        from core.models import Bookmark
+        from django.contrib.contenttypes.models import ContentType
+        
+        content_type = get_object_or_404(ContentType, id=content_type_id)
+        target_obj = get_object_or_404(content_type.model_class(), id=object_id)
+        
+        bookmark_qs = Bookmark.objects.filter(
             user=request.user,
             model=content_type,
             object_id=object_id
         )
-        is_bookmarked = True
         
-    if getattr(request, 'htmx', False):
-        referer = request.META.get('HTTP_REFERER', '')
-        if 'subscriptions' in referer:
-            # If deleted from subscriptions page, return empty content to remove list item
-            response = HttpResponse("")
+        if bookmark_qs.exists():
+            bookmark_qs.delete()
+            is_bookmarked = False
+        else:
+            Bookmark.objects.create(
+                user=request.user,
+                model=content_type,
+                object_id=object_id
+            )
+            is_bookmarked = True
+            
+        if getattr(request, 'htmx', False):
+            referer = request.META.get('HTTP_REFERER', '')
+            if 'subscriptions' in referer:
+                # If deleted from subscriptions page, return empty content to remove list item
+                response = HttpResponse("")
+                response['HX-Trigger'] = json.dumps({
+                    "showMessage": {
+                        "message": _("Unsubscribed from {name}.").format(name=str(target_obj)),
+                        "level": "success"
+                    }
+                })
+                return response
+                
+            # Detail page toggle response
+            from django.middleware.csrf import get_token
+            csrf_token = get_token(request)
+            button_html = f"""
+            <button type="button" class="btn btn-icon {'btn-warning' if is_bookmarked else 'btn-outline-secondary'}"
+                    hx-post="{reverse('users:bookmark_toggle', kwargs={'content_type_id': content_type_id, 'object_id': object_id})}"
+                    hx-headers='{{"X-CSRFToken": "{csrf_token}"}}'
+                    hx-target="this"
+                    hx-swap="outerHTML"
+                    title="{'Remove Bookmark' if is_bookmarked else 'Bookmark Item'}">
+                <i class="mdi mdi-star-outline"></i>
+            </button>
+            """
+            response = HttpResponse(button_html)
             response['HX-Trigger'] = json.dumps({
                 "showMessage": {
-                    "message": _("Unsubscribed from {name}.").format(name=str(target_obj)),
+                    "message": _("Subscribed to {name}.").format(name=str(target_obj)) if is_bookmarked else _("Unsubscribed from {name}.").format(name=str(target_obj)),
                     "level": "success"
                 }
             })
             return response
             
-        # Detail page toggle response
-        from django.middleware.csrf import get_token
-        csrf_token = get_token(request)
-        button_html = f"""
-        <button type="button" class="btn btn-icon {'btn-warning' if is_bookmarked else 'btn-outline-secondary'}"
-                hx-post="{reverse('users:bookmark_toggle', kwargs={'content_type_id': content_type_id, 'object_id': object_id})}"
-                hx-headers='{{"X-CSRFToken": "{csrf_token}"}}'
-                hx-target="this"
-                hx-swap="outerHTML"
-                title="{'Remove Bookmark' if is_bookmarked else 'Bookmark Item'}">
-            <i class="mdi mdi-star-outline"></i>
-        </button>
-        """
-        response = HttpResponse(button_html)
-        response['HX-Trigger'] = json.dumps({
-            "showMessage": {
-                "message": _("Subscribed to {name}.").format(name=str(target_obj)) if is_bookmarked else _("Unsubscribed from {name}.").format(name=str(target_obj)),
-                "level": "success"
-            }
-        })
-        return response
-        
-    return redirect(target_obj.get_absolute_url())
+        return redirect(target_obj.get_absolute_url())
 
 
