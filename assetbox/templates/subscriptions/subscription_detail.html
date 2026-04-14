@@ -65,6 +65,53 @@
 {% endif %}
 {% endblock extra_cards_right %}
 
+{% block extra_page_actions %}
+    {# Renew button #}
+    {% if object.status != 'cancelled' %}
+        <button type="button" class="btn btn-outline-primary"
+                hx-get="{% url 'subscriptions:subscription_renew' pk=object.pk %}"
+                hx-target="#modal-placeholder"
+                hx-swap="innerHTML">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -5v5h5" />
+                <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 5v-5h-5" />
+            </svg>
+            {% translate "Renew..." %}
+        </button>
+    {% endif %}
+
+    {# Suspend button #}
+    {% if object.status == 'active' %}
+        <button type="button" class="btn btn-outline-warning"
+                hx-post="{% url 'subscriptions:subscription_suspend' pk=object.pk %}"
+                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                hx-confirm="Are you sure you want to suspend this subscription?">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z" />
+                <path d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z" />
+            </svg>
+            {% translate "Suspend" %}
+        </button>
+    {% endif %}
+
+    {# Cancel button #}
+    {% if object.status != 'cancelled' %}
+        <button type="button" class="btn btn-outline-danger"
+                hx-get="{% url 'subscriptions:subscription_cancel' pk=object.pk %}"
+                hx-target="#modal-placeholder"
+                hx-swap="innerHTML">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M18 6l-12 12" />
+                <path d="M6 6l12 12" />
+            </svg>
+            {% translate "Cancel..." %}
+        </button>
+    {% endif %}
+{% endblock extra_page_actions %}
+
 {% block full_width_content %}
 {% if assignments_table %}
 <div class="card mt-3 border-0 shadow-sm">
@@ -77,7 +124,20 @@
             </svg>
             {% translate "Assignments" %}
         </h3>
-        <span class="badge bg-indigo-lt">{{ assignment_count }}</span>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-primary"
+                    hx-get="{% url 'subscriptions:subscription_checkout' pk=object.pk %}"
+                    hx-target="#modal-placeholder"
+                    hx-swap="innerHTML">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                    <path d="M12 5l0 14" />
+                    <path d="M5 12l14 0" />
+                </svg>
+                {% translate "Assign Subscription..." %}
+            </button>
+            <span class="badge bg-indigo-lt">{{ assignment_count }}</span>
+        </div>
     </div>
     {% if assignments_table.rows %}
     <div class="table-responsive">
@@ -93,3 +153,11 @@
 </div>
 {% endif %}
 {% endblock full_width_content %}
+
+{% block javascript %}
+<script>
+    document.body.addEventListener('tableRefreshRequired', function() {
+        htmx.ajax('GET', window.location.href, {target: 'body', swap: 'outerHTML'});
+    });
+</script>
+{% endblock javascript %}

@@ -4,9 +4,10 @@ from assetbox.views.generic import ObjectListView, ObjectDetailView, ObjectEditV
 from assetbox.utils import get_paginate_count
 from assetbox.panels import Panel
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseBadRequest
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import View
+import json
 from django.contrib import messages
 from django.urls import reverse
 from django.contrib.contenttypes.models import ContentType
@@ -135,6 +136,155 @@ class SubscriptionBulkEditView(ObjectBulkEditView):
 
 class SubscriptionBulkDeleteView(ObjectBulkDeleteView):
     queryset = Subscription.objects.all()
+
+
+class SubscriptionRenewView(LoginRequiredMixin, View):
+    template_name = 'subscriptions/includes/subscription_renew_modal.html'
+
+    def get(self, request, pk, *args, **kwargs):
+        subscription = get_object_or_404(Subscription, pk=pk)
+        form = forms.SubscriptionRenewForm(subscription=subscription)
+        return render(request, self.template_name, {
+            'form': form,
+            'subscription': subscription,
+        })
+
+    def post(self, request, pk, *args, **kwargs):
+        subscription = get_object_or_404(Subscription, pk=pk)
+        form = forms.SubscriptionRenewForm(request.POST, subscription=subscription)
+        if form.is_valid():
+            renewal_date = form.cleaned_data['renewal_date']
+            renewal_cost = form.cleaned_data['renewal_cost']
+            subscription.renew(renewal_date, renewal_cost)
+            
+            messages.success(request, f"Subscription '{subscription.name}' renewed successfully.")
+            if request.htmx:
+                response = HttpResponse(status=204)
+                response['HX-Trigger'] = json.dumps({
+                    "tableRefreshRequired": None,
+                    "showMessage": {
+                        "message": f"Subscription '{subscription.name}' renewed successfully.",
+                        "level": "success"
+                    }
+                })
+                return response
+            return redirect(subscription.get_absolute_url())
+
+        return render(request, self.template_name, {
+            'form': form,
+            'subscription': subscription,
+        })
+
+
+class SubscriptionCancelView(LoginRequiredMixin, View):
+    template_name = 'subscriptions/includes/subscription_cancel_modal.html'
+
+    def get(self, request, pk, *args, **kwargs):
+        subscription = get_object_or_404(Subscription, pk=pk)
+        form = forms.SubscriptionCancelForm()
+        return render(request, self.template_name, {
+            'form': form,
+            'subscription': subscription,
+        })
+
+    def post(self, request, pk, *args, **kwargs):
+        subscription = get_object_or_404(Subscription, pk=pk)
+        form = forms.SubscriptionCancelForm(request.POST)
+        if form.is_valid():
+            cancellation_date = form.cleaned_data['cancellation_date']
+            reason = form.cleaned_data['reason']
+            subscription.cancel(cancellation_date, reason)
+            
+            messages.success(request, f"Subscription '{subscription.name}' cancelled successfully.")
+            if request.htmx:
+                response = HttpResponse(status=204)
+                response['HX-Trigger'] = json.dumps({
+                    "tableRefreshRequired": None,
+                    "showMessage": {
+                        "message": f"Subscription '{subscription.name}' cancelled successfully.",
+                        "level": "success"
+                    }
+                })
+                return response
+            return redirect(subscription.get_absolute_url())
+
+        return render(request, self.template_name, {
+            'form': form,
+            'subscription': subscription,
+        })
+
+
+class SubscriptionSuspendView(LoginRequiredMixin, View):
+    def post(self, request, pk, *args, **kwargs):
+        subscription = get_object_or_404(Subscription, pk=pk)
+        subscription.suspend()
+        messages.success(request, f"Subscription '{subscription.name}' suspended successfully.")
+        if request.htmx:
+            response = HttpResponse(status=204)
+            response['HX-Trigger'] = json.dumps({
+                "tableRefreshRequired": None,
+                "showMessage": {
+                    "message": f"Subscription '{subscription.name}' suspended successfully.",
+                    "level": "success"
+                }
+            })
+            return response
+        return redirect(subscription.get_absolute_url())
+
+
+class SubscriptionCheckoutView(LoginRequiredMixin, View):
+    template_name = 'subscriptions/includes/subscription_checkout_modal.html'
+
+    def get(self, request, pk, *args, **kwargs):
+        subscription = get_object_or_404(Subscription, pk=pk)
+        form = forms.SubscriptionCheckoutForm(subscription=subscription)
+        return render(request, self.template_name, {
+            'form': form,
+            'subscription': subscription,
+        })
+
+    def post(self, request, pk, *args, **kwargs):
+        subscription = get_object_or_404(Subscription, pk=pk)
+        form = forms.SubscriptionCheckoutForm(request.POST, subscription=subscription)
+        if form.is_valid():
+            target_type = form.cleaned_data['target_type']
+            notes = form.cleaned_data['notes']
+            
+            if target_type == 'holder':
+                target_obj = form.cleaned_data['assigned_holder']
+            elif target_type == 'asset':
+                target_obj = form.cleaned_data['asset']
+            else:
+                target_obj = form.cleaned_data['location']
+                
+            content_type = ContentType.objects.get_for_model(target_obj)
+            
+            # Create SubscriptionAssignment
+            assignment = SubscriptionAssignment.objects.create(
+                subscription=subscription,
+                content_type=content_type,
+                object_id=target_obj.pk,
+                assigned_by=request.user,
+                notes=notes
+            )
+            
+            messages.success(request, f"Assigned subscription '{subscription.name}' successfully to {target_obj}.")
+            if request.htmx:
+                response = HttpResponse(status=204)
+                response['HX-Trigger'] = json.dumps({
+                    "tableRefreshRequired": None,
+                    "showMessage": {
+                        "message": f"Assigned subscription '{subscription.name}' successfully to {target_obj}.",
+                        "level": "success"
+                    }
+                })
+                return response
+            return redirect(subscription.get_absolute_url())
+
+        return render(request, self.template_name, {
+            'form': form,
+            'subscription': subscription,
+        })
 
 
 class ProviderBulkEditView(ObjectBulkEditView):

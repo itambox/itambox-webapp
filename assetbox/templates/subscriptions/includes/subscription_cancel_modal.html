@@ -1,0 +1,40 @@
+{% load i18n %}
+{# templates/subscriptions/includes/subscription_cancel_modal.html #}
+{% load crispy_forms_tags %}
+{% load partials %}
+
+{# Define the form partial #}
+{% startpartial cancel-modal-form %}
+    {% if form.non_field_errors %}
+        <div class="alert alert-danger mb-3">
+            {% for error in form.non_field_errors %}
+                <div>{{ error }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+    {% crispy form %}
+{% endpartial %}
+
+<div class="modal modal-blur fade" id="subscription-cancel-modal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <form id="subscription-cancel-form"
+                  hx-post="{% url 'subscriptions:subscription_cancel' pk=subscription.pk %}"
+                  hx-target="#subscription-cancel-modal-body"
+                  hx-swap="innerHTML">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">{% translate "Cancel Subscription:" %} {{ subscription.name }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+                </div>
+                <div class="modal-body" id="subscription-cancel-modal-body">
+                    {% partial cancel-modal-form %}
+                </div>
+                <div class="modal-footer justify-content-start">
+                    <button type="submit" class="btn btn-danger">{% translate "Cancel Subscription" %}</button>
+                    <button type="button" class="btn btn-secondary ms-2" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

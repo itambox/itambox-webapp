@@ -1,0 +1,83 @@
+{% load i18n %}
+{# templates/subscriptions/includes/subscription_checkout_modal.html #}
+{% load crispy_forms_tags %}
+{% load partials %}
+
+{# Define the form partial #}
+{% startpartial checkout-modal-form %}
+    {% if form.non_field_errors %}
+        <div class="alert alert-danger mb-3">
+            {% for error in form.non_field_errors %}
+                <div>{{ error }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+    {% crispy form %}
+{% endpartial %}
+
+<div class="modal modal-blur fade" id="subscription-checkout-modal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <form id="subscription-checkout-form"
+                  hx-post="{% url 'subscriptions:subscription_checkout' pk=subscription.pk %}"
+                  hx-target="#subscription-checkout-modal-body"
+                  hx-swap="innerHTML">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">{% translate "Assign Subscription:" %} {{ subscription.name }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+                </div>
+                <div class="modal-body" id="subscription-checkout-modal-body">
+                    {% partial checkout-modal-form %}
+                </div>
+                <div class="modal-footer justify-content-start">
+                    <button type="submit" class="btn btn-primary">{% translate "Assign Subscription" %}</button>
+                    <button type="button" class="btn btn-secondary ms-2" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        function toggleTargetFields() {
+            var form = document.getElementById('subscription-checkout-form');
+            if (!form) return;
+            var targetTypeSelect = form.querySelector('select[name=target_type]');
+            if (!targetTypeSelect) return;
+            var targetType = targetTypeSelect.value;
+            
+            var holderDiv = form.querySelector('#div_id_assigned_holder');
+            var assetDiv = form.querySelector('#div_id_asset');
+            var locationDiv = form.querySelector('#div_id_location');
+            
+            if (holderDiv) holderDiv.style.display = (targetType === 'holder') ? '' : 'none';
+            if (assetDiv) assetDiv.style.display = (targetType === 'asset') ? '' : 'none';
+            if (locationDiv) locationDiv.style.display = (targetType === 'location') ? '' : 'none';
+        }
+        
+        // Listen to change event on the form target_type select
+        document.body.addEventListener('change', function(e) {
+            if (e.target && e.target.name === 'target_type') {
+                toggleTargetFields();
+            }
+        });
+        
+        // Run initially when modal is loaded
+        toggleTargetFields();
+        
+        // Also run after HTMX swaps inside the modal (e.g. error re-render)
+        document.body.addEventListener('htmx:afterSettle', function(e) {
+            if (e.target && e.target.id === 'subscription-checkout-modal-body') {
+                toggleTargetFields();
+            }
+        });
+        
+        // Tabler/Bootstrap modal show event listener
+        var modalEl = document.getElementById('subscription-checkout-modal');
+        if (modalEl) {
+            modalEl.addEventListener('shown.bs.modal', toggleTargetFields);
+        }
+    })();
+</script>

@@ -3,7 +3,8 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Div, Row, Column
 from django.urls import reverse
 from core.forms import FilterForm
-from organization.models import Tenant
+from organization.models import Tenant, AssetHolder, Location
+from assets.models import Asset
 from django.db import models as db_models
 from .models import Provider, Subscription, SubscriptionAssignment
 from .filters import SubscriptionFilterSet, ProviderFilterSet
@@ -233,4 +234,147 @@ class SubscriptionAssignmentForm(forms.ModelForm):
         if commit:
             instance.save()
         return instance
+
+
+class SubscriptionRenewForm(forms.Form):
+    renewal_date = forms.DateField(
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        label="Next Renewal Date",
+        required=True
+    )
+    renewal_cost = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+        label="Renewal Cost",
+        required=False
+    )
+
+    def __init__(self, *args, **kwargs):
+        subscription = kwargs.pop('subscription', None)
+        super().__init__(*args, **kwargs)
+        if subscription:
+            self.fields['renewal_cost'].initial = subscription.renewal_cost
+            if subscription.renewal_date:
+                from datetime import timedelta
+                cycle = subscription.billing_cycle
+                current_date = subscription.renewal_date
+                if cycle == 'monthly':
+                    self.fields['renewal_date'].initial = current_date + timedelta(days=30)
+                elif cycle == 'quarterly':
+                    self.fields['renewal_date'].initial = current_date + timedelta(days=91)
+                elif cycle == 'biannual':
+                    self.fields['renewal_date'].initial = current_date + timedelta(days=182)
+                else:
+                    self.fields['renewal_date'].initial = current_date + timedelta(days=365)
+            else:
+                from django.utils import timezone
+                self.fields['renewal_date'].initial = timezone.now().date()
+
+        self.helper = FormHelper()
+        self.helper.form_tag = False
+        self.helper.layout = Layout(
+            'renewal_date',
+            'renewal_cost',
+        )
+
+
+class SubscriptionCancelForm(forms.Form):
+    cancellation_date = forms.DateField(
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        label="Cancellation Date",
+        required=True
+    )
+    reason = forms.CharField(
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        label="Cancellation Reason",
+        required=False,
+        help_text="Optional reason notes to log on the subscription."
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from django.utils import timezone
+        self.fields['cancellation_date'].initial = timezone.now().date()
+
+        self.helper = FormHelper()
+        self.helper.form_tag = False
+        self.helper.layout = Layout(
+            'cancellation_date',
+            'reason',
+        )
+
+
+class SubscriptionCheckoutForm(forms.Form):
+    TARGET_CHOICES = [
+        ('holder', 'Employee / Asset Holder'),
+        ('asset', 'Hardware Asset'),
+        ('location', 'Location'),
+    ]
+
+    target_type = forms.ChoiceField(
+        choices=TARGET_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Assign to"
+    )
+    assigned_holder = forms.ModelChoiceField(
+        queryset=AssetHolder.objects.all().order_by('last_name', 'first_name'),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Asset Holder"
+    )
+    asset = forms.ModelChoiceField(
+        queryset=Asset.objects.exclude(status__type='undeployable').order_by('name'),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Hardware Asset"
+    )
+    location = forms.ModelChoiceField(
+        queryset=Location.objects.all().order_by('name'),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Location"
+    )
+    notes = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
+        required=False,
+        label="Notes"
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        target_type = cleaned_data.get('target_type')
+        holder = cleaned_data.get('assigned_holder')
+        asset = cleaned_data.get('asset')
+        location = cleaned_data.get('location')
+
+        if target_type == 'holder' and not holder:
+            raise forms.ValidationError("Must select an Asset Holder.", code='holder_required')
+        if target_type == 'asset' and not asset:
+            raise forms.ValidationError("Must select a Hardware Asset.", code='asset_required')
+        if target_type == 'location' and not location:
+            raise forms.ValidationError("Must select a Location.", code='location_required')
+        if not target_type:
+            raise forms.ValidationError("Must select a target type.", code='target_type_required')
+        return cleaned_data
+
+    def __init__(self, *args, **kwargs):
+        subscription = kwargs.pop('subscription', None)
+        super().__init__(*args, **kwargs)
+        
+        # If tenant is restricted, filter candidates
+        if subscription and subscription.tenant:
+            self.fields['assigned_holder'].queryset = AssetHolder.objects.filter(tenant=subscription.tenant).order_by('last_name', 'first_name')
+            self.fields['asset'].queryset = Asset.objects.filter(tenant=subscription.tenant).exclude(status__type='undeployable').order_by('name')
+            self.fields['location'].queryset = Location.objects.filter(tenant=subscription.tenant).order_by('name')
+            
+        self.helper = FormHelper()
+        self.helper.form_tag = False
+        self.helper.layout = Layout(
+            'target_type',
+            'assigned_holder',
+            'asset',
+            'location',
+            'notes',
+        )
 

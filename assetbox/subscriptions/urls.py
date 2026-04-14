@@ -21,6 +21,10 @@ urlpatterns = [
     path('subscriptions/<int:pk>/', views.SubscriptionDetailView.as_view(), name='subscription_detail'),
     path('subscriptions/<int:pk>/edit/', views.SubscriptionEditView.as_view(), name='subscription_update'),
     path('subscriptions/<int:pk>/delete/', views.SubscriptionDeleteView.as_view(), name='subscription_delete'),
+    path('subscriptions/<int:pk>/renew/', views.SubscriptionRenewView.as_view(), name='subscription_renew'),
+    path('subscriptions/<int:pk>/cancel/', views.SubscriptionCancelView.as_view(), name='subscription_cancel'),
+    path('subscriptions/<int:pk>/suspend/', views.SubscriptionSuspendView.as_view(), name='subscription_suspend'),
+    path('subscriptions/<int:pk>/checkout/', views.SubscriptionCheckoutView.as_view(), name='subscription_checkout'),
 
     # Subscription Assignments
     path('assignments/add/', views.SubscriptionAssignmentCreateView.as_view(), name='subscriptionassignment_create'),
