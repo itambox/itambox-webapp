@@ -30,44 +30,7 @@
     <dt class="col-sm-4">{% translate "Description:" %}</dt>
     <dd class="col-sm-8 text-secondary">{{ object.description|linebreaksbr|default:"—" }}</dd>
 
-    <hr class="my-3 text-muted">
-    <h4 class="text-secondary mb-2 uppercase font-sans small font-weight-bold" style="letter-spacing: 0.05em;">Checkout &amp; EULA Settings</h4>
 
-    <dt class="col-sm-4">{% translate "Email on Checkout:" %}</dt>
-    <dd class="col-sm-8">
-        {% if object.email_on_checkout %}
-            <span class="badge bg-green-lt">{% translate "Enabled" %}</span>
-        {% else %}
-            <span class="badge bg-secondary-lt">{% translate "Disabled" %}</span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-4">{% translate "Email on Checkin:" %}</dt>
-    <dd class="col-sm-8">
-        {% if object.email_on_checkin %}
-            <span class="badge bg-green-lt">{% translate "Enabled" %}</span>
-        {% else %}
-            <span class="badge bg-secondary-lt">{% translate "Disabled" %}</span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-4">{% translate "Require Acceptance:" %}</dt>
-    <dd class="col-sm-8">
-        {% if object.require_acceptance %}
-            <span class="badge bg-red-lt">{% translate "Required" %}</span>
-        {% else %}
-            <span class="badge bg-secondary-lt">{% translate "Optional" %}</span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-4">{% translate "Email EULA:" %}</dt>
-    <dd class="col-sm-8">
-        {% if object.email_eula %}
-            <span class="badge bg-green-lt">{% translate "Enabled" %}</span>
-        {% else %}
-            <span class="badge bg-secondary-lt">{% translate "Disabled" %}</span>
-        {% endif %}
-    </dd>
 
     {% if object.tags.all %}
     <hr class="my-3 text-muted">

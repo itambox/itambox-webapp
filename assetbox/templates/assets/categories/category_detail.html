@@ -24,6 +24,12 @@
             {% translate "Accessories" %} <span class="badge bg-purple-lt ms-2">{{ accessories_table.rows|length }}</span>
         </a>
     </li>
+    <li class="nav-item" role="presentation">
+        <a href="#custody-policies" class="nav-link" data-bs-toggle="tab" role="tab">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-green" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 12l2 2l4 -4" /><path d="M12 3c-1.2 0 -2.4 .6 -3 1.7c-.6 -1.1 -1.8 -1.7 -3 -1.7c-2 0 -3.5 1.5 -3.5 3.5c0 4.5 6 9 6.5 9.5c.5 -.5 6.5 -5 6.5 -9.5c0 -2 -1.5 -3.5 -3.5 -3.5" /><path d="M19 19m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M17 21l4 -4" /></svg>
+            {% translate "Custody EULAs & Policies" %} <span class="badge bg-green-lt ms-2">{{ custody_templates|length }}</span>
+        </a>
+    </li>
 {% endblock extra_tabs %}
 
 {# Sidebar elements #}
@@ -67,6 +73,95 @@
                 <div class="card-body py-5 text-muted text-center">
                     <i class="mdi mdi-puzzle-outline text-muted mb-2"></i>
                     <p class="mb-0">{% translate "No accessories registered under this notification category yet." %}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Custody EULAs & Policies Tab Pane #}
+    <div class="tab-pane fade" id="custody-policies" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent d-flex align-items-center justify-content-between">
+                <h3 class="card-title">{% translate "Tenant-Scoped Custody Policies & EULAs" %}</h3>
+                <a href="{% url 'compliance:custodytemplate_create' %}?category={{ object.pk }}" class="btn btn-primary btn-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+                    {% translate "Add Custody Policy" %}
+                </a>
+            </div>
+            {% if custody_templates %}
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table table-hover table-striped">
+                        <thead>
+                            <tr>
+                                <th>{% translate "Policy / EULA Name" %}</th>
+                                <th>{% translate "Tenant / Scope" %}</th>
+                                <th>{% translate "Require Acceptance" %}</th>
+                                <th>{% translate "Email Signature Request" %}</th>
+                                <th>{% translate "Signature Provider" %}</th>
+                                <th>{% translate "QMS Reference" %}</th>
+                                <th class="w-1"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for temp in custody_templates %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'compliance:custodytemplate_detail' pk=temp.pk %}" class="font-weight-bold text-reset">
+                                            {{ temp.name }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        {% if temp.tenant %}
+                                            <span class="badge bg-blue-lt">{{ temp.tenant.name }}</span>
+                                        {% elif temp.tenant_group %}
+                                            <span class="badge bg-purple-lt">Group: {{ temp.tenant_group.name }}</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary-lt">{% translate "Global Default" %}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if temp.require_acceptance %}
+                                            <span class="badge bg-red-lt">{% translate "Yes (Required)" %}</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary-lt">{% translate "No (Optional)" %}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if temp.email_signature_request %}
+                                            <span class="badge bg-green-lt">{% translate "Enabled" %}</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary-lt">{% translate "Disabled" %}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-blue-lt text-uppercase">{{ temp.signature_provider }}</span>
+                                    </td>
+                                    <td>
+                                        {% if temp.qms_reference %}
+                                            <code>{{ temp.qms_reference }}</code>
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-list flex-nowrap">
+                                            <a href="{% url 'compliance:custodytemplate_update' pk=temp.pk %}" class="btn btn-outline-secondary btn-icon btn-sm" title="{% translate 'Edit' %}">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" /><path d="M13.5 6.5l4 4" /></svg>
+                                            </a>
+                                            <a href="{% url 'compliance:custodytemplate_delete' pk=temp.pk %}" class="btn btn-outline-danger btn-icon btn-sm" title="{% translate 'Delete' %}">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-lg mb-3 text-muted" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 12l2 2l4 -4" /><path d="M12 3c-1.2 0 -2.4 .6 -3 1.7c-.6 -1.1 -1.8 -1.7 -3 -1.7c-2 0 -3.5 1.5 -3.5 3.5c0 4.5 6 9 6.5 9.5c.5 -.5 6.5 -5 6.5 -9.5c0 -2 -1.5 -3.5 -3.5 -3.5" /><path d="M19 19m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M17 21l4 -4" /></svg>
+                    <p class="mb-0">{% translate "No custody policies or templates are currently registered for this category." %}</p>
                 </div>
             {% endif %}
         </div>

@@ -196,8 +196,7 @@ class CategorySerializer(BaseModelSerializer):
         model = Category
         fields = [
             'id', 'name', 'slug', 'color', 'description',
-            'email_on_checkout', 'email_on_checkin', 'require_acceptance',
-            'email_eula', 'applies_to', 'tags',
+            'applies_to', 'tags',
             'created_at', 'updated_at'
         ]
         brief_fields = ['id', 'name', 'slug', 'color']

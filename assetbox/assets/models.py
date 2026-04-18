@@ -549,10 +549,6 @@ class Category(AutoSlugMixin, StandardModel):
     slug = models.SlugField(max_length=255, unique=True)
     color = models.CharField(max_length=6, blank=True, null=True, help_text="RGB color in hexadecimal (e.g. 00ff00)")
     description = models.TextField(blank=True, null=True)
-    email_on_checkout = models.BooleanField(default=False, help_text="Send email notification on asset checkout")
-    email_on_checkin = models.BooleanField(default=False, help_text="Send email notification on asset checkin")
-    require_acceptance = models.BooleanField(default=False, help_text="Require digital acceptance on checkout")
-    email_eula = models.TextField(blank=True, verbose_name="EULA Text")
     applies_to = models.JSONField(default=dict, blank=True, help_text="Applies to: {'asset': True, 'accessory': True, 'component': True}")
     tags = models.ManyToManyField('extras.Tag', related_name='categories', blank=True)
 
@@ -713,6 +709,10 @@ class AssetAssignment(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseMo
     @property
     def assigned_target(self):
         return self.assigned_user or self.assigned_location or self.assigned_asset
+
+    @property
+    def assigned_to(self):
+        return self.assigned_target
 
     @property
     def assigned_to_type(self):

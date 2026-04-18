@@ -43,6 +43,13 @@ class CategoryDetailView(ObjectDetailView):
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(accessories_table)
         context['accessories_table'] = accessories_table
 
+        # Query active custody templates (Policies) linked to this category
+        from compliance.models import CustodyTemplate
+        context['custody_templates'] = CustodyTemplate.objects.filter(
+            category=category,
+            is_active=True
+        ).select_related('tenant', 'tenant_group')
+
         related_objects_list = []
         assettype_count = cat_asset_types.count()
         if assettype_count:

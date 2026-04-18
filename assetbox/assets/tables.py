@@ -279,8 +279,8 @@ class CategoryTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = Category
-        fields = ('pk', 'name', 'color', 'email_on_checkout', 'email_on_checkin', 'require_acceptance', 'tags', 'actions')
-        default_columns = ('pk', 'name', 'email_on_checkout', 'require_acceptance', 'tags', 'actions')
+        fields = ('pk', 'name', 'color', 'tags', 'actions')
+        default_columns = ('pk', 'name', 'color', 'tags', 'actions')
 
 
 class AssetRequestTable(BaseTable):
