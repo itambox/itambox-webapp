@@ -510,8 +510,29 @@ class BaseTable(tables.Table):
             unique_select = list(set(extended_select))
             self.data.data = self.data.data.select_related(*unique_select)
         if prefetch_related_fields:
-            unique_prefetch = list(set(prefetch_related_fields))
-            self.data.data = self.data.data.prefetch_related(*unique_prefetch)
+            # Validate prefetch paths against the Meta model to prevent AttributeError on models without relations
+            model_class = getattr(self.Meta, 'model', None)
+            valid_prefetch = []
+            for path in prefetch_related_fields:
+                if model_class is None:
+                    continue
+                parts = path.split('__')
+                current_model = model_class
+                valid = True
+                for part in parts:
+                    try:
+                        field = current_model._meta.get_field(part)
+                        if hasattr(field, 'remote_field') and field.remote_field:
+                            current_model = field.remote_field.model
+                    except Exception:
+                        valid = False
+                        break
+                if valid:
+                    valid_prefetch.append(path)
+
+            if valid_prefetch:
+                unique_prefetch = list(set(valid_prefetch))
+                self.data.data = self.data.data.prefetch_related(*unique_prefetch)
 
 
 
