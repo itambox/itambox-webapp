@@ -8,10 +8,10 @@ from assetbox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
 )
 
-from .models import AssetMaintenance, CustodyReceipt
+from .models import AssetMaintenance, CustodyReceipt, CustodyTemplate
 from .filters import AssetMaintenanceFilterSet
-from .forms import AssetMaintenanceForm, AssetMaintenanceFilterForm
-from .tables import AssetMaintenanceTable
+from .forms import AssetMaintenanceForm, AssetMaintenanceFilterForm, CustodyTemplateForm
+from .tables import AssetMaintenanceTable, CustodyTemplateTable
 
 class AssetMaintenanceListView(ObjectListView):
     queryset = AssetMaintenance.objects.select_related('asset')
@@ -126,3 +126,76 @@ def _safe_dispatch_custody(receipt):
         dispatch_event(CustodyReceipt, receipt, action='update')
     except Exception:
         pass
+
+
+class CustodyTemplateListView(ObjectListView):
+    queryset = CustodyTemplate.objects.select_related('tenant', 'tenant_group').prefetch_related('tags')
+    table = CustodyTemplateTable
+    action_buttons = ('add',)
+
+
+class CustodyTemplateDetailView(ObjectDetailView):
+    queryset = CustodyTemplate.objects.select_related('tenant', 'tenant_group').prefetch_related('tags')
+    template_name = 'compliance/custodytemplates/custodytemplate_detail.html'
+
+
+class CustodyTemplateEditView(ObjectEditView):
+    queryset = CustodyTemplate.objects.all()
+    model = CustodyTemplate
+    model_form = CustodyTemplateForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'compliance:custodytemplate_list'
+
+    def get_initial(self):
+        initial = super().get_initial()
+        if 'category' in self.request.GET:
+            initial['category'] = self.request.GET['category']
+        return initial
+
+
+class CustodyTemplateDeleteView(ObjectDeleteView):
+    queryset = CustodyTemplate.objects.all()
+    model = CustodyTemplate
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('compliance:custodytemplate_list')
+
+
+def custody_template_preview(request, pk):
+    template = get_object_or_404(CustodyTemplate, pk=pk)
+
+    from organization.models import AssetHolder
+    from assets.models import Asset
+
+    asset = Asset.objects.first()
+    if not asset:
+        asset = Asset(
+            name="[Preview] Professional Corporate Laptop (M3 Max)",
+            asset_tag="PREVIEW-LT-099",
+            serial_number="PREVIEW-SN-88291-XYZ"
+        )
+    
+    holder = AssetHolder.objects.first()
+    if not holder:
+        holder = AssetHolder(
+            first_name="Jane",
+            last_name="Doe",
+            email="jane.doe@organization.com",
+            upn="jane.doe"
+        )
+
+    receipt = CustodyReceipt(
+        custody_template=template,
+        signature_provider=template.signature_provider,
+        eula_text=template.eula_text,
+        disclaimer=template.disclaimer,
+        qms_reference=template.qms_reference,
+        acceptance_status=CustodyReceipt.STATUS_PENDING
+    )
+
+    return render(request, "compliance/custody/sign_portal.html", {
+        "asset": asset,
+        "holder": holder,
+        "receipt": receipt,
+        "token": "preview",
+        "is_preview": True
+    })

@@ -127,7 +127,7 @@ class AssetDetailView(ObjectDetailView):
             if isinstance(active_assignment.assigned_target, AssetHolder):
                 custody_receipt = CustodyReceipt.objects.filter(
                     asset=asset, holder=active_assignment.assigned_target
-                ).first()
+                ).order_by('-created_date').first()
                 if custody_receipt:
                     eula_token = custody_receipt.token
 
