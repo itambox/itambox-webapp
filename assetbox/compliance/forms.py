@@ -1,9 +1,9 @@
-﻿from django import forms
+from django import forms
 from django.urls import reverse
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Row, Column
 from core.forms import FilterForm
-from assets.models import Asset, Supplier
+from assets.models import Asset, Supplier, Category
 from .models import AssetMaintenance
 
 class AssetMaintenanceFilterForm(FilterForm):
@@ -93,3 +93,112 @@ class AssetMaintenanceForm(forms.ModelForm):
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
             HTML('</div>')
         )
+
+
+from organization.models import Tenant, TenantGroup
+from extras.models import Tag
+from .models import CustodyTemplate
+from compliance.registry import signature_providers
+
+class CustodyTemplateForm(forms.ModelForm):
+    tenant = forms.ModelChoiceField(
+        queryset=Tenant.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Tenant"
+    )
+    tenant_group = forms.ModelChoiceField(
+        queryset=TenantGroup.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Tenant Group"
+    )
+    category = forms.ModelChoiceField(
+        queryset=Category.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Target Category"
+    )
+    signature_provider = forms.ChoiceField(
+        choices=[],
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Signature Provider"
+    )
+    tags = forms.ModelMultipleChoiceField(
+        queryset=Tag.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
+        label="Tags"
+    )
+
+    class Meta:
+        model = CustodyTemplate
+        fields = [
+            'tenant', 'tenant_group', 'name', 'category', 'signature_provider', 'logo',
+            'eula_text', 'disclaimer', 'qms_reference', 'require_acceptance',
+            'email_signature_request', 'is_active', 'tags'
+        ]
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'logo': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+            'eula_text': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
+            'disclaimer': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'qms_reference': forms.TextInput(attrs={'class': 'form-control'}),
+            'require_acceptance': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'email_signature_request': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['signature_provider'].choices = signature_providers.choices()
+        
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+
+        button_text = 'Update' if self.instance and self.instance.pk else 'Create'
+        cancel_url = reverse('compliance:custodytemplate_list')
+
+        self.helper.layout = Layout(
+            Row(
+                Column('tenant', css_class='col-md-4'),
+                Column('tenant_group', css_class='col-md-4'),
+                Column('name', css_class='col-md-4')
+            ),
+            Row(
+                Column('category', css_class='col-md-6'),
+                Column('signature_provider', css_class='col-md-6'),
+            ),
+            Row(
+                Column('qms_reference', css_class='col-md-6')
+            ),
+            'logo',
+            'eula_text',
+            'disclaimer',
+            Row(
+                Column('require_acceptance', css_class='col-md-4 mt-2'),
+                Column('email_signature_request', css_class='col-md-4 mt-2'),
+                Column('is_active', css_class='col-md-4 mt-2')
+            ),
+            'tags',
+            HTML('<div class="mt-3">'),
+            Submit('submit', button_text, css_class='btn btn-primary'),
+            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+            HTML('</div>')
+        )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        tenant = cleaned_data.get('tenant')
+        tenant_group = cleaned_data.get('tenant_group')
+
+        if tenant and tenant_group:
+            raise forms.ValidationError("You can assign this template to either a Tenant or a Tenant Group, but not both.")
+
+        from django.conf import settings
+        if not getattr(settings, 'ALLOW_GLOBAL_CUSTODY_TEMPLATES', True):
+            if not tenant and not tenant_group:
+                raise forms.ValidationError("Global custody templates are disabled. You must select either a Tenant or a Tenant Group.")
+
+        return cleaned_data

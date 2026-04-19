@@ -303,3 +303,7 @@ import sys
 if 'test' in sys.argv:
     Q_CLUSTER['sync'] = True
 
+
+ALLOW_GLOBAL_CUSTODY_TEMPLATES = os.environ.get('ASSETBOX_ALLOW_GLOBAL_CUSTODY_TEMPLATES', 'True') == 'True'
+
+

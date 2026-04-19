@@ -179,3 +179,423 @@ class CustodyReceiptViewTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'expired')
+
+
+from ..models import CustodyTemplate
+from compliance.registry import signature_providers
+from compliance.providers import BaseSignatureProvider
+
+class MockSignatureProvider(BaseSignatureProvider):
+    name = 'mock_esign'
+    verbose_name = 'Mock E-Sign Integration'
+
+    def initiate_signature(self, receipt, request=None):
+        return f"https://mockesign.com/sign/{receipt.token}/"
+
+    def verify_signature(self, payload):
+        return True
+
+
+class CustodyTemplateViewTests(TestCase):
+    def setUp(self):
+        self.user = baker.make(User, is_staff=True, is_superuser=True)
+        self.user.set_password('testpassword')
+        self.user.save()
+        self.client.login(username=self.user.username, password='testpassword')
+        
+        self.template = baker.make(
+            CustodyTemplate,
+            name='Laptop Custody Template',
+            signature_provider='local',
+            eula_text='This laptop belongs to the company.',
+            disclaimer='Draw signature if you agree.',
+            qms_reference='QMS-IT-001',
+        )
+
+    def test_list_view(self):
+        url = reverse('compliance:custodytemplate_list')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Laptop Custody Template')
+
+    def test_detail_view(self):
+        url = reverse('compliance:custodytemplate_detail', kwargs={'pk': self.template.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Laptop Custody Template')
+        self.assertContains(response, 'This laptop belongs to the company.')
+        self.assertContains(response, 'QMS-IT-001')
+
+    def test_create_view_get(self):
+        url = reverse('compliance:custodytemplate_create')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_create_view_post(self):
+        url = reverse('compliance:custodytemplate_create')
+        response = self.client.post(url, {
+            'name': 'New Server Template',
+            'signature_provider': 'local',
+            'eula_text': 'Server room access guidelines.',
+            'disclaimer': 'Do not damage servers.',
+            'qms_reference': 'QMS-IT-002',
+            'is_active': True,
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(CustodyTemplate.objects.filter(name='New Server Template').exists())
+
+    def test_edit_view_post(self):
+        url = reverse('compliance:custodytemplate_update', kwargs={'pk': self.template.pk})
+        response = self.client.post(url, {
+            'name': 'Updated Laptop Template',
+            'signature_provider': 'local',
+            'eula_text': 'Updated laptop terms.',
+            'disclaimer': 'Sign pad.',
+            'qms_reference': 'QMS-IT-001-v2',
+            'is_active': True,
+        })
+        self.assertEqual(response.status_code, 302)
+        self.template.refresh_from_db()
+        self.assertEqual(self.template.name, 'Updated Laptop Template')
+        self.assertEqual(self.template.qms_reference, 'QMS-IT-001-v2')
+
+    def test_delete_view_post(self):
+        url = reverse('compliance:custodytemplate_delete', kwargs={'pk': self.template.pk})
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(CustodyTemplate.objects.filter(pk=self.template.pk).exists())
+
+
+class SignatureRegistryTests(TestCase):
+    def test_provider_registration(self):
+        # Test default local provider
+        choices = signature_providers.choices()
+        self.assertIn(('local', 'Local Canvas Signature Pad'), choices)
+        
+        # Test mock provider registration
+        signature_providers.register(MockSignatureProvider)
+        choices_after = signature_providers.choices()
+        self.assertIn(('mock_esign', 'Mock E-Sign Integration'), choices_after)
+        
+        # Verify get
+        provider = signature_providers.get('mock_esign')
+        self.assertIsNotNone(provider)
+        self.assertEqual(provider.name, 'mock_esign')
+
+
+from django.utils import timezone
+
+class CustodyTemplateCheckoutTests(TestCase):
+    def setUp(self):
+        self.tg = baker.make('organization.TenantGroup', name="TG1", slug="tg1")
+        self.tenant = baker.make('organization.Tenant', name="Tenant1", slug="tenant1", group=self.tg)
+        self.category = baker.make(
+            'assets.Category',
+            name='Tenant Laptops',
+            slug='tenant-laptops'
+        )
+        self.template = baker.make(
+            CustodyTemplate,
+            tenant=self.tenant,
+            category=self.category,
+            require_acceptance=True,
+            email_signature_request=True,
+            name='Tenant Laptop EULA',
+            signature_provider='local',
+            eula_text='Tenant-specific laptop EULA rules.',
+            disclaimer='Please sign the pad.',
+            qms_reference='QMS-TEN-001',
+        )
+        self.asset_type = baker.make('assets.AssetType', model='MBP16', slug='mbp16', category=self.category)
+        self.asset = baker.make(Asset, name='Laptop 01', asset_tag='TAG-LT-01', asset_type=self.asset_type, tenant=self.tenant)
+        self.holder = baker.make(AssetHolder, first_name='John', last_name='Doe', email='john@tenant.com', tenant=self.tenant)
+
+    def test_checkout_copies_template_fields(self):
+        from assets.services import checkout_asset
+        
+        # Perform checkout
+        checkout_asset(
+            asset=self.asset,
+            holder=self.holder,
+            checkout_date=timezone.now(),
+            notes="Assigning laptop to John",
+            request=None
+        )
+        
+        # Verify CustodyReceipt was created and fields copied
+        receipts = CustodyReceipt.objects.filter(asset=self.asset, holder=self.holder)
+        self.assertEqual(receipts.count(), 1)
+        receipt = receipts.first()
+        
+        self.assertEqual(receipt.custody_template, self.template)
+        self.assertEqual(receipt.signature_provider, 'local')
+        self.assertEqual(receipt.eula_text, 'Tenant-specific laptop EULA rules.')
+        self.assertEqual(receipt.disclaimer, 'Please sign the pad.')
+        self.assertEqual(receipt.qms_reference, 'QMS-TEN-001')
+
+
+class CustodyUXAndPreviewTests(TestCase):
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        self.user = baker.make(get_user_model(), is_staff=True, is_superuser=True)
+        self.user.set_password('testpassword')
+        self.user.save()
+        self.client.login(username=self.user.username, password='testpassword')
+
+        self.category = baker.make(
+            'assets.Category',
+            name='Laptops',
+            slug='laptops'
+        )
+        self.template = baker.make(
+            CustodyTemplate,
+            category=self.category,
+            require_acceptance=True,
+            email_signature_request=True,
+            name='Standard Laptop EULA',
+            signature_provider='local',
+            eula_text='Laptops must be protected.',
+            disclaimer='Draw signature to accept.',
+            qms_reference='QMS-LT-001',
+        )
+        self.asset_type = baker.make('assets.AssetType', model='ThinkPad', slug='thinkpad', category=self.category)
+        self.asset = baker.make(Asset, name='Developer Laptop 01', asset_tag='TAG-DEV-01', asset_type=self.asset_type)
+        self.holder = baker.make(AssetHolder, first_name='Alex', last_name='Staff', email='alex@staff.com')
+
+    def test_asset_detail_shows_pending_eula_status(self):
+        from assets.services import checkout_asset
+        # Checkout asset to create the pending CustodyReceipt
+        checkout_asset(
+            asset=self.asset,
+            holder=self.holder,
+            checkout_date=timezone.now(),
+            notes="Onboarding Alex",
+            request=None
+        )
+
+        # Retrieve asset details page
+        url = reverse('assets:asset_detail', kwargs={'pk': self.asset.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        # Assert correct UX elements render for pending state
+        self.assertContains(response, 'Pending EULA Acceptance')
+        self.assertContains(response, 'Sign Custody (On-Site)...')
+        self.assertContains(response, 'Copy Link')
+        self.assertNotContains(response, 'Custody Secured')
+
+    def test_asset_detail_shows_secured_custody_status(self):
+        from assets.services import checkout_asset
+        # Checkout asset to create the pending CustodyReceipt
+        checkout_asset(
+            asset=self.asset,
+            holder=self.holder,
+            checkout_date=timezone.now(),
+            notes="Onboarding Alex",
+            request=None
+        )
+
+        # Sign the receipt
+        receipt = CustodyReceipt.objects.filter(asset=self.asset, holder=self.holder).first()
+        receipt.accepted = True
+        receipt.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
+        receipt.save()
+
+        # Retrieve asset details page
+        url = reverse('assets:asset_detail', kwargs={'pk': self.asset.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        # Assert correct UX elements render for secured state
+        self.assertContains(response, 'Custody Secured')
+        self.assertContains(response, 'View Signed Receipt')
+        self.assertNotContains(response, 'Pending EULA Acceptance')
+        self.assertNotContains(response, 'Sign Custody (On-Site)...')
+
+    def test_custody_template_preview_rendering(self):
+        # Request template preview sandbox
+        url = reverse('compliance:custodytemplate_preview', kwargs={'pk': self.template.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        # Assert elements of preview mode are present
+        self.assertContains(response, 'Live Template Preview Sandbox')
+        self.assertContains(response, 'This is a secure simulation showing exactly how users will view this template.')
+        self.assertContains(response, 'Sign-off submission is disabled in preview mode.')
+        self.assertContains(response, 'Laptops must be protected.')
+        self.assertContains(response, 'QMS-LT-001')
+
+
+class CustodyTemplateOverrideTests(TestCase):
+    def setUp(self):
+        # Create organization structure
+        self.tg = baker.make('organization.TenantGroup', name="TG1", slug="tg1")
+        self.tenant_a = baker.make('organization.Tenant', name="Tenant A", slug="tenant-a", group=self.tg)
+        self.tenant_b = baker.make('organization.Tenant', name="Tenant B", slug="tenant-b", group=self.tg)
+
+        # Create Category
+        self.category = baker.make(
+            'assets.Category',
+            name='Laptops',
+            slug='laptops'
+        )
+
+        # Create global default template (linked to Category via ForeignKey)
+        self.global_template = baker.make(
+            CustodyTemplate,
+            category=self.category,
+            require_acceptance=True,
+            email_signature_request=True,
+            name='Global Laptop EULA',
+            signature_provider='local',
+            eula_text='Global EULA terms.',
+            disclaimer='Please sign globally.',
+            qms_reference='QMS-GLOBAL-01',
+        )
+
+        # Create Tenant A custom template (overriding for category Laptops)
+        self.tenant_a_template = baker.make(
+            CustodyTemplate,
+            tenant=self.tenant_a,
+            category=self.category,
+            require_acceptance=True,
+            email_signature_request=True,
+            name='Tenant A Laptop EULA',
+            signature_provider='local',
+            eula_text='Tenant A specific laptop EULA terms.',
+            disclaimer='Please sign for Tenant A.',
+            qms_reference='QMS-TENANT-A-01',
+        )
+
+        # Assets & Holders
+        self.asset_type = baker.make('assets.AssetType', model='Latitude', slug='latitude', category=self.category)
+        self.asset_a = baker.make(Asset, name='Laptop A', asset_tag='TAG-LT-A', asset_type=self.asset_type, tenant=self.tenant_a)
+        self.asset_b = baker.make(Asset, name='Laptop B', asset_tag='TAG-LT-B', asset_type=self.asset_type, tenant=self.tenant_b)
+
+        self.holder_a = baker.make(AssetHolder, first_name='John', last_name='A', email='john@a.com', tenant=self.tenant_a)
+        self.holder_b = baker.make(AssetHolder, first_name='John', last_name='B', email='john@b.com', tenant=self.tenant_b)
+
+    def test_checkout_resolves_tenant_specific_category_override(self):
+        from assets.services import checkout_asset
+        # Checkout for Tenant A holder
+        checkout_asset(
+            asset=self.asset_a,
+            holder=self.holder_a,
+            checkout_date=timezone.now(),
+            notes="Assigning laptop to Tenant A user",
+            request=None
+        )
+
+        # Verify receipt has Tenant A custom template values
+        receipts = CustodyReceipt.objects.filter(asset=self.asset_a, holder=self.holder_a)
+        self.assertEqual(receipts.count(), 1)
+        receipt = receipts.first()
+
+        self.assertEqual(receipt.custody_template, self.tenant_a_template)
+        self.assertEqual(receipt.eula_text, 'Tenant A specific laptop EULA terms.')
+        self.assertEqual(receipt.qms_reference, 'QMS-TENANT-A-01')
+
+    def test_checkout_falls_back_to_global_category_template(self):
+        from assets.services import checkout_asset
+        # Checkout for Tenant B holder (no tenant-specific override template exists)
+        checkout_asset(
+            asset=self.asset_b,
+            holder=self.holder_b,
+            checkout_date=timezone.now(),
+            notes="Assigning laptop to Tenant B user",
+            request=None
+        )
+
+        # Verify receipt falls back to Global template
+        receipts = CustodyReceipt.objects.filter(asset=self.asset_b, holder=self.holder_b)
+        self.assertEqual(receipts.count(), 1)
+        receipt = receipts.first()
+
+        self.assertEqual(receipt.custody_template, self.global_template)
+        self.assertEqual(receipt.eula_text, 'Global EULA terms.')
+        self.assertEqual(receipt.qms_reference, 'QMS-GLOBAL-01')
+
+    def test_checkout_resolves_tenant_group_override(self):
+        from assets.services import checkout_asset
+        
+        # Create a Tenant Group template (specific to the group, overriding global)
+        group_template = baker.make(
+            CustodyTemplate,
+            tenant_group=self.tg,
+            category=self.category,
+            require_acceptance=True,
+            email_signature_request=True,
+            name='Group TG1 Laptop EULA',
+            signature_provider='local',
+            eula_text='Group TG1 specific EULA.',
+            disclaimer='Please sign for TG1 Group.',
+            qms_reference='QMS-GROUP-TG1',
+        )
+
+        # Checkout for Tenant B (no tenant-specific template, but belongs to group TG1)
+        checkout_asset(
+            asset=self.asset_b,
+            holder=self.holder_b,
+            checkout_date=timezone.now(),
+            notes="Assigning laptop to Tenant B user",
+            request=None
+        )
+
+        # Verify receipt resolves to Group template instead of Global template
+        receipts = CustodyReceipt.objects.filter(asset=self.asset_b, holder=self.holder_b)
+        self.assertEqual(receipts.count(), 1)
+        receipt = receipts.first()
+
+        self.assertEqual(receipt.custody_template, group_template)
+        self.assertEqual(receipt.eula_text, 'Group TG1 specific EULA.')
+        self.assertEqual(receipt.qms_reference, 'QMS-GROUP-TG1')
+
+    def test_checkout_respects_allow_global_custody_templates_disabled(self):
+        from assets.services import checkout_asset
+        from django.test import override_settings
+
+        # Disallow global templates
+        with override_settings(ALLOW_GLOBAL_CUSTODY_TEMPLATES=False):
+            # Checkout for Tenant B (only global template available)
+            checkout_asset(
+                asset=self.asset_b,
+                holder=self.holder_b,
+                checkout_date=timezone.now(),
+                notes="Assigning laptop with global disabled",
+                request=None
+            )
+
+            # Verify no receipt is created since global fallback is disabled
+            receipts = CustodyReceipt.objects.filter(asset=self.asset_b, holder=self.holder_b)
+            self.assertEqual(receipts.count(), 0)
+
+    def test_form_validation_mutual_exclusion(self):
+        from compliance.forms import CustodyTemplateForm
+
+        form = CustodyTemplateForm(data={
+            'name': 'Invalid Template',
+            'tenant': self.tenant_a.pk,
+            'tenant_group': self.tg.pk,
+            'signature_provider': 'local',
+            'eula_text': 'Terms',
+            'is_active': True,
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn('__all__', form.errors)
+        self.assertEqual(form.errors['__all__'][0], "You can assign this template to either a Tenant or a Tenant Group, but not both.")
+
+    def test_form_validation_global_disallowed(self):
+        from compliance.forms import CustodyTemplateForm
+        from django.test import override_settings
+
+        with override_settings(ALLOW_GLOBAL_CUSTODY_TEMPLATES=False):
+            form = CustodyTemplateForm(data={
+                'name': 'Invalid Global Template',
+                'signature_provider': 'local',
+                'eula_text': 'Terms',
+                'is_active': True,
+            })
+            self.assertFalse(form.is_valid())
+            self.assertIn('__all__', form.errors)
+            self.assertEqual(form.errors['__all__'][0], "Global custody templates are disabled. You must select either a Tenant or a Tenant Group.")
+

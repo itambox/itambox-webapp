@@ -1,4 +1,4 @@
-﻿import django_tables2 as tables
+import django_tables2 as tables
 from django_tables2.utils import A
 from core.tables import ActionsColumn, BaseTable, ToggleColumn
 from .models import AssetMaintenance
@@ -41,3 +41,20 @@ class AssetMaintenanceTable(BaseTable):
 
     def render_supplier(self, value):
         return value or "\u2014"
+
+
+from .models import CustodyTemplate
+
+class CustodyTemplateTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    name = tables.LinkColumn('compliance:custodytemplate_detail', args=[A('pk')], verbose_name='Name')
+    tenant = tables.Column(verbose_name='Tenant')
+    tenant_group = tables.Column(verbose_name='Tenant Group')
+    signature_provider = tables.Column(verbose_name='Provider')
+    is_active = tables.BooleanColumn(verbose_name='Active')
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = CustodyTemplate
+        fields = ('pk', 'name', 'tenant', 'tenant_group', 'signature_provider', 'is_active', 'actions')
+        default_columns = ('pk', 'name', 'tenant', 'tenant_group', 'signature_provider', 'is_active', 'actions')

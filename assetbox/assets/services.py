@@ -83,39 +83,78 @@ def checkout_asset(
         assignment = AssetAssignment.objects.create(**assignment_kwargs)
 
         category = asset.asset_type.category if asset.asset_type else None
-        if holder and category and category.require_acceptance:
-            receipt = CustodyReceipt.objects.create(
-                asset=asset,
-                holder=holder,
-            )
-            if category.email_eula and request:
-                try:
-                    from core.models import EmailSettings
-                    email_config = EmailSettings.load()
-                    if email_config and email_config.enabled and email_config.from_address:
-                        recipient = holder.email
-                        if not recipient:
-                            recipient = email_config.test_recipient or email_config.from_address
-                        if recipient:
-                            sign_url = request.build_absolute_uri(
-                                reverse('compliance:custody_eula_sign', kwargs={'token': receipt.token})
-                            )
-                            send_mail(
-                                subject=f'Asset Acceptance Required: {asset.name} ({asset.asset_tag})',
-                                message=(
-                                    f'You have been assigned custody of:\n\n'
-                                    f'  Asset: {asset.name}\n'
-                                    f'  Asset Tag: {asset.asset_tag}\n'
-                                    f'  Serial: {asset.serial_number or "N/A"}\n\n'
-                                    f'Please accept custody at the following link:\n{sign_url}\n\n'
-                                    f'This link expires in 7 days.'
-                                ),
-                                from_email=email_config.from_address,
-                                recipient_list=[recipient],
-                                fail_silently=True,
-                             )
-                except Exception:
-                     pass
+        if holder and category:
+            from compliance.models import CustodyTemplate
+            resolved_template = None
+
+            # Priority 1: Tenant-specific override for the category
+            if holder.tenant:
+                resolved_template = CustodyTemplate.objects.filter(
+                    tenant=holder.tenant,
+                    category=category,
+                    is_active=True
+                ).first()
+
+            # Priority 2: Tenant Group-specific override (if tenant belongs to a group)
+            if not resolved_template and holder.tenant and holder.tenant.group:
+                resolved_template = CustodyTemplate.objects.filter(
+                    tenant_group=holder.tenant.group,
+                    category=category,
+                    is_active=True
+                ).first()
+
+            # Priority 3: Global category template (only if allowed by settings)
+            if not resolved_template:
+                from django.conf import settings
+                if getattr(settings, 'ALLOW_GLOBAL_CUSTODY_TEMPLATES', True):
+                    resolved_template = CustodyTemplate.objects.filter(
+                        tenant__isnull=True,
+                        tenant_group__isnull=True,
+                        category=category,
+                        is_active=True
+                    ).first()
+
+            if resolved_template and resolved_template.require_acceptance:
+                receipt_kwargs = {
+                    'asset': asset,
+                    'holder': holder,
+                    'custody_template': resolved_template,
+                    'signature_provider': resolved_template.signature_provider,
+                    'eula_text': resolved_template.eula_text,
+                    'disclaimer': resolved_template.disclaimer,
+                    'qms_reference': resolved_template.qms_reference,
+                }
+                receipt = CustodyReceipt.objects.create(**receipt_kwargs)
+
+                # Send email signature request link if configured
+                if resolved_template.email_signature_request and request:
+                    try:
+                        from core.models import EmailSettings
+                        email_config = EmailSettings.load()
+                        if email_config and email_config.enabled and email_config.from_address:
+                            recipient = holder.email
+                            if not recipient:
+                                recipient = email_config.test_recipient or email_config.from_address
+                            if recipient:
+                                from compliance.registry import signature_providers
+                                provider = signature_providers.get(receipt.signature_provider or 'local')
+                                sign_url = provider.initiate_signature(receipt, request)
+                                send_mail(
+                                    subject=f'Asset Acceptance Required: {asset.name} ({asset.asset_tag})',
+                                    message=(
+                                        f'You have been assigned custody of:\n\n'
+                                        f'  Asset: {asset.name}\n'
+                                        f'  Asset Tag: {asset.asset_tag}\n'
+                                        f'  Serial: {asset.serial_number or "N/A"}\n\n'
+                                        f'Please accept custody at the following link:\n{sign_url}\n\n'
+                                        f'This link expires in 7 days.'
+                                    ),
+                                    from_email=email_config.from_address,
+                                    recipient_list=[recipient],
+                                    fail_silently=True,
+                                )
+                    except Exception:
+                        pass
 
     return target
 
