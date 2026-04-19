@@ -1,10 +1,10 @@
 from django import forms
 from django.core.exceptions import ValidationError
-from core.forms import BootstrapMixin
+
 from assets.models import Asset, AssetType, AssetRequest
 
 
-class AssetRequestForm(BootstrapMixin, forms.ModelForm):
+class AssetRequestForm(forms.ModelForm):
     class Meta:
         model = AssetRequest
         fields = ['asset_type', 'asset', 'notes']
@@ -36,7 +36,7 @@ class AssetRequestForm(BootstrapMixin, forms.ModelForm):
         return cleaned_data
 
 
-class AssetRequestActionForm(BootstrapMixin, forms.Form):
+class AssetRequestActionForm(forms.Form):
     allocated_asset = forms.ModelChoiceField(
         queryset=Asset.objects.none(),
         required=False,

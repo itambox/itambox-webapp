@@ -47,20 +47,13 @@ class SearchForm(forms.Form):
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
-class BootstrapMixin(forms.Form):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for field_name, field in self.fields.items():
-            if isinstance(field.widget, (forms.TextInput, forms.Textarea, forms.PasswordInput, forms.EmailInput, forms.NumberInput)):
-                field.widget.attrs.update({'class': 'form-control'})
-            elif isinstance(field.widget, forms.Select):
-                field.widget.attrs.update({'class': 'form-select'})
-            elif isinstance(field.widget, (forms.CheckboxInput, forms.RadioSelect)):
-                pass
-            elif isinstance(field.widget, forms.SelectMultiple):
-                 field.widget.attrs.update({'class': 'form-select'})
-            elif isinstance(field.widget, forms.ClearableFileInput):
-                field.widget.attrs.update({'class': 'form-control'})
+class BootstrapMixin:
+    """
+    DEPRECATED: Custom styling injection is no longer needed.
+    Django Crispy Forms handles styling layout at render-time.
+    This class remains as a stub for compatibility.
+    """
+    pass
 
 class JournalEntryForm(forms.Form):
     comment = forms.CharField(widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}))
@@ -111,7 +104,7 @@ PRESET_PAYLOADS = {
 }
 
 
-class WebhookEndpointForm(BootstrapMixin, forms.ModelForm):
+class WebhookEndpointForm(forms.ModelForm):
     payload_preset = forms.ChoiceField(
         choices=PAYLOAD_PRESET_CHOICES,
         required=False,
@@ -141,7 +134,7 @@ class WebhookEndpointForm(BootstrapMixin, forms.ModelForm):
         return data
 
 
-class EventRuleForm(BootstrapMixin, forms.ModelForm):
+class EventRuleForm(forms.ModelForm):
     payload_preset = forms.ChoiceField(
         choices=PAYLOAD_PRESET_CHOICES,
         required=False,
@@ -196,7 +189,7 @@ class EventRuleForm(BootstrapMixin, forms.ModelForm):
         return data
 
 
-class LabelTemplateForm(BootstrapMixin, forms.ModelForm):
+class LabelTemplateForm(forms.ModelForm):
     class Meta:
         model = LabelTemplate
         fields = ['name', 'description', 'page_width', 'page_height', 'barcode_format', 'template_code', 'printer_settings']
@@ -220,7 +213,7 @@ class LabelTemplateForm(BootstrapMixin, forms.ModelForm):
         return data
 
 
-class ConfirmationForm(BootstrapMixin, forms.Form):
+class ConfirmationForm(forms.Form):
     return_url = forms.CharField(widget=forms.HiddenInput(), required=False)
 
     def __init__(self, *args, instance=None, **kwargs):
@@ -267,7 +260,7 @@ BULK_EDIT_FIELD_TYPE_MAP = {
 }
 
 
-class BulkEditForm(BootstrapMixin, forms.Form):
+class BulkEditForm(forms.Form):
     _selected_fields = forms.MultipleChoiceField(
         widget=forms.MultipleHiddenInput(),
         required=False
@@ -349,7 +342,7 @@ class SlugModelForm(CrispyFormMixin, forms.ModelForm):
             'js/slugify.js',
         )
 
-class FilterForm(BootstrapMixin, forms.Form):
+class FilterForm(forms.Form):
     filterset_class = None
 
     def __init__(self, *args, **kwargs):
@@ -450,7 +443,7 @@ class ColorFieldFormMixin:
             raise forms.ValidationError("Ensure the color hex code is 6 characters long.")
 
 
-class ReportTemplateForm(BootstrapMixin, forms.ModelForm):
+class ReportTemplateForm(forms.ModelForm):
     COLUMN_CHOICES = [
         # Asset Inventory Summary Columns
         ('asset_tag', _('Asset Tag')),
@@ -541,7 +534,7 @@ class ReportTemplateForm(BootstrapMixin, forms.ModelForm):
 
 
 
-class ScheduledReportForm(BootstrapMixin, forms.ModelForm):
+class ScheduledReportForm(forms.ModelForm):
     class Meta:
         model = ScheduledReport
         fields = [
@@ -601,7 +594,7 @@ class ScheduledReportForm(BootstrapMixin, forms.ModelForm):
 
 
 
-class AlertRuleForm(BootstrapMixin, forms.ModelForm):
+class AlertRuleForm(forms.ModelForm):
     class Meta:
         model = AlertRule
         fields = ['name', 'description', 'alert_type', 'threshold_value', 'severity', 'recipients', 'is_active', 'channels', 'tenant']
@@ -631,7 +624,7 @@ class AlertRuleForm(BootstrapMixin, forms.ModelForm):
         return instance
 
 
-class NotificationChannelForm(BootstrapMixin, forms.ModelForm):
+class NotificationChannelForm(forms.ModelForm):
     class Meta:
         model = NotificationChannel
         fields = ['name', 'channel_type', 'enabled', 'config', 'tenant']
@@ -673,7 +666,7 @@ class NotificationChannelForm(BootstrapMixin, forms.ModelForm):
 
 from django.contrib.auth.models import Permission
 
-class PermissionGroupForm(BootstrapMixin, forms.ModelForm):
+class PermissionGroupForm(forms.ModelForm):
     permission_objects = forms.ModelMultipleChoiceField(
         queryset=Permission.objects.select_related('content_type').order_by('content_type__app_label', 'codename'),
         widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tomselect': 'true'}),

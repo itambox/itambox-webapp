@@ -1,9 +1,9 @@
 from django import forms
-from core.forms import SlugModelForm, BootstrapMixin
+from core.forms import SlugModelForm
 from ..models import Supplier
 
 
-class SupplierForm(SlugModelForm, BootstrapMixin):
+class SupplierForm(SlugModelForm):
     class Meta:
         model = Supplier
         fields = ['name', 'slug', 'website', 'contact_email', 'contact_phone', 'contact_name', 'address', 'notes', 'tags']

@@ -1,17 +1,88 @@
 from django import forms
-from core.forms import SlugModelForm, BootstrapMixin
+from core.forms import SlugModelForm, ColorFieldFormMixin
 from ..models import Category
 
 
-class CategoryForm(SlugModelForm, BootstrapMixin):
+class CategoryForm(ColorFieldFormMixin, SlugModelForm):
+    APPLIES_TO_CHOICES = [
+        ('asset', 'Assets (Hardware)'),
+        ('accessory', 'Accessories'),
+        ('consumable', 'Consumables'),
+        ('component', 'Modular Components'),
+    ]
+
+    applies_to_flags = forms.MultipleChoiceField(
+        choices=APPLIES_TO_CHOICES,
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
+        required=False,
+        label="Applies to"
+    )
+
+    color = forms.CharField(
+        max_length=7,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'type': 'color',
+            'class': 'form-control form-control-color'
+        }),
+        label="Category Color",
+        help_text="Choose a color for this Category"
+    )
+
     class Meta:
         model = Category
-        fields = ['name', 'slug', 'color', 'description', 'applies_to', 'email_on_checkout', 'email_on_checkin', 'require_acceptance', 'email_eula', 'tags']
+        fields = ['name', 'slug', 'color', 'description', 'applies_to_flags', 'tags']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'slug': forms.TextInput(attrs={'class': 'form-control', 'slugify': 'name'}),
-            'color': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '00ff00'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'applies_to': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': '["asset", "accessory", "license"]'}),
             'tags': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            applies_to = self.instance.applies_to or {}
+            self.initial['applies_to_flags'] = [k for k, v in applies_to.items() if v]
+
+        # Initialize premium FormHelper layout
+        from crispy_forms.helper import FormHelper
+        from crispy_forms.layout import Layout, Row, Column, Submit, HTML
+        from django.urls import reverse
+        
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+        
+        button_text = 'Update' if self.instance and self.instance.pk else 'Create'
+        cancel_url = reverse('assets:category_list')
+        
+        self.helper.layout = Layout(
+            Row(
+                Column('name', css_class='col-md-6'),
+                Column('slug', css_class='col-md-6')
+            ),
+            Row(
+                Column('color', css_class='col-md-6'),
+                Column('tags', css_class='col-md-6')
+            ),
+            'description',
+            'applies_to_flags',
+            HTML('<div class="mt-4"></div>'),
+            Submit('submit', button_text, css_class='btn btn-primary'),
+            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>')
+        )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        flags = cleaned_data.get('applies_to_flags', [])
+        cleaned_data['applies_to'] = {choice: (choice in flags) for choice, _ in self.APPLIES_TO_CHOICES}
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.applies_to = self.cleaned_data['applies_to']
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance

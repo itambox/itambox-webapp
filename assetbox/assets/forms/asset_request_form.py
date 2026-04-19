@@ -1,9 +1,9 @@
 from django import forms
-from core.forms import BootstrapMixin
+
 from ..models import AssetRequest
 
 
-class AssetRequestForm(BootstrapMixin, forms.ModelForm):
+class AssetRequestForm(forms.ModelForm):
     class Meta:
         model = AssetRequest
         fields = ['asset', 'asset_type', 'notes']
@@ -14,7 +14,7 @@ class AssetRequestForm(BootstrapMixin, forms.ModelForm):
         }
 
 
-class AssetRequestResponseForm(BootstrapMixin, forms.ModelForm):
+class AssetRequestResponseForm(forms.ModelForm):
     class Meta:
         model = AssetRequest
         fields = ['status', 'response_notes']

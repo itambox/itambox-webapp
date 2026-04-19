@@ -2,7 +2,7 @@ from django import forms
 from django.utils.translation import gettext_lazy as _
 from software.models import Software
 from extras.models import Tag
-from core.forms import BootstrapMixin, FilterForm
+from core.forms import FilterForm
 from .filters import LicenseFilterSet
 from .models import License, LicenseSeatAssignment
 from crispy_forms.helper import FormHelper
@@ -11,7 +11,7 @@ from django.urls import reverse
 from assets.models import Asset
 from organization.models import AssetHolder
 
-class LicenseForm(BootstrapMixin, forms.ModelForm):
+class LicenseForm(forms.ModelForm):
     """Form for creating and updating License entitlements."""
     software = forms.ModelChoiceField(
         queryset=Software.objects.all(),

@@ -2,7 +2,7 @@ from django import forms
 from django.utils.translation import gettext_lazy as _
 from assets.models import Manufacturer # Import Manufacturer
 from extras.models import Tag
-from core.forms import BootstrapMixin, FilterForm # Assuming a BootstrapMixin exists in core
+from core.forms import FilterForm
 from .filters import SoftwareFilterSet
 from .models import Software
 from crispy_forms.helper import FormHelper
@@ -13,7 +13,7 @@ from django.urls import reverse
 # Software
 # =============================================================================
 
-class SoftwareForm(BootstrapMixin, forms.ModelForm):
+class SoftwareForm(forms.ModelForm):
     """Form for creating and updating Software instances."""
     manufacturer = forms.ModelChoiceField(
         queryset=Manufacturer.objects.all(),
