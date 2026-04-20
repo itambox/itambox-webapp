@@ -43,6 +43,22 @@ class CategoryDetailView(ObjectDetailView):
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(accessories_table)
         context['accessories_table'] = accessories_table
 
+        # Components
+        from components.models import Component
+        from components.tables import ComponentTable
+        cat_components = Component.objects.filter(category=category).select_related('manufacturer', 'category', 'tenant').prefetch_related('tags')
+        components_table = ComponentTable(cat_components, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(components_table)
+        context['components_table'] = components_table
+
+        # Consumables
+        from inventory.models import Consumable
+        from inventory.tables import ConsumableTable
+        cat_consumables = Consumable.objects.filter(category=category).select_related('manufacturer', 'category', 'tenant').prefetch_related('tags')
+        consumables_table = ConsumableTable(cat_consumables, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(consumables_table)
+        context['consumables_table'] = consumables_table
+
         # Query active custody templates (Policies) linked to this category
         from compliance.models import CustodyTemplate
         context['custody_templates'] = CustodyTemplate.objects.filter(
@@ -65,8 +81,23 @@ class CategoryDetailView(ObjectDetailView):
                 'count': accessory_count,
                 'url': f"{reverse('inventory:accessory_list')}?category={category.slug}"
             })
+        component_count = cat_components.count()
+        if component_count:
+            related_objects_list.append({
+                'label': 'Components',
+                'count': component_count,
+                'url': f"{reverse('components:component_list')}?category={category.slug}"
+            })
+        consumable_count = cat_consumables.count()
+        if consumable_count:
+            related_objects_list.append({
+                'label': 'Consumables',
+                'count': consumable_count,
+                'url': f"{reverse('inventory:consumable_list')}?category={category.slug}"
+            })
         context['related_objects_list'] = related_objects_list
         return context
+
 
 
 class CategoryEditView(ObjectEditView):

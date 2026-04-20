@@ -49,9 +49,80 @@ class AssetHolderDetailView(ObjectDetailView):
 
         assignments_table = AssetAssignmentTable(assetholder.checked_out_assets, request=self.request)
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assignments_table)
-
         context['assignments_table'] = assignments_table
+
+        # Accessory Assignments
+        from inventory.models import AccessoryAssignment
+        from inventory.tables import AccessoryAssignmentTable
+        acc_assign_qs = AccessoryAssignment.objects.filter(assigned_holder=assetholder).select_related('accessory__manufacturer', 'accessory__category', 'assigned_holder')
+        accessory_assignments_table = AccessoryAssignmentTable(acc_assign_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(accessory_assignments_table)
+        context['accessory_assignments_table'] = accessory_assignments_table
+
+        # Consumable Dispatches
+        from inventory.models import ConsumableAssignment
+        from inventory.tables import ConsumableAssignmentTable
+        con_assign_qs = ConsumableAssignment.objects.filter(assigned_holder=assetholder).select_related('consumable__manufacturer', 'consumable__category', 'assigned_holder')
+        consumable_dispatches_table = ConsumableAssignmentTable(con_assign_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(consumable_dispatches_table)
+        context['consumable_dispatches_table'] = consumable_dispatches_table
+
+        # Software License Seats
+        from licenses.models import LicenseSeatAssignment
+        from licenses.tables import LicenseSeatAssignmentTable
+        lic_assign_qs = LicenseSeatAssignment.objects.filter(assigned_holder=assetholder).select_related('license__software', 'asset', 'assigned_holder')
+        license_assignments_table = LicenseSeatAssignmentTable(lic_assign_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(license_assignments_table)
+        context['license_assignments_table'] = license_assignments_table
+
+        # Signed Custody EULAs
+        from compliance.models import CustodyReceipt
+        from compliance.tables import CustodyReceiptTable
+        custody_receipts_qs = CustodyReceipt.objects.filter(holder=assetholder).select_related('asset', 'holder', 'custody_template')
+        custody_receipts_table = CustodyReceiptTable(custody_receipts_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(custody_receipts_table)
+        context['custody_receipts_table'] = custody_receipts_table
+
+        related_objects_list = []
+        asset_count = assetholder.checked_out_assets.count()
+        if asset_count:
+            related_objects_list.append({
+                'label': 'Assets',
+                'count': asset_count,
+                'url': f"{reverse('assets:asset_list')}?holder={assetholder.pk}"
+            })
+        accessory_count = acc_assign_qs.count()
+        if accessory_count:
+            related_objects_list.append({
+                'label': 'Accessories',
+                'count': accessory_count,
+                'url': f"{reverse('inventory:accessoryassignment_list')}?assigned_holder={assetholder.pk}"
+            })
+        consumable_count = con_assign_qs.count()
+        if consumable_count:
+            related_objects_list.append({
+                'label': 'Consumables',
+                'count': consumable_count,
+                'url': f"{reverse('inventory:consumableassignment_list')}?assigned_holder={assetholder.pk}"
+            })
+        license_count = lic_assign_qs.count()
+        if license_count:
+            related_objects_list.append({
+                'label': 'Licenses',
+                'count': license_count,
+                'url': f"{reverse('organization:assetholder_detail', kwargs={'pk': assetholder.pk})}#licenses"
+            })
+        custody_count = custody_receipts_qs.count()
+        if custody_count:
+            related_objects_list.append({
+                'label': 'Custody EULAs',
+                'count': custody_count,
+                'url': f"{reverse('organization:assetholder_detail', kwargs={'pk': assetholder.pk})}#custody"
+            })
+        context['related_objects_list'] = related_objects_list
+
         return context
+
 
 
 class AssetHolderEditView(ObjectEditView):

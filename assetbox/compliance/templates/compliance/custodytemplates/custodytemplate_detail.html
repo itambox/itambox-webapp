@@ -1,6 +1,7 @@
 {% extends 'generic/object_detail.html' %}
 {% load i18n %}
 {% load static %}
+{% load render_table from django_tables2 %}
 
 {% block title %}{{ object.name }} {% translate "- Custody Template - AssetBox" %}{% endblock %}
 
@@ -100,3 +101,32 @@
 </div>
 {% endif %}
 {% endblock object_details %}
+
+{% block extra_tabs %}
+    <li class="nav-item" role="presentation">
+        <a href="#receipts" class="nav-link" data-bs-toggle="tab" role="tab">
+            <i class="mdi mdi-file-sign me-1 text-green"></i>
+            {% translate "Signed Custody Receipts" %} <span class="badge bg-green-lt ms-2">{{ receipts_table.rows|length }}</span>
+        </a>
+    </li>
+{% endblock extra_tabs %}
+
+{% block extra_tab_panes %}
+    <div class="tab-pane fade" id="receipts" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">{% translate "Signed Custody Receipts" %}</h3>
+            </div>
+            {% if receipts_table.rows %}
+                <div class="table-responsive">
+                    {% render_table receipts_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=receipts_table %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <p class="mb-0">{% translate "No custody receipts generated under this template yet." %}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock extra_tab_panes %}

@@ -60,7 +60,15 @@ class AccessoryDetailView(ObjectDetailView):
         stocks_table = tables.AccessoryStockTable(accessory.stocks.all(), request=self.request)
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(stocks_table)
         context['stocks_table'] = stocks_table
+
+        # Kits
+        kits_qs = Kit.objects.filter(items__accessory=accessory).distinct().select_related('tenant')
+        kits_table = tables.KitTable(kits_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(kits_table)
+        context['kits_table'] = kits_table
+
         return context
+
 
 
 class AccessoryEditView(ObjectEditView):
@@ -124,7 +132,15 @@ class ConsumableDetailView(ObjectDetailView):
         stocks_table = tables.ConsumableStockTable(consumable.stocks.all(), request=self.request)
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(stocks_table)
         context['stocks_table'] = stocks_table
+
+        # Kits
+        kits_qs = Kit.objects.filter(items__consumable=consumable).distinct().select_related('tenant')
+        kits_table = tables.KitTable(kits_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(kits_table)
+        context['kits_table'] = kits_table
+
         return context
+
 
 
 class ConsumableEditView(ObjectEditView):
@@ -201,7 +217,7 @@ class KitDetailView(ObjectDetailView):
         # 2. Batch Accessory Available Qty
         accessory_avail = {}
         if accessory_ids:
-            from django.db.models import Sum, Coalesce, Q
+            from django.db.models import Sum, Q
             stocks = Accessory.objects.filter(id__in=accessory_ids).annotate(
                 total_qty=Coalesce(Sum('stocks__qty'), 0),
                 undeducted_qty=Coalesce(Sum('assignments__qty', filter=Q(assignments__from_location__isnull=True)), 0)
@@ -223,7 +239,7 @@ class KitDetailView(ObjectDetailView):
         # 4. Batch Consumable Available Qty
         consumable_avail = {}
         if consumable_ids:
-            from django.db.models import Sum, Coalesce, Q
+            from django.db.models import Sum, Q
             stocks = Consumable.objects.filter(id__in=consumable_ids).annotate(
                 total_qty=Coalesce(Sum('stocks__qty'), 0),
                 undeducted_qty=Coalesce(Sum('consumptions__qty', filter=Q(consumptions__from_location__isnull=True)), 0)

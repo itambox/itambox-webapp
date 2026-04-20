@@ -48,6 +48,22 @@ class AssetTypeDetailView(ObjectDetailView):
 
         context['assets_table'] = assets_table
         context['related_objects_list'] = related_objects_list
+
+        # Requests
+        from ..models import AssetRequest
+        req_qs = AssetRequest.objects.filter(asset_type=assettype).select_related('requester', 'asset', 'asset_type')
+        requests_table = tables.AssetRequestTable(req_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(requests_table)
+        context['requests_table'] = requests_table
+
+        # Kits
+        from inventory.models import Kit
+        from inventory.tables import KitTable
+        kits_qs = Kit.objects.filter(items__asset_type=assettype).distinct().select_related('tenant')
+        kits_table = KitTable(kits_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(kits_table)
+        context['kits_table'] = kits_table
+
         return context
 
 

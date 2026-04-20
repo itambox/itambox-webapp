@@ -24,6 +24,37 @@ class DepreciationDetailView(ObjectDetailView):
         ((Panel('info', 'Depreciation Rule Details'),),),
     )
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        depreciation = self.get_object()
+
+        from django_tables2 import RequestConfig
+        from assetbox.utils import get_paginate_count
+        from ..models import Asset, AssetType
+
+        # Affected Asset Types
+        assettype_qs = AssetType.objects.filter(depreciation=depreciation).select_related('manufacturer').prefetch_related('tags')
+        assettypes_table = tables.AssetTypeTable(assettype_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assettypes_table)
+        context['assettypes_table'] = assettypes_table
+
+        # Active Assets Amortization Schedule (using this depreciation rule)
+        asset_qs = Asset.objects.filter(asset_type__depreciation=depreciation).select_related(
+            'asset_role',
+            'asset_type',
+            'asset_type__manufacturer',
+            'location',
+            'tenant',
+            'status',
+            'supplier',
+        ).prefetch_related('tags')
+        assets_table = tables.AssetTable(asset_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assets_table)
+        context['assets_table'] = assets_table
+
+        return context
+
+
 
 class DepreciationEditView(ObjectEditView):
     queryset = Depreciation.objects.all()

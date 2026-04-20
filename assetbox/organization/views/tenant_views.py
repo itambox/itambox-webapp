@@ -67,6 +67,20 @@ class TenantDetailView(ObjectDetailView):
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(consumables_table)
         context['consumables_table'] = consumables_table
 
+        # Component Catalog
+        from components.tables import ComponentTable
+        components_table = ComponentTable(tenant.components.select_related('manufacturer', 'category', 'tenant').prefetch_related('tags'), request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(components_table)
+        context['components_table'] = components_table
+
+        # Custody Policies
+        from compliance.models import CustodyTemplate
+        from compliance.tables import CustodyTemplateTable
+        custody_templates_qs = CustodyTemplate.objects.filter(tenant=tenant).select_related('tenant', 'tenant_group').prefetch_related('tags')
+        custody_templates_table = CustodyTemplateTable(custody_templates_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(custody_templates_table)
+        context['custody_templates_table'] = custody_templates_table
+
         licenses_table = LicenseTable(tenant.licenses.select_related('software__manufacturer', 'tenant'), request=self.request)
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(licenses_table)
         context['licenses_table'] = licenses_table
@@ -82,6 +96,8 @@ class TenantDetailView(ObjectDetailView):
         context['tenant_asset_count'] = tenant.assets.count()
         context['tenant_accessory_count'] = tenant.accessories.count()
         context['tenant_consumable_count'] = tenant.consumables.count()
+        context['tenant_component_count'] = tenant.components.count()
+        context['tenant_custody_count'] = custody_templates_qs.count()
         context['tenant_license_count'] = tenant.licenses.count()
         context['tenant_kit_count'] = tenant.kits.count()
         context['tenant_subscription_count'] = tenant.subscriptions_org.count()

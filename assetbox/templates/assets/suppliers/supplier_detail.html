@@ -18,6 +18,24 @@
             {% translate "Supplied Assets" %} <span class="badge bg-green-lt ms-2">{{ assets_table.rows|length }}</span>
         </a>
     </li>
+    <li class="nav-item" role="presentation">
+        <a href="#accessories" class="nav-link" data-bs-toggle="tab" role="tab">
+            <i class="mdi mdi-keyboard me-1 text-azure"></i>
+            {% translate "Accessories" %} <span class="badge bg-azure-lt ms-2">{{ accessories_table.rows|length }}</span>
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a href="#maintenances" class="nav-link" data-bs-toggle="tab" role="tab">
+            <i class="mdi mdi-wrench me-1 text-yellow"></i>
+            {% translate "Maintenances" %} <span class="badge bg-yellow-lt ms-2">{{ maintenances_table.rows|length }}</span>
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a href="#licenses" class="nav-link" data-bs-toggle="tab" role="tab">
+            <i class="mdi mdi-key-outline me-1 text-red"></i>
+            {% translate "Licenses" %} <span class="badge bg-red-lt ms-2">{{ licenses_table.rows|length }}</span>
+        </a>
+    </li>
 {% endblock extra_tabs %}
 
 {# Sidebar elements #}
@@ -45,4 +63,62 @@
             {% endif %}
         </div>
     </div>
+
+    {# Accessories Supplied Tab Pane #}
+    <div class="tab-pane fade" id="accessories" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">{% translate "Accessories Supplied by" %} {{ object.name }}</h3>
+            </div>
+            {% if accessories_table.rows %}
+                <div class="table-responsive">
+                    {% render_table accessories_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=accessories_table %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <p class="mb-0">{% translate "No accessories supplied by this supplier yet." %}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Maintenances Tab Pane #}
+    <div class="tab-pane fade" id="maintenances" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">{% translate "Maintenance Expenditures with" %} {{ object.name }}</h3>
+            </div>
+            {% if maintenances_table.rows %}
+                <div class="table-responsive">
+                    {% render_table maintenances_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=maintenances_table %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <p class="mb-0">{% translate "No maintenance logs recorded for this supplier yet." %}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Licenses Purchased Tab Pane #}
+    <div class="tab-pane fade" id="licenses" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">{% translate "Licenses Purchased from" %} {{ object.name }}</h3>
+            </div>
+            {% if licenses_table.rows %}
+                <div class="table-responsive">
+                    {% render_table licenses_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=licenses_table %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <p class="mb-0">{% translate "No licenses purchased from this supplier yet." %}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
 {% endblock extra_tab_panes %}
+

@@ -43,7 +43,7 @@ class AssetMaintenanceTable(BaseTable):
         return value or "\u2014"
 
 
-from .models import CustodyTemplate
+from .models import CustodyTemplate, CustodyReceipt
 
 class CustodyTemplateTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
@@ -58,3 +58,29 @@ class CustodyTemplateTable(BaseTable):
         model = CustodyTemplate
         fields = ('pk', 'name', 'tenant', 'tenant_group', 'signature_provider', 'is_active', 'actions')
         default_columns = ('pk', 'name', 'tenant', 'tenant_group', 'signature_provider', 'is_active', 'actions')
+
+
+class CustodyReceiptTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    asset = tables.LinkColumn('assets:asset_detail', args=[A('asset__pk')], accessor='asset', verbose_name='Asset')
+    holder = tables.LinkColumn('organization:assetholder_detail', args=[A('holder__pk')], accessor='holder', verbose_name='Holder')
+    custody_template = tables.LinkColumn('compliance:custodytemplate_detail', args=[A('custody_template_id')], accessor='custody_template.name', verbose_name='Template')
+    acceptance_status = tables.Column(verbose_name='Status')
+    signed_at = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name='Signed At')
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = CustodyReceipt
+        fields = ('pk', 'asset', 'holder', 'custody_template', 'acceptance_status', 'signed_at', 'actions')
+        default_columns = ('pk', 'asset', 'holder', 'custody_template', 'acceptance_status', 'signed_at', 'actions')
+
+    def render_acceptance_status(self, value):
+        badges = {
+            'pending': 'bg-warning text-warning-invert',
+            'accepted': 'bg-success text-success-invert',
+            'declined': 'bg-danger text-danger-invert',
+        }
+        badge_class = badges.get(value, 'bg-secondary')
+        from django.utils.html import format_html
+        return format_html('<span class="badge {}">{}</span>', badge_class, value.title())
+

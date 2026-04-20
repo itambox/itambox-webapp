@@ -138,6 +138,22 @@ class CustodyTemplateDetailView(ObjectDetailView):
     queryset = CustodyTemplate.objects.select_related('tenant', 'tenant_group').prefetch_related('tags')
     template_name = 'compliance/custodytemplates/custodytemplate_detail.html'
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        template = self.get_object()
+
+        from django_tables2 import RequestConfig
+        from assetbox.utils import get_paginate_count
+        from .tables import CustodyReceiptTable
+
+        receipts_qs = template.receipts.all().select_related('asset', 'holder', 'custody_template')
+        receipts_table = CustodyReceiptTable(receipts_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(receipts_table)
+        context['receipts_table'] = receipts_table
+
+        return context
+
+
 
 class CustodyTemplateEditView(ObjectEditView):
     queryset = CustodyTemplate.objects.all()

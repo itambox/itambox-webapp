@@ -52,7 +52,33 @@ class LicenseDetailView(ObjectDetailView):
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assignments_table)
         context['assignments_table'] = assignments_table
 
+        # Kits
+        from inventory.models import Kit
+        from inventory.tables import KitTable
+        kits_qs = Kit.objects.filter(items__license=license_obj).distinct().select_related('tenant')
+        kits_table = KitTable(kits_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(kits_table)
+        context['kits_table'] = kits_table
+
+        related_objects_list = []
+        assignment_count = assignments_qs.count()
+        if assignment_count:
+            related_objects_list.append({
+                'label': 'Seat Assignments',
+                'count': assignment_count,
+                'url': f"{reverse('licenses:license_detail', kwargs={'pk': license_obj.pk})}#assignments"
+            })
+        kit_count = kits_qs.count()
+        if kit_count:
+            related_objects_list.append({
+                'label': 'Kits',
+                'count': kit_count,
+                'url': f"{reverse('inventory:kit_list')}?license={license_obj.pk}"
+            })
+        context['related_objects_list'] = related_objects_list
+
         return context
+
 
 class LicenseEditView(ObjectEditView):
     queryset = License.objects.all()

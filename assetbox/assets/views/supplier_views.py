@@ -38,6 +38,30 @@ class SupplierDetailView(ObjectDetailView):
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assets_table)
         context['assets_table'] = assets_table
 
+        # Accessories Supplied
+        from inventory.models import Accessory
+        from inventory.tables import AccessoryTable
+        accessory_qs = Accessory.objects.filter(supplier=supplier).select_related('manufacturer', 'category', 'tenant').prefetch_related('tags')
+        accessories_table = AccessoryTable(accessory_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(accessories_table)
+        context['accessories_table'] = accessories_table
+
+        # Maintenance Expenditures
+        from compliance.models import AssetMaintenance
+        from compliance.tables import AssetMaintenanceTable
+        maintenance_qs = AssetMaintenance.objects.filter(supplier=supplier).select_related('asset', 'supplier')
+        maintenances_table = AssetMaintenanceTable(maintenance_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(maintenances_table)
+        context['maintenances_table'] = maintenances_table
+
+        # Licenses Purchased
+        from licenses.models import License
+        from licenses.tables import LicenseTable
+        license_qs = License.objects.filter(supplier=supplier).select_related('software', 'tenant').prefetch_related('tags')
+        licenses_table = LicenseTable(license_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(licenses_table)
+        context['licenses_table'] = licenses_table
+
         related_objects_list = []
         asset_count = supplier_assets.count()
         if asset_count:
@@ -46,8 +70,30 @@ class SupplierDetailView(ObjectDetailView):
                 'count': asset_count,
                 'url': f"{reverse('assets:asset_list')}?supplier={supplier.slug}"
             })
+        accessory_count = accessory_qs.count()
+        if accessory_count:
+            related_objects_list.append({
+                'label': 'Accessories',
+                'count': accessory_count,
+                'url': f"{reverse('inventory:accessory_list')}?supplier={supplier.slug}"
+            })
+        maintenance_count = maintenance_qs.count()
+        if maintenance_count:
+            related_objects_list.append({
+                'label': 'Maintenances',
+                'count': maintenance_count,
+                'url': f"{reverse('compliance:assetmaintenance_list')}?supplier={supplier.slug}"
+            })
+        license_count = license_qs.count()
+        if license_count:
+            related_objects_list.append({
+                'label': 'Licenses',
+                'count': license_count,
+                'url': f"{reverse('licenses:license_list')}?supplier={supplier.slug}"
+            })
         context['related_objects_list'] = related_objects_list
         return context
+
 
 
 class SupplierEditView(ObjectEditView):

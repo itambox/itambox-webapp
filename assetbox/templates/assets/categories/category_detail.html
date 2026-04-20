@@ -19,9 +19,21 @@
         </a>
     </li>
     <li class="nav-item" role="presentation">
+        <a href="#components" class="nav-link" data-bs-toggle="tab" role="tab">
+            <i class="mdi mdi-cpu me-1 text-orange"></i>
+            {% translate "Components" %} <span class="badge bg-orange-lt ms-2">{{ components_table.rows|length }}</span>
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
         <a href="#accessories" class="nav-link" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-purple" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7h3a1 1 0 0 0 1 -1v-1a2 2 0 0 1 4 0v1a1 1 0 0 0 1 1h3a1 1 0 0 1 1 1v3a1 1 0 0 0 1 1h1a2 2 0 0 1 0 4h-1a1 1 0 0 0 -1 1v3a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-1a2 2 0 0 0 -4 0v1a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1v-1a2 2 0 0 0 0 -4v-1a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1" /></svg>
             {% translate "Accessories" %} <span class="badge bg-purple-lt ms-2">{{ accessories_table.rows|length }}</span>
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a href="#consumables" class="nav-link" data-bs-toggle="tab" role="tab">
+            <i class="mdi mdi-layers-outline me-1 text-yellow"></i>
+            {% translate "Consumables" %} <span class="badge bg-yellow-lt ms-2">{{ consumables_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
@@ -73,6 +85,44 @@
                 <div class="card-body py-5 text-muted text-center">
                     <i class="mdi mdi-puzzle-outline text-muted mb-2"></i>
                     <p class="mb-0">{% translate "No accessories registered under this notification category yet." %}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Components Tab Pane #}
+    <div class="tab-pane fade" id="components" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">{% translate "Components Scoped under" %} {{ object.name }}</h3>
+            </div>
+            {% if components_table.rows %}
+                <div class="table-responsive">
+                    {% render_table components_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=components_table %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <p class="mb-0">{% translate "No components registered under this category yet." %}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Consumables Tab Pane #}
+    <div class="tab-pane fade" id="consumables" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">{% translate "Consumables Scoped under" %} {{ object.name }}</h3>
+            </div>
+            {% if consumables_table.rows %}
+                <div class="table-responsive">
+                    {% render_table consumables_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=consumables_table %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <p class="mb-0">{% translate "No consumables registered under this category yet." %}</p>
                 </div>
             {% endif %}
         </div>

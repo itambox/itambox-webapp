@@ -116,6 +116,36 @@ class AssetDetailView(ObjectDetailView):
         RequestConfig(self.request, paginate={'per_page': 10}).configure(con_table)
         context['consumable_table'] = con_table
 
+        # Requests
+        from ..models import AssetRequest
+        req_qs = AssetRequest.objects.filter(asset=asset).select_related('requester', 'asset', 'asset_type')
+        requests_table = tables.AssetRequestTable(req_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': 10}).configure(requests_table)
+        context['requests_table'] = requests_table
+
+        # Audits
+        from ..models import AssetAudit
+        audit_qs = AssetAudit.objects.filter(asset=asset).select_related('session', 'auditor', 'location', 'status')
+        audits_table = tables.AssetAuditTable(audit_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': 10}).configure(audits_table)
+        context['audits_table'] = audits_table
+
+        # Custody Receipts
+        from compliance.models import CustodyReceipt
+        from compliance.tables import CustodyReceiptTable
+        receipt_qs = CustodyReceipt.objects.filter(asset=asset).select_related('asset', 'holder', 'custody_template')
+        receipts_table = CustodyReceiptTable(receipt_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': 10}).configure(receipts_table)
+        context['receipts_table'] = receipts_table
+
+        # License Seat Assignments
+        from licenses.models import LicenseSeatAssignment
+        from licenses.tables import LicenseSeatAssignmentTable
+        license_qs = LicenseSeatAssignment.objects.filter(asset=asset).select_related('license', 'asset', 'assigned_holder')
+        license_seats_table = LicenseSeatAssignmentTable(license_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': 10}).configure(license_seats_table)
+        context['license_seats_table'] = license_seats_table
+
         context['eol_date'] = asset.eol_date
         context['time_to_eol'] = asset.time_to_eol
         context['total_cost_of_ownership'] = asset.total_cost_of_ownership

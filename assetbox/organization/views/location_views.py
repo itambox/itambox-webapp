@@ -47,6 +47,47 @@ class LocationDetailView(ObjectDetailView):
 
         assets_table = AssetTable(location.assets.all(), request=self.request)
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assets_table)
+        context['assets_table'] = assets_table
+
+        # Accessory Stocks
+        from inventory.models import AccessoryStock
+        from inventory.tables import AccessoryStockTable
+        acc_stock_qs = AccessoryStock.objects.filter(location=location).select_related('accessory', 'location')
+        accessory_stocks_table = AccessoryStockTable(acc_stock_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(accessory_stocks_table)
+        context['accessory_stocks_table'] = accessory_stocks_table
+
+        # Consumable Stocks
+        from inventory.models import ConsumableStock
+        from inventory.tables import ConsumableStockTable
+        con_stock_qs = ConsumableStock.objects.filter(location=location).select_related('consumable', 'location')
+        consumable_stocks_table = ConsumableStockTable(con_stock_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(consumable_stocks_table)
+        context['consumable_stocks_table'] = consumable_stocks_table
+
+        # Component Stocks
+        from components.models import ComponentStock
+        from components.tables import ComponentStockTable
+        comp_stock_qs = ComponentStock.objects.filter(location=location).select_related('component', 'location')
+        component_stocks_table = ComponentStockTable(comp_stock_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(component_stocks_table)
+        context['component_stocks_table'] = component_stocks_table
+
+        # Historical Checkout Log
+        from assets.models import AssetAssignment
+        from organization.tables import AssetAssignmentTable
+        asset_assignments_qs = AssetAssignment.objects.filter(assigned_location=location).select_related('asset', 'assigned_user', 'assigned_location', 'checked_out_by').prefetch_related('tags')
+        asset_assignments_table = AssetAssignmentTable(asset_assignments_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(asset_assignments_table)
+        context['asset_assignments_table'] = asset_assignments_table
+
+        # Audit Campaigns
+        from assets.models import AuditSession
+        from assets.views.audit_views import AuditSessionTable
+        audits_qs = AuditSession.objects.filter(location=location).select_related('location', 'created_by')
+        audits_table = AuditSessionTable(audits_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(audits_table)
+        context['audits_table'] = audits_table
 
         related_objects_list = []
         asset_count = location.assets.count()
@@ -63,10 +104,45 @@ class LocationDetailView(ObjectDetailView):
                 'count': child_count,
                 'url': f"{reverse('organization:location_list')}?parent={location.slug}"
             })
+        accessory_count = acc_stock_qs.count()
+        if accessory_count:
+            related_objects_list.append({
+                'label': 'Accessory Stocks',
+                'count': accessory_count,
+                'url': f"{reverse('inventory:accessorystock_list')}?location={location.slug}"
+            })
+        consumable_count = con_stock_qs.count()
+        if consumable_count:
+            related_objects_list.append({
+                'label': 'Consumable Stocks',
+                'count': consumable_count,
+                'url': f"{reverse('inventory:consumablestock_list')}?location={location.slug}"
+            })
+        component_count = comp_stock_qs.count()
+        if component_count:
+            related_objects_list.append({
+                'label': 'Component Stocks',
+                'count': component_count,
+                'url': f"{reverse('components:componentstock_list')}?location={location.slug}"
+            })
+        checkout_count = asset_assignments_qs.count()
+        if checkout_count:
+            related_objects_list.append({
+                'label': 'Checkout Log',
+                'count': checkout_count,
+                'url': f"{reverse('organization:location_detail', kwargs={'pk': location.pk})}#checkout-log"
+            })
+        audit_count = audits_qs.count()
+        if audit_count:
+            related_objects_list.append({
+                'label': 'Audit Campaigns',
+                'count': audit_count,
+                'url': f"{reverse('assets:auditsession_list')}?location={location.slug}"
+            })
 
-        context['assets_table'] = assets_table
         context['related_objects_list'] = related_objects_list
         return context
+
 
 
 class LocationEditView(QuickAddMixin, ObjectEditView):

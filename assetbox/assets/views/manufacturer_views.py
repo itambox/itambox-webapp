@@ -67,6 +67,39 @@ class ManufacturerDetailView(ObjectDetailView):
         context['asset_types_table'] = asset_types_table
         context['assets_table'] = assets_table
         context['related_objects_list'] = related_objects_list
+
+        # Components
+        from components.models import Component
+        from components.tables import ComponentTable
+        comp_qs = Component.objects.filter(manufacturer=manufacturer).select_related('category', 'tenant')
+        components_table = ComponentTable(comp_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(components_table)
+        context['components_table'] = components_table
+
+        # Accessories
+        from inventory.models import Accessory
+        from inventory.tables import AccessoryTable
+        acc_qs = Accessory.objects.filter(manufacturer=manufacturer).select_related('category', 'tenant')
+        accessories_table = AccessoryTable(acc_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(accessories_table)
+        context['accessories_table'] = accessories_table
+
+        # Consumables
+        from inventory.models import Consumable
+        from inventory.tables import ConsumableTable
+        con_qs = Consumable.objects.filter(manufacturer=manufacturer).select_related('category', 'tenant')
+        consumables_table = ConsumableTable(con_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(consumables_table)
+        context['consumables_table'] = consumables_table
+
+        # Software products
+        from software.models import Software
+        from software.tables import SoftwareTable
+        sw_qs = Software.objects.filter(manufacturer=manufacturer).select_related('manufacturer').prefetch_related('tags')
+        software_table = SoftwareTable(sw_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(software_table)
+        context['software_table'] = software_table
+
         return context
 
 

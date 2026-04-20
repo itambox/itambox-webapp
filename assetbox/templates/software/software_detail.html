@@ -18,6 +18,12 @@
             {% translate "Installed Instances" %} <span class="badge bg-purple-lt ms-2">{{ instances_table.rows|length }}</span>
         </a>
     </li>
+    <li class="nav-item" role="presentation">
+        <a href="#licenses" class="nav-link" data-bs-toggle="tab" role="tab">
+            <i class="mdi mdi-key-outline me-1 text-blue"></i>
+            {% translate "Licenses & Entitlements" %} <span class="badge bg-blue-lt ms-2">{{ licenses_table.rows|length }}</span>
+        </a>
+    </li>
 {% endblock extra_tabs %}
 
 {# Object details rendered via panel layout #}
@@ -39,6 +45,25 @@
                 <div class="card-body py-5 text-muted text-center">
                     <i class="mdi mdi-checkbox-outline text-muted mb-2"></i>
                     <p class="mb-0">{% translate "This software catalog item is not currently installed on any asset." %}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Licenses Tab Pane #}
+    <div class="tab-pane fade" id="licenses" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">{% translate "Associated Software Licenses & Entitlements" %}</h3>
+            </div>
+            {% if licenses_table.rows %}
+                <div class="table-responsive">
+                    {% render_table licenses_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=licenses_table %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <p class="mb-0">{% translate "No software license entitlements created for this software product yet." %}</p>
                 </div>
             {% endif %}
         </div>

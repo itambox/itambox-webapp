@@ -42,6 +42,14 @@ class TenantGroupDetailView(ObjectDetailView):
         tenants_table = TenantTable(tenantgroup.tenants.all(), request=self.request)
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(tenants_table)
 
+        # Custody Templates
+        from compliance.models import CustodyTemplate
+        from compliance.tables import CustodyTemplateTable
+        custody_templates_qs = CustodyTemplate.objects.filter(tenant_group=tenantgroup).select_related('tenant', 'tenant_group').prefetch_related('tags')
+        custody_templates_table = CustodyTemplateTable(custody_templates_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(custody_templates_table)
+        context['custody_templates_table'] = custody_templates_table
+
         related_objects_list = []
         tenant_count = tenantgroup.tenants.count()
         if tenant_count:
@@ -57,6 +65,13 @@ class TenantGroupDetailView(ObjectDetailView):
                 'count': child_count,
                 'url': f"{reverse('organization:tenantgroup_list')}?parent={tenantgroup.slug}"
             })
+        custody_count = custody_templates_qs.count()
+        if custody_count:
+            related_objects_list.append({
+                'label': 'Custody EULAs',
+                'count': custody_count,
+                'url': f"{reverse('compliance:custodytemplate_list')}?tenant_group={tenantgroup.slug}"
+            })
 
         context['tenants_table'] = tenants_table
         context['related_objects_list'] = related_objects_list
@@ -66,6 +81,7 @@ class TenantGroupDetailView(ObjectDetailView):
             context['children_table'] = TenantGroupTable(children, request=self.request)
 
         return context
+
 
 
 class TenantGroupEditView(ObjectEditView):
