@@ -41,11 +41,9 @@ class ProviderDetailView(ObjectDetailView):
         context = super().get_context_data(**kwargs)
         provider = self.get_object()
 
-        subscriptions_qs = provider.subscriptions.select_related('tenant', 'owner')
+        subscriptions_qs = provider.subscriptions.all()
         context['subscriptions_table'] = tables.SubscriptionTable(subscriptions_qs, request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(
-            context['subscriptions_table']
-        )
+        context['subscriptions_table'].configure(self.request)
         context['subscription_count'] = subscriptions_qs.count()
         context['active_subscription_count'] = subscriptions_qs.filter(status='active').count()
         return context
@@ -111,9 +109,7 @@ class SubscriptionDetailView(ObjectDetailView):
             ).get(assignment.object_id)
 
         context['assignments_table'] = tables.SubscriptionAssignmentTable(assignments_qs, request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(
-            context['assignments_table']
-        )
+        context['assignments_table'].configure(self.request)
         context['assignment_count'] = assignments_qs.count()
         return context
 

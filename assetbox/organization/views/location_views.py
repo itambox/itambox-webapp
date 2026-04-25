@@ -46,47 +46,47 @@ class LocationDetailView(ObjectDetailView):
         location = self.get_object()
 
         assets_table = AssetTable(location.assets.all(), request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assets_table)
+        assets_table.configure(self.request)
         context['assets_table'] = assets_table
 
         # Accessory Stocks
         from inventory.models import AccessoryStock
         from inventory.tables import AccessoryStockTable
-        acc_stock_qs = AccessoryStock.objects.filter(location=location).select_related('accessory', 'location')
+        acc_stock_qs = AccessoryStock.objects.filter(location=location)
         accessory_stocks_table = AccessoryStockTable(acc_stock_qs, request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(accessory_stocks_table)
+        accessory_stocks_table.configure(self.request)
         context['accessory_stocks_table'] = accessory_stocks_table
 
         # Consumable Stocks
         from inventory.models import ConsumableStock
         from inventory.tables import ConsumableStockTable
-        con_stock_qs = ConsumableStock.objects.filter(location=location).select_related('consumable', 'location')
+        con_stock_qs = ConsumableStock.objects.filter(location=location)
         consumable_stocks_table = ConsumableStockTable(con_stock_qs, request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(consumable_stocks_table)
+        consumable_stocks_table.configure(self.request)
         context['consumable_stocks_table'] = consumable_stocks_table
 
         # Component Stocks
         from components.models import ComponentStock
         from components.tables import ComponentStockTable
-        comp_stock_qs = ComponentStock.objects.filter(location=location).select_related('component', 'location')
+        comp_stock_qs = ComponentStock.objects.filter(location=location)
         component_stocks_table = ComponentStockTable(comp_stock_qs, request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(component_stocks_table)
+        component_stocks_table.configure(self.request)
         context['component_stocks_table'] = component_stocks_table
 
         # Historical Checkout Log
         from assets.models import AssetAssignment
         from organization.tables import AssetAssignmentTable
-        asset_assignments_qs = AssetAssignment.objects.filter(assigned_location=location).select_related('asset', 'assigned_user', 'assigned_location', 'checked_out_by').prefetch_related('tags')
+        asset_assignments_qs = AssetAssignment.objects.filter(assigned_location=location)
         asset_assignments_table = AssetAssignmentTable(asset_assignments_qs, request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(asset_assignments_table)
+        asset_assignments_table.configure(self.request)
         context['asset_assignments_table'] = asset_assignments_table
 
         # Audit Campaigns
         from assets.models import AuditSession
         from assets.views.audit_views import AuditSessionTable
-        audits_qs = AuditSession.objects.filter(location=location).select_related('location', 'created_by')
+        audits_qs = AuditSession.objects.filter(location=location)
         audits_table = AuditSessionTable(audits_qs, request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(audits_table)
+        audits_table.configure(self.request)
         context['audits_table'] = audits_table
 
         related_objects_list = []

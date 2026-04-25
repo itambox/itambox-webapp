@@ -42,14 +42,14 @@ class ComponentDetailView(ObjectDetailView):
         component = self.get_object()
 
         stocks_table = ComponentStockTable(component.stocks.all(), request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(stocks_table)
+        stocks_table.configure(self.request)
         context['stocks_table'] = stocks_table
 
         allocations_table = ComponentAllocationTable(
-            component.allocations.filter(deleted_at__isnull=True).select_related('asset', 'from_location'),
+            component.allocations.filter(deleted_at__isnull=True),
             request=self.request
         )
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(allocations_table)
+        allocations_table.configure(self.request)
         context['allocations_table'] = allocations_table
 
         return context

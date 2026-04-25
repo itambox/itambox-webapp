@@ -160,12 +160,12 @@ class AssetAssignmentTable(BaseTable):
 
     def render_checkin_btn(self, record):
         request = getattr(self, 'request', None)
-        if not request or not request.user.has_perm('assets.change_asset', record.asset):
+        if not request or not self.has_perm(request.user, 'assets.change_asset', record.asset):
             return mark_safe('<span class="text-muted small">—</span>')
         
         url = reverse('assets:asset_checkin', kwargs={'pk': record.asset.pk})
         return format_html(
-            '<div class="d-inline-block"><a class="btn btn-sm btn-outline-success text-success" hx-post="{}" hx-swap="none" href="#">'
+            '<div class="d-inline-block"><a class="btn btn-sm btn-outline-success text-success" hx-post="{}" hx-swap="none" href="javascript:void(0)">'
             '<i class="mdi mdi-keyboard-return"></i> Check-in</a></div>', url
         )
 

@@ -31,13 +31,13 @@
 {# --- Tabs Hook --- #}
 {% block extra_tabs %}
     <li class="nav-item" role="presentation">
-        <a href="#seats" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=seats" class="nav-link {% if request.GET.tab == 'seats' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#seats" role="tab" aria-selected="{% if request.GET.tab == 'seats' %}true{% else %}false{% endif %}">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-purple" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M6 18a6 6 0 0 1 12 0" /></svg>
             {% translate "Seat Assignments" %} <span class="badge bg-purple-lt ms-2">{{ assignments_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="#kits" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=kits" class="nav-link {% if request.GET.tab == 'kits' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#kits" role="tab" aria-selected="{% if request.GET.tab == 'kits' %}true{% else %}false{% endif %}">
             <i class="mdi mdi-package-variant-closed me-1 text-orange"></i>
             {% translate "Kit Assignments" %} <span class="badge bg-orange-lt ms-2">{{ kits_table.rows|length }}</span>
         </a>
@@ -47,7 +47,7 @@
 {# --- Extra Tab Panes --- #}
 {% block extra_tab_panes %}
     {# Assignments Tab Pane #}
-    <div class="tab-pane fade" id="seats" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'seats' %}show active{% endif %}" id="seats" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Active License Seat Allocations" %}</h3>
@@ -56,7 +56,7 @@
                 <div class="table-responsive">
                     {% render_table assignments_table %}
                 </div>
-                {% include 'generic/includes/table_pagination.html' with table=assignments_table %}
+                {% include 'generic/includes/table_pagination.html' with table=assignments_table tab="seats" %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <i class="mdi mdi-account-multiple-minus-outline text-muted mb-2"></i>
@@ -67,7 +67,7 @@
     </div>
 
     {# Kit Assignments Tab Pane #}
-    <div class="tab-pane fade" id="kits" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'kits' %}show active{% endif %}" id="kits" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Kits Allocating this License" %}</h3>
@@ -76,7 +76,7 @@
                 <div class="table-responsive">
                     {% render_table kits_table %}
                 </div>
-                {% include 'generic/includes/table_pagination.html' with table=kits_table %}
+                {% include 'generic/includes/table_pagination.html' with table=kits_table tab="kits" %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <p class="mb-0">{% translate "No kits allocate this license." %}</p>

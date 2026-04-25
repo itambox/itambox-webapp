@@ -36,7 +36,7 @@
 
 {# Render pagination controls #}
 {% if table.page %}
-    {% include 'global_includes/pagination_links.html' with page_obj=table.page %}
+    {% include 'global_includes/pagination_links.html' with page_obj=table.page hx_target="#object-list-dynamic-content" %}
 {% endif %}
 
 {# --- Out-Of-Band Swaps --- #}

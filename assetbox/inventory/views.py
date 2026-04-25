@@ -54,17 +54,17 @@ class AccessoryDetailView(ObjectDetailView):
         accessory = self.get_object()
 
         assignments_table = tables.AccessoryAssignmentTable(accessory.assignments.all(), request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assignments_table)
+        assignments_table.configure(self.request)
         context['assignments_table'] = assignments_table
 
         stocks_table = tables.AccessoryStockTable(accessory.stocks.all(), request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(stocks_table)
+        stocks_table.configure(self.request)
         context['stocks_table'] = stocks_table
 
         # Kits
-        kits_qs = Kit.objects.filter(items__accessory=accessory).distinct().select_related('tenant')
+        kits_qs = Kit.objects.filter(items__accessory=accessory).distinct()
         kits_table = tables.KitTable(kits_qs, request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(kits_table)
+        kits_table.configure(self.request)
         context['kits_table'] = kits_table
 
         return context
@@ -126,17 +126,17 @@ class ConsumableDetailView(ObjectDetailView):
         consumable = self.get_object()
 
         consumptions_table = tables.ConsumableAssignmentTable(consumable.consumptions.all(), request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(consumptions_table)
+        consumptions_table.configure(self.request)
         context['consumptions_table'] = consumptions_table
 
         stocks_table = tables.ConsumableStockTable(consumable.stocks.all(), request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(stocks_table)
+        stocks_table.configure(self.request)
         context['stocks_table'] = stocks_table
 
         # Kits
-        kits_qs = Kit.objects.filter(items__consumable=consumable).distinct().select_related('tenant')
+        kits_qs = Kit.objects.filter(items__consumable=consumable).distinct()
         kits_table = tables.KitTable(kits_qs, request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(kits_table)
+        kits_table.configure(self.request)
         context['kits_table'] = kits_table
 
         return context

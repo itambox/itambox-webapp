@@ -35,7 +35,7 @@ class ContactDetailView(ObjectDetailView):
         contact = self.get_object()
 
         assignments_table = ContactAssignmentTable(contact.assignments.all(), request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assignments_table)
+        assignments_table.configure(self.request)
 
         context['assignments_table'] = assignments_table
         return context

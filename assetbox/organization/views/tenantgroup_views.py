@@ -40,14 +40,14 @@ class TenantGroupDetailView(ObjectDetailView):
         tenantgroup = self.get_object()
 
         tenants_table = TenantTable(tenantgroup.tenants.all(), request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(tenants_table)
+        tenants_table.configure(self.request)
 
         # Custody Templates
         from compliance.models import CustodyTemplate
         from compliance.tables import CustodyTemplateTable
-        custody_templates_qs = CustodyTemplate.objects.filter(tenant_group=tenantgroup).select_related('tenant', 'tenant_group').prefetch_related('tags')
+        custody_templates_qs = CustodyTemplate.objects.filter(tenant_group=tenantgroup)
         custody_templates_table = CustodyTemplateTable(custody_templates_qs, request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(custody_templates_table)
+        custody_templates_table.configure(self.request)
         context['custody_templates_table'] = custody_templates_table
 
         related_objects_list = []

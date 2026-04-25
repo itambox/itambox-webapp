@@ -8,6 +8,38 @@ from ..filters import (
 
 class AssetFilterForm(FilterForm):
     filterset_class = AssetFilterSet
+    ajax_fields = {
+        'location': {
+            'url_name': 'api:organization_api:location-list',
+            'value_field': 'id',
+            'label_field': 'name',
+        },
+        'asset_type': {
+            'url_name': 'api:assets_api:assettype-list',
+            'value_field': 'id',
+            'label_field': 'name',
+        },
+        'manufacturer': {
+            'url_name': 'api:assets_api:manufacturer-list',
+            'value_field': 'id',
+            'label_field': 'name',
+        },
+        'supplier': {
+            'url_name': 'api:assets_api:supplier-list',
+            'value_field': 'id',
+            'label_field': 'name',
+        },
+        'tenant': {
+            'url_name': 'api:organization_api:tenant-list',
+            'value_field': 'id',
+            'label_field': 'name',
+        },
+        'tags': {
+            'url_name': 'api:extras_api:tag-list',
+            'value_field': 'slug',
+            'label_field': 'name',
+        },
+     }
 
 class AssetRoleFilterForm(FilterForm):
     filterset_class = AssetRoleFilterSet

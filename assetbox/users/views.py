@@ -43,7 +43,7 @@ class UserProfileView(LoginRequiredMixin, BaseHTMXView, UpdateView):
         context['user_groups'] = self.request.user.groups.all()
         activity_qs = ObjectChange.objects.filter(user=self.request.user)[:15]
         activity_table = ObjectChangeTable(activity_qs, request=self.request)
-        RequestConfig(self.request, paginate=False).configure(activity_table)
+        activity_table.configure(self.request, paginate=False)
         context['activity_table'] = activity_table
         context['title'] = _("User Profile")
         context['breadcrumbs'] = [

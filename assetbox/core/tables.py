@@ -353,6 +353,7 @@ class BaseTable(tables.Table):
 
     class Meta:
         model = None
+        template_name = 'global_includes/htmx_table.html'
         attrs = {
             'class': 'table table-hover table-vcenter card-table',
             'thead': {
@@ -536,7 +537,32 @@ class BaseTable(tables.Table):
 
 
 
-    def configure(self, request):
+    def has_perm(self, user, perm, record=None):
+        if not user:
+            return False
+        if record is None:
+            return user.has_perm(perm)
+
+        # Extract tenant id to cache per tenant
+        tenant_id = getattr(record, 'tenant_id', None)
+        if tenant_id is None:
+            tenant = getattr(record, 'tenant', None)
+            if tenant:
+                tenant_id = getattr(tenant, 'pk', None)
+            elif record.__class__.__name__.lower() == 'tenant':
+                tenant_id = record.pk
+
+        # Use tenant ID or record ID if no tenant exists
+        if tenant_id is not None:
+            cache_key = f'_perm_cache_t{tenant_id}_{perm}'
+        else:
+            cache_key = f'_perm_cache_r{record.pk}_{perm}'
+
+        if not hasattr(self, cache_key):
+            setattr(self, cache_key, user.has_perm(perm, record))
+        return getattr(self, cache_key)
+
+    def configure(self, request, paginate=True):
         columns = None
         ordering = None
 
@@ -550,7 +576,9 @@ class BaseTable(tables.Table):
             try:
                 from django.apps import apps
                 UserPreference = apps.get_model('users', 'UserPreference')
-                prefs = UserPreference.objects.filter(user=request.user).first()
+                if not hasattr(request, '_user_preferences_cache'):
+                    request._user_preferences_cache = UserPreference.objects.filter(user=request.user).first()
+                prefs = request._user_preferences_cache
                 if prefs and prefs.data:
                     model = getattr(self.Meta, 'model', None)
                     if model:
@@ -584,11 +612,14 @@ class BaseTable(tables.Table):
         if ordering is not None:
             self.order_by = ordering
 
-        paginate = {
-            'paginator_class': EnhancedPaginator,
-            'per_page': get_paginate_count(request)
-        }
-        tables.RequestConfig(request, paginate).configure(self)
+        if paginate:
+            paginate_config = {
+                'paginator_class': EnhancedPaginator,
+                'per_page': get_paginate_count(request)
+            }
+        else:
+            paginate_config = False
+        tables.RequestConfig(request, paginate_config).configure(self)
 
 
 class ObjectChangeTable(BaseTable):

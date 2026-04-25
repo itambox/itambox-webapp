@@ -44,17 +44,17 @@ class SoftwareDetailView(ObjectDetailView):
         from django_tables2 import RequestConfig
         from assetbox.utils import get_paginate_count
 
-        instances_qs = InstalledSoftware.objects.filter(software=software).select_related('asset', 'asset__asset_type', 'asset__asset_type__manufacturer')
+        instances_qs = InstalledSoftware.objects.filter(software=software)
         instances_table = InstalledSoftwareTable(instances_qs)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(instances_table)
+        instances_table.configure(self.request)
         context['instances_table'] = instances_table
 
         # Software Licenses & Entitlements
         from licenses.models import License
         from licenses.tables import LicenseTable
-        license_qs = License.objects.filter(software=software).select_related('software', 'tenant').prefetch_related('tags')
+        license_qs = License.objects.filter(software=software)
         licenses_table = LicenseTable(license_qs, request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(licenses_table)
+        licenses_table.configure(self.request)
         context['licenses_table'] = licenses_table
 
         related_objects_list = []

@@ -191,6 +191,25 @@ class ObjectDetailView(TenantScopingViewMixin, LoginRequiredMixin, BaseHTMXView,
     detail_page_body_partial_name = "htmx/detail_page_wrapper.html"
     layout = None
 
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        
+        tab = request.GET.get('tab')
+        if tab and request.headers.get('HX-Request'):
+            # Try replacing hyphens with underscores
+            tab_clean = tab.replace('-', '_')
+            tab_method_name = f"get_tab_{tab_clean}"
+            if hasattr(self, tab_method_name):
+                return getattr(self, tab_method_name)(request)
+            
+            # Try removing hyphens entirely (e.g., asset-holders -> assetholders)
+            tab_flat = tab.replace('-', '')
+            tab_method_name_flat = f"get_tab_{tab_flat}"
+            if hasattr(self, tab_method_name_flat):
+                return getattr(self, tab_method_name_flat)(request)
+                
+        return super().get(request, *args, **kwargs)
+
     def get_template_names(self):
         if self.template_name and self.template_name != 'generic/object_detail.html':
             return [self.template_name]

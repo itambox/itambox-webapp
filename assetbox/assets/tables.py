@@ -83,19 +83,19 @@ class AssetTable(BaseTable): # Inherit from BaseTable
 
     def render_checkout_checkin(self, record):
         request = getattr(self, 'request', None)
-        if not request or not request.user.has_perm('assets.change_asset', record):
+        if not request or not self.has_perm(request.user, 'assets.change_asset', record):
             return mark_safe('<span class="text-muted small">—</span>')
         
         if record.active_assignment:
             url = reverse('assets:asset_checkin', kwargs={'pk': record.pk})
             return format_html(
-                '<div class="d-inline-block"><a class="btn btn-sm btn-outline-success text-success" hx-post="{}" hx-swap="none" href="#">'
+                '<div class="d-inline-block"><a class="btn btn-sm btn-outline-success text-success" hx-post="{}" hx-swap="none" href="javascript:void(0)">'
                 '<i class="mdi mdi-keyboard-return"></i> Check-in</a></div>', url
             )
         else:
             url = reverse('assets:asset_checkout_modal', kwargs={'pk': record.pk})
             return format_html(
-                '<div class="d-inline-block"><a class="btn btn-sm btn-outline-primary" hx-get="{}" hx-target="#modal-placeholder" hx-swap="innerHTML" href="#">'
+                '<div class="d-inline-block"><a class="btn btn-sm btn-outline-primary" hx-get="{}" hx-target="#modal-placeholder" hx-swap="innerHTML" href="javascript:void(0)">'
                 '<i class="mdi mdi-keyboard-tab-reverse"></i> Check-out</a></div>', url
             )
 
@@ -104,9 +104,9 @@ class AssetTable(BaseTable): # Inherit from BaseTable
         if not request:
             return ""
 
-        can_edit = request.user.has_perm('assets.change_asset', record)
-        can_delete = request.user.has_perm('assets.delete_asset', record)
-        can_clone = request.user.has_perm('assets.add_asset', record)
+        can_edit = self.has_perm(request.user, 'assets.change_asset', record)
+        can_delete = self.has_perm(request.user, 'assets.delete_asset', record)
+        can_clone = self.has_perm(request.user, 'assets.add_asset', record)
         
         if not can_edit and not can_delete and not can_clone:
             return ""
@@ -117,20 +117,24 @@ class AssetTable(BaseTable): # Inherit from BaseTable
             clone_url = reverse('assets:asset_clone', kwargs={'pk': record.pk})
             html += f'<a class="btn btn-sm btn-warning" href="{clone_url}" title="Copy/Clone"><i class="mdi mdi-content-copy"></i></a>'
             
-        if can_edit or can_delete:
-            html += '<span class="btn-group dropdown">'
-            if can_edit:
-                edit_url = reverse('assets:asset_update', kwargs={'pk': record.pk})
-                html += f'<a class="btn btn-sm btn-primary" href="{edit_url}" title="Edit Details"><i class="mdi mdi-pencil-outline"></i></a>'
-            
-            html += '<a class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="padding-left: 2px"><span class="visually-hidden">Toggle Dropdown</span></a>'
-            html += '<ul class="dropdown-menu dropdown-menu-end">'
-            
-            if can_delete:
-                del_url = reverse('assets:asset_delete', kwargs={'pk': record.pk})
-                html += f'<li><a class="dropdown-item text-danger" href="{del_url}"><i class="mdi mdi-trash-can-outline me-1"></i>Delete</a></li>'
-            
-            html += '</ul></span>'
+        if can_edit and can_delete:
+            edit_url = reverse('assets:asset_update', kwargs={'pk': record.pk})
+            del_url = reverse('assets:asset_delete', kwargs={'pk': record.pk})
+            html += (
+                f'<span class="btn-group dropdown">'
+                f'<a class="btn btn-sm btn-primary" href="{edit_url}" title="Edit Details"><i class="mdi mdi-pencil-outline"></i></a>'
+                f'<a class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="padding-left: 2px">'
+                f'<span class="visually-hidden">Toggle Dropdown</span></a>'
+                f'<ul class="dropdown-menu dropdown-menu-end">'
+                f'<li><a class="dropdown-item text-danger" href="{del_url}"><i class="mdi mdi-trash-can-outline me-1"></i>Delete</a></li>'
+                f'</ul></span>'
+            )
+        elif can_edit:
+            edit_url = reverse('assets:asset_update', kwargs={'pk': record.pk})
+            html += f'<a class="btn btn-sm btn-primary" href="{edit_url}" title="Edit Details"><i class="mdi mdi-pencil-outline"></i></a>'
+        elif can_delete:
+            del_url = reverse('assets:asset_delete', kwargs={'pk': record.pk})
+            html += f'<a class="btn btn-sm btn-danger" href="{del_url}" title="Delete"><i class="mdi mdi-trash-can-outline"></i></a>'
             
         html += '</div>'
         return mark_safe(html)

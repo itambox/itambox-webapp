@@ -70,7 +70,9 @@ def get_paginate_count(request):
 
     if request.user.is_authenticated:
         try:
-            prefs = UserPreference.objects.filter(user=request.user).first()
+            if not hasattr(request, '_user_preferences_cache'):
+                request._user_preferences_cache = UserPreference.objects.filter(user=request.user).first()
+            prefs = request._user_preferences_cache
             if prefs and prefs.data:
                 per_page = prefs.data.get('pagination', {}).get('per_page', DEFAULT_PAGINATE_COUNT)
                 return int(per_page)

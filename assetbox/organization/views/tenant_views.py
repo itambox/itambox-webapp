@@ -1,4 +1,4 @@
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 from django.db.models import Count
@@ -31,9 +31,7 @@ class TenantListView(ObjectListView):
 
 
 class TenantDetailView(ObjectDetailView):
-    queryset = Tenant.objects.select_related('group').prefetch_related(
-        'tags', 'sites__region', 'locations__site'
-    )
+    queryset = Tenant.objects.select_related('group').prefetch_related('tags')
 
     layout = (
         ((Panel('info', 'Tenant Details'),),),
@@ -43,65 +41,143 @@ class TenantDetailView(ObjectDetailView):
         context = super().get_context_data(**kwargs)
         tenant = self.get_object()
 
-        sites_table = SiteTable(tenant.sites.select_related('region', 'group', 'tenant'), request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(sites_table)
-        context['sites_table'] = sites_table
-
-        locations_table = LocationTable(tenant.locations.select_related('site', 'parent', 'tenant'), request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(locations_table)
-        context['locations_table'] = locations_table
-
-        assetholders_table = AssetHolderTable(tenant.asset_holders.select_related('tenant'), request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assetholders_table)
-        context['assetholders_table'] = assetholders_table
-
-        assets_table = AssetTable(tenant.assets.select_related('asset_role', 'asset_type__manufacturer', 'location', 'tenant', 'status'), request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assets_table)
-        context['assets_table'] = assets_table
-
-        accessories_table = AccessoryTable(tenant.accessories.select_related('manufacturer', 'category', 'tenant'), request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(accessories_table)
-        context['accessories_table'] = accessories_table
-
-        consumables_table = ConsumableTable(tenant.consumables.select_related('manufacturer', 'category', 'tenant'), request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(consumables_table)
-        context['consumables_table'] = consumables_table
-
-        # Component Catalog
-        from components.tables import ComponentTable
-        components_table = ComponentTable(tenant.components.select_related('manufacturer', 'category', 'tenant').prefetch_related('tags'), request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(components_table)
-        context['components_table'] = components_table
-
-        # Custody Policies
-        from compliance.models import CustodyTemplate
-        from compliance.tables import CustodyTemplateTable
-        custody_templates_qs = CustodyTemplate.objects.filter(tenant=tenant).select_related('tenant', 'tenant_group').prefetch_related('tags')
-        custody_templates_table = CustodyTemplateTable(custody_templates_qs, request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(custody_templates_table)
-        context['custody_templates_table'] = custody_templates_table
-
-        licenses_table = LicenseTable(tenant.licenses.select_related('software__manufacturer', 'tenant'), request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(licenses_table)
-        context['licenses_table'] = licenses_table
-
-        kits_table = KitTable(tenant.kits.select_related('tenant'), request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(kits_table)
-        context['kits_table'] = kits_table
-
-        subscriptions_table = SubscriptionTable(tenant.subscriptions_org.select_related('provider', 'tenant'), request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(subscriptions_table)
-        context['subscriptions_table'] = subscriptions_table
-
+        context['tenant_site_count'] = tenant.sites.count()
+        context['tenant_location_count'] = tenant.locations.count()
+        context['tenant_assetholder_count'] = tenant.asset_holders.count()
         context['tenant_asset_count'] = tenant.assets.count()
         context['tenant_accessory_count'] = tenant.accessories.count()
         context['tenant_consumable_count'] = tenant.consumables.count()
         context['tenant_component_count'] = tenant.components.count()
-        context['tenant_custody_count'] = custody_templates_qs.count()
+        
+        from compliance.models import CustodyTemplate
+        context['tenant_custody_count'] = CustodyTemplate.objects.filter(tenant=tenant).count()
         context['tenant_license_count'] = tenant.licenses.count()
         context['tenant_kit_count'] = tenant.kits.count()
         context['tenant_subscription_count'] = tenant.subscriptions_org.count()
         return context
+
+    def get_tab_sites(self, request):
+        tenant = self.get_object()
+        table = SiteTable(tenant.sites.all(), request=request)
+        table.configure(request)
+        return render(request, "generic/tab_table.html", {
+            'table': table,
+            'title': 'Associated Sites',
+            'empty_icon': 'mdi-office-building',
+            'empty_text': 'No sites found for this tenant.',
+        })
+
+    def get_tab_locations(self, request):
+        tenant = self.get_object()
+        table = LocationTable(tenant.locations.all(), request=request)
+        table.configure(request)
+        return render(request, "generic/tab_table.html", {
+            'table': table,
+            'title': 'Associated Locations',
+            'empty_icon': 'mdi-map-marker-outline',
+            'empty_text': 'No locations found for this tenant.',
+        })
+
+    def get_tab_assetholders(self, request):
+        tenant = self.get_object()
+        table = AssetHolderTable(tenant.asset_holders.all(), request=request)
+        table.configure(request)
+        return render(request, "generic/tab_table.html", {
+            'table': table,
+            'title': 'Associated Asset Holders',
+            'empty_icon': 'mdi-account-group-outline',
+            'empty_text': 'No asset holders found for this tenant.',
+        })
+
+    def get_tab_assets(self, request):
+        tenant = self.get_object()
+        table = AssetTable(tenant.assets.all(), request=request)
+        table.configure(request)
+        return render(request, "generic/tab_table.html", {
+            'table': table,
+            'title': 'Associated Assets',
+            'empty_icon': 'mdi-laptop',
+            'empty_text': 'No assets found for this tenant.',
+        })
+
+    def get_tab_accessories(self, request):
+        tenant = self.get_object()
+        table = AccessoryTable(tenant.accessories.all(), request=request)
+        table.configure(request)
+        return render(request, "generic/tab_table.html", {
+            'table': table,
+            'title': 'Associated Accessories',
+            'empty_icon': 'mdi-keyboard-outline',
+            'empty_text': 'No accessories found for this tenant.',
+        })
+
+    def get_tab_consumables(self, request):
+        tenant = self.get_object()
+        table = ConsumableTable(tenant.consumables.all(), request=request)
+        table.configure(request)
+        return render(request, "generic/tab_table.html", {
+            'table': table,
+            'title': 'Associated Consumables',
+            'empty_icon': 'mdi-water-outline',
+            'empty_text': 'No consumables found for this tenant.',
+        })
+
+    def get_tab_components(self, request):
+        tenant = self.get_object()
+        from components.tables import ComponentTable
+        table = ComponentTable(tenant.components.all(), request=request)
+        table.configure(request)
+        return render(request, "generic/tab_table.html", {
+            'table': table,
+            'title': 'Associated Component Catalog',
+            'empty_text': 'No components found for this tenant.',
+        })
+
+    def get_tab_custody_policies(self, request):
+        tenant = self.get_object()
+        from compliance.models import CustodyTemplate
+        from compliance.tables import CustodyTemplateTable
+        custody_templates_qs = CustodyTemplate.objects.filter(tenant=tenant)
+        table = CustodyTemplateTable(custody_templates_qs, request=request)
+        table.configure(request)
+        return render(request, "generic/tab_table.html", {
+            'table': table,
+            'title': 'Associated Custody Policies & EULAs',
+            'empty_text': 'No custody policies found for this tenant.',
+        })
+
+    def get_tab_licenses(self, request):
+        tenant = self.get_object()
+        table = LicenseTable(tenant.licenses.all(), request=request)
+        table.configure(request)
+        return render(request, "generic/tab_table.html", {
+            'table': table,
+            'title': 'Associated Licenses',
+            'empty_icon': 'mdi-key-outline',
+            'empty_text': 'No licenses found for this tenant.',
+        })
+
+    def get_tab_kits(self, request):
+        tenant = self.get_object()
+        table = KitTable(tenant.kits.all(), request=request)
+        table.configure(request)
+        return render(request, "generic/tab_table.html", {
+            'table': table,
+            'title': 'Associated Kits',
+            'empty_icon': 'mdi-package-variant',
+            'empty_text': 'No kits found for this tenant.',
+        })
+
+    def get_tab_subscriptions(self, request):
+        tenant = self.get_object()
+        table = SubscriptionTable(tenant.subscriptions_org.all(), request=request)
+        table.configure(request)
+        return render(request, "generic/tab_table.html", {
+            'table': table,
+            'title': 'Associated Subscriptions',
+            'empty_icon': 'mdi-file-document-outline',
+            'empty_text': 'No subscriptions found for this tenant.',
+        })
 
 
 class TenantEditView(ObjectEditView):

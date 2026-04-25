@@ -352,7 +352,7 @@ class FilterForm(forms.Form):
         if self.filterset_class is None:
             raise NotImplementedError("'filterset_class' must be defined on the FilterForm subclass.")
 
-        filterset_data = args[0] if args else None
+        filterset_data = args[0] if args else kwargs.get('data', None)
         self.filterset = self.filterset_class(filterset_data, queryset=self.queryset)
 
         for name, filter_field in self.filterset.filters.items():
@@ -384,6 +384,63 @@ class FilterForm(forms.Form):
         self.helper = FormHelper()
         self.helper.form_method = 'get'
         self.helper.form_tag = False
+
+        ajax_fields = getattr(self, 'ajax_fields', None)
+        if ajax_fields:
+            self.setup_ajax_fields(ajax_fields, filterset_data)
+
+    def setup_ajax_fields(self, ajax_fields, filterset_data):
+        for field_name, config in ajax_fields.items():
+            if field_name not in self.fields:
+                continue
+
+            field = self.fields[field_name]
+            url = reverse(config['url_name'])
+
+            field.widget.attrs.update({
+                'data-tom-select': '',
+                'data-tom-select-url': url,
+                'data-tom-select-value-field': config.get('value_field', 'id'),
+                'data-tom-select-label-field': config.get('label_field', 'name'),
+            })
+
+            if hasattr(field, 'queryset'):
+                selected_vals = []
+                if filterset_data:
+                    if hasattr(filterset_data, 'getlist'):
+                        selected_vals = filterset_data.getlist(field_name)
+                    else:
+                        val = filterset_data.get(field_name)
+                        if val:
+                            if isinstance(val, list):
+                                selected_vals = val
+                            else:
+                                selected_vals = [val]
+                elif self.initial and field_name in self.initial:
+                    val = self.initial[field_name]
+                    if isinstance(val, list):
+                        selected_vals = val
+                    else:
+                        selected_vals = [val]
+
+                # Convert model instances to PK/to_field_name values if necessary, and filter empty values
+                to_field = getattr(field, 'to_field_name', None) or 'pk'
+                cleaned_vals = []
+                for val in selected_vals:
+                    if val is None or val == '':
+                        continue
+                    if hasattr(val, to_field):
+                        cleaned_vals.append(getattr(val, to_field))
+                    elif hasattr(val, 'pk'):
+                        cleaned_vals.append(val.pk)
+                    else:
+                        cleaned_vals.append(val)
+
+                if cleaned_vals:
+                    filter_kwargs = {f"{to_field}__in": cleaned_vals}
+                    field.queryset = field.queryset.filter(**filter_kwargs)
+                else:
+                    field.queryset = field.queryset.none()
 
     def search(self):
         if self.is_valid():

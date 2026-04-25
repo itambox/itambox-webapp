@@ -40,7 +40,7 @@ class RegionDetailView(ObjectDetailView):
         region = self.get_object()
 
         sites_table = SiteTable(region.sites.all(), request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(sites_table)
+        sites_table.configure(self.request)
 
         related_objects_list = []
         site_count = region.sites.count()

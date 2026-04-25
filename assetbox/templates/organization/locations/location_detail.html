@@ -30,43 +30,43 @@
 {# --- Tabs Hook --- #}
 {% block extra_tabs %}
     <li class="nav-item" role="presentation">
-        <a href="#assets" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=assets" class="nav-link {% if request.GET.tab == 'assets' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#assets" role="tab" aria-selected="{% if request.GET.tab == 'assets' %}true{% else %}false{% endif %}">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-green" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l18 0" /><path d="M9 8l1 0" /><path d="M9 12l1 0" /><path d="M9 16l1 0" /><path d="M14 8l1 0" /><path d="M14 12l1 0" /><path d="M14 16l1 0" /><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16" /></svg>
             {% translate "Assets" %} <span class="badge bg-green-lt ms-2">{{ assets_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="#accessory-stocks" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=accessory-stocks" class="nav-link {% if request.GET.tab == 'accessory-stocks' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#accessory-stocks" role="tab" aria-selected="{% if request.GET.tab == 'accessory-stocks' %}true{% else %}false{% endif %}">
             <i class="mdi mdi-keyboard me-1 text-teal"></i>
             {% translate "Accessories" %} <span class="badge bg-teal-lt ms-2">{{ accessory_stocks_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="#consumable-stocks" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=consumable-stocks" class="nav-link {% if request.GET.tab == 'consumable-stocks' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#consumable-stocks" role="tab" aria-selected="{% if request.GET.tab == 'consumable-stocks' %}true{% else %}false{% endif %}">
             <i class="mdi mdi-layers-outline me-1 text-yellow"></i>
             {% translate "Consumables" %} <span class="badge bg-yellow-lt ms-2">{{ consumable_stocks_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="#component-stocks" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=component-stocks" class="nav-link {% if request.GET.tab == 'component-stocks' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#component-stocks" role="tab" aria-selected="{% if request.GET.tab == 'component-stocks' %}true{% else %}false{% endif %}">
             <i class="mdi mdi-cpu me-1 text-orange"></i>
             {% translate "Components" %} <span class="badge bg-orange-lt ms-2">{{ component_stocks_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="#checkout-log" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=checkout-log" class="nav-link {% if request.GET.tab == 'checkout-log' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#checkout-log" role="tab" aria-selected="{% if request.GET.tab == 'checkout-log' %}true{% else %}false{% endif %}">
             <i class="mdi mdi-clipboard-text-clock-outline me-1 text-purple"></i>
             {% translate "Checkout Log" %} <span class="badge bg-purple-lt ms-2">{{ asset_assignments_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="#audits" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=audits" class="nav-link {% if request.GET.tab == 'audits' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#audits" role="tab" aria-selected="{% if request.GET.tab == 'audits' %}true{% else %}false{% endif %}">
             <i class="mdi mdi-file-check-outline me-1 text-green"></i>
             {% translate "Audit Campaigns" %} <span class="badge bg-green-lt ms-2">{{ audits_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="#child-locations" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=child-locations" class="nav-link {% if request.GET.tab == 'child-locations' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#child-locations" role="tab" aria-selected="{% if request.GET.tab == 'child-locations' %}true{% else %}false{% endif %}">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-azure" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M3 21v-2a4 4 0 0 1 4 -4h10a4 4 0 0 1 4 4v2" /></svg>
             {% translate "Child Locations" %} <span class="badge bg-azure-lt ms-2">{{ object.children.count }}</span>
         </a>
@@ -78,7 +78,7 @@
 {# --- Extra Tab Panes --- #}
 {% block extra_tab_panes %}
     {# Assets Tab Pane #}
-    <div class="tab-pane fade" id="assets" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'assets' %}show active{% endif %}" id="assets" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Assets Located in this Specific Location" %}</h3>
@@ -87,7 +87,7 @@
                 <div class="table-responsive">
                     {% render_table assets_table %}
                 </div>
-                {% include 'generic/includes/table_pagination.html' with table=assets_table %}
+                {% include 'generic/includes/table_pagination.html' with table=assets_table tab="assets" %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <i class="mdi mdi-devices text-muted mb-2"></i>
@@ -98,7 +98,7 @@
     </div>
 
     {# Accessory Stocks Tab Pane #}
-    <div class="tab-pane fade" id="accessory-stocks" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'accessory-stocks' %}show active{% endif %}" id="accessory-stocks" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Accessory Stocks" %}</h3>
@@ -107,7 +107,7 @@
                 <div class="table-responsive">
                     {% render_table accessory_stocks_table %}
                 </div>
-                {% include 'generic/includes/table_pagination.html' with table=accessory_stocks_table %}
+                {% include 'generic/includes/table_pagination.html' with table=accessory_stocks_table tab="accessory-stocks" %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <p class="mb-0">{% translate "No accessories stored in this location." %}</p>
@@ -117,7 +117,7 @@
     </div>
 
     {# Consumable Stocks Tab Pane #}
-    <div class="tab-pane fade" id="consumable-stocks" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'consumable-stocks' %}show active{% endif %}" id="consumable-stocks" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Consumable Stocks" %}</h3>
@@ -126,7 +126,7 @@
                 <div class="table-responsive">
                     {% render_table consumable_stocks_table %}
                 </div>
-                {% include 'generic/includes/table_pagination.html' with table=consumable_stocks_table %}
+                {% include 'generic/includes/table_pagination.html' with table=consumable_stocks_table tab="consumable-stocks" %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <p class="mb-0">{% translate "No consumables stored in this location." %}</p>
@@ -136,7 +136,7 @@
     </div>
 
     {# Component Stocks Tab Pane #}
-    <div class="tab-pane fade" id="component-stocks" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'component-stocks' %}show active{% endif %}" id="component-stocks" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Component Stocks" %}</h3>
@@ -145,7 +145,7 @@
                 <div class="table-responsive">
                     {% render_table component_stocks_table %}
                 </div>
-                {% include 'generic/includes/table_pagination.html' with table=component_stocks_table %}
+                {% include 'generic/includes/table_pagination.html' with table=component_stocks_table tab="component-stocks" %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <p class="mb-0">{% translate "No components stored in this location." %}</p>
@@ -155,7 +155,7 @@
     </div>
 
     {# Checkout Log Tab Pane #}
-    <div class="tab-pane fade" id="checkout-log" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'checkout-log' %}show active{% endif %}" id="checkout-log" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Historical Checkout Log" %}</h3>
@@ -164,7 +164,7 @@
                 <div class="table-responsive">
                     {% render_table asset_assignments_table %}
                 </div>
-                {% include 'generic/includes/table_pagination.html' with table=asset_assignments_table %}
+                {% include 'generic/includes/table_pagination.html' with table=asset_assignments_table tab="checkout-log" %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <p class="mb-0">{% translate "No checkout logs for this location." %}</p>
@@ -174,7 +174,7 @@
     </div>
 
     {# Audit Campaigns Tab Pane #}
-    <div class="tab-pane fade" id="audits" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'audits' %}show active{% endif %}" id="audits" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Audit Campaigns run in this Location" %}</h3>
@@ -183,7 +183,7 @@
                 <div class="table-responsive">
                     {% render_table audits_table %}
                 </div>
-                {% include 'generic/includes/table_pagination.html' with table=audits_table %}
+                {% include 'generic/includes/table_pagination.html' with table=audits_table tab="audits" %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <p class="mb-0">{% translate "No audit campaigns logged for this location." %}</p>
@@ -193,7 +193,7 @@
     </div>
 
     {# Child Locations Tab Pane #}
-    <div class="tab-pane fade" id="child-locations" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'child-locations' %}show active{% endif %}" id="child-locations" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Child Locations" %}</h3>

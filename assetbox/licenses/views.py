@@ -47,17 +47,17 @@ class LicenseDetailView(ObjectDetailView):
         license_obj = self.get_object()
 
         # Query all seat assignments (to either assets or holders)
-        assignments_qs = license_obj.assignments.select_related('asset', 'assigned_holder')
+        assignments_qs = license_obj.assignments.all()
         assignments_table = tables.LicenseSeatAssignmentTable(assignments_qs, request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assignments_table)
+        assignments_table.configure(self.request)
         context['assignments_table'] = assignments_table
 
         # Kits
         from inventory.models import Kit
         from inventory.tables import KitTable
-        kits_qs = Kit.objects.filter(items__license=license_obj).distinct().select_related('tenant')
+        kits_qs = Kit.objects.filter(items__license=license_obj).distinct()
         kits_table = KitTable(kits_qs, request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(kits_table)
+        kits_table.configure(self.request)
         context['kits_table'] = kits_table
 
         related_objects_list = []

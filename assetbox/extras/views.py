@@ -29,14 +29,12 @@ class TagDetailView(ObjectDetailView):
         tag = self.object
 
         # Fetch related assets using the related_name from Asset.tags
-        related_assets = tag.assets.all().prefetch_related(
-            'asset_role', 'asset_type__manufacturer', 'location', 'location__site'
-        )
+        related_assets = tag.assets.all()
 
         # Create and configure the assets table
         assets_table = AssetTable(related_assets, request=self.request)
         # Disable pagination for related table
-        RequestConfig(self.request, paginate=False).configure(assets_table)
+        assets_table.configure(self.request, paginate=False)
 
         context['assets_table'] = assets_table
         return context

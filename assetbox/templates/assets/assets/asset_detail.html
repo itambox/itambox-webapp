@@ -258,7 +258,7 @@
                 <div class="table-responsive">
                     {% render_table components_table %}
                 </div>
-                {% include 'generic/includes/table_pagination.html' with table=components_table %}
+                {% include 'generic/includes/table_pagination.html' with table=components_table tab="components" %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <p class="mb-0">{% translate "No physical modules (like RAM, SSD, GPU) checked into this hardware asset." %}</p>
@@ -281,7 +281,7 @@
                 <div class="table-responsive">
                     {% render_table maintenances_table %}
                 </div>
-                {% include 'generic/includes/table_pagination.html' with table=maintenances_table %}
+                {% include 'generic/includes/table_pagination.html' with table=maintenances_table tab="maintenances" %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <p class="mb-0">{% translate "No repair, calibration, or hardware maintenance logged for this asset." %}</p>
@@ -299,7 +299,7 @@
                 <div class="table-responsive">
                     {% render_table software_table %}
                 </div>
-                {% include 'generic/includes/table_pagination.html' with table=software_table %}
+                {% include 'generic/includes/table_pagination.html' with table=software_table tab="software" %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <p class="mb-0">{% translate "No catalog software items registered on this asset." %}</p>
@@ -318,7 +318,7 @@
                 <div class="table-responsive">
                     {% render_table accessory_table %}
                 </div>
-                {% include 'generic/includes/table_pagination.html' with table=accessory_table %}
+                {% include 'generic/includes/table_pagination.html' with table=accessory_table tab="accessories" %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <p class="mb-0">{% translate "No accessories assigned to this asset." %}</p>
@@ -338,7 +338,7 @@
                 <div class="table-responsive">
                     {% render_table consumable_table %}
                 </div>
-                {% include 'generic/includes/table_pagination.html' with table=consumable_table %}
+                {% include 'generic/includes/table_pagination.html' with table=consumable_table tab="consumables" %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <p class="mb-0">{% translate "No consumables assigned to this asset." %}</p>
@@ -357,7 +357,7 @@
                 <div class="table-responsive">
                     {% render_table requests_table %}
                 </div>
-                {% include 'generic/includes/table_pagination.html' with table=requests_table %}
+                {% include 'generic/includes/table_pagination.html' with table=requests_table tab="requests" %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <p class="mb-0">{% translate "No requests logged for this asset." %}</p>
@@ -375,7 +375,7 @@
                 <div class="table-responsive">
                     {% render_table audits_table %}
                 </div>
-                {% include 'generic/includes/table_pagination.html' with table=audits_table %}
+                {% include 'generic/includes/table_pagination.html' with table=audits_table tab="audits" %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <p class="mb-0">{% translate "No verification audits logged for this asset." %}</p>
@@ -393,7 +393,7 @@
                 <div class="table-responsive">
                     {% render_table receipts_table %}
                 </div>
-                {% include 'generic/includes/table_pagination.html' with table=receipts_table %}
+                {% include 'generic/includes/table_pagination.html' with table=receipts_table tab="custody-receipts" %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <p class="mb-0">{% translate "No custody receipts generated for this asset." %}</p>
@@ -411,7 +411,7 @@
                 <div class="table-responsive">
                     {% render_table license_seats_table %}
                 </div>
-                {% include 'generic/includes/table_pagination.html' with table=license_seats_table %}
+                {% include 'generic/includes/table_pagination.html' with table=license_seats_table tab="license-seats" %}
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
                     <p class="mb-0">{% translate "No software license seats allocated to this asset." %}</p>
@@ -419,5 +419,4 @@
             {% endif %}
         </div>
     </div>
-
 {% endblock extra_tab_panes %}

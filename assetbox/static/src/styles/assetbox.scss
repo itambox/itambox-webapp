@@ -526,6 +526,11 @@ html,
         z-index: 4 !important;
         background-color: var(--tblr-bg-surface-secondary, #f4f6fa) !important;
     }
+
+    // Elevate z-index of cells containing open dropdowns to render on top of sticky rows
+    td:has(.show) {
+        z-index: 10 !important;
+    }
 }
 
 // Dark mode: solid sticky column backgrounds

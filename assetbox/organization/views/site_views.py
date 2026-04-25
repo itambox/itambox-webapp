@@ -43,12 +43,12 @@ class SiteDetailView(ObjectDetailView):
         site = self.get_object()
 
         from ..tables import LocationTable
-        locations_table = LocationTable(site.locations.select_related('site', 'parent', 'tenant'), request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(locations_table)
+        locations_table = LocationTable(site.locations.all(), request=self.request)
+        locations_table.configure(self.request)
 
-        site_assets = Asset.objects.filter(location__site=site).select_related('asset_role', 'asset_type', 'asset_type__manufacturer', 'location')
+        site_assets = Asset.objects.filter(location__site=site)
         assets_table = AssetTable(site_assets, request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assets_table)
+        assets_table.configure(self.request)
 
         related_objects_list = []
         location_count = site.locations.count()

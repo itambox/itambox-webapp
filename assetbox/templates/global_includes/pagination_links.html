@@ -3,17 +3,18 @@
 
 {% if page_obj %}
 <div class="d-flex justify-content-between align-items-center border-top p-2"
-     hx-target="#object-list-dynamic-content"
+     {% if hx_target %}
+     hx-target="{{ hx_target }}"
      hx-swap="innerHTML"
-     hx-push-url="true">
+     hx-push-url="{% if hx_push_url is not None %}{{ hx_push_url }}{% else %}true{% endif %}"
+     {% endif %}>
 
     {% if page_obj.paginator.num_pages > 1 %}
     <nav aria-label="{% trans "Page selection" %}">
         <ul class="pagination mb-0">
             {% if page_obj.has_previous %}
             <li class="page-item">
-                <a href="#"
-                   hx-get="{{ request.path }}{% update_querystring request page=page_obj.previous_page_number %}"
+                <a {% if hx_target %}href="#" hx-get="{{ request.path }}{% update_querystring request page=page_obj.previous_page_number tab=tab %}"{% else %}href="{{ request.path }}{% update_querystring request page=page_obj.previous_page_number tab=tab %}"{% endif %}
                    class="page-link" aria-label="{% trans "Previous page" %}">
                     <i class="mdi mdi-chevron-left"></i>
                 </a>
@@ -23,8 +24,7 @@
             {% for p in page_obj.smart_pages|default:page_obj.paginator.page_range %}
             <li class="page-item{% if page_obj.number == p %} active{% endif %}"{% if page_obj.number == p %} aria-current="page"{% endif %}>
                 {% if p %}
-                <a href="#"
-                   hx-get="{{ request.path }}{% update_querystring request page=p %}"
+                <a {% if hx_target %}href="#" hx-get="{{ request.path }}{% update_querystring request page=p tab=tab %}"{% else %}href="{{ request.path }}{% update_querystring request page=p tab=tab %}"{% endif %}
                    class="page-link" aria-label="{% blocktrans with num=p %}Page {{ num }}{% endblocktrans %}">
                     {{ p }}
                 </a>
@@ -36,8 +36,7 @@
 
             {% if page_obj.has_next %}
             <li class="page-item">
-                <a href="#"
-                   hx-get="{{ request.path }}{% update_querystring request page=page_obj.next_page_number %}"
+                <a {% if hx_target %}href="#" hx-get="{{ request.path }}{% update_querystring request page=page_obj.next_page_number tab=tab %}"{% else %}href="{{ request.path }}{% update_querystring request page=page_obj.next_page_number tab=tab %}"{% endif %}
                    class="page-link" aria-label="{% trans "Next page" %}">
                     <i class="mdi mdi-chevron-right"></i>
                 </a>
@@ -53,6 +52,6 @@
         {% endblocktrans %}
     </small>
 
-    {% include 'global_includes/pagination_per_page.html' with paginator=page_obj.paginator %}
+    {% include 'global_includes/pagination_per_page.html' with paginator=page_obj.paginator hx_target=hx_target hx_push_url=hx_push_url tab=tab %}
 </div>
 {% endif %}
