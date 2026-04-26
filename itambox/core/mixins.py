@@ -293,7 +293,7 @@ class AutoSlugMixin:
                 slug_src = getattr(self, self.slug_source, "")
             
             # Slugify the resolved source string
-            self.slug = slugify(slug_src or "auto-slug")
+            self.slug = slugify(slug_src) or "auto-slug"
             
             # Handle collision
             base_slug = self.slug

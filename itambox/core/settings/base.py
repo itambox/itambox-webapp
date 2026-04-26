@@ -300,7 +300,7 @@ Q_CLUSTER = {
 }
 
 import sys
-if 'test' in sys.argv:
+if 'test' in sys.argv or any('test' in arg or 'pytest' in arg for arg in sys.argv):
     Q_CLUSTER['sync'] = True
 
 

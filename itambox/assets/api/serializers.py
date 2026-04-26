@@ -66,6 +66,11 @@ class AssetTypeSerializer(BaseModelSerializer):
         queryset=Manufacturer.objects.all(), source='manufacturer',
         write_only=True
     )
+    asset_role = NestedAssetRoleSerializer(read_only=True)
+    assetrole_id = serializers.PrimaryKeyRelatedField(
+        queryset=AssetRole.objects.all(), source='asset_role',
+        write_only=True, required=False, allow_null=True
+    )
     tags = TagSerializer(many=True, read_only=True)
     depreciation = DepreciationSerializer(read_only=True)
     depreciation_id = serializers.PrimaryKeyRelatedField(
@@ -77,8 +82,8 @@ class AssetTypeSerializer(BaseModelSerializer):
         model = AssetType
         fields = [
             'id', 'model', 'slug', 'manufacturer', 'manufacturer_id',
-            'part_number', 'eol_months', 'category', 'depreciation',
-            'depreciation_id', 'custom_fieldset', 'custom_values',
+            'part_number', 'eol_months', 'category', 'asset_role', 'assetrole_id',
+            'depreciation', 'depreciation_id', 'custom_fieldset', 'custom_values',
             'image', 'requestable', 'description', 'comments',
             'tags', 'created_at', 'updated_at'
         ]

@@ -190,6 +190,15 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel):
         verbose_name="Category",
         db_index=True
     )
+    asset_role = models.ForeignKey(
+        'AssetRole',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='asset_types',
+        verbose_name="Asset Role",
+        db_index=True
+    )
     image = models.ImageField(upload_to='asset_types/', blank=True, null=True, verbose_name="Model Image")
 
     # Other

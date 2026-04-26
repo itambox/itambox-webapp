@@ -849,15 +849,30 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
                     status=Job.STATUS_PENDING
                 )
                 
-                # Dispatch async task to worker queue
-                async_task(
-                    'core.tasks.import_csv_task',
-                    job.pk,
-                    rows,
-                    model._meta.app_label,
-                    model._meta.model_name,
-                    request.user.pk
-                )
+                # Dispatch async task to worker queue safely after transaction commits (with sync bypass for tests)
+                from django.db import transaction
+                from django.conf import settings
+                if getattr(settings, 'Q_CLUSTER', {}).get('sync', False):
+                    async_task(
+                        'core.tasks.import_csv_task',
+                        job.pk,
+                        rows,
+                        model._meta.app_label,
+                        model._meta.model_name,
+                        request.user.pk
+                    )
+                else:
+                    transaction.on_commit(
+                        lambda job_pk=job.pk, r=rows, app=model._meta.app_label, name=model._meta.model_name, u_pk=request.user.pk: async_task(
+                            'core.tasks.import_csv_task',
+                            job_pk,
+                            r,
+                            app,
+                            name,
+                            u_pk
+                        )
+                    )
+
                 
                 messages.success(
                     request,

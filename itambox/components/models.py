@@ -201,6 +201,8 @@ class ComponentAllocation(JournalingMixin, TaggableMixin, SoftDeleteMixin, BaseM
         with transaction.atomic():
             is_new = self.pk is None
             if is_new:
+                if not self.from_location and self.asset:
+                    self.from_location = self.asset.location
                 if self.deleted_at is None:
                     self._deduct_stock(self.component, self.from_location, self.qty_allocated)
             else:

@@ -82,4 +82,20 @@
   document.body.addEventListener('htmx:afterSettle', function () {
     initAll();
   });
+
+  // Clean up Tom Select instances before elements are removed from the DOM
+  document.body.addEventListener('htmx:beforeCleanUp', function (evt: Event) {
+    const target = (evt as CustomEvent).detail.target as HTMLElement;
+    if (!target) return;
+    target.querySelectorAll<HTMLSelectElement>('select[data-tom-select]').forEach(function (sel) {
+      const ts = (sel as any).tomselect;
+      if (ts && typeof ts.destroy === 'function') {
+        try {
+          ts.destroy();
+        } catch (_e) {
+          // Ignore
+        }
+      }
+    });
+  });
 })();

@@ -82,19 +82,37 @@ class TenantScopingQuerySet(models.QuerySet):
             if self.model._meta.model_name == 'tenant':
                 return self.filter(pk__in=allowed_tenant_ids)
 
+            allowed_group_ids = []
+            if active_group:
+                allowed_group_ids = [active_group.pk]
+            elif active_tenant and active_tenant.group:
+                allowed_group_ids = [active_tenant.group.pk]
+
+            qs = self
+
+            # Filter by tenant group if field exists
+            try:
+                self.model._meta.get_field('tenant_group')
+                qs = qs.filter(models.Q(tenant_group_id__in=allowed_group_ids) | models.Q(tenant_group__isnull=True))
+            except FieldDoesNotExist:
+                pass
+
+            # Filter by tenant if field exists
             try:
                 self.model._meta.get_field('tenant')
                 try:
                     self.model._meta.get_field('filter_tenants')
-                    return self.filter(
+                    qs = qs.filter(
                         models.Q(tenant_id__in=allowed_tenant_ids) |
                         models.Q(filter_tenants__id__in=allowed_tenant_ids) |
                         (models.Q(tenant__isnull=True) & models.Q(filter_tenants__isnull=True))
                     ).distinct()
                 except FieldDoesNotExist:
-                    return self.filter(models.Q(tenant_id__in=allowed_tenant_ids) | models.Q(tenant__isnull=True))
+                    qs = qs.filter(models.Q(tenant_id__in=allowed_tenant_ids) | models.Q(tenant__isnull=True))
             except FieldDoesNotExist:
-                return self
+                pass
+
+            return qs
         return self
 
 

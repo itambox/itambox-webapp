@@ -66,6 +66,7 @@ class Command(BaseCommand):
             ('components', 'ComponentAllocation'),
             ('components', 'ComponentStock'),
             ('compliance', 'CustodyReceipt'),
+            ('compliance', 'CustodyTemplate'),
             ('core', 'ObjectChange'),
             ('core', 'Notification'),
             ('users', 'UserPreference'),
@@ -278,16 +279,32 @@ class Command(BaseCommand):
 
         # AssetRoles
         role_data = [
-            ('Laptop', 'laptop', '007bff', 'Portable computing device for end users'),
-            ('Desktop', 'desktop', '28a745', 'Fixed workstation for office use'),
-            ('Server', 'server', 'dc3545', 'Datacenter or rack-mounted server'),
-            ('Monitor', 'monitor', '6f42c1', 'Display device'),
-            ('Mobile Phone', 'mobile-phone', 'fd7e14', 'Smartphone or feature phone'),
-            ('Tablet', 'tablet', '20c997', 'Tablet device'),
-            ('Printer', 'printer', 'adb5bd', 'Network or local printer'),
-            ('Network Device', 'network-device', '0d6efd', 'Switch, router, firewall, or access point'),
-            ('Peripheral', 'peripheral', 'ff6b6b', 'Keyboard, mouse, webcam, headset'),
-            ('Storage Device', 'storage-device', 'e83e8c', 'NAS, external drive, or SAN component'),
+            # Laptops/Workstations roles
+            ('Standard Workstation', 'standard-workstation', '007bff', 'Standard laptop or workstation for general office staff'),
+            ('Developer Workstation', 'developer-workstation', '6f42c1', 'High-performance workstation for developers and engineers'),
+            ('Executive Workstation', 'executive-workstation', 'e83e8c', 'Premium computing device for executives and management'),
+            ('CAD/Design Workstation', 'cad-design-workstation', 'fd7e14', 'GPU-optimized workstation for CAD, design, and 3D modeling'),
+            ('Kiosk / Reception Terminal', 'kiosk-reception-terminal', 'adb5bd', 'Restricted access terminal for reception, guest check-in, or lab environments'),
+            ('Field Representative Tablet', 'field-tablet', '20c997', 'Ruggedized tablet for field operations or warehouse logistics'),
+            ('Mobile Testing Device', 'mobile-test-device', 'ff6b6b', 'Smartphone used exclusively for software testing and QA'),
+            ('Corporate Smartphone', 'corporate-smartphone', 'fd7e14', 'Company-issued mobile smartphone for voice, chat, and MFA'),
+            
+            # Servers / Datacenter roles
+            ('Virtualization Host', 'virtualization-host-server', 'dc3545', 'Bare-metal hypervisor server running ESXi, Proxmox, or Hyper-V'),
+            ('Database Server', 'database-server', '17a2b8', 'Server hosting production database instances (PostgreSQL, MSSQL, Oracle)'),
+            ('Application Server', 'application-server', '20c997', 'Server hosting line-of-business applications'),
+            ('Backup Storage Server', 'backup-server', 'fd7e14', 'High-capacity storage server or NAS for backup retention'),
+            ('Build & CI/CD Agent', 'build-ci-agent', '28a745', 'Dedicated build node for CI/CD pipeline automation'),
+
+            # Network roles
+            ('Core Router / Firewall', 'core-router-firewall', 'dc3545', 'Central security gateway, router, or edge firewall'),
+            ('Access / Distribution Switch', 'access-switch', '0d6efd', 'Network switch providing physical Ethernet connectivity'),
+            ('Wireless Access Point', 'wireless-ap', '20c997', 'Enterprise WiFi access point'),
+
+            # Peripherals / Shared roles
+            ('Conference Room AV System', 'conference-av', 'e83e8c', 'Smart display, camera, and audio hub for hybrid meetings'),
+            ('Network Printer', 'network-printer', 'adb5bd', 'Multi-function network printer, scanner, and copier'),
+            ('Desktop Monitor', 'desktop-monitor', '6f42c1', 'External desktop display monitor'),
         ]
         self._asset_roles = {}
         for name, slug, color, desc in role_data:
@@ -617,7 +634,7 @@ class Command(BaseCommand):
 
         # AssetHolders (employees)
         holder_data = [
-            ('Alex', 'Rettig', 'alex.admin', 'alex.admin@acme.corp', tenants['acme-north-america']),
+            ('Alex', 'Miller', 'alex.admin', 'alex.admin@acme.corp', tenants['acme-north-america']),
             ('Sarah', 'Chen', 'sarah.chen', 'sarah.chen@acme.corp', tenants['acme-north-america']),
             ('Marcus', 'Johnson', 'marcus.johnson', 'marcus.johnson@acme.corp', tenants['acme-labs']),
             ('Elena', 'Rodriguez', 'elena.rodriguez', 'elena.rodriguez@acme.corp', tenants['acme-europe']),
@@ -720,76 +737,13 @@ class Command(BaseCommand):
 
         self.stdout.write('--- Phase 2: Asset Infrastructure ---')
 
-        # --- Asset Types ---
-        at_data = [
-            # (model, slug, manufacturer_slug, part_number, cpu, ram_gb, storage_gb, storage_type, gpu, eol_months, custom_fieldset, depreciation)
-            ('Latitude 5550', 'dell-latitude-5550', 'dell-technologies', 'LAT5550-2025',
-             'Intel Core i7-1365U', 16, 512, 'NVMe', 'Intel Iris Xe', 36, self._laptop_fieldset, self._depreciations['3-Year Straight-Line']),
-            ('Precision 5680', 'dell-precision-5680', 'dell-technologies', 'PREC5680-WS',
-             'Intel Core i9-13900H', 32, 1024, 'NVMe', 'NVIDIA RTX 2000 Ada', 36, self._laptop_fieldset, self._depreciations['4-Year Straight-Line']),
-            ('OptiPlex 7010', 'dell-optiplex-7010', 'dell-technologies', 'OPT7010-SFF',
-             'Intel Core i5-13500', 16, 256, 'NVMe', 'Intel UHD 770', 48, None, self._depreciations['4-Year Straight-Line']),
-            ('MacBook Pro 16"', 'macbook-pro-16-2024', 'apple-inc', 'MBP16-M4',
-             'Apple M4 Pro', 36, 512, 'NVMe', 'Integrated 20-core GPU', 36, self._laptop_fieldset, self._depreciations['3-Year Straight-Line']),
-            ('MacBook Air 15"', 'macbook-air-15-2024', 'apple-inc', 'MBA15-M3',
-             'Apple M3', 16, 256, 'NVMe', 'Integrated 10-core GPU', 36, self._laptop_fieldset, self._depreciations['3-Year Straight-Line']),
-            ('Mac Studio', 'mac-studio-2024', 'apple-inc', 'MSTUDIO-M2U',
-             'Apple M2 Ultra', 64, 1024, 'NVMe', 'Integrated 76-core GPU', 48, None, self._depreciations['5-Year Straight-Line']),
-            ('EliteBook 860 G11', 'hp-elitebook-860-g11', 'hp-inc', '866S7EA',
-             'Intel Core i7-1370P', 32, 1024, 'NVMe', 'Intel Iris Xe', 36, self._laptop_fieldset, self._depreciations['3-Year Straight-Line']),
-            ('ThinkPad X1 Carbon Gen 12', 'thinkpad-x1-carbon-g12', 'lenovo-group', '21KC004PGE',
-             'Intel Core i7-1365U', 16, 512, 'NVMe', 'Intel Iris Xe', 36, self._laptop_fieldset, self._depreciations['3-Year Straight-Line']),
-            ('ThinkCentre M90q Gen 5', 'thinkcentre-m90q-gen5', 'lenovo-group', '12JNS00E00',
-             'Intel Core i5-13500T', 16, 256, 'NVMe', 'Intel UHD 770', 48, None, self._depreciations['4-Year Straight-Line']),
-            ('PowerEdge R760', 'dell-poweredge-r760', 'dell-technologies', 'R760-XEON',
-             '2x Intel Xeon Gold 6430', 256, 8000, 'SSD RAID', None, 60, self._server_fieldset, self._depreciations['5-Year Straight-Line']),
-            ('ProLiant DL380 Gen11', 'hpe-proliant-dl380-g11', 'hp-inc', 'P52534-B21',
-             '2x Intel Xeon Silver 4416+', 128, 4000, 'SSD RAID', None, 60, self._server_fieldset, self._depreciations['5-Year Straight-Line']),
-            ('iPhone 15 Pro', 'iphone-15-pro', 'apple-inc', 'A2847',
-             'Apple A17 Pro', 8, 256, 'NVMe', None, 24, self._mobile_fieldset, self._depreciations['3-Year Straight-Line']),
-            ('Galaxy S24 Ultra', 'galaxy-s24-ultra', 'samsung-electronics', 'SM-S928B',
-             'Snapdragon 8 Gen 3', 12, 256, 'UFS 4.0', None, 24, self._mobile_fieldset, self._depreciations['3-Year Straight-Line']),
-            ('iPad Pro 12.9"', 'ipad-pro-129-2024', 'apple-inc', 'A2436',
-             'Apple M4', 8, 256, 'NVMe', None, 36, None, self._depreciations['3-Year Straight-Line']),
-            ('Surface Pro 10', 'surface-pro-10', 'microsoft-corporation', 'SURFPRO10-I7',
-             'Intel Core i7-1365U', 16, 512, 'NVMe', 'Intel Iris Xe', 36, self._laptop_fieldset, self._depreciations['3-Year Straight-Line']),
-            ('Catalyst 9300', 'cisco-catalyst-9300', 'cisco-systems', 'C9300-48P',
-             None, None, None, None, None, 60, self._switch_fieldset, self._depreciations['7-Year Straight-Line']),
-            ('Meraki MR46', 'meraki-mr46', 'cisco-systems', 'MR46-HW',
-             None, None, None, None, None, 60, None, self._depreciations['5-Year Straight-Line']),
-            ('UniFi Dream Machine Pro', 'unifi-dream-machine-pro', 'ubiquiti-inc', 'UDM-Pro',
-             None, None, None, None, None, 48, self._switch_fieldset, self._depreciations['5-Year Straight-Line']),
-            ('UniFi Switch Pro 48 PoE', 'unifi-switch-pro-48', 'ubiquiti-inc', 'USW-PRO-48-POE',
-             None, None, None, None, None, 48, self._switch_fieldset, self._depreciations['5-Year Straight-Line']),
-            ('DiskStation DS1823xs+', 'synology-ds1823xs', 'synology-inc', 'DS1823XS+',
-             'AMD Ryzen V1780B', 32, 8000, 'HDD', None, 60, None, self._depreciations['5-Year Straight-Line']),
-            ('Dell P2723DE 27" Monitor', 'dell-p2723de-monitor', 'dell-technologies', 'P2723DE',
-             '', None, None, '', '', 60, None, self._depreciations['5-Year Straight-Line']),
-            ('Dell P2422HE 24" Monitor', 'dell-p2422he-monitor', 'dell-technologies', 'P2422HE',
-             '', None, None, '', '', 60, None, self._depreciations['5-Year Straight-Line']),
-            ('Logitech MeetUp AV System', 'logitech-meetup', 'logitech-international', '960-001101',
-             None, None, None, None, None, 36, self._av_fieldset, self._depreciations['5-Year Straight-Line']),
-            ('Precision 7960 Tower', 'dell-precision-7960-tower', 'dell-technologies', 'PREC7960-TWR',
-             None, None, None, None, None, 48, self._laptop_fieldset, self._depreciations['4-Year Straight-Line']),
-        ]
-        self._asset_types = {}
-        for data in at_data:
-            model_name, slug, mfr_slug = data[0], data[1], data[2]
-            obj, _ = AssetType.objects.get_or_create(
-                slug=slug,
-                defaults={
-                    'model': model_name, 'manufacturer': self._manufacturers[mfr_slug],
-                    'part_number': data[3] or '', 'eol_months': data[9],
-                    'custom_fieldset': data[10], 'depreciation': data[11],
-                }
-            )
-            self._asset_types[slug] = obj
-
         # --- Categories ---
         cat_names = [
             'charger', 'adaptor', 'mouse', 'keyboard', 'webcam', 'headset', 'cable',
             'display', 'toner', 'ink', 'batteries', 'thermal-paste', 'other',
             'ram-memory', 'ssd-nvme', 'hdd', 'nic', 'gpu', 'cpu', 'dock',
+            'laptops', 'desktops', 'servers', 'monitors', 'mobile-phones', 'tablets',
+            'printers', 'network-devices', 'storage-devices', 'conference-systems',
         ]
         self._categories = {}
         for cat_slug in cat_names:
@@ -799,6 +753,76 @@ class Command(BaseCommand):
                 defaults={'name': cat_slug.replace('-', ' ').title(), 'applies_to': applies}
             )
             self._categories[cat_slug] = obj
+
+        # --- Asset Types ---
+        at_data = [
+            # (model, slug, manufacturer_slug, part_number, cpu, ram_gb, storage_gb, storage_type, gpu, eol_months, custom_fieldset, depreciation, category_slug, role_slug)
+            ('Latitude 5550', 'dell-latitude-5550', 'dell-technologies', 'LAT5550-2025',
+             'Intel Core i7-1365U', 16, 512, 'NVMe', 'Intel Iris Xe', 36, self._laptop_fieldset, self._depreciations['3-Year Straight-Line'], 'laptops', 'standard-workstation'),
+            ('Precision 5680', 'dell-precision-5680', 'dell-technologies', 'PREC5680-WS',
+             'Intel Core i9-13900H', 32, 1024, 'NVMe', 'NVIDIA RTX 2000 Ada', 36, self._laptop_fieldset, self._depreciations['4-Year Straight-Line'], 'laptops', 'developer-workstation'),
+            ('OptiPlex 7010', 'dell-optiplex-7010', 'dell-technologies', 'OPT7010-SFF',
+             'Intel Core i5-13500', 16, 256, 'NVMe', 'Intel UHD 770', 48, None, self._depreciations['4-Year Straight-Line'], 'desktops', 'standard-workstation'),
+            ('MacBook Pro 16"', 'macbook-pro-16-2024', 'apple-inc', 'MBP16-M4',
+             'Apple M4 Pro', 36, 512, 'NVMe', 'Integrated 20-core GPU', 36, self._laptop_fieldset, self._depreciations['3-Year Straight-Line'], 'laptops', 'developer-workstation'),
+            ('MacBook Air 15"', 'macbook-air-15-2024', 'apple-inc', 'MBA15-M3',
+             'Apple M3', 16, 256, 'NVMe', 'Integrated 10-core GPU', 36, self._laptop_fieldset, self._depreciations['3-Year Straight-Line'], 'laptops', 'standard-workstation'),
+            ('Mac Studio', 'mac-studio-2024', 'apple-inc', 'MSTUDIO-M2U',
+             'Apple M2 Ultra', 64, 1024, 'NVMe', 'Integrated 76-core GPU', 48, None, self._depreciations['5-Year Straight-Line'], 'desktops', 'developer-workstation'),
+            ('EliteBook 860 G11', 'hp-elitebook-860-g11', 'hp-inc', '866S7EA',
+             'Intel Core i7-1370P', 32, 1024, 'NVMe', 'Intel Iris Xe', 36, self._laptop_fieldset, self._depreciations['3-Year Straight-Line'], 'laptops', 'standard-workstation'),
+            ('ThinkPad X1 Carbon Gen 12', 'thinkpad-x1-carbon-g12', 'lenovo-group', '21KC004PGE',
+             'Intel Core i7-1365U', 16, 512, 'NVMe', 'Intel Iris Xe', 36, self._laptop_fieldset, self._depreciations['3-Year Straight-Line'], 'laptops', 'developer-workstation'),
+            ('ThinkCentre M90q Gen 5', 'thinkcentre-m90q-gen5', 'lenovo-group', '12JNS00E00',
+             'Intel Core i5-13500T', 16, 256, 'NVMe', 'Intel UHD 770', 48, None, self._depreciations['4-Year Straight-Line'], 'desktops', 'standard-workstation'),
+            ('PowerEdge R760', 'dell-poweredge-r760', 'dell-technologies', 'R760-XEON',
+             '2x Intel Xeon Gold 6430', 256, 8000, 'SSD RAID', None, 60, self._server_fieldset, self._depreciations['5-Year Straight-Line'], 'servers', 'virtualization-host-server'),
+            ('ProLiant DL380 Gen11', 'hpe-proliant-dl380-g11', 'hp-inc', 'P52534-B21',
+             '2x Intel Xeon Silver 4416+', 128, 4000, 'SSD RAID', None, 60, self._server_fieldset, self._depreciations['5-Year Straight-Line'], 'servers', 'application-server'),
+            ('iPhone 15 Pro', 'iphone-15-pro', 'apple-inc', 'A2847',
+             'Apple A17 Pro', 8, 256, 'NVMe', None, 24, self._mobile_fieldset, self._depreciations['3-Year Straight-Line'], 'mobile-phones', 'corporate-smartphone'),
+            ('Galaxy S24 Ultra', 'galaxy-s24-ultra', 'samsung-electronics', 'SM-S928B',
+             'Snapdragon 8 Gen 3', 12, 256, 'UFS 4.0', None, 24, self._mobile_fieldset, self._depreciations['3-Year Straight-Line'], 'mobile-phones', 'corporate-smartphone'),
+            ('iPad Pro 12.9"', 'ipad-pro-129-2024', 'apple-inc', 'A2436',
+             'Apple M4', 8, 256, 'NVMe', None, 36, None, self._depreciations['3-Year Straight-Line'], 'tablets', 'field-tablet'),
+            ('Surface Pro 10', 'surface-pro-10', 'microsoft-corporation', 'SURFPRO10-I7',
+             'Intel Core i7-1365U', 16, 512, 'NVMe', 'Intel Iris Xe', 36, self._laptop_fieldset, self._depreciations['3-Year Straight-Line'], 'tablets', 'field-tablet'),
+            ('Catalyst 9300', 'cisco-catalyst-9300', 'cisco-systems', 'C9300-48P',
+             None, None, None, None, None, 60, self._switch_fieldset, self._depreciations['7-Year Straight-Line'], 'network-devices', 'access-switch'),
+            ('Meraki MR46', 'meraki-mr46', 'cisco-systems', 'MR46-HW',
+             None, None, None, None, None, 60, None, self._depreciations['5-Year Straight-Line'], 'network-devices', 'wireless-ap'),
+            ('UniFi Dream Machine Pro', 'unifi-dream-machine-pro', 'ubiquiti-inc', 'UDM-Pro',
+             None, None, None, None, None, 48, self._switch_fieldset, self._depreciations['5-Year Straight-Line'], 'network-devices', 'core-router-firewall'),
+            ('UniFi Switch Pro 48 PoE', 'unifi-switch-pro-48', 'ubiquiti-inc', 'USW-PRO-48-POE',
+             None, None, None, None, None, 48, self._switch_fieldset, self._depreciations['5-Year Straight-Line'], 'network-devices', 'access-switch'),
+            ('DiskStation DS1823xs+', 'synology-ds1823xs', 'synology-inc', 'DS1823XS+',
+             'AMD Ryzen V1780B', 32, 8000, 'HDD', None, 60, None, self._depreciations['5-Year Straight-Line'], 'storage-devices', 'backup-server'),
+            ('Dell P2723DE 27" Monitor', 'dell-p2723de-monitor', 'dell-technologies', 'P2723DE',
+             '', None, None, '', '', 60, None, self._depreciations['5-Year Straight-Line'], 'monitors', 'desktop-monitor'),
+            ('Dell P2422HE 24" Monitor', 'dell-p2422he-monitor', 'dell-technologies', 'P2422HE',
+             '', None, None, '', '', 60, None, self._depreciations['5-Year Straight-Line'], 'monitors', 'desktop-monitor'),
+            ('Logitech MeetUp AV System', 'logitech-meetup', 'logitech-international', '960-001101',
+             None, None, None, None, None, 36, self._av_fieldset, self._depreciations['5-Year Straight-Line'], 'conference-systems', 'conference-av'),
+            ('Precision 7960 Tower', 'dell-precision-7960-tower', 'dell-technologies', 'PREC7960-TWR',
+             None, None, None, None, None, 48, self._laptop_fieldset, self._depreciations['4-Year Straight-Line'], 'desktops', 'cad-design-workstation'),
+        ]
+        self._asset_types = {}
+        for data in at_data:
+            model_name, slug, mfr_slug = data[0], data[1], data[2]
+            category_slug = data[12]
+            role_slug = data[13]
+            category_obj = self._categories.get(category_slug)
+            role_obj = self._asset_roles.get(role_slug)
+            obj, _ = AssetType.objects.get_or_create(
+                slug=slug,
+                defaults={
+                    'model': model_name, 'manufacturer': self._manufacturers[mfr_slug],
+                    'part_number': data[3] or '', 'eol_months': data[9],
+                    'custom_fieldset': data[10], 'depreciation': data[11],
+                    'category': category_obj, 'asset_role': role_obj,
+                }
+            )
+            self._asset_types[slug] = obj
 
         # --- Components ---
         comp_data = [
@@ -898,103 +922,153 @@ class Command(BaseCommand):
             Asset, InstalledSoftware,
         )
         from inventory.models import AccessoryAssignment, ConsumableAssignment, AccessoryStock, ConsumableStock
-        from compliance.models import CustodyReceipt
+        from compliance.models import CustodyReceipt, CustodyTemplate
         from components.models import ComponentStock, ComponentAllocation
 
         self.stdout.write('--- Phase 3: Hardware Assets ---')
 
+        # --- Custody Templates ---
+        self.stdout.write('  Seeding Custody Templates...')
+        self._custody_templates = {}
+        
+        templates_data = [
+            ('Standard Laptop Agreement', 'standard-laptop-agreement', None, None, 
+             'laptops',
+             'By signing this document, you acknowledge receipt of the IT equipment (laptop) and agree to abide by the company\'s acceptable use policy. You agree to return the equipment in good condition upon termination of your employment.',
+             'This equipment remains the property of the company and must be returned on demand.',
+             'QMS-IT-EULA-V1'),
+             
+            ('Mobile Device Agreement', 'mobile-device-agreement', None, None, 
+             'mobile-phones',
+             'By signing this document, you acknowledge receipt of the mobile device and SIM card. You agree to keep the device secured with a passcode/biometrics, and not disable any mobile device management (MDM) profiles.',
+             'This device is intended for business use. Personal use must be kept to a minimum.',
+             'QMS-IT-MOB-V1'),
+
+            ('Workstation & Desktop Agreement', 'workstation-desktop-agreement', None, None, 
+             'desktops',
+             'By signing this document, you acknowledge custody of the specified desktop workstation. You agree to ensure that it is connected only to authorized networks and not to modify its hardware configuration without IT approval.',
+             'Workstation remains the property of the company and is subject to security auditing.',
+             'QMS-IT-DSK-V1'),
+
+            ('Acme NA Specific Laptop EULA', 'acme-na-laptop-agreement', 'acme-north-america', None, 
+             'laptops',
+             'By signing this document, you acknowledge receipt of the IT equipment (laptop) and agree to the Acme North America local security guidelines, including disk encryption requirements.',
+             'This equipment remains the property of Acme North America and must be returned on demand.',
+             'QMS-NA-IT-EULA-V1'),
+        ]
+        
+        for name, slug, tenant_slug, tg_slug, cat_slug, eula, disclaimer, qms_ref in templates_data:
+            tenant_obj = self._tenants.get(tenant_slug) if tenant_slug else None
+            cat_obj = self._categories.get(cat_slug) if cat_slug else None
+            
+            obj, _ = CustodyTemplate.objects.get_or_create(
+                name=name,
+                defaults={
+                    'tenant': tenant_obj,
+                    'category': cat_obj,
+                    'eula_text': eula,
+                    'disclaimer': disclaimer,
+                    'qms_reference': qms_ref,
+                    'is_active': True,
+                    'require_acceptance': True,
+                    'email_signature_request': True,
+                    'signature_provider': 'local',
+                }
+            )
+            self._custody_templates[slug] = obj
+
         # Create 60+ assets across all types
         asset_data = [
             # (name, asset_tag, asset_type_slug, asset_role_slug, status_slug, holder_upn, location_slug, serial, purchase_cost, salvage_value, purchase_date)
-            ('MBP16 Alex Admin', 'ABX-001', 'macbook-pro-16-2024', 'laptop', 'in-use', 'alex.admin', 'berlin-floor-1-eng', 'C02ZV1R9MD6T', 3599.00, 500.00, datetime.date(2024, 3, 15)),
-            ('MBP16 Sarah Chen', 'ABX-002', 'macbook-pro-16-2024', 'laptop', 'in-use', 'sarah.chen', 'berlin-floor-1-eng', 'C02ZV2T8MD7U', 3599.00, 500.00, datetime.date(2024, 4, 10)),
-            ('Latitude 5550 Marcus', 'ABX-003', 'dell-latitude-5550', 'laptop', 'in-use', 'marcus.johnson', 'ny-floor-5-eng', 'DL5550-001', 1899.00, 300.00, datetime.date(2024, 6, 1)),
-            ('Latitude 5550 Elena', 'ABX-004', 'dell-latitude-5550', 'laptop', 'in-use', 'elena.rodriguez', 'munich-office-12a', 'DL5550-002', 1899.00, 300.00, datetime.date(2024, 7, 20)),
-            ('ThinkPad X1 Thomas', 'ABX-005', 'thinkpad-x1-carbon-g12', 'laptop', 'in-use', 'thomas.weber', 'berlin-floor-1-eng', 'TPX1-001', 2199.00, 350.00, datetime.date(2024, 5, 12)),
-            ('ThinkPad X1 Anna', 'ABX-006', 'thinkpad-x1-carbon-g12', 'laptop', 'in-use', 'anna.schmidt', 'berlin-floor-2-admin', 'TPX1-002', 2199.00, 350.00, datetime.date(2024, 5, 12)),
-            ('MBA15 James Wilson', 'ABX-007', 'macbook-air-15-2024', 'laptop', 'in-use', 'james.wilson', 'ny-floor-5-eng', 'C02XK3P9N6QW', 1499.00, 200.00, datetime.date(2024, 8, 5)),
-            ('EliteBook Yuki', 'ABX-008', 'hp-elitebook-860-g11', 'laptop', 'in-use', 'yuki.tanaka', 'berlin-floor-2-admin', 'HPEB-001', 2099.00, 300.00, datetime.date(2024, 4, 22)),
-            ('MBP16 Omar Hassan', 'ABX-009', 'macbook-pro-16-2024', 'laptop', 'in-use', 'omar.hassan', 'munich-office-12a', 'C02ZV5R0PD8VX', 3599.00, 500.00, datetime.date(2024, 9, 1)),
-            ('M2 Ultra Dev Server', 'ABX-010', 'mac-studio-2024', 'laptop', 'in-use', None, 'berlin-server-room-a', 'C07XM8S2DT6P', 6999.00, 1000.00, datetime.date(2024, 2, 10)),
-            ('EliteBook Lisa', 'ABX-011', 'hp-elitebook-860-g11', 'laptop', 'in-use', 'lisa.andersson', 'berlin-floor-1-eng', 'HPEB-002', 2099.00, 300.00, datetime.date(2024, 11, 8)),
-            ('Latitude 5550 Carlos', 'ABX-012', 'dell-latitude-5550', 'laptop', 'in-use', 'carlos.mendez', 'ny-floor-6-sales', 'DL5550-003', 1899.00, 300.00, datetime.date(2024, 10, 15)),
-            ('ThinkPad X1 Priya', 'ABX-013', 'thinkpad-x1-carbon-g12', 'laptop', 'in-use', 'priya.patel', 'berlin-floor-1-eng', 'TPX1-003', 2199.00, 350.00, datetime.date(2024, 6, 18)),
-            ('Precision 5680 WS-1', 'ABX-014', 'dell-precision-5680', 'laptop', 'in-use', None, 'berlin-floor-1-eng', 'PREC-001', 4299.00, 600.00, datetime.date(2024, 1, 25)),
-            ('Precision 5680 WS-2', 'ABX-015', 'dell-precision-5680', 'laptop', 'available', None, 'berlin-floor-1-eng', 'PREC-002', 4299.00, 600.00, datetime.date(2024, 1, 25)),
-            ('Mac Studio Design', 'ABX-016', 'mac-studio-2024', 'desktop', 'in-use', None, 'berlin-floor-1-eng', 'C07XM9G4DT8Q', 6999.00, 1000.00, datetime.date(2024, 3, 1)),
-            ('OptiPlex 7010 Finance-1', 'ABX-017', 'dell-optiplex-7010', 'desktop', 'in-use', None, 'berlin-floor-2-admin', 'OPT-001', 1299.00, 200.00, datetime.date(2024, 4, 5)),
-            ('OptiPlex 7010 Finance-2', 'ABX-018', 'dell-optiplex-7010', 'desktop', 'in-use', None, 'berlin-floor-2-admin', 'OPT-002', 1299.00, 200.00, datetime.date(2024, 4, 5)),
-            ('OptiPlex 7010 HR-1', 'ABX-019', 'dell-optiplex-7010', 'desktop', 'in-use', None, 'berlin-floor-2-admin', 'OPT-003', 1299.00, 200.00, datetime.date(2024, 4, 12)),
-            ('OptiPlex 7010 Exec-1', 'ABX-020', 'dell-optiplex-7010', 'desktop', 'in-use', None, 'berlin-floor-3-exec', 'OPT-004', 1299.00, 200.00, datetime.date(2024, 2, 28)),
-            ('ThinkCentre M90q Backup', 'ABX-021', 'thinkcentre-m90q-gen5', 'desktop', 'available', None, 'berlin-server-room-a', 'TCM-001', 899.00, 100.00, datetime.date(2024, 8, 15)),
-            ('PowerEdge R760 Prod-1', 'ABX-022', 'dell-poweredge-r760', 'server', 'in-use', None, 'ams-rack-row-1', 'SRV-PROD-01', 18500.00, 2000.00, datetime.date(2024, 1, 10)),
-            ('PowerEdge R760 Prod-2', 'ABX-023', 'dell-poweredge-r760', 'server', 'in-use', None, 'ams-rack-row-1', 'SRV-PROD-02', 18500.00, 2000.00, datetime.date(2024, 1, 10)),
-            ('ProLiant DL380 Dev-1', 'ABX-024', 'hpe-proliant-dl380-g11', 'server', 'in-use', None, 'ams-rack-row-2', 'SRV-DEV-01', 12500.00, 1500.00, datetime.date(2024, 3, 20)),
-            ('PowerEdge R760 Backup', 'ABX-025', 'dell-poweredge-r760', 'server', 'available', None, 'ams-rack-row-2', 'SRV-BACKUP-01', 18500.00, 2000.00, datetime.date(2024, 6, 1)),
-            ('iPhone 15 Pro Alex', 'ABX-026', 'iphone-15-pro', 'mobile-phone', 'in-use', 'alex.admin', 'berlin-floor-1-eng', 'IP15P-001', 1299.00, 150.00, datetime.date(2024, 9, 22)),
-            ('iPhone 15 Pro Sarah', 'ABX-027', 'iphone-15-pro', 'mobile-phone', 'in-use', 'sarah.chen', 'berlin-floor-1-eng', 'IP15P-002', 1299.00, 150.00, datetime.date(2024, 9, 22)),
-            ('iPhone 15 Pro Marcus', 'ABX-028', 'iphone-15-pro', 'mobile-phone', 'in-use', 'marcus.johnson', 'ny-floor-5-eng', 'IP15P-003', 1299.00, 150.00, datetime.date(2024, 9, 25)),
-            ('Galaxy S24 Elena', 'ABX-029', 'galaxy-s24-ultra', 'mobile-phone', 'in-use', 'elena.rodriguez', 'munich-office-12a', 'S24U-001', 1249.00, 150.00, datetime.date(2024, 10, 5)),
-            ('iPad Pro James', 'ABX-030', 'ipad-pro-129-2024', 'tablet', 'in-use', 'james.wilson', 'ny-floor-5-eng', 'IPP-001', 1099.00, 100.00, datetime.date(2024, 7, 15)),
-            ('Surface Pro Thomas', 'ABX-031', 'surface-pro-10', 'tablet', 'in-use', 'thomas.weber', 'berlin-floor-3-exec', 'SP10-001', 1799.00, 200.00, datetime.date(2024, 8, 20)),
-            ('Catalyst 9300 Core-1', 'ABX-032', 'cisco-catalyst-9300', 'network-device', 'in-use', None, 'ams-rack-row-3', 'C9300-CORE-01', 8500.00, 500.00, datetime.date(2024, 2, 1)),
-            ('Catalyst 9300 Core-2', 'ABX-033', 'cisco-catalyst-9300', 'network-device', 'available', None, 'berlin-server-room-a', 'C9300-CORE-02', 8500.00, 500.00, datetime.date(2024, 2, 1)),
-            ('Meraki MR46 AP-1', 'ABX-034', 'meraki-mr46', 'network-device', 'in-use', None, 'berlin-floor-1-eng', 'MR46-AP-01', 1200.00, 100.00, datetime.date(2024, 3, 5)),
-            ('Meraki MR46 AP-2', 'ABX-035', 'meraki-mr46', 'network-device', 'in-use', None, 'berlin-floor-2-admin', 'MR46-AP-02', 1200.00, 100.00, datetime.date(2024, 3, 5)),
-            ('UDM Pro Gateway', 'ABX-036', 'unifi-dream-machine-pro', 'network-device', 'in-use', None, 'berlin-server-room-a', 'UDM-PRO-01', 379.00, 50.00, datetime.date(2024, 1, 15)),
-            ('Synology NAS Primary', 'ABX-037', 'synology-ds1823xs', 'storage-device', 'in-use', None, 'ams-rack-row-2', 'NAS-PRIMARY-01', 4200.00, 400.00, datetime.date(2024, 5, 10)),
-            ('Dell P2723DE Monitor-1', 'ABX-038', 'dell-p2723de-monitor', 'monitor', 'in-use', 'alex.admin', 'berlin-floor-1-eng', 'MON-DELL-01', 499.00, 50.00, datetime.date(2024, 3, 15)),
-            ('Dell P2723DE Monitor-2', 'ABX-039', 'dell-p2723de-monitor', 'monitor', 'in-use', 'sarah.chen', 'berlin-floor-1-eng', 'MON-DELL-02', 499.00, 50.00, datetime.date(2024, 4, 10)),
-            ('Latitude 5550 Spare-1', 'ABX-040', 'dell-latitude-5550', 'laptop', 'available', None, 'berlin-floor-1-eng', 'DL5550-SP01', 1899.00, 300.00, datetime.date(2024, 10, 1)),
-            ('Latitude 5550 Spare-2', 'ABX-041', 'dell-latitude-5550', 'laptop', 'available', None, 'ny-floor-5-eng', 'DL5550-SP02', 1899.00, 300.00, datetime.date(2024, 10, 1)),
-            ('MBP16 Repair-1', 'ABX-042', 'macbook-pro-16-2024', 'laptop', 'pending-repair', None, 'berlin-floor-1-eng', 'C02ZV0R5LD1UY', 3599.00, 500.00, datetime.date(2024, 2, 20)),
-            ('ThinkPad X1 Retired-1', 'ABX-043', 'thinkpad-x1-carbon-g12', 'laptop', 'retired', None, 'berlin-server-room-a', 'TPX1-RET-01', 1899.00, 100.00, datetime.date(2021, 3, 15)),
-            ('iPhone 15 Pro Spare', 'ABX-044', 'iphone-15-pro', 'mobile-phone', 'available', None, 'berlin-floor-3-exec', 'IP15P-SP01', 1299.00, 150.00, datetime.date(2024, 11, 1)),
-            ('iPad Pro Spare', 'ABX-045', 'ipad-pro-129-2024', 'tablet', 'available', None, 'ny-floor-6-sales', 'IPP-SP01', 1099.00, 100.00, datetime.date(2024, 11, 1)),
-            ('OptiPlex 7010 Reception', 'ABX-046', 'dell-optiplex-7010', 'desktop', 'in-use', None, 'berlin-floor-3-exec', 'OPT-REC-01', 1299.00, 200.00, datetime.date(2024, 5, 20)),
+            ('MBP16 Alex Admin', 'ABX-001', 'macbook-pro-16-2024', 'executive-workstation', 'in-use', 'alex.admin', 'berlin-floor-1-eng', 'C02ZV1R9MD6T', 3599.00, 500.00, datetime.date(2024, 3, 15)),
+            ('MBP16 Sarah Chen', 'ABX-002', 'macbook-pro-16-2024', 'developer-workstation', 'in-use', 'sarah.chen', 'berlin-floor-1-eng', 'C02ZV2T8MD7U', 3599.00, 500.00, datetime.date(2024, 4, 10)),
+            ('Latitude 5550 Marcus', 'ABX-003', 'dell-latitude-5550', 'standard-workstation', 'in-use', 'marcus.johnson', 'ny-floor-5-eng', 'DL5550-001', 1899.00, 300.00, datetime.date(2024, 6, 1)),
+            ('Latitude 5550 Elena', 'ABX-004', 'dell-latitude-5550', 'standard-workstation', 'in-use', 'elena.rodriguez', 'munich-office-12a', 'DL5550-002', 1899.00, 300.00, datetime.date(2024, 7, 20)),
+            ('ThinkPad X1 Thomas', 'ABX-005', 'thinkpad-x1-carbon-g12', 'developer-workstation', 'in-use', 'thomas.weber', 'berlin-floor-1-eng', 'TPX1-001', 2199.00, 350.00, datetime.date(2024, 5, 12)),
+            ('ThinkPad X1 Anna', 'ABX-006', 'thinkpad-x1-carbon-g12', 'standard-workstation', 'in-use', 'anna.schmidt', 'berlin-floor-2-admin', 'TPX1-002', 2199.00, 350.00, datetime.date(2024, 5, 12)),
+            ('MBA15 James Wilson', 'ABX-007', 'macbook-air-15-2024', 'standard-workstation', 'in-use', 'james.wilson', 'ny-floor-5-eng', 'C02XK3P9N6QW', 1499.00, 200.00, datetime.date(2024, 8, 5)),
+            ('EliteBook Yuki', 'ABX-008', 'hp-elitebook-860-g11', 'standard-workstation', 'in-use', 'yuki.tanaka', 'berlin-floor-2-admin', 'HPEB-001', 2099.00, 300.00, datetime.date(2024, 4, 22)),
+            ('MBP16 Omar Hassan', 'ABX-009', 'macbook-pro-16-2024', 'developer-workstation', 'in-use', 'omar.hassan', 'munich-office-12a', 'C02ZV5R0PD8VX', 3599.00, 500.00, datetime.date(2024, 9, 1)),
+            ('M2 Ultra Dev Server', 'ABX-010', 'mac-studio-2024', 'build-ci-agent', 'in-use', None, 'berlin-server-room-a', 'C07XM8S2DT6P', 6999.00, 1000.00, datetime.date(2024, 2, 10)),
+            ('EliteBook Lisa', 'ABX-011', 'hp-elitebook-860-g11', 'standard-workstation', 'in-use', 'lisa.andersson', 'berlin-floor-1-eng', 'HPEB-002', 2099.00, 300.00, datetime.date(2024, 11, 8)),
+            ('Latitude 5550 Carlos', 'ABX-012', 'dell-latitude-5550', 'standard-workstation', 'in-use', 'carlos.mendez', 'ny-floor-6-sales', 'DL5550-003', 1899.00, 300.00, datetime.date(2024, 10, 15)),
+            ('ThinkPad X1 Priya', 'ABX-013', 'thinkpad-x1-carbon-g12', 'developer-workstation', 'in-use', 'priya.patel', 'berlin-floor-1-eng', 'TPX1-003', 2199.00, 350.00, datetime.date(2024, 6, 18)),
+            ('Precision 5680 WS-1', 'ABX-014', 'dell-precision-5680', 'cad-design-workstation', 'in-use', None, 'berlin-floor-1-eng', 'PREC-001', 4299.00, 600.00, datetime.date(2024, 1, 25)),
+            ('Precision 5680 WS-2', 'ABX-015', 'dell-precision-5680', 'cad-design-workstation', 'available', None, 'berlin-floor-1-eng', 'PREC-002', 4299.00, 600.00, datetime.date(2024, 1, 25)),
+            ('Mac Studio Design', 'ABX-016', 'mac-studio-2024', 'cad-design-workstation', 'in-use', None, 'berlin-floor-1-eng', 'C07XM9G4DT8Q', 6999.00, 1000.00, datetime.date(2024, 3, 1)),
+            ('OptiPlex 7010 Finance-1', 'ABX-017', 'dell-optiplex-7010', 'standard-workstation', 'in-use', None, 'berlin-floor-2-admin', 'OPT-001', 1299.00, 200.00, datetime.date(2024, 4, 5)),
+            ('OptiPlex 7010 Finance-2', 'ABX-018', 'dell-optiplex-7010', 'standard-workstation', 'in-use', None, 'berlin-floor-2-admin', 'OPT-002', 1299.00, 200.00, datetime.date(2024, 4, 5)),
+            ('OptiPlex 7010 HR-1', 'ABX-019', 'dell-optiplex-7010', 'standard-workstation', 'in-use', None, 'berlin-floor-2-admin', 'OPT-003', 1299.00, 200.00, datetime.date(2024, 4, 12)),
+            ('OptiPlex 7010 Exec-1', 'ABX-020', 'dell-optiplex-7010', 'standard-workstation', 'in-use', None, 'berlin-floor-3-exec', 'OPT-004', 1299.00, 200.00, datetime.date(2024, 2, 28)),
+            ('ThinkCentre M90q Backup', 'ABX-021', 'thinkcentre-m90q-gen5', 'standard-workstation', 'available', None, 'berlin-server-room-a', 'TCM-001', 899.00, 100.00, datetime.date(2024, 8, 15)),
+            ('PowerEdge R760 Prod-1', 'ABX-022', 'dell-poweredge-r760', 'virtualization-host-server', 'in-use', None, 'ams-rack-row-1', 'SRV-PROD-01', 18500.00, 2000.00, datetime.date(2024, 1, 10)),
+            ('PowerEdge R760 Prod-2', 'ABX-023', 'dell-poweredge-r760', 'database-server', 'in-use', None, 'ams-rack-row-1', 'SRV-PROD-02', 18500.00, 2000.00, datetime.date(2024, 1, 10)),
+            ('ProLiant DL380 Dev-1', 'ABX-024', 'hpe-proliant-dl380-g11', 'application-server', 'in-use', None, 'ams-rack-row-2', 'SRV-DEV-01', 12500.00, 1500.00, datetime.date(2024, 3, 20)),
+            ('PowerEdge R760 Backup', 'ABX-025', 'dell-poweredge-r760', 'backup-server', 'available', None, 'ams-rack-row-2', 'SRV-BACKUP-01', 18500.00, 2000.00, datetime.date(2024, 6, 1)),
+            ('iPhone 15 Pro Alex', 'ABX-026', 'iphone-15-pro', 'corporate-smartphone', 'in-use', 'alex.admin', 'berlin-floor-1-eng', 'IP15P-001', 1299.00, 150.00, datetime.date(2024, 9, 22)),
+            ('iPhone 15 Pro Sarah', 'ABX-027', 'iphone-15-pro', 'corporate-smartphone', 'in-use', 'sarah.chen', 'berlin-floor-1-eng', 'IP15P-002', 1299.00, 150.00, datetime.date(2024, 9, 22)),
+            ('iPhone 15 Pro Marcus', 'ABX-028', 'iphone-15-pro', 'corporate-smartphone', 'in-use', 'marcus.johnson', 'ny-floor-5-eng', 'IP15P-003', 1299.00, 150.00, datetime.date(2024, 9, 25)),
+            ('Galaxy S24 Elena', 'ABX-029', 'galaxy-s24-ultra', 'corporate-smartphone', 'in-use', 'elena.rodriguez', 'munich-office-12a', 'S24U-001', 1249.00, 150.00, datetime.date(2024, 10, 5)),
+            ('iPad Pro James', 'ABX-030', 'ipad-pro-129-2024', 'field-tablet', 'in-use', 'james.wilson', 'ny-floor-5-eng', 'IPP-001', 1099.00, 100.00, datetime.date(2024, 7, 15)),
+            ('Surface Pro Thomas', 'ABX-031', 'surface-pro-10', 'field-tablet', 'in-use', 'thomas.weber', 'berlin-floor-3-exec', 'SP10-001', 1799.00, 200.00, datetime.date(2024, 8, 20)),
+            ('Catalyst 9300 Core-1', 'ABX-032', 'cisco-catalyst-9300', 'access-switch', 'in-use', None, 'ams-rack-row-3', 'C9300-CORE-01', 8500.00, 500.00, datetime.date(2024, 2, 1)),
+            ('Catalyst 9300 Core-2', 'ABX-033', 'cisco-catalyst-9300', 'access-switch', 'available', None, 'berlin-server-room-a', 'C9300-CORE-02', 8500.00, 500.00, datetime.date(2024, 2, 1)),
+            ('Meraki MR46 AP-1', 'ABX-034', 'meraki-mr46', 'wireless-ap', 'in-use', None, 'berlin-floor-1-eng', 'MR46-AP-01', 1200.00, 100.00, datetime.date(2024, 3, 5)),
+            ('Meraki MR46 AP-2', 'ABX-035', 'meraki-mr46', 'wireless-ap', 'in-use', None, 'berlin-floor-2-admin', 'MR46-AP-02', 1200.00, 100.00, datetime.date(2024, 3, 5)),
+            ('UDM Pro Gateway', 'ABX-036', 'unifi-dream-machine-pro', 'core-router-firewall', 'in-use', None, 'berlin-server-room-a', 'UDM-PRO-01', 379.00, 50.00, datetime.date(2024, 1, 15)),
+            ('Synology NAS Primary', 'ABX-037', 'synology-ds1823xs', 'backup-server', 'in-use', None, 'ams-rack-row-2', 'NAS-PRIMARY-01', 4200.00, 400.00, datetime.date(2024, 5, 10)),
+            ('Dell P2723DE Monitor-1', 'ABX-038', 'dell-p2723de-monitor', 'desktop-monitor', 'in-use', 'alex.admin', 'berlin-floor-1-eng', 'MON-DELL-01', 499.00, 50.00, datetime.date(2024, 3, 15)),
+            ('Dell P2723DE Monitor-2', 'ABX-039', 'dell-p2723de-monitor', 'desktop-monitor', 'in-use', 'sarah.chen', 'berlin-floor-1-eng', 'MON-DELL-02', 499.00, 50.00, datetime.date(2024, 4, 10)),
+            ('Latitude 5550 Spare-1', 'ABX-040', 'dell-latitude-5550', 'standard-workstation', 'available', None, 'berlin-floor-1-eng', 'DL5550-SP01', 1899.00, 300.00, datetime.date(2024, 10, 1)),
+            ('Latitude 5550 Spare-2', 'ABX-041', 'dell-latitude-5550', 'standard-workstation', 'available', None, 'ny-floor-5-eng', 'DL5550-SP02', 1899.00, 300.00, datetime.date(2024, 10, 1)),
+            ('MBP16 Repair-1', 'ABX-042', 'macbook-pro-16-2024', 'developer-workstation', 'pending-repair', None, 'berlin-floor-1-eng', 'C02ZV0R5LD1UY', 3599.00, 500.00, datetime.date(2024, 2, 20)),
+            ('ThinkPad X1 Retired-1', 'ABX-043', 'thinkpad-x1-carbon-g12', 'developer-workstation', 'retired', None, 'berlin-server-room-a', 'TPX1-RET-01', 1899.00, 100.00, datetime.date(2021, 3, 15)),
+            ('iPhone 15 Pro Spare', 'ABX-044', 'iphone-15-pro', 'corporate-smartphone', 'available', None, 'berlin-floor-3-exec', 'IP15P-SP01', 1299.00, 150.00, datetime.date(2024, 11, 1)),
+            ('iPad Pro Spare', 'ABX-045', 'ipad-pro-129-2024', 'field-tablet', 'available', None, 'ny-floor-6-sales', 'IPP-SP01', 1099.00, 100.00, datetime.date(2024, 11, 1)),
+            ('OptiPlex 7010 Reception', 'ABX-046', 'dell-optiplex-7010', 'kiosk-reception-terminal', 'in-use', None, 'berlin-floor-3-exec', 'OPT-REC-01', 1299.00, 200.00, datetime.date(2024, 5, 20)),
             # New internal networking, AV & high-end desktop workstation assets
-            ('UniFi Switch 48 Berlin HQ', 'ABX-050', 'unifi-switch-pro-48', 'network-device', 'in-use', None, 'berlin-server-room-a', 'USW-PRO-48-001', 1099.00, 100.00, datetime.date(2024, 4, 1)),
-            ('UniFi Switch 48 AMS DC', 'ABX-051', 'unifi-switch-pro-48', 'network-device', 'in-use', None, 'ams-rack-row-3', 'USW-PRO-48-002', 1099.00, 100.00, datetime.date(2024, 4, 5)),
-            ('Berlin Room 12 AV', 'ABX-052', 'logitech-meetup', 'peripheral', 'in-use', None, 'berlin-floor-1-eng', 'LOG-AV-001', 899.00, 50.00, datetime.date(2024, 6, 12)),
-            ('Munich Room A AV', 'ABX-053', 'logitech-meetup', 'peripheral', 'in-use', None, 'munich-office-12a', 'LOG-AV-002', 899.00, 50.00, datetime.date(2024, 6, 15)),
-            ('Precision 7960 Oliver', 'ABX-054', 'dell-precision-7960-tower', 'desktop', 'in-use', 'oliver.smith', 'berlin-floor-1-eng', 'PREC7960-001', 5499.00, 800.00, datetime.date(2024, 5, 1)),
-            ('Precision 7960 Sophia', 'ABX-055', 'dell-precision-7960-tower', 'desktop', 'in-use', 'sophia.martinez', 'berlin-floor-1-eng', 'PREC7960-002', 5499.00, 800.00, datetime.date(2024, 5, 1)),
+            ('UniFi Switch 48 Berlin HQ', 'ABX-050', 'unifi-switch-pro-48', 'access-switch', 'in-use', None, 'berlin-server-room-a', 'USW-PRO-48-001', 1099.00, 100.00, datetime.date(2024, 4, 1)),
+            ('UniFi Switch 48 AMS DC', 'ABX-051', 'unifi-switch-pro-48', 'access-switch', 'in-use', None, 'ams-rack-row-3', 'USW-PRO-48-002', 1099.00, 100.00, datetime.date(2024, 4, 5)),
+            ('Berlin Room 12 AV', 'ABX-052', 'logitech-meetup', 'conference-av', 'in-use', None, 'berlin-floor-1-eng', 'LOG-AV-001', 899.00, 50.00, datetime.date(2024, 6, 12)),
+            ('Munich Room A AV', 'ABX-053', 'logitech-meetup', 'conference-av', 'in-use', None, 'munich-office-12a', 'LOG-AV-002', 899.00, 50.00, datetime.date(2024, 6, 15)),
+            ('Precision 7960 Oliver', 'ABX-054', 'dell-precision-7960-tower', 'developer-workstation', 'in-use', 'oliver.smith', 'berlin-floor-1-eng', 'PREC7960-001', 5499.00, 800.00, datetime.date(2024, 5, 1)),
+            ('Precision 7960 Sophia', 'ABX-055', 'dell-precision-7960-tower', 'developer-workstation', 'in-use', 'sophia.martinez', 'berlin-floor-1-eng', 'PREC7960-002', 5499.00, 800.00, datetime.date(2024, 5, 1)),
             # Customer Tenant Assets
-            ('Latitude 5550 Klaus', 'FIN-001', 'dell-latitude-5550', 'laptop', 'in-use', 'klaus.fischer', 'globex-floor-2-trading', 'DL5550-FIN01', 1899.00, 300.00, datetime.date(2024, 3, 1)),
-            ('Latitude 5550 Nina', 'FIN-002', 'dell-latitude-5550', 'laptop', 'in-use', 'nina.bergmann', 'globex-floor-3-risk', 'DL5550-FIN02', 1899.00, 300.00, datetime.date(2024, 3, 15)),
-            ('EliteBook 860 Dr. Wagner', 'MED-001', 'hp-elitebook-860-g11', 'laptop', 'in-use', 'markus.wagner', 'medicare-ward-admin', 'HPEB-MED01', 2099.00, 300.00, datetime.date(2024, 4, 1)),
-            ('EliteBook 860 Sophie', 'MED-002', 'hp-elitebook-860-g11', 'laptop', 'in-use', 'sophie.klein', 'medicare-lab-research', 'HPEB-MED02', 2099.00, 300.00, datetime.date(2024, 4, 15)),
-            ('MB Air 15 Felix', 'TSI-001', 'macbook-air-15-2024', 'laptop', 'in-use', 'felix.bauer', 'techstartup-open-space', 'MBA-TSI01', 1499.00, 200.00, datetime.date(2024, 5, 1)),
-            ('MB Air 15 Lena', 'TSI-002', 'macbook-air-15-2024', 'laptop', 'in-use', 'lena.schulz', 'techstartup-eng-lab', 'MBA-TSI02', 1499.00, 200.00, datetime.date(2024, 5, 10)),
-            ('ThinkPad X1 Jonas', 'GRE-001', 'thinkpad-x1-carbon-g12', 'laptop', 'in-use', 'jonas.hoffmann', 'greenenergy-wind-analytics', 'TPX1-GRE01', 2199.00, 350.00, datetime.date(2024, 6, 1)),
-            ('ThinkPad X1 Katja', 'GRE-002', 'thinkpad-x1-carbon-g12', 'laptop', 'in-use', 'katja.vogel', 'greenenergy-solar-ops', 'TPX1-GRE02', 2199.00, 350.00, datetime.date(2024, 6, 1)),
-            ('OptiPlex 7010 Globex-1', 'FIN-003', 'dell-optiplex-7010', 'desktop', 'in-use', None, 'globex-floor-2-trading', 'OPT-FIN01', 1299.00, 200.00, datetime.date(2024, 2, 15)),
-            ('OptiPlex 7010 Globex-2', 'FIN-004', 'dell-optiplex-7010', 'desktop', 'in-use', None, 'globex-floor-3-risk', 'OPT-FIN02', 1299.00, 200.00, datetime.date(2024, 2, 15)),
-            ('Mac Studio TechStartup', 'TSI-003', 'mac-studio-2024', 'desktop', 'in-use', None, 'techstartup-eng-lab', 'MST-TSI01', 6999.00, 1000.00, datetime.date(2024, 6, 15)),
-            ('iPhone 15 Pro Klaus', 'FIN-005', 'iphone-15-pro', 'mobile-phone', 'in-use', 'klaus.fischer', 'globex-floor-2-trading', 'IP15P-FIN01', 1299.00, 150.00, datetime.date(2024, 10, 1)),
-            ('iPad Pro Medicare', 'MED-003', 'ipad-pro-129-2024', 'tablet', 'in-use', 'markus.wagner', 'medicare-ward-admin', 'IPP-MED01', 1099.00, 100.00, datetime.date(2024, 8, 1)),
-            ('Surface Pro GreenEnergy', 'GRE-003', 'surface-pro-10', 'tablet', 'in-use', 'jonas.hoffmann', 'greenenergy-wind-analytics', 'SP10-GRE01', 1799.00, 200.00, datetime.date(2024, 7, 15)),
-            ('Dell P2422HE Globex 1', 'FIN-006', 'dell-p2422he-monitor', 'monitor', 'in-use', 'klaus.fischer', 'globex-floor-2-trading', 'MON-FIN01', 379.00, 30.00, datetime.date(2024, 3, 1)),
-            ('Dell P2422HE Globex 2', 'FIN-007', 'dell-p2422he-monitor', 'monitor', 'in-use', 'nina.bergmann', 'globex-floor-3-risk', 'MON-FIN02', 379.00, 30.00, datetime.date(2024, 3, 15)),
-            ('Latitude 5550 GreenEnergy Spare', 'GRE-004', 'dell-latitude-5550', 'laptop', 'available', None, 'greenenergy-wind-analytics', 'DL5550-GRE01', 1899.00, 300.00, datetime.date(2024, 8, 1)),
-            ('EliteBook 860 Globex Spare', 'FIN-008', 'hp-elitebook-860-g11', 'laptop', 'available', None, 'globex-floor-2-trading', 'HPEB-FIN01', 2099.00, 300.00, datetime.date(2024, 7, 1)),
+            ('Latitude 5550 Klaus', 'FIN-001', 'dell-latitude-5550', 'standard-workstation', 'in-use', 'klaus.fischer', 'globex-floor-2-trading', 'DL5550-FIN01', 1899.00, 300.00, datetime.date(2024, 3, 1)),
+            ('Latitude 5550 Nina', 'FIN-002', 'dell-latitude-5550', 'standard-workstation', 'in-use', 'nina.bergmann', 'globex-floor-3-risk', 'DL5550-FIN02', 1899.00, 300.00, datetime.date(2024, 3, 15)),
+            ('EliteBook 860 Dr. Wagner', 'MED-001', 'hp-elitebook-860-g11', 'standard-workstation', 'in-use', 'markus.wagner', 'medicare-ward-admin', 'HPEB-MED01', 2099.00, 300.00, datetime.date(2024, 4, 1)),
+            ('EliteBook 860 Sophie', 'MED-002', 'hp-elitebook-860-g11', 'standard-workstation', 'in-use', 'sophie.klein', 'medicare-lab-research', 'HPEB-MED02', 2099.00, 300.00, datetime.date(2024, 4, 15)),
+            ('MB Air 15 Felix', 'TSI-001', 'macbook-air-15-2024', 'developer-workstation', 'in-use', 'felix.bauer', 'techstartup-open-space', 'MBA-TSI01', 1499.00, 200.00, datetime.date(2024, 5, 1)),
+            ('MB Air 15 Lena', 'TSI-002', 'macbook-air-15-2024', 'developer-workstation', 'in-use', 'lena.schulz', 'techstartup-eng-lab', 'MBA-TSI02', 1499.00, 200.00, datetime.date(2024, 5, 10)),
+            ('ThinkPad X1 Jonas', 'GRE-001', 'thinkpad-x1-carbon-g12', 'developer-workstation', 'in-use', 'jonas.hoffmann', 'greenenergy-wind-analytics', 'TPX1-GRE01', 2199.00, 350.00, datetime.date(2024, 6, 1)),
+            ('ThinkPad X1 Katja', 'GRE-002', 'thinkpad-x1-carbon-g12', 'developer-workstation', 'in-use', 'katja.vogel', 'greenenergy-solar-ops', 'TPX1-GRE02', 2199.00, 350.00, datetime.date(2024, 6, 1)),
+            ('OptiPlex 7010 Globex-1', 'FIN-003', 'dell-optiplex-7010', 'standard-workstation', 'in-use', None, 'globex-floor-2-trading', 'OPT-FIN01', 1299.00, 200.00, datetime.date(2024, 2, 15)),
+            ('OptiPlex 7010 Globex-2', 'FIN-004', 'dell-optiplex-7010', 'standard-workstation', 'in-use', None, 'globex-floor-3-risk', 'OPT-FIN02', 1299.00, 200.00, datetime.date(2024, 2, 15)),
+            ('Mac Studio TechStartup', 'TSI-003', 'mac-studio-2024', 'developer-workstation', 'in-use', None, 'techstartup-eng-lab', 'MST-TSI01', 6999.00, 1000.00, datetime.date(2024, 6, 15)),
+            ('iPhone 15 Pro Klaus', 'FIN-005', 'iphone-15-pro', 'corporate-smartphone', 'in-use', 'klaus.fischer', 'globex-floor-2-trading', 'IP15P-FIN01', 1299.00, 150.00, datetime.date(2024, 10, 1)),
+            ('iPad Pro Medicare', 'MED-003', 'ipad-pro-129-2024', 'field-tablet', 'in-use', 'markus.wagner', 'medicare-ward-admin', 'IPP-MED01', 1099.00, 100.00, datetime.date(2024, 8, 1)),
+            ('Surface Pro GreenEnergy', 'GRE-003', 'surface-pro-10', 'field-tablet', 'in-use', 'jonas.hoffmann', 'greenenergy-wind-analytics', 'SP10-GRE01', 1799.00, 200.00, datetime.date(2024, 7, 15)),
+            ('Dell P2422HE Globex 1', 'FIN-006', 'dell-p2422he-monitor', 'desktop-monitor', 'in-use', 'klaus.fischer', 'globex-floor-2-trading', 'MON-FIN01', 379.00, 30.00, datetime.date(2024, 3, 1)),
+            ('Dell P2422HE Globex 2', 'FIN-007', 'dell-p2422he-monitor', 'desktop-monitor', 'in-use', 'nina.bergmann', 'globex-floor-3-risk', 'MON-FIN02', 379.00, 30.00, datetime.date(2024, 3, 15)),
+            ('Latitude 5550 GreenEnergy Spare', 'GRE-004', 'dell-latitude-5550', 'standard-workstation', 'available', None, 'greenenergy-wind-analytics', 'DL5550-GRE01', 1899.00, 300.00, datetime.date(2024, 8, 1)),
+            ('EliteBook 860 Globex Spare', 'FIN-008', 'hp-elitebook-860-g11', 'standard-workstation', 'available', None, 'globex-floor-2-trading', 'HPEB-FIN01', 2099.00, 300.00, datetime.date(2024, 7, 1)),
             # New Customer Tenant Assets (Apex Logistics and Quantum Robotics)
-            ('Latitude 5550 Noah', 'APX-001', 'dell-latitude-5550', 'laptop', 'in-use', 'noah.schmidt', 'frankfurt-depot-shelf-b', 'DL5550-APX01', 1899.00, 300.00, datetime.date(2024, 5, 1)),
-            ('Latitude 5550 Mia', 'APX-002', 'dell-latitude-5550', 'laptop', 'in-use', 'mia.petrov', 'frankfurt-depot-shelf-b', 'DL5550-APX02', 1899.00, 300.00, datetime.date(2024, 5, 10)),
-            ('ThinkPad X1 David', 'QNT-001', 'thinkpad-x1-carbon-g12', 'laptop', 'in-use', 'david.kim', 'boston-assembly-floor', 'TPX1-QNT01', 2199.00, 350.00, datetime.date(2024, 6, 1)),
-            ('ThinkPad X1 Wei', 'QNT-002', 'thinkpad-x1-carbon-g12', 'laptop', 'in-use', 'wei.zhang', 'boston-assembly-floor', 'TPX1-QNT02', 2199.00, 350.00, datetime.date(2024, 6, 1)),
-            ('Precision 7960 Alex', 'QNT-003', 'dell-precision-7960-tower', 'desktop', 'in-use', 'alexander.gruber', 'boston-assembly-floor', 'PREC7960-QNT01', 5499.00, 800.00, datetime.date(2024, 6, 10)),
+            ('Latitude 5550 Noah', 'APX-001', 'dell-latitude-5550', 'standard-workstation', 'in-use', 'noah.schmidt', 'frankfurt-depot-shelf-b', 'DL5550-APX01', 1899.00, 300.00, datetime.date(2024, 5, 1)),
+            ('Latitude 5550 Mia', 'APX-002', 'dell-latitude-5550', 'standard-workstation', 'in-use', 'mia.petrov', 'frankfurt-depot-shelf-b', 'DL5550-APX02', 1899.00, 300.00, datetime.date(2024, 5, 10)),
+            ('ThinkPad X1 David', 'QNT-001', 'thinkpad-x1-carbon-g12', 'developer-workstation', 'in-use', 'david.kim', 'boston-assembly-floor', 'TPX1-QNT01', 2199.00, 350.00, datetime.date(2024, 6, 1)),
+            ('ThinkPad X1 Wei', 'QNT-002', 'thinkpad-x1-carbon-g12', 'developer-workstation', 'in-use', 'wei.zhang', 'boston-assembly-floor', 'TPX1-QNT02', 2199.00, 350.00, datetime.date(2024, 6, 1)),
+            ('Precision 7960 Alex', 'QNT-003', 'dell-precision-7960-tower', 'cad-design-workstation', 'in-use', 'alexander.gruber', 'boston-assembly-floor', 'PREC7960-QNT01', 5499.00, 800.00, datetime.date(2024, 6, 10)),
         ]
 
         # Dynamically generate 800 additional assets spread across companies
         at_slugs = list(self._asset_types.keys())
-        role_slugs = ['laptop', 'desktop', 'monitor', 'mobile-phone', 'tablet', 'network-device', 'server']
         loc_slugs = list(self._locations.keys())
         
         for i in range(1, 801):
             tag = f'GEN-{i:04d}'
             at_slug = random.choice(at_slugs)
-            role_slug = random.choice(role_slugs)
+            at_obj = self._asset_types[at_slug]
+            role_slug = at_obj.asset_role.slug if at_obj.asset_role else 'standard-workstation'
             status_slug = random.choice(['in-use', 'in-use', 'in-use', 'available', 'available', 'pending-repair', 'retired'])
             
             location_slug = random.choice(loc_slugs)
@@ -1313,13 +1387,33 @@ class Command(BaseCommand):
                                  ('FIN-001', 'klaus.fischer'), ('MED-001', 'markus.wagner'), ('GRE-001', 'jonas.hoffmann')]:
             h = self._holders[holder_upn]
             hash_val = hashlib.sha256(f"{tag}-{h.pk}-{timezone.now()}".encode()).hexdigest()[:64]
+            
+            # Find a matching CustodyTemplate based on the asset's type category
+            asset_obj = self._assets[tag]
+            template_obj = None
+            if asset_obj.asset_type and asset_obj.asset_type.category:
+                cat_slug = asset_obj.asset_type.category.slug
+                if cat_slug == 'laptops':
+                    if asset_obj.tenant and asset_obj.tenant.slug == 'acme-north-america':
+                        template_obj = self._custody_templates.get('acme-na-laptop-agreement')
+                    else:
+                        template_obj = self._custody_templates.get('standard-laptop-agreement')
+                elif cat_slug == 'mobile-phones':
+                    template_obj = self._custody_templates.get('mobile-device-agreement')
+                elif cat_slug == 'desktops':
+                    template_obj = self._custody_templates.get('workstation-desktop-agreement')
+            
             CustodyReceipt.objects.get_or_create(
                 verification_hash=hash_val,
                 defaults={
-                    'asset': self._assets[tag],
+                    'asset': asset_obj,
                     'holder': h,
+                    'custody_template': template_obj,
                     'signature_canvas': f'data:image/png;base64,MOCK_SIGNATURE_{tag}',
                     'eula_version': '1.0',
+                    'accepted': True,
+                    'acceptance_status': 'accepted',
+                    'signed_at': timezone.now() - datetime.timedelta(days=random.randint(10, 100)),
                 }
             )
         self.stdout.write(f'  {len(self._assets)} assets, components, accessories, consumables, custody receipts.')
@@ -1509,7 +1603,7 @@ class Command(BaseCommand):
 
         # SubscriptionAssignments (link to Locations and Assets)
         ct_asset = ContentType.objects.get_for_model(Asset)
-        servers = [a for a in self._assets.values() if a.asset_role and a.asset_role.slug == 'server']
+        servers = [a for a in self._assets.values() if a.asset_role and a.asset_role.slug in ['virtualization-host-server', 'database-server', 'application-server', 'backup-server']]
         for server in servers[:4]:
             SubscriptionAssignment.objects.get_or_create(
                 subscription=self._subscriptions[0],

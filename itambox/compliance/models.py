@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from core.models import BaseModel, ChangeLoggingMixin
 from core.mixins import TaggableMixin, CloneableMixin, ExportableMixin, JournalingMixin, ImageAttachmentMixin, FileAttachmentMixin, SoftDeleteMixin
-from core.managers import SoftDeleteManager, AllObjectsManager
+from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingManager
 
 
 def generate_token():
@@ -21,6 +21,8 @@ class MaintenanceStatusChoices(models.TextChoices):
 
 
 class CustodyTemplate(TaggableMixin, CloneableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
+    objects = TenantScopingManager()
+
     tenant = models.ForeignKey(
         to='organization.Tenant',
         on_delete=models.CASCADE,

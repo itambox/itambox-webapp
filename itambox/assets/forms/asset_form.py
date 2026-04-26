@@ -114,6 +114,21 @@ class AssetForm(forms.ModelForm):
                 asset_type_id = asset_type_val
         elif self.instance and self.instance.pk and self.instance.asset_type:
             asset_type_id = self.instance.asset_type.pk
+        # Default the asset role from the selected asset type if not already set
+        if not self.instance.pk and asset_type_id:
+            current_role = None
+            if self.data and 'asset_role' in self.data:
+                current_role = self.data.get('asset_role')
+            elif self.initial and 'asset_role' in self.initial:
+                current_role = self.initial.get('asset_role')
+                
+            if not current_role:
+                try:
+                    asset_type_obj = AssetType.objects.get(pk=asset_type_id)
+                    if asset_type_obj.asset_role:
+                        self.fields['asset_role'].initial = asset_type_obj.asset_role
+                except AssetType.DoesNotExist:
+                    pass
 
         custom_fields = []
         if asset_type_id:

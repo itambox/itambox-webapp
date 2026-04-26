@@ -5,13 +5,19 @@ from crispy_forms.layout import Layout, Submit, HTML, Div, Row, Column, Fieldset
 
 from core.forms import SlugModelForm
 from extras.models import Tag
-from ..models import AssetType, Manufacturer
+from ..models import AssetType, Manufacturer, AssetRole
 
 
 class AssetTypeForm(SlugModelForm):
     manufacturer = forms.ModelChoiceField(
         queryset=Manufacturer.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    asset_role = forms.ModelChoiceField(
+        queryset=AssetRole.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Asset Role"
     )
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
@@ -25,7 +31,7 @@ class AssetTypeForm(SlugModelForm):
         fields = [
             'manufacturer', 'part_number', 'model', 'slug',
             'eol_months',
-            'category', 'custom_fieldset', 'depreciation', 'image',
+            'category', 'asset_role', 'custom_fieldset', 'depreciation', 'image',
             'description', 'comments', 'tags', 'requestable'
         ]
         widgets = {
@@ -162,9 +168,10 @@ class AssetTypeForm(SlugModelForm):
             Fieldset(
                 'Classification & Financial',
                 Row(
-                    Column('category', css_class='col-md-4'),
-                    Column('custom_fieldset', css_class='col-md-4'),
-                    Column('depreciation', css_class='col-md-4')
+                    Column('category', css_class='col-md-3'),
+                    Column('asset_role', css_class='col-md-3'),
+                    Column('custom_fieldset', css_class='col-md-3'),
+                    Column('depreciation', css_class='col-md-3')
                 ),
             ),
         ]
