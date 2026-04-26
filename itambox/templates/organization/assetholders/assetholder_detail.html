@@ -1,0 +1,148 @@
+{% extends 'generic/object_detail.html' %}
+{% load i18n %}
+{% load render_table from django_tables2 %}
+{% load static %}
+
+{# --- Page Title --- #}
+{% block title %}{{ object.first_name }} {{ object.last_name }} {% translate "- Asset Holder - ITAMbox" %}{% endblock %}
+
+{# --- Page Header --- #}
+{% block page_pretitle %}{% translate "Organization / Asset Holders" %}{% endblock %}
+
+{# --- Tabs Hook --- #}
+{% block extra_tabs %}
+    <li class="nav-item" role="presentation">
+        <a href="?tab=assignments" class="nav-link {% if request.GET.tab == 'assignments' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#assignments" role="tab" aria-selected="{% if request.GET.tab == 'assignments' %}true{% else %}false{% endif %}">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-indigo" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 5H7a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2V7a2 2 0 0 0 -2 -2h-2" /><path d="M9 3m0 2a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2z" /><path d="M9 14l2 2l4 -4" /></svg>
+            {% translate "Assets" %} <span class="badge bg-indigo-lt ms-2">{{ assignments_table.rows|length }}</span>
+        </a>
+     </li>
+     <li class="nav-item" role="presentation">
+        <a href="?tab=accessories" class="nav-link {% if request.GET.tab == 'accessories' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#accessories" role="tab" aria-selected="{% if request.GET.tab == 'accessories' %}true{% else %}false{% endif %}">
+            <i class="mdi mdi-keyboard me-1 text-teal"></i>
+            {% translate "Accessories" %} <span class="badge bg-teal-lt ms-2">{{ accessory_assignments_table.rows|length }}</span>
+        </a>
+     </li>
+     <li class="nav-item" role="presentation">
+        <a href="?tab=consumables" class="nav-link {% if request.GET.tab == 'consumables' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#consumables" role="tab" aria-selected="{% if request.GET.tab == 'consumables' %}true{% else %}false{% endif %}">
+            <i class="mdi mdi-layers-outline me-1 text-yellow"></i>
+            {% translate "Consumables" %} <span class="badge bg-yellow-lt ms-2">{{ consumable_dispatches_table.rows|length }}</span>
+        </a>
+     </li>
+     <li class="nav-item" role="presentation">
+        <a href="?tab=licenses" class="nav-link {% if request.GET.tab == 'licenses' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#licenses" role="tab" aria-selected="{% if request.GET.tab == 'licenses' %}true{% else %}false{% endif %}">
+            <i class="mdi mdi-key-outline me-1 text-blue"></i>
+            {% translate "Licenses" %} <span class="badge bg-blue-lt ms-2">{{ license_assignments_table.rows|length }}</span>
+        </a>
+     </li>
+     <li class="nav-item" role="presentation">
+        <a href="?tab=custody" class="nav-link {% if request.GET.tab == 'custody' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#custody" role="tab" aria-selected="{% if request.GET.tab == 'custody' %}true{% else %}false{% endif %}">
+            <i class="mdi mdi-file-sign me-1 text-green"></i>
+            {% translate "Custody EULAs" %} <span class="badge bg-green-lt ms-2">{{ custody_receipts_table.rows|length }}</span>
+        </a>
+     </li>
+{% endblock extra_tabs %}
+
+{# Object details rendered via panel layout #}
+
+{# Leave related_objects empty for the sidebar #}
+{% block related_objects %}{% endblock related_objects %}
+
+{# --- Extra Tab Panes --- #}
+{% block extra_tab_panes %}
+    {# Assignments Tab Pane #}
+    <div class="tab-pane fade {% if request.GET.tab == 'assignments' %}show active{% endif %}" id="assignments" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">{% translate "Checked Out Assets" %}</h3>
+            </div>
+            {% if assignments_table.rows %}
+                <div class="table-responsive">
+                    {% render_table assignments_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=assignments_table tab="assignments" %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <i class="mdi mdi-clipboard-off-outline text-muted mb-2"></i>
+                    <p class="mb-0">{% translate "No checked out assets assigned to this holder." %}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Accessories Tab Pane #}
+    <div class="tab-pane fade {% if request.GET.tab == 'accessories' %}show active{% endif %}" id="accessories" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">{% translate "Assigned Accessories" %}</h3>
+            </div>
+            {% if accessory_assignments_table.rows %}
+                <div class="table-responsive">
+                    {% render_table accessory_assignments_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=accessory_assignments_table tab="accessories" %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <p class="mb-0">{% translate "No checked out accessories assigned to this holder." %}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Consumables Tab Pane #}
+    <div class="tab-pane fade {% if request.GET.tab == 'consumables' %}show active{% endif %}" id="consumables" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">{% translate "Consumable Dispatches" %}</h3>
+            </div>
+            {% if consumable_dispatches_table.rows %}
+                <div class="table-responsive">
+                    {% render_table consumable_dispatches_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=consumable_dispatches_table tab="consumables" %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <p class="mb-0">{% translate "No consumables assigned to this holder." %}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Licenses Tab Pane #}
+    <div class="tab-pane fade {% if request.GET.tab == 'licenses' %}show active{% endif %}" id="licenses" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">{% translate "Software Licenses" %}</h3>
+            </div>
+            {% if license_assignments_table.rows %}
+                <div class="table-responsive">
+                    {% render_table license_assignments_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=license_assignments_table tab="licenses" %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <p class="mb-0">{% translate "No software license seats assigned to this holder." %}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Custody Tab Pane #}
+    <div class="tab-pane fade {% if request.GET.tab == 'custody' %}show active{% endif %}" id="custody" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">{% translate "Signed Custody EULAs" %}</h3>
+            </div>
+            {% if custody_receipts_table.rows %}
+                <div class="table-responsive">
+                    {% render_table custody_receipts_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=custody_receipts_table tab="custody" %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <p class="mb-0">{% translate "No electronic custody receipts logged for this holder." %}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock extra_tab_panes %}

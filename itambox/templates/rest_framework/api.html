@@ -1,0 +1,15 @@
+{% extends 'rest_framework/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block head %}
+  {{ block.super }}
+  <link rel="icon" type="image/png" href="{% static 'favicon.ico' %}" />
+{% endblock head %}
+
+{% block title %}{% if name %}{{ name }} | {% endif %}{% translate "ITAMbox" %} {% trans "REST API" %}{% endblock %}
+
+{% block branding %}
+  {# Link to the ITAMbox dashboard #}
+  <a class="navbar-brand" href="{% url 'dashboard' %}">{% translate "ITAMbox" %}</a>
+{% endblock branding %} 

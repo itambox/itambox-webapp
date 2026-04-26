@@ -1,0 +1,96 @@
+{% extends 'generic/object_detail.html' %}
+{% load i18n %}
+{% load static %}
+{% load utility_tags %}
+{% load render_table from django_tables2 %}
+
+{# --- Page Title --- #}
+{% block title %}{{ object.name }} {% translate "- Licenses - ITAMbox" %}{% endblock %}
+
+{# --- Page Header --- #}
+{% block page_pretitle %}{% translate "Licenses / License Entitlements" %}{% endblock %}
+
+{# --- Page Actions --- #}
+{% block extra_page_actions %}
+    {% if object.available_seats > 0 %}
+        <button type="button" class="btn btn-primary"
+                hx-get="{% url 'licenses:license_checkout' pk=object.pk %}"
+                hx-target="#modal-placeholder"
+                hx-swap="innerHTML">
+            <i class="mdi mdi-upload"></i>
+            {% translate "Check Out Seat..." %}
+        </button>
+    {% else %}
+        <button type="button" class="btn btn-primary disabled" disabled>
+            <i class="mdi mdi-upload"></i>
+            {% translate "Check Out Seat..." %}
+        </button>
+    {% endif %}
+{% endblock extra_page_actions %}
+
+{# --- Tabs Hook --- #}
+{% block extra_tabs %}
+    <li class="nav-item" role="presentation">
+        <a href="?tab=seats" class="nav-link {% if request.GET.tab == 'seats' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#seats" role="tab" aria-selected="{% if request.GET.tab == 'seats' %}true{% else %}false{% endif %}">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-purple" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M6 18a6 6 0 0 1 12 0" /></svg>
+            {% translate "Seat Assignments" %} <span class="badge bg-purple-lt ms-2">{{ assignments_table.rows|length }}</span>
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a href="?tab=kits" class="nav-link {% if request.GET.tab == 'kits' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#kits" role="tab" aria-selected="{% if request.GET.tab == 'kits' %}true{% else %}false{% endif %}">
+            <i class="mdi mdi-package-variant-closed me-1 text-orange"></i>
+            {% translate "Kit Assignments" %} <span class="badge bg-orange-lt ms-2">{{ kits_table.rows|length }}</span>
+        </a>
+    </li>
+{% endblock extra_tabs %}
+
+{# --- Extra Tab Panes --- #}
+{% block extra_tab_panes %}
+    {# Assignments Tab Pane #}
+    <div class="tab-pane fade {% if request.GET.tab == 'seats' %}show active{% endif %}" id="seats" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">{% translate "Active License Seat Allocations" %}</h3>
+            </div>
+            {% if assignments_table.rows %}
+                <div class="table-responsive">
+                    {% render_table assignments_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=assignments_table tab="seats" %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <i class="mdi mdi-account-multiple-minus-outline text-muted mb-2"></i>
+                    <p class="mb-0">{% translate "No active seats assigned for this license entitlement." %}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Kit Assignments Tab Pane #}
+    <div class="tab-pane fade {% if request.GET.tab == 'kits' %}show active{% endif %}" id="kits" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">{% translate "Kits Allocating this License" %}</h3>
+            </div>
+            {% if kits_table.rows %}
+                <div class="table-responsive">
+                    {% render_table kits_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=kits_table tab="kits" %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <p class="mb-0">{% translate "No kits allocate this license." %}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock extra_tab_panes %}
+
+{# --- HTMX Auto-Refresh Script --- #}
+{% block javascript %}
+<script>
+    document.body.addEventListener('licenseUpdated', function() {
+        htmx.ajax('GET', window.location.href, {target: 'body', swap: 'outerHTML'});
+    });
+</script>
+{% endblock javascript %}

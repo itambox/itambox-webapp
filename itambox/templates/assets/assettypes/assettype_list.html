@@ -1,0 +1,12 @@
+{% extends 'generic/object_list.html' %}
+{% load i18n %}
+{% load render_table from django_tables2 %}
+
+{% block title %}{% translate "Asset Types - ITAMbox" %}{% endblock %}
+
+{% block page_header %}
+    <div class="page-pretitle">{% translate "Assets" %}</div>
+    <h2 class="page-title">{% translate "Asset Types" %}</h2>
+{% endblock %}
+
+ 

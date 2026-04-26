@@ -1,0 +1,26 @@
+{% extends base_template|default:"layout.html" %}
+{% load i18n %}
+{% load crispy_forms_tags %}
+
+{% block title %}{% translate "Assign Subscription to" %} {{ target_obj }} {% translate "- ITAMbox" %}{% endblock %}
+
+{% block page_header %}
+    <div class="page-pretitle">
+        {% translate "Subscriptions / Assignments" %}
+    </div>
+    <h2 class="page-title">
+        {% translate "Assign Subscription to" %} {{ target_obj }}
+    </h2>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6 col-lg-5">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                {% crispy form %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends 'generic/object_detail.html' %}
+{% load i18n %}
+{% load render_table from django_tables2 %}
+
+{% block title %}{{ object.name }} {% translate "- Depreciation Rule - ITAMbox" %}{% endblock %}
+
+{% block page_pretitle %}{% translate "Assets / Depreciation Rules" %}{% endblock %}
+
+{% block extra_tabs %}
+    <li class="nav-item" role="presentation">
+        <a href="#asset-types" class="nav-link" data-bs-toggle="tab" role="tab">
+            <i class="mdi mdi-shape-outline me-1 text-purple"></i>
+            {% translate "Affected Asset Types" %} <span class="badge bg-purple-lt ms-2">{{ assettypes_table.rows|length }}</span>
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a href="#assets" class="nav-link" data-bs-toggle="tab" role="tab">
+            <i class="mdi mdi-laptop me-1 text-blue"></i>
+            {% translate "Active Assets" %} <span class="badge bg-blue-lt ms-2">{{ assets_table.rows|length }}</span>
+        </a>
+    </li>
+{% endblock extra_tabs %}
+
+{% block extra_tab_panes %}
+    <div class="tab-pane fade" id="asset-types" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">{% translate "Affected Asset Types" %}</h3>
+            </div>
+            {% if assettypes_table.rows %}
+                <div class="table-responsive">
+                    {% render_table assettypes_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=assettypes_table %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <p class="mb-0">{% translate "No asset types associated with this depreciation rule." %}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="tab-pane fade" id="assets" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">{% translate "Active Assets Amortization Schedule" %}</h3>
+            </div>
+            {% if assets_table.rows %}
+                <div class="table-responsive">
+                    {% render_table assets_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=assets_table %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <p class="mb-0">{% translate "No active assets currently using this depreciation rule." %}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock extra_tab_panes %}
+

@@ -1,0 +1,68 @@
+{% extends base_template|default:"layout.html" %}
+{% load i18n %}
+
+{% block title %}{% translate "Confirm Deletion -" %} {{ object }} {% translate "- ITAMbox" %}{% endblock %}
+
+{% block page_header %}
+    <h2 class="page-title">
+       {% translate "Confirm Deletion:" %} {{ object }}
+    </h2>
+{% endblock %}
+
+{% block page_actions %}
+    {# Use return_url provided by ObjectDeleteView context #}
+    {% if return_url %}
+    <a href="{{ return_url }}" class="btn btn-outline-secondary">
+        <i class="mdi mdi-arrow-left"></i>
+        {% translate "Cancel" %}
+    </a>
+    {% endif %}
+{% endblock page_actions %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h3 class="card-title">{% translate "Confirm Deletion" %}</h3>
+            </div>
+            <div class="card-body">
+                <p>{% translate "Are you sure you want to delete" %} <strong>{{ object }}</strong>?</p>
+                {# Remove related_objects_count check, as deletion is blocked in the view's post method #}
+                <form method="post">
+                    {% csrf_token %}
+                    {# Render the form if provided (e.g., ConfirmationForm from base view) #}
+                    {% if form %}
+                        {% for field in form %}
+                            {% if field.is_hidden %}
+                                {{ field }}
+                            {% else %}
+                                <div class="mb-3">
+                                    <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                                    {{ field }}
+                                    {% if field.help_text %}
+                                        <small class="form-text text-muted">{{ field.help_text }}</small>
+                                    {% endif %}
+                                    {% for error in field.errors %}
+                                        <div class="invalid-feedback d-block">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                    
+                    {# Buttons always shown now #}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="mdi mdi-trash-can-outline"></i>
+                        {% translate "Confirm Deletion" %}
+                    </button>
+                     {# Use return_url for cancel button #}
+                    {% if return_url %}
+                    <a href="{{ return_url }}" class="btn btn-outline-secondary ms-2">{% translate "Cancel" %}</a>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

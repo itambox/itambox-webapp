@@ -1,6 +1,6 @@
 # Security Policy
 
-We take the security of AssetBox seriously. If you discover a vulnerability, please report it using the instructions below.
+We take the security of ITAMbox seriously. If you discover a vulnerability, please report it using the instructions below.
 
 ---
 
@@ -25,5 +25,5 @@ If you discover a security concern (e.g., credential exposure, multi-tenant bypa
 2.  Provide a clear description of the vulnerability, including:
     *   Steps or proof-of-concept code to reproduce the issue.
     *   The potential impact of the vulnerability.
-    *   The specific version of AssetBox affected.
+    *   The specific version of ITAMbox affected.
 3.  We will acknowledge receipt within 48 hours and work with you to coordinate a patched release before public disclosure.

@@ -1,0 +1,33 @@
+{% load i18n %}
+{# --- OOB Block: Page Title --- #}
+<span id="page-title-block" hx-swap-oob="true">
+    {{ title|default:"List View" }} {% translate "- ITAMbox" %}
+</span>
+
+{# --- OOB Block: Page Header --- #}
+<div id="page-header-block" hx-swap-oob="true">
+    <div class="page-pretitle">
+        {{ pretitle|default:"Manage" }}
+    </div>
+    <h2 class="page-title">
+        {{ title|default:"Objects" }}
+    </h2>
+</div>
+
+{# --- OOB Block: Page Actions --- #}
+<div id="page-actions-block" hx-swap-oob="true">
+    <div class="btn-list">
+        {% if create_url_name %}
+        <a href="{% url create_url_name %}" class="btn btn-primary">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+            {% translate "Create" %} {{ object_type|default:"Object" }}
+        </a>
+        {% endif %}
+        {% if export_url_name %}
+        <a href="#" class="btn btn-secondary d-none d-sm-inline-block">
+            <i class="mdi mdi-download me-1"></i>
+            {% translate "Export" %}
+        </a>
+        {% endif %}
+    </div>
+</div>

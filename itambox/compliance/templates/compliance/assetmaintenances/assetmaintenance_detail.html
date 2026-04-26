@@ -1,0 +1,15 @@
+{% extends 'generic/object_detail.html' %}
+{% load i18n %}
+{% load static %}
+
+{# --- Page Title and Header --- #}
+{% block title %}{% translate "Maintenance on" %} {{ object.asset.name }} {% translate "- Details - ITAMbox" %}{% endblock %}
+
+{% block page_header %}
+    <div class="page-pretitle">{% translate "Assets / Maintenances" %}</div>
+    <h2 class="page-title">
+        {% translate "Maintenance Details:" %} {{ object.get_maintenance_type_display }}
+    </h2>
+{% endblock %}
+
+{# Object details rendered via panel layout #}

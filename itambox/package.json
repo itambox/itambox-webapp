@@ -1,0 +1,29 @@
+{
+  "name": "itambox",
+  "version": "0.1.0",
+  "private": true,
+  "description": "IT Asset Management System — static assets build pipeline",
+  "scripts": {
+    "build:scss": "sass static/src/styles/itambox.scss:static/dist/itambox.css --style=compressed",
+    "build:vendor": "node copy-vendor.mjs",
+    "build": "node bundle.mjs",
+    "build:all": "npm run build:scss && npm run build:vendor && npm run build",
+    "watch": "node bundle.mjs --watch",
+    "watch:css": "sass --watch static/src/styles/itambox.scss:static/dist/itambox.css"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "eslint": "^9.0.0",
+    "globals": "^15.0.0",
+    "sass": "^1.80.0"
+  },
+  "dependencies": {
+    "@mdi/font": "^7.4.47",
+    "@tabler/core": "^1.1.0",
+    "apexcharts": "^5.13.0",
+    "bootstrap": "^5.3.3",
+    "gridstack": "^10.3.0",
+    "htmx.org": "^2.0.4",
+    "tom-select": "^2.3.1"
+  }
+}

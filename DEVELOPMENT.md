@@ -1,9 +1,9 @@
-# Development Guide — AssetBox
+# Development Guide — ITAMbox
 
 ## Quick Start
 
-1. **Database Requirements**: AssetBox strictly requires a running PostgreSQL 15+ database. Ensure a server is active locally or accessible.
-2. **Environment Variables**: Copy `.env.example` to `.env` and configure the PostgreSQL connection credentials (e.g., `ASSETBOX_DB_ENGINE=django.db.backends.postgresql`, `ASSETBOX_DB_NAME`, `ASSETBOX_DB_USER`, `ASSETBOX_DB_PASSWORD`, `ASSETBOX_DB_HOST`, `ASSETBOX_DB_PORT`).
+1. **Database Requirements**: ITAMbox strictly requires a running PostgreSQL 15+ database. Ensure a server is active locally or accessible.
+2. **Environment Variables**: Copy `.env.example` to `.env` and configure the PostgreSQL connection credentials (e.g., `ITAMBOX_DB_ENGINE=django.db.backends.postgresql`, `ITAMBOX_DB_NAME`, `ITAMBOX_DB_USER`, `ITAMBOX_DB_PASSWORD`, `ITAMBOX_DB_HOST`, `ITAMBOX_DB_PORT`).
 
 ```bash
 # Create virtual environment
@@ -14,14 +14,14 @@ source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 pip install -r requirements.txt
 
 # Run migrations
-cd assetbox
+cd itambox
 python manage.py migrate
 
 # Seed sample data (400+ records across all models)
 python manage.py seed_data
 
 # Start dev server
-ASSETBOX_DEBUG=true python manage.py runserver
+ITAMBOX_DEBUG=true python manage.py runserver
 ```
 
 ### Seed Data Modes
@@ -74,7 +74,7 @@ In `base_htmx.html` or wrapper partials, emit OOB elements BEFORE the main conte
 
 ### Filter panel persistence
 
-Filter state uses `localStorage` key `assetbox-show-filters`. Call `window.initFiltersToggle()` from `htmx:afterSettle` with `setTimeout(0)` — using `htmx:afterSwap` causes a DOM timing race where class changes are reverted by the rendering pipeline.
+Filter state uses `localStorage` key `itambox-show-filters`. Call `window.initFiltersToggle()` from `htmx:afterSettle` with `setTimeout(0)` — using `htmx:afterSwap` causes a DOM timing race where class changes are reverted by the rendering pipeline.
 
 ### Creating a new HTMX-boosted list page
 

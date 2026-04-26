@@ -1,0 +1,41 @@
+{% extends base_template|default:'layout.html' %}
+{% load i18n %}
+
+{% block title %}{% translate "Confirm Delete -" %} {{ tenantgroup.name }} {% translate "- ITAMbox" %}{% endblock %}
+
+{% block page_header %}
+    <div class="page-pretitle">{% translate "Organization / Tenant Groups" %}</div>
+    <h2 class="page-title">{% translate "Confirm Deletion" %}</h2>
+{% endblock %}
+
+{% block content %}
+<div class="col-md-6">
+    <div class="card border-danger">
+        <div class="card-header">
+            <h3 class="card-title">{% translate "Delete Tenant Group" %}</h3>
+        </div>
+        <div class="card-body">
+            <p>{% translate "Are you sure you want to delete the tenant group:" %} <strong>{{ tenantgroup.name }} ({{ tenantgroup.slug }})</strong>?</p>
+
+            {# Add warning about related objects #}
+            {% if tenantgroup.tenants.count > 0 or tenantgroup.children.count > 0 %}
+                <p class="text-warning">
+                    {% translate "Warning: This group has" %} {{ tenantgroup.tenants.count }} {% translate "assigned tenant" %}{{ tenantgroup.tenants.count|pluralize }}
+                    {% translate "and" %} {{ tenantgroup.children.count }} {% translate "child group" %}{{ tenantgroup.children.count|pluralize }}.
+                    Deleting it may affect related objects depending on your setup.
+                </p>
+            {% endif %}
+
+            <p class="text-danger">{% translate "This action cannot be undone." %}</p>
+
+            <form method="post">
+                {% csrf_token %}
+                <div class="d-flex justify-content-end">
+                    <a href="{% url 'organization:tenantgroup_detail' pk=tenantgroup.pk %}" class="btn btn-link me-2">{% translate "Cancel" %}</a>
+                    <button type="submit" class="btn btn-danger">{% translate "Confirm Delete" %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %} 

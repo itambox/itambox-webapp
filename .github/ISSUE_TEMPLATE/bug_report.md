@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Create a report to help us improve AssetBox
+about: Create a report to help us improve ITAMbox
 title: '[Bug]: '
 labels: bug
 assignees: ''
@@ -8,7 +8,7 @@ assignees: ''
 ---
 
 ### Environment
-*   AssetBox Version: <!-- e.g., 0.1.0 -->
+*   ITAMbox Version: <!-- e.g., 0.1.0 -->
 *   Python Version: <!-- e.g., 3.12 -->
 *   Django Version: <!-- e.g., 5.2 -->
 *   Database Type & Version: <!-- e.g., SQLite, PostgreSQL 16 -->

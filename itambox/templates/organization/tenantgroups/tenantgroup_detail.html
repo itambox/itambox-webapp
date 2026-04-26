@@ -1,0 +1,79 @@
+{% extends 'generic/object_detail.html' %}
+{% load render_table from django_tables2 %}
+{% load static %}
+{% load i18n %}
+
+{# --- Page Title --- #}
+{% block title %}{{ object.name }} {% translate "- Tenant Group Details - ITAMbox" %}{% endblock %}
+
+{# --- Page Header (from base) --- #}
+{% block page_pretitle %}{% translate "Organization / Tenant Groups" %}{% endblock %}
+
+{# --- Page Actions (from base) --- #}
+
+{# Object details rendered via panel layout #}
+
+{# --- Related Objects (Sidebar) --- #}
+{% block related_objects %}
+    {# Base template uses related_objects_list context variable #}
+{% endblock related_objects %}
+
+{# --- Full Width Content (Tenants Table) --- #}
+{% block full_width_content %}
+    {# Render Tenants table #}
+    {% if tenants_table and tenants_table.rows %}
+    <div class="card mb-4">
+        <div class="card-header"><h3 class="card-title">{% translate "Tenants in this Group (" %}{{ tenants_table.page.paginator.count }})</h3></div>
+        <div class="table-responsive">
+            {% render_table tenants_table %}
+        </div>
+        {% if tenants_table.page %}
+             {% include 'global_includes/pagination_links.html' with page_obj=tenants_table.page hx_push_url="false" %}
+         {% endif %}
+    </div>
+     {% elif tenants_table %}
+     <div class="card mb-4">
+        <div class="card-header"><h3 class="card-title">{% translate "Tenants in this Group (0)" %}</h3></div>
+         <div class="card-body">
+            <p class="text-muted">{% translate "No tenants found in this group." %}</p>
+         </div>
+    </div>
+    {% endif %}
+    {% if children_table and children_table.rows %}
+    <div class="card mb-4">
+        <div class="card-header"><h3 class="card-title">{% translate "Child Groups (" %}{{ children_table.rows|length }})</h3></div>
+        <div class="table-responsive">
+            {% render_table children_table %}
+        </div>
+    </div>
+    {% endif %}
+{% endblock full_width_content %}
+
+{% block extra_tabs %}
+    <li class="nav-item" role="presentation">
+        <a href="?tab=custody-policies" class="nav-link {% if request.GET.tab == 'custody-policies' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#custody-policies" role="tab" aria-selected="{% if request.GET.tab == 'custody-policies' %}true{% else %}false{% endif %}">
+            <i class="mdi mdi-file-sign me-1 text-green"></i>
+            {% translate "Custody EULAs & Policies" %} <span class="badge bg-green-lt ms-2">{{ custody_templates_table.rows|length }}</span>
+        </a>
+    </li>
+{% endblock extra_tabs %}
+
+{% block extra_tab_panes %}
+    <div class="tab-pane fade {% if request.GET.tab == 'custody-policies' %}show active{% endif %}" id="custody-policies" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">{% translate "Tenant-Scoped Custody Policies & EULAs" %}</h3>
+            </div>
+            {% if custody_templates_table.rows %}
+                <div class="table-responsive">
+                    {% render_table custody_templates_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=custody_templates_table tab="custody-policies" %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <p class="mb-0">{% translate "No custody policies or templates are currently registered for this tenant group." %}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>{% endblock extra_tab_panes %}
+ 

@@ -1,0 +1,16 @@
+{% extends 'generic/object_detail.html' %}
+{% load i18n %}
+{% load render_table from django_tables2 %}
+{% load static %}
+
+{# --- Page Title and Header --- #}
+{% block title %}{{ object }} {% translate "- Component Details - ITAMbox" %}{% endblock %}
+
+{% block page_header %}
+    <div class="page-pretitle">{% translate "Assets / Components" %}</div>
+    <h2 class="page-title">
+        {{ object }}
+    </h2>
+{% endblock %}
+
+{# Object details rendered via panel layout #}
