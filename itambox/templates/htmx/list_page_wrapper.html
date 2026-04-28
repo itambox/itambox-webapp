@@ -1,0 +1,83 @@
+{% load partials %}
+{% load render_table from django_tables2 %}
+{% load static %}
+{% load utility_tags %}
+{% load i18n %}
+{% load crispy_forms_tags %}
+
+{# This template is rendered FOR HTMX requests targeting #object-list-dynamic-content #}
+{# It includes OOB blocks for header/title/actions AND OOB blocks for filter/count badges #}
+{# It THEN renders the main list content (search, table) directly. Pagination is handled OOB. #}
+
+{% include "htmx/includes/list_oob_header.html" %}
+
+{# --- OOB Swaps (These target elements OUTSIDE #object-list-dynamic-content) --- #}
+<div id="filters-sidebar-content" hx-swap-oob="true">
+    {% include 'htmx/filter_form_tab.html' %}
+</div>
+
+<span id="filters-applied-count" hx-swap-oob="true" class="badge bg-primary ms-2 {% if not filter_form.applied_filters %}d-none{% endif %}">
+    {{ filter_form.applied_filters|length|default:"0" }}
+</span>
+
+<div id="object-list-pagination" hx-swap-oob="true">
+    {% if table.page %}
+        {% include 'global_includes/pagination_links.html' with page_obj=table.page hx_target="#object-list-dynamic-content" %}
+    {% endif %}
+</div>
+
+{# --- Main Content Area (Rendered directly, replaces innerHTML of #object-list-dynamic-content) --- #}
+
+{% include "htmx/includes/list_toolbar.html" with show_filter_toggle=True %}
+
+{# Table Rendering Container #}
+<div id="object-list-table-container">
+
+    {# Batch Actions Bar — Top #}
+    <div id="batch-actions-bar-top" class="batch-actions-bar d-none">
+        <div class="d-flex align-items-center gap-2 px-3 py-2 bg-body-tertiary border-bottom">
+            <span id="batch-selected-count" class="fw-bold me-2">{% translate "0 selected" %}</span>
+            {% if model_name_str == 'assets.asset' %}
+            <button type="button" class="btn btn-sm btn-primary" id="btn-bulk-assign"
+                    data-bs-toggle="modal" data-bs-target="#bulk-assign-modal"
+                    title="{% translate 'Assign selected assets to a holder' %}">
+                <i class="mdi mdi-account-plus-outline me-1"></i>
+                {% translate "Assign Selected" %}
+            </button>
+            {% endif %}
+            <form id="bulk-delete-form" method="post" action="{{ bulk_delete_url }}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="model_name" value="{{ model_name_str }}">
+                <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+                <input type="hidden" name="pk" value="" id="bulk-delete-pks">
+                <button type="button" class="btn btn-sm btn-outline-danger"
+                        onclick="if(!confirm('Delete selected items? This cannot be undone.'))return false;var form=document.getElementById('bulk-delete-form');form.querySelector('#bulk-delete-pks').value=Array.from(document.querySelectorAll('#object-list-table-container input[type=checkbox][name=pk]:checked')).map(function(cb){return cb.value;}).join(',');form.submit();">
+                    <i class="mdi mdi-trash-can-outline me-1"></i>
+                    {% translate "Delete Selected" %}
+                </button>
+            </form>
+            <form id="bulk-edit-form" method="post" action="{{ bulk_edit_url }}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="model_name" value="{{ model_name_str }}">
+                <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+                <input type="hidden" name="pk" value="" id="bulk-edit-pks">
+                <button type="button" class="btn btn-sm btn-outline-primary"
+                        onclick="var form=document.getElementById('bulk-edit-form');form.querySelector('#bulk-edit-pks').value=Array.from(document.querySelectorAll('#object-list-table-container input[type=checkbox][name=pk]:checked')).map(function(cb){return cb.value;}).join(',');form.submit();">
+                    <i class="mdi mdi-pencil-outline me-1"></i>
+                    {% translate "Edit Selected" %}
+                </button>
+            </form>
+            <form id="bulk-edit-form" method="post" action="{{ bulk_edit_url }}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="model_name" value="{{ model_name_str }}">
+                <input type="hidden" name="pk" value="" id="bulk-edit-pks">
+                <button type="submit" class="btn btn-sm btn-outline-primary">
+                    <i class="mdi mdi-pencil-outline me-1"></i>
+                    {% translate "Edit Selected" %}
+                </button>
+            </form>
+        </div>
+    </div>
+
+    {% include "htmx/includes/list_table_block.html" %}
+</div>

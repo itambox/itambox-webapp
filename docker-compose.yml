@@ -6,16 +6,16 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - ASSETBOX_SECRET_KEY=change-me-in-production
-      - ASSETBOX_DEBUG=True
-      - ASSETBOX_DB_ENGINE=django.db.backends.postgresql
-      - ASSETBOX_DB_NAME=assetbox
-      - ASSETBOX_DB_USER=assetbox
-      - ASSETBOX_DB_PASSWORD=assetbox
-      - ASSETBOX_DB_HOST=db
-      - ASSETBOX_DB_PORT=5432
+      - ITAMBOX_SECRET_KEY=change-me-in-production
+      - ITAMBOX_DEBUG=True
+      - ITAMBOX_DB_ENGINE=django.db.backends.postgresql
+      - ITAMBOX_DB_NAME=itambox
+      - ITAMBOX_DB_USER=itambox
+      - ITAMBOX_DB_PASSWORD=itambox
+      - ITAMBOX_DB_HOST=db
+      - ITAMBOX_DB_PORT=5432
     volumes:
-      - ./assetbox:/app
+      - ./itambox:/app
     depends_on:
       db:
         condition: service_healthy
@@ -25,13 +25,13 @@ services:
     ports:
       - "5433:5432"
     environment:
-      POSTGRES_USER: assetbox
-      POSTGRES_PASSWORD: assetbox
-      POSTGRES_DB: assetbox
+      POSTGRES_USER: itambox
+      POSTGRES_PASSWORD: itambox
+      POSTGRES_DB: itambox
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U assetbox -d assetbox"]
+      test: ["CMD-SHELL", "pg_isready -U itambox -d itambox"]
       interval: 5s
       timeout: 5s
       retries: 5

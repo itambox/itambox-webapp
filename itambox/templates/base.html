@@ -1,0 +1,109 @@
+{% load static %}
+{% load i18n %}
+{% load utility_tags %}
+{% load core_constants %}
+{% load partials %}
+{% load django_htmx %}
+<!doctype html>
+<html lang="en" data-itambox-user-id="{{ request.user.pk }}" data-itambox-user-name="{{ request.user.get_full_name|default:request.user.username }}" data-itambox-url-name="{{ request.resolver_match.url_name }}" data-itambox-version="{{ settings.VERSION }}">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+    <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
+    <title>{% block title %}{% translate "ITAMbox" %}{% endblock %}</title>
+    {# FOUC prevention: apply stored theme before CSS loads #}
+    <script>
+        (function(){try{var t=localStorage.getItem('itambox.theme');if(t)document.documentElement.setAttribute('data-bs-theme',t);else if(window.matchMedia('(prefers-color-scheme:dark)').matches)document.documentElement.setAttribute('data-bs-theme','dark');}catch(e){}})();
+    </script>
+    <!-- CSS files -->
+    <link href="{% static 'dist/vendor/tabler/css/tabler.min.css' %}" rel="stylesheet"/>
+    <link href="{% static 'dist/vendor/tabler/css/tabler-flags.min.css' %}" rel="stylesheet"/>
+    <link href="{% static 'dist/vendor/tabler/css/tabler-payments.min.css' %}" rel="stylesheet"/>
+    <link href="{% static 'dist/vendor/tabler/css/tabler-vendors.min.css' %}" rel="stylesheet"/>
+    <link href="{% static 'dist/vendor/tom-select/css/tom-select.bootstrap5.css' %}" rel="stylesheet">
+    <link href="{% static 'dist/vendor/mdi/css/materialdesignicons.min.css' %}" rel="stylesheet"/>
+    <link href="{% static 'dist/vendor/gridstack/gridstack.min.css' %}" rel="stylesheet"/>
+    <link href="{% static 'dist/itambox.css' %}?v=1.0.3" rel="stylesheet"/>
+    {# HTMX (in head for early hx-* processing) #}
+    <script src="{% static 'dist/vendor/htmx.min.js' %}"></script>
+    <script src="{% static 'dist/vendor/apexcharts.min.js' %}"></script>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="layout-fluid layout-combo" hx-boost="true" hx-target="#page-content-wrapper" hx-indicator="#htmx-loading-indicator">
+
+    {# Global loading indicator #}
+    <div id="htmx-loading-indicator" class="htmx-indicator" style="position:fixed;top:0;left:0;width:100%;z-index:9999;pointer-events:none;">
+        <div class="progress" style="height:3px;background:transparent;">
+            <div class="progress-bar progress-bar-animated progress-bar-striped bg-primary" style="width:100%;"></div>
+        </div>
+    </div>
+
+    {% block layout %}{% endblock %}
+
+    {% block modals %}
+    <div id="modal-placeholder"></div>
+    {% endblock modals %}
+
+    {# Toast Messages Container #}
+    <div id="django-messages" class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100">
+      {% if messages %}
+        {% for message in messages %}
+          {% include "global_includes/_toast.html" with status=message.level_tag|status_from_tag message=message %}
+        {% endfor %}
+      {% endif %}
+    </div>
+
+    {# Vendor JS (preserves global assignments — bootstrap, GridStack, TomSelect) #}
+    <script src="{% static 'dist/vendor/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'dist/vendor/gridstack-all.js' %}"></script>
+    <script src="{% static 'dist/vendor/tom-select.complete.min.js' %}"></script>
+    {# Application modules bundle #}
+    <script src="{% static 'dist/itambox.js' %}?v=1.0.2"></script>
+
+    {% block javascript %}{% endblock javascript %}
+
+    {# Standalone OOB target for dynamic title swaps #}
+    <span id="page-title-block" style="display:none" aria-hidden="true">{% translate "ITAMbox" %}</span>
+
+    {# --- Premium Physical Scanning Audio Engine --- #}
+    <script>
+        (function() {
+            // Global HTMX CSRF Token Integration
+            document.addEventListener('htmx:configRequest', function(event) {
+                event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+            });
+
+            function playBeep(frequency, duration, type) {
+                try {
+                    var AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (!AudioCtx) return;
+                    var context = new AudioCtx();
+                    var oscillator = context.createOscillator();
+                    var gain = context.createGain();
+                    oscillator.type = type || 'sine';
+                    oscillator.frequency.value = frequency;
+                    gain.gain.setValueAtTime(0.08, context.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + duration);
+                    oscillator.connect(gain);
+                    gain.connect(context.destination);
+                    oscillator.start();
+                    oscillator.stop(context.currentTime + duration);
+                } catch(e) {
+                    console.warn("Web Audio beep failed", e);
+                }
+            }
+
+            document.addEventListener('playAuditSound', function() {
+                playBeep(1000, 0.10);
+            });
+
+            document.addEventListener('playAuditFailSound', function() {
+                playBeep(180, 0.15, 'triangle');
+                setTimeout(function() {
+                    playBeep(180, 0.15, 'triangle');
+                }, 150);
+            });
+        })();
+    </script>
+</body>
+</html>

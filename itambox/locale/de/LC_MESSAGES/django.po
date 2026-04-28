@@ -1,0 +1,3789 @@
+# ITAMbox German translation.
+# Copyright (C) 2026
+# This file is distributed under the same license as the ITAMbox project.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: ITAMbox 0.1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-05-30 08:00+0200\n"
+"PO-Revision-Date: 2026-05-30 08:00+0200\n"
+"Last-Translator: ITAMbox Team\n"
+"Language-Team: German\n"
+"Language: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+# --- Sidebar Menus & Submenus (from core/navigation/menu.py) ---
+
+msgid "Organization"
+msgstr "Organisation"
+
+msgid "Sites & Regions"
+msgstr "Standorte & Regionen"
+
+msgid "Sites"
+msgstr "Standorte"
+
+msgid "Regions"
+msgstr "Regionen"
+
+msgid "Site Groups"
+msgstr "Standortgruppen"
+
+msgid "Locations"
+msgstr "Lagerorte"
+
+msgid "Tenancy"
+msgstr "Tenancy"
+
+msgid "Tenants"
+msgstr "Mandanten"
+
+msgid "Tenant Groups"
+msgstr "Mandantengruppen"
+
+msgid "Asset Holders"
+msgstr "Asset-Inhaber"
+
+msgid "Assignments"
+msgstr "Zuweisungen"
+
+msgid "Physical Assets"
+msgstr "Physische Assets"
+
+msgid "Hardware"
+msgstr "Hardware"
+
+msgid "Assets"
+msgstr "Assets"
+
+msgid "Asset Roles"
+msgstr "Asset-Rollen"
+
+msgid "Status Labels"
+msgstr "Status-Labels"
+
+msgid "Catalog"
+msgstr "Katalog"
+
+msgid "Asset Types"
+msgstr "Asset-Typen"
+
+msgid "Manufacturers"
+msgstr "Hersteller"
+
+msgid "Categories"
+msgstr "Kategorien"
+
+msgid "Inventory & Stock"
+msgstr "Inventar & Lager"
+
+msgid "Component Inventory"
+msgstr "Komponenten-Inventar"
+
+msgid "Components"
+msgstr "Komponenten"
+
+msgid "Component Stocks"
+msgstr "Komponentenbestände"
+
+msgid "Component Allocations"
+msgstr "Komponentenzuweisungen"
+
+msgid "Peripherals & Accessories"
+msgstr "Peripheriegeräte & Zubehör"
+
+msgid "Accessories"
+msgstr "Zubehör"
+
+msgid "Accessory Stocks"
+msgstr "Zubehörbestände"
+
+msgid "Consumables"
+msgstr "Verbrauchsmaterialien"
+
+msgid "Consumable Stocks"
+msgstr "Verbrauchsmaterialbestände"
+
+msgid "Kits & Lifecycle"
+msgstr "Kits & Lebenszyklus"
+
+msgid "Kits"
+msgstr "Kits"
+
+msgid "Depreciation"
+msgstr "Abschreibung"
+
+msgid "Software & SaaS"
+msgstr "Software & SaaS"
+
+msgid "Contracts & SaaS"
+msgstr "Verträge & SaaS"
+
+msgid "Software"
+msgstr "Software"
+
+msgid "Licenses"
+msgstr "Lizenzen"
+
+msgid "Subscriptions"
+msgstr "Abonnements"
+
+msgid "Providers"
+msgstr "Anbieter"
+
+msgid "Operations"
+msgstr "Operations"
+
+msgid "Compliance & Audits"
+msgstr "Compliance & Audits"
+
+msgid "Audit Sessions"
+msgstr "Audit-Sitzungen"
+
+msgid "Audit Session"
+msgstr "Audit-Sitzung"
+
+msgid "Asset Audits"
+msgstr "Asset-Audits"
+
+msgid "Asset Audit"
+msgstr "Asset-Audit"
+
+msgid "Maintenances"
+msgstr "Wartungen"
+
+msgid "Procurement"
+msgstr "Beschaffung"
+
+msgid "Requests"
+msgstr "Anfragen"
+
+msgid "Suppliers"
+msgstr "Lieferanten"
+
+msgid "Contacts"
+msgstr "Kontakte"
+
+msgid "Contact Roles"
+msgstr "Kontaktrollen"
+
+msgid "System Activity"
+msgstr "Systemaktivität"
+
+msgid "Changelog"
+msgstr "Änderungsprotokoll"
+
+msgid "Customization"
+msgstr "Anpassung"
+
+msgid "Custom Schemas"
+msgstr "Benutzerdefinierte Schemata"
+
+msgid "Custom Fields"
+msgstr "Benutzerdefinierte Felder"
+
+msgid "Custom Fieldsets"
+msgstr "Benutzerdefinierte Feldgruppen"
+
+msgid "Metadata"
+msgstr "Metadaten"
+
+msgid "Tags"
+msgstr "Tags"
+
+msgid "Asset Tag Sequences"
+msgstr "Asset-Tag-Sequenzen"
+
+msgid "Admin"
+msgstr "Administration"
+
+msgid "System"
+msgstr "System"
+
+msgid "Admin Panel"
+msgstr "Administration"
+
+msgid "Home"
+msgstr "Startseite"
+
+# --- Topbar & Layout UI ---
+
+msgid "Search…"
+msgstr "Suchen…"
+
+msgid "Search in website"
+msgstr "Website durchsuchen"
+
+msgid "Unread Alerts"
+msgstr "Ungelesene Benachrichtigungen"
+
+msgid "No unread notifications"
+msgstr "Keine ungelesenen Benachrichtigungen"
+
+msgid "View Notification Center"
+msgstr "Benachrichtigungscenter anzeigen"
+
+msgid "Signed in as"
+msgstr "Angemeldet als"
+
+msgid "Guest"
+msgstr "Gast"
+
+msgid "User"
+msgstr "Benutzer"
+
+msgid "Not Logged In"
+msgstr "Nicht angemeldet"
+
+msgid "Profile"
+msgstr "Profil"
+
+msgid "Notifications"
+msgstr "Benachrichtigungen"
+
+msgid "Preferences"
+msgstr "Einstellungen"
+
+msgid "API Tokens"
+msgstr "API-Token"
+
+msgid "Logout"
+msgstr "Abmelden"
+
+msgid "Login"
+msgstr "Anmelden"
+
+msgid "Overview"
+msgstr "Übersicht"
+
+msgid "Dashboard"
+msgstr "Dashboard"
+
+msgid "Docs"
+msgstr "Dokumentation"
+
+msgid "REST API"
+msgstr "REST-API"
+
+msgid "API documentation"
+msgstr "API-Dokumentation"
+
+msgid "Source Code"
+msgstr "Quellcode"
+
+# --- User Account Titles & Pretires (from views.py) ---
+
+msgid "User Profile"
+msgstr "Benutzerprofil"
+
+msgid "User Account"
+msgstr "Benutzerkonto"
+
+msgid "Change Password"
+msgstr "Kennwort ändern"
+
+msgid "User Tab"
+msgstr "Benutzer-Reiter"
+
+# --- Views Success / Error Flash Toast Messages ---
+
+msgid "Profile updated successfully."
+msgstr "Profil erfolgreich aktualisiert."
+
+msgid "Password changed successfully."
+msgstr "Passwort erfolgreich geändert."
+
+msgid "Preferences saved successfully."
+msgstr "Einstellungen erfolgreich gespeichert."
+
+msgid "There was an error saving your preferences."
+msgstr "Beim Speichern Ihrer Einstellungen ist ein Fehler aufgetreten."
+
+msgid "API Token has been revoked."
+msgstr "API-Token wurde widerrufen."
+
+msgid "API Token generated successfully! Make sure to copy your new personal access token now, as you won't be able to see it again: <code>{token_key}</code>"
+msgstr "API-Token erfolgreich generiert! Kopieren Sie jetzt Ihren persönlichen Token, da Sie ihn später nicht mehr sehen können: <code>{token_key}</code>"
+
+# --- Custom Breadcrumbs, Table Columns & Generic Buttons ---
+
+msgid "Export"
+msgstr "Exportieren"
+
+msgid "Export to CSV"
+msgstr "Als CSV exportieren"
+
+msgid "Export Templates"
+msgstr "Export-Vorlagen"
+
+msgid "Configure Table"
+msgstr "Tabelle konfigurieren"
+
+msgid "Filters"
+msgstr "Filter"
+
+msgid "Toggle Filters"
+msgstr "Filter ein-/ausblenden"
+
+msgid "Search..."
+msgstr "Suchen..."
+
+msgid "Clear search"
+msgstr "Suche löschen"
+
+msgid "Create %(object_type)s"
+msgstr "%(object_type)s erstellen"
+
+msgid "Create new %(object_type)s"
+msgstr "Neues %(object_type)s erstellen"
+
+msgid "Delete {verbose_name}: {object}"
+msgstr "{verbose_name} löschen: {object}"
+
+msgid "Delete {object}"
+msgstr "{object} löschen"
+
+msgid "List"
+msgstr "Liste"
+
+msgid "Import"
+msgstr "Importieren"
+
+msgid "Import {verbose_name_plural}"
+msgstr "{verbose_name_plural} importieren"
+
+msgid "Import Objects"
+msgstr "Objekte importieren"
+
+msgid "Edit"
+msgstr "Bearbeiten"
+
+msgid "Create"
+msgstr "Erstellen"
+
+# --- Common Table Column Headers ---
+
+msgid "Asset Tag"
+msgstr "Inventarnummer"
+
+msgid "Name"
+msgstr "Name"
+
+msgid "Model"
+msgstr "Modell"
+
+msgid "Status"
+msgstr "Status"
+
+msgid "Serial"
+msgstr "Seriennummer"
+
+msgid "Location"
+msgstr "Lagerort"
+
+msgid "Holder"
+msgstr "Besitzer"
+
+msgid "Assignee"
+msgstr "Zugewiesen an"
+
+msgid "Actions"
+msgstr "Aktionen"
+
+msgid "Created"
+msgstr "Erstellt"
+
+msgid "Description"
+msgstr "Beschreibung"
+
+msgid "Category"
+msgstr "Kategorie"
+
+msgid "Supplier"
+msgstr "Lieferant"
+
+msgid "Manufacturer"
+msgstr "Hersteller"
+
+msgid "Expires"
+msgstr "Ablaufdatum"
+
+# --- Audit Session Details Page Translations ---
+
+msgid "Audit Campaign"
+msgstr "Audit-Kampagne"
+
+msgid "Close Campaign & Reconcile"
+msgstr "Kampagne schließen & abgleichen"
+
+msgid "Bulk Re-home Mismatches"
+msgstr "Fehlplatzierungen gesammelt korrigieren"
+
+msgid "Back to Campaigns"
+msgstr "Zurück zu den Kampagnen"
+
+msgid "Campaign Status"
+msgstr "Kampagnenstatus"
+
+msgid "Expected Assets"
+msgstr "Erwartete Assets"
+
+msgid "Audited So Far"
+msgstr "Bisher geprüft"
+
+msgid "Mismatches"
+msgstr "Fehlplatzierungen"
+
+msgid "Missing Assets"
+msgstr "Fehlende Assets"
+
+msgid "Barcode Scanning Engine"
+msgstr "Barcode-Scan-Engine"
+
+msgid "Set your barcode scanner to enter/newline mode, focus on the input box below, and scan your physical assets."
+msgstr "Stellen Sie Ihren Barcodescanner auf Enter/Newline-Modus ein, fokussieren Sie das Eingabefeld unten und scannen Sie Ihre physischen Assets."
+
+msgid "Log Scanned Asset"
+msgstr "Gescanntes Asset protokollieren"
+
+msgid "Campaign Information"
+msgstr "Kampagnen-Informationen"
+
+msgid "Target Location:"
+msgstr "Ziel-Lagerort:"
+
+msgid "Created By:"
+msgstr "Erstellt von:"
+
+msgid "Started At:"
+msgstr "Gestartet am:"
+
+msgid "Completed At:"
+msgstr "Beendet am:"
+
+msgid "Global (All Locations)"
+msgstr "Global (Alle Lagerorte)"
+
+msgid "Location Mismatches"
+msgstr "Lagerort-Fehlplatzierungen"
+
+msgid "Missing Expected Assets"
+msgstr "Fehlende erwartete Assets"
+
+msgid "Verified / Matching"
+msgstr "Verifiziert / Übereinstimmend"
+
+msgid "Mismatched Assets"
+msgstr "Fehlplatzierte Assets"
+
+msgid "These assets are registered under other locations, but were physically verified at <strong>%(loc)s</strong> during this campaign."
+msgstr "Diese Assets sind an anderen Lagerorten registriert, wurden aber während dieser Kampagne physisch an <strong>%(loc)s</strong> verifiziert."
+
+msgid "Asset"
+msgstr "Asset"
+
+msgid "Registered Location"
+msgstr "Registrierter Lagerort"
+
+msgid "Auditor"
+msgstr "Prüfer"
+
+msgid "Timestamp"
+msgstr "Zeitstempel"
+
+msgid "No location mismatches found!"
+msgstr "Keine Lagerort-Fehlplatzierungen gefunden!"
+
+msgid "Every audited asset matches the expected location."
+msgstr "Jedes geprüfte Asset entspricht dem erwarteten Lagerort."
+
+msgid "These assets are registered here, but have NOT been scanned or physical-verified in this campaign."
+msgstr "Diese Assets sind hier registriert, wurden aber in dieser Kampagne NICHT gescannt oder physisch verifiziert."
+
+msgid "All assets audited!"
+msgstr "Alle Assets geprüft!"
+
+msgid "Zero missing assets. 100% campaign coverage achieved!"
+msgstr "Keine fehlenden Assets. 100 % Kampagnenabdeckung erreicht!"
+
+msgid "Verified / Matching Assets"
+msgstr "Verifizierte / Übereinstimmende Assets"
+
+msgid "These assets have been scanned and physically match the registered location in the database."
+msgstr "Diese Assets wurden gescannt und stimmen physisch mit dem registrierten Lagerort in der Datenbank überein."
+
+msgid "Method"
+msgstr "Methode"
+
+msgid "No matching assets scanned yet."
+msgstr "Noch keine übereinstimmenden Assets gescannt."
+
+msgid "Start scanning assets to physically reconcile your registry."
+msgstr "Scannen Sie Assets, um Ihre Registrierung physisch abzugleichen."
+
+
+
+# --- Automated Remediation Translations (ITAMbox Audit) ---
+
+msgid "(Detail block override missing)"
+msgstr "(Detail block override missing)"
+
+msgid "(HMAC Signature Secret Configured)"
+msgstr "(HMAC Signature Secret Configured)"
+
+msgid "(user deleted)"
+msgstr "(user deleted)"
+
+msgid ") - ITAMbox"
+msgstr "- ) - ITAMbox"
+
+msgid ") successfully!"
+msgstr ") successfully!"
+
+msgid "- Accessory Details - ITAMbox"
+msgstr "- Accessory Details - ITAMbox"
+
+msgid "- Asset Holder - ITAMbox"
+msgstr "- Asset-Inhaber - ITAMbox"
+
+msgid "- Asset Role Details - ITAMbox"
+msgstr "- Asset Role Details - ITAMbox"
+
+msgid "- Asset Type - ITAMbox"
+msgstr "- Asset-Typ - ITAMbox"
+
+msgid "- ITAMbox"
+msgstr "- ITAMbox"
+
+msgid "- Category Details - ITAMbox"
+msgstr "- Category Details - ITAMbox"
+
+msgid "- Component Details - ITAMbox"
+msgstr "- Component Details - ITAMbox"
+
+msgid "- Component Type Details - ITAMbox"
+msgstr "- Component Type Details - ITAMbox"
+
+msgid "- Consumable Details - ITAMbox"
+msgstr "- Consumable Details - ITAMbox"
+
+msgid "- Contact Details - ITAMbox"
+msgstr "- Contact Details - ITAMbox"
+
+msgid "- Contact Role Details - ITAMbox"
+msgstr "- Contact Role Details - ITAMbox"
+
+msgid "- Custom Field - ITAMbox"
+msgstr "- Custom Field - ITAMbox"
+
+msgid "- Custom Field Set - ITAMbox"
+msgstr "- Custom Field Set - ITAMbox"
+
+msgid "- Depreciation Rule - ITAMbox"
+msgstr "- Abschreibungsregel - ITAMbox"
+
+msgid "- Details - ITAMbox"
+msgstr "- Details - ITAMbox"
+
+msgid "- Licenses - ITAMbox"
+msgstr "- Lizenzen - ITAMbox"
+
+msgid "- Location Details - ITAMbox"
+msgstr "- Location Details - ITAMbox"
+
+msgid "- Manufacturer Details - ITAMbox"
+msgstr "- Manufacturer Details - ITAMbox"
+
+msgid "- Site Details - ITAMbox"
+msgstr "- Site Details - ITAMbox"
+
+msgid "- Site Group Details - ITAMbox"
+msgstr "- Site Group Details - ITAMbox"
+
+msgid "- Software Catalog - ITAMbox"
+msgstr "- Software Catalog - ITAMbox"
+
+msgid "- Status Label Details - ITAMbox"
+msgstr "- Status Label Details - ITAMbox"
+
+msgid "- Supplier Details - ITAMbox"
+msgstr "- Supplier Details - ITAMbox"
+
+msgid "- Tenant Details - ITAMbox"
+msgstr "- Tenant Details - ITAMbox"
+
+msgid "- Tenant Group Details - ITAMbox"
+msgstr "- Tenant Group Details - ITAMbox"
+
+msgid "0 (Fully Allocated)"
+msgstr "0 (Fully Allocated)"
+
+msgid "0 selected"
+msgstr "0 selected"
+
+msgid "1. Custody & Care:"
+msgstr "1. Verwahrung & Sorgfalt:"
+
+msgid "2. Return Policy:"
+msgstr "2. Rückgaberecht:"
+
+msgid "3. Reporting Incidents:"
+msgstr "3. Meldung von Vorfällen:"
+
+msgid "4. Modification Prohibited:"
+msgstr "4. Modifikation verboten:"
+
+msgid "ADDED OR MODIFIED STATE"
+msgstr "ADDED OR MODIFIED STATE"
+
+msgid "Accessor"
+
+# --- Automated Remediation Translations (ITAMbox Audit) ---
+
+msgid "(Detail block override missing)"
+msgstr "(Detail block override missing)"
+
+msgid "(HMAC Signature Secret Configured)"
+msgstr "(HMAC Signature Secret Configured)"
+
+msgid "(user deleted)"
+msgstr "(user deleted)"
+
+msgid ") - ITAMbox"
+msgstr "- ) - ITAMbox"
+
+msgid ") successfully!"
+msgstr ") successfully!"
+
+msgid "- Accessory Details - ITAMbox"
+msgstr "- Accessory Details - ITAMbox"
+
+msgid "- Asset Holder - ITAMbox"
+msgstr "- Asset-Inhaber - ITAMbox"
+
+msgid "- Asset Role Details - ITAMbox"
+msgstr "- Asset Role Details - ITAMbox"
+
+msgid "- Asset Type - ITAMbox"
+msgstr "- Asset-Typ - ITAMbox"
+
+msgid "- ITAMbox"
+msgstr "- ITAMbox"
+
+msgid "- Category Details - ITAMbox"
+msgstr "- Category Details - ITAMbox"
+
+msgid "- Component Details - ITAMbox"
+msgstr "- Component Details - ITAMbox"
+
+msgid "- Component Type Details - ITAMbox"
+msgstr "- Component Type Details - ITAMbox"
+
+msgid "- Consumable Details - ITAMbox"
+msgstr "- Consumable Details - ITAMbox"
+
+msgid "- Contact Details - ITAMbox"
+msgstr "- Contact Details - ITAMbox"
+
+msgid "- Contact Role Details - ITAMbox"
+msgstr "- Contact Role Details - ITAMbox"
+
+msgid "- Custom Field - ITAMbox"
+msgstr "- Custom Field - ITAMbox"
+
+msgid "- Custom Field Set - ITAMbox"
+msgstr "- Custom Field Set - ITAMbox"
+
+msgid "- Depreciation Rule - ITAMbox"
+msgstr "- Abschreibungsregel - ITAMbox"
+
+msgid "- Details - ITAMbox"
+msgstr "- Details - ITAMbox"
+
+msgid "- Licenses - ITAMbox"
+msgstr "- Lizenzen - ITAMbox"
+
+msgid "- Location Details - ITAMbox"
+msgstr "- Location Details - ITAMbox"
+
+msgid "- Manufacturer Details - ITAMbox"
+msgstr "- Manufacturer Details - ITAMbox"
+
+msgid "- Site Details - ITAMbox"
+msgstr "- Site Details - ITAMbox"
+
+msgid "- Site Group Details - ITAMbox"
+msgstr "- Site Group Details - ITAMbox"
+
+msgid "- Software Catalog - ITAMbox"
+msgstr "- Software Catalog - ITAMbox"
+
+msgid "- Status Label Details - ITAMbox"
+msgstr "- Status Label Details - ITAMbox"
+
+msgid "- Supplier Details - ITAMbox"
+msgstr "- Supplier Details - ITAMbox"
+
+msgid "- Tenant Details - ITAMbox"
+msgstr "- Tenant Details - ITAMbox"
+
+msgid "- Tenant Group Details - ITAMbox"
+msgstr "- Tenant Group Details - ITAMbox"
+
+msgid "0 (Fully Allocated)"
+msgstr "0 (Fully Allocated)"
+
+msgid "0 selected"
+msgstr "0 selected"
+
+msgid "1. Custody & Care:"
+msgstr "1. Verwahrung & Sorgfalt:"
+
+msgid "2. Return Policy:"
+msgstr "2. Rückgaberecht:"
+
+msgid "3. Reporting Incidents:"
+msgstr "3. Meldung von Vorfällen:"
+
+msgid "4. Modification Prohibited:"
+msgstr "4. Modifikation verboten:"
+
+msgid "ADDED OR MODIFIED STATE"
+msgstr "ADDED OR MODIFIED STATE"
+
+msgid "Accessor"
+msgstr "Accessor"
+
+msgid "Accessories Monitored under"
+msgstr "Accessories Monitored under"
+
+msgid "Accessory"
+msgstr "Zubehör"
+
+msgid "Accessory Checkouts"
+msgstr "Accessory Checkouts"
+
+msgid "Account ID:"
+msgstr "Account ID:"
+
+msgid "Acknowledge"
+msgstr "Acknowledge"
+
+msgid "Acknowledged"
+msgstr "Acknowledged"
+
+msgid "Action"
+msgstr "Action"
+
+msgid "Action Configuration:"
+msgstr "Action Configuration:"
+
+msgid "Action Type:"
+msgstr "Action Type:"
+
+msgid "Actioned By:"
+msgstr "Actioned By:"
+
+msgid "Active"
+msgstr "Aktiv"
+
+msgid "Active / Enabled"
+msgstr "Aktiv / Aktiviert"
+
+msgid "Active Alerts"
+msgstr "Aktive Warnungen"
+
+msgid "Active Assignments"
+msgstr "Aktive Zuweisungen"
+
+msgid "Active License Seat Allocations"
+msgstr "Aktive Lizenzplatzzuweisungen"
+
+msgid "Active Physical Assets of this Type"
+msgstr "Aktive physische Assets dieses Typs"
+
+msgid "Active Schedules"
+msgstr "Aktive Pläne"
+
+msgid "Active Tokens"
+msgstr "Aktive Token"
+
+msgid "Active Triggered Alerts"
+msgstr "Aktive ausgelöste Warnungen"
+
+msgid "Active Workers"
+msgstr "Aktive Worker"
+
+msgid "Active Workspace"
+msgstr "Aktiver Arbeitsbereich"
+
+msgid "Active subscription spend:"
+msgstr "Active subscription spend:"
+
+msgid "Active:"
+msgstr "Aktiv:"
+
+msgid "Add"
+msgstr "Add"
+
+msgid "Add Component"
+msgstr "Komponente hinzufügen"
+
+msgid "Add Entry"
+msgstr "Eintrag hinzufügen"
+
+msgid "Add Item"
+msgstr "Artikel hinzufügen"
+
+msgid "Add Journal Entry"
+msgstr "Journaleintrag hinzufügen"
+
+msgid "Add Software"
+msgstr "Software hinzufügen"
+
+msgid "Add Widget"
+msgstr "Widget hinzufügen"
+
+msgid "Add your first widget"
+msgstr "Fügen Sie Ihr erstes Widget hinzu"
+
+msgid "Address:"
+msgstr "Adresse:"
+
+msgid "Admin Portal:"
+msgstr "Admin-Portal:"
+
+msgid "Administrative Custody Only"
+msgstr "Nur administrative Verwahrung"
+
+msgid "Advanced Code Active"
+msgstr "Erweiterter Code aktiv"
+
+msgid "Advanced mode enabled, but template content is empty. Falling back to default layout."
+msgstr "Advanced mode enabled, but template content is empty. Falling back to default layout."
+
+msgid "Alert Rule"
+msgstr "Alarmregel"
+
+msgid "Alert Type"
+msgstr "Alarmtyp"
+
+msgid "All"
+msgstr "Alle"
+
+msgid "All Assets / Devices"
+msgstr "Alle Assets / Geräte"
+
+msgid "All Data"
+msgstr "Alle Daten"
+
+msgid "All Standard Columns"
+msgstr "Alle Standardspalten"
+
+msgid "All Tenants"
+msgstr "Alle Mandanten"
+
+msgid "All Tenants (Global)"
+msgstr "Alle Mandanten (Global)"
+
+msgid "All stock levels are healthy."
+msgstr "Alle Lagerbestände sind im grünen Bereich."
+
+msgid "Allocate Specific Asset (Optional)"
+msgstr "Spezifisches Asset zuweisen (Optional)"
+
+msgid "Allocated"
+msgstr "Zugewiesen"
+
+msgid "Allowed (Negative Stock Permitted)"
+msgstr "Allowed (Negative Stock Permitted)"
+
+msgid "An irrefutable cryptographic sign-off has been committed to the inventory ledger."
+msgstr "Eine unwiderrufliche kryptografische Freigabe wurde in das Inventarbuch eingetragen."
+
+msgid "Any Asset"
+msgstr "Any Asset"
+
+msgid "Any Asset Type"
+msgstr "Any Asset Type"
+
+msgid "Any physical damage, technical failure, loss, or theft of the assigned equipment must be reported to the IT department within 24 hours of occurrence."
+msgstr "Physische Schäden, technische Ausfälle, Verlust oder Diebstahl der zugewiesenen Ausrüstung müssen der IT-Abteilung innerhalb von 24 Stunden nach Auftreten gemeldet werden."
+
+msgid "Applies To:"
+msgstr "Gilt für:"
+
+msgid "Apply"
+msgstr "Anwenden"
+
+msgid "Apply Changes"
+msgstr "Änderungen übernehmen"
+
+msgid "Apply Filter"
+msgstr "Filter anwenden"
+
+msgid "Approve Asset Request"
+msgstr "Asset-Anfrage genehmigen"
+
+msgid "Approve..."
+msgstr "Genehmigen..."
+
+msgid "Approved"
+msgstr "Genehmigt"
+
+msgid "Are you sure you want to close and reconcile the audit campaign:"
+msgstr "Sind Sie sicher, dass Sie die Audit-Kampagne schließen und abgleichen möchten:"
+
+msgid "Are you sure you want to delete"
+msgstr "Are you sure you want to delete"
+
+msgid "Are you sure you want to delete the asset role:"
+msgstr "Are you sure you want to delete the asset role:"
+
+msgid "Are you sure you want to delete the asset type"
+msgstr "Are you sure you want to delete the asset type"
+
+msgid "Are you sure you want to delete the asset:"
+msgstr "Sind Sie sicher, dass Sie dieses Asset löschen möchten:"
+
+msgid "Are you sure you want to delete the location:"
+msgstr "Sind Sie sicher, dass Sie diesen Lagerort löschen möchten:"
+
+msgid "Are you sure you want to delete the manufacturer \""
+msgstr "Are you sure you want to delete the manufacturer \""
+
+msgid "Are you sure you want to delete the region:"
+msgstr "Sind Sie sicher, dass Sie diese Region löschen möchten:"
+
+msgid "Are you sure you want to delete the selected objects?"
+msgstr "Are you sure you want to delete the selected objects?"
+
+msgid "Are you sure you want to delete the site group:"
+msgstr "Are you sure you want to delete the site group:"
+
+msgid "Are you sure you want to delete the site:"
+msgstr "Sind Sie sicher, dass Sie diesen Standort löschen möchten:"
+
+msgid "Are you sure you want to delete the tenant group:"
+msgstr "Are you sure you want to delete the tenant group:"
+
+msgid "Are you sure you want to delete the tenant:"
+msgstr "Sind Sie sicher, dass Sie diesen Mandanten löschen möchten:"
+
+msgid "Are you sure you want to revoke this API token? External scripts using this key will immediately lose access."
+msgstr "Sind Sie sicher, dass Sie dieses API-Token widerrufen möchten? Externe Skripte, die diesen Schlüssel verwenden, verlieren sofort den Zugriff."
+
+msgid "Asset Assigned for Custody"
+msgstr "Asset zur Verwahrung zugewiesen"
+
+msgid "Asset Assignment"
+msgstr "Asset-Zuweisung"
+
+msgid "Asset Details"
+msgstr "Asset-Details"
+
+msgid "Asset Holder"
+msgstr "Asset-Inhaber"
+
+msgid "Asset Name"
+msgstr "Asset-Name"
+
+msgid "Asset Repair & Upgrade History"
+msgstr "Asset Repair & Upgrade History"
+
+msgid "Asset Request"
+msgstr "Asset-Anforderung"
+
+msgid "Asset Requests - ITAMbox"
+msgstr "- Asset-Anfragen - ITAMbox"
+
+msgid "Asset Role:"
+msgstr "Asset-Rolle:"
+
+msgid "Asset Tag:"
+msgstr "Inventarnummer:"
+
+msgid "Asset Type"
+msgstr "Asset-Typ"
+
+msgid "Asset Type / Model:"
+msgstr "Asset-Typ / Modell:"
+
+msgid "Asset Types (Models)"
+msgstr "Asset-Typen (Modelle)"
+
+msgid "Asset Types - ITAMbox"
+msgstr "- Asset Types - ITAMbox"
+
+msgid "Asset Types / Models"
+msgstr "Asset-Typen / Modelle"
+
+msgid "Asset Types / Models Categorized under"
+msgstr "Asset Types / Models Categorized under"
+
+msgid "Asset summary, license allocation & renewals"
+msgstr "Asset summary, license allocation & renewals"
+
+msgid "Asset:"
+msgstr "Asset:"
+
+msgid "ITAMbox"
+msgstr "ITAMbox"
+
+msgid "Assets / Accessories"
+msgstr "Assets / Accessories"
+
+msgid "Assets / Asset Roles"
+msgstr "Assets / Asset-Rollen"
+
+msgid "Assets / Asset Types"
+msgstr "Assets / Asset Types"
+
+msgid "Assets / Categories"
+msgstr "Assets / Categories"
+
+msgid "Assets / Component Types"
+msgstr "Assets / Component Types"
+
+msgid "Assets / Components"
+msgstr "Assets / Components"
+
+msgid "Assets / Consumables"
+msgstr "Assets / Consumables"
+
+msgid "Assets / Custom Field Sets"
+msgstr "Assets / Custom Field Sets"
+
+msgid "Assets / Custom Fields"
+msgstr "Assets / Custom Fields"
+
+msgid "Assets / Depreciation Rules"
+msgstr "Assets / Abschreibungsregeln"
+
+msgid "Assets / Devices with status \""
+msgstr "Assets / Devices with status \""
+
+msgid "Assets / Kits"
+msgstr "Assets / Kits"
+
+msgid "Assets / Maintenances"
+msgstr "Assets / Maintenances"
+
+msgid "Assets / Manufacturers"
+msgstr "Assets / Hersteller"
+
+msgid "Assets / Status Labels"
+msgstr "Assets / Status Labels"
+
+msgid "Assets / Suppliers"
+msgstr "Assets / Lieferanten"
+
+msgid "Assets Located in this Specific Location"
+msgstr "Assets Located in this Specific Location"
+
+msgid "Assets Physical-Located inside this Site"
+msgstr "Assets Physical-Located inside this Site"
+
+msgid "Assets Sourced from"
+msgstr "Assets Sourced from"
+
+msgid "Assets Supplied"
+msgstr "Assets Supplied"
+
+msgid "Assets in this Role"
+msgstr "Assets in this Role"
+
+msgid "Assets of this Model / Type"
+msgstr "Assets of this Model / Typ"
+
+msgid "Assets with this Tag ("
+msgstr "Assets with this Tag ("
+
+msgid "Assign"
+msgstr "Assign"
+
+msgid "Assign Asset"
+msgstr "Assign Asset"
+
+msgid "Assign Contact"
+msgstr "Assign Contact"
+
+msgid "Assign Contact to"
+msgstr "Assign Contact to"
+
+msgid "Assign Selected"
+msgstr "Assign Selected"
+
+msgid "Assign Subscription"
+msgstr "Assign Subscription"
+
+msgid "Assign Subscription to"
+msgstr "Assign Subscription to"
+
+msgid "Assign selected assets to a holder"
+msgstr "Assign selected assets to a holder"
+
+msgid "Assigned Accessories"
+msgstr "Assigned Accessories"
+
+msgid "Assigned Consumables"
+msgstr "Assigned Consumables"
+
+msgid "Assigned Contacts"
+msgstr "Assigned Contacts"
+
+msgid "Assigned Groups"
+msgstr "Assigned Groups"
+
+msgid "Assigned Objects"
+msgstr "Assigned Objects"
+
+msgid "Assigned Qty:"
+msgstr "Assigned Qty:"
+
+msgid "Assigned SaaS & Support Licenses"
+msgstr "Assigned SaaS & Support Licenses"
+
+msgid "Assigned System Hardware Specifications"
+msgstr "Assigned System Hardware Specifications"
+
+msgid "Assigned Tags"
+msgstr "Assigned Tags"
+
+msgid "Assigned Tenant:"
+msgstr "Assigned Tenant:"
+
+msgid "Assigned To:"
+msgstr "Assigned To:"
+
+msgid "Assigned Users ("
+msgstr "Assigned Users ("
+
+msgid "Assigned:"
+msgstr "Assigned:"
+
+msgid "Assignment Status"
+msgstr "Assignment Status"
+
+msgid "Associated Accessories"
+msgstr "Zugehöriges Zubehör"
+
+msgid "Associated Asset Holders"
+msgstr "Zugehörige Asset-Inhaber"
+
+msgid "Associated Assets"
+msgstr "Zugehörige Assets"
+
+msgid "Associated Assignments"
+msgstr "Zugehörige Zuweisungen"
+
+msgid "Associated Consumables"
+msgstr "Zugehörige Verbrauchsmaterialien"
+
+msgid "Associated Contacts"
+msgstr "Zugehörige Kontakte"
+
+msgid "Associated Kits"
+msgstr "Zugehörige Kits"
+
+msgid "Associated Licenses"
+msgstr "Zugehörige Lizenzen"
+
+msgid "Associated Locations"
+msgstr "Zugehörige Lagerorte"
+
+msgid "Associated Sites"
+msgstr "Zugehörige Standorte"
+
+msgid "Associated Subscriptions"
+msgstr "Zugehörige Abonnements"
+
+msgid "Asynchronous import and checkout tasks will appear in this registry."
+msgstr "Asynchrone Import- und Checkout-Aufgaben werden in diesem Register angezeigt."
+
+msgid "Attachments"
+msgstr "Anhänge"
+
+msgid "Audit & Compliance Control"
+msgstr "Audit & Compliance Control"
+
+msgid "Audit Campaigns"
+msgstr "Audit-Kampagnen"
+
+msgid "Audit Safety"
+msgstr "Audit Safety"
+
+msgid "Audited"
+msgstr "Geprüft"
+
+msgid "Auto-Renewal"
+msgstr "Automatische Verlängerung"
+
+msgid "Automated Report Schedules"
+msgstr "Automatisierte Berichtspläne"
+
+msgid "Available"
+msgstr "Verfügbar"
+
+msgid "Available Label Templates"
+msgstr "Verfügbare Etikettenvorlagen"
+
+msgid "Available Seats"
+msgstr "Verfügbare Plätze"
+
+msgid "Available Stock"
+msgstr "Verfügbarer Bestand"
+
+msgid "Available in Inventory"
+msgstr "Im Inventar verfügbar"
+
+msgid "Back to Upload"
+msgstr "Zurück zum Upload"
+
+msgid "Background Tasks & Jobs"
+msgstr "Hintergrundaufgaben & Jobs"
+
+msgid "Barcode Format:"
+msgstr "Barcode-Format:"
+
+msgid "Billing Cycle:"
+msgstr "Abrechnungszyklus:"
+
+msgid "Bulk Assign Assets"
+msgstr "Assets gesammelt zuweisen"
+
+msgid "CSV"
+msgstr "CSV"
+
+msgid "CSV Format"
+msgstr "CSV-Format"
+
+msgid "Cancel"
+msgstr "Abbrechen"
+
+msgid "Cancel Request"
+msgstr "Anfrage abbrechen"
+
+msgid "Cancel Task"
+msgstr "Aufgabe abbrechen"
+
+msgid "Cancelled"
+msgstr "Abgebrochen"
+
+msgid "Cancelled:"
+msgstr "Cancelled:"
+
+msgid "Category:"
+msgstr "Kategorie:"
+
+msgid "Centralized logs registry"
+msgstr "Zentralisiertes Protokollregister"
+
+msgid "Change Details"
+msgstr "Änderungsdetails"
+
+msgid "Change Log"
+msgstr "Änderungsprotokoll"
+
+msgid "Change language"
+msgstr "Sprache ändern"
+
+msgid "Changelog History (Last 50 changes)"
+msgstr "Änderungsprotokoll (Letzte 50 Änderungen)"
+
+msgid "Channel Name"
+msgstr "Kanalname"
+
+msgid "Check In"
+msgstr "Einbuchen"
+
+msgid "Check Out"
+msgstr "Herausgeben"
+
+msgid "Check Out Accessory:"
+msgstr "Check Out Accessory:"
+
+msgid "Check Out Asset:"
+msgstr "Asset herausgeben:"
+
+msgid "Check Out..."
+msgstr "Check Out..."
+
+msgid "Check-in"
+msgstr "Einbuchen"
+
+msgid "Check-out"
+msgstr "Herausgeben"
+
+msgid "Checked Out"
+msgstr "Ausgebucht"
+
+msgid "Checked Out Assets"
+msgstr "Ausgebuchte Assets"
+
+msgid "Checked Out Assets Assigned"
+msgstr "Checked Out Assets Assigned"
+
+msgid "Checked Out Assignments"
+msgstr "Checked Out Assignments"
+
+msgid "Checked Out:"
+msgstr "Ausgebucht:"
+
+msgid "Checkout Kit"
+msgstr "Kit herausgeben"
+
+msgid "Checkout Kit:"
+msgstr "Kit herausgeben:"
+
+msgid "Child Groups ("
+msgstr "Child Groups ("
+
+msgid "Child Locations"
+msgstr "Untergeordnete Lagerorte"
+
+msgid "Child Regions ("
+msgstr "Child Regions ("
+
+msgid "Choices:"
+msgstr "Choices:"
+
+msgid "Clear Filters"
+msgstr "Filter löschen"
+
+msgid "Clear Pad"
+msgstr "Pad leeren"
+
+msgid "Clear table preferences"
+msgstr "Tabelleneinstellungen löschen"
+
+msgid "Click to rename"
+msgstr "Click to rename"
+
+msgid "Close"
+msgstr "Schließen"
+
+msgid "Close & Reconcile"
+msgstr "Schließen & Abgleichen"
+
+msgid "Close Audit Campaign"
+msgstr "Close Audit Campaign"
+
+msgid "Close Audit Campaign -"
+msgstr "Close Audit Campaign -"
+
+msgid "Close Campaign"
+msgstr "Close Campaign"
+
+msgid "Close Preview"
+msgstr "Vorschau schließen"
+
+msgid "Collapse Panel"
+msgstr "Bereich einklappen"
+
+msgid "Color Badge:"
+msgstr "Farb-Badge:"
+
+msgid "Color:"
+msgstr "Farbe:"
+
+msgid "Columns"
+msgstr "Spalten"
+
+msgid "Comments"
+msgstr "Kommentare"
+
+msgid "Comments:"
+msgstr "Kommentare:"
+
+msgid "Compiling Report Template..."
+msgstr "Compiling Report Template..."
+
+msgid "Completed"
+msgstr "Abgeschlossen"
+
+msgid "Completion Date:"
+msgstr "Completion Date:"
+
+msgid "Component Model:"
+msgstr "Komponentenmodell:"
+
+msgid "Configure"
+msgstr "Konfigurieren"
+
+msgid "Configure Support Contact"
+msgstr "Supportkontakt konfigurieren"
+
+msgid "Configure Threshold Rules"
+msgstr "Schwellenwertregeln konfigurieren"
+
+msgid "Configure Widget"
+msgstr "Widget konfigurieren"
+
+msgid "Configure this widget to select which object types to count."
+msgstr "Configure this widget to select which object types to count."
+
+msgid "Configured Permissions:"
+msgstr "Konfigurierte Berechtigungen:"
+
+msgid "Confirm Bulk Deletion"
+msgstr "Gesammeltes Löschen bestätigen"
+
+msgid "Confirm Delete"
+msgstr "Löschen bestätigen"
+
+msgid "Confirm Delete -"
+msgstr "Confirm Delete -"
+
+msgid "Confirm Delete Manufacturer"
+msgstr "Confirm Delete Manufacturer"
+
+msgid "Confirm Deletion"
+msgstr "Löschen bestätigen"
+
+msgid "Confirm Deletion -"
+msgstr "Confirm Deletion -"
+
+msgid "Confirm Deletion:"
+msgstr "Löschen bestätigen:"
+
+msgid "Consumable Usage"
+msgstr "Consumable Usage"
+
+msgid "Consume / Debit Consumable:"
+msgstr "Consume / Debit Consumable:"
+
+msgid "Consume Item"
+msgstr "Artikel verbrauchen"
+
+msgid "Consume Item..."
+msgstr "Consume Item..."
+
+msgid "Consumed"
+msgstr "Verbraucht"
+
+msgid "Consumption & Debit History Log"
+msgstr "Consumption & Debit History Log"
+
+msgid "Consumption Log"
+msgstr "Consumption Log"
+
+msgid "Contact"
+msgstr "Kontakt"
+
+msgid "Contact Assignments"
+msgstr "Contact Assignments"
+
+msgid "Contact Information"
+msgstr "Contact Information"
+
+msgid "Contact Person:"
+msgstr "Contact Person:"
+
+msgid "Content Type:"
+msgstr "Inhaltstyp:"
+
+msgid "Contract Ref:"
+msgstr "Vertragsreferenz:"
+
+msgid "Copy"
+msgstr "Kopieren"
+
+msgid "Copy Link"
+msgstr "Link kopieren"
+
+msgid "Copy/Clone"
+msgstr "Kopieren/Klonen"
+
+msgid "Cost Center:"
+msgstr "Kostenstelle:"
+
+msgid "Cost:"
+msgstr "Kosten:"
+
+msgid "Create Board"
+msgstr "Dashboard erstellen"
+
+msgid "Create New Dashboard"
+msgstr "Neues Dashboard erstellen"
+
+msgid "Create one"
+msgstr "Create one"
+
+msgid "Created:"
+msgstr "Created:"
+
+msgid "Critical"
+msgstr "Critical"
+
+msgid "Current View"
+msgstr "Aktuelle Ansicht"
+
+msgid "Custodian"
+msgstr "Verwahrer"
+
+msgid "Custodian / Asset Holder"
+msgstr "Verwahrer / Asset-Inhaber"
+
+msgid "Custody Agreement Secured - ITAMbox"
+msgstr "- Custody Agreement Secured - ITAMbox"
+
+msgid "Custody Agreement Secured!"
+msgstr "Verwahrungsvereinbarung gesichert!"
+
+msgid "Custody Secured"
+msgstr "Verwahrung gesichert"
+
+msgid "Custody Signoff & EULA Acceptance - ITAMbox"
+msgstr "- Custody Signoff & EULA Acceptance - ITAMbox"
+
+msgid "Custody Signoff Failed"
+msgstr "Verwahrungsfreigabe fehlgeschlagen"
+
+msgid "Custody Status:"
+msgstr "Verwahrungsstatus:"
+
+msgid "Custody Terms & Conditions (EULA)"
+msgstr "Verwahrungsbedingungen (EULA)"
+
+msgid "Custom Fields ("
+msgstr "Custom Fields ("
+
+msgid "Custom Fieldset:"
+msgstr "Custom Fieldset:"
+
+msgid "Custom HTTP Headers:"
+msgstr "Custom HTTP Headers:"
+
+msgid "Custom Specifications"
+msgstr "Custom Specifications"
+
+msgid "Dashboard - ITAMbox"
+msgstr "- Dashboard - ITAMbox"
+
+msgid "Dashboard Name"
+msgstr "Dashboard Name"
+
+msgid "Data Format"
+msgstr "Data Format"
+
+msgid "Date"
+msgstr "Date"
+
+msgid "Day"
+msgstr "Day"
+
+msgid "Days Left"
+msgstr "Days Left"
+
+msgid "Decision Notes"
+msgstr "Decision Notes"
+
+msgid "Decline"
+msgstr "Ablehnen"
+
+msgid "Default"
+msgstr "Default"
+
+msgid "Delete"
+msgstr "Delete"
+
+msgid "Delete Asset"
+msgstr "Delete Asset"
+
+msgid "Delete Asset Type"
+msgstr "Delete Asset Type"
+
+msgid "Delete Asset Type - ITAMbox"
+msgstr "- Delete Asset Type - ITAMbox"
+
+msgid "Delete Dashboard"
+msgstr "Delete Dashboard"
+
+msgid "Delete Location"
+msgstr "Delete Location"
+
+msgid "Delete Region"
+msgstr "Delete Region"
+
+msgid "Delete Selected"
+msgstr "Delete Selected"
+
+msgid "Delete Site"
+msgstr "Delete Site"
+
+msgid "Delete Site Group"
+msgstr "Delete Site Group"
+
+msgid "Delete Tenant"
+msgstr "Delete Tenant"
+
+msgid "Delete Tenant Group"
+msgstr "Delete Tenant Group"
+
+msgid "Delete this dashboard? All widget custom sizing and placements will be lost."
+msgstr "Delete this dashboard? All widget custom sizing and placements will be lost."
+
+msgid "Deleted"
+msgstr "Gelöscht"
+
+msgid "Denial/Decision Notes"
+msgstr "Denial/Decision Notes"
+
+msgid "Denied"
+msgstr "Denied"
+
+msgid "Deny Asset Request"
+msgstr "Asset-Anfrage ablehnen"
+
+msgid "Deny Request"
+msgstr "Deny Request"
+
+msgid "Deny..."
+msgstr "Ablehnen..."
+
+msgid "Deploy / Checkout Kit"
+msgstr "Deploy / Kit herausgeben"
+
+msgid "Deployed / Checked Out"
+msgstr "Deployed / Ausgebucht"
+
+msgid "Deployment & Custody"
+msgstr "Deployment & Custody"
+
+msgid "Depreciated Book Value:"
+msgstr "Depreciated Book Value:"
+
+msgid "Depreciated over"
+msgstr "Depreciated over"
+
+msgid "Depreciation Policy:"
+msgstr "Depreciation Policy:"
+
+msgid "Description:"
+msgstr "Beschreibung:"
+
+msgid "Details"
+msgstr "Details"
+
+msgid "Difference"
+msgstr "Difference"
+
+msgid "Direct Editor"
+msgstr "Direct Editor"
+
+msgid "Disabled"
+msgstr "Disabled"
+
+msgid "Display Label:"
+msgstr "Display Label:"
+
+msgid "Django-Q2 ORM Broker"
+msgstr "Django-Q2 ORM Broker"
+
+msgid "Don't have account yet?"
+msgstr "Don't have account yet?"
+
+msgid "Download"
+msgstr "Download"
+
+msgid "Downtime Duration"
+msgstr "Ausfallzeitdauer"
+
+msgid "Draw Signature Below"
+msgstr "Unterschrift unten zeichnen"
+
+msgid "Drawn Signature"
+msgstr "Gezeichnete Unterschrift"
+
+msgid "Drawn signature image"
+msgstr "Bild der gezeichneten Unterschrift"
+
+msgid "Duration (months):"
+msgstr "Duration (months):"
+
+msgid "EULA Acceptance Portal"
+msgstr "EULA-Akzeptanzportal"
+
+msgid "EULA Version"
+msgstr "EULA-Version"
+
+msgid "EULA custody links expire automatically after 7 days to preserve organizational security. Please contact your IT administrator to request a fresh transfer link."
+msgstr "EULA-Verwahrungslinks laufen automatisch nach 7 Tagen ab, um die Sicherheit der Organisation zu gewährleisten. Bitte wenden Sie sich an Ihren IT-Administrator, um einen neuen Übertragungslink anzufordern."
+
+msgid "EXPIRED"
+msgstr "EXPIRED"
+
+msgid "Edit Details"
+msgstr "Edit Details"
+
+msgid "Edit Kit"
+msgstr "Edit Kit"
+
+msgid "Edit Rule"
+msgstr "Edit Rule"
+
+msgid "Edit Selected"
+msgstr "Ausgewählte bearbeiten"
+
+msgid "Edit Template"
+msgstr "Edit Template"
+
+msgid "Email"
+msgstr "E-Mail"
+
+msgid "Email Address:"
+msgstr "Email Address:"
+
+msgid "Email EULA:"
+msgstr "Email EULA:"
+
+msgid "Email on Checkin:"
+msgstr "Email on Checkin:"
+
+msgid "Email on Checkout:"
+msgstr "Email on Checkout:"
+
+msgid "Email:"
+msgstr "E-Mail:"
+
+msgid "Enable dark mode"
+msgstr "Enable dark mode"
+
+msgid "Enable light mode"
+msgstr "Enable light mode"
+
+msgid "Enabled"
+msgstr "Enabled"
+
+msgid "Endpoint Name:"
+msgstr "Endpoint Name:"
+
+msgid "Ensure margins are set to \"None\" in your print options."
+msgstr "Stellen Sie sicher, dass die Ränder in den Druckoptionen auf \"Keine\" eingestellt sind."
+
+msgid "Equipment Transfer & Custody Agreement"
+msgstr "Geräteübertragungs- & Verwahrungsvereinbarung"
+
+msgid "Error: content_template_name not provided to user page wrapper."
+msgstr "Error: content_template_name not provided to user page wrapper."
+
+msgid "Est. Annual Cost:"
+msgstr "Est. Annual Cost:"
+
+msgid "Est. Annual:"
+msgstr "Est. Annual:"
+
+msgid "Estimated EOL Date:"
+msgstr "Estimated EOL Date:"
+
+msgid "Execution & Activity Logs"
+msgstr "Execution & Activity Logs"
+
+msgid "Expected Return:"
+msgstr "Expected Return:"
+
+msgid "Expiration Date:"
+msgstr "Ablaufdatum:"
+
+msgid "Expired"
+msgstr "Abgelaufen"
+
+msgid "Expired (EOL Reached)"
+msgstr "Expired (EOL Reached)"
+
+msgid "Export CSV"
+msgstr "Export CSV"
+
+msgid "Export HTML"
+msgstr "Export HTML"
+
+msgid "Facility:"
+msgstr "Facility:"
+
+msgid "Failed"
+msgstr "Failed"
+
+msgid "Fast Async Actions"
+msgstr "Fast Async Actions"
+
+msgid "Field"
+msgstr "Field"
+
+msgid "Field Name:"
+msgstr "Field Name:"
+
+msgid "Field Options"
+msgstr "Field Options"
+
+msgid "Field Type:"
+msgstr "Field Type:"
+
+msgid "Fields to Update"
+msgstr "Fields to Update"
+
+msgid "Fieldset Name:"
+msgstr "Fieldset Name:"
+
+msgid "File Extension:"
+msgstr "File Extension:"
+
+msgid "File Upload"
+msgstr "File Upload"
+
+msgid "Files"
+msgstr "Files"
+
+msgid "Financial & Lifecycle"
+msgstr "Financial & Lifecycle"
+
+msgid "Financial Details"
+msgstr "Financial Details"
+
+msgid "Format"
+msgstr "Format"
+
+msgid "Fulfilled"
+msgstr "Fulfilled"
+
+msgid "Full Name:"
+msgstr "Full Name:"
+
+msgid "GPS Coordinates:"
+msgstr "GPS Coordinates:"
+
+msgid "GRID COLUMNS COMPOSITION"
+msgstr "GRID COLUMNS COMPOSITION"
+
+msgid "GROUP BY FIELD"
+msgstr "GROUP BY FIELD"
+
+msgid "Gathering tenant records & rendering template"
+msgstr "Gathering tenant records & rendering template"
+
+msgid "Generate Token"
+msgstr "Generate Token"
+
+msgid "Generate Warranty Claim Email"
+msgstr "Generate Warranty Claim Email"
+
+msgid "Generated Attachments"
+msgstr "Generated Attachments"
+
+msgid "Global (No Tenant)"
+msgstr "Global (No Tenant)"
+
+msgid "Granted"
+msgstr "Granted"
+
+msgid "Group Name:"
+msgstr "Group Name:"
+
+msgid "Group:"
+msgstr "Group:"
+
+msgid "HTTP Method:"
+msgstr "HTTP Method:"
+
+msgid "Hardware Asset"
+msgstr "Hardware Asset"
+
+msgid "Header Color Style"
+msgstr "Header Color Style"
+
+msgid "Highest Utilization Rates"
+msgstr "Höchste Auslastungsraten"
+
+msgid "Historical runs queue"
+msgstr "Historical runs queue"
+
+msgid "Hourly, nightly, or weekly runs cataloged"
+msgstr "Hourly, nightly, or weekly runs cataloged"
+
+msgid "I Agree & Accept Custody"
+msgstr "Ich stimme zu & akzeptiere die Verwahrung"
+
+msgid "Images"
+msgstr "Images"
+
+msgid "Import Complete"
+msgstr "Import Complete"
+
+msgid "Import Errors"
+msgstr "Import Errors"
+
+msgid "In Progress (Out of Service)"
+msgstr "In Progress (Out of Service)"
+
+msgid "In-Stock / Available"
+msgstr "In-Stock / Verfügbar"
+
+msgid "Inactive"
+msgstr "Inactive"
+
+msgid "Info"
+msgstr "Info"
+
+msgid "Information"
+msgstr "Information"
+
+msgid "Initial landing dashboard"
+msgstr "Initial landing dashboard"
+
+msgid "Installed Instances"
+msgstr "Installed Instances"
+
+msgid "Installed Instances on Assets / Devices"
+msgstr "Installed Instances on Assets / Geräte"
+
+msgid "Installed Physical Modules / Components"
+msgstr "Installed Physical Modules / Components"
+
+msgid "Installed Software Inventory"
+msgstr "Installed Software Inventory"
+
+msgid "Invite Member"
+msgstr "Invite Member"
+
+msgid "Invite Workspace Member"
+msgstr "Invite Workspace Member"
+
+msgid "Invite a new staff member to join your active tenant workspace. They will receive a secure token which links their account to this workspace."
+msgstr "Invite a new staff member to join your active tenant workspace. They will receive a secure token which links their account to this workspace."
+
+msgid "Is Active"
+msgstr "Is Active"
+
+msgid "Item Type"
+msgstr "Item Type"
+
+msgid "Items Logged"
+msgstr "Items Logged"
+
+msgid "Items below minimum quantity:"
+msgstr "Items below minimum quantity:"
+
+msgid "Jinja2 HTML Override Code"
+msgstr "Jinja2 HTML Override Code"
+
+msgid "Job Information"
+msgstr "Job Information"
+
+msgid "Journal"
+msgstr "Journal"
+
+msgid "Journal Entries"
+msgstr "Journal Entries"
+
+msgid "Kit Components"
+msgstr "Kit Components"
+
+msgid "Kit Unavailable (Out of Stock)"
+msgstr "Kit Unavailable (Out of Stock)"
+
+msgid "Kit:"
+msgstr "Kit:"
+
+msgid "LAYOUT PRESET"
+msgstr "LAYOUT PRESET"
+
+msgid "Label"
+msgstr "Label"
+
+msgid "Label Printing"
+msgstr "Label Printing"
+
+msgid "Label Size:"
+msgstr "Label Size:"
+
+msgid "Label:"
+msgstr "Label:"
+
+msgid "Last Used"
+msgstr "Last Used"
+
+msgid "Leave blank to use the default title."
+msgstr "Leave blank to use the default title."
+
+msgid "License"
+msgstr "Lizenz"
+
+msgid "License Seats"
+msgstr "License Seats"
+
+msgid "License Type:"
+msgstr "License Type:"
+
+msgid "Licensed Qty:"
+msgstr "Licensed Qty:"
+
+msgid "Licenses / License Entitlements"
+msgstr "Lizenzen / License Entitlements"
+
+msgid "Link Validation Failure - ITAMbox"
+msgstr "- Link Validation Failure - ITAMbox"
+
+msgid "Linked User account:"
+msgstr "Linked User account:"
+
+msgid "Live Report Template Preview"
+msgstr "Live Report Template Preview"
+
+msgid "Loading..."
+msgstr "Loading..."
+
+msgid "Locations in this Site"
+msgstr "Locations in this Site"
+
+msgid "Lock"
+msgstr "Lock"
+
+msgid "Lock dashboard"
+msgstr "Lock dashboard"
+
+msgid "Log In"
+msgstr "Anmelden"
+
+msgid "Log In to Your Account"
+msgstr "Log In to Your Account"
+
+msgid "Login with SSO (dummy)"
+msgstr "Login with SSO (dummy)"
+
+msgid "Low Stock Warning:"
+msgstr "Low Stock Warning:"
+
+msgid "MIME Type:"
+msgstr "MIME Type:"
+
+msgid "Maintenance Cost"
+msgstr "Maintenance Cost"
+
+msgid "Maintenance Details:"
+msgstr "Maintenance Details:"
+
+msgid "Maintenance Expenditures"
+msgstr "Wartungsausgaben"
+
+msgid "Maintenance Type:"
+msgstr "Maintenance Type:"
+
+msgid "Maintenance on"
+msgstr "Maintenance on"
+
+msgid "Manage Alert Rules"
+msgstr "Manage Alert Rules"
+
+msgid "Manage Dashboards"
+msgstr "Manage Dashboards"
+
+msgid "Manage Templates"
+msgstr "Manage Templates"
+
+msgid "Manage personal access tokens to authenticate external integrations, API scripts, and CLI utilities."
+msgstr "Manage personal access tokens to authenticate external integrations, API scripts, and CLI utilities."
+
+msgid "Manage triggers & notification channels"
+msgstr "Manage triggers & notification channels"
+
+msgid "Manufacturer:"
+msgstr "Manufacturer:"
+
+msgid "Mark All as Read"
+msgstr "Mark All as Read"
+
+msgid "Mark Read"
+msgstr "Mark Read"
+
+msgid "Mark as Read"
+msgstr "Mark as Read"
+
+msgid "Matching Conditions:"
+msgstr "Matching Conditions:"
+
+msgid "Max"
+msgstr "Max"
+
+msgid "Meta Type"
+msgstr "Meta Type"
+
+msgid "Meta Type:"
+msgstr "Meta Type:"
+
+msgid "Min Stock Level:"
+msgstr "Min Stock Level:"
+
+msgid "Modal content missing."
+msgstr "Modal content missing."
+
+msgid "Model Name:"
+msgstr "Model Name:"
+
+msgid "Modified Object"
+msgstr "Modified Object"
+
+msgid "Monitor the status and execution logs of asynchronous operations."
+msgstr "Monitor the status and execution logs of asynchronous operations."
+
+msgid "N/A (No Purchase Cost)"
+msgstr "N/A (No Purchase Cost)"
+
+msgid "Name:"
+msgstr "Name:"
+
+msgid "Never"
+msgstr "Never"
+
+msgid "Never Audited"
+msgstr "Never Audited"
+
+msgid "New API Access Token Generated Successfully!"
+msgstr "New API Access Token Generated Successfully!"
+
+msgid "Next Numeric Value:"
+msgstr "Next Numeric Value:"
+
+msgid "Next Renewal:"
+msgstr "Next Renewal:"
+
+msgid "Next Tag Preview:"
+msgstr "Next Tag Preview:"
+
+msgid "Next page"
+msgstr "Next page"
+
+msgid "No"
+msgstr "Nein"
+
+msgid "No Changes Logged"
+msgstr "No Changes Logged"
+
+msgid "No Cost Recorded"
+msgstr "No Cost Recorded"
+
+msgid "No Depreciation"
+msgstr "No Depreciation"
+
+msgid "No Serial Number"
+msgstr "No Serial Number"
+
+msgid "No accessories assigned to this asset."
+msgstr "No accessories assigned to this asset."
+
+msgid "No accessories found for this tenant."
+msgstr "No accessories found for this tenant."
+
+msgid "No accessories registered under this notification category yet."
+msgstr "No accessories registered under this notification category yet."
+
+msgid "No active SaaS subscriptions or support agreements are assigned to this item."
+msgstr "No active SaaS subscriptions or support agreements are assigned to this item."
+
+msgid "No active assignment"
+msgstr "No active assignment"
+
+msgid "No active checkout assignments logged for this peripheral."
+msgstr "No active checkout assignments logged for this peripheral."
+
+msgid "No active maintenance tasks recorded."
+msgstr "No active maintenance tasks recorded."
+
+msgid "No active seats assigned for this license entitlement."
+msgstr "No active seats assigned for this license entitlement."
+
+msgid "No active support contact configured."
+msgstr "No active support contact configured."
+
+msgid "No active support contact is configured for"
+msgstr "No active support contact is configured for"
+
+msgid "No activity data available."
+msgstr "No activity data available."
+
+msgid "No alerts have been triggered by this rule yet."
+msgstr "No alerts have been triggered by this rule yet."
+
+msgid "No asset holders found for this tenant."
+msgstr "No asset holders found for this tenant."
+
+msgid "No asset purchase dates recorded."
+msgstr "No asset purchase dates recorded."
+
+msgid "No asset types defined for this manufacturer yet."
+msgstr "No asset types defined for this manufacturer yet."
+
+msgid "No asset types or models categorized under this section yet."
+msgstr "No asset types or models categorized under this section yet."
+
+msgid "No assets approaching EOL limit."
+msgstr "No assets approaching EOL limit."
+
+msgid "No assets assigned to active status labels."
+msgstr "No assets assigned to active status labels."
+
+msgid "No assets assigned to this specific location."
+msgstr "No assets assigned to this specific location."
+
+msgid "No assets currently located at this site."
+msgstr "No assets currently located at this site."
+
+msgid "No assets found for this tenant."
+msgstr "No assets found for this tenant."
+
+msgid "No assets found with this status label."
+msgstr "No assets found with this status label."
+
+msgid "No assets have been assigned this role yet."
+msgstr "No assets have been assigned this role yet."
+
+msgid "No assets, holders, or locations are currently assigned to this subscription."
+msgstr "No assets, holders, or locations are currently assigned to this subscription."
+
+msgid "No catalog software items registered on this asset."
+msgstr "No catalog software items registered on this asset."
+
+msgid "No checked out assets assigned to this holder."
+msgstr "No checked out assets assigned to this holder."
+
+msgid "No child locations defined under this location."
+msgstr "No child locations defined under this location."
+
+msgid "No components added to this kit yet. Click \"Add Item\" above to construct the bundle."
+msgstr "No components added to this kit yet. Click \"Add Item\" above to construct the bundle."
+
+msgid "No consumables assigned to this asset."
+msgstr "No consumables assigned to this asset."
+
+msgid "No consumables found for this tenant."
+msgstr "No consumables found for this tenant."
+
+msgid "No contacts are assigned to this manufacturer yet."
+msgstr "No contacts are assigned to this manufacturer yet."
+
+msgid "No contacts are assigned to this role yet."
+msgstr "No contacts are assigned to this role yet."
+
+msgid "No content yet. Click the gear icon to add notes."
+msgstr "No content yet. Click the gear icon to add notes."
+
+msgid "No custom channels configured (broadcast fallback)."
+msgstr "No custom channels configured (broadcast fallback)."
+
+msgid "No custom fields assigned."
+msgstr "No custom fields assigned."
+
+msgid "No events configured"
+msgstr "No events configured"
+
+msgid "No files attached."
+msgstr "No files attached."
+
+msgid "No images attached."
+msgstr "No images attached."
+
+msgid "No jobs found"
+msgstr "No jobs found"
+
+msgid "No journal entries yet."
+msgstr "No journal entries yet."
+
+msgid "No kits found for this tenant."
+msgstr "No kits found for this tenant."
+
+msgid "No label templates configured."
+msgstr "No label templates configured."
+
+msgid "No licenses found for this tenant."
+msgstr "No licenses found for this tenant."
+
+msgid "No linked user"
+msgstr "No linked user"
+
+msgid "No locations defined under this site."
+msgstr "No locations defined under this site."
+
+msgid "No locations found for this tenant."
+msgstr "No locations found for this tenant."
+
+msgid "No notes provided."
+msgstr "No notes provided."
+
+msgid "No permanent stock consumption debits recorded yet for this item."
+msgstr "No permanent stock consumption debits recorded yet for this item."
+
+msgid "No permissions configured in this group."
+msgstr "No permissions configured in this group."
+
+msgid "No physical assets found for this manufacturer."
+msgstr "No physical assets found for this manufacturer."
+
+msgid "No physical assets registered under this type/model yet."
+msgstr "No physical assets registered under this type/model yet."
+
+msgid "No physical assets sourced from this supplier yet."
+msgstr "No physical assets sourced from this supplier yet."
+
+msgid "No physical modifications, hardware upgrades, or unapproved firmware changes may be made to the equipment without written authorization."
+msgstr "Ohne schriftliche Genehmigung dürfen keine physischen Modifikationen, Hardware-Upgrades oder nicht genehmigten Firmware-Änderungen an den Geräten vorgenommen werden."
+
+msgid "No physical modules (like RAM, SSD, GPU) checked into this hardware asset."
+msgstr "No physical modules (like RAM, SSD, GPU) checked into this hardware asset."
+
+msgid "No physical units of this component model found in inventory."
+msgstr "No physical units of this component model found in inventory."
+
+msgid "No recent changes recorded matching search parameters."
+msgstr "No recent changes recorded matching search parameters."
+
+msgid "No repair, calibration, or hardware maintenance logged for this asset."
+msgstr "No repair, calibration, or hardware maintenance logged for this asset."
+
+msgid "No results found."
+msgstr "No results found."
+
+msgid "No row grouping configured"
+msgstr "No row grouping configured"
+
+msgid "No schedules configured for this template yet."
+msgstr "No schedules configured for this template yet."
+
+msgid "No sites found for this tenant."
+msgstr "No sites found for this tenant."
+
+msgid "No software licenses registered."
+msgstr "Keine Softwarelizenzen registriert."
+
+msgid "No status labels configured."
+msgstr "No status labels configured."
+
+msgid "No subscriptions found for this tenant."
+msgstr "No subscriptions found for this tenant."
+
+msgid "No subscriptions linked to this provider yet."
+msgstr "No subscriptions linked to this provider yet."
+
+msgid "No table data available."
+msgstr "No table data available."
+
+msgid "No template found for panel \""
+msgstr "No template found for panel \""
+
+msgid "No tenant data available."
+msgstr "No tenant data available."
+
+msgid "No tenants found in this group."
+msgstr "No tenants found in this group."
+
+msgid "No users assigned to this group."
+msgstr "No users assigned to this group."
+
+msgid "No widgets are currently configured."
+msgstr "No widgets are currently configured."
+
+msgid "No workspace memberships"
+msgstr "No workspace memberships"
+
+msgid "No-Code Designer Active"
+msgstr "No-Code Designer Active"
+
+msgid "Non-expiring / Perpetual"
+msgstr "Non-expiring / Perpetual"
+
+msgid "None"
+msgstr "Keine"
+
+msgid "None Configured"
+msgstr "None Configured"
+
+msgid "Not Assigned"
+msgstr "Not Assigned"
+
+msgid "Not Set"
+msgstr "Nicht festgelegt"
+
+msgid "Not Specified"
+msgstr "Not Specified"
+
+msgid "Not configured"
+msgstr "Not configured"
+
+msgid "Notes"
+msgstr "Notes"
+
+msgid "Notes/Description:"
+msgstr "Notes/Description:"
+
+msgid "Notes:"
+msgstr "Notes:"
+
+msgid "Notification Channels"
+msgstr "Notification Channels"
+
+msgid "Notification Inbox"
+msgstr "Notification Inbox"
+
+msgid "Object"
+msgstr "Object"
+
+msgid "Object Created"
+msgstr "Object Created"
+
+msgid "Object Deleted"
+msgstr "Object Deleted"
+
+msgid "Object Type"
+msgstr "Object Type"
+
+msgid "Object details should be defined in the specific template extending this base."
+msgstr "Object details should be defined in the specific template extending this base."
+
+msgid "Ongoing Repairs (Downtime):"
+msgstr "Ongoing Repairs (Downtime):"
+
+msgid "Only requestable and deployable assets are shown."
+msgstr "Only requestable and deployable assets are shown."
+
+msgid "Open / Active"
+msgstr "Open / Aktiv"
+
+msgid "Open Admin Portal"
+msgstr "Open Admin Portal"
+
+msgid "Open Provider Portal"
+msgstr "Open Provider Portal"
+
+msgid "Open user menu"
+msgstr "Open user menu"
+
+msgid "Optional"
+msgstr "Optional"
+
+msgid "Order Number:"
+msgstr "Order Number:"
+
+msgid "Ordering"
+msgstr "Ordering"
+
+msgid "Organization / Asset Holders"
+msgstr "Organisation / Asset Holders"
+
+msgid "Organization / Contact Roles"
+msgstr "Organisation / Contact Roles"
+
+msgid "Organization / Contacts"
+msgstr "Organisation / Kontakte"
+
+msgid "Organization / Locations"
+msgstr "Organisation / Lagerorte"
+
+msgid "Organization / Regions"
+msgstr "Organisation / Regionen"
+
+msgid "Organization / Site Groups"
+msgstr "Organisation / Site Groups"
+
+msgid "Organization / Sites"
+msgstr "Organisation / Standorte"
+
+msgid "Organization / Tenant Groups"
+msgstr "Organisation / Tenant Groups"
+
+msgid "Organization / Tenants"
+msgstr "Organisation / Mandanten"
+
+msgid "Original Purchase Cost"
+msgstr "Ursprüngliche Anschaffungskosten"
+
+msgid "Out of Stock Alert:"
+msgstr "Out of Stock Alert:"
+
+msgid "Over-allocation Policy:"
+msgstr "Over-allocation Policy:"
+
+msgid "Overview of physical and logical inventory objects you have subscribed to for real-time change notifications."
+msgstr "Overview of physical and logical inventory objects you have subscribed to for real-time change notifications."
+
+msgid "Owner:"
+msgstr "Owner:"
+
+msgid "Page selection"
+msgstr "Page selection"
+
+msgid "Pagination options"
+msgstr "Pagination options"
+
+msgid "Parent Asset:"
+msgstr "Übergeordnetes Asset:"
+
+msgid "Parent Group:"
+msgstr "Parent Group:"
+
+msgid "Parent Location:"
+msgstr "Parent Location:"
+
+msgid "Parent Region:"
+msgstr "Parent Region:"
+
+msgid "Parent:"
+msgstr "Parent:"
+
+msgid "Part Number / SKU:"
+msgstr "Teilenummer / SKU:"
+
+msgid "Part Number:"
+msgstr "Part Number:"
+
+msgid "Pending"
+msgstr "Pending"
+
+msgid "Pending EULA Acceptance"
+msgstr "Pending EULA Acceptance"
+
+msgid "Per Page"
+msgstr "Per Page"
+
+msgid "Permission Key"
+msgstr "Permission Key"
+
+msgid "Permissions"
+msgstr "Permissions"
+
+msgid "Phone"
+msgstr "Phone"
+
+msgid "Phone:"
+msgstr "Phone:"
+
+msgid "Physical Address:"
+msgstr "Physical Address:"
+
+msgid "Physical Audit State"
+msgstr "Physical Audit State"
+
+msgid "Physical Components / Serialized Units"
+msgstr "Physical Components / Serialized Units"
+
+msgid "Physical Location:"
+msgstr "Physical Location:"
+
+msgid "Physical Parts"
+msgstr "Physical Parts"
+
+msgid "Please copy this token key now. For your security, it will not be displayed on this page again."
+msgstr "Please copy this token key now. For your security, it will not be displayed on this page again."
+
+msgid "Please correct the errors below."
+msgstr "Bitte korrigieren Sie die folgenden Fehler."
+
+msgid "Post-Change Data"
+msgstr "Post-Change Data"
+
+msgid "Pre-Change Data"
+msgstr "Pre-Change Data"
+
+msgid "Pre-formatted for"
+msgstr "Pre-formatted for"
+
+msgid "Prefix:"
+msgstr "Prefix:"
+
+msgid "Preview"
+msgstr "Preview"
+
+msgid "Preview Import Data"
+msgstr "Preview Import Data"
+
+msgid "Previous page"
+msgstr "Previous page"
+
+msgid "Primary"
+msgstr "Primary"
+
+msgid "Print"
+msgstr "Print"
+
+msgid "Print Asset Label"
+msgstr "Print Asset Label"
+
+msgid "Print Asset Label:"
+msgstr "Print Asset Label:"
+
+msgid "Print Label"
+msgstr "Etikett drucken"
+
+msgid "Print Report"
+msgstr "Print Report"
+
+msgid "Printer Settings:"
+msgstr "Printer Settings:"
+
+msgid "Priority"
+msgstr "Priority"
+
+msgid "Provider Details"
+msgstr "Provider Details"
+
+msgid "Provider:"
+msgstr "Provider:"
+
+msgid "Purchase +"
+msgstr "Purchase +"
+
+msgid "Purchase Cost:"
+msgstr "Anschaffungskosten:"
+
+msgid "Purchase Date:"
+msgstr "Kaufdatum:"
+
+msgid "Purchase cost by tenant"
+msgstr "Purchase cost by tenant"
+
+msgid "Quantity Required"
+msgstr "Quantity Required"
+
+msgid "REMOVED OR ORIGINAL STATE"
+msgstr "REMOVED OR ORIGINAL STATE"
+
+msgid "Rate:"
+msgstr "Rate:"
+
+msgid "Read"
+msgstr "Read"
+
+msgid "Read / Write"
+msgstr "Read / Write"
+
+msgid "Read-Only"
+msgstr "Read-Only"
+
+msgid "Recent Activity"
+msgstr "Recent Activity"
+
+msgid "Recipients"
+msgstr "Recipients"
+
+msgid "Record Maintenance"
+msgstr "Record Maintenance"
+
+msgid "Region:"
+msgstr "Region:"
+
+msgid "Related Assets"
+msgstr "Related Assets"
+
+msgid "Related Inventory"
+msgstr "Related Inventory"
+
+msgid "Related Objects"
+msgstr "Related Objects"
+
+msgid "Related objects (ForeignKeys) can be matched by ID, Slug, or Name (case-insensitive)."
+msgstr "Related objects (ForeignKeys) can be matched by ID, Slug, or Name (case-insensitive)."
+
+msgid "Remaining Lifespan:"
+msgstr "Remaining Lifespan:"
+
+msgid "Remaining Stock"
+msgstr "Remaining Stock"
+
+msgid "Remove"
+msgstr "Remove"
+
+msgid "Remove Widget"
+msgstr "Remove Widget"
+
+msgid "Renewal Cost:"
+msgstr "Renewal Cost:"
+
+msgid "Report Designer"
+msgstr "Report Designer"
+
+msgid "Report Template"
+msgstr "Report Template"
+
+msgid "Report Templates Available"
+msgstr "Report Templates Available"
+
+msgid "Report Type"
+msgstr "Report Type"
+
+msgid "Request Date"
+msgstr "Request Date"
+
+msgid "Request Date:"
+msgstr "Request Date:"
+
+msgid "Request Details"
+msgstr "Request Details"
+
+msgid "Request Details - ITAMbox"
+msgstr "- Request Details - ITAMbox"
+
+msgid "Request ID"
+msgstr "Request ID"
+
+msgid "Requestable Status:"
+msgstr "Requestable Status:"
+
+msgid "Requestable by Staff"
+msgstr "Requestable by Staff"
+
+msgid "Requestable:"
+msgstr "Requestable:"
+
+msgid "Requested Asset Type"
+msgstr "Requested Asset Type"
+
+msgid "Requested Specific Asset"
+msgstr "Requested Specific Asset"
+
+msgid "Requester"
+msgstr "Requester"
+
+msgid "Requester Notes:"
+msgstr "Requester Notes:"
+
+msgid "Requester:"
+msgstr "Requester:"
+
+msgid "Require Acceptance:"
+msgstr "Require Acceptance:"
+
+msgid "Require immediate validation"
+msgstr "Require immediate validation"
+
+msgid "Required"
+msgstr "Required"
+
+msgid "Required fields must be specified for all records."
+msgstr "Required fields must be specified for all records."
+
+msgid "Required:"
+msgstr "Required:"
+
+msgid "Reset"
+msgstr "Reset"
+
+msgid "Resolve"
+msgstr "Resolve"
+
+msgid "Resolved"
+msgstr "Resolved"
+
+msgid "Responded By"
+msgstr "Responded By"
+
+msgid "Responded:"
+msgstr "Responded:"
+
+msgid "Response Date"
+msgstr "Response Date"
+
+msgid "Response Date:"
+msgstr "Response Date:"
+
+msgid "Response/Decision Notes"
+msgstr "Response/Decision Notes"
+
+msgid "Retry Policy:"
+msgstr "Retry Policy:"
+
+msgid "Return to List"
+msgstr "Return to List"
+
+msgid "Reviewer Notes:"
+msgstr "Reviewer Notes:"
+
+msgid "Revoke"
+msgstr "Revoke"
+
+msgid "Revoke Token"
+msgstr "Revoke Token"
+
+msgid "Revoked"
+msgstr "Revoked"
+
+msgid "Role"
+msgstr "Role"
+
+msgid "Rule Configuration"
+msgstr "Rule Configuration"
+
+msgid "Rule Name:"
+msgstr "Rule Name:"
+
+msgid "Running"
+msgstr "Running"
+
+msgid "SHA-256 Verification Hash"
+msgstr "SHA-256 Verifizierungshash"
+
+msgid "Safety Stock Limit:"
+msgstr "Safety Stock Limit:"
+
+msgid "Salvage Value:"
+msgstr "Salvage Value:"
+
+msgid "Same Day Service"
+msgstr "Same Day Service"
+
+msgid "Save"
+msgstr "Speichern"
+
+msgid "Save Changes"
+msgstr "Save Changes"
+
+msgid "Save Layout"
+msgstr "Save Layout"
+
+msgid "Save Name"
+msgstr "Save Name"
+
+msgid "Save layout"
+msgstr "Save layout"
+
+msgid "Scanned"
+msgstr "Scanned"
+
+msgid "Schedule"
+msgstr "Schedule"
+
+msgid "Scoped to Tenant"
+msgstr "Scoped to Tenant"
+
+msgid "Search"
+msgstr "Suchen"
+
+msgid "Search Options"
+msgstr "Search Options"
+
+msgid "Search Results"
+msgstr "Search Results"
+
+msgid "Seat Assignments"
+msgstr "Seat Assignments"
+
+msgid "Secondary"
+msgstr "Secondary"
+
+msgid "Select Tenant"
+msgstr "Select Tenant"
+
+msgid "Select an Asset Holder to assign the selected assets to:"
+msgstr "Select an Asset Holder to assign the selected assets to:"
+
+msgid "Select one or more table configurations to clear."
+msgstr "Select one or more table configurations to clear."
+
+msgid "Selected Objects ("
+msgstr "Selected Objects ("
+
+msgid "Send Test Webhook"
+msgstr "Send Test Webhook"
+
+msgid "Serial Number"
+msgstr "Serial Number"
+
+msgid "Serial Number:"
+msgstr "Seriennummer:"
+
+msgid "Set Default"
+msgstr "Set Default"
+
+msgid "Set as Default Landing Dashboard"
+msgstr "Set as Default Landing Dashboard"
+
+msgid "Severity"
+msgstr "Severity"
+
+msgid "Shared Secret:"
+msgstr "Shared Secret:"
+
+msgid "Shipping Address:"
+msgstr "Shipping Address:"
+
+msgid "Show Choices"
+msgstr "Show Choices"
+
+msgid "Show notifications"
+msgstr "Show notifications"
+
+msgid "Sign in"
+msgstr "Sign in"
+
+msgid "Sign up"
+msgstr "Sign up"
+
+msgid "Signed Timestamp"
+msgstr "Unterzeichnungs-Zeitstempel"
+
+msgid "Site Group:"
+msgstr "Site Group:"
+
+msgid "Site:"
+msgstr "Site:"
+
+msgid "Sites in this Group ("
+msgstr "Sites in this Group ("
+
+msgid "Sites in this Region ("
+msgstr "Sites in this Region ("
+
+msgid "Slug:"
+msgstr "Slug:"
+
+msgid "Software Catalog Details"
+msgstr "Software Catalog Details"
+
+msgid "Software Catalog:"
+msgstr "Software Catalog:"
+
+msgid "Software Details"
+msgstr "Software Details"
+
+msgid "Software Inventory"
+msgstr "Software Inventory"
+
+msgid "Some items are out of stock"
+msgstr "Some items are out of stock"
+
+msgid "Specifications:"
+msgstr "Specifications:"
+
+msgid "Spend"
+msgstr "Spend"
+
+msgid "Spend Distribution Chart"
+msgstr "Spend Distribution Chart"
+
+msgid "Start Date:"
+msgstr "Start Date:"
+
+msgid "Started"
+msgstr "Started"
+
+msgid "Started:"
+msgstr "Started:"
+
+msgid "Status:"
+msgstr "Status:"
+
+msgid "Stock count has dipped below the configured safety threshold of"
+msgstr "Stock count has dipped below the configured safety threshold of"
+
+msgid "Strict Enforcement (Prevent Negative Stock)"
+msgstr "Strict Enforcement (Prevent Negative Stock)"
+
+msgid "Subject"
+msgstr "Subject"
+
+msgid "Submit"
+msgstr "Submit"
+
+msgid "Subscribed Objects & Change Updates"
+msgstr "Subscribed Objects & Change Updates"
+
+msgid "Subscribed on"
+msgstr "Subscribed on"
+
+msgid "Subscription Details"
+msgstr "Subscription Details"
+
+msgid "Subscriptions / Assignments"
+msgstr "Abonnements / Assignments"
+
+msgid "Subscriptions:"
+msgstr "Subscriptions:"
+
+msgid "Summary"
+msgstr "Summary"
+
+msgid "Summary Cards Total Summary"
+msgstr "Summary Cards Total Summary"
+
+msgid "Supplied Assets"
+msgstr "Supplied Assets"
+
+msgid "Supplier / Vendor:"
+msgstr "Lieferant / Vendor:"
+
+msgid "Supplier/Vendor:"
+msgstr "Supplier/Vendor:"
+
+msgid "Supplier:"
+msgstr "Supplier:"
+
+msgid "Support Contact:"
+msgstr "Support Contact:"
+
+msgid "Support Email:"
+msgstr "Support Email:"
+
+msgid "Support Phone:"
+msgstr "Support Phone:"
+
+msgid "Support Portal:"
+msgstr "Support Portal:"
+
+msgid "Support:"
+msgstr "Support:"
+
+msgid "Switch Dashboard"
+msgstr "Switch Dashboard"
+
+msgid "System Hardware Specifications"
+msgstr "System Hardware Specifications"
+
+msgid "System operational logs, license expirations, and stock warnings."
+msgstr "System operational logs, license expirations, and stock warnings."
+
+msgid "TCO Budget Utilization"
+msgstr "TCO-Budgetauslastung"
+
+msgid "Table"
+msgstr "Table"
+
+msgid "Table Configurations"
+msgstr "Table Configurations"
+
+msgid "Tabler"
+msgstr "Tabler"
+
+msgid "Tags:"
+msgstr "Tags:"
+
+msgid "Target Model / Catalog Item"
+msgstr "Target Model / Catalog Item"
+
+msgid "Target Model:"
+msgstr "Target Model:"
+
+msgid "Target Object:"
+msgstr "Target Object:"
+
+msgid "Target Tenant Context"
+msgstr "Target Tenant Context"
+
+msgid "Target URL:"
+msgstr "Target URL:"
+
+msgid "Task Result Summary"
+msgstr "Task Result Summary"
+
+msgid "Tasks & Jobs"
+msgstr "Tasks & Jobs"
+
+msgid "Tasks Queue"
+msgstr "Tasks Queue"
+
+msgid "Template Code:"
+msgstr "Template Code:"
+
+msgid "Template HTML/Jinja Code:"
+msgstr "Template HTML/Jinja Code:"
+
+msgid "Template Information"
+msgstr "Template Information"
+
+msgid "Template Name:"
+msgstr "Template Name:"
+
+msgid "Tenant:"
+msgstr "Tenant:"
+
+msgid "Tenants in this Group ("
+msgstr "Tenants in this Group ("
+
+msgid "Tenants in this Group (0)"
+msgstr "Tenants in this Group (0)"
+
+msgid "Term:"
+msgstr "Term:"
+
+msgid "The Custodian agrees to maintain and operate the assigned equipment in a safe, secure, and responsible manner, in compliance with organizational policies."
+msgstr "Der Verwahrer verpflichtet sich, das zugewiesene Gerät sicher, geschützt und verantwortungsbewusst in Übereinstimmung mit den Richtlinien der Organisation zu führen und zu betreiben."
+
+msgid "The background operation generated files for checkout or label template batch downloading."
+msgstr "The background operation generated files for checkout or label template batch downloading."
+
+msgid "The equipment remains the sole property of the organization and must be returned in good condition upon request, termination of service, or transfer of role."
+msgstr "Das Gerät bleibt das alleinige Eigentum der Organisation und muss auf Anfrage, bei Beendigung des Dienstes oder bei Übertragung der Rolle in gutem Zustand zurückgegeben werden."
+
+msgid "Theme by"
+msgstr "Theme by"
+
+msgid "There are"
+msgstr "There are"
+
+msgid "Thermal Label Preview"
+msgstr "Thermo-Etikettenvorschau"
+
+msgid "This action cannot be undone."
+msgstr "This action cannot be undone."
+
+msgid "This asset request is currently pending administrative review."
+msgstr "This asset request is currently pending administrative review."
+
+msgid "This asset role is not currently assigned to any assets."
+msgstr "This asset role is not currently assigned to any assets."
+
+msgid "This asset type is currently assigned to"
+msgstr "This asset type is currently assigned to"
+
+msgid "This consumable item is completely depleted. Reorder immediately!"
+msgstr "This consumable item is completely depleted. Reorder immediately!"
+
+msgid "This contact has no active assignments."
+msgstr "This contact has no active assignments."
+
+msgid "This custody receipt represents a legally binding digital audit state. You can safely close this browser window."
+msgstr "Dieser Verwahrungsbeleg stellt einen rechtlich bindenden digitalen Audit-Status dar. Sie können dieses Browserfenster sicher schließen."
+
+msgid "This feature is not yet implemented."
+msgstr "This feature is not yet implemented."
+
+msgid "This manufacturer is associated with"
+msgstr "This manufacturer is associated with"
+
+msgid "This model has no fields available for bulk editing."
+msgstr "This model has no fields available for bulk editing."
+
+msgid "This software catalog item is not currently installed on any asset."
+msgstr "This software catalog item is not currently installed on any asset."
+
+msgid "This will lock the campaign from further physical scanning and finalize the discrepancy and mismatch lists."
+msgstr "This will lock the campaign from further physical scanning and finalize the discrepancy and mismatch lists."
+
+msgid "Threshold Value"
+msgstr "Threshold Value"
+
+msgid "Time"
+msgstr "Time"
+
+msgid "Time Zone:"
+msgstr "Time Zone:"
+
+msgid "Title"
+msgstr "Titel"
+
+msgid "Title:"
+msgstr "Title:"
+
+msgid "Today"
+msgstr "Today"
+
+msgid "Toggle Dropdown"
+msgstr "Toggle Dropdown"
+
+msgid "Toggle navigation"
+msgstr "Toggle navigation"
+
+msgid "Token"
+msgstr "Token"
+
+msgid "Total"
+msgstr "Gesamt"
+
+msgid "Total Assets Assigned"
+msgstr "Total Assets Assigned"
+
+msgid "Total Cost of Ownership (TCO)"
+msgstr "Gesamtbetriebskosten (TCO)"
+
+msgid "Total Cost of Ownership (TCO):"
+msgstr "Total Cost of Ownership (TCO):"
+
+msgid "Total Historical Alerts"
+msgstr "Total Historical Alerts"
+
+msgid "Total Installations Detected"
+msgstr "Total Installations Detected"
+
+msgid "Total Managed Assets"
+msgstr "Total Managed Assets"
+
+msgid "Total Physical Assets"
+msgstr "Total Physical Assets"
+
+msgid "Total Purchased"
+msgstr "Total Purchased"
+
+msgid "Total Purchased Seats"
+msgstr "Total Purchased Seats"
+
+msgid "Total Salvage Book Value"
+msgstr "Gesamt-Restbuchwert"
+
+msgid "Total Stock"
+msgstr "Gesamtbestand"
+
+msgid "Total Tasks"
+msgstr "Total Tasks"
+
+msgid "Trigger Events:"
+msgstr "Trigger Events:"
+
+msgid "Triggered Alerts History"
+msgstr "Triggered Alerts History"
+
+msgid "Type"
+msgstr "Typ"
+
+msgid "Type:"
+msgstr "Type:"
+
+msgid "UTC"
+msgstr "UTC"
+
+msgid "Unassigned / In Stock"
+msgstr "Unassigned / In Stock"
+
+msgid "Unavailable"
+msgstr "Unavailable"
+
+msgid "Under review by administrators"
+msgstr "Under review by administrators"
+
+msgid "Units"
+msgstr "Units"
+
+msgid "Unlock"
+msgstr "Unlock"
+
+msgid "Unlock dashboard to resize and reorder widgets"
+msgstr "Unlock dashboard to resize and reorder widgets"
+
+msgid "Unread Alerts ("
+msgstr "Unread Alerts ("
+
+msgid "Unsubscribe"
+msgstr "Unsubscribe"
+
+msgid "Updated"
+msgstr "Updated"
+
+msgid "Updated:"
+msgstr "Updated:"
+
+msgid "Upload"
+msgstr "Upload"
+
+msgid "Use the star icon on any hardware asset, license, or location details page to subscribe."
+msgstr "Use the star icon on any hardware asset, license, or location details page to subscribe."
+
+msgid "User Preferences"
+msgstr "User Preferences"
+
+msgid "User Principal Name (UPN):"
+msgstr "User Principal Name (UPN):"
+
+msgid "User is not assigned to any groups."
+msgstr "User is not assigned to any groups."
+
+msgid "VISUAL SECTIONS"
+msgstr "VISUAL SECTIONS"
+
+msgid "Value"
+msgstr "Wert"
+
+msgid "Verify Physical Presence"
+msgstr "Verify Physical Presence"
+
+msgid "View All Activity"
+msgstr "View All Activity"
+
+msgid "View All Tenants"
+msgstr "View All Tenants"
+
+msgid "View Custody Receipt"
+msgstr "View Custody Receipt"
+
+msgid "View Detail"
+msgstr "View Detail"
+
+msgid "View Help Documentation"
+msgstr "View Help Documentation"
+
+msgid "View all"
+msgstr "View all"
+
+msgid "Visible"
+msgstr "Visible"
+
+msgid "Visit Support Portal"
+msgstr "Visit Support Portal"
+
+msgid "Visual Designer Parameters"
+msgstr "Visual Designer Parameters"
+
+msgid "Waiting for task initialization..."
+msgstr "Waiting for task initialization..."
+
+msgid "Warning"
+msgstr "Warning"
+
+msgid "Warning!"
+msgstr "Warning!"
+
+msgid "Warning:"
+msgstr "Warning:"
+
+msgid "Warning: Related Assets"
+msgstr "Warning: Related Assets"
+
+msgid "Warning: This group has"
+msgstr "Warning: This group has"
+
+msgid "Warning: This location has"
+msgstr "Warning: This location has"
+
+msgid "Warning: This region has"
+msgstr "Warning: This region has"
+
+msgid "Warning: This tenant is associated with"
+msgstr "Warning: This tenant is associated with"
+
+msgid "Warranty Expiration:"
+msgstr "Warranty Expiration:"
+
+msgid "Web URL:"
+msgstr "Web URL:"
+
+msgid "Website:"
+msgstr "Website:"
+
+msgid "Weight:"
+msgstr "Weight:"
+
+msgid "Widget"
+msgstr "Widget"
+
+msgid "Widget Settings"
+msgstr "Widget Settings"
+
+msgid "Workspace Onboarding"
+msgstr "Workspace Onboarding"
+
+msgid "YAML"
+msgstr "YAML"
+
+msgid "YAML Format"
+msgstr "YAML Format"
+
+msgid "Yes"
+msgstr "Ja"
+
+msgid "Yes (Users can request this model)"
+msgstr "Yes (Users can request this model)"
+
+msgid "You are already logged in."
+msgstr "You are already logged in."
+
+msgid "You are approving the request from"
+msgstr "You are approving the request from"
+
+msgid "You are denying the request from"
+msgstr "You are denying the request from"
+
+msgid "You have no system notifications."
+msgstr "You have no system notifications."
+
+msgid "You have not generated any API access tokens."
+msgstr "You have not generated any API access tokens."
+
+msgid "You have not subscribed to any specific objects for updates yet."
+msgstr "You have not subscribed to any specific objects for updates yet."
+
+msgid "Your Dashboards"
+msgstr "Your Dashboards"
+
+msgid "Your dashboard is empty"
+msgstr "Your dashboard is empty"
+
+msgid "Your username and password didn't match. Please try again."
+msgstr "Your username and password didn't match. Please try again."
+
+msgid "Zero N+1 query storm"
+msgstr "Zero N+1 query storm"
+
+msgid "Zero Padding:"
+msgstr "Zero Padding:"
+
+msgid "ago by"
+msgstr "ago by"
+
+msgid "and"
+msgstr "and"
+
+msgid "asset"
+msgstr "asset"
+
+msgid "asset(s) assigned to this role."
+msgstr "asset(s) assigned to this role."
+
+msgid "Deleting this role will prevent these assets from being properly categorized."
+msgstr "Deleting this role will prevent these assets from being properly categorized."
+
+msgid "Consider reassigning assets before deleting this role."
+msgstr "Consider reassigning assets before deleting this role."
+
+msgid "asset(s)."
+msgstr "asset(s)."
+
+msgid "assets"
+msgstr "assets"
+
+msgid "assigned asset"
+msgstr "assigned asset"
+
+msgid "assigned site"
+msgstr "assigned site"
+
+msgid "assigned tenant"
+msgstr "assigned tenant"
+
+msgid "at site"
+msgstr "at site"
+
+msgid "average asset age"
+msgstr "average asset age"
+
+msgid "breadcrumbs"
+msgstr "breadcrumbs"
+
+msgid "by"
+msgstr "by"
+
+msgid "child group"
+msgstr "child group"
+
+msgid "child location"
+msgstr "child location"
+
+msgid "child region"
+msgstr "child region"
+
+msgid "days"
+msgstr "days"
+
+msgid "days overdue"
+msgstr "days overdue"
+
+msgid "days planning horizon"
+msgstr "days planning horizon"
+
+msgid "digits"
+msgstr "digits"
+
+msgid "e.g. Finance Board, Tenant A overview"
+msgstr "e.g. Finance Board, Tenant A overview"
+
+msgid "for"
+msgstr "for"
+
+msgid "found"
+msgstr "found"
+
+msgid "in |"
+msgstr "in |"
+
+msgid "location"
+msgstr "location"
+
+msgid "months"
+msgstr "months"
+
+msgid "months ("
+msgstr "months ("
+
+msgid "or"
+msgstr "or"
+
+msgid "processing..."
+msgstr "processing..."
+
+msgid "repair/maintenance item"
+msgstr "repair/maintenance item"
+
+msgid "retry attempts with"
+msgstr "retry attempts with"
+
+msgid "s backoff interval."
+msgstr "s backoff interval."
+
+msgid "seats ("
+msgstr "seats ("
+
+msgid "site"
+msgstr "site"
+
+msgid "thermal rolls. Clicking print will launch the print settings modal."
+msgstr "thermal rolls. Clicking print will launch the print settings modal."
+
+msgid "units limit"
+msgstr "units limit"
+
+msgid "units. Consider replenishing inventory."
+msgstr "units. Consider replenishing inventory."
+
+msgid "— Provider — ITAMbox"
+msgstr "— Provider — ITAMbox"
+
+msgid "— Select an Asset Holder —"
+msgstr "— Select an Asset Holder —"
+
+msgid "— Subscription — ITAMbox"
+msgstr "— Subscription — ITAMbox"
+
+msgid "″ height"
+msgstr "″ height"
+
+msgid "″ width ×"
+msgstr "″ width ×"
+
+msgid "Assets"
+msgstr "Assets"
+
+msgid "Asset Role"
+msgstr "Asset-Rolle"
+
+msgid "Asset Roles"
+msgstr "Asset-Rollen"
+
+msgid "Manufacturer"
+msgstr "Hersteller"
+
+msgid "Manufacturers"
+msgstr "Hersteller"
+
+msgid "Location"
+msgstr "Lagerort"
+
+msgid "Locations"
+msgstr "Lagerorte"
+
+msgid "Site"
+msgstr "Standort"
+
+msgid "Sites"
+msgstr "Standorte"
+
+msgid "Tenant"
+msgstr "Mandant"
+
+msgid "Tenants"
+msgstr "Mandanten"
+
+msgid "Component (Catalog)"
+msgstr "Komponente (Katalog)"
+
+msgid "Components (Catalog)"
+msgstr "Komponenten (Katalog)"
+
+msgid "Component Stock"
+msgstr "Komponentenbestand"
+
+msgid "Component Stocks"
+msgstr "Komponentenbestände"
+
+msgid "Component Allocation"
+msgstr "Komponentenzuweisung"
+
+msgid "Component Allocations"
+msgstr "Komponentenzuweisungen"
+
+msgid "Accessory"
+msgstr "Zubehör"
+
+msgid "Accessories"
+msgstr "Zubehör"
+
+msgid "Accessory Stock"
+msgstr "Zubehörbestand"
+
+msgid "Accessory Stocks"
+msgstr "Zubehörbestände"
+
+msgid "Accessory Assignment"
+msgstr "Zubehörzuweisung"
+
+msgid "Accessory Assignments"
+msgstr "Zubehörzuweisungen"
+
+msgid "Consumable"
+msgstr "Verbrauchsmaterial"
+
+msgid "Consumables"
+msgstr "Verbrauchsmaterialien"
+
+msgid "Consumable Stock"
+msgstr "Verbrauchsmaterialbestand"
+
+msgid "Consumable Stocks"
+msgstr "Verbrauchsmaterialbestände"
+
+msgid "Consumable Assignment"
+msgstr "Verbrauchsmaterialzuweisung"
+
+msgid "Consumable Assignments"
+msgstr "Verbrauchsmaterialzuweisungen"
+
+msgid "Kit"
+msgstr "Kit"
+
+msgid "Kits"
+msgstr "Kits"
+
+msgid "Kit Item"
+msgstr "Kit-Element"
+
+msgid "Kit Items"
+msgstr "Kit-Elemente"
+
+msgid "License"
+msgstr "Lizenz"
+
+msgid "Licenses"
+msgstr "Lizenzen"
+
+msgid "License Seat Assignment"
+msgstr "Lizenzplatzzuweisung"
+
+msgid "License Seat Assignments"
+msgstr "Lizenzplatzzuweisungen"
+
+msgid "Software"
+msgstr "Software"
+
+msgid "Provider"
+msgstr "Anbieter"
+
+msgid "Providers"
+msgstr "Anbieter"
+
+msgid "Subscription"
+msgstr "Abonnement"
+
+msgid "Subscriptions"
+msgstr "Abonnements"
+
+msgid "Subscription Assignment"
+msgstr "Abonnementszuweisung"
+
+msgid "Subscription Assignments"
+msgstr "Abonnementszuweisungen"
+
+msgid "Tenant Group"
+msgstr "Mandantengruppe"
+
+msgid "Tenant Groups"
+msgstr "Mandantengruppen"
+
+msgid "Site Group"
+msgstr "Standortgruppe"
+
+msgid "Site Groups"
+msgstr "Standortgruppen"
+
+msgid "Region"
+msgstr "Region"
+
+msgid "Regions"
+msgstr "Regionen"
+
+msgid "Tenant Invitation"
+msgstr "Mandanten-Einladung"
+
+msgid "Tenant Invitations"
+msgstr "Mandanten-Einladungen"
+
+msgid "Status Label"
+msgstr "Status-Label"
+
+msgid "Depreciations"
+msgstr "Abschreibungen"
+
+msgid "Activity Log"
+msgstr "Aktivitätsprotokoll"
+
+msgid "Activity Logs"
+msgstr "Aktivitätsprotokolle"
+
+msgid "Installed Software Instance"
+msgstr "Installierte Software-Instanz"
+
+msgid "Installed Software Instances"
+msgstr "Installierte Software-Instanzen"
+
+msgid "Asset Requests"
+msgstr "Asset-Anforderungen"
+
+msgid "Asset Tag Sequence"
+msgstr "Asset-Tag-Sequenz"
+
+msgid "Asset Assignments"
+msgstr "Asset-Zuweisungen"
+
+msgid "Tag"
+msgstr "Tag"
+
+msgid "Dashboards"
+msgstr "Dashboards"
+
+msgid "Custom Field"
+msgstr "Benutzerdefiniertes Feld"
+
+msgid "Custom Fieldset"
+msgstr "Benutzerdefiniertes Feldset"
+
+msgid "Config Context"
+msgstr "Konfigurationskontext"
+
+msgid "Config Contexts"
+msgstr "Konfigurationskontexte"
+
+msgid "Asset Holder Assignment"
+msgstr "Asset-Inhaber-Zuweisung"
+
+msgid "Asset Holder Assignments"
+msgstr "Asset-Inhaber-Zuweisungen"
+
+msgid "Contact Role"
+msgstr "Kontaktrolle"
+
+msgid "Contact Assignment"
+msgstr "Kontaktzuweisung"
+
+msgid "Tenant Membership"
+msgstr "Mandanten-Mitgliedschaft"
+
+msgid "Tenant Memberships"
+msgstr "Mandanten-Mitgliedschaften"
+
+msgid "Consumable Consumption"
+msgstr "Verbrauchsmaterial-Verbrauch"
+
+msgid "Consumable Consumptions"
+msgstr "Verbrauchsmaterial-Verbräuche"
+
+msgid "Custody Receipt"
+msgstr "Übergabeprotokoll"
+
+msgid "Custody Receipts"
+msgstr "Übergabeprotokolle"
+
+msgid "Asset Maintenance"
+msgstr "Asset-Wartung"
+
+msgid "Asset Maintenances"
+msgstr "Asset-Wartungen"
+
+msgid "User Preference"
+msgstr "Benutzerpräferenz"
+
+msgid "Tokens"
+msgstr "Token"

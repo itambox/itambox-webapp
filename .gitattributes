@@ -1,5 +1,5 @@
 # ==============================================================================
-# AssetBox Git Attributes Normalization File
+# ITAMbox Git Attributes Normalization File
 # ==============================================================================
 # Forces all text files to be checked in with LF line endings, preventing
 # line-ending mismatches between Windows, Linux, and macOS environments.

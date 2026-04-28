@@ -1,0 +1,132 @@
+{% extends 'generic/object_detail.html' %}
+{% load i18n %}
+{% load static %}
+{% load render_table from django_tables2 %}
+
+{% block title %}{{ object.name }} {% translate "- Custody Template - ITAMbox" %}{% endblock %}
+
+{% block page_pretitle %}{% translate "Compliance / Custody Templates" %}{% endblock %}
+
+{% block extra_page_actions %}
+    <a href="{% url 'compliance:custodytemplate_preview' pk=object.pk %}" target="_blank" class="btn btn-outline-info">
+        <i class="mdi mdi-eye-outline me-1"></i>
+        {% translate "Preview Sign Page..." %}
+    </a>
+{% endblock %}
+
+{% block object_details %}
+<div class="row g-3">
+    <div class="col-md-6">
+        <dl class="row mb-0">
+            <dt class="col-4">{% translate "Template Name:" %}</dt>
+            <dd class="col-8"><strong>{{ object.name }}</strong></dd>
+
+            <dt class="col-4">{% translate "Tenant / Scope:" %}</dt>
+            <dd class="col-8">
+                {% if object.tenant %}
+                    {{ object.tenant.name }} (Tenant)
+                {% elif object.tenant_group %}
+                    {{ object.tenant_group.name }} (Tenant Group)
+                {% else %}
+                    {% translate "Global (All Tenants)" %}
+                {% endif %}
+            </dd>
+
+            <dt class="col-4">{% translate "Signature Provider:" %}</dt>
+            <dd class="col-8"><span class="badge bg-blue-lt">{{ object.signature_provider }}</span></dd>
+
+            <dt class="col-4">{% translate "Target Category:" %}</dt>
+            <dd class="col-8">{% if object.category %}<code>{{ object.category.name }}</code>{% else %}—{% endif %}</dd>
+
+            <dt class="col-4">{% translate "Doc Reference (QMS):" %}</dt>
+            <dd class="col-8">{% if object.qms_reference %}<code>{{ object.qms_reference }}</code>{% else %}—{% endif %}</dd>
+
+            <dt class="col-4">{% translate "Require Acceptance:" %}</dt>
+            <dd class="col-8">
+                {% if object.require_acceptance %}
+                    <span class="badge bg-red-lt">{% translate "Yes (Required)" %}</span>
+                {% else %}
+                    <span class="badge bg-secondary-lt">{% translate "No (Optional)" %}</span>
+                {% endif %}
+            </dd>
+
+            <dt class="col-4">{% translate "Email Signature Request:" %}</dt>
+            <dd class="col-8">
+                {% if object.email_signature_request %}
+                    <span class="badge bg-green-lt">{% translate "Enabled" %}</span>
+                {% else %}
+                    <span class="badge bg-secondary-lt">{% translate "Disabled" %}</span>
+                {% endif %}
+            </dd>
+
+            <dt class="col-4">{% translate "Status:" %}</dt>
+            <dd class="col-8">
+                {% if object.is_active %}
+                    <span class="badge bg-green">{% translate "Active" %}</span>
+                {% else %}
+                    <span class="badge bg-red">{% translate "Inactive" %}</span>
+                {% endif %}
+            </dd>
+        </dl>
+    </div>
+    <div class="col-md-6 text-center text-md-end">
+        {% if object.logo %}
+            <div class="mb-2 text-secondary small">{% translate "Custom Acceptance Logo" %}</div>
+            <img src="{{ object.logo.url }}" alt="Logo" style="max-height: 80px; border: 1px solid #ddd; padding: 5px; border-radius: 4px; background: white;" />
+        {% else %}
+            <div class="text-muted italic small py-4">{% translate "No custom logo uploaded. Standard global branding will apply." %}</div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card mt-4 border-0 shadow-sm">
+    <div class="card-header border-0 bg-transparent">
+        <h3 class="card-title text-secondary">
+            {% translate "Custody Terms & Conditions (EULA)" %}
+        </h3>
+    </div>
+    <div class="card-body bg-light rounded text-muted" style="max-height: 250px; overflow-y: auto; font-size: 9.5pt; line-height: 1.5;">
+        {{ object.eula_text|linebreaksbr|safe }}
+    </div>
+</div>
+
+{% if object.disclaimer %}
+<div class="card mt-3 border-0 shadow-sm">
+    <div class="card-header border-0 bg-transparent py-2">
+        <h5 class="card-title text-secondary small mb-0">{% translate "Sign-Off Legal Disclaimer" %}</h5>
+    </div>
+    <div class="card-body bg-light rounded text-muted py-2 small italic">
+        {{ object.disclaimer }}
+    </div>
+</div>
+{% endif %}
+{% endblock object_details %}
+
+{% block extra_tabs %}
+    <li class="nav-item" role="presentation">
+        <a href="#receipts" class="nav-link" data-bs-toggle="tab" role="tab">
+            <i class="mdi mdi-file-sign me-1 text-green"></i>
+            {% translate "Signed Custody Receipts" %} <span class="badge bg-green-lt ms-2">{{ receipts_table.rows|length }}</span>
+        </a>
+    </li>
+{% endblock extra_tabs %}
+
+{% block extra_tab_panes %}
+    <div class="tab-pane fade" id="receipts" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">{% translate "Signed Custody Receipts" %}</h3>
+            </div>
+            {% if receipts_table.rows %}
+                <div class="table-responsive">
+                    {% render_table receipts_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=receipts_table %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <p class="mb-0">{% translate "No custody receipts generated under this template yet." %}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock extra_tab_panes %}

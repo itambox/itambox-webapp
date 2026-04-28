@@ -1,0 +1,163 @@
+{% extends 'generic/object_detail.html' %}
+{% load i18n %}
+{% load static %}
+{% load render_table from django_tables2 %}
+
+{% block title %}{{ object.name }} {% translate "— Subscription — ITAMbox" %}{% endblock %}
+
+{% block page_pretitle %}{% translate "Subscription Details" %}{% endblock %}
+
+{# Object details rendered via panel layout #}
+
+{% block extra_cards_right %}
+<div class="card mb-3 border-0 shadow-sm">
+    <div class="card-header border-0 bg-transparent">
+        <h3 class="card-title text-secondary d-flex align-items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-2 text-green" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M14.8 9A2 2 0 0 0 13 8h-2a2 2 0 0 0 0 4h2a2 2 0 0 1 0 4h-2a2 2 0 0 1 -1.8 -1" />
+                <path d="M12 6v2m0 8v2" />
+            </svg>
+            {% translate "Financial Details" %}
+        </h3>
+    </div>
+    <div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-5">{% translate "Renewal Cost:" %}</dt>
+            <dd class="col-7">
+                {% if object.renewal_cost %}
+                    <strong>{{ object.renewal_cost|floatformat:2 }} {{ object.currency }}</strong>
+                {% else %}—{% endif %}
+            </dd>
+
+            <dt class="col-5">{% translate "Billing Cycle:" %}</dt>
+            <dd class="col-7 text-secondary">{{ object.get_billing_cycle_display|default:"—" }}</dd>
+
+            {% if object.annual_cost %}
+            <dt class="col-5">{% translate "Est. Annual:" %}</dt>
+            <dd class="col-7"><strong>{{ object.annual_cost|floatformat:2 }} {{ object.currency }}</strong></dd>
+            {% endif %}
+
+            {% if object.licensed_quantity %}
+            <dt class="col-5">{% translate "Licensed Qty:" %}</dt>
+            <dd class="col-7{% if object.licensed_quantity < 10 %} text-warning{% endif %}"><strong>{{ object.licensed_quantity }}</strong></dd>
+            {% endif %}
+
+            {% if object.licensed_quantity and assignment_count %}
+            <dt class="col-5">{% translate "Assigned:" %}</dt>
+            <dd class="col-7">
+                <span class="badge bg-primary">{{ assignment_count }}</span>
+            </dd>
+            {% endif %}
+        </dl>
+    </div>
+</div>
+
+{% if object.provider.portal_url %}
+<a href="{{ object.provider.portal_url }}" class="btn btn-outline-primary d-inline-flex align-items-center w-100 justify-content-center mb-3" target="_blank" rel="noopener">
+    <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6" />
+        <path d="M11 13l9 -9" />
+        <path d="M15 4h5v5" />
+    </svg>
+    {% translate "Open Provider Portal" %}
+</a>
+{% endif %}
+{% endblock extra_cards_right %}
+
+{% block extra_page_actions %}
+    {# Renew button #}
+    {% if object.status != 'cancelled' %}
+        <button type="button" class="btn btn-outline-primary"
+                hx-get="{% url 'subscriptions:subscription_renew' pk=object.pk %}"
+                hx-target="#modal-placeholder"
+                hx-swap="innerHTML">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -5v5h5" />
+                <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 5v-5h-5" />
+            </svg>
+            {% translate "Renew..." %}
+        </button>
+    {% endif %}
+
+    {# Suspend button #}
+    {% if object.status == 'active' %}
+        <button type="button" class="btn btn-outline-warning"
+                hx-post="{% url 'subscriptions:subscription_suspend' pk=object.pk %}"
+                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                hx-confirm="Are you sure you want to suspend this subscription?">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z" />
+                <path d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z" />
+            </svg>
+            {% translate "Suspend" %}
+        </button>
+    {% endif %}
+
+    {# Cancel button #}
+    {% if object.status != 'cancelled' %}
+        <button type="button" class="btn btn-outline-danger"
+                hx-get="{% url 'subscriptions:subscription_cancel' pk=object.pk %}"
+                hx-target="#modal-placeholder"
+                hx-swap="innerHTML">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M18 6l-12 12" />
+                <path d="M6 6l12 12" />
+            </svg>
+            {% translate "Cancel..." %}
+        </button>
+    {% endif %}
+{% endblock extra_page_actions %}
+
+{% block full_width_content %}
+{% if assignments_table %}
+<div class="card mt-3 border-0 shadow-sm">
+    <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
+        <h3 class="card-title text-secondary d-flex align-items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-2 text-indigo" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" />
+                <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+                <path d="M16 11l2 2l4 -4" />
+            </svg>
+            {% translate "Assignments" %}
+        </h3>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-primary"
+                    hx-get="{% url 'subscriptions:subscription_checkout' pk=object.pk %}"
+                    hx-target="#modal-placeholder"
+                    hx-swap="innerHTML">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                    <path d="M12 5l0 14" />
+                    <path d="M5 12l14 0" />
+                </svg>
+                {% translate "Assign Subscription..." %}
+            </button>
+            <span class="badge bg-indigo-lt">{{ assignment_count }}</span>
+        </div>
+    </div>
+    {% if assignments_table.rows %}
+    <div class="table-responsive">
+        {% render_table assignments_table %}
+    </div>
+    {% include 'generic/includes/table_pagination.html' with table=assignments_table %}
+    {% else %}
+    <div class="card-body py-5 text-muted text-center">
+        <i class="mdi mdi-link-variant-off text-muted mb-2"></i>
+        <p class="mb-0">{% translate "No assets, holders, or locations are currently assigned to this subscription." %}</p>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock full_width_content %}
+
+{% block javascript %}
+<script>
+    document.body.addEventListener('tableRefreshRequired', function() {
+        htmx.ajax('GET', window.location.href, {target: 'body', swap: 'outerHTML'});
+    });
+</script>
+{% endblock javascript %}

@@ -1,11 +1,11 @@
 # ==============================================================================
-# AssetBox Development Automation Makefile
+# ITAMbox Development Automation Makefile
 # ==============================================================================
 
 .PHONY: help setup run migrate seed test lint clean
 
 help:
-	@echo "AssetBox Development Automation Command Hub"
+	@echo "ITAMbox Development Automation Command Hub"
 	@echo "==========================================="
 	@echo "Available commands:"
 	@echo "  make setup   - Create virtual environment and install dependencies"
@@ -24,17 +24,17 @@ setup:
 	.venv/bin/pre-commit install
 
 run:
-	.venv/bin/python assetbox/manage.py migrate
-	ASSETBOX_DEBUG=true .venv/bin/python assetbox/manage.py runserver
+	.venv/bin/python itambox/manage.py migrate
+	ITAMBOX_DEBUG=true .venv/bin/python itambox/manage.py runserver
 
 migrate:
-	.venv/bin/python assetbox/manage.py migrate
+	.venv/bin/python itambox/manage.py migrate
 
 seed:
-	.venv/bin/python assetbox/manage.py seed_data
+	.venv/bin/python itambox/manage.py seed_data
 
 test:
-	.venv/bin/python assetbox/manage.py test
+	.venv/bin/python itambox/manage.py test
 
 lint:
 	.venv/bin/pre-commit run --all-files

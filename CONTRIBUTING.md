@@ -1,17 +1,17 @@
-# Contributing to AssetBox
+# Contributing to ITAMbox
 
-Thank you for your interest in contributing to AssetBox. To ensure code quality and a smooth integration workflow, please follow these guidelines.
+Thank you for your interest in contributing to ITAMbox. To ensure code quality and a smooth integration workflow, please follow these guidelines.
 
 ---
 
 ## Development Setup
 
-AssetBox is a standard Django application. Set up your local environment as follows:
+ITAMbox is a standard Django application. Set up your local environment as follows:
 
 1.  **Fork and Clone the Repository:**
     ```bash
-    git clone https://github.com/your-username/assetbox-webapp.git
-    cd assetbox-webapp
+    git clone https://github.com/your-username/itambox-webapp.git
+    cd itambox-webapp
     ```
 
 2.  **Initialize a Virtual Environment:**
@@ -29,14 +29,14 @@ AssetBox is a standard Django application. Set up your local environment as foll
 
 4.  **Database Migration & Seeding:**
     ```bash
-    cd assetbox
+    cd itambox
     python manage.py migrate
     python manage.py seed_data
     ```
 
 5.  **Run the Server:**
     ```bash
-    ASSETBOX_DEBUG=true python manage.py runserver
+    ITAMBOX_DEBUG=true python manage.py runserver
     ```
 
 ---

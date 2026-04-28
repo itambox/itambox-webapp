@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/tabler/tabler/master/src/assets/brand/tabler-logo.svg" alt="AssetBox Logo" width="100" height="100">
+  <img src="https://raw.githubusercontent.com/tabler/tabler/master/src/assets/brand/tabler-logo.svg" alt="ITAMbox Logo" width="100" height="100">
 </p>
 
-<h1 align="center">AssetBox</h1>
+<h1 align="center">ITAMbox</h1>
 
 <p align="center">
   <strong>IT Asset Management (ITAM) platform built on Django, Tabler, and HTMX</strong>
@@ -17,7 +17,7 @@
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache%202.0-red.svg" alt="License"></a>
 </p>
 
-AssetBox is an IT asset management (ITAM) and tracking application. Inspired by the strict data modeling approach of **NetBox**, it is designed as a lightweight, customizable inventory tool for hardware, software licenses, maintenance history, and asset financials.
+ITAMbox is an IT asset management (ITAM) and tracking application. Inspired by the strict data modeling approach of **NetBox**, it is designed as a lightweight, customizable inventory tool for hardware, software licenses, maintenance history, and asset financials.
 
 ---
 
@@ -60,7 +60,7 @@ erDiagram
 
 ### HTMX Navigation
 
-AssetBox uses a dual-template layout to achieve a fast interface without a complex JavaScript frontend framework:
+ITAMbox uses a dual-template layout to achieve a fast interface without a complex JavaScript frontend framework:
 1.  **Full Request:** Renders the outer shell (`base.html`) containing the sidebar, top navigation, and dependencies.
 2.  **HTMX Request:** Dynamically swaps out the `#page-content-wrapper` block using a partial template (`base_htmx.html`), updating the active breadcrumbs, actions, tables, and tabs in a single roundtrip.
 3.  **Out-of-Band (OOB) Swaps:** Modifies peripheral elements like `<title>` tags and toast notifications on demand.
@@ -75,8 +75,8 @@ To spin up the PostgreSQL database and application server immediately:
 
 ```bash
 # Clone the repository
-git clone https://github.com/assetbox-itam/assetbox-webapp.git
-cd assetbox-webapp
+git clone https://github.com/itambox-itam/itambox-webapp.git
+cd itambox-webapp
 
 # Build and start services
 docker compose up -d --build
@@ -93,7 +93,7 @@ docker compose exec app python manage.py seed_data
 ### Local Virtualenv Setup
 
 1. **Set up PostgreSQL**: Ensure a PostgreSQL 15+ server is running locally (e.g., via Docker or system service).
-2. **Configure Environment**: Copy `.env.example` to `.env` and update the database connection variables (`ASSETBOX_DB_HOST`, `ASSETBOX_DB_PORT`, etc.).
+2. **Configure Environment**: Copy `.env.example` to `.env` and update the database connection variables (`ITAMBOX_DB_HOST`, `ITAMBOX_DB_PORT`, etc.).
 
 ```bash
 # Set up virtual environment
@@ -104,12 +104,12 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
 # Run migrations and seed data
-cd assetbox
+cd itambox
 python manage.py migrate
 python manage.py seed_data
 
 # Start local server in debug mode
-ASSETBOX_DEBUG=true python manage.py runserver
+ITAMBOX_DEBUG=true python manage.py runserver
 
 # App is now live at http://127.0.0.1:8000
 ```

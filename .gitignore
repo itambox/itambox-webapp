@@ -59,3 +59,6 @@ scratch_page.html
 **/tests/e2e/test-results/
 **/tests/e2e/storageState.json
 
+# Python package metadata
+*.egg-info/
+

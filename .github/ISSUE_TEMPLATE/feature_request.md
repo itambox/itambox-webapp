@@ -1,6 +1,6 @@
 ---
 name: Feature Request
-about: Propose a new feature or improvement for AssetBox
+about: Propose a new feature or improvement for ITAMbox
 title: '[Feature]: '
 labels: enhancement
 assignees: ''

@@ -1,0 +1,93 @@
+{% extends 'generic/object_detail.html' %}
+{% load i18n %}
+{% load static %}
+{% load utility_tags %}
+{% load render_table from django_tables2 %}
+
+{# --- Page Title and Header --- #}
+{% block title %}{{ object.manufacturer.name }} {{ object.model }} {% translate "- Asset Type - ITAMbox" %}{% endblock %}
+
+{% block page_pretitle %}{% translate "Assets / Asset Types" %}{% endblock %}
+
+{# --- Tabs Hook --- #}
+{% block extra_tabs %}
+    <li class="nav-item" role="presentation">
+        <a href="#related-assets" class="nav-link" data-bs-toggle="tab" role="tab">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-purple" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l18 0" /><path d="M9 8l1 0" /><path d="M9 12l1 0" /><path d="M9 16l1 0" /><path d="M14 8l1 0" /><path d="M14 12l1 0" /><path d="M14 16l1 0" /><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16" /></svg>
+            {% translate "Related Assets" %} <span class="badge bg-purple-lt ms-2">{{ assets_table.rows|length }}</span>
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a href="#requests" class="nav-link" data-bs-toggle="tab" role="tab">
+            <i class="mdi mdi-clipboard-text-outline me-1 text-yellow"></i>
+            {% translate "Requests" %} <span class="badge bg-yellow-lt ms-2">{{ object.requests.count }}</span>
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a href="#kits" class="nav-link" data-bs-toggle="tab" role="tab">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-orange" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5" /><path d="M12 12l8 -4.5" /><path d="M12 12l0 9" /><path d="M12 12l-8 -4.5" /></svg>
+            {% translate "Kits" %} <span class="badge bg-orange-lt ms-2">{{ kits_table.rows|length }}</span>
+        </a>
+    </li>
+{% endblock extra_tabs %}
+
+{# Object details rendered via panel layout #}
+
+{# --- Extra Tab Panes --- #}
+{% block extra_tab_panes %}
+    {# Related Assets Tab Pane #}
+    <div class="tab-pane fade" id="related-assets" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">{% translate "Assets of this Model / Type" %}</h3>
+            </div>
+            {% if assets_table.rows %}
+                <div class="table-responsive">
+                    {% render_table assets_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=assets_table %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <i class="mdi mdi-cancel text-muted mb-2"></i>
+                    <p class="mb-0">{% translate "No physical assets registered under this type/model yet." %}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="tab-pane fade" id="requests" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">{% translate "Asset Requests for this Model / Type" %}</h3>
+            </div>
+            {% if requests_table.rows %}
+                <div class="table-responsive">
+                    {% render_table requests_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=requests_table %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <p class="mb-0">{% translate "No requests logged for this asset type." %}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="tab-pane fade" id="kits" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent">
+                <h3 class="card-title">{% translate "Kits Allocating this Model / Type" %}</h3>
+            </div>
+            {% if kits_table.rows %}
+                <div class="table-responsive">
+                    {% render_table kits_table %}
+                </div>
+                {% include 'generic/includes/table_pagination.html' with table=kits_table %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <p class="mb-0">{% translate "No kits allocate this asset type." %}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock extra_tab_panes %}

@@ -1,0 +1,137 @@
+{% load render_table from django_tables2 %}
+{% load utility_tags %}
+{% load i18n %}
+{% load panels %}
+
+{# --- OOB Swaps (Must be outside the main target) --- #}
+<span id="page-title-block" hx-swap-oob="true">{{ object }} - {{ title|default:"Detail View" }} {% translate "- ITAMbox" %}</span>
+
+<div id="breadcrumbs-block" hx-swap-oob="true">
+    {% if breadcrumbs %}
+        <ol class="breadcrumb breadcrumb-arrows" aria-label="{% translate 'breadcrumbs' %}">
+            {% for url, label in breadcrumbs %}
+                {% if url %}
+                    <li class="breadcrumb-item"><a href="{{ url }}">{{ label }}</a></li>
+                {% else %}
+                    <li class="breadcrumb-item active" aria-current="page">{{ label }}</li>
+                {% endif %}
+            {% endfor %}
+        </ol>
+    {% endif %}
+</div>
+
+<div id="page-header-block" hx-swap-oob="true">
+    <div class="page-pretitle">{{ object_type|default:"Object" }} {% translate "Details" %}</div>
+    <h2 class="page-title">{{ object }}</h2>
+</div>
+
+<div id="page-actions-block" hx-swap-oob="true">
+    <div class="btn-list">
+        {% if action_urls.edit %}
+        <a href="{{ action_urls.edit }}" class="btn">
+            <i class="mdi mdi-pencil-outline"></i>
+            {% translate "Edit" %}
+        </a>
+        {% endif %}
+         {% if action_urls.delete %}
+        <a href="{{ action_urls.delete }}" class="btn btn-danger">
+            <i class="mdi mdi-trash-can-outline"></i>
+            {% translate "Delete" %}
+        </a>
+        {% endif %}
+        {# Placeholder for Extra Actions #}
+        {% block extra_page_actions %}{% endblock %}
+    </div>
+</div>
+{# --- End OOB Swaps --- #}
+
+
+{# --- Main Target Content (Replaces innerHTML of #page-body-main) --- #}
+{# --- Replicates structure inside {% block content %} of generic/object_detail.html --- #}
+<div class="container-fluid"> {# Add the container wrapper #}
+    {% if layout %}
+        {% for row in layout %}
+        <div class="row g-4">
+            {% for column in row %}
+            <div class="col-md-{% widthratio 12 row|length 1 %}">
+                {% for panel in column %}
+                    {% render_panel panel %}
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    {% else %}
+    <div class="row g-4">
+
+        {# --- Left Column --- #}
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header"><h3 class="card-title">{{ object_type|default:"Object" }} {% translate "Information" %}</h3></div>
+                <div class="card-body">
+                    {% block object_details %}
+                        <p class="text-muted"><em>{% translate "(Detail block override missing)" %}</em></p>
+                    {% endblock object_details %}
+                </div>
+            </div>
+            {% if object.comments %}
+            <div class="card mt-4"><div class="card-header"><h3 class="card-title">{% translate "Comments" %}</h3></div><div class="card-body">{{ object.comments|linebreaksbr|safe }}</div></div>
+            {% endif %}
+            {% if object.notes %}
+             <div class="card mt-4"><div class="card-header"><h3 class="card-title">{% translate "Notes" %}</h3></div><div class="card-body">{{ object.notes|linebreaksbr|safe }}</div></div>
+            {% endif %}
+             {% if object.description %}
+             <div class="card mt-4"><div class="card-header"><h3 class="card-title">{% translate "Description" %}</h3></div><div class="card-body">{{ object.description|linebreaksbr|safe }}</div></div>
+            {% endif %}
+            {% block hierarchy %}{% endblock hierarchy %}
+            {% block extra_cards_left %}{% endblock %}
+        </div>
+
+        {# --- Right Column --- #}
+        <div class="col-md-4">
+            {% if object.created_at or object.updated_at %}
+             <div class="card mb-4">
+                 <div class="card-body">
+                     <h3 class="card-title">{% translate "Metadata" %}</h3>
+                     <p class="text-muted small">
+                        {% if object.created_at %}{% translate "Created:" %} {{ object.created_at|date:"Y-m-d H:i" }} <br>{% endif %}
+                        {% if object.updated_at %}{% translate "Updated:" %} {{ object.updated_at|date:"Y-m-d H:i" }}{% endif %}
+                     </p>
+                </div>
+            </div>
+            {% endif %}
+            {% if object.tags.all %}
+                <div class="card mb-4">
+                    <div class="card-header"><h3 class="card-title">{% translate "Tags" %}</h3></div>
+                    <div class="card-body">
+                        {% for tag in object.tags.all %}{% include 'inc/tags.html' with tag=tag %}{% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+            {% block related_objects %}{% endblock related_objects %}
+             {% if related_objects_list %}
+             <div class="card mb-4">
+                 <div class="card-header"><h3 class="card-title">{% translate "Related Objects" %}</h3></div>
+                 <div class="list-group list-group-flush">
+                     {% for item in related_objects_list %}
+                         <a href="{{ item.url }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                             {{ item.label }}
+                             <span class="badge bg-primary rounded-pill">{{ item.count }}</span>
+                         </a>
+                     {% endfor %}
+                 </div>
+             </div>
+             {% endif %}
+            {% block extra_cards_right %}{% endblock %}
+        </div>
+    </div>
+
+    {# --- Full Width Content Block --- #}
+    <div class="row g-4 mt-2">
+        <div class="col-12">
+            {% block full_width_content %}{% endblock full_width_content %}
+        </div>
+    </div>
+    {% endif %}
+</div> {# End container-fluid #}
+{# Note: No script tags here #}

@@ -28,17 +28,17 @@ jobs:
           pip install -r requirements.txt
 
       - name: Check for missing migrations
-        working-directory: ./assetbox
+        working-directory: ./itambox
         run: |
           python manage.py makemigrations --check --dry-run
 
       - name: Run Django system checks
-        working-directory: ./assetbox
+        working-directory: ./itambox
         run: |
           python manage.py check
 
       - name: Run tests
-        working-directory: ./assetbox
+        working-directory: ./itambox
         run: |
           python manage.py test --verbosity=2
 
@@ -60,5 +60,5 @@ jobs:
 
       - name: Lint with flake8
         run: |
-          flake8 assetbox/ --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=migrations,.venv,__pycache__
-          flake8 assetbox/ --count --exit-zero --max-complexity=10 --statistics --exclude=migrations,.venv,__pycache__
+          flake8 itambox/ --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=migrations,.venv,__pycache__
+          flake8 itambox/ --count --exit-zero --max-complexity=10 --statistics --exclude=migrations,.venv,__pycache__

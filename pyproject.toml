@@ -1,5 +1,5 @@
 [project]
-name = "assetbox"
+name = "itambox"
 version = "0.1.0"
 description = "IT Asset Management System inspired by NetBox"
 requires-python = ">=3.11"
@@ -50,7 +50,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["assetbox*"]
+include = ["itambox*"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "core.settings"
