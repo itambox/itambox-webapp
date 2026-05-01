@@ -167,6 +167,9 @@ urlpatterns = [
     # i18n
     path('i18n/', include('django.conf.urls.i18n')),
 
+    # SAML SSO
+    path('saml2/', include('djangosaml2.urls')),
+
     # Attachments
     path('attachments/image/upload/<str:app_label>/<str:model_name>/<int:object_id>/', ImageAttachmentUploadView.as_view(), name='image_attachment_upload'),
     path('attachments/image/delete/<int:pk>/', ImageAttachmentDeleteView.as_view(), name='image_attachment_delete'),

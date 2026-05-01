@@ -142,4 +142,3 @@ class TenantMembershipBackend:
             return False
         # If they have active membership, they have access to standard modules
         return app_label in ('assets', 'inventory', 'components', 'organization', 'extras')
-
