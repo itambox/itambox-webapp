@@ -705,56 +705,6 @@ class PermissionGroup(BaseModel):
     def get_absolute_url(self):
         return reverse('permissiongroup_detail', kwargs={'pk': self.pk})
 
-
-class LDAPSettings(ChangeLoggingMixin, BaseModel):
-    server_uri = models.CharField(max_length=500, help_text="ldap://ldap.example.com")
-    bind_dn = models.CharField(max_length=500, blank=True)
-    bind_password = models.CharField(max_length=255, blank=True)
-    user_search_base = models.CharField(max_length=500, blank=True)
-    user_search_filter = models.CharField(max_length=500, default='(uid=%(user)s)')
-    group_search_base = models.CharField(max_length=500, blank=True)
-    is_active = models.BooleanField(default=False)
-    require_group = models.CharField(max_length=500, blank=True)
-
-    class Meta:
-        verbose_name = "LDAP Settings"
-        verbose_name_plural = "LDAP Settings"
-
-    def __str__(self):
-        return f"LDAP Settings ({'Active' if self.is_active else 'Inactive'})"
-
-    def save(self, *args, **kwargs):
-        self.pk = 1
-        super().save(*args, **kwargs)
-
-    @classmethod
-    def load(cls):
-        return cls.objects.first()
-
-
-class SAMLSettings(ChangeLoggingMixin, BaseModel):
-    idp_metadata_url = models.URLField(blank=True, help_text="Identity Provider metadata URL")
-    idp_entity_id = models.CharField(max_length=500, blank=True)
-    sp_entity_id = models.CharField(max_length=500, default='itambox')
-    is_active = models.BooleanField(default=False)
-    strict = models.BooleanField(default=True)
-
-    class Meta:
-        verbose_name = "SAML Settings"
-        verbose_name_plural = "SAML Settings"
-
-    def __str__(self):
-        return f"SAML Settings ({'Active' if self.is_active else 'Inactive'})"
-
-    def save(self, *args, **kwargs):
-        self.pk = 1
-        super().save(*args, **kwargs)
-
-    @classmethod
-    def load(cls):
-        return cls.objects.first()
-
-
 class LabelTemplate(ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True)

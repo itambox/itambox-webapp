@@ -246,6 +246,8 @@ LOGOUT_REDIRECT_URL = 'login'
 AUTHENTICATION_BACKENDS = [
     'core.auth.TenantMembershipBackend',
     'core.auth.ITAMBoxPermissionBackend',
+    'core.auth.ldap.MultiTenantLDAPBackend',
+    'djangosaml2.backends.Saml2Backend',
     'django.contrib.auth.backends.ModelBackend',
 ]
 
@@ -259,29 +261,27 @@ PAGINATE_COUNT_CHOICES = (
     (1000, '1000'),
 )
 
-SAML_ACTIVE = False
+import json
+try:
+    ITAMBOX_TENANT_LDAP_CONFIGS = json.loads(os.environ.get('ITAMBOX_TENANT_LDAP_CONFIGS', '{}'))
+except Exception:
+    ITAMBOX_TENANT_LDAP_CONFIGS = {}
 
 try:
-    from core.models import SAMLSettings
-    saml_config = SAMLSettings.load()
-    if saml_config and saml_config.is_active:
-        SAML_ACTIVE = True
-        SAML_DJANGO_USER_MAIN_ATTRIBUTE = 'username'
-        SAML_USE_NAME_ID_AS_USERNAME = True
-        SAML_CREATE_UNKNOWN_USER = True
-        SAML_ATTRIBUTE_MAPPING = {
-            'email': ('email',),
-            'first_name': ('first_name', 'givenName'),
-            'last_name': ('last_name', 'sn'),
-        }
-        if saml_config.strict:
-            SAML_STRICT = True
-        if saml_config.sp_entity_id:
-            SAML_SP_ENTITY_ID = saml_config.sp_entity_id
-        if saml_config.idp_entity_id:
-            SAML_IDP_ENTITY_ID = saml_config.idp_entity_id
+    ITAMBOX_TENANT_SAML_CONFIGS = json.loads(os.environ.get('ITAMBOX_TENANT_SAML_CONFIGS', '{}'))
 except Exception:
-    SAML_ACTIVE = False
+    ITAMBOX_TENANT_SAML_CONFIGS = {}
+
+# SAML SSO Configuration Loader
+SAML_CONFIG_LOADER = 'core.auth.saml.load_saml_config'
+SAML_USE_NAME_ID_AS_USERNAME = True
+SAML_CREATE_UNKNOWN_USER = True
+SAML_ATTRIBUTE_MAPPING = {
+    'email': ('email',),
+    'first_name': ('first_name', 'givenName'),
+    'last_name': ('last_name', 'sn'),
+}
+
 
 
 # ==============================================================================
