@@ -22,37 +22,50 @@
         <thead class="table-light">
             <tr>
                 <th style="width: 40%;">{% translate "Object / Model" %}</th>
-                <th class="text-center" style="width: 20%;">{% translate "Read" %}</th>
-                <th class="text-center" style="width: 20%;">{% translate "Write" %}</th>
-                <th class="text-center" style="width: 20%;">{% translate "Delete" %}</th>
+                <th class="text-center" style="width: 15%;">{% translate "Read" %}</th>
+                <th class="text-center" style="width: 15%;">{% translate "Create" %}</th>
+                <th class="text-center" style="width: 15%;">{% translate "Edit" %}</th>
+                <th class="text-center" style="width: 15%;">{% translate "Delete" %}</th>
             </tr>
         </thead>
         <tbody>
-            {% for key, info in matrix_models.items %}
+            {% for group_name, items in matrix_grouped_items.items %}
+            <tr style="background-color: var(--tblr-bg-surface-secondary, #f6f8fb); color: var(--tblr-body-color);">
+                <td colspan="5" class="fw-bold ps-3">{{ group_name }}</td>
+            </tr>
+            {% for item in items %}
             <tr>
-                <td class="fw-semibold">{{ info.label }}</td>
+                <td class="fw-semibold ps-4">{{ item.label }}</td>
                 <td class="text-center">
-                    {% if info.read_codename in object.permissions %}
+                    {% if item.read_codename in object.permissions %}
                         <span class="badge bg-success text-success-fg"><i class="mdi mdi-check"></i> {% translate "Yes" %}</span>
                     {% else %}
                         <span class="badge bg-secondary-lt text-muted"><i class="mdi mdi-close"></i> {% translate "No" %}</span>
                     {% endif %}
                 </td>
                 <td class="text-center">
-                    {% if info.write_codename in object.permissions %}
+                    {% if item.create_codename in object.permissions %}
                         <span class="badge bg-success text-success-fg"><i class="mdi mdi-check"></i> {% translate "Yes" %}</span>
                     {% else %}
                         <span class="badge bg-secondary-lt text-muted"><i class="mdi mdi-close"></i> {% translate "No" %}</span>
                     {% endif %}
                 </td>
                 <td class="text-center">
-                    {% if info.delete_codename in object.permissions %}
+                    {% if item.edit_codename in object.permissions %}
+                        <span class="badge bg-success text-success-fg"><i class="mdi mdi-check"></i> {% translate "Yes" %}</span>
+                    {% else %}
+                        <span class="badge bg-secondary-lt text-muted"><i class="mdi mdi-close"></i> {% translate "No" %}</span>
+                    {% endif %}
+                </td>
+                <td class="text-center">
+                    {% if item.delete_codename in object.permissions %}
                         <span class="badge bg-success text-success-fg"><i class="mdi mdi-check"></i> {% translate "Yes" %}</span>
                     {% else %}
                         <span class="badge bg-secondary-lt text-muted"><i class="mdi mdi-close"></i> {% translate "No" %}</span>
                     {% endif %}
                 </td>
             </tr>
+            {% endfor %}
             {% endfor %}
         </tbody>
     </table>

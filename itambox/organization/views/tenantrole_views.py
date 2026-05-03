@@ -17,56 +17,22 @@ class TenantRoleDetailView(ObjectDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['matrix_models'] = {
-            'asset': {
-                'label': 'Assets',
-                'read_codename': 'assets.view_asset',
-                'write_codename': 'assets.change_asset',
-                'delete_codename': 'assets.delete_asset',
-            },
-            'accessory': {
-                'label': 'Accessories',
-                'read_codename': 'inventory.view_accessory',
-                'write_codename': 'inventory.change_accessory',
-                'delete_codename': 'inventory.delete_accessory',
-            },
-            'consumable': {
-                'label': 'Consumables',
-                'read_codename': 'inventory.view_consumable',
-                'write_codename': 'inventory.change_consumable',
-                'delete_codename': 'inventory.delete_consumable',
-            },
-            'kit': {
-                'label': 'Kits',
-                'read_codename': 'inventory.view_kit',
-                'write_codename': 'inventory.change_kit',
-                'delete_codename': 'inventory.delete_kit',
-            },
-            'component': {
-                'label': 'Components',
-                'read_codename': 'components.view_component',
-                'write_codename': 'components.change_component',
-                'delete_codename': 'components.delete_component',
-            },
-            'location': {
-                'label': 'Locations',
-                'read_codename': 'organization.view_location',
-                'write_codename': 'organization.change_location',
-                'delete_codename': 'organization.delete_location',
-            },
-            'site': {
-                'label': 'Sites',
-                'read_codename': 'organization.view_site',
-                'write_codename': 'organization.change_site',
-                'delete_codename': 'organization.delete_site',
-            },
-            'assetholder': {
-                'label': 'Asset Holders',
-                'read_codename': 'organization.view_assetholder',
-                'write_codename': 'organization.change_assetholder',
-                'delete_codename': 'organization.delete_assetholder',
-            },
-        }
+        from ..forms.tenantrole_form import MATRIX_MODELS
+        groups = {}
+        for key, info in MATRIX_MODELS.items():
+            group_name = info.get('group', 'Other')
+            if group_name not in groups:
+                groups[group_name] = []
+            app = info['app']
+            model = info['model_name']
+            groups[group_name].append({
+                'label': info['label'],
+                'read_codename': f'{app}.view_{model}',
+                'create_codename': f'{app}.add_{model}',
+                'edit_codename': f'{app}.change_{model}',
+                'delete_codename': f'{app}.delete_{model}',
+            })
+        context['matrix_grouped_items'] = groups
         return context
 
 class TenantRoleEditView(ObjectEditView):

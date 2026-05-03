@@ -51,7 +51,8 @@ class TenantRoleSecurityTests(TestCase):
             'name': 'Custom Asset Specialist',
             'description': 'Can view and change assets',
             'perm_asset_read': True,
-            'perm_asset_write': True,
+            'perm_asset_create': True,
+            'perm_asset_edit': True,
             'perm_asset_delete': False,
         }
         
@@ -70,7 +71,8 @@ class TenantRoleSecurityTests(TestCase):
         # Verify deserialization into form initial values
         edit_form = TenantRoleForm(instance=role, tenant=self.tenant_a, user=self.super_user)
         self.assertTrue(edit_form.fields['perm_asset_read'].initial)
-        self.assertTrue(edit_form.fields['perm_asset_write'].initial)
+        self.assertTrue(edit_form.fields['perm_asset_create'].initial)
+        self.assertTrue(edit_form.fields['perm_asset_edit'].initial)
         self.assertFalse(edit_form.fields['perm_asset_delete'].initial)
 
     def test_permission_backend_resolution(self):
@@ -166,3 +168,16 @@ class TenantRoleSecurityTests(TestCase):
         # Since membership.role on_delete=models.PROTECT, we should get a ProtectedError on deletion
         with self.assertRaises(ProtectedError):
             role.delete()
+
+    def test_global_mode_tenant_selection(self):
+        # In global mode (no tenant in kwargs), tenant is selected in form fields
+        form_data = {
+            'name': 'Global Role',
+            'tenant': self.tenant_b.pk,
+            'description': 'Created in global mode',
+            'perm_asset_read': True,
+        }
+        form = TenantRoleForm(data=form_data, user=self.super_user)
+        self.assertTrue(form.is_valid(), form.errors)
+        role = form.save()
+        self.assertEqual(role.tenant, self.tenant_b)

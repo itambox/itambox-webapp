@@ -229,11 +229,12 @@ class ContactAssignmentTable(BaseTable):
 class TenantRoleTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:tenantrole_detail', args=[A('pk')], verbose_name='Name')
+    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant')
     description = tables.Column()
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = TenantRole
-        fields = ('pk', 'name', 'description', 'actions')
-        default_columns = ('pk', 'name', 'description', 'actions')
+        fields = ('pk', 'name', 'tenant', 'description', 'actions')
+        default_columns = ('pk', 'name', 'tenant', 'description', 'actions')
  
