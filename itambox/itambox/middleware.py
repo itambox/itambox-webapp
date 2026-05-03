@@ -156,7 +156,7 @@ class TenantMiddleware:
                 active_membership = TenantMembership.objects.filter(
                     user=request.user,
                     tenant_id=session_tenant_id
-                ).select_related('tenant').first()
+                ).select_related('tenant', 'role').first()
                 if active_membership:
                     active_tenant = active_membership.tenant
                 else:
@@ -167,7 +167,7 @@ class TenantMiddleware:
                 memberships = TenantMembership.objects.filter(
                     user=request.user,
                     tenant__group_id=session_group_id
-                ).select_related('tenant', 'tenant__group')
+                ).select_related('tenant', 'tenant__group', 'role')
                 if memberships.exists():
                     active_tenant_group = TenantGroup.objects.get(pk=session_group_id)
                     # Use first membership for role-based permission fallback within group
@@ -179,7 +179,7 @@ class TenantMiddleware:
             if not active_tenant and not active_tenant_group:
                 active_membership = TenantMembership.objects.filter(
                     user=request.user
-                ).select_related('tenant').first()
+                ).select_related('tenant', 'role').first()
                 if active_membership:
                     active_tenant = active_membership.tenant
                     request.session['active_tenant_id'] = active_tenant.id

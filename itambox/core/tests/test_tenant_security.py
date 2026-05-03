@@ -15,7 +15,14 @@ class CoreTenantSecurityTestCase(TestCase):
         self.tenant = Tenant.objects.create(name='Test Tenant', slug='test-tenant', group=self.tenant_group)
         self.site = Site.objects.create(name='Test Site', slug='test-site')
         self.location = Location.objects.create(name='Test Location', slug='test-location', tenant=self.tenant, site=self.site)
-        self.membership = TenantMembership.objects.create(user=self.user, tenant=self.tenant)
+        self.role = TenantRole.objects.create(
+            tenant=self.tenant,
+            name='Admin',
+            permissions=[
+                'assets.view_asset', 'assets.add_asset', 'assets.change_asset', 'assets.delete_asset'
+            ]
+        )
+        self.membership = TenantMembership.objects.create(user=self.user, tenant=self.tenant, role=self.role)
 
     def test_tenant_group_scoping(self):
         from core.managers import set_current_tenant_group
@@ -67,8 +74,22 @@ class CoreTenantSecurityTestCase(TestCase):
         test_user = User.objects.create_user(username='tenant_test_user', password='password123', is_superuser=False)
         
         # 4. Bind memberships
-        TenantMembership.objects.create(user=test_user, tenant=tenant_admin, role=TenantRole.ADMIN)
-        TenantMembership.objects.create(user=test_user, tenant=tenant_readonly, role=TenantRole.READER)
+        admin_role = TenantRole.objects.create(
+            tenant=tenant_admin,
+            name='Admin',
+            permissions=[
+                'assets.view_asset', 'assets.add_asset', 'assets.change_asset', 'assets.delete_asset'
+            ]
+        )
+        reader_role = TenantRole.objects.create(
+            tenant=tenant_readonly,
+            name='Reader',
+            permissions=[
+                'assets.view_asset'
+            ]
+        )
+        TenantMembership.objects.create(user=test_user, tenant=tenant_admin, role=admin_role)
+        TenantMembership.objects.create(user=test_user, tenant=tenant_readonly, role=reader_role)
         
         # Set active context in test client session
         self.client.force_login(test_user)

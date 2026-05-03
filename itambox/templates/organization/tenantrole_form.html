@@ -1,0 +1,174 @@
+{% extends base_template|default:"layout.html" %}
+{% load i18n %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ title }} {% translate "- ITAMbox" %}{% endblock %}
+
+{% block page_header %}
+    <h2 class="page-title">
+        {{ title }}
+    </h2>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10 col-md-12">
+        <form method="post" class="card shadow-sm">
+            {% csrf_token %}
+            <div class="card-body">
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger mb-4">
+                    {% for error in form.non_field_errors %}
+                    <div>{{ error }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <h4 class="card-title text-primary mb-4">{% translate "Role Details" %}</h4>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        {{ form.name|as_crispy_field }}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        {{ form.description|as_crispy_field }}
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <h4 class="card-title text-primary mb-3">{% translate "Permissions Matrix" %}</h4>
+                <p class="text-muted mb-4 small">
+                    {% translate "Configure role-specific access by checking permissions below. A checked 'Write' permission enables both Create and Edit capabilities." %}
+                </p>
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle border mb-4">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 40%;">{% translate "Object / Model" %}</th>
+                                <th class="text-center" style="width: 20%;">{% translate "Read" %}</th>
+                                <th class="text-center" style="width: 20%;">{% translate "Write" %}</th>
+                                <th class="text-center" style="width: 20%;">{% translate "Delete" %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Row 1: Assets -->
+                            <tr>
+                                <td class="fw-semibold">{% translate "Assets" %}</td>
+                                <td class="text-center">
+                                    <div class="form-check d-inline-block">{{ form.perm_asset_read }}</div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="form-check d-inline-block">{{ form.perm_asset_write }}</div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="form-check d-inline-block">{{ form.perm_asset_delete }}</div>
+                                </td>
+                            </tr>
+                            <!-- Row 2: Accessories -->
+                            <tr>
+                                <td class="fw-semibold">{% translate "Accessories" %}</td>
+                                <td class="text-center">
+                                    <div class="form-check d-inline-block">{{ form.perm_accessory_read }}</div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="form-check d-inline-block">{{ form.perm_accessory_write }}</div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="form-check d-inline-block">{{ form.perm_accessory_delete }}</div>
+                                </td>
+                            </tr>
+                            <!-- Row 3: Consumables -->
+                            <tr>
+                                <td class="fw-semibold">{% translate "Consumables" %}</td>
+                                <td class="text-center">
+                                    <div class="form-check d-inline-block">{{ form.perm_consumable_read }}</div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="form-check d-inline-block">{{ form.perm_consumable_write }}</div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="form-check d-inline-block">{{ form.perm_consumable_delete }}</div>
+                                </td>
+                            </tr>
+                            <!-- Row 4: Kits -->
+                            <tr>
+                                <td class="fw-semibold">{% translate "Kits" %}</td>
+                                <td class="text-center">
+                                    <div class="form-check d-inline-block">{{ form.perm_kit_read }}</div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="form-check d-inline-block">{{ form.perm_kit_write }}</div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="form-check d-inline-block">{{ form.perm_kit_delete }}</div>
+                                </td>
+                            </tr>
+                            <!-- Row 5: Components -->
+                            <tr>
+                                <td class="fw-semibold">{% translate "Components" %}</td>
+                                <td class="text-center">
+                                    <div class="form-check d-inline-block">{{ form.perm_component_read }}</div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="form-check d-inline-block">{{ form.perm_component_write }}</div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="form-check d-inline-block">{{ form.perm_component_delete }}</div>
+                                </td>
+                            </tr>
+                            <!-- Row 6: Locations -->
+                            <tr>
+                                <td class="fw-semibold">{% translate "Locations" %}</td>
+                                <td class="text-center">
+                                    <div class="form-check d-inline-block">{{ form.perm_location_read }}</div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="form-check d-inline-block">{{ form.perm_location_write }}</div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="form-check d-inline-block">{{ form.perm_location_delete }}</div>
+                                </td>
+                            </tr>
+                            <!-- Row 7: Sites -->
+                            <tr>
+                                <td class="fw-semibold">{% translate "Sites" %}</td>
+                                <td class="text-center">
+                                    <div class="form-check d-inline-block">{{ form.perm_site_read }}</div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="form-check d-inline-block">{{ form.perm_site_write }}</div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="form-check d-inline-block">{{ form.perm_site_delete }}</div>
+                                </td>
+                            </tr>
+                            <!-- Row 8: Asset Holders -->
+                            <tr>
+                                <td class="fw-semibold">{% translate "Asset Holders" %}</td>
+                                <td class="text-center">
+                                    <div class="form-check d-inline-block">{{ form.perm_assetholder_read }}</div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="form-check d-inline-block">{{ form.perm_assetholder_write }}</div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="form-check d-inline-block">{{ form.perm_assetholder_delete }}</div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="d-flex justify-content-end mt-4">
+                    <button type="submit" class="btn btn-primary">
+                        {% if is_editing %}{% translate "Update" %}{% else %}{% translate "Create" %}{% endif %}
+                    </button>
+                    <a href="{{ cancel_url }}" class="btn btn-outline-secondary ms-2">{% translate "Cancel" %}</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock content %}

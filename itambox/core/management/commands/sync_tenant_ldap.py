@@ -149,11 +149,29 @@ class Command(BaseCommand):
                         )
                         
                         # Add user to tenant membership as member by default
-                        from organization.models import TenantMembership
+                        from organization.models import TenantMembership, TenantRole
+                        tenant_role, _ = TenantRole.objects.get_or_create(
+                            tenant=tenant,
+                            name='Member',
+                            defaults={
+                                'description': 'Default Standard Member',
+                                'permissions': [
+                                    'assets.view_asset', 'assets.add_asset', 'assets.change_asset',
+                                    'inventory.view_accessory', 'inventory.add_accessory', 'inventory.change_accessory',
+                                    'inventory.view_consumable', 'inventory.add_consumable', 'inventory.change_consumable',
+                                    'inventory.view_kit', 'inventory.add_kit', 'inventory.change_kit',
+                                    'components.view_component', 'components.add_component', 'components.change_component',
+                                    'organization.view_location', 'organization.add_location', 'organization.change_location',
+                                    'organization.view_site', 'organization.add_site', 'organization.change_site',
+                                    'organization.view_assetholder', 'organization.add_assetholder', 'organization.change_assetholder',
+                                    'extras.view_dashboard', 'extras.add_dashboard', 'extras.change_dashboard',
+                                ]
+                            }
+                        )
                         TenantMembership.objects.update_or_create(
                             user=user,
                             tenant=tenant,
-                            defaults={'role': 'member'}
+                            defaults={'role': tenant_role}
                         )
 
                         if created:

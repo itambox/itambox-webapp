@@ -245,7 +245,6 @@ LOGOUT_REDIRECT_URL = 'login'
 
 AUTHENTICATION_BACKENDS = [
     'core.auth.TenantMembershipBackend',
-    'core.auth.ITAMBoxPermissionBackend',
     'core.auth.ldap.MultiTenantLDAPBackend',
     'djangosaml2.backends.Saml2Backend',
     'django.contrib.auth.backends.ModelBackend',

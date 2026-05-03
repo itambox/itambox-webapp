@@ -3,7 +3,7 @@ import django_tables2 as tables
 from django_tables2.utils import A
 from django_tables2.data import TableQuerysetData
 from .models import (
-    ObjectChange, ExportTemplate, PermissionGroup, WebhookEndpoint,
+    ObjectChange, ExportTemplate, WebhookEndpoint,
     EventRule, LabelTemplate, Job, ReportTemplate, ScheduledReport,
     AlertRule, AlertLog, NotificationChannel
 )
@@ -749,25 +749,6 @@ class LabelTemplateTable(BaseTable):
         from core.models import LabelTemplate as LT
         fmt_map = dict(LT._meta.get_field('barcode_format').choices)
         return fmt_map.get(value, value)
-
-
-class PermissionGroupTable(BaseTable):
-    name = tables.Column(linkify=True)
-    description = tables.Column()
-    permissions = tables.Column()
-
-    class Meta(BaseTable.Meta):
-        model = PermissionGroup
-        fields = ('name', 'description', 'permissions')
-        sequence = ('name', 'description', 'permissions')
-
-    def render_permissions(self, value):
-        if not value:
-            return mark_safe('<span class="text-muted">&mdash;</span>')
-        items = [f'<span class="badge bg-primary me-1">{k}</span>' for k, v in value.items() if v]
-        return mark_safe(' '.join(items)) if items else mark_safe('<span class="text-muted">&mdash;</span>')
-
-
 class JobTable(BaseTable):
     name = tables.Column(linkify=True)
     status = tables.Column(verbose_name='Status')

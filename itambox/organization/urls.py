@@ -90,6 +90,13 @@ urlpatterns = [
     path('locations/import/', views.LocationImportView.as_view(), name='location_import'),
     path('asset-holders/import/', views.AssetHolderImportView.as_view(), name='assetholder_import'),
 
+    # Tenant Roles
+    path('roles/', views.TenantRoleListView.as_view(), name='tenantrole_list'),
+    path('roles/add/', views.TenantRoleEditView.as_view(), name='tenantrole_create'),
+    path('roles/<int:pk>/', views.TenantRoleDetailView.as_view(), name='tenantrole_detail'),
+    path('roles/<int:pk>/edit/', views.TenantRoleEditView.as_view(), name='tenantrole_update'),
+    path('roles/<int:pk>/delete/', views.TenantRoleDeleteView.as_view(), name='tenantrole_delete'),
+
     # Invitations
     path('invite-user/', views.InviteUserView.as_view(), name='invite_user'),
     path('accept-invitation/<uuid:token>/', views.AcceptInvitationView.as_view(), name='accept_invitation'),

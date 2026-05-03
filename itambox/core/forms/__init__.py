@@ -11,7 +11,7 @@ from core.search import SEARCH_INDEXES
 from core.utils import get_model_viewname
 import django_filters
 from itambox.middleware import get_current_user
-from core.models import WebhookEndpoint, EventRule, LabelTemplate, ReportTemplate, ScheduledReport, AlertRule, NotificationChannel, PermissionGroup
+from core.models import WebhookEndpoint, EventRule, LabelTemplate, ReportTemplate, ScheduledReport, AlertRule, NotificationChannel
 
 OBJ_TYPE_CHOICES = [
     (
@@ -715,52 +715,6 @@ class NotificationChannelForm(forms.ModelForm):
             profile = getattr(user, 'asset_holder_profile', None)
             if profile and profile.tenant:
                 instance.tenant = profile.tenant
-        if commit:
-            instance.save()
-            self.save_m2m()
-        return instance
-
-
-from django.contrib.auth.models import Permission
-
-class PermissionGroupForm(forms.ModelForm):
-    permission_objects = forms.ModelMultipleChoiceField(
-        queryset=Permission.objects.select_related('content_type').order_by('content_type__app_label', 'codename'),
-        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tomselect': 'true'}),
-        required=False,
-        label="Permissions",
-        help_text="Select one or more permissions to assign to this group."
-    )
-
-    class Meta:
-        model = PermissionGroup
-        fields = ['name', 'description', 'users']
-        widgets = {
-            'users': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tomselect': 'true'}),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self.instance and self.instance.pk and self.instance.permissions:
-            pks = []
-            for perm_str, has_perm in self.instance.permissions.items():
-                if has_perm:
-                    try:
-                        app_label, codename = perm_str.split('.')
-                        perm = Permission.objects.get(content_type__app_label=app_label, codename=codename)
-                        pks.append(perm.pk)
-                    except (ValueError, Permission.DoesNotExist):
-                        pass
-            self.fields['permission_objects'].initial = pks
-
-    def save(self, commit=True):
-        instance = super().save(commit=False)
-        permissions_dict = {}
-        selected_perms = self.cleaned_data.get('permission_objects', [])
-        for perm in selected_perms:
-            perm_str = f"{perm.content_type.app_label}.{perm.codename}"
-            permissions_dict[perm_str] = True
-        instance.permissions = permissions_dict
         if commit:
             instance.save()
             self.save_m2m()

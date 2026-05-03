@@ -31,7 +31,6 @@ from itambox.views.features import (
     LabelTemplateDeleteView, ImageAttachmentUploadView, ImageAttachmentDeleteView,
     FileAttachmentUploadView, FileAttachmentDeleteView, JournalEntryCreateView,
     LabelSelectView, LabelPrintView,
-    PermissionGroupListView, PermissionGroupDetailView, PermissionGroupEditView, PermissionGroupDeleteView,
 )
 from itambox.views.utility import SearchView, health # Import core views, aliased to avoid clash
 from itambox.views.jobs import JobListView, JobDetailView, JobCancelView
@@ -151,12 +150,7 @@ urlpatterns = [
     path('label-templates/<int:pk>/edit/', LabelTemplateEditView.as_view(), name='labeltemplate_edit'),
     path('label-templates/<int:pk>/delete/', LabelTemplateDeleteView.as_view(), name='labeltemplate_delete'),
 
-    # Permission Groups
-    path('permission-groups/', PermissionGroupListView.as_view(), name='permissiongroup_list'),
-    path('permission-groups/add/', PermissionGroupEditView.as_view(), name='permissiongroup_add'),
-    path('permission-groups/<int:pk>/', PermissionGroupDetailView.as_view(), name='permissiongroup_detail'),
-    path('permission-groups/<int:pk>/edit/', PermissionGroupEditView.as_view(), name='permissiongroup_edit'),
-    path('permission-groups/<int:pk>/delete/', PermissionGroupDeleteView.as_view(), name='permissiongroup_delete'),
+
 
     # Export View
     path('export/<str:app_label>/<str:model_name>/<int:template_id>/', ObjectExportView.as_view(), name='object_export'),

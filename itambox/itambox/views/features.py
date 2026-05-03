@@ -17,7 +17,7 @@ from django.utils.http import urlencode
 from django_tables2 import RequestConfig
 
 from core.models import (
-    ObjectChange, ExportTemplate, JournalEntry, PermissionGroup, 
+    ObjectChange, ExportTemplate, JournalEntry, 
     WebhookEndpoint, EventRule, LabelTemplate, ImageAttachment, FileAttachment
 )
 from core.tables import (
@@ -25,7 +25,7 @@ from core.tables import (
     EventRuleTable, LabelTemplateTable
 )
 from core.forms import (
-    JournalEntryForm, WebhookEndpointForm, EventRuleForm, LabelTemplateForm, PermissionGroupForm,
+    JournalEntryForm, WebhookEndpointForm, EventRuleForm, LabelTemplateForm,
     ObjectChangeFilterForm
 )
 from core.filters import ObjectChangeFilterSet
@@ -441,46 +441,6 @@ class LabelPrintView(LoginRequiredMixin, View):
             except Exception:
                 pass
         return ''
-
-
-class PermissionGroupListView(ObjectListView):
-    queryset = PermissionGroup.objects.all()
-    action_buttons = ('add',)
-
-    def get_table(self):
-        from core.tables import PermissionGroupTable
-        return PermissionGroupTable(self.get_queryset(), request=self.request)
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['title'] = 'Permission Groups'
-        return context
-
-
-class PermissionGroupDetailView(ObjectDetailView):
-    queryset = PermissionGroup.objects.all()
-    layout = (
-        ((Panel('info', 'Permission Group Details'),),),
-    )
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['title'] = str(self.get_object())
-        return context
-
-
-class PermissionGroupEditView(ObjectEditView):
-    queryset = PermissionGroup.objects.all()
-    model_form = PermissionGroupForm
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['title'] = 'Edit Permission Group' if self.object else 'Create Permission Group'
-        return context
-
-
-class PermissionGroupDeleteView(ObjectDeleteView):
-    queryset = PermissionGroup.objects.all()
 
 
 @method_decorator(login_required, name='dispatch')

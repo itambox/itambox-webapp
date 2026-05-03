@@ -688,23 +688,6 @@ class ExportTemplate(BaseModel):
         return '\n'.join(results)
 
 
-class PermissionGroup(BaseModel):
-    name = models.CharField(max_length=255, unique=True)
-    description = models.TextField(blank=True)
-    permissions = models.JSONField(default=dict, help_text="{'assets.view_asset': True, 'assets.change_asset': True, ...}")
-    users = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='permission_groups', blank=True)
-
-    class Meta:
-        ordering = ['name']
-        verbose_name = "Permission Group"
-        verbose_name_plural = "Permission Groups"
-
-    def __str__(self):
-        return self.name
-
-    def get_absolute_url(self):
-        return reverse('permissiongroup_detail', kwargs={'pk': self.pk})
-
 class LabelTemplate(ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True)
