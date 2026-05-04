@@ -63,6 +63,16 @@ class Command(BaseCommand):
         # Delete in reverse-dependency order
         models_to_clear = [
             # Leaf models first
+            ('assets', 'AssetRequest'),
+            ('assets', 'AssetAudit'),
+            ('assets', 'AuditSession'),
+            ('core', 'WebhookEndpoint'),
+            ('core', 'ReportTemplate'),
+            ('core', 'LabelTemplate'),
+            ('core', 'JournalEntry'),
+            ('organization', 'TenantMembership'),
+            ('organization', 'TenantInvitation'),
+            ('organization', 'TenantRole'),
             ('components', 'ComponentAllocation'),
             ('components', 'ComponentStock'),
             ('compliance', 'CustodyReceipt'),
@@ -1692,7 +1702,7 @@ class Command(BaseCommand):
         self.stdout.write('  5 kits, 14 maintenance records.')
 
     def _seed_phase7(self):
-        from core.models import PermissionGroup, WebhookEndpoint, ReportTemplate, LabelTemplate, JournalEntry
+        from core.models import WebhookEndpoint, ReportTemplate, LabelTemplate, JournalEntry
         from assets.models import AssetRequest, AuditSession, AssetAudit, Asset, AssetType
         from django.contrib.contenttypes.models import ContentType
         from django.contrib.auth import get_user_model
@@ -1700,11 +1710,6 @@ class Command(BaseCommand):
         User = get_user_model()
         
         self.stdout.write('--- Phase 7: Demo Features (Requests, Webhooks, Templates, Audits) ---')
-
-        # 1. Permission Groups
-        pg1, _ = PermissionGroup.objects.get_or_create(name='Helpdesk Tier 1', description='Basic read and request access')
-        pg2, _ = PermissionGroup.objects.get_or_create(name='Auditor', description='Can perform asset audits')
-        pg3, _ = PermissionGroup.objects.get_or_create(name='Read-Only', description='Global read-only access')
         
         # 2. Webhook Endpoints
         WebhookEndpoint.objects.get_or_create(

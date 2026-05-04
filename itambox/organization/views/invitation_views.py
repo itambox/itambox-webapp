@@ -13,12 +13,19 @@ class InviteUserMixin(LoginRequiredMixin, UserPassesTestMixin):
         if self.request.user.is_superuser:
             return True
         membership = getattr(self.request, 'active_membership', None)
-        return membership is not None and membership.role == 'admin'
+        if membership and membership.role:
+            return 'organization.add_tenantinvitation' in membership.role.permissions or membership.role.name.lower() == 'admin'
+        return False
 
 class InviteUserView(InviteUserMixin, CreateView):
     model = TenantInvitation
     form_class = TenantInvitationForm
     template_name = 'organization/invite_user.html'
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['tenant'] = getattr(self.request, 'active_tenant', None)
+        return kwargs
 
     def form_valid(self, form):
         active_tenant = getattr(self.request, 'active_tenant', None)

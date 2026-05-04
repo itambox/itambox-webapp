@@ -1,7 +1,7 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
-from organization.models import Tenant, TenantGroup, AssetHolder
+from organization.models import Tenant, TenantGroup, AssetHolder, TenantRole
 
 User = get_user_model()
 
@@ -97,19 +97,65 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
         self.user = User.objects.create_user(
             username='staffuser', email='staff@example.com', password='password123'
         )
+        # Create standard tenant roles
+        self.role_admin = TenantRole.objects.create(
+            tenant=self.tenant_a,
+            name='Administrator',
+            permissions=[
+                'assets.view_asset', 'assets.add_asset', 'assets.change_asset', 'assets.delete_asset',
+                'inventory.view_accessory', 'inventory.add_accessory', 'inventory.change_accessory', 'inventory.delete_accessory',
+                'inventory.view_consumable', 'inventory.add_consumable', 'inventory.change_consumable', 'inventory.delete_consumable',
+                'inventory.view_kit', 'inventory.add_kit', 'inventory.change_kit', 'inventory.delete_kit',
+                'components.view_component', 'components.add_component', 'components.change_component', 'components.delete_component',
+                'organization.view_location', 'organization.add_location', 'organization.change_location', 'organization.delete_location',
+                'organization.view_site', 'organization.add_site', 'organization.change_site', 'organization.delete_site',
+                'organization.view_assetholder', 'organization.add_assetholder', 'organization.change_assetholder', 'organization.delete_assetholder',
+                'extras.view_dashboard', 'extras.add_dashboard', 'extras.change_dashboard', 'extras.delete_dashboard',
+            ]
+        )
+        self.role_member = TenantRole.objects.create(
+            tenant=self.tenant_a,
+            name='Standard Member',
+            permissions=[
+                'assets.view_asset', 'assets.add_asset', 'assets.change_asset',
+                'inventory.view_accessory', 'inventory.add_accessory', 'inventory.change_accessory',
+                'inventory.view_consumable', 'inventory.add_consumable', 'inventory.change_consumable',
+                'inventory.view_kit', 'inventory.add_kit', 'inventory.change_kit',
+                'components.view_component', 'components.add_component', 'components.change_component',
+                'organization.view_location', 'organization.add_location', 'organization.change_location',
+                'organization.view_site', 'organization.add_site', 'organization.change_site',
+                'organization.view_assetholder', 'organization.add_assetholder', 'organization.change_assetholder',
+                'extras.view_dashboard', 'extras.add_dashboard', 'extras.change_dashboard',
+            ]
+        )
+        self.role_reader = TenantRole.objects.create(
+            tenant=self.tenant_a,
+            name='Read-Only Viewer',
+            permissions=[
+                'assets.view_asset',
+                'inventory.view_accessory',
+                'inventory.view_consumable',
+                'inventory.view_kit',
+                'components.view_component',
+                'organization.view_location',
+                'organization.view_site',
+                'organization.view_assetholder',
+                'extras.view_dashboard',
+            ]
+        )
 
     def test_tenant_membership_creation_and_string_representation(self):
-        from organization.models import TenantMembership, TenantRole
+        from organization.models import TenantMembership
         membership = TenantMembership.objects.create(
             user=self.user,
             tenant=self.tenant_a,
-            role=TenantRole.MEMBER
+            role=self.role_member
         )
         self.assertEqual(str(membership), "staffuser is Standard Member at Tenant A")
-        self.assertEqual(membership.role, TenantRole.MEMBER)
+        self.assertEqual(membership.role, self.role_member)
 
     def test_invitation_acceptance_and_assetholder_linking(self):
-        from organization.models import TenantInvitation, TenantRole, TenantMembership
+        from organization.models import TenantInvitation, TenantMembership
         from django.utils import timezone
         
         holder = AssetHolder.objects.create(
@@ -124,7 +170,7 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
         invitation = TenantInvitation.objects.create(
             email="beate@example.com",
             tenant=self.tenant_a,
-            role=TenantRole.ADMIN,
+            role=self.role_admin,
             expires_at=timezone.now() + timezone.timedelta(days=7)
         )
         self.assertTrue(invitation.is_valid)
@@ -137,7 +183,7 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
         accept_invitation(invitation, invitee_user)
         
         membership = TenantMembership.objects.get(user=invitee_user, tenant=self.tenant_a)
-        self.assertEqual(membership.role, TenantRole.ADMIN)
+        self.assertEqual(membership.role, self.role_admin)
         
         invitation.refresh_from_db()
         self.assertFalse(invitation.is_valid)
@@ -147,27 +193,27 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
         self.assertEqual(holder.user, invitee_user)
 
     def test_tenant_membership_backend_permissions(self):
-        from organization.models import TenantMembership, TenantRole
+        from organization.models import TenantMembership
         from core.managers import set_current_membership
         
         reader_mem = TenantMembership.objects.create(
             user=self.user,
             tenant=self.tenant_a,
-            role=TenantRole.READER
+            role=self.role_reader
         )
         
         set_current_membership(reader_mem)
         self.assertTrue(self.user.has_perm('assets.view_asset'))
         self.assertFalse(self.user.has_perm('assets.add_asset'))
         
-        reader_mem.role = TenantRole.MEMBER
+        reader_mem.role = self.role_member
         reader_mem.save()
         set_current_membership(reader_mem)
         self.assertTrue(self.user.has_perm('assets.view_asset'))
         self.assertTrue(self.user.has_perm('assets.add_asset'))
         self.assertFalse(self.user.has_perm('assets.delete_asset'))
         
-        reader_mem.role = TenantRole.ADMIN
+        reader_mem.role = self.role_admin
         reader_mem.save()
         set_current_membership(reader_mem)
         self.assertTrue(self.user.has_perm('assets.view_asset'))
@@ -177,7 +223,7 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
         set_current_membership(None)
 
     def test_tenant_switching_middleware(self):
-        from organization.models import TenantMembership, TenantRole
+        from organization.models import TenantMembership
         from django.contrib.sessions.middleware import SessionMiddleware
         from itambox.middleware import TenantMiddleware
         from django.test import RequestFactory
@@ -185,7 +231,7 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
         TenantMembership.objects.create(
             user=self.user,
             tenant=self.tenant_a,
-            role=TenantRole.MEMBER
+            role=self.role_member
         )
         
         factory = RequestFactory()

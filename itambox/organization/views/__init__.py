@@ -30,4 +30,7 @@ from .contactrole_views import (
     ContactRoleBulkEditView, ContactRoleBulkDeleteView,
 )
 from .invitation_views import InviteUserView, AcceptInvitationView
+from .tenantrole_views import (
+    TenantRoleListView, TenantRoleDetailView, TenantRoleEditView, TenantRoleDeleteView,
+)
 

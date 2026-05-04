@@ -22,6 +22,7 @@ ORGANIZATION_MENU = Menu(
             items=(
                 get_model_item('organization', 'tenant', _('Tenants')),
                 get_model_item('organization', 'tenantgroup', _('Tenant Groups')),
+                get_model_item('organization', 'tenantrole', _('Roles')),
                 get_model_item('organization', 'assetholder', _('Asset Holders')),
             ),
         ),
@@ -385,24 +386,6 @@ ADMIN_MENU = Menu(
                     permissions=(),
                     staff_only=True,
                     buttons=(),
-                ),
-            ),
-        ),
-        MenuGroup(
-            label=_('Access Control'),
-            items=(
-                MenuItem(
-                    link='permissiongroup_list',
-                    link_text=_('Permission Groups'),
-                    permissions=['core.view_permissiongroup'],
-                    buttons=(
-                        MenuItemButton(
-                            link='permissiongroup_add',
-                            title='Add',
-                            icon_class='mdi mdi-plus-thick',
-                            permissions=['core.add_permissiongroup'],
-                        ),
-                    ),
                 ),
             ),
         ),

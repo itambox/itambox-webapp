@@ -356,10 +356,26 @@ import uuid
 from django.utils import timezone
 from django.db import transaction
 
-class TenantRole(models.TextChoices):
-    ADMIN = 'admin', 'Administrator'
-    MEMBER = 'member', 'Standard Member'
-    READER = 'reader', 'Read-Only Viewer'
+class TenantRole(StandardModel):
+    objects = TenantScopingManager()
+
+    tenant = models.ForeignKey(
+        'organization.Tenant',
+        on_delete=models.CASCADE,
+        related_name='custom_roles'
+    )
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    permissions = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        unique_together = ('tenant', 'name')
+        ordering = ['name']
+        verbose_name = "Tenant Role"
+        verbose_name_plural = "Tenant Roles"
+
+    def __str__(self):
+        return f"{self.name} ({self.tenant.name})"
 
 
 class TenantMembership(models.Model):
@@ -373,10 +389,10 @@ class TenantMembership(models.Model):
         on_delete=models.CASCADE,
         related_name='memberships'
     )
-    role = models.CharField(
-        max_length=50,
-        choices=TenantRole.choices,
-        default=TenantRole.MEMBER
+    role = models.ForeignKey(
+        'organization.TenantRole',
+        on_delete=models.PROTECT,
+        related_name='memberships'
     )
     joined_at = models.DateTimeField(auto_now_add=True)
 
@@ -386,13 +402,17 @@ class TenantMembership(models.Model):
         verbose_name_plural = _("Tenant Memberships")
 
     def __str__(self):
-        return f"{self.user.username} is {self.get_role_display()} at {self.tenant.name}"
+        return f"{self.user.username} is {self.role.name} at {self.tenant.name}"
 
 
 class TenantInvitation(models.Model):
     email = models.EmailField()
     tenant = models.ForeignKey('organization.Tenant', on_delete=models.CASCADE)
-    role = models.CharField(max_length=50, choices=TenantRole.choices, default=TenantRole.MEMBER)
+    role = models.ForeignKey(
+        'organization.TenantRole',
+        on_delete=models.CASCADE,
+        related_name='invitations'
+    )
     token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     invited_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -1,7 +1,7 @@
 # itambox/organization/tables.py
 import django_tables2 as tables
 from django_tables2.utils import A
-from .models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, Contact, ContactRole, ContactAssignment
+from .models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, Contact, ContactRole, ContactAssignment, TenantRole
 from core.tables import ActionsColumn, BaseTable, ToggleColumn
 from extras.tables import TagColumn
 
@@ -224,4 +224,17 @@ class ContactAssignmentTable(BaseTable):
 
     def render_assigned_object_type(self, record):
         return record.content_type.model_class()._meta.verbose_name.title()
+
+
+class TenantRoleTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    name = tables.LinkColumn('organization:tenantrole_detail', args=[A('pk')], verbose_name='Name')
+    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant')
+    description = tables.Column()
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = TenantRole
+        fields = ('pk', 'name', 'tenant', 'description', 'actions')
+        default_columns = ('pk', 'name', 'tenant', 'description', 'actions')
  
