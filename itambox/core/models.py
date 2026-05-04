@@ -22,6 +22,7 @@ from core.mixins import (
     SoftDeleteMixin
 )
 from core.utils import serialize_object
+from core.validators import validate_image_attachment, validate_file_attachment
 
 
 class BaseModel(models.Model):
@@ -344,7 +345,7 @@ class ImageAttachment(ChangeLoggingMixin, BaseModel):
     model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='image_attachments')
     object_id = models.PositiveBigIntegerField(db_index=True)
     content_object = GenericForeignKey('model', 'object_id')
-    image = models.ImageField(upload_to='attachments/images/')
+    image = models.ImageField(upload_to='attachments/images/', validators=[validate_image_attachment])
     name = models.CharField(max_length=255, blank=True)
     created = models.DateTimeField(auto_now_add=True)
 
@@ -364,7 +365,7 @@ class FileAttachment(ChangeLoggingMixin, BaseModel):
     model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='file_attachments')
     object_id = models.PositiveBigIntegerField(db_index=True)
     content_object = GenericForeignKey('model', 'object_id')
-    file = models.FileField(upload_to='attachments/files/')
+    file = models.FileField(upload_to='attachments/files/', validators=[validate_file_attachment])
     name = models.CharField(max_length=255, blank=True)
     mime_type = models.CharField(max_length=100, blank=True)
     created = models.DateTimeField(auto_now_add=True)

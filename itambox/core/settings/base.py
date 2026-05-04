@@ -65,6 +65,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'itambox.middleware.RateLimitMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -242,6 +243,9 @@ SEARCH_BACKEND = 'core.search_backends.DatabaseBackend'
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
+
+# Suppress djangosaml2 django-csp warnings since we manage CSP headers manually
+SAML_CSP_HANDLER = ''
 
 AUTHENTICATION_BACKENDS = [
     'core.auth.TenantMembershipBackend',

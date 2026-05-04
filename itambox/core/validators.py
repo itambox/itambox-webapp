@@ -92,3 +92,41 @@ def parse_json_rules(instance, rules):
 
     if errors:
         raise ValidationError(errors)
+
+
+def validate_file_attachment(file):
+    import os
+    # 1. Size Validation (10 MB limit)
+    max_size = 10 * 1024 * 1024
+    if file.size > max_size:
+        raise ValidationError(_("File size must not exceed 10 MB."))
+
+    # 2. Extension Validation (blacklist dangerous extensions)
+    ext = os.path.splitext(file.name)[1].lower()
+    dangerous_extensions = {
+        '.exe', '.dll', '.bat', '.cmd', '.sh', '.bash', '.php', '.pl', '.py',
+        '.cgi', '.asp', '.aspx', '.jsp', '.vbs', '.scr', '.pif', '.app',
+        '.msi', '.com', '.htm', '.html', '.xml', '.svg'
+    }
+    if ext in dangerous_extensions:
+        raise ValidationError(
+            _("Files with extension '%(ext)s' are not allowed for security reasons."),
+            params={'ext': ext}
+        )
+
+
+def validate_image_attachment(file):
+    import os
+    # 1. Size Validation (5 MB limit)
+    max_size = 5 * 1024 * 1024
+    if file.size > max_size:
+        raise ValidationError(_("Image size must not exceed 5 MB."))
+
+    # 2. Extension Validation (whitelist safe image extensions)
+    ext = os.path.splitext(file.name)[1].lower()
+    allowed_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'}
+    if ext not in allowed_extensions:
+        raise ValidationError(
+            _("Image format '%(ext)s' is not supported. Please upload a PNG, JPG, JPEG, GIF, BMP, or WebP image."),
+            params={'ext': ext}
+        )
