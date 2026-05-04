@@ -21,6 +21,7 @@ dependencies = [
     "segno>=1.6,<2.0",
     "python-barcode>=0.15,<1.0",
     "django-q2>=1.7,<2.0",
+    "sqlparse>=0.5.4,<0.6.0",
 ]
 
 [project.optional-dependencies]
