@@ -513,7 +513,12 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
         elif active_tenant:
             assets_qs = assets_qs.filter(tenant=active_tenant)
             
-        assets_qs = assets_qs.select_related('asset_type', 'asset_type__manufacturer', 'status').prefetch_related('assignments', 'assignments__assigned_to')
+        assets_qs = assets_qs.select_related('asset_type', 'asset_type__manufacturer', 'status').prefetch_related(
+            'assignments',
+            'assignments__assigned_user',
+            'assignments__assigned_location',
+            'assignments__assigned_asset'
+        )
         
         total_assets = assets_qs.count()
         acquisition_sum = sum(asset.purchase_cost for asset in assets_qs if asset.purchase_cost)
