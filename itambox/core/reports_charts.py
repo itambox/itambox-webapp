@@ -461,6 +461,10 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
             active_cols = ['license_name', 'software', 'seats', 'assigned_seats', 'available_seats', 'utilization_rate']
         elif template.report_type == 'asset_maintenance':
             active_cols = ['maintenance_title', 'maintenance_asset', 'maintenance_type', 'maintenance_status', 'maintenance_cost']
+        elif template.report_type == 'asset_depreciation':
+            active_cols = ['asset_tag', 'name', 'purchase_cost', 'salvage_value', 'depreciation_months', 'current_value']
+        elif template.report_type == 'software_inventory':
+            active_cols = ['software_name', 'manufacturer', 'version', 'category', 'license_type', 'installed_count', 'license_count']
         else:
             active_cols = ['subscription_name', 'provider', 'billing_cycle', 'cost', 'end_date']
 
@@ -499,7 +503,13 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
         'maintenance_cost': _('Cost'),
         'maintenance_start_date': _('Start Date'),
         'maintenance_completion_date': _('Completion Date'),
-        'maintenance_downtime': _('Downtime (Days)')
+        'maintenance_downtime': _('Downtime (Days)'),
+        'salvage_value': _('Salvage Value'),
+        'depreciation_months': _('Depreciation Lifespan (Months)'),
+        'current_value': _('Depreciated Value'),
+        'software_name': _('Software Product'),
+        'installed_count': _('Installed Count'),
+        'license_count': _('License Count')
     }
     
     headers = [headers_map[col] for col in active_cols if col in headers_map]
@@ -855,6 +865,168 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
         chart_data = [{'label': k, 'value': v} for k, v in type_counts.items()]
         if template.include_distribution_chart:
             chart_svg = generate_doughnut_chart(chart_data, title=_("Maintenance Type Distribution"))
+
+    elif template.report_type == ReportTemplate.REPORT_TYPE_ASSET_DEPRECIATION:
+        from assets.models import Asset
+        
+        assets_qs = Asset.objects.filter(deleted_at__isnull=True)
+        if filter_tenants:
+            assets_qs = assets_qs.filter(tenant__in=filter_tenants)
+        elif active_tenant:
+            assets_qs = assets_qs.filter(tenant=active_tenant)
+            
+        assets_qs = assets_qs.select_related('asset_type', 'asset_type__depreciation', 'status')
+        
+        total_assets = assets_qs.count()
+        total_purchase_cost = sum(asset.purchase_cost for asset in assets_qs if asset.purchase_cost) or 0
+        total_current_value = sum(asset.current_value for asset in assets_qs if asset.current_value is not None) or 0
+        
+        if template.include_summary_cards:
+            summary_cards = [
+                {'label': _('Total Depreciable Assets'), 'value': str(total_assets)},
+                {'label': _('Total Acquisition Cost'), 'value': f"${total_purchase_cost:,.2f}"},
+                {'label': _('Total Current Book Value'), 'value': f"${total_current_value:,.2f}"}
+            ]
+            
+        for asset in assets_qs[:500]:
+            row = {}
+            if 'asset_tag' in active_cols:
+                row[_('Asset Tag')] = asset.asset_tag or '-'
+            if 'name' in active_cols:
+                row[_('Asset Name')] = asset.name or '-'
+            if 'purchase_cost' in active_cols:
+                row[_('Purchase Cost')] = f"${asset.purchase_cost:,.2f}" if asset.purchase_cost else '-'
+            if 'salvage_value' in active_cols:
+                row[_('Salvage Value')] = f"${asset.salvage_value:,.2f}" if asset.salvage_value else '-'
+            if 'depreciation_months' in active_cols:
+                months = asset.asset_type.depreciation.months if (asset.asset_type and asset.asset_type.depreciation) else None
+                row[_('Depreciation Lifespan (Months)')] = str(months) if months else '-'
+            if 'current_value' in active_cols:
+                val = asset.current_value
+                row[_('Depreciated Value')] = f"${val:,.2f}" if val is not None else '-'
+                
+            group_val = 'General'
+            if template.group_by_field:
+                if template.group_by_field == 'status':
+                    group_val = asset.status.name if asset.status else _('Default')
+                elif template.group_by_field == 'depreciation':
+                    deprec = asset.asset_type.depreciation if asset.asset_type else None
+                    group_val = deprec.name if deprec else _('No Scheme')
+            row['_group_by'] = group_val
+            rows.append(row)
+            
+        if not rows:
+            row = {}
+            for col in active_cols:
+                if col == 'asset_tag':
+                    row[_('Asset Tag')] = 'AST-MOCK-001'
+                elif col == 'name':
+                    row[_('Asset Name')] = 'Developer Workstation (Mock)'
+                elif col == 'purchase_cost':
+                    row[_('Purchase Cost')] = '$2,500.00'
+                elif col == 'salvage_value':
+                    row[_('Salvage Value')] = '$200.00'
+                elif col == 'depreciation_months':
+                    row[_('Depreciation Lifespan (Months)')] = '36'
+                elif col == 'current_value':
+                    row[_('Depreciated Value')] = '$1,450.00'
+            row['_group_by'] = 'General'
+            rows.append(row)
+            if template.include_summary_cards:
+                summary_cards = [
+                    {'label': _('Total Depreciable Assets'), 'value': '1 (Mock)'},
+                    {'label': _('Total Acquisition Cost'), 'value': '$2,500.00'},
+                    {'label': _('Total Current Book Value'), 'value': '$1,450.00'}
+                ]
+        
+        # Build depreciation stats for chart
+        deprec_data = []
+        if total_purchase_cost > 0:
+            deprec_data = [
+                {'label': _('Depreciated Book Value'), 'value': float(total_current_value)},
+                {'label': _('Depreciated Amount'), 'value': max(float(total_purchase_cost - total_current_value), 0.0)}
+            ]
+        else:
+            deprec_data = [
+                {'label': _('Depreciated Book Value'), 'value': 1450.0},
+                {'label': _('Depreciated Amount'), 'value': 1050.0}
+            ]
+        if template.include_distribution_chart:
+            chart_svg = generate_doughnut_chart(deprec_data, title=_("Asset Value Depreciation"))
+
+    elif template.report_type == ReportTemplate.REPORT_TYPE_SOFTWARE_INVENTORY:
+        from software.models import Software
+        
+        software_qs = Software.objects.all().select_related('manufacturer')
+        
+        total_software = software_qs.count()
+        
+        if template.include_summary_cards:
+            summary_cards = [
+                {'label': _('Total Software Products'), 'value': str(total_software)},
+            ]
+            
+        category_counts = {}
+        for soft in software_qs[:500]:
+            row = {}
+            installed = soft.installed_count
+            licenses = soft.license_count
+            
+            if 'software_name' in active_cols:
+                row[_('Software Product')] = soft.name or '-'
+            if 'manufacturer' in active_cols:
+                row[_('Manufacturer')] = soft.manufacturer.name if soft.manufacturer else '-'
+            if 'version' in active_cols:
+                row[_('Version')] = soft.version or '-'
+            if 'category' in active_cols:
+                row[_('Category')] = soft.get_category_display() if soft.category else '-'
+            if 'license_type' in active_cols:
+                row[_('License Type')] = soft.get_license_type_display() if soft.license_type else '-'
+            if 'installed_count' in active_cols:
+                row[_('Installed Count')] = str(installed)
+            if 'license_count' in active_cols:
+                row[_('License Count')] = str(licenses)
+                
+            group_val = 'General'
+            if template.group_by_field:
+                if template.group_by_field == 'category':
+                    group_val = soft.get_category_display() if soft.category else _('Other')
+                elif template.group_by_field == 'manufacturer':
+                    group_val = soft.manufacturer.name if soft.manufacturer else _('Generic')
+            row['_group_by'] = group_val
+            rows.append(row)
+            
+            cat_name = soft.get_category_display() if soft.category else _('Other')
+            category_counts[cat_name] = category_counts.get(cat_name, 0) + 1
+            
+        if not rows:
+            row = {}
+            for col in active_cols:
+                if col == 'software_name':
+                    row[_('Software Product')] = 'Office 365 E5 (Mock)'
+                elif col == 'manufacturer':
+                    row[_('Manufacturer')] = 'Microsoft'
+                elif col == 'version':
+                    row[_('Version')] = '16.0'
+                elif col == 'category':
+                    row[_('Category')] = 'Productivity'
+                elif col == 'license_type':
+                    row[_('License Type')] = 'Subscription'
+                elif col == 'installed_count':
+                    row[_('Installed Count')] = '25'
+                elif col == 'license_count':
+                    row[_('License Count')] = '30'
+            row['_group_by'] = 'Productivity' if template.group_by_field == 'category' else 'Microsoft' if template.group_by_field == 'manufacturer' else 'General'
+            rows.append(row)
+            if template.include_summary_cards:
+                summary_cards = [
+                    {'label': _('Total Software Products'), 'value': '1 (Mock)'}
+                ]
+            category_counts = {'Productivity': 1}
+            
+        chart_data = [{'label': k, 'value': v} for k, v in category_counts.items()]
+        if template.include_distribution_chart:
+            chart_svg = generate_doughnut_chart(chart_data, title=_("Software Category Distribution"))
 
     # Group rows
     grouped_data = {}

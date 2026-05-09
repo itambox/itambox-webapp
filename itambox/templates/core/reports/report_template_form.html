@@ -73,6 +73,12 @@
                 selectedCols = ['asset_tag', 'name', 'status', 'location', 'assigned_to'];
             } else if (reportType === 'license_utilization') {
                 selectedCols = ['license_name', 'software', 'seats', 'assigned_seats', 'available_seats', 'utilization_rate'];
+            } else if (reportType === 'asset_maintenance') {
+                selectedCols = ['maintenance_title', 'maintenance_asset', 'maintenance_type', 'maintenance_status', 'maintenance_cost'];
+            } else if (reportType === 'asset_depreciation') {
+                selectedCols = ['asset_tag', 'name', 'purchase_cost', 'salvage_value', 'depreciation_months', 'current_value'];
+            } else if (reportType === 'software_inventory') {
+                selectedCols = ['software_name', 'manufacturer', 'version', 'category', 'license_type', 'installed_count', 'license_count'];
             } else {
                 selectedCols = ['subscription_name', 'provider', 'billing_cycle', 'cost', 'end_date'];
             }
@@ -101,7 +107,18 @@
             'provider': 'Provider',
             'billing_cycle': 'Billing Cycle',
             'cost': 'Cost',
-            'end_date': 'End Date'
+            'end_date': 'End Date',
+            'salvage_value': 'Salvage Value',
+            'depreciation_months': 'Depreciation Lifespan (Months)',
+            'current_value': 'Depreciated Value',
+            'software_name': 'Software Product',
+            'installed_count': 'Installed Count',
+            'license_count': 'License Count',
+            'maintenance_title': 'Maintenance Title',
+            'maintenance_asset': 'Asset',
+            'maintenance_type': 'Type',
+            'maintenance_status': 'Status',
+            'maintenance_cost': 'Cost'
         };
         
         var headers = selectedCols.map(col => headersMap[col] || col);
@@ -410,6 +427,12 @@
                         'maintenance_title', 'maintenance_asset', 'maintenance_type',
                         'maintenance_status', 'maintenance_cost', 'maintenance_start_date',
                         'maintenance_completion_date', 'maintenance_downtime'
+                    ],
+                    'asset_depreciation': [
+                        'asset_tag', 'name', 'purchase_cost', 'salvage_value', 'depreciation_months', 'current_value'
+                    ],
+                    'software_inventory': [
+                        'software_name', 'manufacturer', 'version', 'category', 'license_type', 'installed_count', 'license_count'
                     ]
                 };
                 

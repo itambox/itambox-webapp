@@ -132,3 +132,72 @@ class ScheduledReportingAndAlertsTests(TestCase):
         
         # Verify webhook was called
         mock_post.assert_called_once()
+
+    def test_report_preview_compilation_and_view(self):
+        """Test report template context compilation and preview endpoint rendering without ValueError."""
+        # Create some sample assets to exercise the asset summary report compilation path
+        from assets.models import Asset, StatusLabel
+        from organization.models import Site, Location
+        
+        status, _ = StatusLabel.objects.get_or_create(name='Available', defaults={'type': StatusLabel.TYPE_DEPLOYABLE})
+        site = Site.objects.create(name='Office HQ Site', slug='office-hq-site')
+        loc = Location.objects.create(name='Office HQ', slug='office-hq', site=site)
+        
+        asset = Asset.objects.create(
+            asset_tag='AST-1001',
+            name='Developer Laptop',
+            status=status,
+            purchase_cost=1200.00
+        )
+        
+        # Test direct compilation of context
+        from core.reports_charts import compile_report_context
+        headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(self.template)
+        
+        self.assertIn('Total Hardware Assets', [c['label'] for c in summary_cards])
+        self.assertIn('$1,200.00', [c['value'] for c in summary_cards])
+        
+        # Test preview view POST endpoint
+        self.client.force_login(self.user)
+        url = reverse('reporttemplate_preview')
+        data = {
+            'report_type': self.template.report_type,
+            'name': self.template.name,
+            'included_columns': self.template.included_columns,
+            'include_summary_cards': 'true',
+            'include_distribution_chart': 'true',
+            'advanced_mode': 'false',
+        }
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Asset Inventory Test Report', response.content)
+
+    def test_new_report_types_compilation(self):
+        """Test that the new report types compile context and preview successfully."""
+        from core.reports_charts import compile_report_context
+        
+        # 1. Test asset_depreciation
+        deprec_template = ReportTemplate.objects.create(
+            name='Depreciation Report',
+            report_type=ReportTemplate.REPORT_TYPE_ASSET_DEPRECIATION,
+            included_columns=['asset_tag', 'name', 'purchase_cost', 'salvage_value', 'depreciation_months', 'current_value'],
+            include_summary_cards=True,
+            include_distribution_chart=True
+        )
+        headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(deprec_template)
+        self.assertIn('Total Depreciable Assets', [c['label'] for c in summary_cards])
+        self.assertIsNotNone(chart_svg)
+        
+        # 2. Test software_inventory
+        software_template = ReportTemplate.objects.create(
+            name='Software Report',
+            report_type=ReportTemplate.REPORT_TYPE_SOFTWARE_INVENTORY,
+            included_columns=['software_name', 'manufacturer', 'version', 'category', 'license_type', 'installed_count', 'license_count'],
+            include_summary_cards=True,
+            include_distribution_chart=True
+        )
+        headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(software_template)
+        self.assertIn('Total Software Products', [c['label'] for c in summary_cards])
+        self.assertIsNotNone(chart_svg)
+
+

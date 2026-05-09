@@ -741,12 +741,16 @@ class ReportTemplate(ChangeLoggingMixin, BaseModel):
     REPORT_TYPE_LICENSE_UTILIZATION = 'license_utilization'
     REPORT_TYPE_SUBSCRIPTION_RENEWALS = 'subscription_renewals'
     REPORT_TYPE_ASSET_MAINTENANCE = 'asset_maintenance'
+    REPORT_TYPE_ASSET_DEPRECIATION = 'asset_depreciation'
+    REPORT_TYPE_SOFTWARE_INVENTORY = 'software_inventory'
 
     REPORT_TYPE_CHOICES = [
         (REPORT_TYPE_ASSET_SUMMARY, 'Asset Inventory Summary'),
         (REPORT_TYPE_LICENSE_UTILIZATION, 'License Utilization'),
         (REPORT_TYPE_SUBSCRIPTION_RENEWALS, 'Subscription Renewals'),
         (REPORT_TYPE_ASSET_MAINTENANCE, 'Asset Maintenance & Repairs'),
+        (REPORT_TYPE_ASSET_DEPRECIATION, 'Asset Depreciation Summary'),
+        (REPORT_TYPE_SOFTWARE_INVENTORY, 'Software Catalog & Installations'),
     ]
 
     name = models.CharField(max_length=255, unique=True)
