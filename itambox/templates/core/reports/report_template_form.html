@@ -255,64 +255,64 @@
             color: #64748b;
             border-top: 1px solid #e2e8f0;
         }
-    </style>
-</head>
+    <\/style>
+<\/head>
 <body>
     <div class="container">
         <div class="header">
-            <h2>{{ report_name }}</h2>
-            <p>{{ description|default:"${description}" }}</p>
-        </div>
+            <h2>{{ report_name }}<\/h2>
+            <p>{{ description|default:"${description}" }}<\/p>
+        <\/div>
         <div class="content">
             <div class="meta">
                 GENERATED: {{ generated_at|date:"Y-m-d H:i:s" }} UTC | STYLE: ${stylePreset.toUpperCase()}
-            </div>
+            <\/div>
             
             ${includeSummary ? `
             {% if summary_cards %}
             <div class="metrics">
                 {% for card in summary_cards %}
                 <div class="metric-card">
-                    <div class="label">{{ card.label }}</div>
-                    <div class="value">{{ card.value }}</div>
-                </div>
+                    <div class="label">{{ card.label }}<\/div>
+                    <div class="value">{{ card.value }}<\/div>
+                <\/div>
                 {% endfor %}
-            </div>
+            <\/div>
             {% endif %}
             ` : ''}
             
             {% for group_name, group_rows in grouped_data.items %}
                 {% if group_name != 'General' %}
-                <div class="group-title">{{ group_name }}</div>
+                <div class="group-title">{{ group_name }}<\/div>
                 {% endif %}
                 <table>
                     <thead>
                         <tr>
-                            ${headers.map(h => `<th>${h}</th>`).join('\n                            ')}
-                        </tr>
-                    </thead>
+                            ${headers.map(h => `<th>${h}<\/th>`).join('\n                            ')}
+                        <\/tr>
+                    <\/thead>
                     <tbody>
                         {% for row in group_rows %}
                         <tr>
-                            ${selectedCols.map(col => `<td>{{ row|lookup:"${headersMap[col]}" }}</td>`).join('\n                            ')}
-                        </tr>
+                            ${selectedCols.map(col => `<td>{{ row|lookup:"${headersMap[col]}" }}<\/td>`).join('\n                            ')}
+                        <\/tr>
                         {% empty %}
                         <tr>
                             <td colspan="${headers.length}" style="text-align: center; color: #64748b; padding: 20px;">
                                 No records found.
-                            </td>
-                        </tr>
+                            <\/td>
+                        <\/tr>
                         {% endfor %}
-                    </tbody>
-                </table>
+                    <\/tbody>
+                <\/table>
             {% endfor %}
-        </div>
+        <\/div>
         <div class="footer">
             Sent automatically by ITAMbox — IT Asset Management Console.
-        </div>
-    </div>
-</body>
-</html>`;
+        <\/div>
+    <\/div>
+<\/body>
+<\/html>`;
         {% endverbatim %}
         return template;
     }
