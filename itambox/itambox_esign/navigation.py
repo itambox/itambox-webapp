@@ -1,7 +1,7 @@
 from itambox.plugins.navigation import PluginNavigationMenu, PluginNavigationItem
 
 class EsignNavigationItem(PluginNavigationItem):
-    link = 'dashboard'
+    link = 'plugins:itambox_esign:dashboard'
     link_text = 'DocuSign Envelopes'
 
 class EsignGroup:

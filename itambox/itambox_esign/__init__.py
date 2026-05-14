@@ -3,10 +3,20 @@ from itambox.plugins import PluginConfig
 class EsignPluginConfig(PluginConfig):
     name = 'itambox_esign'
     verbose_name = 'DocuSign Integration'
-    required_settings = ['DOCUSIGN_API_KEY']
+    version = '1.0.0'
+    author = 'DocuSign Dev Team'
+    author_email = 'dev@docusign.com'
+    min_version = '1.0.0-alpha'
+    graphql_schema = 'itambox_esign.graphql.schema'
+    required_settings = [
+        'DOCUSIGN_INTEGRATION_KEY',
+        'DOCUSIGN_USER_ID',
+        'DOCUSIGN_ACCOUNT_ID',
+        'DOCUSIGN_RSA_PRIVATE_KEY',
+    ]
     default_settings = {
-        'DOCUSIGN_API_KEY': None,
         'DOCUSIGN_SANDBOX': True,
+        'DOCUSIGN_BASE_URL': 'https://demo.docusign.net/restapi',
     }
 
     def ready(self):

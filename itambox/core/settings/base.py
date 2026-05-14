@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'graphene_django',
     'assets',
     'components',
     'inventory',
@@ -61,6 +62,7 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'users',
     'django_q',
+    'mozilla_django_oidc',
 ]
 
 MIDDLEWARE = [
@@ -142,6 +144,9 @@ DATABASES = {
         'OPTIONS': {
             'sslmode': os.environ.get('ITAMBOX_DB_SSLMODE', 'prefer'),
         },
+        'TEST': {
+            'NAME': 'oidc_test_db',
+        },
     }
 }
 
@@ -205,6 +210,10 @@ REST_FRAMEWORK = {
     'VIEW_NAME_FUNCTION': 'itambox.api.utils.get_view_name',
 }
 
+GRAPHENE = {
+    'SCHEMA': 'core.schema.schema',
+}
+
 SPECTACULAR_SETTINGS = {
     'TITLE': 'ITAMbox API',
     'DESCRIPTION': 'IT Asset Management API',
@@ -251,6 +260,7 @@ AUTHENTICATION_BACKENDS = [
     'core.auth.TenantMembershipBackend',
     'core.auth.ldap.MultiTenantLDAPBackend',
     'djangosaml2.backends.Saml2Backend',
+    'core.auth.oidc.TenantOIDCBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
 
@@ -265,6 +275,7 @@ PAGINATE_COUNT_CHOICES = (
 )
 
 import json
+import logging
 try:
     ITAMBOX_TENANT_LDAP_CONFIGS = json.loads(os.environ.get('ITAMBOX_TENANT_LDAP_CONFIGS', '{}'))
 except Exception:
@@ -274,6 +285,12 @@ try:
     ITAMBOX_TENANT_SAML_CONFIGS = json.loads(os.environ.get('ITAMBOX_TENANT_SAML_CONFIGS', '{}'))
 except Exception:
     ITAMBOX_TENANT_SAML_CONFIGS = {}
+
+try:
+    ITAMBOX_TENANT_OIDC_CONFIGS = json.loads(os.environ.get('ITAMBOX_TENANT_OIDC_CONFIGS', '{}'))
+except Exception as e:
+    logging.getLogger(__name__).warning('Failed to parse ITAMBOX_TENANT_OIDC_CONFIGS: %s', e)
+    ITAMBOX_TENANT_OIDC_CONFIGS = {}
 
 # SAML SSO Configuration Loader
 SAML_CONFIG_LOADER = 'core.auth.saml.load_saml_config'
@@ -318,7 +335,10 @@ PLUGINS = [
 ]
 PLUGINS_CONFIG = {
     'itambox_esign': {
-        'DOCUSIGN_API_KEY': 'mock-docusign-api-key',
+        'DOCUSIGN_INTEGRATION_KEY': 'mock-integration-key-guid',
+        'DOCUSIGN_USER_ID': 'mock-user-id-guid',
+        'DOCUSIGN_ACCOUNT_ID': 'mock-account-id-guid',
+        'DOCUSIGN_RSA_PRIVATE_KEY': '-----BEGIN RSA PRIVATE KEY-----\nMockKey\n-----END RSA PRIVATE KEY-----',
         'DOCUSIGN_SANDBOX': True,
     }
 }
