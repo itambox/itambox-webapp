@@ -25,6 +25,11 @@ class Registry:
         self._counter_fields = {}
         self._denormalized_fields = defaultdict(list)
         self._lazy_handlers = []
+        # Plugin registries
+        self._plugin_template_contents = defaultdict(list)
+        self._plugin_menus = []
+        self._plugin_menu_items = []
+        self._plugin_viewsets = defaultdict(list)
 
     def defer_init(self, callback):
         self._lazy_handlers.append(callback)
@@ -126,6 +131,30 @@ class Registry:
             'source_path': source_path,
         })
 
+    def register_plugin_template_content(self, model, content_class):
+        self._plugin_template_contents[model].append(content_class)
+
+    def get_plugin_template_contents(self, model):
+        return self._plugin_template_contents.get(model, [])
+
+    def register_plugin_menu(self, menu_cls):
+        self._plugin_menus.append(menu_cls)
+
+    def get_plugin_menus(self):
+        return self._plugin_menus
+
+    def register_plugin_menu_item(self, item_cls):
+        self._plugin_menu_items.append(item_cls)
+
+    def get_plugin_menu_items(self):
+        return self._plugin_menu_items
+
+    def register_plugin_viewset(self, plugin_name, prefix, viewset, basename=None):
+        self._plugin_viewsets[plugin_name].append((prefix, viewset, basename))
+
+    def get_plugin_viewsets(self):
+        return self._plugin_viewsets
+
     def clear(self):
         """Reset all registrations. Use only in tests."""
         self._model_features.clear()
@@ -137,6 +166,10 @@ class Registry:
         self._export_templates.clear()
         self._counter_fields.clear()
         self._denormalized_fields.clear()
+        self._plugin_template_contents.clear()
+        self._plugin_menus.clear()
+        self._plugin_menu_items.clear()
+        self._plugin_viewsets.clear()
 
 
 registry = Registry()

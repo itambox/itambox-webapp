@@ -2,6 +2,7 @@
 {% load i18n %}
 {% load render_table from django_tables2 %}
 {% load utility_tags %}
+{% load plugins %}
 
 {% block title %}{{ object }} - {{ title|default:"Detail View" }} {% translate "- ITAMbox" %}{% endblock %}
 
@@ -42,6 +43,7 @@
 
         {# --- Placeholder for Extra Actions (like Check In/Out) --- #}
         {% block extra_page_actions %}{% endblock %}
+        {% if object %}{% plugin_template_content object 'buttons' object %}{% endif %}
     </div>
 {% endblock %}
 
@@ -162,6 +164,7 @@
 
                 {# --- Placeholder for Extra Cards (Left Column) --- #}
                 {% block extra_cards_left %}{% endblock %}
+                {% if object %}{% plugin_template_content object 'left_panel' object %}{% endif %}
 
                 {# --- Full Width Content Block --- #}
                 <div class="row g-3 mt-2">
@@ -169,6 +172,7 @@
                         {% block full_width_content %}
                         {# Specific templates can add full-width cards/tables here #}
                         {% endblock full_width_content %}
+                        {% if object %}{% plugin_template_content object 'full_width_panel' object %}{% endif %}
                     </div>
                 </div>
             </div>
@@ -224,6 +228,7 @@
 
                 {# --- Placeholder for Extra Cards (Right Column) --- #}
                 {% block extra_cards_right %}{% endblock %}
+                {% if object %}{% plugin_template_content object 'right_panel' object %}{% endif %}
             </div>
         </div>
         {% endblock details_tab %}

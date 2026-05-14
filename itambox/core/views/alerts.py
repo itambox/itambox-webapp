@@ -3,7 +3,7 @@ from django.shortcuts import get_object_or_404, redirect
 from django.views.generic import View
 from django.contrib import messages
 from django.utils import timezone
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
 from django.urls import reverse
@@ -114,7 +114,18 @@ class AlertLogListView(ObjectListView):
 
 
 @method_decorator(login_required, name='dispatch')
-class AlertAcknowledgeView(LoginRequiredMixin, View):
+class AlertAcknowledgeView(PermissionRequiredMixin, LoginRequiredMixin, View):
+    permission_required = ('core.change_alertlog',)
+
+    def has_permission(self):
+        perms = self.get_permission_required()
+        obj = None
+        try:
+            obj = get_object_or_404(AlertLog, pk=self.kwargs.get('pk'))
+        except Exception:
+            pass
+        return self.request.user.has_perms(perms, obj=obj)
+
     def post(self, request, pk):
         alert = get_object_or_404(AlertLog, pk=pk)
         if alert.status == AlertLog.STATUS_ACTIVE:
@@ -125,7 +136,18 @@ class AlertAcknowledgeView(LoginRequiredMixin, View):
 
 
 @method_decorator(login_required, name='dispatch')
-class AlertResolveView(LoginRequiredMixin, View):
+class AlertResolveView(PermissionRequiredMixin, LoginRequiredMixin, View):
+    permission_required = ('core.change_alertlog',)
+
+    def has_permission(self):
+        perms = self.get_permission_required()
+        obj = None
+        try:
+            obj = get_object_or_404(AlertLog, pk=self.kwargs.get('pk'))
+        except Exception:
+            pass
+        return self.request.user.has_perms(perms, obj=obj)
+
     def post(self, request, pk):
         alert = get_object_or_404(AlertLog, pk=pk)
         if alert.status in [AlertLog.STATUS_ACTIVE, AlertLog.STATUS_ACKNOWLEDGED]:

@@ -310,3 +310,23 @@ if 'test' in sys.argv or any('test' in arg or 'pytest' in arg for arg in sys.arg
 ALLOW_GLOBAL_CUSTODY_TEMPLATES = os.environ.get('ITAMBOX_ALLOW_GLOBAL_CUSTODY_TEMPLATES', 'True') == 'True'
 
 
+# ==============================================================================
+# Plugins Configuration
+# ==============================================================================
+PLUGINS = [
+    'itambox_esign',
+]
+PLUGINS_CONFIG = {
+    'itambox_esign': {
+        'DOCUSIGN_API_KEY': 'mock-docusign-api-key',
+        'DOCUSIGN_SANDBOX': True,
+    }
+}
+
+# Load and validate plugins dynamically
+import sys
+from itambox.plugins.utils import load_plugins
+load_plugins(sys.modules[__name__])
+
+
+

@@ -186,10 +186,29 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         context['help_url'] = get_help_url(self, _model._meta.app_label, _model._meta.model_name)
         return context
 
-class ObjectDetailView(TenantScopingViewMixin, LoginRequiredMixin, BaseHTMXView, DetailView):
+class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, DetailView):
     template_name = 'generic/object_detail.html'
     detail_page_body_partial_name = "htmx/detail_page_wrapper.html"
     layout = None
+
+    def get_permission_required(self):
+        model = getattr(self, 'model', None)
+        if model is None and hasattr(self, 'queryset') and self.queryset is not None:
+            model = self.queryset.model
+        if model:
+            app_label = model._meta.app_label
+            model_name = model._meta.model_name
+            return (f'{app_label}.view_{model_name}',)
+        return ('',)
+
+    def has_permission(self):
+        perms = self.get_permission_required()
+        obj = None
+        try:
+            obj = self.get_object()
+        except Exception:
+            pass
+        return self.request.user.has_perms(perms, obj=obj)
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()

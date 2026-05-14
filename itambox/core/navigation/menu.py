@@ -395,7 +395,10 @@ ADMIN_MENU = Menu(
 
 @cache
 def get_menus():
-    return [
+    from itambox.registry import registry
+    from . import Menu, MenuGroup, MenuItem, MenuItemButton
+
+    menus = [
         ORGANIZATION_MENU,
         ASSETS_MENU,
         INVENTORY_MENU,
@@ -404,3 +407,102 @@ def get_menus():
         EXTRAS_MENU,
         ADMIN_MENU,
     ]
+
+    # Dynamically append registered PluginNavigationMenu classes
+    for menu_cls in registry.get_plugin_menus():
+        if isinstance(menu_cls, type):
+            menu_instance = menu_cls()
+        else:
+            menu_instance = menu_cls
+
+        groups = []
+        for group in getattr(menu_instance, 'groups', []):
+            items = []
+            for item in getattr(group, 'items', []):
+                if isinstance(item, type):
+                    item_inst = item()
+                else:
+                    item_inst = item
+
+                buttons = []
+                for btn in getattr(item_inst, 'buttons', []):
+                    if isinstance(btn, type):
+                        btn_inst = btn()
+                    else:
+                        btn_inst = btn
+                    buttons.append(MenuItemButton(
+                        link=getattr(btn_inst, 'link', None),
+                        title=getattr(btn_inst, 'title', None),
+                        icon_class=getattr(btn_inst, 'icon_class', None),
+                        permissions=getattr(btn_inst, 'permissions', ()),
+                        color=getattr(btn_inst, 'color', None),
+                    ))
+
+                items.append(MenuItem(
+                    link=getattr(item_inst, 'link', None),
+                    link_text=getattr(item_inst, 'link_text', None),
+                    permissions=getattr(item_inst, 'permissions', ()),
+                    auth_required=getattr(item_inst, 'auth_required', False),
+                    staff_only=getattr(item_inst, 'staff_only', False),
+                    buttons=buttons,
+                ))
+            groups.append(MenuGroup(
+                label=getattr(group, 'label', ''),
+                items=items
+            ))
+
+        menus.append(Menu(
+            label=getattr(menu_instance, 'label', ''),
+            icon_class=getattr(menu_instance, 'icon_class', 'mdi mdi-puzzle'),
+            groups=groups
+        ))
+
+    # Dynamically append registered PluginNavigationItem classes
+    standalone_items = []
+    for item_cls in registry.get_plugin_menu_items():
+        if isinstance(item_cls, type):
+            item_inst = item_cls()
+        else:
+            item_inst = item_cls
+
+        buttons = []
+        for btn in getattr(item_inst, 'buttons', []):
+            if isinstance(btn, type):
+                btn_inst = btn()
+            else:
+                btn_inst = btn
+            buttons.append(MenuItemButton(
+                link=getattr(btn_inst, 'link', None),
+                title=getattr(btn_inst, 'title', None),
+                icon_class=getattr(btn_inst, 'icon_class', None),
+                permissions=getattr(btn_inst, 'permissions', ()),
+                color=getattr(btn_inst, 'color', None),
+            ))
+
+        standalone_items.append(MenuItem(
+            link=getattr(item_inst, 'link', None),
+            link_text=getattr(item_inst, 'link_text', None),
+            permissions=getattr(item_inst, 'permissions', ()),
+            auth_required=getattr(item_inst, 'auth_required', False),
+            staff_only=getattr(item_inst, 'staff_only', False),
+            buttons=buttons,
+        ))
+
+    if standalone_items:
+        plugins_menu = None
+        for m in menus:
+            if m.label == 'Plugins':
+                plugins_menu = m
+                break
+        if not plugins_menu:
+            plugins_menu = Menu(
+                label='Plugins',
+                icon_class='mdi mdi-puzzle',
+                groups=[MenuGroup(label='Plugin List', items=[])]
+            )
+            menus.append(plugins_menu)
+
+        plugins_menu.groups[0].items = list(plugins_menu.groups[0].items) + standalone_items
+
+    return menus
+

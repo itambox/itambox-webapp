@@ -181,3 +181,195 @@ class TenantRoleSecurityTests(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         role = form.save()
         self.assertEqual(role.tenant, self.tenant_b)
+
+    def test_generic_detail_view_permissions_enforced(self):
+        from assets.models import Asset, StatusLabel
+        from model_bakery import baker
+        from django.urls import reverse
+        
+        # Create an asset in Tenant A
+        status = baker.make(StatusLabel, type='deployable', name="Deployable")
+        asset = Asset.objects.create(
+            tenant=self.tenant_a,
+            name="Confidential Asset",
+            asset_tag="AST-999",
+            status=status
+        )
+        
+        # User A is a Reader (only has view_asset)
+        reader_role = TenantRole.objects.create(
+            tenant=self.tenant_a,
+            name="Reader",
+            permissions=["assets.view_asset"]
+        )
+        membership_a = TenantMembership.objects.create(
+            user=self.user_a,
+            tenant=self.tenant_a,
+            role=reader_role
+        )
+        
+        # User B is a Software Manager (only has view_software, no view_asset)
+        sw_role = TenantRole.objects.create(
+            tenant=self.tenant_a,
+            name="SW Manager",
+            permissions=["software.view_software"]
+        )
+        membership_b = TenantMembership.objects.create(
+            user=self.user_b,
+            tenant=self.tenant_a,
+            role=sw_role
+        )
+        
+        # Login User A (with view_asset permission)
+        self.client.force_login(self.user_a)
+        session = self.client.session
+        session['active_tenant_id'] = self.tenant_a.pk
+        session.save()
+        
+        # Access asset detail view (should succeed - status code 200)
+        url = reverse('assets:asset_detail', kwargs={'pk': asset.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Login User B (without view_asset permission)
+        self.client.force_login(self.user_b)
+        session = self.client.session
+        session['active_tenant_id'] = self.tenant_a.pk
+        session.save()
+        
+        # Access asset detail view (should fail - status code 403 Forbidden)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_alert_action_permissions_enforced(self):
+        from core.models import AlertRule, AlertLog
+        from model_bakery import baker
+        from django.contrib.contenttypes.models import ContentType
+        from django.urls import reverse
+        
+        rule = baker.make(AlertRule, tenant=self.tenant_a)
+        ct = ContentType.objects.get_for_model(self.user_a)
+        alert = AlertLog.objects.create(
+            rule=rule,
+            subject="Test Alert",
+            message="Alert message",
+            content_type=ct,
+            object_id=self.user_a.pk,
+            tenant=self.tenant_a,
+            status=AlertLog.STATUS_ACTIVE
+        )
+        
+        # User A has change_alertlog
+        alert_admin_role = TenantRole.objects.create(
+            tenant=self.tenant_a,
+            name="Alert Admin",
+            permissions=["core.change_alertlog"]
+        )
+        membership_a = TenantMembership.objects.create(
+            user=self.user_a,
+            tenant=self.tenant_a,
+            role=alert_admin_role
+        )
+        
+        # User B does not have change_alertlog
+        reader_role = TenantRole.objects.create(
+            tenant=self.tenant_a,
+            name="Reader",
+            permissions=["assets.view_asset"]
+        )
+        membership_b = TenantMembership.objects.create(
+            user=self.user_b,
+            tenant=self.tenant_a,
+            role=reader_role
+        )
+        
+        # Login User A
+        self.client.force_login(self.user_a)
+        session = self.client.session
+        session['active_tenant_id'] = self.tenant_a.pk
+        session.save()
+        
+        url = reverse('alertlog_acknowledge', kwargs={'pk': alert.pk})
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 302) # Redirects on success
+        alert.refresh_from_db()
+        self.assertEqual(alert.status, AlertLog.STATUS_ACKNOWLEDGED)
+        
+        # Reset alert status
+        alert.status = AlertLog.STATUS_ACTIVE
+        alert.save()
+        
+        # Login User B (no permission)
+        self.client.force_login(self.user_b)
+        session = self.client.session
+        session['active_tenant_id'] = self.tenant_a.pk
+        session.save()
+        
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 403) # Forbidden
+        alert.refresh_from_db()
+        self.assertEqual(alert.status, AlertLog.STATUS_ACTIVE) # Unchanged
+
+    def test_report_views_permissions_enforced(self):
+        from core.models import ReportTemplate, ScheduledReport
+        from model_bakery import baker
+        from django.urls import reverse
+        
+        template = baker.make(ReportTemplate, tenant=self.tenant_a, name="Test Report Template")
+        sched = ScheduledReport.objects.create(
+            name="Monthly Report",
+            tenant=self.tenant_a,
+            report=template,
+            frequency='monthly'
+        )
+        
+        # User A has view_reporttemplate and view_scheduledreport
+        report_admin_role = TenantRole.objects.create(
+            tenant=self.tenant_a,
+            name="Report Admin",
+            permissions=["core.view_reporttemplate", "core.view_scheduledreport"]
+        )
+        membership_a = TenantMembership.objects.create(
+            user=self.user_a,
+            tenant=self.tenant_a,
+            role=report_admin_role
+        )
+        
+        # User B does not have report permissions
+        reader_role = TenantRole.objects.create(
+            tenant=self.tenant_a,
+            name="Reader",
+            permissions=["assets.view_asset"]
+        )
+        membership_b = TenantMembership.objects.create(
+            user=self.user_b,
+            tenant=self.tenant_a,
+            role=reader_role
+        )
+        
+        # Login User A
+        self.client.force_login(self.user_a)
+        session = self.client.session
+        session['active_tenant_id'] = self.tenant_a.pk
+        session.save()
+        
+        download_url = reverse('reporttemplate_download', kwargs={'pk': template.pk})
+        trigger_url = reverse('scheduledreport_trigger', kwargs={'pk': sched.pk})
+        
+        response = self.client.get(download_url)
+        self.assertEqual(response.status_code, 200) # Succeeds
+        
+        response = self.client.post(trigger_url)
+        self.assertEqual(response.status_code, 302) # Redirect on success
+        
+        # Login User B (no permission)
+        self.client.force_login(self.user_b)
+        session = self.client.session
+        session['active_tenant_id'] = self.tenant_a.pk
+        session.save()
+        
+        response = self.client.get(download_url)
+        self.assertEqual(response.status_code, 403) # Forbidden
+        
+        response = self.client.post(trigger_url)
+        self.assertEqual(response.status_code, 403) # Forbidden

@@ -8,7 +8,6 @@ from django.conf import settings # Import settings
 from core.models import BaseModel, ChangeLoggingMixin, StandardModel, VaultModel
 from core.managers import TenantScopingManager
 from core.mixins import ExportableMixin, TaggableMixin, JournalingMixin, AutoSlugMixin, CloneableMixin, ImageAttachmentMixin, FileAttachmentMixin, BookmarkableMixin, SubscribableMixin
-from django.contrib.contenttypes.fields import GenericForeignKey
 
 # Create your models here.
 
@@ -260,9 +259,7 @@ class AssetHolder(SubscribableMixin, StandardModel):
 
     @property
     def checked_out_assets(self):
-        from django.contrib.contenttypes.models import ContentType
         from assets.models import AssetAssignment
-        holder_ct = ContentType.objects.get_for_model(AssetHolder)
         return AssetAssignment.objects.filter(
             assigned_user=self,
             is_active=True

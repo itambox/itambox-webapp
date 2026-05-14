@@ -3,7 +3,7 @@ from django.shortcuts import get_object_or_404, redirect
 from django.http import HttpResponse
 from django.views.generic import View
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
 from django.urls import reverse
@@ -216,7 +216,18 @@ class ScheduledReportDeleteView(ObjectDeleteView):
 
 
 @method_decorator(login_required, name='dispatch')
-class ReportTriggerImmediateView(LoginRequiredMixin, View):
+class ReportTriggerImmediateView(PermissionRequiredMixin, LoginRequiredMixin, View):
+    permission_required = ('core.view_scheduledreport',)
+
+    def has_permission(self):
+        perms = self.get_permission_required()
+        obj = None
+        try:
+            obj = get_object_or_404(ScheduledReport, pk=self.kwargs.get('pk'))
+        except Exception:
+            pass
+        return self.request.user.has_perms(perms, obj=obj)
+
     def post(self, request, pk):
         sched = get_object_or_404(ScheduledReport, pk=pk)
         
@@ -234,7 +245,8 @@ class ReportTriggerImmediateView(LoginRequiredMixin, View):
 
 
 @method_decorator(login_required, name='dispatch')
-class ReportTemplatePreviewView(View):
+class ReportTemplatePreviewView(PermissionRequiredMixin, View):
+    permission_required = ('core.view_reporttemplate',)
     def post(self, request, *args, **kwargs):
         report_type = request.POST.get('report_type')
         style_preset = request.POST.get('style_preset', 'default')
@@ -313,7 +325,18 @@ class ReportTemplatePreviewView(View):
 
 
 @method_decorator(login_required, name='dispatch')
-class ReportTemplateDownloadView(LoginRequiredMixin, View):
+class ReportTemplateDownloadView(PermissionRequiredMixin, LoginRequiredMixin, View):
+    permission_required = ('core.view_reporttemplate',)
+
+    def has_permission(self):
+        perms = self.get_permission_required()
+        obj = None
+        try:
+            obj = get_object_or_404(ReportTemplate, pk=self.kwargs.get('pk'))
+        except Exception:
+            pass
+        return self.request.user.has_perms(perms, obj=obj)
+
     def get(self, request, pk, *args, **kwargs):
         # objects automatically handles tenant scoping!
         template = get_object_or_404(ReportTemplate.objects.all(), pk=pk)
