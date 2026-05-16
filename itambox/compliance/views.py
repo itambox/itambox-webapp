@@ -57,6 +57,20 @@ class AssetMaintenanceDeleteView(ObjectDeleteView):
 def custody_eula_sign(request, token):
     receipt = get_object_or_404(CustodyReceipt, token=token)
 
+    if receipt.signature_provider != 'local':
+        from compliance.registry import signature_providers
+        provider = signature_providers.get(receipt.signature_provider)
+        if provider:
+            url = provider.initiate_signature(receipt, request)
+            if request.GET.get('onsite') == 'true':
+                from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
+                u = urlparse(url)
+                q = dict(parse_qsl(u.query))
+                q['onsite'] = 'true'
+                url = urlunparse(u._replace(query=urlencode(q)))
+            from django.shortcuts import redirect
+            return redirect(url)
+
     if receipt.created_date and (timezone.now() - receipt.created_date).days > 7:
         return render(request, "compliance/custody/sign_error.html", {"error": "This custody acceptance link has expired (7 day limit)."})
 

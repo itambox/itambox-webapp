@@ -1,0 +1,49 @@
+{% load i18n %}
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+    <title>{% translate "DocuSign Transfer Status - ITAMbox" %}</title>
+    <link href="{% static 'dist/vendor/tabler/css/tabler.min.css' %}" rel="stylesheet"/>
+    <style>
+        body {
+            background-color: #f4f6fa;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .status-card {
+            max-width: 580px;
+            width: 100%;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+        }
+    </style>
+</head>
+<body>
+    <div class="card status-card">
+        <div class="card-header bg-primary text-white py-3">
+            <h3 class="card-title text-white mb-0">{% translate "DocuSign Signature Request" %}</h3>
+        </div>
+        <div class="card-body text-center py-5">
+            <div class="mb-4">
+                <span class="avatar avatar-xl bg-success-lt text-success" style="width: 4.5rem; height: 4.5rem;">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-lg" width="48" height="48" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" style="width: 3rem; height: 3rem;"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l5 5l10 -10" /></svg>
+                </span>
+            </div>
+            <h3>{% translate "Signature Request Sent!" %}</h3>
+            <p class="text-secondary mb-4">
+                {% translate "A DocuSign envelope has been sent to your email:" %} <strong class="text-dark">{{ email }}</strong>.
+                <br/>
+                {% translate "Please check your inbox (and spam folder) to sign the custody agreement." %}
+            </p>
+            <div class="mt-4">
+                <a href="/" class="btn btn-outline-secondary px-4">{% translate "Return to Dashboard" %}</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

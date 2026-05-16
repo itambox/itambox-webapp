@@ -35,4 +35,9 @@ class EsignPluginConfig(PluginConfig):
         from .navigation import EsignNavigationMenu
         registry.register_plugin_menu(EsignNavigationMenu)
 
+        # 4. Register E-Signature Provider
+        from compliance.registry import signature_providers
+        from .providers import DocuSignSignatureProvider
+        signature_providers.register(DocuSignSignatureProvider)
+
 config = EsignPluginConfig

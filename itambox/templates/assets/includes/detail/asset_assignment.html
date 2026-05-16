@@ -68,7 +68,7 @@
                     <i class="mdi mdi-alert-outline me-1"></i>
                     {% translate "Pending EULA Acceptance" %}
                 </span>
-                <a href="{% url 'compliance:custody_eula_sign' token=eula_token %}" target="_blank" class="btn btn-sm btn-primary py-1 px-2.5 ms-2 font-weight-bold align-middle shadow-sm">
+                <a href="{% url 'compliance:custody_eula_sign' token=eula_token %}?onsite=true" target="_blank" class="btn btn-sm btn-primary py-1 px-2.5 ms-2 font-weight-bold align-middle shadow-sm">
                     <i class="mdi mdi-pencil-box-outline me-1"></i>
                     {% translate "Sign Custody (On-Site)..." %}
                 </a>
