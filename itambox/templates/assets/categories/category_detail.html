@@ -13,31 +13,31 @@
 {# --- Tabs Hook --- #}
 {% block extra_tabs %}
     <li class="nav-item" role="presentation">
-        <a href="#asset-types" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=asset-types" data-bs-target="#asset-types" class="nav-link {% if request.GET.tab == 'asset-types' %}active{% endif %}" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-blue" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" /><path d="M9 4v16" /><path d="M14 10l2 2l-2 2" /></svg>
             {% translate "Asset Types" %} <span class="badge bg-blue-lt ms-2">{{ asset_types_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="#components" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=components" data-bs-target="#components" class="nav-link {% if request.GET.tab == 'components' %}active{% endif %}" data-bs-toggle="tab" role="tab">
             <i class="mdi mdi-cpu me-1 text-orange"></i>
             {% translate "Components" %} <span class="badge bg-orange-lt ms-2">{{ components_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="#accessories" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=accessories" data-bs-target="#accessories" class="nav-link {% if request.GET.tab == 'accessories' %}active{% endif %}" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-purple" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7h3a1 1 0 0 0 1 -1v-1a2 2 0 0 1 4 0v1a1 1 0 0 0 1 1h3a1 1 0 0 1 1 1v3a1 1 0 0 0 1 1h1a2 2 0 0 1 0 4h-1a1 1 0 0 0 -1 1v3a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-1a2 2 0 0 0 -4 0v1a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1v-1a2 2 0 0 0 0 -4v-1a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1" /></svg>
             {% translate "Accessories" %} <span class="badge bg-purple-lt ms-2">{{ accessories_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="#consumables" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=consumables" data-bs-target="#consumables" class="nav-link {% if request.GET.tab == 'consumables' %}active{% endif %}" data-bs-toggle="tab" role="tab">
             <i class="mdi mdi-layers-outline me-1 text-yellow"></i>
             {% translate "Consumables" %} <span class="badge bg-yellow-lt ms-2">{{ consumables_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="#custody-policies" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=custody-policies" data-bs-target="#custody-policies" class="nav-link {% if request.GET.tab == 'custody-policies' %}active{% endif %}" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-green" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 12l2 2l4 -4" /><path d="M12 3c-1.2 0 -2.4 .6 -3 1.7c-.6 -1.1 -1.8 -1.7 -3 -1.7c-2 0 -3.5 1.5 -3.5 3.5c0 4.5 6 9 6.5 9.5c.5 -.5 6.5 -5 6.5 -9.5c0 -2 -1.5 -3.5 -3.5 -3.5" /><path d="M19 19m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M17 21l4 -4" /></svg>
             {% translate "Custody EULAs & Policies" %} <span class="badge bg-green-lt ms-2">{{ custody_templates|length }}</span>
         </a>
@@ -51,7 +51,7 @@
 {# --- Extra Tab Panes --- #}
 {% block extra_tab_panes %}
     {# Asset Types Tab Pane #}
-    <div class="tab-pane fade" id="asset-types" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'asset-types' %}show active{% endif %}" id="asset-types" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Asset Types / Models Categorized under" %} {{ object.name }}</h3>
@@ -71,7 +71,7 @@
     </div>
 
     {# Accessories Tab Pane #}
-    <div class="tab-pane fade" id="accessories" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'accessories' %}show active{% endif %}" id="accessories" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Accessories Monitored under" %} {{ object.name }}</h3>
@@ -91,7 +91,7 @@
     </div>
 
     {# Components Tab Pane #}
-    <div class="tab-pane fade" id="components" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'components' %}show active{% endif %}" id="components" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Components Scoped under" %} {{ object.name }}</h3>
@@ -110,7 +110,7 @@
     </div>
 
     {# Consumables Tab Pane #}
-    <div class="tab-pane fade" id="consumables" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'consumables' %}show active{% endif %}" id="consumables" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Consumables Scoped under" %} {{ object.name }}</h3>
@@ -129,7 +129,7 @@
     </div>
 
     {# Custody EULAs & Policies Tab Pane #}
-    <div class="tab-pane fade" id="custody-policies" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'custody-policies' %}show active{% endif %}" id="custody-policies" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent d-flex align-items-center justify-content-between">
                 <h3 class="card-title">{% translate "Tenant-Scoped Custody Policies & EULAs" %}</h3>

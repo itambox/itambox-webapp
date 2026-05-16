@@ -35,7 +35,7 @@
 {% block extra_tabs %}
     {% if object.is_modular %}
     <li class="nav-item" role="presentation">
-        <a href="#components" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=components" data-bs-target="#components" class="nav-link {% if request.GET.tab == 'components' %}active{% endif %}" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-teal" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 5m0 1a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1z" /><path d="M9 9h6v6h-6z" /><path d="M3 10h2" /><path d="M3 14h2" /><path d="M10 3v2" /><path d="M14 3v2" /><path d="M21 10h-2" /><path d="M21 14h-2" /><path d="M14 21v-2" /><path d="M10 21v-2" /></svg>
             {% translate "Components" %} <span class="badge bg-teal-lt ms-2">{{ object.component_allocations.count }}</span>
         </a>
@@ -43,7 +43,7 @@
     {% endif %}
     {% if object.accessory_assignments.exists %}
     <li class="nav-item" role="presentation">
-        <a href="#accessories" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=accessories" data-bs-target="#accessories" class="nav-link {% if request.GET.tab == 'accessories' %}active{% endif %}" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-azure" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 4m0 2a2 2 0 0 1 2 -2h16a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-16a2 2 0 0 1 -2 -2z" /><path d="M3 8h18" /><path d="M10 12h4" /></svg>
             {% translate "Accessories" %} <span class="badge bg-azure-lt ms-2">{{ object.accessory_assignments.count }}</span>
         </a>
@@ -51,44 +51,44 @@
     {% endif %}
     {% if object.consumable_consumptions.exists %}
     <li class="nav-item" role="presentation">
-        <a href="#consumables" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=consumables" data-bs-target="#consumables" class="nav-link {% if request.GET.tab == 'consumables' %}active{% endif %}" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-orange" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9z" /><path d="M12 12l8 -4.5" /><path d="M12 12v9" /><path d="M12 12l-8 -4.5" /></svg>
             {% translate "Consumables" %} <span class="badge bg-orange-lt ms-2">{{ object.consumable_consumptions.count }}</span>
         </a>
     </li>
     {% endif %}
     <li class="nav-item" role="presentation">
-        <a href="#maintenances" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=maintenances" data-bs-target="#maintenances" class="nav-link {% if request.GET.tab == 'maintenances' %}active{% endif %}" data-bs-toggle="tab" role="tab">
             <i class="mdi mdi-tools me-1 text-red"></i>
             {% translate "Maintenances" %} <span class="badge bg-red-lt ms-2">{{ object.maintenances.count }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="#software" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=software" data-bs-target="#software" class="nav-link {% if request.GET.tab == 'software' %}active{% endif %}" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-purple" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" /><path d="M9 4v16" /><path d="M14 10l2 2l-2 2" /></svg>
             {% translate "Software" %} <span class="badge bg-purple-lt ms-2">{{ object.installed_software.count }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="#requests" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=requests" data-bs-target="#requests" class="nav-link {% if request.GET.tab == 'requests' %}active{% endif %}" data-bs-toggle="tab" role="tab">
             <i class="mdi mdi-clipboard-text-outline me-1 text-yellow"></i>
             {% translate "Requests" %} <span class="badge bg-yellow-lt ms-2">{{ object.requests.count }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="#audits" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=audits" data-bs-target="#audits" class="nav-link {% if request.GET.tab == 'audits' %}active{% endif %}" data-bs-toggle="tab" role="tab">
             <i class="mdi mdi-checkbox-marked-circle-outline me-1 text-cyan"></i>
             {% translate "Audits" %} <span class="badge bg-cyan-lt ms-2">{{ object.audits.count }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="#custody-receipts" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=custody-receipts" data-bs-target="#custody-receipts" class="nav-link {% if request.GET.tab == 'custody-receipts' %}active{% endif %}" data-bs-toggle="tab" role="tab">
             <i class="mdi mdi-file-document-edit me-1 text-indigo"></i>
             {% translate "Custody Receipts" %} <span class="badge bg-indigo-lt ms-2">{{ object.custody_receipts.count }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="#license-seats" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=license-seats" data-bs-target="#license-seats" class="nav-link {% if request.GET.tab == 'license-seats' %}active{% endif %}" data-bs-toggle="tab" role="tab">
             <i class="mdi mdi-key-outline me-1 text-pink"></i>
             {% translate "Licenses" %} <span class="badge bg-pink-lt ms-2">{{ object.license_assignments.count }}</span>
         </a>
@@ -245,7 +245,7 @@
 {# Extra tab panes: Components, Maintenances, Software #}
 {% block extra_tab_panes %}
     {% if object.is_modular %}
-    <div class="tab-pane fade" id="components" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'components' %}show active{% endif %}" id="components" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
                 <h3 class="card-title">{% translate "Installed Physical Modules / Components" %}</h3>
@@ -268,7 +268,7 @@
     </div>
     {% endif %}
 
-    <div class="tab-pane fade" id="maintenances" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'maintenances' %}show active{% endif %}" id="maintenances" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
                 <h3 class="card-title">{% translate "Asset Repair & Upgrade History" %}</h3>
@@ -290,7 +290,7 @@
         </div>
     </div>
 
-    <div class="tab-pane fade" id="software" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'software' %}show active{% endif %}" id="software" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Installed Software Inventory" %}</h3>
@@ -309,7 +309,7 @@
     </div>
 
     {% if object.accessory_assignments.exists %}
-    <div class="tab-pane fade" id="accessories" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'accessories' %}show active{% endif %}" id="accessories" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Assigned Accessories" %}</h3>
@@ -329,7 +329,7 @@
     {% endif %}
 
     {% if object.consumable_consumptions.exists %}
-    <div class="tab-pane fade" id="consumables" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'consumables' %}show active{% endif %}" id="consumables" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Assigned Consumables" %}</h3>
@@ -348,7 +348,7 @@
     </div>
     {% endif %}
 
-    <div class="tab-pane fade" id="requests" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'requests' %}show active{% endif %}" id="requests" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Asset Requests History" %}</h3>
@@ -366,7 +366,7 @@
         </div>
     </div>
 
-    <div class="tab-pane fade" id="audits" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'audits' %}show active{% endif %}" id="audits" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Asset Verification & Audits" %}</h3>
@@ -384,7 +384,7 @@
         </div>
     </div>
 
-    <div class="tab-pane fade" id="custody-receipts" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'custody-receipts' %}show active{% endif %}" id="custody-receipts" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Signed Custody Receipts" %}</h3>
@@ -402,7 +402,7 @@
         </div>
     </div>
 
-    <div class="tab-pane fade" id="license-seats" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'license-seats' %}show active{% endif %}" id="license-seats" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Allocated Software Licenses" %}</h3>

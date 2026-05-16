@@ -85,7 +85,7 @@
             {% translate "Custody Terms & Conditions (EULA)" %}
         </h3>
     </div>
-    <div class="card-body bg-light rounded text-muted" style="max-height: 250px; overflow-y: auto; font-size: 9.5pt; line-height: 1.5;">
+    <div class="card-body bg-body-tertiary border rounded text-secondary" style="max-height: 250px; overflow-y: auto; font-size: 9.5pt; line-height: 1.5;">
         {{ object.eula_text|linebreaksbr|safe }}
     </div>
 </div>
@@ -95,7 +95,7 @@
     <div class="card-header border-0 bg-transparent py-2">
         <h5 class="card-title text-secondary small mb-0">{% translate "Sign-Off Legal Disclaimer" %}</h5>
     </div>
-    <div class="card-body bg-light rounded text-muted py-2 small italic">
+    <div class="card-body bg-body-tertiary border rounded text-secondary py-2 small italic">
         {{ object.disclaimer }}
     </div>
 </div>
@@ -104,7 +104,7 @@
 
 {% block extra_tabs %}
     <li class="nav-item" role="presentation">
-        <a href="#receipts" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=receipts" data-bs-target="#receipts" class="nav-link {% if request.GET.tab == 'receipts' %}active{% endif %}" data-bs-toggle="tab" role="tab">
             <i class="mdi mdi-file-sign me-1 text-green"></i>
             {% translate "Signed Custody Receipts" %} <span class="badge bg-green-lt ms-2">{{ receipts_table.rows|length }}</span>
         </a>
@@ -112,7 +112,7 @@
 {% endblock extra_tabs %}
 
 {% block extra_tab_panes %}
-    <div class="tab-pane fade" id="receipts" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'receipts' %}show active{% endif %}" id="receipts" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Signed Custody Receipts" %}</h3>

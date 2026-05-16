@@ -17,7 +17,7 @@ class AssetFilterForm(FilterForm):
         'asset_type': {
             'url_name': 'api:assets_api:assettype-list',
             'value_field': 'id',
-            'label_field': 'name',
+            'label_field': 'model',
         },
         'manufacturer': {
             'url_name': 'api:assets_api:manufacturer-list',

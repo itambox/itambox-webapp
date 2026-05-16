@@ -47,6 +47,25 @@ def load_plugins(settings_module):
         if not issubclass(config_cls, PluginConfig):
             raise ImproperlyConfigured(f"Plugin '{plugin_name}' config class is not a subclass of PluginConfig.")
 
+        # Check version compatibility
+        from packaging.version import parse as parse_version
+        current_version_str = getattr(settings_module, 'VERSION', '0.0.0')
+        current_version = parse_version(current_version_str)
+
+        min_version = getattr(config_cls, 'min_version', None)
+        if min_version:
+            if current_version < parse_version(min_version):
+                raise ImproperlyConfigured(
+                    f"Plugin '{plugin_name}' requires minimum ITAMbox version {min_version} (current version is {current_version_str})"
+                )
+
+        max_version = getattr(config_cls, 'max_version', None)
+        if max_version:
+            if current_version > parse_version(max_version):
+                raise ImproperlyConfigured(
+                    f"Plugin '{plugin_name}' supports maximum ITAMbox version {max_version} (current version is {current_version_str})"
+                )
+
         # Deep-merge default settings with user-supplied settings
         default_settings = getattr(config_cls, 'default_settings', {})
         required_settings = getattr(config_cls, 'required_settings', [])

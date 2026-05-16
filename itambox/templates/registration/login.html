@@ -7,9 +7,19 @@
 {% block content %}
 <div class="container-tight py-4">
     <div class="text-center mb-4">
-        {# Placeholder for ITAMbox logo if you have one #}
-        {# <a href="." class="navbar-brand navbar-brand-autodark"><img src="./static/logo.svg" height="36" alt=""></a> #}
-        <h1 class="navbar-brand navbar-brand-autodark">{% translate "ITAMbox" %}</h1>
+        <a href="." class="navbar-brand">
+             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 40" fill="none" class="navbar-brand-image" style="height: 48px; min-height: 48px;">
+                 <!-- Icon Mark (Solid Green Rounded Square + White Isometric Box Silhouette) -->
+                 <rect x="2" y="2" width="36" height="36" rx="9" fill="#2fb344"/>
+                 <path d="M20 11 L30 16 L30 25 L20 30 L10 25 L10 16 Z" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+                 <path d="M20 20 L30 16" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+                 <path d="M20 20 L10 16" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+                 <path d="M20 20 L20 30" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+                 
+                 <!-- Text Brand mark (ITAM in Green, box in currentColor) -->
+                 <text x="48" y="27" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="21" font-weight="800" letter-spacing="-0.03em" fill="#2fb344">ITAM<tspan fill="currentColor">box</tspan></text>
+             </svg>
+        </a>
     </div>
     <div class="card card-md">
         <div class="card-body">

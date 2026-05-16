@@ -89,13 +89,13 @@ class AssetTable(BaseTable): # Inherit from BaseTable
         if record.active_assignment:
             url = reverse('assets:asset_checkin', kwargs={'pk': record.pk})
             return format_html(
-                '<div class="d-inline-block"><a class="btn btn-sm btn-outline-success text-success" hx-post="{}" hx-swap="none" href="javascript:void(0)">'
+                '<div class="d-inline-block"><a class="btn btn-sm btn-success" hx-post="{}" hx-swap="none" href="javascript:void(0)">'
                 '<i class="mdi mdi-keyboard-return"></i> Check-in</a></div>', url
             )
         else:
             url = reverse('assets:asset_checkout_modal', kwargs={'pk': record.pk})
             return format_html(
-                '<div class="d-inline-block"><a class="btn btn-sm btn-outline-primary" hx-get="{}" hx-target="#modal-placeholder" hx-swap="innerHTML" href="javascript:void(0)">'
+                '<div class="d-inline-block"><a class="btn btn-sm btn-primary" hx-get="{}" hx-target="#modal-placeholder" hx-swap="innerHTML" href="javascript:void(0)">'
                 '<i class="mdi mdi-keyboard-tab-reverse"></i> Check-out</a></div>', url
             )
 
@@ -123,8 +123,8 @@ class AssetTable(BaseTable): # Inherit from BaseTable
             html += (
                 f'<span class="btn-group dropdown">'
                 f'<a class="btn btn-sm btn-primary" href="{edit_url}" title="Edit Details"><i class="mdi mdi-pencil-outline"></i></a>'
-                f'<a class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="padding-left: 2px">'
-                f'<span class="visually-hidden">Toggle Dropdown</span></a>'
+                f'<a class="btn btn-sm btn-primary dropdown-toggle dropdown-toggle-split" type="button" data-bs-toggle="dropdown" aria-expanded="false">'
+                f'</a>'
                 f'<ul class="dropdown-menu dropdown-menu-end">'
                 f'<li><a class="dropdown-item text-danger" href="{del_url}"><i class="mdi mdi-trash-can-outline me-1"></i>Delete</a></li>'
                 f'</ul></span>'

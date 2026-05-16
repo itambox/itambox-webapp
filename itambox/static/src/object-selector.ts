@@ -33,6 +33,7 @@
       plugins: plugins,
       create: false,
       allowEmptyOption: true,
+      preload: 'focus',
       render: {
         no_results: function () {
           return '<div class="no-results">No results found</div>';
@@ -45,11 +46,10 @@
       options.labelField = el.getAttribute('data-tom-select-label-field') || 'name';
       options.searchField = options.labelField as string;
       options.load = function (query: string, callback: (results?: unknown[]) => void) {
-        if (!query.length) return callback();
         const headers: Record<string, string> = { Accept: 'application/json' };
         const token = ITAMboxState ? ITAMboxState.getCSRFToken() : '';
         if (token) headers['X-CSRFToken'] = token;
-        fetch(url + '?q=' + encodeURIComponent(query), { headers })
+        fetch(url + '?q=' + encodeURIComponent(query), { headers, credentials: 'same-origin' })
           .then(function (response) {
             return response.json();
           })
@@ -62,7 +62,19 @@
       };
     }
 
-    return new TomSelect(el, options);
+    const ts = new TomSelect(el, options) as any;
+    if (ts && ts.control_input && el.id) {
+      const inputId = el.id + '-ts-input';
+      ts.control_input.id = inputId;
+      if (el.name) {
+        ts.control_input.setAttribute('name', el.name + '-ts-control');
+      }
+      const label = document.getElementById(el.id + '-ts-label') || document.querySelector('label[for="' + el.id + '-ts-control"]');
+      if (label) {
+        label.setAttribute('for', inputId);
+      }
+    }
+    return ts;
   }
 
   function initAll(): void {

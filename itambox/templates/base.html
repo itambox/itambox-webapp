@@ -4,6 +4,7 @@
 {% load core_constants %}
 {% load partials %}
 {% load django_htmx %}
+{% load plugins %}
 <!doctype html>
 <html lang="en" data-itambox-user-id="{{ request.user.pk }}" data-itambox-user-name="{{ request.user.get_full_name|default:request.user.username }}" data-itambox-url-name="{{ request.resolver_match.url_name }}" data-itambox-version="{{ settings.VERSION }}">
 <head>
@@ -28,6 +29,11 @@
     <script src="{% static 'dist/vendor/htmx.min.js' %}"></script>
     <script src="{% static 'dist/vendor/apexcharts.min.js' %}"></script>
     {% block extra_head %}{% endblock %}
+    {% if object %}
+        {% plugin_template_content object "head" object %}
+    {% elif model_name_str %}
+        {% plugin_template_content model_name_str "head" %}
+    {% endif %}
 </head>
 <body class="layout-fluid layout-combo" hx-boost="true" hx-target="#page-content-wrapper" hx-indicator="#htmx-loading-indicator">
 
@@ -58,7 +64,7 @@
     <script src="{% static 'dist/vendor/gridstack-all.js' %}"></script>
     <script src="{% static 'dist/vendor/tom-select.complete.min.js' %}"></script>
     {# Application modules bundle #}
-    <script src="{% static 'dist/itambox.js' %}?v=1.0.2"></script>
+    <script src="{% static 'dist/itambox.js' %}?v=1.0.5"></script>
 
     {% block javascript %}{% endblock javascript %}
 

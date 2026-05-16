@@ -8,13 +8,13 @@
 
 {% block extra_tabs %}
     <li class="nav-item" role="presentation">
-        <a href="#asset-types" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=asset-types" data-bs-target="#asset-types" class="nav-link {% if request.GET.tab == 'asset-types' %}active{% endif %}" data-bs-toggle="tab" role="tab">
             <i class="mdi mdi-shape-outline me-1 text-purple"></i>
             {% translate "Affected Asset Types" %} <span class="badge bg-purple-lt ms-2">{{ assettypes_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="#assets" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=assets" data-bs-target="#assets" class="nav-link {% if request.GET.tab == 'assets' %}active{% endif %}" data-bs-toggle="tab" role="tab">
             <i class="mdi mdi-laptop me-1 text-blue"></i>
             {% translate "Active Assets" %} <span class="badge bg-blue-lt ms-2">{{ assets_table.rows|length }}</span>
         </a>
@@ -22,7 +22,7 @@
 {% endblock extra_tabs %}
 
 {% block extra_tab_panes %}
-    <div class="tab-pane fade" id="asset-types" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'asset-types' %}show active{% endif %}" id="asset-types" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Affected Asset Types" %}</h3>
@@ -40,7 +40,7 @@
         </div>
     </div>
 
-    <div class="tab-pane fade" id="assets" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'assets' %}show active{% endif %}" id="assets" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Active Assets Amortization Schedule" %}</h3>

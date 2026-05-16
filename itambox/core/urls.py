@@ -49,6 +49,8 @@ from core.views.reports import (
     ScheduledReportCreateView, ScheduledReportUpdateView, ScheduledReportDeleteView,
     ReportTriggerImmediateView, ReportTemplatePreviewView, ReportTemplateDownloadView
 )
+from core.views.graphql import PrivateGraphQLView
+from core.auth.oidc import TenantOIDCAuthorizeView, TenantOIDCCallbackView
 # from django.contrib.auth import views as auth_views # Already imported
 
 # Main URL Patterns
@@ -56,6 +58,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('accounts/', include('django.contrib.auth.urls')),
     path('', asset_views.DashboardView.as_view(), name='dashboard'), # Root path for dashboard
+    path('graphql/', PrivateGraphQLView.as_view(graphiql=settings.DEBUG), name='graphql'),
 
     # Search Path
     path('search/', SearchView.as_view(), name='search'),
@@ -75,7 +78,7 @@ urlpatterns = [
 
     # API Paths (prefixed with /api/) - Point directly to the main api.urls
     path('api/', include('itambox.api.urls', namespace='api')), # Added namespace='api'
-    path('api/plugins/', include('itambox.plugins.urls', namespace='plugins')),
+    path('api/plugins/', include('itambox.plugins.urls', namespace='plugins-api')),
 
     # Path for core app non-API views if any (e.g., User Preferences UI view)
     # path('core/', include('core.urls')), # Example if core had UI views
@@ -165,6 +168,11 @@ urlpatterns = [
     # SAML SSO
     path('saml2/', include('djangosaml2.urls')),
 
+    # OIDC SSO
+    path('oidc/authenticate/', TenantOIDCAuthorizeView.as_view(), name='oidc_authentication_init'),
+    path('oidc/authenticate/<str:tenant_slug>/', TenantOIDCAuthorizeView.as_view(), name='oidc_authentication_init_tenant'),
+    path('oidc/callback/', TenantOIDCCallbackView.as_view(), name='oidc_authentication_callback'),
+
     # Attachments
     path('attachments/image/upload/<str:app_label>/<str:model_name>/<int:object_id>/', ImageAttachmentUploadView.as_view(), name='image_attachment_upload'),
     path('attachments/image/delete/<int:pk>/', ImageAttachmentDeleteView.as_view(), name='image_attachment_delete'),
@@ -181,6 +189,30 @@ urlpatterns = [
     # Health Check
     path('health/', health, name='health'),
 ]
+
+# Dynamically register plugin UI URLconfs
+from django.apps import apps
+import importlib
+
+plugin_ui_patterns = []
+for plugin_name in getattr(settings, 'PLUGINS', []):
+    try:
+        plugin_config = apps.get_app_config(plugin_name)
+        base_url = getattr(plugin_config, 'base_url', None) or plugin_name
+        try:
+            importlib.import_module(f"{plugin_name}.urls")
+            plugin_ui_patterns.append(
+                path(f"{base_url}/", include((f"{plugin_name}.urls", plugin_name), namespace=plugin_name))
+            )
+        except ImportError:
+            pass
+    except LookupError:
+        pass
+
+if plugin_ui_patterns:
+    urlpatterns.append(
+        path('plugins/', include((plugin_ui_patterns, 'plugins'), namespace='plugins'))
+    )
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

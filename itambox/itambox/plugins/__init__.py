@@ -16,3 +16,12 @@ class PluginConfig(AppConfig):
 
     # List of auxiliary django applications to register in settings.INSTALLED_APPS
     django_apps = []
+
+    # Plugin metadata
+    version = ''
+    author = ''
+    author_email = ''
+    base_url = None
+    min_version = None
+    max_version = None
+    graphql_schema = None

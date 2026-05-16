@@ -206,54 +206,211 @@ html,
 :root {
     margin-left: 0px !important;
 
-    // --- Premium Midnight Sapphire Theme Overwrite ---
-    // Curated Toned-Down Slate Blue Palette (Sophisticated Slate Sapphire Accent)
-    --tblr-primary: #3f5e8a; // Muted Calm Slate Blue
-    --tblr-primary-rgb: 63, 94, 138;
+    // --- Tabler Stone Theme Base ---
+    --tblr-gray-50: #fafaf9;
+    --tblr-gray-100: #f5f5f4;
+    --tblr-gray-200: #e7e5e4;
+    --tblr-gray-300: #d6d3d1;
+    --tblr-gray-400: #a8a29e;
+    --tblr-gray-500: #78716c;
+    --tblr-gray-600: #57534e;
+    --tblr-gray-700: #44403c;
+    --tblr-gray-800: #292524;
+    --tblr-gray-900: #1c1917;
+    --tblr-gray-950: #0c0a09;
+
+    // --- Accent Theme: Tabler Green ---
+    --tblr-primary: #2fb344;
+    --tblr-primary-rgb: 47, 179, 68;
     --tblr-primary-fg: #ffffff;
 
-    // ITAMbox Custom Tokens (pointing to the premium blue theme)
-    --itambox-primary: #3f5e8a;
-    --itambox-primary-dark: #7e97b8;
+    // ITAMbox Custom Tokens
+    --itambox-primary: #2fb344;
+    --itambox-primary-dark: #2fb344;
 
     // Focus rings, links, and selections
-    --tblr-focus-ring-color: rgba(63, 94, 138, 0.25);
-    --tblr-link-color: #3f5e8a;
-    --tblr-link-hover-color: #2d3e5a; // Calm dark slate navy hover
+    --tblr-focus-ring-color: rgba(47, 179, 68, 0.25);
+    --tblr-link-color: #2fb344;
+    --tblr-link-hover-color: #238230;
 
     // Alert/notification coloring overrides
-    --tblr-alert-bg: rgba(63, 94, 138, 0.05);
-    --tblr-alert-border-color: rgba(63, 94, 138, 0.15);
-    --tblr-alert-color: #3f5e8a;
+    --tblr-alert-bg: rgba(47, 179, 68, 0.05);
+    --tblr-alert-border-color: rgba(47, 179, 68, 0.15);
+    --tblr-alert-color: #2fb344;
 
-    // Light Mode Premium Slate-Blue background tones
-    --tblr-body-bg: #f4f6fa; // clean matte premium slate-blue
+    // Light Mode background/border tones (Stone-based)
+    --tblr-body-bg: #fafaf9; // stone-50
     --tblr-bg-surface: #ffffff;
-    --tblr-bg-surface-secondary: #eaedf6;
-    --tblr-border-color: #d5dbec;
+    --tblr-bg-surface-secondary: #f5f5f4; // stone-100
+    --tblr-border-color: #e7e5e4; // stone-200
+
+    // Typography
+    --tblr-body-color: #1c1917; // stone-900
+    --tblr-body-color-rgb: 28, 25, 23;
+    --tblr-secondary-color: #57534e; // stone-600
+    --tblr-secondary-color-rgb: 87, 83, 78;
+    --tblr-text-muted: #57534e;
+    --tblr-muted-color: #57534e;
+    --tblr-card-title-color: #1c1917;
+
+    // Forms
+    --tblr-input-bg: #ffffff;
+    --tblr-input-color: #1c1917;
+    --tblr-input-border-color: #e7e5e4;
+    --tblr-input-placeholder-color: #a8a29e; // stone-400
+
+    // Custom sidebar variables for light mode
+    --itambox-sidebar-bg: #ffffff;
+    --itambox-sidebar-border: #e7e5e4; // stone-200
+    --itambox-sidebar-color: #44403c; // stone-700
+    --itambox-sidebar-muted-color: #a8a29e; // stone-400
+    --itambox-sidebar-hover-bg: rgba(47, 179, 68, 0.06);
+    --itambox-sidebar-hover-color: #2fb344;
+    --itambox-sidebar-active-bg: rgba(47, 179, 68, 0.08);
+    --itambox-sidebar-active-color: #2fb344;
 }
 
 // Dark Mode Overrides
 [data-bs-theme="dark"] {
-    // Toned-down, calm Ice-Blue/Sapphire in dark mode for premium contrast without harshness
-    --tblr-primary: #7e97b8; // Sophisticated Ice-Slate Blue
-    --tblr-primary-rgb: 126, 151, 184;
+    // --- Accent Theme: Tabler Green ---
+    --tblr-primary: #2fb344;
+    --tblr-primary-rgb: 47, 179, 68;
     --tblr-primary-fg: #ffffff;
 
-    --tblr-focus-ring-color: rgba(126, 151, 184, 0.3);
-    --tblr-link-color: #7e97b8;
-    --tblr-link-hover-color: #9fb3cd; // Elegant brighter Ice-Slate Blue hover
+    --tblr-focus-ring-color: rgba(47, 179, 68, 0.3);
+    --tblr-link-color: #2fb344;
+    --tblr-link-hover-color: #4cd964;
 
-    --tblr-alert-bg: rgba(126, 151, 184, 0.1);
-    --tblr-alert-border-color: rgba(126, 151, 184, 0.2);
-    --tblr-alert-color: #7e97b8;
+    --tblr-alert-bg: rgba(47, 179, 68, 0.1);
+    --tblr-alert-border-color: rgba(47, 179, 68, 0.2);
+    --tblr-alert-color: #2fb344;
 
-    // Dark Mode Premium matte Obsidian-Midnight background tones
-    --tblr-body-bg: #060814; // deep obsidian-midnight
-    --tblr-bg-surface: #0d0f22; // slightly lighter midnight-blue card surface
-    --tblr-bg-surface-secondary: #13162f;
-    --tblr-border-color: #1c203f;
-    --tblr-border-color-translucent: rgba(28, 32, 63, 0.4);
+    // Dark Mode background/border tones (Stone-based)
+    --tblr-body-bg: #0c0a09; // stone-950
+    --tblr-bg-surface: #1c1917; // stone-900
+    --tblr-bg-surface-secondary: #0c0a09; // stone-950
+    --tblr-border-color: #292524; // stone-800
+    --tblr-border-color-translucent: rgba(41, 37, 36, 0.4);
+
+    // Typography
+    --tblr-body-color: #e7e5e4; // stone-200
+    --tblr-body-color-rgb: 231, 229, 228;
+    --tblr-secondary-color: #a8a29e; // stone-400
+    --tblr-secondary-color-rgb: 168, 162, 158;
+    --tblr-text-muted: #a8a29e;
+    --tblr-muted-color: #a8a29e;
+    --tblr-card-title-color: #fafaf9; // stone-50
+
+    // Form inputs and textboxes
+    --tblr-input-bg: #0c0a09;             // stone-950 inputs
+    --tblr-input-color: #e7e5e4;          // stone-200 input text
+    --tblr-input-border-color: #292524;   // stone-800 input border
+    --tblr-input-placeholder-color: #57534e; // stone-600
+    --tblr-input-focus-bg: #0c0a09;
+    --tblr-input-focus-border-color: #2fb344;
+    --tblr-input-focus-color: #e7e5e4;
+    --tblr-input-disabled-bg: #1c1917;    // stone-900
+    --tblr-input-disabled-border-color: #292524;
+
+    // Tables
+    --tblr-table-color: #e7e5e4;
+    --tblr-table-border-color: #292524;
+    --tblr-table-striped-bg: rgba(255, 255, 255, 0.02);
+    --tblr-table-hover-bg: rgba(255, 255, 255, 0.05);
+
+    // Dropdowns
+    --tblr-dropdown-bg: #1c1917;          // stone-900
+    --tblr-dropdown-border-color: #292524; // stone-800
+    --tblr-dropdown-color: #e7e5e4;
+    --tblr-dropdown-link-color: #e7e5e4;
+    --tblr-dropdown-link-hover-bg: #292524; // stone-800
+    --tblr-dropdown-link-hover-color: #fafaf9;
+
+    // Custom sidebar variables for dark mode (Stone-based)
+    --itambox-sidebar-bg: #0c0a09; // stone-950
+    --itambox-sidebar-border: #292524; // stone-800
+    --itambox-sidebar-color: #d6d3d1; // stone-300
+    --itambox-sidebar-muted-color: #a8a29e; // stone-400
+    --itambox-sidebar-hover-bg: rgba(47, 179, 68, 0.08);
+    --itambox-sidebar-hover-color: #fafaf9;
+    --itambox-sidebar-active-bg: #292524; // stone-800
+    --itambox-sidebar-active-color: #fafaf9;
+
+    // Enforce form inputs & textareas formatting in dark mode
+    .form-control,
+    .form-select,
+    input[type="text"],
+    input[type="search"],
+    input[type="number"],
+    input[type="email"],
+    input[type="password"],
+    select,
+    textarea {
+        background-color: var(--tblr-input-bg) !important;
+        border: 1px solid var(--tblr-input-border-color) !important;
+        color: var(--tblr-input-color) !important;
+        border-radius: var(--tblr-border-radius-sm, 4px) !important;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
+
+        &::placeholder {
+            color: var(--tblr-input-placeholder-color, #526071) !important;
+            opacity: 1 !important;
+        }
+
+        &:focus {
+            background-color: var(--tblr-input-focus-bg, #0c0a09) !important;
+            border-color: var(--tblr-input-focus-border-color, #2fb344) !important;
+            color: var(--tblr-input-focus-color, #e7e5e4) !important;
+            box-shadow: 0 0 0 0.25rem rgba(47, 179, 68, 0.25) !important;
+            outline: 0 !important;
+        }
+
+        &:disabled,
+        &[readonly] {
+            background-color: var(--tblr-input-disabled-bg, #1c1917) !important;
+            border-color: var(--tblr-input-disabled-border-color, #292524) !important;
+            color: var(--tblr-secondary-color) !important;
+            opacity: 0.7 !important;
+        }
+    }
+
+    // Enforce checkbox/radio styling
+    .form-check-input {
+        background-color: var(--tblr-input-bg) !important;
+        border-color: var(--tblr-input-border-color) !important;
+
+        &:checked {
+            background-color: var(--tblr-primary) !important;
+            border-color: var(--tblr-primary) !important;
+        }
+
+        &:focus {
+            border-color: var(--tblr-primary) !important;
+            box-shadow: 0 0 0 0.25rem rgba(47, 179, 68, 0.25) !important;
+        }
+    }
+
+    // Body text contrast
+    body {
+        color: var(--tblr-body-color) !important;
+    }
+
+    // Table text styles
+    .table {
+        color: var(--tblr-body-color) !important;
+
+        thead th {
+            color: var(--tblr-secondary-color) !important;
+            
+            a {
+                color: var(--tblr-primary) !important;
+                
+                &:hover {
+                    color: var(--tblr-link-hover-color) !important;
+                }
+            }
+        }
+    }
 }
 
 // ---- Specs container ----
@@ -273,8 +430,8 @@ html,
 //  Premium Sidebar & Vertical Navigation Styles
 // ============================================================
 .navbar-vertical {
-    background-color: var(--tblr-bg-surface) !important;
-    border-right: 1px solid var(--tblr-border-color) !important;
+    background-color: var(--itambox-sidebar-bg, var(--tblr-bg-surface)) !important;
+    border-right: 1px solid var(--itambox-sidebar-border, var(--tblr-border-color)) !important;
 
     // Sidebar Brand Accent Text
     .navbar-brand {
@@ -282,10 +439,8 @@ html,
         font-weight: 700;
         letter-spacing: -0.025em;
         font-size: 1.25rem;
-        background: linear-gradient(135deg, var(--tblr-primary) 0%, var(--tblr-link-hover-color) 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
         padding-top: 1.5rem;
+        color: var(--tblr-body-color) !important;
     }
 
     // Center brand on mobile viewports
@@ -326,34 +481,34 @@ html,
             font-size: 0.825rem;
             font-weight: 500;
             padding: 0.45rem 0.75rem;
-            color: rgba(var(--tblr-body-color-rgb), 0.65) !important;
+            color: var(--itambox-sidebar-color, rgba(var(--tblr-body-color-rgb), 0.65)) !important;
             border-radius: var(--tblr-border-radius-sm);
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
             .nav-link-icon {
-                color: rgba(var(--tblr-body-color-rgb), 0.45);
+                color: var(--itambox-sidebar-muted-color, rgba(var(--tblr-body-color-rgb), 0.45)) !important;
                 transition: color 0.2s ease;
                 margin-right: 0.5rem;
             }
 
             &:hover {
-                background-color: rgba(var(--tblr-primary-rgb), 0.06);
-                color: var(--tblr-primary) !important;
+                background-color: var(--itambox-sidebar-hover-bg, rgba(var(--tblr-primary-rgb), 0.06)) !important;
+                color: var(--itambox-sidebar-hover-color, var(--tblr-primary)) !important;
                 padding-left: 0.95rem; // Subtle organic slide-in animation
 
                 .nav-link-icon {
-                    color: var(--tblr-primary);
+                    color: var(--itambox-sidebar-hover-color, var(--tblr-primary)) !important;
                 }
             }
 
             &.active,
             &.show {
-                background-color: rgba(var(--tblr-primary-rgb), 0.09) !important;
-                color: var(--tblr-primary) !important;
+                background-color: var(--itambox-sidebar-active-bg, rgba(var(--tblr-primary-rgb), 0.09)) !important;
+                color: var(--itambox-sidebar-active-color, var(--tblr-primary)) !important;
                 font-weight: 600;
 
                 .nav-link-icon {
-                    color: var(--tblr-primary);
+                    color: var(--itambox-sidebar-active-color, var(--tblr-primary)) !important;
                 }
             }
         }
@@ -370,23 +525,23 @@ html,
                 font-size: 0.8rem;
                 font-weight: 500;
                 padding: 0.35rem 0.75rem;
-                color: rgba(var(--tblr-body-color-rgb), 0.6) !important;
+                color: var(--itambox-sidebar-color, rgba(var(--tblr-body-color-rgb), 0.6)) !important;
                 border-left: 2px solid transparent;
                 border-radius: 0;
                 transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
                 &:hover {
-                    background-color: rgba(var(--tblr-primary-rgb), 0.05);
-                    color: var(--tblr-primary) !important;
-                    border-left-color: var(--tblr-primary);
+                    background-color: var(--itambox-sidebar-hover-bg, rgba(var(--tblr-primary-rgb), 0.05)) !important;
+                    color: var(--itambox-sidebar-hover-color, var(--tblr-primary)) !important;
+                    border-left-color: var(--itambox-sidebar-hover-color, var(--tblr-primary)) !important;
                     padding-left: 0.95rem; // Micro-slide
                 }
 
                 &.active,
                 &:active {
-                    background-color: rgba(var(--tblr-primary-rgb), 0.08);
-                    color: var(--tblr-primary) !important;
-                    border-left-color: var(--tblr-primary);
+                    background-color: var(--itambox-sidebar-active-bg, rgba(var(--tblr-primary-rgb), 0.08)) !important;
+                    color: var(--itambox-sidebar-active-color, var(--tblr-primary)) !important;
+                    border-left-color: var(--itambox-sidebar-active-color, var(--tblr-primary)) !important;
                     font-weight: 600;
                 }
             }
@@ -447,6 +602,7 @@ html,
         pointer-events: none;
     }
 
+    // Default right-side shadow on the last-child column (e.g. actions)
     td:last-child::before {
         content: "";
         position: absolute;
@@ -456,6 +612,23 @@ html,
         width: 6px;
         background: linear-gradient(to left, rgba(0, 0, 0, 0.08), transparent);
         pointer-events: none;
+    }
+
+    // If col-checkout exists, it is the leftmost sticky column on the right, so it needs the shadow
+    td.col-checkout::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: -6px;
+        bottom: 0;
+        width: 6px;
+        background: linear-gradient(to left, rgba(0, 0, 0, 0.08), transparent);
+        pointer-events: none;
+    }
+
+    // Remove the last-child shadow if col-checkout is present in the row
+    td.col-checkout ~ td:last-child::before {
+        content: none !important;
     }
 
     // Column minimum-width guardrails for high-value columns
@@ -538,20 +711,35 @@ html,
 
     th:first-child,
     td:first-child {
-        background-color: var(--tblr-bg-surface);
+        background-color: var(--tblr-bg-surface) !important;
     }
 
     thead th:first-child {
-        background-color: var(--tblr-bg-surface);
+        background-color: var(--tblr-bg-surface) !important;
     }
 
     th:last-child,
     td:last-child {
-        background-color: var(--tblr-bg-surface);
+        background-color: var(--tblr-bg-surface) !important;
     }
 
     thead th:last-child {
-        background-color: var(--tblr-bg-surface);
+        background-color: var(--tblr-bg-surface) !important;
+    }
+
+    thead th.col-checkout,
+    thead th.col-actions,
+    thead th.col-actions-wide {
+        background-color: var(--tblr-bg-surface) !important;
+    }
+
+    // Shadow opacity boost in dark mode
+    td:first-child::after {
+        background: linear-gradient(to right, rgba(0, 0, 0, 0.35), transparent) !important;
+    }
+    td:last-child::before,
+    td.col-checkout::before {
+        background: linear-gradient(to left, rgba(0, 0, 0, 0.35), transparent) !important;
     }
 }
 
@@ -761,5 +949,102 @@ html {
         }
     }
 }
+
+// ============================================================
+//  NetBox-Inspired Attribute Table (.attr-table)
+// ============================================================
+// Used for clean, compact, flush key-value listings inside cards.
+// Eliminate card-body padding and place this table directly inside `.card`.
+.attr-table {
+    margin-bottom: 0 !important;
+    font-size: 0.825rem;
+
+    tr {
+        background: transparent !important;
+    }
+
+    th, td {
+        padding: 0.45rem 0.75rem !important;
+        vertical-align: middle;
+        border-color: var(--tblr-border-color) !important;
+    }
+
+    // Label Column (Left side)
+    th:first-child,
+    td:first-child {
+        color: var(--tblr-secondary, #6e7e91) !important;
+        font-weight: 500;
+        width: 30%;
+        min-width: 130px;
+        border-right: none;
+    }
+
+    // Value Column (Right side)
+    td:last-child {
+        width: 70%;
+        color: var(--tblr-body-color);
+    }
+    
+    // Remove the bottom border on the last row to sit flush in card
+    tr:last-child {
+        th, td {
+            border-bottom: 0 !important;
+        }
+    }
+}
+
+// ============================================================
+//  Premium Global Buttons & Inputs Standardization
+// ============================================================
+
+// Form controls & inputs standardization
+.form-control,
+.form-select,
+input[type="text"],
+input[type="search"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+select,
+textarea {
+    height: 34px !important;
+    font-size: 0.85rem !important;
+    border-radius: 6px !important;
+    padding: 0.45rem 0.75rem !important;
+    background-color: var(--tblr-input-bg, #ffffff) !important;
+    border: 1px solid var(--tblr-input-border-color, #cbd5e1) !important;
+    color: var(--tblr-input-color, #1d273b) !important;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
+
+    &::placeholder {
+        color: var(--tblr-input-placeholder-color, #8f959c) !important;
+        opacity: 1 !important;
+    }
+
+    &:focus {
+        background-color: var(--tblr-input-focus-bg, #ffffff) !important;
+        border-color: var(--tblr-input-focus-border-color, #2fb344) !important;
+        color: var(--tblr-input-focus-color, #1c1917) !important;
+        box-shadow: 0 0 0 0.2rem rgba(47, 179, 68, 0.15) !important;
+        outline: 0 !important;
+    }
+}
+
+// Small inputs (for tables and filters)
+.form-control-sm,
+.form-select-sm,
+input.form-control-sm,
+select.form-control-sm {
+    height: 28px !important;
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 4px !important;
+}
+
+
+
+
+
+
 
 

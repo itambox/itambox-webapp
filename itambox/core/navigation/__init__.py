@@ -50,7 +50,12 @@ class MenuItem:
 
     def __post_init__(self):
         if self.link:
-            self._url = reverse_lazy(self.link)
+            if isinstance(self.link, str) and '/' in self.link:
+                self._url = self.link
+            elif not isinstance(self.link, str):
+                self._url = self.link
+            else:
+                self._url = reverse_lazy(self.link)
 
     @property
     def url(self):

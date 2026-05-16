@@ -5,7 +5,7 @@ from itambox.registry import registry
 register = template.Library()
 
 @register.simple_tag(takes_context=True)
-def plugin_template_content(context, model, position, object):
+def plugin_template_content(context, model, position, object=None):
     """
     Renders template content registered by plugins for the given model and position.
     """

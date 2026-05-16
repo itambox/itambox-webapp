@@ -14,6 +14,17 @@ export default defineConfig({
   },
   globalSetup: require.resolve('./global-setup'),
 
+  /*
+  webServer: {
+    command: '..\\..\\.venv\\Scripts\\python.exe manage.py runserver 8000',
+    url: 'http://localhost:8000/',
+    reuseExistingServer: !process.env.CI,
+    cwd: '..\\',
+    stdout: 'ignore',
+    stderr: 'pipe',
+  },
+  */
+
   projects: [
     {
       name: 'chromium',

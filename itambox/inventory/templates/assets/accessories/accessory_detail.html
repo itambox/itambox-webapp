@@ -30,19 +30,19 @@
 {# --- Tabs Hook --- #}
 {% block extra_tabs %}
     <li class="nav-item" role="presentation">
-        <a href="#stocks" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=stocks" data-bs-target="#stocks" class="nav-link {% if request.GET.tab == 'stocks' %}active{% endif %}" data-bs-toggle="tab" role="tab">
             <i class="mdi mdi-store me-1 text-teal"></i>
             {% translate "Stocks" %} <span class="badge bg-teal-lt ms-2">{{ stocks_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="#assignments" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=assignments" data-bs-target="#assignments" class="nav-link {% if request.GET.tab == 'assignments' %}active{% endif %}" data-bs-toggle="tab" role="tab">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-purple" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 7m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /><path d="M16 11l2 2l4 -4" /></svg>
             {% translate "Active Assignments" %} <span class="badge bg-purple-lt ms-2">{{ assignments_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="#kits" class="nav-link" data-bs-toggle="tab" role="tab">
+        <a href="?tab=kits" data-bs-target="#kits" class="nav-link {% if request.GET.tab == 'kits' %}active{% endif %}" data-bs-toggle="tab" role="tab">
             <i class="mdi mdi-package-variant-closed me-1 text-orange"></i>
             {% translate "Kits" %} <span class="badge bg-orange-lt ms-2">{{ kits_table.rows|length }}</span>
         </a>
@@ -54,7 +54,7 @@
 {# --- Extra Tab Panes --- #}
 {% block extra_tab_panes %}
     {# Stocks Tab Pane #}
-    <div class="tab-pane fade" id="stocks" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'stocks' %}show active{% endif %}" id="stocks" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Stock Pools by Location" %}</h3>
@@ -73,7 +73,7 @@
     </div>
 
     {# Active Assignments Tab Pane #}
-    <div class="tab-pane fade" id="assignments" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'assignments' %}show active{% endif %}" id="assignments" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Checked Out Assignments" %}</h3>
@@ -93,7 +93,7 @@
     </div>
 
     {# Kits Tab Pane #}
-    <div class="tab-pane fade" id="kits" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'kits' %}show active{% endif %}" id="kits" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% translate "Kits Allocating this Accessory" %}</h3>

@@ -90,6 +90,51 @@ class PluginLoaderTestCase(SimpleTestCase):
         if dummy_name in sys.modules:
             del sys.modules[dummy_name]
 
+    def test_loader_min_version_compatible(self):
+        dummy_name = 'test_mock_plugin_min_ok'
+        dummy_plugin = types.ModuleType(dummy_name)
+
+        class MockPluginConfig(PluginConfig):
+            name = dummy_name
+            verbose_name = 'Mock Plugin Min OK'
+            min_version = '1.0.0-alpha'
+
+        dummy_plugin.config = MockPluginConfig
+        sys.modules[dummy_name] = dummy_plugin
+
+        dummy_settings = DummySettings()
+        dummy_settings.VERSION = '1.0.0-alpha'
+        dummy_settings.PLUGINS = [dummy_name]
+
+        # Should load without raising ImproperlyConfigured
+        load_plugins(dummy_settings)
+
+        if dummy_name in sys.modules:
+            del sys.modules[dummy_name]
+
+    def test_loader_min_version_incompatible(self):
+        dummy_name = 'test_mock_plugin_min_fail'
+        dummy_plugin = types.ModuleType(dummy_name)
+
+        class MockPluginConfig(PluginConfig):
+            name = dummy_name
+            verbose_name = 'Mock Plugin Min Fail'
+            min_version = '1.1.0'
+
+        dummy_plugin.config = MockPluginConfig
+        sys.modules[dummy_name] = dummy_plugin
+
+        dummy_settings = DummySettings()
+        dummy_settings.VERSION = '1.0.0-alpha'
+        dummy_settings.PLUGINS = [dummy_name]
+
+        with self.assertRaises(ImproperlyConfigured) as ctx:
+            load_plugins(dummy_settings)
+        self.assertIn("requires minimum ITAMbox version", str(ctx.exception))
+
+        if dummy_name in sys.modules:
+            del sys.modules[dummy_name]
+
 
 class TemplateTagTestCase(TestCase):
     def setUp(self):
@@ -128,3 +173,14 @@ class PluginAPITestCase(APITestCase):
             self.assertEqual(response.status_code, status.HTTP_200_OK)
             self.assertEqual(response.data['status'], 'active')
             self.assertEqual(response.data['message'], 'DocuSign integration plugin API is online.')
+
+    def test_ui_route_resolution(self):
+        if 'itambox_esign' in settings.PLUGINS:
+            url = reverse('plugins:itambox_esign:dashboard')
+            self.assertEqual(url, '/plugins/itambox_esign/dashboard/')
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+
+    def test_graphql_dynamic_composition(self):
+        from core.schema import schema
+        self.assertIn('docusign_status', schema.query._meta.fields)

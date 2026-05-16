@@ -156,11 +156,10 @@ class ActionsColumn(tables.Column):
         if button and dropdown_links:
             html += (
                 f'<span class="btn-group dropdown">'
-                f'  {button}'
-                f'  <a class="btn btn-sm btn-{dropdown_class} dropdown-toggle" type="button" data-bs-toggle="dropdown" '
-                f'style="padding-left: 2px">'
-                f'  <span class="visually-hidden">{toggle_text}</span></a>'
-                f'  <ul class="dropdown-menu">{"".join(dropdown_links)}</ul>'
+                f'{button}'
+                f'<a class="btn btn-sm btn-{dropdown_class} dropdown-toggle dropdown-toggle-split" type="button" data-bs-toggle="dropdown" aria-expanded="false">'
+                f'</a>'
+                f'<ul class="dropdown-menu dropdown-menu-end">{"".join(dropdown_links)}</ul>'
                 f'</span>'
             )
         elif button:
@@ -168,9 +167,9 @@ class ActionsColumn(tables.Column):
         elif dropdown_links:
             html += (
                 f'<span class="btn-group dropdown">'
-                f'  <a class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">'
-                f'  <span class="visually-hidden">{toggle_text}</span></a>'
-                f'  <ul class="dropdown-menu">{"".join(dropdown_links)}</ul>'
+                f'<a class="btn btn-sm btn-secondary dropdown-toggle dropdown-toggle-split" type="button" data-bs-toggle="dropdown" aria-expanded="false">'
+                f'</a>'
+                f'<ul class="dropdown-menu dropdown-menu-end">{"".join(dropdown_links)}</ul>'
                 f'</span>'
             )
 
