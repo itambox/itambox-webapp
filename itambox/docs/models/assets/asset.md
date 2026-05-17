@@ -37,6 +37,13 @@ Asset Box utilizes a strict state-governed workflow managed via **Status Labels*
 | **Purchase Cost** | The total cost of acquisition. | Decimal | No |
 | **Warranty Expiration** | The date the manufacturer warranty ends. | Date | No |
 | **Salvage Value** | Estimated value at the end of its useful lifespan. | Decimal | No |
+| **Current Book Value**| Materialized current financial value computed via straight-line depreciation. | Decimal | No (Auto) |
+| **Order Number** | The purchase order reference number associated with this procurement. | String | No |
+| **Supplier** | The vendor or supplier from whom the asset was purchased. | Foreign Key | No |
+| **Last Audited** | The timestamp when the asset was last verified during an audit session. | DateTime | No (Auto) |
+| **Last Audited By** | The user account of the auditor who last scanned the asset. | Foreign Key | No (Auto) |
+| **Requestable** | Toggle allowing end-users to request this asset via self-service. | Boolean | Yes |
+| **Custom Values** | Dynamic custom field metadata defined by the asset type's fieldset. | JSON | No |
 
 ---
 

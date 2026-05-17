@@ -6,7 +6,7 @@ An **Audit Session** represents a physical inventory reconciliation campaign sch
 
 | Field | Description | Type | Required |
 | --- | --- | --- | --- |
-| **Name** | A clear name for the audit campaign (e.g. `Q2 server room audit`). | String | Yes |
+| **Name** | A clear name for the audit campaign (e.g. `Q2 IT Stockroom audit`). | String | Yes |
 | **Location** | Optional Site Location room to focus the audit on. If blank, the audit campaign is global. | Foreign Key | No |
 | **Status** | Session state: `Planned`, `Active`, `Completed`. | Choice | Yes |
 | **Started At** | The timestamp when the audit was opened. | DateTime | Yes |

@@ -17,6 +17,10 @@ An **Asset Type** represents a specific model of hardware manufactured by a vend
 | **EOL (Months)** | Useful lifespan in months before End-of-Life replacement is due. | Integer | No |
 | **Depreciation** | Straight-line depreciation rule template to apply. | Foreign Key | No |
 | **Category** | The asset category containing checkout rules. | Foreign Key | No |
+| **Asset Role** | The functional role of the asset (e.g. `Developer Laptop`). | Foreign Key | No |
+| **Model Image** | Product image for this asset type model. | Image | No |
+| **Custom Fieldset** | Associated custom fields grouping. | Foreign Key | No |
+| **Custom Values** | Dynamically rendered custom field metadata values. | JSON | No |
 | **Requestable** | Allows end-users to request assets of this type. | Boolean | Yes |
 
 ## Speclist Inheritance

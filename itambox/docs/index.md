@@ -1,6 +1,6 @@
 # Introduction to ITAMbox
 
-ITAMbox is an enterprise-grade IT Asset Management (ITAM) platform designed to track the complete lifecycle of physical and digital infrastructure. Inspired by NetBox's data-driven engineering practices and Snipe-IT's visual user-workflows, ITAMbox serves as a centralized source of truth for your organizational hardware, software licenses, SaaS subscriptions, and operation compliance.
+ITAMbox is an enterprise-grade IT Asset Management (ITAM) platform designed to track the complete lifecycle of physical and digital infrastructure. ITAMbox serves as a centralized source of truth for your organizational hardware, software licenses, SaaS subscriptions, and operation compliance.
 
 ## Key Operational Modules
 
