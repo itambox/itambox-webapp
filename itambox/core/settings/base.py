@@ -39,7 +39,6 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'graphene_django',
     'assets',
     'components',
     'inventory',
@@ -62,7 +61,6 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'users',
     'django_q',
-    'mozilla_django_oidc',
 ]
 
 MIDDLEWARE = [
@@ -210,9 +208,6 @@ REST_FRAMEWORK = {
     'VIEW_NAME_FUNCTION': 'itambox.api.utils.get_view_name',
 }
 
-GRAPHENE = {
-    'SCHEMA': 'core.schema.schema',
-}
 
 SPECTACULAR_SETTINGS = {
     'TITLE': 'ITAMbox API',
@@ -260,7 +255,6 @@ AUTHENTICATION_BACKENDS = [
     'core.auth.TenantMembershipBackend',
     'core.auth.ldap.MultiTenantLDAPBackend',
     'djangosaml2.backends.Saml2Backend',
-    'core.auth.oidc.TenantOIDCBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
 
@@ -286,11 +280,6 @@ try:
 except Exception:
     ITAMBOX_TENANT_SAML_CONFIGS = {}
 
-try:
-    ITAMBOX_TENANT_OIDC_CONFIGS = json.loads(os.environ.get('ITAMBOX_TENANT_OIDC_CONFIGS', '{}'))
-except Exception as e:
-    logging.getLogger(__name__).warning('Failed to parse ITAMBOX_TENANT_OIDC_CONFIGS: %s', e)
-    ITAMBOX_TENANT_OIDC_CONFIGS = {}
 
 # SAML SSO Configuration Loader
 SAML_CONFIG_LOADER = 'core.auth.saml.load_saml_config'

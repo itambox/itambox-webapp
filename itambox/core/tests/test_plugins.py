@@ -181,6 +181,4 @@ class PluginAPITestCase(APITestCase):
             response = self.client.get(url)
             self.assertEqual(response.status_code, status.HTTP_302_FOUND)
 
-    def test_graphql_dynamic_composition(self):
-        from core.schema import schema
-        self.assertIn('docusign_status', schema.query._meta.fields)
+

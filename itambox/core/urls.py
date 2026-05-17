@@ -49,16 +49,13 @@ from core.views.reports import (
     ScheduledReportCreateView, ScheduledReportUpdateView, ScheduledReportDeleteView,
     ReportTriggerImmediateView, ReportTemplatePreviewView, ReportTemplateDownloadView
 )
-from core.views.graphql import PrivateGraphQLView
-from core.auth.oidc import TenantOIDCAuthorizeView, TenantOIDCCallbackView
-# from django.contrib.auth import views as auth_views # Already imported
+
 
 # Main URL Patterns
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('accounts/', include('django.contrib.auth.urls')),
     path('', asset_views.DashboardView.as_view(), name='dashboard'), # Root path for dashboard
-    path('graphql/', PrivateGraphQLView.as_view(graphiql=settings.DEBUG), name='graphql'),
 
     # Search Path
     path('search/', SearchView.as_view(), name='search'),
@@ -168,10 +165,6 @@ urlpatterns = [
     # SAML SSO
     path('saml2/', include('djangosaml2.urls')),
 
-    # OIDC SSO
-    path('oidc/authenticate/', TenantOIDCAuthorizeView.as_view(), name='oidc_authentication_init'),
-    path('oidc/authenticate/<str:tenant_slug>/', TenantOIDCAuthorizeView.as_view(), name='oidc_authentication_init_tenant'),
-    path('oidc/callback/', TenantOIDCCallbackView.as_view(), name='oidc_authentication_callback'),
 
     # Attachments
     path('attachments/image/upload/<str:app_label>/<str:model_name>/<int:object_id>/', ImageAttachmentUploadView.as_view(), name='image_attachment_upload'),
