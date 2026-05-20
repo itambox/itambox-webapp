@@ -52,7 +52,10 @@ class DatabaseBackend:
             q_objects = Q()
             for field_name in search_fields:
                 try:
-                    q_objects |= Q(**{f'{field_name}__{lookup}': query})
+                    dummy_q = Q(**{f'{field_name}__{lookup}': query})
+                    # Force Django query compilation to catch FieldErrors (e.g. invalid lookup on ForeignKey)
+                    str(model.objects.filter(dummy_q).query)
+                    q_objects |= dummy_q
                 except FieldError:
                     logger.warning("Lookup '%s' not valid for field '%s' on %s. Skipping.", lookup, field_name, model.__name__)
                     continue

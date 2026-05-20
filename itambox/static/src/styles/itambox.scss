@@ -1007,17 +1007,13 @@ input[type="email"],
 input[type="password"],
 select,
 textarea {
-    height: 34px !important;
-    font-size: 0.85rem !important;
-    border-radius: 6px !important;
-    padding: 0.45rem 0.75rem !important;
     background-color: var(--tblr-input-bg, #ffffff) !important;
     border: 1px solid var(--tblr-input-border-color, #cbd5e1) !important;
-    color: var(--tblr-input-color, #1d273b) !important;
+    color: var(--tblr-input-color, #1c1917) !important;
     transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
 
     &::placeholder {
-        color: var(--tblr-input-placeholder-color, #8f959c) !important;
+        color: var(--tblr-input-placeholder-color, #a8a29e) !important;
         opacity: 1 !important;
     }
 
@@ -1030,15 +1026,13 @@ textarea {
     }
 }
 
-// Small inputs (for tables and filters)
-.form-control-sm,
-.form-select-sm,
-input.form-control-sm,
-select.form-control-sm {
-    height: 28px !important;
-    font-size: 0.75rem !important;
-    padding: 0.25rem 0.5rem !important;
-    border-radius: 4px !important;
+// Ensure search/icon input text padding
+.input-icon {
+    .form-control,
+    input[type="text"],
+    input[type="search"] {
+        padding-left: 2.5rem !important;
+    }
 }
 
 

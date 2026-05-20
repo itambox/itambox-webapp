@@ -22,31 +22,6 @@
 
 {% block content %}
 <div class="row">
-    <div class="col-md-3">
-        {# Search Form Card #}
-        <div class="card mb-3">
-            <div class="card-header"><h3 class="card-title">{% trans "Search Options" %}</h3></div>
-            <div class="card-body">
-                <form action="{% url 'search' %}" method="get" class="options-form">
-                    <div class="mb-3">
-                        <label for="{{ form.q.id_for_label }}" class="form-label">{{ form.q.label }}</label>
-                        {{ form.q }}
-                    </div>
-                    <div class="mb-3">
-                        <label for="{{ form.obj_type.id_for_label }}" class="form-label">{{ form.obj_type.label }}</label>
-                        {{ form.obj_type }}
-                    </div>
-                    <div class="mb-3">
-                        <label for="{{ form.lookup.id_for_label }}" class="form-label">{{ form.lookup.label }}</label>
-                        {{ form.lookup }}
-                    </div>
-                    <div class="mt-4">
-                        <button type="submit" class="btn btn-primary w-100">{% trans "Search" %}</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
     <div class="col-md-9">
         {# Results Section (Keep Existing Logic/Block Intact) #}
         {% block results %}
@@ -77,6 +52,31 @@
                 </div>
             {% endif %}
         {% endblock results %}
+    </div>
+    <div class="col-md-3">
+        {# Search Form Card #}
+        <div class="card mb-3">
+            <div class="card-header"><h3 class="card-title">{% trans "Search Options" %}</h3></div>
+            <div class="card-body">
+                <form action="{% url 'search' %}" method="get" class="options-form">
+                    <div class="mb-3">
+                        <label for="{{ form.q.id_for_label }}" class="form-label">{{ form.q.label }}</label>
+                        {{ form.q }}
+                    </div>
+                    <div class="mb-3">
+                        <label for="{{ form.obj_type.id_for_label }}" class="form-label">{{ form.obj_type.label }}</label>
+                        {{ form.obj_type }}
+                    </div>
+                    <div class="mb-3">
+                        <label for="{{ form.lookup.id_for_label }}" class="form-label">{{ form.lookup.label }}</label>
+                        {{ form.lookup }}
+                    </div>
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary w-100">{% trans "Search" %}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock content %}

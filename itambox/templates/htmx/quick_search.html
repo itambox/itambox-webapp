@@ -8,8 +8,8 @@
         <input type="search" name="q" class="form-control form-control-sm" placeholder="{% translate 'Search...' %}"
                value="{{ request.GET.q|default:'' }}"
                hx-trigger="keyup changed delay:500ms, search">
-        <span class="input-group-text">
-            <a href="#" class="link-secondary {% if not request.GET.q %}d-none{% endif %}"
+        <span class="input-group-text {% if not request.GET.q %}d-none{% endif %}">
+            <a href="#" class="link-secondary"
                title="{% translate 'Clear search' %}" data-bs-toggle="tooltip"
                onclick="this.closest('form').querySelector('input[name=q]').value=''; this.closest('form').dispatchEvent(new Event('submit', { bubbles: true })); return false;">
                 <i class="mdi mdi-close"></i>
