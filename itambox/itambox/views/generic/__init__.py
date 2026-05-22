@@ -17,7 +17,7 @@ from django.views.generic import View, ListView, DetailView, UpdateView, DeleteV
 from django.views.generic.base import TemplateResponseMixin
 from django.contrib.contenttypes.models import ContentType
 from django.utils.http import urlencode
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _, override
 from django.utils.module_loading import import_string
 from django.views.decorators.http import require_POST
 from django.db.models import ProtectedError
@@ -72,7 +72,8 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         if model:
             app_label = model._meta.app_label
             model_name = model._meta.model_name
-            plural_name = str(model._meta.verbose_name_plural).lower().replace(' ', '')
+            with override('en'):
+                plural_name = str(model._meta.verbose_name_plural).lower().replace(' ', '')
 
             templates_to_try = [
                 f'{app_label}/{plural_name}/{model_name}_list.html',
@@ -237,7 +238,8 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
         if obj:
             app_label = obj._meta.app_label
             model_name = obj._meta.model_name
-            plural_name = str(obj._meta.verbose_name_plural).lower().replace(" ", "")
+            with override('en'):
+                plural_name = str(obj._meta.verbose_name_plural).lower().replace(" ", "")
 
             templates_to_try = [
                 f"{app_label}/{plural_name}/{model_name}_detail.html",
@@ -871,6 +873,10 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
                 # Dispatch async task to worker queue safely after transaction commits (with sync bypass for tests)
                 from django.db import transaction
                 from django.conf import settings
+                from core.managers import get_current_tenant
+                current_tenant = get_current_tenant()
+                tenant_id = current_tenant.pk if current_tenant else None
+
                 if getattr(settings, 'Q_CLUSTER', {}).get('sync', False):
                     async_task(
                         'core.tasks.import_csv_task',
@@ -878,17 +884,19 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
                         rows,
                         model._meta.app_label,
                         model._meta.model_name,
-                        request.user.pk
+                        request.user.pk,
+                        tenant_id=tenant_id
                     )
                 else:
                     transaction.on_commit(
-                        lambda job_pk=job.pk, r=rows, app=model._meta.app_label, name=model._meta.model_name, u_pk=request.user.pk: async_task(
+                        lambda job_pk=job.pk, r=rows, app=model._meta.app_label, name=model._meta.model_name, u_pk=request.user.pk, t_id=tenant_id: async_task(
                             'core.tasks.import_csv_task',
                             job_pk,
                             r,
                             app,
                             name,
-                            u_pk
+                            u_pk,
+                            tenant_id=t_id
                         )
                     )
 

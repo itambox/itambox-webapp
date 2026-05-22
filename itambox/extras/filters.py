@@ -17,9 +17,9 @@ class TagFilter(django_filters.FilterSet):
         if not value.strip():
             return queryset
         return queryset.filter(
-            django_filters.Q(name__icontains=value) | 
-            django_filters.Q(slug__icontains=value) |
-            django_filters.Q(description__icontains=value)
+            Q(name__icontains=value) | 
+            Q(slug__icontains=value) |
+            Q(description__icontains=value)
         )
 
 

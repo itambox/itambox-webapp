@@ -1,0 +1,110 @@
+import logging
+import re
+from django.contrib.auth import authenticate as django_authenticate
+from rest_framework.authentication import BaseAuthentication, get_authorization_header
+from rest_framework import exceptions
+from django.utils import timezone
+from users.models import Token
+from organization.models import Tenant, TenantMembership
+
+logger = logging.getLogger('itambox.scim.auth')
+
+class SCIMBearerTokenAuthentication(BaseAuthentication):
+    def authenticate(self, request):
+        # 1. Resolve tenant from URL path
+        tenant_slug = None
+        if request.resolver_match and 'tenant_slug' in request.resolver_match.kwargs:
+            tenant_slug = request.resolver_match.kwargs['tenant_slug']
+        else:
+            match = re.search(r'/api/tenants/([^/]+)/scim/v2/', request.path)
+            if match:
+                tenant_slug = match.group(1)
+
+        if not tenant_slug:
+            return None
+
+        try:
+            tenant = Tenant._base_manager.get(slug=tenant_slug)
+        except Tenant.DoesNotExist:
+            raise exceptions.AuthenticationFailed('Tenant not found.')
+
+        auth = get_authorization_header(request).split()
+
+        # Bearer Auth
+        if auth and auth[0].lower() == b'bearer':
+            if len(auth) == 1:
+                raise exceptions.AuthenticationFailed('Invalid token header. No credentials provided.')
+            elif len(auth) > 2:
+                raise exceptions.AuthenticationFailed('Invalid token header. Token string should not contain spaces.')
+
+            try:
+                token_key = auth[1].decode()
+            except UnicodeError:
+                raise exceptions.AuthenticationFailed('Invalid token header. Token string should not contain invalid characters.')
+
+            try:
+                token = Token.objects.select_related('user').get(key=token_key)
+            except Token.DoesNotExist:
+                raise exceptions.AuthenticationFailed('Invalid token.')
+
+            if token.is_expired:
+                raise exceptions.AuthenticationFailed('Token expired.')
+
+            user = token.user
+            if not user.is_active:
+                raise exceptions.AuthenticationFailed('User inactive or deleted.')
+
+            # Verify tenant membership with admin/owner role
+            if not user.is_superuser:
+                membership = TenantMembership.objects.filter(user=user, tenant=tenant).select_related('role').first()
+                if not membership:
+                    raise exceptions.AuthenticationFailed('User does not have a membership in this tenant.')
+                if membership.role.name.lower() not in ('admin', 'owner'):
+                    raise exceptions.AuthenticationFailed('User does not have sufficient permissions (admin or owner role required).')
+
+            # Enforce write_enabled token flag for write methods
+            if request.method in ('POST', 'PUT', 'PATCH', 'DELETE'):
+                if not token.write_enabled:
+                    raise exceptions.AuthenticationFailed('Token does not have write permissions.')
+
+            # Update last_used
+            if not token.last_used or (timezone.now() - token.last_used).total_seconds() > 60:
+                Token.objects.filter(pk=token.pk).update(last_used=timezone.now())
+
+            return (user, token)
+
+        # Fallback Basic Auth
+        elif auth and auth[0].lower() == b'basic':
+            import base64
+            if len(auth) == 1:
+                raise exceptions.AuthenticationFailed('Invalid basic header. No credentials provided.')
+            elif len(auth) > 2:
+                raise exceptions.AuthenticationFailed('Invalid basic header. Credentials should not contain spaces.')
+
+            try:
+                auth_parts = base64.b64decode(auth[1]).decode('utf-8').partition(':')
+                username, password = auth_parts[0], auth_parts[2]
+            except Exception:
+                raise exceptions.AuthenticationFailed('Invalid basic header. Encoding invalid.')
+
+            user = django_authenticate(request, username=username, password=password)
+            if user is None:
+                raise exceptions.AuthenticationFailed('Invalid username or password.')
+
+            if not user.is_active:
+                raise exceptions.AuthenticationFailed('User inactive or deleted.')
+
+            # Verify tenant membership with admin/owner role
+            if not user.is_superuser:
+                membership = TenantMembership.objects.filter(user=user, tenant=tenant).select_related('role').first()
+                if not membership:
+                    raise exceptions.AuthenticationFailed('User does not have a membership in this tenant.')
+                if membership.role.name.lower() not in ('admin', 'owner'):
+                    raise exceptions.AuthenticationFailed('User does not have sufficient permissions (admin or owner role required).')
+
+            return (user, None)
+
+        return None
+
+    def authenticate_header(self, request):
+        return 'Bearer'

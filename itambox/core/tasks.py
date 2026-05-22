@@ -12,271 +12,315 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from core.models import Job, Notification, FileAttachment
+from organization.models import Tenant
+from core.managers import set_current_tenant
 from itambox.registry import registry
 
 logger = logging.getLogger(__name__)
 
 
-def import_csv_task(job_id, rows_data, app_label, model_name, user_id):
+def import_csv_task(job_id, rows_data, app_label, model_name, user_id, tenant_id=None):
     """
     Asynchronously imports parsed CSV/YAML rows into a target model
     using the dynamic BulkImportForm schema inside database transactions.
     """
-    User = get_user_model()
-    try:
-        user = User.objects.get(pk=user_id)
-    except User.DoesNotExist:
-        user = None
+    tenant = None
+    if tenant_id:
+        try:
+            tenant = Tenant.objects.get(pk=tenant_id)
+        except Tenant.DoesNotExist:
+            pass
+
+    if tenant:
+        set_current_tenant(tenant)
 
     try:
-        job = Job.objects.get(pk=job_id)
-    except Job.DoesNotExist:
-        logger.error(f"Job {job_id} not found during async import.")
-        return
+        User = get_user_model()
+        try:
+            user = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            user = None
 
-    job.mark_running()
-    job.append_log("Initializing asynchronous import pipeline...")
-    job.append_log(f"Target model: {app_label}.{model_name} | Row Count: {len(rows_data)}")
+        try:
+            job = Job.objects.get(pk=job_id)
+        except Job.DoesNotExist:
+            logger.error(f"Job {job_id} not found during async import.")
+            return
 
-    try:
-        # Resolve target model class dynamically
-        model = ContentType.objects.get(app_label=app_label, model=model_name).model_class()
-        if not model:
-            raise ValidationError(f"Target model {app_label}.{model_name} could not be resolved.")
+        job.mark_running()
+        job.append_log("Initializing asynchronous import pipeline...")
+        job.append_log(f"Target model: {app_label}.{model_name} | Row Count: {len(rows_data)}")
 
-        # Dynamically instantiate import form class (similar to ObjectImportView)
-        from django.views.generic import View
-        from itambox.views.generic import ObjectImportView
-        
-        # Instantiate views to leverage generic form resolution
-        view_instance = ObjectImportView()
-        view_instance.model = model
-        ImportFormClass = view_instance.get_form_class()
-        
-        form = ImportFormClass()
-        form._rows_data = rows_data
+        try:
+            # Resolve target model class dynamically
+            model = ContentType.objects.get(app_label=app_label, model=model_name).model_class()
+            if not model:
+                raise ValidationError(f"Target model {app_label}.{model_name} could not be resolved.")
 
-        job.append_log("Validating and importing records inside transaction...")
-        
-        with transaction.atomic():
-            imported_count, errors = form.import_data()
-
-        job.append_log(f"Import finished. Successfully imported: {imported_count} record(s).")
-        
-        if errors:
-            job.append_log(f"Encountered {len(errors)} error(s) during processing:")
-            for err in errors:
-                job.append_log(f" - {err}")
+            # Dynamically instantiate import form class (similar to ObjectImportView)
+            from django.views.generic import View
+            from itambox.views.generic import ObjectImportView
             
-            # If everything failed, mark job as failed, otherwise partial success
-            if imported_count == 0:
-                job.mark_failed("All records failed to import due to validation errors.")
+            # Instantiate views to leverage generic form resolution
+            view_instance = ObjectImportView()
+            view_instance.model = model
+            ImportFormClass = view_instance.get_form_class()
+            
+            form = ImportFormClass()
+            form._rows_data = rows_data
+
+            job.append_log("Validating and importing records inside transaction...")
+            
+            with transaction.atomic():
+                imported_count, errors = form.import_data()
+
+            job.append_log(f"Import finished. Successfully imported: {imported_count} record(s).")
+            
+            if errors:
+                job.append_log(f"Encountered {len(errors)} error(s) during processing:")
+                for err in errors:
+                    job.append_log(f" - {err}")
+                
+                # If everything failed, mark job as failed, otherwise partial success
+                if imported_count == 0:
+                    job.mark_failed("All records failed to import due to validation errors.")
+                    Notification.objects.create(
+                        user=user,
+                        subject=f"Bulk Import Failed",
+                        message=f"Failed to import CSV/YAML data to {model._meta.verbose_name_plural}. View job logs for details.",
+                        level=Notification.LEVEL_DANGER,
+                        target_url=reverse_job_detail(job.pk)
+                    )
+                    return
+
+            job.mark_completed(result={
+                'imported': imported_count,
+                'failed': len(errors),
+                'total': len(rows_data)
+            })
+
+            Notification.objects.create(
+                user=user,
+                subject=f"Bulk Import Complete",
+                message=f"Successfully imported {imported_count} record(s) to {model._meta.verbose_name_plural}.",
+                level=Notification.LEVEL_SUCCESS,
+                target_url=reverse_job_detail(job.pk)
+            )
+
+        except Exception as e:
+            logger.exception("Exception during async import task")
+            job.mark_failed(str(e))
+            Notification.objects.create(
+                user=user,
+                subject=f"Bulk Import Error",
+                message=f"A system exception occurred during the import: {str(e)}",
+                level=Notification.LEVEL_DANGER,
+                target_url=reverse_job_detail(job.pk)
+            )
+    finally:
+        if tenant:
+            set_current_tenant(None)
+
+
+def bulk_checkout_task(job_id, asset_pks, target_type_str, target_pk, user_id, notes, expected_checkin_date=None, tenant_id=None):
+    """
+    Asynchronously executes bulk checkout operations on selected hardware Assets
+    utilizing select_for_update row-level locking to prevent race anomalies.
+    """
+    tenant = None
+    if tenant_id:
+        try:
+            tenant = Tenant.objects.get(pk=tenant_id)
+        except Tenant.DoesNotExist:
+            pass
+
+    if tenant:
+        set_current_tenant(tenant)
+
+    try:
+        User = get_user_model()
+        try:
+            user = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            user = None
+
+        try:
+            job = Job.objects.get(pk=job_id)
+        except Job.DoesNotExist:
+            logger.error(f"Job {job_id} not found during async checkout.")
+            return
+
+        job.mark_running()
+        job.append_log("Initializing asynchronous bulk checkout pipeline...")
+        job.append_log(f"Assets to process: {len(asset_pks)}")
+
+        try:
+            # Resolve target assignment GFK
+            target_model = ContentType.objects.get(
+                app_label='organization' if target_type_str == 'assetholder' else 'assets' if target_type_str == 'asset' else 'organization',
+                model=target_type_str
+            ).model_class()
+            
+            target = target_model.objects.get(pk=target_pk)
+            job.append_log(f"Checkout target assignee: {str(target)}")
+
+            from assets.models import Asset
+            from assets.services import checkout_asset
+            
+            success_count = 0
+            failure_count = 0
+            
+            for pk in asset_pks:
+                try:
+                    # Concurrency-safe lookup
+                    with transaction.atomic():
+                        asset = Asset.objects.select_for_update().get(pk=pk)
+                        checkout_asset(
+                            asset=asset,
+                            target=target,
+                            user=user,
+                            notes=notes,
+                            expected_checkin=expected_checkin_date
+                        )
+                        success_count += 1
+                        job.append_log(f" - Asset {asset.asset_tag} ({asset.name}) checked out successfully.")
+                except Exception as ex:
+                    failure_count += 1
+                    job.append_log(f" - Failed to checkout Asset PK {pk}: {str(ex)}")
+
+            job.append_log(f"Bulk checkout execution finished. Successes: {success_count} | Failures: {failure_count}")
+
+            if success_count == 0:
+                job.mark_failed("All asset checkouts failed.")
                 Notification.objects.create(
                     user=user,
-                    subject=f"Bulk Import Failed",
-                    message=f"Failed to import CSV/YAML data to {model._meta.verbose_name_plural}. View job logs for details.",
+                    subject="Bulk Checkout Failed",
+                    message="All hardware checkouts failed. View logs for error tracebacks.",
                     level=Notification.LEVEL_DANGER,
                     target_url=reverse_job_detail(job.pk)
                 )
                 return
 
-        job.mark_completed(result={
-            'imported': imported_count,
-            'failed': len(errors),
-            'total': len(rows_data)
-        })
+            job.mark_completed(result={
+                'checked_out': success_count,
+                'failed': failure_count,
+                'total': len(asset_pks)
+            })
 
-        Notification.objects.create(
-            user=user,
-            subject=f"Bulk Import Complete",
-            message=f"Successfully imported {imported_count} record(s) to {model._meta.verbose_name_plural}.",
-            level=Notification.LEVEL_SUCCESS,
-            target_url=reverse_job_detail(job.pk)
-        )
-
-    except Exception as e:
-        logger.exception("Exception during async import task")
-        job.mark_failed(str(e))
-        Notification.objects.create(
-            user=user,
-            subject=f"Bulk Import Error",
-            message=f"A system exception occurred during the import: {str(e)}",
-            level=Notification.LEVEL_DANGER,
-            target_url=reverse_job_detail(job.pk)
-        )
-
-
-def bulk_checkout_task(job_id, asset_pks, target_type_str, target_pk, user_id, notes, expected_checkin_date=None):
-    """
-    Asynchronously executes bulk checkout operations on selected hardware Assets
-    utilizing select_for_update row-level locking to prevent race anomalies.
-    """
-    User = get_user_model()
-    try:
-        user = User.objects.get(pk=user_id)
-    except User.DoesNotExist:
-        user = None
-
-    try:
-        job = Job.objects.get(pk=job_id)
-    except Job.DoesNotExist:
-        logger.error(f"Job {job_id} not found during async checkout.")
-        return
-
-    job.mark_running()
-    job.append_log("Initializing asynchronous bulk checkout pipeline...")
-    job.append_log(f"Assets to process: {len(asset_pks)}")
-
-    try:
-        # Resolve target assignment GFK
-        target_model = ContentType.objects.get(
-            app_label='organization' if target_type_str == 'assetholder' else 'assets' if target_type_str == 'asset' else 'organization',
-            model=target_type_str
-        ).model_class()
-        
-        target = target_model.objects.get(pk=target_pk)
-        job.append_log(f"Checkout target assignee: {str(target)}")
-
-        from assets.models import Asset
-        from assets.services import checkout_asset
-        
-        success_count = 0
-        failure_count = 0
-        
-        for pk in asset_pks:
-            try:
-                # Concurrency-safe lookup
-                with transaction.atomic():
-                    asset = Asset.objects.select_for_update().get(pk=pk)
-                    checkout_asset(
-                        asset=asset,
-                        target=target,
-                        user=user,
-                        notes=notes,
-                        expected_checkin=expected_checkin_date
-                    )
-                    success_count += 1
-                    job.append_log(f" - Asset {asset.asset_tag} ({asset.name}) checked out successfully.")
-            except Exception as ex:
-                failure_count += 1
-                job.append_log(f" - Failed to checkout Asset PK {pk}: {str(ex)}")
-
-        job.append_log(f"Bulk checkout execution finished. Successes: {success_count} | Failures: {failure_count}")
-
-        if success_count == 0:
-            job.mark_failed("All asset checkouts failed.")
             Notification.objects.create(
                 user=user,
-                subject="Bulk Checkout Failed",
-                message="All hardware checkouts failed. View logs for error tracebacks.",
+                subject="Bulk Checkout Complete",
+                message=f"Successfully checked out {success_count} asset(s).",
+                level=Notification.LEVEL_SUCCESS,
+                target_url=reverse_job_detail(job.pk)
+            )
+
+        except Exception as e:
+            logger.exception("Exception during bulk checkout task")
+            job.mark_failed(str(e))
+            Notification.objects.create(
+                user=user,
+                subject="Bulk Checkout Error",
+                message=f"A system exception occurred during the checkout: {str(e)}",
                 level=Notification.LEVEL_DANGER,
                 target_url=reverse_job_detail(job.pk)
             )
-            return
-
-        job.mark_completed(result={
-            'checked_out': success_count,
-            'failed': failure_count,
-            'total': len(asset_pks)
-        })
-
-        Notification.objects.create(
-            user=user,
-            subject="Bulk Checkout Complete",
-            message=f"Successfully checked out {success_count} asset(s).",
-            level=Notification.LEVEL_SUCCESS,
-            target_url=reverse_job_detail(job.pk)
-        )
-
-    except Exception as e:
-        logger.exception("Exception during bulk checkout task")
-        job.mark_failed(str(e))
-        Notification.objects.create(
-            user=user,
-            subject="Bulk Checkout Error",
-            message=f"A system exception occurred during the checkout: {str(e)}",
-            level=Notification.LEVEL_DANGER,
-            target_url=reverse_job_detail(job.pk)
-        )
+    finally:
+        if tenant:
+            set_current_tenant(None)
 
 
-def generate_label_batch_task(job_id, asset_pks, label_format, user_id):
+def generate_label_batch_task(job_id, asset_pks, label_format, user_id, tenant_id=None):
     """
     Asynchronously generates QR-codes/barcodes for selected assets,
     packages them into a ZIP archive, and attaches it directly to the Job.
     """
-    User = get_user_model()
-    try:
-        user = User.objects.get(pk=user_id)
-    except User.DoesNotExist:
-        user = None
+    tenant = None
+    if tenant_id:
+        try:
+            tenant = Tenant.objects.get(pk=tenant_id)
+        except Tenant.DoesNotExist:
+            pass
+
+    if tenant:
+        set_current_tenant(tenant)
 
     try:
-        job = Job.objects.get(pk=job_id)
-    except Job.DoesNotExist:
-        logger.error(f"Job {job_id} not found during async label printing.")
-        return
+        User = get_user_model()
+        try:
+            user = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            user = None
 
-    job.mark_running()
-    job.append_log("Starting label batch generation...")
-    job.append_log(f"Format: {label_format} | Total assets: {len(asset_pks)}")
+        try:
+            job = Job.objects.get(pk=job_id)
+        except Job.DoesNotExist:
+            logger.error(f"Job {job_id} not found during async label printing.")
+            return
 
-    try:
-        from assets.models import Asset
-        assets = Asset.objects.filter(pk__in=asset_pks)
-        
-        # Build ZIP archive in memory
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            for asset in assets:
-                try:
-                    # Generate dynamic label graphic (QR or barcode)
-                    img_data = generate_single_label_graphic(asset, label_format)
-                    filename = f"label_{asset.asset_tag}_{label_format}.png"
-                    zip_file.writestr(filename, img_data)
-                    job.append_log(f" - Rendered label for {asset.asset_tag}")
-                except Exception as ex:
-                    job.append_log(f" - Error rendering label for PK {asset.pk}: {str(ex)}")
+        job.mark_running()
+        job.append_log("Starting label batch generation...")
+        job.append_log(f"Format: {label_format} | Total assets: {len(asset_pks)}")
 
-        zip_buffer.seek(0)
-        
-        # Save archive directly as a FileAttachment on the Job model
-        ct = ContentType.objects.get_for_model(Job)
-        attachment = FileAttachment.objects.create(
-            model=ct,
-            object_id=job.pk,
-            name=f"labels_batch_{job.pk}.zip",
-            mime_type="application/zip"
-        )
-        # Direct save of bytes
-        from django.core.files.base import ContentFile
-        attachment.file.save(f"labels_batch_{job.pk}.zip", ContentFile(zip_buffer.getvalue()))
-        attachment.save()
+        try:
+            from assets.models import Asset
+            assets = Asset.objects.filter(pk__in=asset_pks)
+            
+            # Build ZIP archive in memory
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                for asset in assets:
+                    try:
+                        # Generate dynamic label graphic (QR or barcode)
+                        img_data = generate_single_label_graphic(asset, label_format)
+                        filename = f"label_{asset.asset_tag}_{label_format}.png"
+                        zip_file.writestr(filename, img_data)
+                        job.append_log(f" - Rendered label for {asset.asset_tag}")
+                    except Exception as ex:
+                        job.append_log(f" - Error rendering label for PK {asset.pk}: {str(ex)}")
 
-        job.append_log(f"ZIP package generated and saved successfully: {attachment.file.name}")
-        job.mark_completed(result={
-            'file_name': attachment.name,
-            'download_url': attachment.file.url
-        })
+            zip_buffer.seek(0)
+            
+            # Save archive directly as a FileAttachment on the Job model
+            ct = ContentType.objects.get_for_model(Job)
+            attachment = FileAttachment.objects.create(
+                model=ct,
+                object_id=job.pk,
+                name=f"labels_batch_{job.pk}.zip",
+                mime_type="application/zip"
+            )
+            # Direct save of bytes
+            from django.core.files.base import ContentFile
+            attachment.file.save(f"labels_batch_{job.pk}.zip", ContentFile(zip_buffer.getvalue()))
+            attachment.save()
 
-        Notification.objects.create(
-            user=user,
-            subject="Label Generation Complete",
-            message=f"Successfully generated label batch zip for {assets.count()} asset(s). Click to download.",
-            level=Notification.LEVEL_SUCCESS,
-            target_url=attachment.file.url
-        )
+            job.append_log(f"ZIP package generated and saved successfully: {attachment.file.name}")
+            job.mark_completed(result={
+                'file_name': attachment.name,
+                'download_url': attachment.file.url
+            })
 
-    except Exception as e:
-        logger.exception("Exception during label batch generation task")
-        job.mark_failed(str(e))
-        Notification.objects.create(
-            user=user,
-            subject="Label Generation Failed",
-            message=f"An error occurred during barcode rendering: {str(e)}",
-            level=Notification.LEVEL_DANGER,
-            target_url=reverse_job_detail(job.pk)
-        )
+            Notification.objects.create(
+                user=user,
+                subject="Label Generation Complete",
+                message=f"Successfully generated label batch zip for {assets.count()} asset(s). Click to download.",
+                level=Notification.LEVEL_SUCCESS,
+                target_url=attachment.file.url
+            )
+
+        except Exception as e:
+            logger.exception("Exception during label batch generation task")
+            job.mark_failed(str(e))
+            Notification.objects.create(
+                user=user,
+                subject="Label Generation Failed",
+                message=f"An error occurred during barcode rendering: {str(e)}",
+                level=Notification.LEVEL_DANGER,
+                target_url=reverse_job_detail(job.pk)
+            )
+    finally:
+        if tenant:
+            set_current_tenant(None)
 
 
 def nightly_expiration_check_task():

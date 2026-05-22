@@ -23,6 +23,12 @@ class TenantViewTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
+    def test_detail_view_german_locale(self):
+        url = reverse('organization:tenant_detail', kwargs={'pk': self.tenant.pk})
+        response = self.client.get(url, HTTP_ACCEPT_LANGUAGE='de')
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'organization/tenants/tenant_detail.html')
+
     def test_create_view_post(self):
         url = reverse('organization:tenant_create')
         response = self.client.post(url, {'name': 'Globex Inc', 'slug': 'globex-inc'})
