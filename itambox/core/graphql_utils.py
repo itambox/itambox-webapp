@@ -4,20 +4,32 @@ from django.utils.text import slugify
 
 logger = logging.getLogger(__name__)
 
+MAX_PAGINATION_LIMIT = 200
+
+def paginate_queryset(qs, limit=None, offset=None, max_limit=MAX_PAGINATION_LIMIT):
+    offset = max(offset or 0, 0)
+    limit = max(min(limit or max_limit, max_limit), 0)
+    if offset > 0:
+        qs = qs[offset:]
+    return qs[:limit]
+
 def check_permission(info, perm, obj=None):
     user = info.context.user
     if not user or not user.is_authenticated:
         raise PermissionDenied("Authentication credentials were not provided.")
     if not user.has_perm(perm, obj=obj):
-        raise PermissionDenied(f"You do not have permission: {perm}")
+        raise PermissionDenied("Permission denied.")
     return user
 
-def get_object_or_denied(model, pk, user):
+def get_object_or_denied(model, pk, user, tenant=None):
     try:
-        obj = model.objects.get(pk=pk)
+        qs = model.objects.all()
+        if tenant and hasattr(model, 'tenant'):
+            qs = qs.filter(tenant=tenant)
+        obj = qs.get(pk=pk)
         return obj
     except model.DoesNotExist:
-        raise PermissionDenied(f"Object {model._meta.model_name} with id {pk} not found or access denied.")
+        raise PermissionDenied("Object not found or access denied.")
 
 def generate_slug(instance):
     logger.debug("GENERATE SLUG called for %s with current slug: %r", instance.__class__.__name__, getattr(instance, 'slug', None))

@@ -44,6 +44,12 @@ class Token(models.Model):
         on_delete=models.CASCADE,
         related_name='tokens'
     )
+    tenant = models.ForeignKey(
+        to='organization.Tenant',
+        on_delete=models.CASCADE,
+        related_name='tokens',
+        db_index=True
+    )
     created = models.DateTimeField(auto_now_add=True)
     expires = models.DateTimeField(blank=True, null=True, db_index=True)
     last_used = models.DateTimeField(blank=True, null=True)

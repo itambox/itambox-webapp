@@ -7,7 +7,7 @@ class IsSuperuser(BasePermission):
         return bool(request.user and request.user.is_superuser)
 
 
-class TokenPermissions(DjangoObjectPermissions):
+class TokenPermissions(BasePermission):
     perms_map = {
         'GET': ['%(app_label)s.view_%(model_name)s'],
         'OPTIONS': [],
@@ -17,6 +17,32 @@ class TokenPermissions(DjangoObjectPermissions):
         'PATCH': ['%(app_label)s.change_%(model_name)s'],
         'DELETE': ['%(app_label)s.delete_%(model_name)s'],
     }
+
+    def _queryset(self, view):
+        assert hasattr(view, 'get_queryset') or hasattr(view, 'queryset'), (
+            'Cannot apply {} on a view that does not set '
+            '`.queryset` or have a `.get_queryset()` method.'
+        ).format(self.__class__.__name__)
+
+        if hasattr(view, 'get_queryset'):
+            queryset = view.get_queryset()
+            assert queryset is not None, (
+                '{}.get_queryset() returned None'.format(view.__class__.__name__)
+            )
+            return queryset
+        return view.queryset
+
+    def get_required_permissions(self, method, model):
+        kwargs = {
+            'app_label': model._meta.app_label,
+            'model_name': model._meta.model_name
+        }
+
+        if method not in self.perms_map:
+            from rest_framework.exceptions import MethodNotAllowed
+            raise MethodNotAllowed(method)
+
+        return [perm % kwargs for perm in self.perms_map[method]]
 
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
@@ -30,6 +56,11 @@ class TokenPermissions(DjangoObjectPermissions):
 
         if not perms:
             return True
+
+        # Ensure active tenant context is set and valid
+        from core.managers import get_current_tenant
+        if not get_current_tenant():
+            return False
 
         return request.user.has_perms(perms)
 

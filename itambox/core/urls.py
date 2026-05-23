@@ -21,6 +21,8 @@ from itambox.views.generic import (
     ObjectBulkDeleteView, ObjectBulkEditView, table_config,
     GenericObjectImportView,
 )
+from core.views.graphql import PrivateGraphQLView
+from core.schema import schema
 from itambox.views.features import (
     ObjectChangeListView, ObjectChangeView, ObjectExportView,
     ExportTemplateListView, ExportTemplateEditView, ExportTemplateDetailView,
@@ -76,6 +78,7 @@ urlpatterns = [
     # API Paths (prefixed with /api/) - Point directly to the main api.urls
     path('api/', include('itambox.api.urls', namespace='api')), # Added namespace='api'
     path('api/plugins/', include('itambox.plugins.urls', namespace='plugins-api')),
+    path('graphql/', PrivateGraphQLView.as_view(schema=schema), name='graphql'),
 
     # Path for core app non-API views if any (e.g., User Preferences UI view)
     # path('core/', include('core.urls')), # Example if core had UI views

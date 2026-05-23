@@ -25,21 +25,31 @@ def import_csv_task(job_id, rows_data, app_label, model_name, user_id, tenant_id
     using the dynamic BulkImportForm schema inside database transactions.
     """
     tenant = None
+    user = None
     if tenant_id:
         try:
             tenant = Tenant.objects.get(pk=tenant_id)
         except Tenant.DoesNotExist:
             pass
 
-    if tenant:
-        set_current_tenant(tenant)
-
     try:
         User = get_user_model()
+        user = User.objects.get(pk=user_id)
+    except Exception:
+        user = None
+
+    if tenant:
+        set_current_tenant(tenant)
+        if user:
+            from organization.models import TenantMembership
+            from core.managers import set_current_membership
+            membership = TenantMembership.objects.filter(user=user, tenant=tenant).first()
+            if membership:
+                set_current_membership(membership)
+
+    try:
         try:
-            user = User.objects.get(pk=user_id)
-        except User.DoesNotExist:
-            user = None
+            job = Job.objects.get(pk=job_id)
 
         try:
             job = Job.objects.get(pk=job_id)
@@ -118,8 +128,9 @@ def import_csv_task(job_id, rows_data, app_label, model_name, user_id, tenant_id
                 target_url=reverse_job_detail(job.pk)
             )
     finally:
-        if tenant:
-            set_current_tenant(None)
+        from core.managers import set_current_tenant, set_current_membership
+        set_current_tenant(None)
+        set_current_membership(None)
 
 
 def bulk_checkout_task(job_id, asset_pks, target_type_str, target_pk, user_id, notes, expected_checkin_date=None, tenant_id=None):
@@ -128,21 +139,31 @@ def bulk_checkout_task(job_id, asset_pks, target_type_str, target_pk, user_id, n
     utilizing select_for_update row-level locking to prevent race anomalies.
     """
     tenant = None
+    user = None
     if tenant_id:
         try:
             tenant = Tenant.objects.get(pk=tenant_id)
         except Tenant.DoesNotExist:
             pass
 
-    if tenant:
-        set_current_tenant(tenant)
-
     try:
         User = get_user_model()
+        user = User.objects.get(pk=user_id)
+    except Exception:
+        user = None
+
+    if tenant:
+        set_current_tenant(tenant)
+        if user:
+            from organization.models import TenantMembership
+            from core.managers import set_current_membership
+            membership = TenantMembership.objects.filter(user=user, tenant=tenant).first()
+            if membership:
+                set_current_membership(membership)
+
+    try:
         try:
-            user = User.objects.get(pk=user_id)
-        except User.DoesNotExist:
-            user = None
+            job = Job.objects.get(pk=job_id)
 
         try:
             job = Job.objects.get(pk=job_id)
@@ -226,8 +247,9 @@ def bulk_checkout_task(job_id, asset_pks, target_type_str, target_pk, user_id, n
                 target_url=reverse_job_detail(job.pk)
             )
     finally:
-        if tenant:
-            set_current_tenant(None)
+        from core.managers import set_current_tenant, set_current_membership
+        set_current_tenant(None)
+        set_current_membership(None)
 
 
 def generate_label_batch_task(job_id, asset_pks, label_format, user_id, tenant_id=None):
@@ -236,14 +258,27 @@ def generate_label_batch_task(job_id, asset_pks, label_format, user_id, tenant_i
     packages them into a ZIP archive, and attaches it directly to the Job.
     """
     tenant = None
+    user = None
     if tenant_id:
         try:
             tenant = Tenant.objects.get(pk=tenant_id)
         except Tenant.DoesNotExist:
             pass
 
+    try:
+        User = get_user_model()
+        user = User.objects.get(pk=user_id)
+    except Exception:
+        user = None
+
     if tenant:
         set_current_tenant(tenant)
+        if user:
+            from organization.models import TenantMembership
+            from core.managers import set_current_membership
+            membership = TenantMembership.objects.filter(user=user, tenant=tenant).first()
+            if membership:
+                set_current_membership(membership)
 
     try:
         User = get_user_model()
@@ -319,8 +354,9 @@ def generate_label_batch_task(job_id, asset_pks, label_format, user_id, tenant_i
                 target_url=reverse_job_detail(job.pk)
             )
     finally:
-        if tenant:
-            set_current_tenant(None)
+        from core.managers import set_current_tenant, set_current_membership
+        set_current_tenant(None)
+        set_current_membership(None)
 
 
 def nightly_expiration_check_task():
@@ -672,8 +708,9 @@ def generate_scheduled_report_task(scheduled_report_id):
             archive_entry.save()
         return False
     finally:
-        from core.managers import set_current_tenant
+        from core.managers import set_current_tenant, set_current_membership
         set_current_tenant(None)
+        set_current_membership(None)
 
 
 def evaluate_alert_rules_task():
@@ -926,7 +963,9 @@ def evaluate_alert_rules_task():
                     logger.info(f"Triggered AlertLog {alert_log.pk} for '{match['subject']}' on object '{str(obj)}'.")
                     
         finally:
+            from core.managers import set_current_tenant, set_current_membership
             set_current_tenant(None)
+            set_current_membership(None)
                 
     logger.info(f"Alert evaluation complete. Triggered {alerts_triggered_count} fresh alert(s).")
     return alerts_triggered_count

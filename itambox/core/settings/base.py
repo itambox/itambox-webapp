@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'users',
     'django_q',
+    'graphene_django',
 ]
 
 MIDDLEWARE = [
@@ -254,8 +255,8 @@ SAML_CSP_HANDLER = ''
 AUTHENTICATION_BACKENDS = [
     'core.auth.TenantMembershipBackend',
     'core.auth.ldap.MultiTenantLDAPBackend',
-    'djangosaml2.backends.Saml2Backend',
-    'django.contrib.auth.backends.ModelBackend',
+    'core.auth.saml.TenantSaml2Backend',
+    'core.auth.PasswordLoginOnlyBackend',
 ]
 
 DEFAULT_PAGINATE_COUNT = 25
@@ -336,6 +337,11 @@ PLUGINS_CONFIG = {
 import sys
 from itambox.plugins.utils import load_plugins
 load_plugins(sys.modules[__name__])
+
+GRAPHENE = {
+    'SCHEMA': 'core.schema.schema',
+    'MIDDLEWARE': [],
+}
 
 
 

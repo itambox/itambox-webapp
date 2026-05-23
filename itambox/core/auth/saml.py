@@ -62,3 +62,25 @@ def load_saml_config():
     config = SPConfig()
     config.load(sp_config)
     return config
+
+
+from djangosaml2.backends import Saml2Backend
+
+class TenantSaml2Backend(Saml2Backend):
+    """
+    A custom SAML2 authentication backend that delegates authentication to djangosaml2
+    but rejects all permissions checks (has_perm/has_module_perms) to prevent bypassing
+    the custom multi-tenant RBAC system.
+    """
+    def has_perm(self, user_obj, perm, obj=None):
+        return False
+
+    def has_module_perms(self, user_obj, app_label):
+        return False
+
+    def get_group_permissions(self, user_obj, obj=None):
+        return set()
+
+    def get_all_permissions(self, user_obj, obj=None):
+        return set()
+

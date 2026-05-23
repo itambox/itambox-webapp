@@ -51,7 +51,7 @@ class Location(SubscribableMixin, StandardModel):
     )
     tenant = models.ForeignKey(
         'Tenant',
-        on_delete=models.SET_NULL, # Or PROTECT
+        on_delete=models.PROTECT,
         related_name='locations',
         blank=True,
         null=True,
@@ -201,7 +201,7 @@ class Site(VaultModel, BookmarkableMixin):
     # Use local models for FKs within the app
     region = models.ForeignKey(Region, on_delete=models.SET_NULL, related_name='sites', blank=True, null=True, db_index=True)
     group = models.ForeignKey(SiteGroup, on_delete=models.SET_NULL, related_name='sites', blank=True, null=True, db_index=True)
-    tenant = models.ForeignKey(Tenant, on_delete=models.SET_NULL, related_name='sites', blank=True, null=True, db_index=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name='sites', blank=True, null=True, db_index=True)
     facility = models.CharField(max_length=100, blank=True)
     time_zone = models.CharField(max_length=63, blank=True) # Consider using timezone_field package later
     description = models.CharField(max_length=200, blank=True)
@@ -239,7 +239,7 @@ class AssetHolder(SubscribableMixin, StandardModel):
     email = models.EmailField(blank=True, null=True)
     tenant = models.ForeignKey(
         Tenant,
-        on_delete=models.SET_NULL,
+        on_delete=models.PROTECT,
         blank=True,
         null=True,
         related_name='asset_holders',
@@ -403,6 +403,8 @@ class TenantMembership(models.Model):
 
 
 class TenantInvitation(models.Model):
+    objects = TenantScopingManager()
+
     email = models.EmailField()
     tenant = models.ForeignKey('organization.Tenant', on_delete=models.CASCADE)
     role = models.ForeignKey(
@@ -430,6 +432,10 @@ class TenantInvitation(models.Model):
 
 @transaction.atomic
 def accept_invitation(invitation, user):
+    from django.core.exceptions import ValidationError
+    if not invitation.is_valid:
+        raise ValidationError(_("This invitation has expired or has already been accepted."))
+
     # 1. Create the Workspace Membership
     TenantMembership.objects.create(
         user=user,

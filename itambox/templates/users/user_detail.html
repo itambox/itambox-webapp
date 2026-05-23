@@ -1,0 +1,84 @@
+{% extends 'generic/object_detail.html' %}
+{% load i18n %}
+
+{% block object_details %}
+<div class="table-responsive">
+    <table class="table table-transparent table-nodotted">
+        <tbody>
+            <tr>
+                <td><strong>{% translate "Username" %}:</strong></td>
+                <td>{{ object.username }}</td>
+            </tr>
+            <tr>
+                <td><strong>{% translate "First Name" %}:</strong></td>
+                <td>{{ object.first_name|default:"—" }}</td>
+            </tr>
+            <tr>
+                <td><strong>{% translate "Last Name" %}:</strong></td>
+                <td>{{ object.last_name|default:"—" }}</td>
+            </tr>
+            <tr>
+                <td><strong>{% translate "Email Address" %}:</strong></td>
+                <td>{% if object.email %}<a href="mailto:{{ object.email }}">{{ object.email }}</a>{% else %}—{% endif %}</td>
+            </tr>
+            <tr>
+                <td><strong>{% translate "Active Status" %}:</strong></td>
+                <td>
+                    {% if object.is_active %}
+                        <span class="badge bg-success">{% translate "Active" %}</span>
+                    {% else %}
+                        <span class="badge bg-danger">{% translate "Inactive" %}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td><strong>{% translate "Staff Status" %}:</strong></td>
+                <td>
+                    {% if object.is_staff %}
+                        <span class="badge bg-primary">{% translate "Staff" %}</span>
+                    {% else %}
+                        <span class="badge bg-secondary">{% translate "Non-Staff" %}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td><strong>{% translate "Superuser Status" %}:</strong></td>
+                <td>
+                    {% if object.is_superuser %}
+                        <span class="badge bg-purple">{% translate "Superuser" %}</span>
+                    {% else %}
+                        <span class="badge bg-secondary">{% translate "Regular User" %}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td><strong>{% translate "Date Joined" %}:</strong></td>
+                <td>{{ object.date_joined|date:"Y-m-d H:i" }}</td>
+            </tr>
+            <tr>
+                <td><strong>{% translate "Last Login" %}:</strong></td>
+                <td>{{ object.last_login|date:"Y-m-d H:i"|default:"—" }}</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+{% endblock object_details %}
+
+{% block extra_cards_right %}
+<div class="card mb-3 shadow-sm">
+    <div class="card-header">
+        <h3 class="card-title">{% translate "Tenant Memberships" %}</h3>
+    </div>
+    <div class="list-group list-group-flush">
+        {% for membership in object.memberships.all %}
+            <div class="list-group-item">
+                <i class="mdi mdi-domain me-1"></i> <strong>{{ membership.tenant.name }}</strong> ({{ membership.role.name }})
+            </div>
+        {% empty %}
+            <div class="list-group-item text-muted">
+                <em>{% translate "No memberships assigned." %}</em>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock extra_cards_right %}

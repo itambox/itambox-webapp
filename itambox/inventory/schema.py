@@ -2,10 +2,9 @@ import graphene
 from graphene_django import DjangoObjectType
 from .models import Accessory, Consumable, Kit
 from assets.models import Manufacturer, Category, Supplier
-from core.graphql_utils import check_permission, get_object_or_denied, generate_slug
+from core.graphql_utils import check_permission, get_object_or_denied, generate_slug, paginate_queryset
+from graphql import GraphQLError
 from django.core.exceptions import ValidationError
-
-MAX_PAGINATION_LIMIT = 200
 
 class AccessoryNode(DjangoObjectType):
     class Meta:
@@ -56,64 +55,58 @@ class Query(graphene.ObjectType):
 
     def resolve_accessories(self, info, limit=None, offset=None, sort_by=None, **kwargs):
         check_permission(info, 'inventory.view_accessory')
-        qs = Accessory.objects.all()
+        active_tenant = getattr(info.context, 'active_tenant', None)
+        qs = Accessory.objects.filter(tenant=active_tenant)
         for key, val in kwargs.items():
             if val is not None:
                 qs = qs.filter(**{key: val})
         if sort_by and sort_by in ACCESSORY_SORTABLE_FIELDS:
             qs = qs.order_by(sort_by)
-        if offset is not None:
-            qs = qs[offset:]
-        limit = min(limit, MAX_PAGINATION_LIMIT) if limit is not None else MAX_PAGINATION_LIMIT
-        qs = qs[:limit]
-        return qs
+        return paginate_queryset(qs, limit, offset)
 
     def resolve_accessory(self, info, id):
         check_permission(info, 'inventory.view_accessory')
+        active_tenant = getattr(info.context, 'active_tenant', None)
         try:
-            return Accessory.objects.get(pk=id)
+            return Accessory.objects.filter(tenant=active_tenant).get(pk=id)
         except Accessory.DoesNotExist:
             return None
 
     def resolve_consumables(self, info, limit=None, offset=None, sort_by=None, **kwargs):
         check_permission(info, 'inventory.view_consumable')
-        qs = Consumable.objects.all()
+        active_tenant = getattr(info.context, 'active_tenant', None)
+        qs = Consumable.objects.filter(tenant=active_tenant)
         for key, val in kwargs.items():
             if val is not None:
                 qs = qs.filter(**{key: val})
         if sort_by and sort_by in CONSUMABLE_SORTABLE_FIELDS:
             qs = qs.order_by(sort_by)
-        if offset is not None:
-            qs = qs[offset:]
-        limit = min(limit, MAX_PAGINATION_LIMIT) if limit is not None else MAX_PAGINATION_LIMIT
-        qs = qs[:limit]
-        return qs
+        return paginate_queryset(qs, limit, offset)
 
     def resolve_consumable(self, info, id):
         check_permission(info, 'inventory.view_consumable')
+        active_tenant = getattr(info.context, 'active_tenant', None)
         try:
-            return Consumable.objects.get(pk=id)
+            return Consumable.objects.filter(tenant=active_tenant).get(pk=id)
         except Consumable.DoesNotExist:
             return None
 
     def resolve_kits(self, info, limit=None, offset=None, sort_by=None, **kwargs):
         check_permission(info, 'inventory.view_kit')
-        qs = Kit.objects.all()
+        active_tenant = getattr(info.context, 'active_tenant', None)
+        qs = Kit.objects.filter(tenant=active_tenant)
         for key, val in kwargs.items():
             if val is not None:
                 qs = qs.filter(**{key: val})
         if sort_by and sort_by in KIT_SORTABLE_FIELDS:
             qs = qs.order_by(sort_by)
-        if offset is not None:
-            qs = qs[offset:]
-        limit = min(limit, MAX_PAGINATION_LIMIT) if limit is not None else MAX_PAGINATION_LIMIT
-        qs = qs[:limit]
-        return qs
+        return paginate_queryset(qs, limit, offset)
 
     def resolve_kit(self, info, id):
         check_permission(info, 'inventory.view_kit')
+        active_tenant = getattr(info.context, 'active_tenant', None)
         try:
-            return Kit.objects.get(pk=id)
+            return Kit.objects.filter(tenant=active_tenant).get(pk=id)
         except Kit.DoesNotExist:
             return None
 
@@ -134,22 +127,27 @@ class CreateAccessory(graphene.Mutation):
         user = check_permission(info, 'inventory.add_accessory')
         active_tenant = getattr(info.context, 'active_tenant', None)
         
-        mfr = get_object_or_denied(Manufacturer, manufacturer_id, user)
+        mfr = get_object_or_denied(Manufacturer, manufacturer_id, user, tenant=active_tenant)
         acc = Accessory(manufacturer=mfr, tenant=active_tenant)
         
         if 'category_id' in kwargs:
-            acc.category = get_object_or_denied(Category, kwargs.pop('category_id'), user)
+            acc.category = get_object_or_denied(Category, kwargs.pop('category_id'), user, tenant=active_tenant)
         if 'supplier_id' in kwargs:
-            acc.supplier = get_object_or_denied(Supplier, kwargs.pop('supplier_id'), user)
+            acc.supplier = get_object_or_denied(Supplier, kwargs.pop('supplier_id'), user, tenant=active_tenant)
             
+        ALLOWED_FIELDS = {'name', 'part_number', 'min_qty', 'allow_overallocate', 'notes'}
         for key, val in kwargs.items():
-            setattr(acc, key, val)
+            if key in ALLOWED_FIELDS:
+                setattr(acc, key, val)
             
         generate_slug(acc)
         try:
             acc.full_clean()
         except ValidationError as e:
-            raise Exception(str(e.message_dict if hasattr(e, 'message_dict') else e.messages))
+            raise GraphQLError(
+                "Validation failed",
+                extensions={"validation_errors": e.message_dict if hasattr(e, 'message_dict') else e.messages}
+            )
         acc.save()
         return CreateAccessory(accessory=acc)
 
@@ -169,23 +167,29 @@ class UpdateAccessory(graphene.Mutation):
 
     def mutate(self, info, id, **kwargs):
         user = check_permission(info, 'inventory.change_accessory')
-        acc = get_object_or_denied(Accessory, id, user)
+        active_tenant = getattr(info.context, 'active_tenant', None)
+        acc = get_object_or_denied(Accessory, id, user, tenant=active_tenant)
         check_permission(info, 'inventory.change_accessory', obj=acc)
         
         if 'manufacturer_id' in kwargs:
-            acc.manufacturer = get_object_or_denied(Manufacturer, kwargs.pop('manufacturer_id'), user)
+            acc.manufacturer = get_object_or_denied(Manufacturer, kwargs.pop('manufacturer_id'), user, tenant=active_tenant)
         if 'category_id' in kwargs:
-            acc.category = get_object_or_denied(Category, kwargs.pop('category_id'), user)
+            acc.category = get_object_or_denied(Category, kwargs.pop('category_id'), user, tenant=active_tenant)
         if 'supplier_id' in kwargs:
-            acc.supplier = get_object_or_denied(Supplier, kwargs.pop('supplier_id'), user)
+            acc.supplier = get_object_or_denied(Supplier, kwargs.pop('supplier_id'), user, tenant=active_tenant)
             
+        ALLOWED_FIELDS = {'name', 'part_number', 'min_qty', 'allow_overallocate', 'notes'}
         for key, val in kwargs.items():
-            setattr(acc, key, val)
+            if key in ALLOWED_FIELDS:
+                setattr(acc, key, val)
             
         try:
             acc.full_clean()
         except ValidationError as e:
-            raise Exception(str(e.message_dict if hasattr(e, 'message_dict') else e.messages))
+            raise GraphQLError(
+                "Validation failed",
+                extensions={"validation_errors": e.message_dict if hasattr(e, 'message_dict') else e.messages}
+            )
         acc.save()
         return UpdateAccessory(accessory=acc)
 
@@ -197,7 +201,8 @@ class DeleteAccessory(graphene.Mutation):
 
     def mutate(self, info, id):
         user = check_permission(info, 'inventory.delete_accessory')
-        acc = get_object_or_denied(Accessory, id, user)
+        active_tenant = getattr(info.context, 'active_tenant', None)
+        acc = get_object_or_denied(Accessory, id, user, tenant=active_tenant)
         check_permission(info, 'inventory.delete_accessory', obj=acc)
         acc.delete()
         return DeleteAccessory(success=True)
@@ -218,20 +223,25 @@ class CreateConsumable(graphene.Mutation):
         user = check_permission(info, 'inventory.add_consumable')
         active_tenant = getattr(info.context, 'active_tenant', None)
         
-        mfr = get_object_or_denied(Manufacturer, manufacturer_id, user)
+        mfr = get_object_or_denied(Manufacturer, manufacturer_id, user, tenant=active_tenant)
         cons = Consumable(manufacturer=mfr, tenant=active_tenant)
         
         if 'category_id' in kwargs:
-            cons.category = get_object_or_denied(Category, kwargs.pop('category_id'), user)
+            cons.category = get_object_or_denied(Category, kwargs.pop('category_id'), user, tenant=active_tenant)
             
+        ALLOWED_FIELDS = {'name', 'part_number', 'min_qty', 'allow_overallocate', 'notes'}
         for key, val in kwargs.items():
-            setattr(cons, key, val)
+            if key in ALLOWED_FIELDS:
+                setattr(cons, key, val)
             
         generate_slug(cons)
         try:
             cons.full_clean()
         except ValidationError as e:
-            raise Exception(str(e.message_dict if hasattr(e, 'message_dict') else e.messages))
+            raise GraphQLError(
+                "Validation failed",
+                extensions={"validation_errors": e.message_dict if hasattr(e, 'message_dict') else e.messages}
+            )
         cons.save()
         return CreateConsumable(consumable=cons)
 
@@ -250,21 +260,27 @@ class UpdateConsumable(graphene.Mutation):
 
     def mutate(self, info, id, **kwargs):
         user = check_permission(info, 'inventory.change_consumable')
-        cons = get_object_or_denied(Consumable, id, user)
+        active_tenant = getattr(info.context, 'active_tenant', None)
+        cons = get_object_or_denied(Consumable, id, user, tenant=active_tenant)
         check_permission(info, 'inventory.change_consumable', obj=cons)
         
         if 'manufacturer_id' in kwargs:
-            cons.manufacturer = get_object_or_denied(Manufacturer, kwargs.pop('manufacturer_id'), user)
+            cons.manufacturer = get_object_or_denied(Manufacturer, kwargs.pop('manufacturer_id'), user, tenant=active_tenant)
         if 'category_id' in kwargs:
-            cons.category = get_object_or_denied(Category, kwargs.pop('category_id'), user)
+            cons.category = get_object_or_denied(Category, kwargs.pop('category_id'), user, tenant=active_tenant)
             
+        ALLOWED_FIELDS = {'name', 'part_number', 'min_qty', 'allow_overallocate', 'notes'}
         for key, val in kwargs.items():
-            setattr(cons, key, val)
+            if key in ALLOWED_FIELDS:
+                setattr(cons, key, val)
             
         try:
             cons.full_clean()
         except ValidationError as e:
-            raise Exception(str(e.message_dict if hasattr(e, 'message_dict') else e.messages))
+            raise GraphQLError(
+                "Validation failed",
+                extensions={"validation_errors": e.message_dict if hasattr(e, 'message_dict') else e.messages}
+            )
         cons.save()
         return UpdateConsumable(consumable=cons)
 
@@ -276,7 +292,8 @@ class DeleteConsumable(graphene.Mutation):
 
     def mutate(self, info, id):
         user = check_permission(info, 'inventory.delete_consumable')
-        cons = get_object_or_denied(Consumable, id, user)
+        active_tenant = getattr(info.context, 'active_tenant', None)
+        cons = get_object_or_denied(Consumable, id, user, tenant=active_tenant)
         check_permission(info, 'inventory.delete_consumable', obj=cons)
         cons.delete()
         return DeleteConsumable(success=True)
@@ -292,11 +309,19 @@ class CreateKit(graphene.Mutation):
         user = check_permission(info, 'inventory.add_kit')
         active_tenant = getattr(info.context, 'active_tenant', None)
         
-        kt = Kit(tenant=active_tenant, **kwargs)
+        kt = Kit(tenant=active_tenant)
+        ALLOWED_FIELDS = {'name', 'description'}
+        for key, val in kwargs.items():
+            if key in ALLOWED_FIELDS:
+                setattr(kt, key, val)
+                
         try:
             kt.full_clean()
         except ValidationError as e:
-            raise Exception(str(e.message_dict if hasattr(e, 'message_dict') else e.messages))
+            raise GraphQLError(
+                "Validation failed",
+                extensions={"validation_errors": e.message_dict if hasattr(e, 'message_dict') else e.messages}
+            )
         kt.save()
         return CreateKit(kit=kt)
 
@@ -310,16 +335,22 @@ class UpdateKit(graphene.Mutation):
 
     def mutate(self, info, id, **kwargs):
         user = check_permission(info, 'inventory.change_kit')
-        kt = get_object_or_denied(Kit, id, user)
+        active_tenant = getattr(info.context, 'active_tenant', None)
+        kt = get_object_or_denied(Kit, id, user, tenant=active_tenant)
         check_permission(info, 'inventory.change_kit', obj=kt)
         
+        ALLOWED_FIELDS = {'name', 'description'}
         for key, val in kwargs.items():
-            setattr(kt, key, val)
+            if key in ALLOWED_FIELDS:
+                setattr(kt, key, val)
             
         try:
             kt.full_clean()
         except ValidationError as e:
-            raise Exception(str(e.message_dict if hasattr(e, 'message_dict') else e.messages))
+            raise GraphQLError(
+                "Validation failed",
+                extensions={"validation_errors": e.message_dict if hasattr(e, 'message_dict') else e.messages}
+            )
         kt.save()
         return UpdateKit(kit=kt)
 
@@ -331,7 +362,8 @@ class DeleteKit(graphene.Mutation):
 
     def mutate(self, info, id):
         user = check_permission(info, 'inventory.delete_kit')
-        kt = get_object_or_denied(Kit, id, user)
+        active_tenant = getattr(info.context, 'active_tenant', None)
+        kt = get_object_or_denied(Kit, id, user, tenant=active_tenant)
         check_permission(info, 'inventory.delete_kit', obj=kt)
         kt.delete()
         return DeleteKit(success=True)

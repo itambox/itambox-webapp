@@ -65,18 +65,33 @@ class TenantScopingQuerySet(models.QuerySet):
             from django.apps import apps
             Tenant = apps.get_model('organization', 'Tenant')
 
+            def get_descendant_group_ids(group_id):
+                if not group_id:
+                    return []
+                TenantGroup = apps.get_model('organization', 'TenantGroup')
+                descendant_ids = [group_id]
+                to_check = [group_id]
+                while to_check:
+                    children = list(TenantGroup.objects.filter(parent_id__in=to_check).values_list('pk', flat=True))
+                    if not children:
+                        break
+                    descendant_ids.extend(children)
+                    to_check = children
+                return descendant_ids
+
             if active_tenant:
                 allowed_tenant_ids = [active_tenant.pk]
             else:
+                allowed_group_ids = get_descendant_group_ids(active_group.pk)
                 from itambox.middleware import get_current_user
                 user = get_current_user()
                 if user and user.is_superuser:
-                    allowed_tenant_ids = list(Tenant._base_manager.filter(group=active_group).values_list('pk', flat=True))
+                    allowed_tenant_ids = list(Tenant._base_manager.filter(group_id__in=allowed_group_ids).values_list('pk', flat=True))
                 elif user:
                     from organization.models import TenantMembership
-                    allowed_tenant_ids = list(TenantMembership.objects.filter(user=user, tenant__group=active_group).values_list('tenant_id', flat=True))
+                    allowed_tenant_ids = list(TenantMembership.objects.filter(user=user, tenant__group_id__in=allowed_group_ids).values_list('tenant_id', flat=True))
                 else:
-                    allowed_tenant_ids = list(Tenant._base_manager.filter(group=active_group).values_list('pk', flat=True))
+                    allowed_tenant_ids = list(Tenant._base_manager.filter(group_id__in=allowed_group_ids).values_list('pk', flat=True))
 
             # If the query is for the Tenant model itself:
             if self.model._meta.model_name == 'tenant':
@@ -84,9 +99,9 @@ class TenantScopingQuerySet(models.QuerySet):
 
             allowed_group_ids = []
             if active_group:
-                allowed_group_ids = [active_group.pk]
+                allowed_group_ids = get_descendant_group_ids(active_group.pk)
             elif active_tenant and active_tenant.group:
-                allowed_group_ids = [active_tenant.group.pk]
+                allowed_group_ids = get_descendant_group_ids(active_tenant.group.pk)
 
             qs = self
 
@@ -100,15 +115,25 @@ class TenantScopingQuerySet(models.QuerySet):
             # Filter by tenant if field exists
             try:
                 self.model._meta.get_field('tenant')
+                allow_global = getattr(self.model, 'allow_global_tenant', False)
                 try:
                     self.model._meta.get_field('filter_tenants')
-                    qs = qs.filter(
-                        models.Q(tenant_id__in=allowed_tenant_ids) |
-                        models.Q(filter_tenants__id__in=allowed_tenant_ids) |
-                        (models.Q(tenant__isnull=True) & models.Q(filter_tenants__isnull=True))
-                    ).distinct()
+                    if allow_global:
+                        qs = qs.filter(
+                            models.Q(tenant_id__in=allowed_tenant_ids) |
+                            models.Q(filter_tenants__id__in=allowed_tenant_ids) |
+                            (models.Q(tenant__isnull=True) & models.Q(filter_tenants__isnull=True))
+                        ).distinct()
+                    else:
+                        qs = qs.filter(
+                            models.Q(tenant_id__in=allowed_tenant_ids) |
+                            models.Q(filter_tenants__id__in=allowed_tenant_ids)
+                        ).distinct()
                 except FieldDoesNotExist:
-                    qs = qs.filter(models.Q(tenant_id__in=allowed_tenant_ids) | models.Q(tenant__isnull=True))
+                    if allow_global:
+                        qs = qs.filter(models.Q(tenant_id__in=allowed_tenant_ids) | models.Q(tenant__isnull=True))
+                    else:
+                        qs = qs.filter(tenant_id__in=allowed_tenant_ids)
             except FieldDoesNotExist:
                 pass
 
