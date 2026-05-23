@@ -92,3 +92,7 @@ nav:
       - Asset Maintenances: 'models/compliance/assetmaintenance.md'
       - Metadata Tags: 'models/extras/tag.md'
       - Object Changelog: 'models/core/objectchange.md'
+  - Plugin Development:
+      - Getting Started: 'plugins/getting_started.md'
+      - API Reference: 'plugins/api_reference.md'
+      - Extension Hooks: 'plugins/hooks.md'

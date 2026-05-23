@@ -1,0 +1,3 @@
+name,asset_tag,serial_number,description,purchase_date,purchase_cost,order_number,notes
+MacBook Pro 16,ASSET-100201,C02F2345Q05D,Developer laptop,2026-01-15,2499.00,PO-90812,Standard dev setup
+Dell UltraSharp 27,ASSET-100202,MX0234567,External monitor,2026-02-10,499.00,PO-90813,Dual screen setup
