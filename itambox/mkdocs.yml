@@ -100,3 +100,10 @@ nav:
       - DocuSign Envelopes: 'models/itambox_esign/docusignenvelope.md'
       - Metadata Tags: 'models/extras/tag.md'
       - Object Changelog: 'models/core/objectchange.md'
+  - Integrations & API:
+      - Developer Guide: 'integration/developer_guide.md'
+      - Bulk CSV Import Guide: 'integration/bulk_import_guide.md'
+  - Plugin Development:
+      - Getting Started: 'plugins/getting_started.md'
+      - API Reference: 'plugins/api_reference.md'
+      - Extension Hooks: 'plugins/hooks.md'

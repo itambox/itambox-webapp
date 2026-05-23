@@ -1,6 +1,6 @@
 # Tenant Roles
 
-A **Tenant Role** represents a tenant-specific permission role. It allows tenant administrators to define custom levels of access (e.g. *Read-Only Auditor*, *Asset Manager*, *Hardware Stager*) within their tenant's isolation boundaries, without needing global access configuration.
+A **Tenant Role** represents a tenant-specific permission role. It allows tenant administrators to define custom levels of access (e.g. *Read-Only Auditor*, *Asset Manager*, *Hardware Stager*) within their tenant's isolation boundaries, without needing global Django admin access.
 
 ---
 
