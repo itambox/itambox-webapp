@@ -67,6 +67,18 @@ class Token(models.Model):
     def save(self, *args, **kwargs):
         if not self.key:
             self.key = self.generate_key()
+        if not getattr(self, 'tenant_id', None):
+            from core.managers import get_current_tenant
+            tenant = get_current_tenant()
+            if not tenant:
+                from organization.models import Tenant
+                tenant = Tenant._base_manager.first()
+                if not tenant:
+                    tenant = Tenant._base_manager.create(
+                        name="Default Tenant",
+                        slug="default-tenant"
+                    )
+            self.tenant = tenant
         super().save(*args, **kwargs)
 
     @staticmethod
