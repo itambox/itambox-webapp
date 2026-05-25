@@ -7,11 +7,13 @@ logger = logging.getLogger(__name__)
 MAX_PAGINATION_LIMIT = 200
 
 def paginate_queryset(qs, limit=None, offset=None, max_limit=MAX_PAGINATION_LIMIT):
+    """
+    Paginate a queryset safely, clamping offset and limit to prevent negative slices
+    or excessively large limits.
+    """
     offset = max(offset or 0, 0)
     limit = max(min(limit or max_limit, max_limit), 0)
-    if offset > 0:
-        qs = qs[offset:]
-    return qs[:limit]
+    return qs[offset:offset + limit]
 
 def check_permission(info, perm, obj=None):
     user = info.context.user
@@ -29,7 +31,7 @@ def get_object_or_denied(model, pk, user, tenant=None):
         obj = qs.get(pk=pk)
         return obj
     except model.DoesNotExist:
-        raise PermissionDenied("Object not found or access denied.")
+        raise PermissionDenied("Permission denied.")
 
 def generate_slug(instance):
     logger.debug("GENERATE SLUG called for %s with current slug: %r", instance.__class__.__name__, getattr(instance, 'slug', None))
@@ -63,4 +65,3 @@ def generate_slug(instance):
         while manager.filter(slug=instance.slug).exclude(pk=instance.pk).exists():
             instance.slug = f"{base_slug}-{counter}"
             counter += 1
-

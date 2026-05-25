@@ -389,6 +389,24 @@ ADMIN_MENU = Menu(
                 ),
             ),
         ),
+        MenuGroup(
+            label=_('Access Control'),
+            items=(
+                MenuItem(
+                    link='users:user_list',
+                    link_text=_('Users'),
+                    permissions=['users.view_user'],
+                    buttons=(
+                        MenuItemButton(
+                            link='users:user_create',
+                            title='Add',
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=['users.add_user'],
+                        ),
+                    ),
+                ),
+            ),
+        ),
     ),
 )
 

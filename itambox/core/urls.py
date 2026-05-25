@@ -51,6 +51,7 @@ from core.views.reports import (
     ScheduledReportCreateView, ScheduledReportUpdateView, ScheduledReportDeleteView,
     ReportTriggerImmediateView, ReportTemplatePreviewView, ReportTemplateDownloadView
 )
+from core.auth.oidc import TenantOIDCAuthorizeView, TenantOIDCCallbackView
 
 
 # Main URL Patterns
@@ -167,6 +168,11 @@ urlpatterns = [
 
     # SAML SSO
     path('saml2/', include('djangosaml2.urls')),
+
+    # OIDC SSO
+    path('oidc/authenticate/', TenantOIDCAuthorizeView.as_view(), name='oidc_authentication_init'),
+    path('oidc/authenticate/<str:tenant_slug>/', TenantOIDCAuthorizeView.as_view(), name='oidc_authentication_init_tenant'),
+    path('oidc/callback/', TenantOIDCCallbackView.as_view(), name='oidc_authentication_callback'),
 
 
     # Attachments

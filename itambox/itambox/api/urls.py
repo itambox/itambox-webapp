@@ -25,6 +25,7 @@ urlpatterns = [
     path('software/', include('software.api.urls', namespace='software_api')),
     path('subscriptions/', include('subscriptions.api.urls', namespace='subscriptions_api')),
     path('users/', include('users.api.urls', namespace='users_api')),
+    path('tenants/<slug:tenant_slug>/scim/v2/', include('users.api.scim.urls', namespace='scim')),
 
     path('schema/openapi.json', SpectacularJSONAPIView.as_view(), name='openapi-schema'),
     path('schema/', SpectacularAPIView.as_view(), name='schema'),

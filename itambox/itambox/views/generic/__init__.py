@@ -274,22 +274,22 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
         context['edit_url'] = None
         if can_change:
             try:
-                context['edit_url'] = reverse(f'{app_label}:{model_name}_update', kwargs={'pk': obj.pk})
+                context['edit_url'] = reverse(get_model_viewname(obj, 'update'), kwargs={'pk': obj.pk})
             except NoReverseMatch:
                 if hasattr(obj, 'slug') and obj.slug:
                     try:
-                        context['edit_url'] = reverse(f'{app_label}:{model_name}_update', kwargs={'slug': obj.slug})
+                        context['edit_url'] = reverse(get_model_viewname(obj, 'update'), kwargs={'slug': obj.slug})
                     except NoReverseMatch:
                         logger.debug("Edit URL not resolvable for %s obj=%s slug=%s", model_name, obj.pk, obj.slug)
         
         context['delete_url'] = None
         if can_delete:
             try:
-                context['delete_url'] = reverse(f'{app_label}:{model_name}_delete', kwargs={'pk': obj.pk})
+                context['delete_url'] = reverse(get_model_viewname(obj, 'delete'), kwargs={'pk': obj.pk})
             except NoReverseMatch:
                 if hasattr(obj, 'slug') and obj.slug:
                     try:
-                        context['delete_url'] = reverse(f'{app_label}:{model_name}_delete', kwargs={'slug': obj.slug})
+                        context['delete_url'] = reverse(get_model_viewname(obj, 'delete'), kwargs={'slug': obj.slug})
                     except NoReverseMatch:
                         logger.debug("Delete URL not resolvable for %s obj=%s slug=%s", model_name, obj.pk, obj.slug)
         
