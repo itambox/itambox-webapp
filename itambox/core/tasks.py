@@ -50,9 +50,6 @@ def import_csv_task(job_id, rows_data, app_label, model_name, user_id, tenant_id
     try:
         try:
             job = Job.objects.get(pk=job_id)
-
-        try:
-            job = Job.objects.get(pk=job_id)
         except Job.DoesNotExist:
             logger.error(f"Job {job_id} not found during async import.")
             return
