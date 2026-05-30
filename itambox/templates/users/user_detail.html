@@ -66,13 +66,21 @@
 
 {% block extra_cards_right %}
 <div class="card mb-3 shadow-sm">
-    <div class="card-header">
-        <h3 class="card-title">{% translate "Tenant Memberships" %}</h3>
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h3 class="card-title mb-0">{% translate "Tenant Memberships" %}</h3>
+        <a href="{% url 'organization:tenantmembership_create' %}?user={{ object.pk }}" class="btn btn-sm btn-primary">
+            <i class="mdi mdi-plus-thick"></i> {% translate "Add" %}
+        </a>
     </div>
     <div class="list-group list-group-flush">
         {% for membership in object.memberships.all %}
-            <div class="list-group-item">
-                <i class="mdi mdi-domain me-1"></i> <strong>{{ membership.tenant.name }}</strong> ({{ membership.role.name }})
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="mdi mdi-domain me-1"></i> <strong>{{ membership.tenant.name }}</strong> ({{ membership.role.name }})
+                </div>
+                <a href="{% url 'organization:tenantmembership_delete' pk=membership.pk %}" class="btn btn-sm btn-outline-danger" title="{% translate "Remove Membership" %}">
+                    <i class="mdi mdi-trash-can-outline"></i>
+                </a>
             </div>
         {% empty %}
             <div class="list-group-item text-muted">

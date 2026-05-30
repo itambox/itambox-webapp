@@ -33,4 +33,7 @@ from .invitation_views import InviteUserView, AcceptInvitationView
 from .tenantrole_views import (
     TenantRoleListView, TenantRoleDetailView, TenantRoleEditView, TenantRoleDeleteView,
 )
+from .tenantmembership_views import (
+    TenantMembershipCreateView, TenantMembershipDeleteView,
+)
 

@@ -10,4 +10,5 @@ from .contact_form import ContactForm, ContactFilterForm
 from .contactrole_form import ContactRoleForm, ContactAssignmentForm, ContactRoleFilterForm
 from .invitation import TenantInvitationForm
 from .tenantrole_form import TenantRoleForm, MATRIX_MODELS
+from .tenantmembership_form import TenantMembershipForm
 
