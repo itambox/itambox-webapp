@@ -161,9 +161,6 @@ def bulk_checkout_task(job_id, asset_pks, target_type_str, target_pk, user_id, n
     try:
         try:
             job = Job.objects.get(pk=job_id)
-
-        try:
-            job = Job.objects.get(pk=job_id)
         except Job.DoesNotExist:
             logger.error(f"Job {job_id} not found during async checkout.")
             return
