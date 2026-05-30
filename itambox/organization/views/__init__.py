@@ -34,6 +34,6 @@ from .tenantrole_views import (
     TenantRoleListView, TenantRoleDetailView, TenantRoleEditView, TenantRoleDeleteView,
 )
 from .tenantmembership_views import (
-    TenantMembershipCreateView, TenantMembershipDeleteView,
+    TenantMembershipListView, TenantMembershipCreateView, TenantMembershipDeleteView,
 )
 

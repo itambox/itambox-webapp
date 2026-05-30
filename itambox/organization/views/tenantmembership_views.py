@@ -2,9 +2,15 @@ from django.shortcuts import redirect, render
 from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 
-from itambox.views.generic import ObjectEditView, ObjectDeleteView
+from itambox.views.generic import ObjectListView, ObjectEditView, ObjectDeleteView
 from ..models import TenantMembership
 from ..forms import TenantMembershipForm
+from ..tables import TenantMembershipTable
+
+class TenantMembershipListView(ObjectListView):
+    queryset = TenantMembership.objects.all()
+    table = TenantMembershipTable
+    action_buttons = ('add',)
 
 class TenantMembershipCreateView(ObjectEditView):
     queryset = TenantMembership.objects.all()

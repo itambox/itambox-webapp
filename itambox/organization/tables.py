@@ -1,7 +1,7 @@
 # itambox/organization/tables.py
 import django_tables2 as tables
 from django_tables2.utils import A
-from .models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, Contact, ContactRole, ContactAssignment, TenantRole
+from .models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, Contact, ContactRole, ContactAssignment, TenantRole, TenantMembership
 from core.tables import ActionsColumn, BaseTable, ToggleColumn
 from extras.tables import TagColumn
 
@@ -237,4 +237,19 @@ class TenantRoleTable(BaseTable):
         model = TenantRole
         fields = ('pk', 'name', 'tenant', 'description', 'actions')
         default_columns = ('pk', 'name', 'tenant', 'description', 'actions')
+
+
+class TenantMembershipTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    user = tables.LinkColumn('users:user_detail', args=[A('user.pk')], verbose_name='User')
+    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant', verbose_name='Tenant')
+    role = tables.LinkColumn('organization:tenantrole_detail', args=[A('role_id')], accessor='role', verbose_name='Role')
+    joined_at = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name='Joined')
+    actions = ActionsColumn(actions=('delete',))
+
+    class Meta(BaseTable.Meta):
+        model = TenantMembership
+        fields = ('pk', 'user', 'tenant', 'role', 'joined_at', 'actions')
+        default_columns = ('pk', 'user', 'tenant', 'role', 'joined_at', 'actions')
+
  

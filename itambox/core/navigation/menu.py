@@ -405,6 +405,32 @@ ADMIN_MENU = Menu(
                         ),
                     ),
                 ),
+                MenuItem(
+                    link='organization:tenantrole_list',
+                    link_text=_('Roles'),
+                    permissions=['organization.view_tenantrole'],
+                    buttons=(
+                        MenuItemButton(
+                            link='organization:tenantrole_create',
+                            title='Add',
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=['organization.add_tenantrole'],
+                        ),
+                    ),
+                ),
+                MenuItem(
+                    link='organization:tenantmembership_list',
+                    link_text=_('Tenant Assignments'),
+                    permissions=['organization.view_tenantmembership'],
+                    buttons=(
+                        MenuItemButton(
+                            link='organization:tenantmembership_create',
+                            title='Add',
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=['organization.add_tenantmembership'],
+                        ),
+                    ),
+                ),
             ),
         ),
     ),

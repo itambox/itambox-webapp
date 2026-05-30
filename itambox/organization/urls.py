@@ -102,7 +102,9 @@ urlpatterns = [
     path('accept-invitation/<uuid:token>/', views.AcceptInvitationView.as_view(), name='accept_invitation'),
 
     # Tenant Memberships
+    path('memberships/', views.TenantMembershipListView.as_view(), name='tenantmembership_list'),
     path('memberships/add/', views.TenantMembershipCreateView.as_view(), name='tenantmembership_create'),
     path('memberships/<int:pk>/delete/', views.TenantMembershipDeleteView.as_view(), name='tenantmembership_delete'),
 ]
+
  
