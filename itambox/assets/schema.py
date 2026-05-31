@@ -2,10 +2,9 @@ import graphene
 from graphene_django import DjangoObjectType
 from .models import Asset, StatusLabel, AssetRole, Manufacturer, Depreciation, AssetType, Supplier, Category
 from organization.models import Location, Tenant
-from core.graphql_utils import check_permission, get_object_or_denied
+from core.graphql_utils import check_permission, get_object_or_denied, paginate_queryset
+from graphql import GraphQLError
 from django.core.exceptions import ValidationError
-
-MAX_PAGINATION_LIMIT = 200
 
 class TenantNode(DjangoObjectType):
     class Meta:
@@ -75,22 +74,20 @@ class Query(graphene.ObjectType):
 
     def resolve_assets(self, info, limit=None, offset=None, sort_by=None, **kwargs):
         check_permission(info, 'assets.view_asset')
-        qs = Asset.objects.all()
+        active_tenant = getattr(info.context, 'active_tenant', None)
+        qs = Asset.objects.filter(tenant=active_tenant)
         for key, val in kwargs.items():
             if val is not None:
                 qs = qs.filter(**{key: val})
         if sort_by and sort_by in ASSET_SORTABLE_FIELDS:
             qs = qs.order_by(sort_by)
-        if offset is not None:
-            qs = qs[offset:]
-        limit = min(limit, MAX_PAGINATION_LIMIT) if limit is not None else MAX_PAGINATION_LIMIT
-        qs = qs[:limit]
-        return qs
+        return paginate_queryset(qs, limit, offset)
 
     def resolve_asset(self, info, id):
         check_permission(info, 'assets.view_asset')
+        active_tenant = getattr(info.context, 'active_tenant', None)
         try:
-            return Asset.objects.get(pk=id)
+            return Asset.objects.filter(tenant=active_tenant).get(pk=id)
         except Asset.DoesNotExist:
             return None
 
@@ -120,23 +117,28 @@ class CreateAsset(graphene.Mutation):
         asset = Asset(tenant=active_tenant)
         
         if 'asset_type_id' in kwargs:
-            asset.asset_type = get_object_or_denied(AssetType, kwargs.pop('asset_type_id'), user)
+            asset.asset_type = get_object_or_denied(AssetType, kwargs.pop('asset_type_id'), user, tenant=active_tenant)
         if 'asset_role_id' in kwargs:
-            asset.asset_role = get_object_or_denied(AssetRole, kwargs.pop('asset_role_id'), user)
+            asset.asset_role = get_object_or_denied(AssetRole, kwargs.pop('asset_role_id'), user, tenant=active_tenant)
         if 'status_id' in kwargs:
-            asset.status = get_object_or_denied(StatusLabel, kwargs.pop('status_id'), user)
+            asset.status = get_object_or_denied(StatusLabel, kwargs.pop('status_id'), user, tenant=active_tenant)
         if 'location_id' in kwargs:
-            asset.location = get_object_or_denied(Location, kwargs.pop('location_id'), user)
+            asset.location = get_object_or_denied(Location, kwargs.pop('location_id'), user, tenant=active_tenant)
         if 'supplier_id' in kwargs:
-            asset.supplier = get_object_or_denied(Supplier, kwargs.pop('supplier_id'), user)
+            asset.supplier = get_object_or_denied(Supplier, kwargs.pop('supplier_id'), user, tenant=active_tenant)
             
+        ALLOWED_FIELDS = {'name', 'asset_tag', 'serial_number', 'purchase_date', 'warranty_expiration', 'purchase_cost', 'salvage_value', 'order_number', 'notes'}
         for key, val in kwargs.items():
-            setattr(asset, key, val)
+            if key in ALLOWED_FIELDS:
+                setattr(asset, key, val)
             
         try:
             asset.full_clean()
         except ValidationError as e:
-            raise Exception(str(e.message_dict if hasattr(e, 'message_dict') else e.messages))
+            raise GraphQLError(
+                "Validation failed",
+                extensions={"validation_errors": e.message_dict if hasattr(e, 'message_dict') else e.messages}
+            )
         asset.save()
         return CreateAsset(asset=asset)
 
@@ -162,27 +164,33 @@ class UpdateAsset(graphene.Mutation):
 
     def mutate(self, info, id, **kwargs):
         user = check_permission(info, 'assets.change_asset')
-        asset = get_object_or_denied(Asset, id, user)
+        active_tenant = getattr(info.context, 'active_tenant', None)
+        asset = get_object_or_denied(Asset, id, user, tenant=active_tenant)
         check_permission(info, 'assets.change_asset', obj=asset)
         
         if 'asset_type_id' in kwargs:
-            asset.asset_type = get_object_or_denied(AssetType, kwargs.pop('asset_type_id'), user)
+            asset.asset_type = get_object_or_denied(AssetType, kwargs.pop('asset_type_id'), user, tenant=active_tenant)
         if 'asset_role_id' in kwargs:
-            asset.asset_role = get_object_or_denied(AssetRole, kwargs.pop('asset_role_id'), user)
+            asset.asset_role = get_object_or_denied(AssetRole, kwargs.pop('asset_role_id'), user, tenant=active_tenant)
         if 'status_id' in kwargs:
-            asset.status = get_object_or_denied(StatusLabel, kwargs.pop('status_id'), user)
+            asset.status = get_object_or_denied(StatusLabel, kwargs.pop('status_id'), user, tenant=active_tenant)
         if 'location_id' in kwargs:
-            asset.location = get_object_or_denied(Location, kwargs.pop('location_id'), user)
+            asset.location = get_object_or_denied(Location, kwargs.pop('location_id'), user, tenant=active_tenant)
         if 'supplier_id' in kwargs:
-            asset.supplier = get_object_or_denied(Supplier, kwargs.pop('supplier_id'), user)
+            asset.supplier = get_object_or_denied(Supplier, kwargs.pop('supplier_id'), user, tenant=active_tenant)
             
+        ALLOWED_FIELDS = {'name', 'asset_tag', 'serial_number', 'purchase_date', 'warranty_expiration', 'purchase_cost', 'salvage_value', 'order_number', 'notes'}
         for key, val in kwargs.items():
-            setattr(asset, key, val)
+            if key in ALLOWED_FIELDS:
+                setattr(asset, key, val)
             
         try:
             asset.full_clean()
         except ValidationError as e:
-            raise Exception(str(e.message_dict if hasattr(e, 'message_dict') else e.messages))
+            raise GraphQLError(
+                "Validation failed",
+                extensions={"validation_errors": e.message_dict if hasattr(e, 'message_dict') else e.messages}
+            )
         asset.save()
         return UpdateAsset(asset=asset)
 
@@ -194,7 +202,8 @@ class DeleteAsset(graphene.Mutation):
 
     def mutate(self, info, id):
         user = check_permission(info, 'assets.delete_asset')
-        asset = get_object_or_denied(Asset, id, user)
+        active_tenant = getattr(info.context, 'active_tenant', None)
+        asset = get_object_or_denied(Asset, id, user, tenant=active_tenant)
         check_permission(info, 'assets.delete_asset', obj=asset)
         asset.delete()
         return DeleteAsset(success=True)

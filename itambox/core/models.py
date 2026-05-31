@@ -549,6 +549,7 @@ class Job(ChangeLoggingMixin, BaseModel):
 
 class NotificationChannel(ChangeLoggingMixin, BaseModel):
     objects = TenantScopingManager()
+    allow_global_tenant = True
 
     TYPE_EMAIL = 'email'
     TYPE_WEBHOOK = 'webhook'
@@ -737,6 +738,7 @@ class DeletableVaultModel(VaultModel, SoftDeleteMixin):
 
 class ReportTemplate(ChangeLoggingMixin, BaseModel):
     objects = TenantScopingManager()
+    allow_global_tenant = True
 
     REPORT_TYPE_ASSET_SUMMARY = 'asset_summary'
     REPORT_TYPE_LICENSE_UTILIZATION = 'license_utilization'
@@ -810,6 +812,7 @@ class ReportTemplate(ChangeLoggingMixin, BaseModel):
 
 class ScheduledReport(ChangeLoggingMixin, BaseModel):
     objects = TenantScopingManager()
+    allow_global_tenant = True
 
     FORMAT_HTML = 'html'
     FORMAT_CSV = 'csv'
@@ -945,6 +948,7 @@ class ReportGenerationArchive(ChangeLoggingMixin, BaseModel):
 
 class AlertRule(ChangeLoggingMixin, BaseModel):
     objects = TenantScopingManager()
+    allow_global_tenant = True
 
     ALERT_TYPE_LOW_STOCK = 'low_stock'
     ALERT_TYPE_UPCOMING_EOL = 'upcoming_eol'

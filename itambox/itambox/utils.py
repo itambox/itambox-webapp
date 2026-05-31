@@ -18,6 +18,8 @@ def get_model_viewname(model, action):
     app_label = model._meta.app_label
     if app_label == 'components':
         app_label = 'assets'
+    elif app_label == 'auth':
+        app_label = 'users'
     model_name = model._meta.model_name
     if app_label == 'core':
         # Core app URL naming traditionally registers f"{model_name}_add" for creation
@@ -203,6 +205,8 @@ def build_breadcrumbs(request, obj=None):
         app_label = model_meta.app_label
         if app_label == 'components':
             app_label = 'assets'
+        elif app_label == 'auth':
+            app_label = 'users'
         list_view_name = f"{app_label}:{model_meta.model_name}_list"
         try:
             list_url = reverse(list_view_name)

@@ -3,10 +3,9 @@ from graphene_django import DjangoObjectType
 from .models import License
 from software.models import Software
 from assets.models import Supplier
-from core.graphql_utils import check_permission, get_object_or_denied
+from core.graphql_utils import check_permission, get_object_or_denied, paginate_queryset
+from graphql import GraphQLError
 from django.core.exceptions import ValidationError
-
-MAX_PAGINATION_LIMIT = 200
 
 class LicenseNode(DjangoObjectType):
     class Meta:
@@ -27,22 +26,20 @@ class Query(graphene.ObjectType):
 
     def resolve_licenses(self, info, limit=None, offset=None, sort_by=None, **kwargs):
         check_permission(info, 'licenses.view_license')
-        qs = License.objects.all()
+        active_tenant = getattr(info.context, 'active_tenant', None)
+        qs = License.objects.filter(tenant=active_tenant)
         for key, val in kwargs.items():
             if val is not None:
                 qs = qs.filter(**{key: val})
         if sort_by and sort_by in LICENSE_SORTABLE_FIELDS:
             qs = qs.order_by(sort_by)
-        if offset is not None:
-            qs = qs[offset:]
-        limit = min(limit, MAX_PAGINATION_LIMIT) if limit is not None else MAX_PAGINATION_LIMIT
-        qs = qs[:limit]
-        return qs
+        return paginate_queryset(qs, limit, offset)
 
     def resolve_license(self, info, id):
         check_permission(info, 'licenses.view_license')
+        active_tenant = getattr(info.context, 'active_tenant', None)
         try:
-            return License.objects.get(pk=id)
+            return License.objects.filter(tenant=active_tenant).get(pk=id)
         except License.DoesNotExist:
             return None
 
@@ -66,19 +63,24 @@ class CreateLicense(graphene.Mutation):
         user = check_permission(info, 'licenses.add_license')
         active_tenant = getattr(info.context, 'active_tenant', None)
         
-        software = get_object_or_denied(Software, software_id, user)
+        software = get_object_or_denied(Software, software_id, user, tenant=active_tenant)
         lic = License(software=software, tenant=active_tenant)
         
         if 'supplier_id' in kwargs:
-            lic.supplier = get_object_or_denied(Supplier, kwargs.pop('supplier_id'), user)
+            lic.supplier = get_object_or_denied(Supplier, kwargs.pop('supplier_id'), user, tenant=active_tenant)
             
+        ALLOWED_FIELDS = {'name', 'license_type', 'product_key', 'seats', 'purchase_date', 'purchase_cost', 'order_number', 'expiration_date', 'notes'}
         for key, val in kwargs.items():
-            setattr(lic, key, val)
+            if key in ALLOWED_FIELDS:
+                setattr(lic, key, val)
             
         try:
             lic.full_clean()
         except ValidationError as e:
-            raise Exception(str(e.message_dict if hasattr(e, 'message_dict') else e.messages))
+            raise GraphQLError(
+                "Validation failed",
+                extensions={"validation_errors": e.message_dict if hasattr(e, 'message_dict') else e.messages}
+            )
         lic.save()
         return CreateLicense(license=lic)
 
@@ -101,21 +103,27 @@ class UpdateLicense(graphene.Mutation):
 
     def mutate(self, info, id, **kwargs):
         user = check_permission(info, 'licenses.change_license')
-        lic = get_object_or_denied(License, id, user)
+        active_tenant = getattr(info.context, 'active_tenant', None)
+        lic = get_object_or_denied(License, id, user, tenant=active_tenant)
         check_permission(info, 'licenses.change_license', obj=lic)
         
         if 'software_id' in kwargs:
-            lic.software = get_object_or_denied(Software, kwargs.pop('software_id'), user)
+            lic.software = get_object_or_denied(Software, kwargs.pop('software_id'), user, tenant=active_tenant)
         if 'supplier_id' in kwargs:
-            lic.supplier = get_object_or_denied(Supplier, kwargs.pop('supplier_id'), user)
+            lic.supplier = get_object_or_denied(Supplier, kwargs.pop('supplier_id'), user, tenant=active_tenant)
             
+        ALLOWED_FIELDS = {'name', 'license_type', 'product_key', 'seats', 'purchase_date', 'purchase_cost', 'order_number', 'expiration_date', 'notes'}
         for key, val in kwargs.items():
-            setattr(lic, key, val)
+            if key in ALLOWED_FIELDS:
+                setattr(lic, key, val)
             
         try:
             lic.full_clean()
         except ValidationError as e:
-            raise Exception(str(e.message_dict if hasattr(e, 'message_dict') else e.messages))
+            raise GraphQLError(
+                "Validation failed",
+                extensions={"validation_errors": e.message_dict if hasattr(e, 'message_dict') else e.messages}
+            )
         lic.save()
         return UpdateLicense(license=lic)
 
@@ -127,7 +135,8 @@ class DeleteLicense(graphene.Mutation):
 
     def mutate(self, info, id):
         user = check_permission(info, 'licenses.delete_license')
-        lic = get_object_or_denied(License, id, user)
+        active_tenant = getattr(info.context, 'active_tenant', None)
+        lic = get_object_or_denied(License, id, user, tenant=active_tenant)
         check_permission(info, 'licenses.delete_license', obj=lic)
         lic.delete()
         return DeleteLicense(success=True)

@@ -40,7 +40,8 @@ class UserProfileView(LoginRequiredMixin, BaseHTMXView, UpdateView):
         context = super().get_context_data(**kwargs)
         context['active_tab'] = 'profile'
         context['user'] = self.request.user
-        context['user_groups'] = self.request.user.groups.all()
+        from organization.models import TenantMembership
+        context['user_memberships'] = TenantMembership.objects.filter(user=self.request.user).select_related('tenant', 'role')
         activity_qs = ObjectChange.objects.filter(user=self.request.user)[:15]
         activity_table = ObjectChangeTable(activity_qs, request=self.request)
         activity_table.configure(self.request, paginate=False)
@@ -168,6 +169,8 @@ class UserApiTokensView(UserGenericTabView):
         if form.is_valid():
             token = form.save(commit=False)
             token.user = request.user
+            from core.managers import get_current_tenant
+            token.tenant = get_current_tenant()
             if form.cleaned_data.get('expires'):
                 from django.utils import timezone
                 import datetime
@@ -381,3 +384,55 @@ class BookmarkToggleView(LoginRequiredMixin, View):
         return redirect(target_obj.get_absolute_url())
 
 
+# User Management Views (Frontend Admin)
+from itambox.views.generic import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
+from .tables import UserTable
+from .filters import UserFilterSet
+from .forms import UserFilterForm, UserForm
+
+class UserListView(ObjectListView):
+    queryset = User.objects.all()
+    filterset = UserFilterSet
+    filterset_form = UserFilterForm
+    table = UserTable
+    action_buttons = ('add',)
+
+
+class UserDetailView(ObjectDetailView):
+    queryset = User.objects.prefetch_related('memberships__tenant', 'memberships__role')
+    template_name = 'users/user_detail.html'
+
+    def has_permission(self):
+        return self.request.user.has_perms(self.get_permission_required())
+
+
+class UserEditView(ObjectEditView):
+    queryset = User.objects.all()
+    model = User
+    model_form = UserForm
+    template_name = 'generic/object_edit.html'
+
+    def has_permission(self):
+        return self.request.user.has_perms(self.get_permission_required())
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
+
+class UserDeleteView(ObjectDeleteView):
+    queryset = User.objects.all()
+    model = User
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('users:user_list')
+
+    def has_permission(self):
+        return self.request.user.has_perms(self.get_permission_required())
+
+    def post(self, request, *args, **kwargs):
+        user_to_delete = self.get_object()
+        if user_to_delete == request.user:
+            messages.error(request, _("You cannot delete your own user account."))
+            return redirect(reverse('users:user_detail', kwargs={'pk': user_to_delete.pk}))
+        return super().post(request, *args, **kwargs)

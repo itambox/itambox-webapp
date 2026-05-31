@@ -12,11 +12,84 @@ from django.conf import settings # Import settings
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Layout
 
 class UserProfileForm(forms.ModelForm):
     class Meta:
         model = User
         fields = ['first_name', 'last_name', 'email']
+
+class UserForm(forms.ModelForm):
+    password = forms.CharField(
+        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
+        required=False,
+        help_text=_("Raw passwords are not stored. If editing a user, leave this blank to keep the current password.")
+    )
+
+    class Meta:
+        model = User
+        fields = ['username', 'first_name', 'last_name', 'email', 'is_active', 'is_staff', 'is_superuser']
+        widgets = {
+            'username': forms.TextInput(attrs={'class': 'form-control'}),
+            'first_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'is_staff': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'is_superuser': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+    def __init__(self, *args, user=None, **kwargs):
+        self.request_user = user
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            self.fields['password'].required = False
+            self.fields['password'].help_text = _("Leave blank to keep the current password.")
+        else:
+            self.fields['password'].required = True
+
+        # Security check: only superusers can modify is_superuser and is_staff
+        if not self.request_user or not self.request_user.is_superuser:
+            if 'is_superuser' in self.fields:
+                self.fields['is_superuser'].disabled = True
+            if 'is_staff' in self.fields:
+                self.fields['is_staff'].disabled = True
+
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+        self.helper.layout = Layout(
+            'username', 'password', 'first_name', 'last_name', 'email', 'is_active', 'is_staff', 'is_superuser'
+        )
+        from organization.forms.helpers import add_standard_buttons
+        add_standard_buttons(self.helper, self.instance, 'users:user_list')
+
+    def clean_is_superuser(self):
+        is_superuser = self.cleaned_data.get('is_superuser')
+        if is_superuser and (not self.request_user or not self.request_user.is_superuser):
+            if self.instance and self.instance.is_superuser:
+                return is_superuser
+            raise forms.ValidationError(_("Only superusers can grant superuser status."))
+        return is_superuser
+
+    def clean_is_staff(self):
+        is_staff = self.cleaned_data.get('is_staff')
+        if is_staff and (not self.request_user or not self.request_user.is_superuser):
+            if self.instance and self.instance.is_staff:
+                return is_staff
+            raise forms.ValidationError(_("Only superusers can grant staff status."))
+        return is_staff
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        password = self.cleaned_data.get('password')
+        if password:
+            user.set_password(password)
+        if commit:
+            user.save()
+            self.save_m2m()
+        return user
 
 class UserPreferencesForm(forms.Form):
     # Define fields explicitly
@@ -192,4 +265,13 @@ class TokenForm(forms.ModelForm):
             'description': forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('e.g., Personal Laptop API Access')}),
             'write_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
+
+
+from core.forms import FilterForm
+from .filters import UserFilterSet
+
+
+class UserFilterForm(FilterForm):
+    filterset_class = UserFilterSet
+
  

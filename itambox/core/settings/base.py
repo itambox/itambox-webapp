@@ -61,6 +61,8 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'users',
     'django_q',
+    'graphene_django',
+    'mozilla_django_oidc',
 ]
 
 MIDDLEWARE = [
@@ -254,8 +256,9 @@ SAML_CSP_HANDLER = ''
 AUTHENTICATION_BACKENDS = [
     'core.auth.TenantMembershipBackend',
     'core.auth.ldap.MultiTenantLDAPBackend',
-    'djangosaml2.backends.Saml2Backend',
-    'django.contrib.auth.backends.ModelBackend',
+    'core.auth.saml.TenantSaml2Backend',
+    'core.auth.oidc.TenantOIDCBackend',
+    'core.auth.PasswordLoginOnlyBackend',
 ]
 
 DEFAULT_PAGINATE_COUNT = 25
@@ -279,6 +282,12 @@ try:
     ITAMBOX_TENANT_SAML_CONFIGS = json.loads(os.environ.get('ITAMBOX_TENANT_SAML_CONFIGS', '{}'))
 except Exception:
     ITAMBOX_TENANT_SAML_CONFIGS = {}
+
+try:
+    ITAMBOX_TENANT_OIDC_CONFIGS = json.loads(os.environ.get('ITAMBOX_TENANT_OIDC_CONFIGS', '{}'))
+except Exception as e:
+    logging.getLogger(__name__).warning('Failed to parse ITAMBOX_TENANT_OIDC_CONFIGS: %s', e)
+    ITAMBOX_TENANT_OIDC_CONFIGS = {}
 
 
 # SAML SSO Configuration Loader
@@ -336,6 +345,11 @@ PLUGINS_CONFIG = {
 import sys
 from itambox.plugins.utils import load_plugins
 load_plugins(sys.modules[__name__])
+
+GRAPHENE = {
+    'SCHEMA': 'core.schema.schema',
+    'MIDDLEWARE': [],
+}
 
 
 

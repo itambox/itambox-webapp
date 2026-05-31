@@ -26,21 +26,21 @@
         </div>
     </div>
 
-    {# Assigned Groups Card #}
+    {# Tenant Memberships Card #}
     <div class="col-md-6">
         <div class="card">
             <div class="card-header">
-                <h3 class="card-title">{% trans "Assigned Groups" %}</h3>
+                <h3 class="card-title">{% trans "Tenant Memberships" %}</h3>
             </div>
             <div class="card-body">
-                {% if user_groups %}
+                {% if user_memberships %}
                     <ul class="list-unstyled">
-                        {% for group in user_groups %}
-                            <li>{{ group.name }}</li>
+                        {% for membership in user_memberships %}
+                            <li><i class="mdi mdi-domain me-1"></i> <strong>{{ membership.tenant.name }}</strong> ({{ membership.role.name }})</li>
                         {% endfor %}
                     </ul>
                 {% else %}
-                    <p class="text-muted">{% trans "User is not assigned to any groups." %}</p>
+                    <p class="text-muted">{% trans "User has no active tenant memberships." %}</p>
                 {% endif %}
             </div>
         </div>

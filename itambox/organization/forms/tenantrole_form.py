@@ -4,6 +4,7 @@ from crispy_forms.layout import Layout
 from ..models import TenantRole, Tenant
 
 MATRIX_MODELS = {
+    # Inventory & Hardware
     'asset': {
         'label': 'Assets',
         'app': 'assets',
@@ -46,6 +47,8 @@ MATRIX_MODELS = {
         'model_name': 'component',
         'group': 'Inventory & Hardware',
     },
+
+    # Software & Subscriptions
     'license': {
         'label': 'Licenses',
         'app': 'licenses',
@@ -64,6 +67,8 @@ MATRIX_MODELS = {
         'model_name': 'subscription',
         'group': 'Software & Subscriptions',
     },
+
+    # Organization & Structure
     'location': {
         'label': 'Locations',
         'app': 'organization',
@@ -88,6 +93,44 @@ MATRIX_MODELS = {
         'model_name': 'tenantrole',
         'group': 'Organization & Structure',
     },
+    'region': {
+        'label': 'Regions',
+        'app': 'organization',
+        'model_name': 'region',
+        'group': 'Organization & Structure',
+    },
+    'sitegroup': {
+        'label': 'Site Groups',
+        'app': 'organization',
+        'model_name': 'sitegroup',
+        'group': 'Organization & Structure',
+    },
+    'tenantgroup': {
+        'label': 'Tenant Groups',
+        'app': 'organization',
+        'model_name': 'tenantgroup',
+        'group': 'Organization & Structure',
+    },
+    'contact': {
+        'label': 'Contacts',
+        'app': 'organization',
+        'model_name': 'contact',
+        'group': 'Organization & Structure',
+    },
+    'contactrole': {
+        'label': 'Contact Roles',
+        'app': 'organization',
+        'model_name': 'contactrole',
+        'group': 'Organization & Structure',
+    },
+    'tenantinvitation': {
+        'label': 'Tenant Invitations',
+        'app': 'organization',
+        'model_name': 'tenantinvitation',
+        'group': 'Organization & Structure',
+    },
+
+    # Metadata & Settings
     'manufacturer': {
         'label': 'Manufacturers',
         'app': 'assets',
@@ -136,6 +179,20 @@ MATRIX_MODELS = {
         'model_name': 'customfield',
         'group': 'Metadata & Settings',
     },
+    'tag': {
+        'label': 'Tags',
+        'app': 'extras',
+        'model_name': 'tag',
+        'group': 'Metadata & Settings',
+    },
+    'configcontext': {
+        'label': 'Config Contexts',
+        'app': 'extras',
+        'model_name': 'configcontext',
+        'group': 'Metadata & Settings',
+    },
+
+    # System & Reporting
     'reporttemplate': {
         'label': 'Report Templates',
         'app': 'core',
@@ -147,6 +204,90 @@ MATRIX_MODELS = {
         'app': 'core',
         'model_name': 'scheduledreport',
         'group': 'System & Reporting',
+    },
+    'alertrule': {
+        'label': 'Alert Rules',
+        'app': 'core',
+        'model_name': 'alertrule',
+        'group': 'System & Reporting',
+    },
+    'alertlog': {
+        'label': 'Alert Logs',
+        'app': 'core',
+        'model_name': 'alertlog',
+        'group': 'System & Reporting',
+    },
+    'notificationchannel': {
+        'label': 'Notification Channels',
+        'app': 'core',
+        'model_name': 'notificationchannel',
+        'group': 'System & Reporting',
+    },
+    'exporttemplate': {
+        'label': 'Export Templates',
+        'app': 'core',
+        'model_name': 'exporttemplate',
+        'group': 'System & Reporting',
+    },
+    'webhookendpoint': {
+        'label': 'Webhook Endpoints',
+        'app': 'core',
+        'model_name': 'webhookendpoint',
+        'group': 'System & Reporting',
+    },
+    'eventrule': {
+        'label': 'Event Rules',
+        'app': 'core',
+        'model_name': 'eventrule',
+        'group': 'System & Reporting',
+    },
+    'labeltemplate': {
+        'label': 'Label Templates',
+        'app': 'core',
+        'model_name': 'labeltemplate',
+        'group': 'System & Reporting',
+    },
+
+    # Compliance & Custody
+    'custodytemplate': {
+        'label': 'Custody Templates',
+        'app': 'compliance',
+        'model_name': 'custodytemplate',
+        'group': 'Compliance & Custody',
+    },
+    'custodyreceipt': {
+        'label': 'Custody Receipts',
+        'app': 'compliance',
+        'model_name': 'custodyreceipt',
+        'group': 'Compliance & Custody',
+    },
+    'assetmaintenance': {
+        'label': 'Asset Maintenances',
+        'app': 'compliance',
+        'model_name': 'assetmaintenance',
+        'group': 'Compliance & Custody',
+    },
+
+    # User Management
+    'user': {
+        'label': 'Users',
+        'app': 'auth',
+        'model_name': 'user',
+        'group': 'User Management',
+    },
+    'token': {
+        'label': 'API Tokens',
+        'app': 'users',
+        'model_name': 'token',
+        'group': 'User Management',
+    },
+
+    # Plugins
+    'docusignenvelope': {
+        'label': 'DocuSign Envelopes',
+        'app': 'itambox_esign',
+        'model_name': 'docusignenvelope',
+        'group': 'Plugins',
     },
 }
 

@@ -13,6 +13,20 @@ from itambox.middleware import TenantMiddleware, CurrentUserMiddleware
 
 @method_decorator(csrf_exempt, name='dispatch')
 class PrivateGraphQLView(GraphQLView):
+    def __init__(self, *args, **kwargs):
+        from graphql.validation import specified_rules
+        from graphql.validation import NoSchemaIntrospectionCustomRule
+        from graphene.validation import depth_limit_validator
+        
+        rules = list(specified_rules)
+        rules.append(depth_limit_validator(max_depth=10))
+        
+        if not settings.DEBUG:
+            rules.append(NoSchemaIntrospectionCustomRule)
+            
+        kwargs['validation_rules'] = rules
+        super().__init__(*args, **kwargs)
+
     @property
     def graphiql(self):
         return settings.DEBUG
@@ -45,5 +59,16 @@ class PrivateGraphQLView(GraphQLView):
                     return JsonResponse({'errors': [{'message': str(e)}]}, status=401)
                 except Exception as e:
                     return JsonResponse({'errors': [{'message': 'Authentication failed'}]}, status=401)
+            
+            # Perform rate limiting / throttling checks
+            from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
+            throttles = [AnonRateThrottle(), UserRateThrottle()]
+            for throttle in throttles:
+                if not throttle.allow_request(request, self):
+                    wait = throttle.wait()
+                    return JsonResponse(
+                        {'errors': [{'message': f'Request was throttled. Expected available in {wait} seconds.'}]},
+                        status=429
+                    )
                     
         return super().dispatch(request, *args, **kwargs)

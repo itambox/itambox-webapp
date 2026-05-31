@@ -1,11 +1,33 @@
 import logging
 from django.contrib.auth import get_user_model
+from django.contrib.auth.backends import ModelBackend
+from core.managers import get_current_membership
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
-from core.managers import get_current_membership
+class PasswordLoginOnlyBackend(ModelBackend):
+    """
+    A custom authentication backend that delegates authentication (username/password validation)
+    to ModelBackend but rejects all permissions checking (has_perm/has_module_perms) to prevent
+    bypassing the custom multi-tenant RBAC system.
+    """
+    def has_perm(self, user_obj, perm, obj=None):
+        return False
+
+    def has_module_perms(self, user_obj, app_label):
+        return False
+
+    def get_all_permissions(self, user_obj, obj=None):
+        return set()
+
+    def get_user_permissions(self, user_obj, obj=None):
+        return set()
+
+    def get_group_permissions(self, user_obj, obj=None):
+        return set()
+
 
 class TenantMembershipBackend:
     """

@@ -56,6 +56,18 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
         # Do not call super().__init__() because it assigns settings statically
         self.UserModel = get_user_model()
 
+    def has_perm(self, user_obj, perm, obj=None):
+        return False
+
+    def has_module_perms(self, user_obj, app_label):
+        return False
+
+    def get_group_permissions(self, user_obj, obj=None):
+        return set()
+
+    def get_all_permissions(self, user_obj, obj=None):
+        return set()
+
     def filter_users_by_claims(self, claims):
         email = claims.get('email')
         if email:

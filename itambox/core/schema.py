@@ -1,5 +1,6 @@
 import graphene
 import importlib
+import logging
 from django.apps import apps
 from django.conf import settings
 import assets.schema
@@ -7,6 +8,8 @@ import software.schema
 import licenses.schema
 import components.schema
 import inventory.schema
+
+logger = logging.getLogger(__name__)
 
 query_bases = [
     assets.schema.Query,
@@ -35,10 +38,8 @@ for plugin_name in getattr(settings, 'PLUGINS', []):
                 query_bases.append(getattr(schema_module, 'Query'))
             if hasattr(schema_module, 'Mutation'):
                 mutation_bases.append(getattr(schema_module, 'Mutation'))
-    except LookupError:
-        pass
-    except ImportError:
-        pass
+    except (LookupError, ImportError) as e:
+        logger.warning("Failed to load GraphQL schema for plugin %s: %s", plugin_name, e)
 
 query_bases.append(graphene.ObjectType)
 mutation_bases.append(graphene.ObjectType)

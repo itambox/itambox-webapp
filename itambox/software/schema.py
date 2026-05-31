@@ -2,10 +2,9 @@ import graphene
 from graphene_django import DjangoObjectType
 from .models import Software
 from assets.models import Manufacturer
-from core.graphql_utils import check_permission, get_object_or_denied
+from core.graphql_utils import check_permission, get_object_or_denied, paginate_queryset
+from graphql import GraphQLError
 from django.core.exceptions import ValidationError
-
-MAX_PAGINATION_LIMIT = 200
 
 class SoftwareNode(DjangoObjectType):
     class Meta:
@@ -33,11 +32,7 @@ class Query(graphene.ObjectType):
                 qs = qs.filter(**{key: val})
         if sort_by and sort_by in SOFTWARE_SORTABLE_FIELDS:
             qs = qs.order_by(sort_by)
-        if offset is not None:
-            qs = qs[offset:]
-        limit = min(limit, MAX_PAGINATION_LIMIT) if limit is not None else MAX_PAGINATION_LIMIT
-        qs = qs[:limit]
-        return qs
+        return paginate_queryset(qs, limit, offset)
 
     def resolve_software(self, info, id):
         check_permission(info, 'software.view_software')
@@ -60,12 +55,22 @@ class CreateSoftware(graphene.Mutation):
 
     def mutate(self, info, manufacturer_id, **kwargs):
         user = check_permission(info, 'software.add_software')
-        manufacturer = get_object_or_denied(Manufacturer, manufacturer_id, user)
-        software = Software(manufacturer=manufacturer, **kwargs)
+        active_tenant = getattr(info.context, 'active_tenant', None)
+        manufacturer = get_object_or_denied(Manufacturer, manufacturer_id, user, tenant=active_tenant)
+        
+        software = Software(manufacturer=manufacturer)
+        ALLOWED_FIELDS = {'name', 'version', 'category', 'license_type', 'website', 'description'}
+        for key, val in kwargs.items():
+            if key in ALLOWED_FIELDS:
+                setattr(software, key, val)
+                
         try:
             software.full_clean()
         except ValidationError as e:
-            raise Exception(str(e.message_dict if hasattr(e, 'message_dict') else e.messages))
+            raise GraphQLError(
+                "Validation failed",
+                extensions={"validation_errors": e.message_dict if hasattr(e, 'message_dict') else e.messages}
+            )
         software.save()
         return CreateSoftware(software=software)
 
@@ -84,19 +89,25 @@ class UpdateSoftware(graphene.Mutation):
 
     def mutate(self, info, id, **kwargs):
         user = check_permission(info, 'software.change_software')
-        software = get_object_or_denied(Software, id, user)
+        active_tenant = getattr(info.context, 'active_tenant', None)
+        software = get_object_or_denied(Software, id, user, tenant=active_tenant)
         check_permission(info, 'software.change_software', obj=software)
         
         if 'manufacturer_id' in kwargs:
-            software.manufacturer = get_object_or_denied(Manufacturer, kwargs.pop('manufacturer_id'), user)
+            software.manufacturer = get_object_or_denied(Manufacturer, kwargs.pop('manufacturer_id'), user, tenant=active_tenant)
             
+        ALLOWED_FIELDS = {'name', 'version', 'category', 'license_type', 'website', 'description'}
         for key, val in kwargs.items():
-            setattr(software, key, val)
+            if key in ALLOWED_FIELDS:
+                setattr(software, key, val)
             
         try:
             software.full_clean()
         except ValidationError as e:
-            raise Exception(str(e.message_dict if hasattr(e, 'message_dict') else e.messages))
+            raise GraphQLError(
+                "Validation failed",
+                extensions={"validation_errors": e.message_dict if hasattr(e, 'message_dict') else e.messages}
+            )
         software.save()
         return UpdateSoftware(software=software)
 
@@ -108,7 +119,8 @@ class DeleteSoftware(graphene.Mutation):
 
     def mutate(self, info, id):
         user = check_permission(info, 'software.delete_software')
-        software = get_object_or_denied(Software, id, user)
+        active_tenant = getattr(info.context, 'active_tenant', None)
+        software = get_object_or_denied(Software, id, user, tenant=active_tenant)
         check_permission(info, 'software.delete_software', obj=software)
         software.delete()
         return DeleteSoftware(success=True)
