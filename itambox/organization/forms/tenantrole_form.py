@@ -271,7 +271,7 @@ MATRIX_MODELS = {
     # User Management
     'user': {
         'label': 'Users',
-        'app': 'users',
+        'app': 'auth',
         'model_name': 'user',
         'group': 'User Management',
     },
