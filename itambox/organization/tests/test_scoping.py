@@ -95,17 +95,17 @@ class OrganizationTenantScopingTests(TestCase):
 
         sites = list(Site.objects.all())
         self.assertIn(self.site_a, sites)
-        self.assertIn(self.site_global, sites)
+        self.assertNotIn(self.site_global, sites)
         self.assertNotIn(self.site_b, sites)
 
         locs = list(Location.objects.all())
         self.assertIn(self.loc_a, locs)
-        self.assertIn(self.loc_global, locs)
+        self.assertNotIn(self.loc_global, locs)
         self.assertNotIn(self.loc_b, locs)
 
         holders = list(AssetHolder.objects.all())
         self.assertIn(self.holder_a, holders)
-        self.assertIn(self.holder_global, holders)
+        self.assertNotIn(self.holder_global, holders)
         self.assertNotIn(self.holder_b, holders)
 
     def test_tenant_b_scoping(self):
@@ -118,17 +118,17 @@ class OrganizationTenantScopingTests(TestCase):
 
         sites = list(Site.objects.all())
         self.assertIn(self.site_b, sites)
-        self.assertIn(self.site_global, sites)
+        self.assertNotIn(self.site_global, sites)
         self.assertNotIn(self.site_a, sites)
 
         locs = list(Location.objects.all())
         self.assertIn(self.loc_b, locs)
-        self.assertIn(self.loc_global, locs)
+        self.assertNotIn(self.loc_global, locs)
         self.assertNotIn(self.loc_a, locs)
 
         holders = list(AssetHolder.objects.all())
         self.assertIn(self.holder_b, holders)
-        self.assertIn(self.holder_global, holders)
+        self.assertNotIn(self.holder_global, holders)
         self.assertNotIn(self.holder_a, holders)
 
     def test_no_tenant_scoping(self):
@@ -175,7 +175,7 @@ class OrganizationTenantScopingTests(TestCase):
         
         sites = list(Site.objects.all())
         self.assertIn(self.site_a, sites)
-        self.assertIn(self.site_global, sites)
+        self.assertNotIn(self.site_global, sites)
         self.assertNotIn(site_c, sites)
         self.assertNotIn(self.site_b, sites)
 
@@ -189,7 +189,7 @@ class OrganizationTenantScopingTests(TestCase):
 
         sites = list(Site.objects.all())
         self.assertIn(self.site_a, sites)
-        self.assertIn(self.site_global, sites)
+        self.assertNotIn(self.site_global, sites)
         self.assertIn(site_c, sites)
         self.assertNotIn(self.site_b, sites)
 
