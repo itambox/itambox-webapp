@@ -268,7 +268,6 @@ MATRIX_MODELS = {
         'group': 'Compliance & Custody',
     },
 
-    # User Management
     'user': {
         'label': 'Users',
         'app': 'auth',
