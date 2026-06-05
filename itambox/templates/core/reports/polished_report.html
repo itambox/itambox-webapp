@@ -1,0 +1,286 @@
+{% load utility_tags %}
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            color: #1e293b;
+            line-height: 1.5;
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 24px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #ffffff;
+            padding: 32px;
+            text-align: left;
+        }
+        .header h2 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        .header p {
+            margin: 8px 0 0 0;
+            opacity: 0.85;
+            font-size: 14px;
+        }
+        .content {
+            padding: 32px;
+        }
+        .meta {
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 24px;
+            font-family: monospace;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .metrics {
+            display: flex;
+            flex-wrap: wrap;
+            margin-bottom: 32px;
+            gap: 16px;
+        }
+        .metric-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 16px;
+            flex: 1;
+            min-width: 140px;
+            text-align: center;
+        }
+        .metric-card .value {
+            font-size: 22px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-top: 4px;
+        }
+        .metric-card .label {
+            font-size: 11px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+        .group-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #475569;
+            background: #f1f5f9;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-top: 28px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 24px;
+        }
+        th, td {
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        th {
+            color: #475569;
+            font-weight: 600;
+            background: #f8fafc;
+        }
+        
+        /* Layout Presets styling */
+        {% if is_compact %}
+        th, td {
+            padding: 6px 8px;
+            font-size: 11px;
+        }
+        {% else %}
+        th, td {
+            padding: 12px 14px;
+            font-size: 13px;
+        }
+        {% endif %}
+        
+        {% if is_financial %}
+        td:contains('$') {
+            font-weight: 700;
+            color: #0f766e;
+        }
+        {% endif %}
+        
+        .footer {
+            background: #f8fafc;
+            padding: 24px;
+            text-align: center;
+            font-size: 12px;
+            color: #64748b;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        /* Print Media Stylesheet */
+        @media print {
+            body {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            .container {
+                border: none !important;
+                box-shadow: none !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            .header {
+                background: none !important;
+                color: #000000 !important;
+                padding: 0 0 20px 0 !important;
+                border-bottom: 2px solid #0f172a !important;
+            }
+            .header h2 {
+                color: #000000 !important;
+                font-size: 28px !important;
+            }
+            .header p {
+                color: #475569 !important;
+                opacity: 1 !important;
+            }
+            .content {
+                padding: 20px 0 !important;
+            }
+            .metrics {
+                margin-bottom: 20px !important;
+                gap: 12px !important;
+            }
+            .metric-card {
+                border: 1px solid #cbd5e1 !important;
+                background: #ffffff !important;
+                padding: 12px !important;
+            }
+            .metric-card .value {
+                color: #000000 !important;
+            }
+            table {
+                page-break-inside: auto !important;
+            }
+            tr {
+                page-break-inside: avoid !important;
+                page-break-after: auto !important;
+            }
+            thead {
+                display: table-header-group !important;
+            }
+            th {
+                background: #f1f5f9 !important;
+                color: #000000 !important;
+                border-bottom: 2px solid #cbd5e1 !important;
+            }
+            td {
+                border-bottom: 1px solid #e2e8f0 !important;
+            }
+            .footer {
+                background: none !important;
+                border-top: 1px solid #cbd5e1 !important;
+                color: #64748b !important;
+                padding: 12px 0 !important;
+            }
+            .no-print, .print-btn {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>{{ report_name }}</h2>
+            <p>{{ description|default:"Visual inventory compilation." }}</p>
+        </div>
+        <div class="content">
+            <div class="meta">
+                <div>
+                    GENERATED: {{ generated_at|date:"Y-m-d H:i:s" }} UTC | STYLE: {{ style_preset|upper }}
+                </div>
+                <button type="button" class="no-print" onclick="window.print();" style="cursor: pointer; display: inline-flex; align-items: center; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 12px; font-size: 11px; font-weight: 600; color: #334155; transition: all 0.15s ease;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; vertical-align: middle;"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2" /><path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4" /><path d="M7 13m0 2a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2z" /></svg>
+                    Print Report
+                </button>
+            </div>
+            
+            {% if summary_cards %}
+            <div class="metrics">
+                {% for card in summary_cards %}
+                <div class="metric-card">
+                    <div class="label">{{ card.label }}</div>
+                    <div class="value">{{ card.value }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if distribution_chart %}
+            <div style="margin-bottom: 32px;" class="chart-wrapper">
+                {{ distribution_chart|safe }}
+            </div>
+            {% endif %}
+            
+            {% for group_name, group_rows in grouped_data.items %}
+                {% if group_name != 'General' %}
+                <div class="group-title">{{ group_name }}</div>
+                {% endif %}
+                <table>
+                    <thead>
+                        <tr>
+                            {% for head in headers %}
+                            <th>{{ head }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in group_rows %}
+                        <tr>
+                            {% for head in headers %}
+                            <td>{{ row|lookup:head }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="{{ headers|length }}" style="text-align: center; color: #64748b; padding: 20px;">
+                                No records found.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endfor %}
+        </div>
+        <div class="footer">
+            Sent automatically by ITAMbox — IT Asset Management Console.
+        </div>
+    </div>
+    <script>
+        if (window.location.search.includes('print=true')) {
+            window.onload = function() {
+                window.print();
+            }
+        }
+    </script>
+</body>
+</html>

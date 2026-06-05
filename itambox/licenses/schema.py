@@ -27,7 +27,12 @@ class Query(graphene.ObjectType):
     def resolve_licenses(self, info, limit=None, offset=None, sort_by=None, **kwargs):
         check_permission(info, 'licenses.view_license')
         active_tenant = getattr(info.context, 'active_tenant', None)
-        qs = License.objects.filter(tenant=active_tenant)
+        qs = License.objects.select_related(
+            'software',
+            'software__manufacturer',
+            'supplier',
+            'tenant'
+        ).filter(tenant=active_tenant)
         for key, val in kwargs.items():
             if val is not None:
                 qs = qs.filter(**{key: val})
@@ -39,7 +44,12 @@ class Query(graphene.ObjectType):
         check_permission(info, 'licenses.view_license')
         active_tenant = getattr(info.context, 'active_tenant', None)
         try:
-            return License.objects.filter(tenant=active_tenant).get(pk=id)
+            return License.objects.select_related(
+                'software',
+                'software__manufacturer',
+                'supplier',
+                'tenant'
+            ).filter(tenant=active_tenant).get(pk=id)
         except License.DoesNotExist:
             return None
 

@@ -4,6 +4,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema
 from core.api.permissions import TokenPermissions, StrictTenantPermission
 
 from core.api.viewsets import ITAMBoxModelViewSet, ITAMBoxReadOnlyModelViewSet
@@ -38,6 +39,10 @@ class AssetViewSet(ITAMBoxModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filterset_class = AssetFilterSet
 
+    @extend_schema(
+        request=AssetCheckOutAPISerializer,
+        responses={200: {"type": "object", "properties": {"status": {"type": "string"}, "message": {"type": "string"}}}}
+    )
     @action(detail=True, methods=['post'], serializer_class=AssetCheckOutAPISerializer)
     def checkout(self, request, pk=None):
         """
@@ -63,6 +68,10 @@ class AssetViewSet(ITAMBoxModelViewSet):
             status=status.HTTP_200_OK
         )
 
+    @extend_schema(
+        request=AssetCheckInAPISerializer,
+        responses={200: {"type": "object", "properties": {"status": {"type": "string"}, "message": {"type": "string"}}}}
+    )
     @action(detail=True, methods=['post'], serializer_class=AssetCheckInAPISerializer)
     def checkin(self, request, pk=None):
         """

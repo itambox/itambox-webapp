@@ -49,9 +49,14 @@ class Accessory(AutoSlugMixin, SubscribableMixin, DeletableVaultModel):
 
     class Meta:
         ordering = ('manufacturer', 'name')
-        unique_together = ('manufacturer', 'name')
         verbose_name = _("Accessory")
         verbose_name_plural = _("Accessories")
+        constraints = [
+            models.UniqueConstraint(
+                fields=['manufacturer', 'name'],
+                name='inventory_accessory_unique_manufacturer_name'
+            )
+        ]
 
     def __str__(self):
         return f"{self.manufacturer.name} {self.name}"
@@ -95,9 +100,14 @@ class AccessoryStock(ChangeLoggingMixin, BaseModel):
 
     class Meta:
         ordering = ('accessory', 'location')
-        unique_together = ('accessory', 'location')
         verbose_name = _("Accessory Stock")
         verbose_name_plural = _("Accessory Stocks")
+        constraints = [
+            models.UniqueConstraint(
+                fields=['accessory', 'location'],
+                name='inventory_accessorystock_unique_accessory_location'
+            )
+        ]
 
     def __str__(self):
         return f"{self.accessory.name} @ {self.location.name}: {self.qty}"
@@ -140,65 +150,15 @@ class AccessoryAssignment(ChangeLoggingMixin, BaseModel):
         return f"{self.qty}x {self.accessory} assigned to {recipient}"
 
     def save(self, *args, **kwargs):
-        from django.db import transaction
-        from django.core.exceptions import ValidationError
-        from .models import AccessoryStock
-
-        with transaction.atomic():
-            is_new = self.pk is None
-            if is_new:
-                if self.from_location:
-                    stock, _ = AccessoryStock.objects.select_for_update().get_or_create(
-                        accessory=self.accessory,
-                        location=self.from_location,
-                        defaults={'qty': 0}
-                    )
-                    if not self.accessory.allow_overallocate and stock.qty < self.qty:
-                        raise ValidationError(
-                            f"Insufficient stock at {self.from_location}. Available: {stock.qty}, Requested: {self.qty}"
-                        )
-                    stock.qty = max(0, stock.qty - self.qty)
-                    stock.save(update_fields=['qty'])
-            else:
-                old_instance = AccessoryAssignment.objects.get(pk=self.pk)
-                # Revert old stock allocation
-                if old_instance.from_location:
-                    old_stock, _ = AccessoryStock.objects.select_for_update().get_or_create(
-                        accessory=old_instance.accessory,
-                        location=old_instance.from_location,
-                        defaults={'qty': 0}
-                    )
-                    old_stock.qty += old_instance.qty
-                    old_stock.save(update_fields=['qty'])
-                # Apply new stock allocation
-                if self.from_location:
-                    new_stock, _ = AccessoryStock.objects.select_for_update().get_or_create(
-                        accessory=self.accessory,
-                        location=self.from_location,
-                        defaults={'qty': 0}
-                    )
-                    if not self.accessory.allow_overallocate and new_stock.qty < self.qty:
-                        raise ValidationError(
-                            f"Insufficient stock at {self.from_location}. Available: {new_stock.qty}, Requested: {self.qty}"
-                        )
-                    new_stock.qty = max(0, new_stock.qty - self.qty)
-                    new_stock.save(update_fields=['qty'])
-            super().save(*args, **kwargs)
+        from .services import adjust_inventory_stock
+        adjust_inventory_stock(self)
+        super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
-        from django.db import transaction
-        from .models import AccessoryStock
+        from .services import adjust_inventory_stock
+        adjust_inventory_stock(self, is_delete=True)
+        super().delete(*args, **kwargs)
 
-        with transaction.atomic():
-            if self.from_location:
-                stock, _ = AccessoryStock.objects.select_for_update().get_or_create(
-                    accessory=self.accessory,
-                    location=self.from_location,
-                    defaults={'qty': 0}
-                )
-                stock.qty += self.qty
-                stock.save(update_fields=['qty'])
-            super().delete(*args, **kwargs)
 
 
 class Consumable(AutoSlugMixin, SoftDeleteMixin, StandardModel, ImageAttachmentMixin, SubscribableMixin):
@@ -231,9 +191,14 @@ class Consumable(AutoSlugMixin, SoftDeleteMixin, StandardModel, ImageAttachmentM
 
     class Meta:
         ordering = ('manufacturer', 'name')
-        unique_together = ('manufacturer', 'name')
         verbose_name = _("Consumable")
         verbose_name_plural = _("Consumables")
+        constraints = [
+            models.UniqueConstraint(
+                fields=['manufacturer', 'name'],
+                name='inventory_consumable_unique_manufacturer_name'
+            )
+        ]
 
     def __str__(self):
         return f"{self.manufacturer.name} {self.name}"
@@ -277,9 +242,14 @@ class ConsumableStock(ChangeLoggingMixin, BaseModel):
 
     class Meta:
         ordering = ('consumable', 'location')
-        unique_together = ('consumable', 'location')
         verbose_name = _("Consumable Stock")
         verbose_name_plural = _("Consumable Stocks")
+        constraints = [
+            models.UniqueConstraint(
+                fields=['consumable', 'location'],
+                name='inventory_consumablestock_unique_consumable_location'
+            )
+        ]
 
     def __str__(self):
         return f"{self.consumable.name} @ {self.location.name}: {self.qty}"
@@ -322,65 +292,17 @@ class ConsumableAssignment(ChangeLoggingMixin, BaseModel):
         return f"{self.qty}x {self.consumable} consumed by {recipient}"
 
     def save(self, *args, **kwargs):
-        from django.db import transaction
-        from django.core.exceptions import ValidationError
-        from .models import ConsumableStock
-
-        with transaction.atomic():
-            is_new = self.pk is None
-            if is_new:
-                if self.from_location:
-                    stock, _ = ConsumableStock.objects.select_for_update().get_or_create(
-                        consumable=self.consumable,
-                        location=self.from_location,
-                        defaults={'qty': 0}
-                    )
-                    if not self.consumable.allow_overallocate and stock.qty < self.qty:
-                        raise ValidationError(
-                            f"Insufficient stock at {self.from_location}. Available: {stock.qty}, Requested: {self.qty}"
-                        )
-                    stock.qty = max(0, stock.qty - self.qty)
-                    stock.save(update_fields=['qty'])
-            else:
-                old_instance = ConsumableAssignment.objects.get(pk=self.pk)
-                # Revert old stock allocation
-                if old_instance.from_location:
-                    old_stock, _ = ConsumableStock.objects.select_for_update().get_or_create(
-                        consumable=old_instance.consumable,
-                        location=old_instance.from_location,
-                        defaults={'qty': 0}
-                    )
-                    old_stock.qty += old_instance.qty
-                    old_stock.save(update_fields=['qty'])
-                # Apply new stock allocation
-                if self.from_location:
-                    new_stock, _ = ConsumableStock.objects.select_for_update().get_or_create(
-                        consumable=self.consumable,
-                        location=self.from_location,
-                        defaults={'qty': 0}
-                    )
-                    if not self.consumable.allow_overallocate and new_stock.qty < self.qty:
-                        raise ValidationError(
-                            f"Insufficient stock at {self.from_location}. Available: {new_stock.qty}, Requested: {self.qty}"
-                        )
-                    new_stock.qty = max(0, new_stock.qty - self.qty)
-                    new_stock.save(update_fields=['qty'])
-            super().save(*args, **kwargs)
+        from .services import adjust_inventory_stock
+        adjust_inventory_stock(self)
+        super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
-        from django.db import transaction
-        from .models import ConsumableStock
+        from .services import adjust_inventory_stock
+        adjust_inventory_stock(self, is_delete=True)
+        super().delete(*args, **kwargs)
 
-        with transaction.atomic():
-            if self.from_location:
-                stock, _ = ConsumableStock.objects.select_for_update().get_or_create(
-                    consumable=self.consumable,
-                    location=self.from_location,
-                    defaults={'qty': 0}
-                )
-                stock.qty += self.qty
-                stock.save(update_fields=['qty'])
-            super().delete(*args, **kwargs)
+
+
 
 
 class Kit(JournalingMixin, TaggableMixin, CloneableMixin, ExportableMixin, SoftDeleteMixin, ChangeLoggingMixin, BaseModel):

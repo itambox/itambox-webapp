@@ -332,9 +332,14 @@ class Bookmark(ChangeLoggingMixin, BaseModel):
         ordering = ['-created']
         verbose_name = "Bookmark"
         verbose_name_plural = "Bookmarks"
-        unique_together = ('user', 'model', 'object_id')
         indexes = [
             models.Index(fields=['user', 'model', 'object_id']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'model', 'object_id'],
+                name='core_bookmark_unique_user_model_object'
+            )
         ]
 
     def __str__(self):
@@ -664,9 +669,14 @@ class ExportTemplate(BaseModel):
 
     class Meta:
         ordering = ['content_type', 'name']
-        unique_together = [['content_type', 'name']]
         verbose_name = "Export Template"
         verbose_name_plural = "Export Templates"
+        constraints = [
+            models.UniqueConstraint(
+                fields=['content_type', 'name'],
+                name='core_exporttemplate_unique_content_type_name'
+            )
+        ]
 
     def __str__(self):
         return f"{self.content_type.model} - {self.name}"

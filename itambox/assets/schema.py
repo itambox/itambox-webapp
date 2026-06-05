@@ -75,7 +75,19 @@ class Query(graphene.ObjectType):
     def resolve_assets(self, info, limit=None, offset=None, sort_by=None, **kwargs):
         check_permission(info, 'assets.view_asset')
         active_tenant = getattr(info.context, 'active_tenant', None)
-        qs = Asset.objects.filter(tenant=active_tenant)
+        qs = Asset.objects.select_related(
+            'asset_type',
+            'asset_type__manufacturer',
+            'asset_type__category',
+            'asset_type__depreciation',
+            'asset_type__asset_role',
+            'asset_role',
+            'status',
+            'location',
+            'location__site',
+            'tenant',
+            'supplier'
+        ).filter(tenant=active_tenant)
         for key, val in kwargs.items():
             if val is not None:
                 qs = qs.filter(**{key: val})
@@ -87,7 +99,19 @@ class Query(graphene.ObjectType):
         check_permission(info, 'assets.view_asset')
         active_tenant = getattr(info.context, 'active_tenant', None)
         try:
-            return Asset.objects.filter(tenant=active_tenant).get(pk=id)
+            return Asset.objects.select_related(
+                'asset_type',
+                'asset_type__manufacturer',
+                'asset_type__category',
+                'asset_type__depreciation',
+                'asset_type__asset_role',
+                'asset_role',
+                'status',
+                'location',
+                'location__site',
+                'tenant',
+                'supplier'
+            ).filter(tenant=active_tenant).get(pk=id)
         except Asset.DoesNotExist:
             return None
 

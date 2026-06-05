@@ -210,9 +210,12 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel):
     requestable = models.BooleanField(default=False, db_index=True, help_text="Allow users to request assets of this type")
 
     class Meta:
-        unique_together = ('manufacturer', 'model')
+        constraints = [
+            models.UniqueConstraint(fields=['manufacturer', 'model'], name='unique_manufacturer_model')
+        ]
         verbose_name = _("Asset Type")
         verbose_name_plural = _("Asset Types")
+
 
     def __str__(self):
         return f"{self.manufacturer.name} {self.model}"
@@ -532,10 +535,13 @@ class InstalledSoftware(ChangeLoggingMixin, BaseModel):
     )
 
     class Meta:
-        unique_together = ('asset', 'software', 'version_detected') # Allow tracking same sw multiple times if version changes
+        constraints = [
+            models.UniqueConstraint(fields=['asset', 'software', 'version_detected'], name='unique_asset_software_version')
+        ]
         ordering = ['asset', 'software', '-last_seen_date']
         verbose_name = _("Installed Software Instance")
         verbose_name_plural = _("Installed Software Instances")
+
 
     def __str__(self):
         version_part = f" (v{self.version_detected})" if self.version_detected else ""
@@ -944,7 +950,10 @@ class AssetAudit(models.Model):
 
     class Meta:
         ordering = ['-timestamp']
-        unique_together = ('session', 'asset')  # Single verification per asset per campaign
+        constraints = [
+            models.UniqueConstraint(fields=['session', 'asset'], name='unique_session_asset')
+        ]
         verbose_name = _("Asset Audit")
         verbose_name_plural = _("Asset Audits")
+
 

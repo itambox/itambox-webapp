@@ -78,7 +78,9 @@ class Component(AutoSlugMixin, SoftDeleteMixin, StandardModel, ImageAttachmentMi
 
     class Meta:
         ordering = ('manufacturer', 'name')
-        unique_together = ('manufacturer', 'name')
+        constraints = [
+            models.UniqueConstraint(fields=['manufacturer', 'name'], name='unique_component_manufacturer_name')
+        ]
         verbose_name = _("Component (Catalog)")
         verbose_name_plural = _("Components (Catalog)")
 
@@ -119,7 +121,9 @@ class ComponentStock(ChangeLoggingMixin, BaseModel):
 
     class Meta:
         ordering = ('component', 'location')
-        unique_together = ('component', 'location')
+        constraints = [
+            models.UniqueConstraint(fields=['component', 'location'], name='unique_component_location')
+        ]
         verbose_name = _("Component Stock")
         verbose_name_plural = _("Component Stocks")
 

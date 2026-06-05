@@ -36,17 +36,26 @@ class SoftwareAPITests(APITestCase):
             license_type="proprietary"
         )
 
-        # Grant specific software permission codenames to staff user for TokenPermissions validation
-        from django.contrib.auth.models import Permission
-        from django.contrib.contenttypes.models import ContentType
-        
-        content_type = ContentType.objects.get_for_model(Software)
-        for codename in ['view_software', 'add_software', 'change_software', 'delete_software']:
-            permission = Permission.objects.get(
-                codename=codename,
-                content_type=content_type,
-            )
-            self.staff.user_permissions.add(permission)
+        # Grant specific software permission codenames to staff user via multi-tenant RBAC system
+        from organization.models import Tenant, TenantRole, TenantMembership
+        self.tenant = baker.make(Tenant, name="Test Tenant", slug="test-tenant")
+        self.role = baker.make(
+            TenantRole,
+            tenant=self.tenant,
+            name="Staff Role",
+            permissions=[
+                'software.view_software',
+                'software.add_software',
+                'software.change_software',
+                'software.delete_software'
+            ]
+        )
+        self.membership = baker.make(
+            TenantMembership,
+            user=self.staff,
+            tenant=self.tenant,
+            role=self.role
+        )
 
     def test_software_api_list_and_detail(self):
         self.client.force_authenticate(user=self.staff)

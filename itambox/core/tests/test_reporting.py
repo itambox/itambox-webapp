@@ -151,7 +151,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         )
         
         # Test direct compilation of context
-        from core.reports_charts import compile_report_context
+        from core.reports import compile_report_context
         headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(self.template)
         
         self.assertIn('Total Hardware Assets', [c['label'] for c in summary_cards])
@@ -174,7 +174,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
 
     def test_new_report_types_compilation(self):
         """Test that the new report types compile context and preview successfully."""
-        from core.reports_charts import compile_report_context
+        from core.reports import compile_report_context
         
         # 1. Test asset_depreciation
         deprec_template = ReportTemplate.objects.create(

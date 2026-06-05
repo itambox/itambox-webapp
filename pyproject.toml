@@ -39,6 +39,7 @@ dev = [
     "tblib>=3.0,<4.0",
     "django-debug-toolbar>=4.4,<5.0",
     "model_bakery",
+    "pytest-cov",
 ]
 celery = [
     "celery>=5.4,<5.7",
@@ -56,4 +57,24 @@ include = ["itambox*"]
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "core.settings"
 python_files = ["tests.py", "test_*.py"]
-addopts = ["--tb=short", "-p", "no:warnings"]
+addopts = ["--tb=short", "-p", "no:warnings", "--cov=.", "--cov-report=html", "--cov-report=term"]
+norecursedirs = [".venv", "scratch", "node_modules", ".git", ".agents", ".*"]
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "manage.py",
+    "core/wsgi.py",
+    "core/asgi.py",
+    "itambox/wsgi.py",
+    "itambox/asgi.py",
+]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+
+
+

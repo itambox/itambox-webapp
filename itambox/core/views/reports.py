@@ -290,7 +290,7 @@ class ReportTemplatePreviewView(PermissionRequiredMixin, View):
             template_content=template_content
         )
 
-        from core.reports_charts import compile_report_context, get_polished_system_html_template
+        from core.reports import compile_report_context, get_polished_system_html_template
         
         try:
             headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(
@@ -348,7 +348,7 @@ class ReportTemplateDownloadView(PermissionRequiredMixin, LoginRequiredMixin, Vi
         # Enforce sandboxed constellation
         filter_tenants = list(template.filter_tenants.all())
         
-        from core.reports_charts import compile_report_context, get_polished_system_html_template
+        from core.reports import compile_report_context, get_polished_system_html_template
         
         try:
             headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(

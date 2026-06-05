@@ -20,9 +20,19 @@ class ImportExportPermissionTestCase(TestCase):
             username='guestuser', password='password123', is_staff=False, is_superuser=False
         )
 
-        # Grant staff standard view permission on assets
-        view_perm = Permission.objects.get(codename='view_asset')
-        self.staff.user_permissions.add(view_perm)
+        # Grant staff standard view permission on assets via multi-tenant RBAC
+        from organization.models import Tenant, TenantRole, TenantMembership
+        self.tenant = Tenant.objects.create(name='Test Tenant', slug='test-tenant')
+        self.role = TenantRole.objects.create(
+            tenant=self.tenant,
+            name='Staff Role',
+            permissions=['assets.view_asset']
+        )
+        self.membership = TenantMembership.objects.create(
+            user=self.staff,
+            tenant=self.tenant,
+            role=self.role
+        )
 
     def test_list_view_gating_without_add_permission(self):
         # Log in as staff (with only view permission, no add permission)
@@ -41,9 +51,9 @@ class ImportExportPermissionTestCase(TestCase):
         self.assertContains(response, 'Export')
 
     def test_list_view_gating_with_add_permission(self):
-        # Grant add permission to staff
-        add_perm = Permission.objects.get(codename='add_asset')
-        self.staff.user_permissions.add(add_perm)
+        # Grant add permission to staff by updating the role permissions
+        self.role.permissions = ['assets.view_asset', 'assets.add_asset']
+        self.role.save()
         
         # Log in as staff
         self.client.login(username='staffuser', password='password123')

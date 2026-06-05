@@ -92,16 +92,6 @@ class TenantMembershipBackend:
                     from core.managers import set_current_tenant
                     set_current_tenant(holder.tenant)
                     return ModelBackend().has_perm(user_obj, perm, obj)
-                else:
-                    import sys
-                    is_testing = 'test' in sys.argv or any('test' in arg or 'pytest' in arg for arg in sys.argv)
-                    if is_testing:
-                        from organization.models import Tenant
-                        first_tenant = Tenant.objects.first()
-                        if first_tenant:
-                            from core.managers import set_current_tenant
-                            set_current_tenant(first_tenant)
-                        return ModelBackend().has_perm(user_obj, perm, obj)
 
         if not membership or not getattr(membership, 'role', None):
             return False
@@ -129,16 +119,6 @@ class TenantMembershipBackend:
                     from core.managers import set_current_tenant
                     set_current_tenant(holder.tenant)
                     return ModelBackend().has_module_perms(user_obj, app_label)
-                else:
-                    import sys
-                    is_testing = 'test' in sys.argv or any('test' in arg or 'pytest' in arg for arg in sys.argv)
-                    if is_testing:
-                        from organization.models import Tenant
-                        first_tenant = Tenant.objects.first()
-                        if first_tenant:
-                            from core.managers import set_current_tenant
-                            set_current_tenant(first_tenant)
-                        return ModelBackend().has_module_perms(user_obj, app_label)
         if not membership or not getattr(membership, 'role', None):
             return False
         

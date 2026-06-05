@@ -32,7 +32,10 @@ class Command(BaseCommand):
         total_purged = 0
 
         for model in models_with_soft_delete:
-            queryset = model.all_objects.filter(deleted_at__lt=cutoff)
+            if model._meta.abstract:
+                continue
+            manager = getattr(model, 'all_objects', model._base_manager)
+            queryset = manager.filter(deleted_at__lt=cutoff)
             count = queryset.count()
             if count == 0:
                 continue

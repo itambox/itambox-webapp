@@ -26,7 +26,11 @@ class Query(graphene.ObjectType):
     def resolve_components(self, info, limit=None, offset=None, sort_by=None, **kwargs):
         check_permission(info, 'components.view_component')
         active_tenant = getattr(info.context, 'active_tenant', None)
-        qs = Component.objects.filter(tenant=active_tenant)
+        qs = Component.objects.select_related(
+            'manufacturer',
+            'category',
+            'tenant'
+        ).filter(tenant=active_tenant)
         for key, val in kwargs.items():
             if val is not None:
                 qs = qs.filter(**{key: val})
@@ -38,7 +42,11 @@ class Query(graphene.ObjectType):
         check_permission(info, 'components.view_component')
         active_tenant = getattr(info.context, 'active_tenant', None)
         try:
-            return Component.objects.filter(tenant=active_tenant).get(pk=id)
+            return Component.objects.select_related(
+                'manufacturer',
+                'category',
+                'tenant'
+            ).filter(tenant=active_tenant).get(pk=id)
         except Component.DoesNotExist:
             return None
 

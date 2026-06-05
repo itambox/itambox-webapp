@@ -1,28 +1,34 @@
 from django.db import models
 from django.core.exceptions import FieldError, FieldDoesNotExist
+from django.db.models import QuerySet
+from typing import Any, Optional, List
 from .querysets import CustomQuerySet
 import contextvars
 
 _current_tenant = contextvars.ContextVar('current_tenant', default=None)
 _current_tenant_group = contextvars.ContextVar('current_tenant_group', default=None)
 _current_membership = contextvars.ContextVar('current_membership', default=None)
+_descendant_group_ids_cache = contextvars.ContextVar('descendant_group_ids_cache', default=None)
 
-def set_current_tenant(tenant):
+def set_current_tenant(tenant: Optional[Any]) -> None:
     _current_tenant.set(tenant)
+    _descendant_group_ids_cache.set(None)
 
-def get_current_tenant():
+def get_current_tenant() -> Optional[Any]:
     return _current_tenant.get()
 
-def set_current_tenant_group(group):
+def set_current_tenant_group(group: Optional[Any]) -> None:
     _current_tenant_group.set(group)
+    _descendant_group_ids_cache.set(None)
 
-def get_current_tenant_group():
+def get_current_tenant_group() -> Optional[Any]:
     return _current_tenant_group.get()
 
-def set_current_membership(membership):
+def set_current_membership(membership: Optional[Any]) -> None:
     _current_membership.set(membership)
+    _descendant_group_ids_cache.set(None)
 
-def get_current_membership():
+def get_current_membership() -> Optional[Any]:
     return _current_membership.get()
 
 
@@ -36,15 +42,15 @@ class CustomManager(models.Manager):
 
 
 class SoftDeleteQuerySet(models.QuerySet):
-    def deleted(self):
+    def deleted(self) -> QuerySet:
         return self.filter(deleted_at__isnull=False)
 
-    def active(self):
+    def active(self) -> QuerySet:
         return self.filter(deleted_at__isnull=True)
 
 
 class SoftDeleteManager(models.Manager.from_queryset(SoftDeleteQuerySet)):
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet:
         qs = super().get_queryset()
         try:
             return qs.filter(deleted_at__isnull=True)
@@ -57,7 +63,7 @@ class AllObjectsManager(models.Manager.from_queryset(SoftDeleteQuerySet)):
 
 
 class TenantScopingQuerySet(models.QuerySet):
-    def filter_by_tenant(self):
+    def filter_by_tenant(self) -> QuerySet:
         active_tenant = get_current_tenant()
         active_group = get_current_tenant_group()
 
@@ -68,6 +74,13 @@ class TenantScopingQuerySet(models.QuerySet):
             def get_descendant_group_ids(group_id):
                 if not group_id:
                     return []
+                cache = _descendant_group_ids_cache.get()
+                if cache is None:
+                    cache = {}
+                    _descendant_group_ids_cache.set(cache)
+                if group_id in cache:
+                    return cache[group_id]
+
                 TenantGroup = apps.get_model('organization', 'TenantGroup')
                 descendant_ids = [group_id]
                 to_check = [group_id]
@@ -77,6 +90,7 @@ class TenantScopingQuerySet(models.QuerySet):
                         break
                     descendant_ids.extend(children)
                     to_check = children
+                cache[group_id] = descendant_ids
                 return descendant_ids
 
             if active_tenant:

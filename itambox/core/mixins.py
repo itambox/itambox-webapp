@@ -271,41 +271,10 @@ class AutoSlugMixin:
 
     def save(self, *args, **kwargs):
         if not getattr(self, 'slug', None):
-            from django.utils.text import slugify
-            
-            # Resolve slug source
-            if isinstance(self.slug_source, (list, tuple)):
-                source_values = []
-                for field_name in self.slug_source:
-                    # Support double underscore relation lookup (e.g. manufacturer__name)
-                    if '__' in field_name:
-                        parts = field_name.split('__')
-                        obj = self
-                        for part in parts:
-                            obj = getattr(obj, part, None) if obj else None
-                        val = str(obj) if obj else ""
-                    else:
-                        val = getattr(self, field_name, "")
-                    if val:
-                        source_values.append(str(val))
-                slug_src = "-".join(source_values)
-            else:
-                slug_src = getattr(self, self.slug_source, "")
-            
-            # Slugify the resolved source string
-            self.slug = slugify(slug_src) or "auto-slug"
-            
-            # Handle collision
-            base_slug = self.slug
-            counter = 1
-            model_class = self.__class__
-            manager = getattr(model_class, '_base_manager', model_class.objects)
-            
-            while manager.filter(slug=self.slug).exclude(pk=self.pk).exists():
-                self.slug = f"{base_slug}-{counter}"
-                counter += 1
-                
+            from core.utils import generate_unique_slug
+            generate_unique_slug(self, self.slug_source)
         super().save(*args, **kwargs)
+
 
 
 class SubscribableMixin(models.Model):

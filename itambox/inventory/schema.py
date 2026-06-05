@@ -56,7 +56,12 @@ class Query(graphene.ObjectType):
     def resolve_accessories(self, info, limit=None, offset=None, sort_by=None, **kwargs):
         check_permission(info, 'inventory.view_accessory')
         active_tenant = getattr(info.context, 'active_tenant', None)
-        qs = Accessory.objects.filter(tenant=active_tenant)
+        qs = Accessory.objects.select_related(
+            'manufacturer',
+            'category',
+            'supplier',
+            'tenant'
+        ).filter(tenant=active_tenant)
         for key, val in kwargs.items():
             if val is not None:
                 qs = qs.filter(**{key: val})
@@ -68,14 +73,23 @@ class Query(graphene.ObjectType):
         check_permission(info, 'inventory.view_accessory')
         active_tenant = getattr(info.context, 'active_tenant', None)
         try:
-            return Accessory.objects.filter(tenant=active_tenant).get(pk=id)
+            return Accessory.objects.select_related(
+                'manufacturer',
+                'category',
+                'supplier',
+                'tenant'
+            ).filter(tenant=active_tenant).get(pk=id)
         except Accessory.DoesNotExist:
             return None
 
     def resolve_consumables(self, info, limit=None, offset=None, sort_by=None, **kwargs):
         check_permission(info, 'inventory.view_consumable')
         active_tenant = getattr(info.context, 'active_tenant', None)
-        qs = Consumable.objects.filter(tenant=active_tenant)
+        qs = Consumable.objects.select_related(
+            'manufacturer',
+            'category',
+            'tenant'
+        ).filter(tenant=active_tenant)
         for key, val in kwargs.items():
             if val is not None:
                 qs = qs.filter(**{key: val})
@@ -87,14 +101,18 @@ class Query(graphene.ObjectType):
         check_permission(info, 'inventory.view_consumable')
         active_tenant = getattr(info.context, 'active_tenant', None)
         try:
-            return Consumable.objects.filter(tenant=active_tenant).get(pk=id)
+            return Consumable.objects.select_related(
+                'manufacturer',
+                'category',
+                'tenant'
+            ).filter(tenant=active_tenant).get(pk=id)
         except Consumable.DoesNotExist:
             return None
 
     def resolve_kits(self, info, limit=None, offset=None, sort_by=None, **kwargs):
         check_permission(info, 'inventory.view_kit')
         active_tenant = getattr(info.context, 'active_tenant', None)
-        qs = Kit.objects.filter(tenant=active_tenant)
+        qs = Kit.objects.select_related('tenant').filter(tenant=active_tenant)
         for key, val in kwargs.items():
             if val is not None:
                 qs = qs.filter(**{key: val})
@@ -106,7 +124,7 @@ class Query(graphene.ObjectType):
         check_permission(info, 'inventory.view_kit')
         active_tenant = getattr(info.context, 'active_tenant', None)
         try:
-            return Kit.objects.filter(tenant=active_tenant).get(pk=id)
+            return Kit.objects.select_related('tenant').filter(tenant=active_tenant).get(pk=id)
         except Kit.DoesNotExist:
             return None
 

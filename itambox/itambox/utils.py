@@ -248,3 +248,50 @@ def get_help_url(view_instance, app_label=None, model_name=None):
     elif os.path.exists(dir_target):
         return f"{settings.STATIC_URL}docs/{doc_path}/index.html"
     return None
+
+
+def generate_unique_slug(instance, slug_source=None, slug_field='slug'):
+    """
+    Helper to automatically generate a unique slug field on an instance.
+    By default, it will slugify the field specified by instance.slug_source (default: 'name').
+    It handles list/tuple of field names and double-underscore relation lookups (e.g. manufacturer__name).
+    If there is a collision, it appends a counter to ensure uniqueness.
+    """
+    if getattr(instance, slug_field, None):
+        return
+        
+    from django.utils.text import slugify
+    
+    if slug_source is None:
+        slug_source = getattr(instance, 'slug_source', 'name')
+        
+    if isinstance(slug_source, (list, tuple)):
+        source_values = []
+        for field_name in slug_source:
+            if '__' in field_name:
+                parts = field_name.split('__')
+                obj = instance
+                for part in parts:
+                    obj = getattr(obj, part, None) if obj else None
+                val = str(obj) if obj else ""
+            else:
+                val = getattr(instance, field_name, "")
+            if val:
+                source_values.append(str(val))
+        slug_src = "-".join(source_values)
+    else:
+        slug_src = getattr(instance, slug_source, "")
+        
+    slug_val = slugify(slug_src) or "auto-slug"
+    base_slug = slug_val
+    counter = 1
+    model_class = instance.__class__
+    manager = getattr(model_class, '_base_manager', model_class.objects)
+    
+    current_slug = base_slug
+    while manager.filter(**{slug_field: current_slug}).exclude(pk=instance.pk).exists():
+        current_slug = f"{base_slug}-{counter}"
+        counter += 1
+        
+    setattr(instance, slug_field, current_slug)
+

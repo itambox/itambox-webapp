@@ -13,9 +13,15 @@ paths:
         schema:
           type: integer
       - in: query
+        name: assigned_user_id
+        schema:
+          type: integer
+          nullable: true
+      - in: query
         name: checked_out_by_id
         schema:
           type: integer
+          nullable: true
       - in: query
         name: is_active
         schema:
@@ -1029,6 +1035,16 @@ paths:
     get:
       operationId: assets_asset_tag_sequences_list
       parameters:
+      - in: query
+        name: category
+        schema:
+          type: integer
+        description: Category
+      - in: query
+        name: is_active
+        schema:
+          type: boolean
+        description: Active
       - name: limit
         required: false
         in: query
@@ -1057,6 +1073,11 @@ paths:
           by pk.'
         schema:
           type: integer
+      - in: query
+        name: tenant
+        schema:
+          type: integer
+        description: Tenant
       tags:
       - assets
       security:
@@ -1538,6 +1559,16 @@ paths:
         schema:
           type: integer
         description: Asset Type
+      - in: query
+        name: assigned_to
+        schema:
+          type: integer
+        description: Assigned To
+      - in: query
+        name: category
+        schema:
+          type: integer
+        description: Category
       - name: limit
         required: false
         in: query
@@ -1838,13 +1869,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AssetRequest'
+              $ref: '#/components/schemas/AssetCheckInAPIRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/AssetRequest'
+              $ref: '#/components/schemas/AssetCheckInAPIRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/AssetRequest'
+              $ref: '#/components/schemas/AssetCheckInAPIRequest'
       security:
       - TokenAuth: []
       - cookieAuth: []
@@ -1854,7 +1885,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Asset'
+                type: object
+                properties:
+                  status:
+                    type: string
+                  message:
+                    type: string
           description: ''
   /api/assets/assets/{id}/checkout/:
     post:
@@ -1889,7 +1925,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AssetCheckOutAPI'
+                type: object
+                properties:
+                  status:
+                    type: string
+                  message:
+                    type: string
           description: ''
   /api/assets/audit-sessions/:
     get:
@@ -10988,6 +11029,21 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/plugins/itambox_esign/:
+    get:
+      operationId: plugins_itambox_esign_retrieve
+      description: |-
+        Mock API ViewSet for DocuSign Integration.
+        Exposes endpoints at /api/plugins/itambox_esign/.
+      tags:
+      - plugins
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
   /api/schema/:
     get:
       operationId: schema_retrieve
@@ -12266,6 +12322,220 @@ paths:
               schema:
                 $ref: '#/components/schemas/SubscriptionStatus'
           description: ''
+  /api/tenants/{tenant_slug}/scim/v2/Groups:
+    get:
+      operationId: tenants_scim_v2_Groups_retrieve
+      parameters:
+      - in: path
+        name: tenant_slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - tenants
+      responses:
+        '200':
+          description: No response body
+    post:
+      operationId: tenants_scim_v2_Groups_create
+      parameters:
+      - in: path
+        name: tenant_slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - tenants
+      responses:
+        '200':
+          description: No response body
+  /api/tenants/{tenant_slug}/scim/v2/Groups/{id}:
+    get:
+      operationId: tenants_scim_v2_Groups_retrieve_2
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: tenant_slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - tenants
+      responses:
+        '200':
+          description: No response body
+    put:
+      operationId: tenants_scim_v2_Groups_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: tenant_slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - tenants
+      responses:
+        '200':
+          description: No response body
+    patch:
+      operationId: tenants_scim_v2_Groups_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: tenant_slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - tenants
+      responses:
+        '200':
+          description: No response body
+    delete:
+      operationId: tenants_scim_v2_Groups_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: tenant_slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - tenants
+      responses:
+        '204':
+          description: No response body
+  /api/tenants/{tenant_slug}/scim/v2/ServiceProviderConfig:
+    get:
+      operationId: tenants_scim_v2_ServiceProviderConfig_retrieve
+      parameters:
+      - in: path
+        name: tenant_slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - tenants
+      responses:
+        '200':
+          description: No response body
+  /api/tenants/{tenant_slug}/scim/v2/Users:
+    get:
+      operationId: tenants_scim_v2_Users_retrieve
+      parameters:
+      - in: path
+        name: tenant_slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - tenants
+      responses:
+        '200':
+          description: No response body
+    post:
+      operationId: tenants_scim_v2_Users_create
+      parameters:
+      - in: path
+        name: tenant_slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - tenants
+      responses:
+        '200':
+          description: No response body
+  /api/tenants/{tenant_slug}/scim/v2/Users/{id}:
+    get:
+      operationId: tenants_scim_v2_Users_retrieve_2
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: tenant_slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - tenants
+      responses:
+        '200':
+          description: No response body
+    put:
+      operationId: tenants_scim_v2_Users_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: tenant_slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - tenants
+      responses:
+        '200':
+          description: No response body
+    patch:
+      operationId: tenants_scim_v2_Users_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: tenant_slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - tenants
+      responses:
+        '200':
+          description: No response body
+    delete:
+      operationId: tenants_scim_v2_Users_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: tenant_slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - tenants
+      responses:
+        '204':
+          description: No response body
   /api/users/:
     get:
       operationId: users_retrieve
@@ -13223,19 +13493,16 @@ components:
       - asset_id
       - location_id
       - status_id
-    AssetCheckOutAPI:
+    AssetCheckInAPIRequest:
       type: object
       properties:
-        holder_id:
+        status_id:
           type: integer
           nullable: true
         location_id:
           type: integer
           nullable: true
-        asset_target_id:
-          type: integer
-          nullable: true
-        expected_checkin:
+        checkin_date:
           type: string
           format: date
           nullable: true
@@ -13252,6 +13519,9 @@ components:
           type: integer
           nullable: true
         asset_target_id:
+          type: integer
+          nullable: true
+        status_id:
           type: integer
           nullable: true
         expected_checkin:
@@ -13423,7 +13693,7 @@ components:
           - $ref: '#/components/schemas/NestedAssetType'
           readOnly: true
         status:
-          $ref: '#/components/schemas/Status7dbEnum'
+          $ref: '#/components/schemas/Status3dcEnum'
         status_display:
           type: string
           readOnly: true
@@ -13483,7 +13753,7 @@ components:
           writeOnly: true
           nullable: true
         status:
-          $ref: '#/components/schemas/Status7dbEnum'
+          $ref: '#/components/schemas/Status3dcEnum'
         response_date:
           type: string
           format: date-time
@@ -13562,6 +13832,8 @@ components:
           readOnly: true
         prefix:
           type: string
+          default: ASSET-
+          description: Prefix for generated asset tags (e.g. ASSET-)
           maxLength: 20
         next_value:
           type: integer
@@ -13571,6 +13843,18 @@ components:
           type: integer
           maximum: 32767
           minimum: 0
+        tenant:
+          type: integer
+          nullable: true
+          description: The tenant owning this sequence. Null represents system-wide/global
+            sequences.
+        category:
+          type: integer
+          nullable: true
+          description: The asset category this sequence applies to. Null represents
+            default sequences.
+        is_active:
+          type: boolean
         created_at:
           type: string
           format: date-time
@@ -13589,6 +13873,8 @@ components:
         prefix:
           type: string
           minLength: 1
+          default: ASSET-
+          description: Prefix for generated asset tags (e.g. ASSET-)
           maxLength: 20
         next_value:
           type: integer
@@ -13598,6 +13884,18 @@ components:
           type: integer
           maximum: 32767
           minimum: 0
+        tenant:
+          type: integer
+          nullable: true
+          description: The tenant owning this sequence. Null represents system-wide/global
+            sequences.
+        category:
+          type: integer
+          nullable: true
+          description: The asset category this sequence applies to. Null represents
+            default sequences.
+        is_active:
+          type: boolean
     AssetType:
       type: object
       properties:
@@ -13629,6 +13927,10 @@ components:
         category:
           type: integer
           nullable: true
+        asset_role:
+          allOf:
+          - $ref: '#/components/schemas/NestedAssetRole'
+          readOnly: true
         depreciation:
           allOf:
           - $ref: '#/components/schemas/Depreciation'
@@ -13663,6 +13965,7 @@ components:
           format: date-time
           readOnly: true
       required:
+      - asset_role
       - created_at
       - depreciation
       - id
@@ -13699,6 +14002,10 @@ components:
           description: Lifespan in months before EOL replacement
         category:
           type: integer
+          nullable: true
+        assetrole_id:
+          type: integer
+          writeOnly: true
           nullable: true
         depreciation_id:
           type: integer
@@ -15496,7 +15803,6 @@ components:
           type: string
           maxLength: 50
       required:
-      - asset_tag
       - id
       - name
     NestedAssetRequest:
@@ -15508,10 +15814,8 @@ components:
           maxLength: 255
         asset_tag:
           type: string
-          minLength: 1
           maxLength: 50
       required:
-      - asset_tag
       - name
     NestedAssetRole:
       type: object
@@ -17282,7 +17586,6 @@ components:
           maxLength: 255
         asset_tag:
           type: string
-          minLength: 1
           maxLength: 50
         serial_number:
           type: string
@@ -17358,7 +17661,7 @@ components:
           writeOnly: true
           nullable: true
         status:
-          $ref: '#/components/schemas/Status7dbEnum'
+          $ref: '#/components/schemas/Status3dcEnum'
         response_date:
           type: string
           format: date-time
@@ -17393,6 +17696,8 @@ components:
         prefix:
           type: string
           minLength: 1
+          default: ASSET-
+          description: Prefix for generated asset tags (e.g. ASSET-)
           maxLength: 20
         next_value:
           type: integer
@@ -17402,6 +17707,18 @@ components:
           type: integer
           maximum: 32767
           minimum: 0
+        tenant:
+          type: integer
+          nullable: true
+          description: The tenant owning this sequence. Null represents system-wide/global
+            sequences.
+        category:
+          type: integer
+          nullable: true
+          description: The asset category this sequence applies to. Null represents
+            default sequences.
+        is_active:
+          type: boolean
     PatchedAssetTypeRequest:
       type: object
       properties:
@@ -17430,6 +17747,10 @@ components:
           description: Lifespan in months before EOL replacement
         category:
           type: integer
+          nullable: true
+        assetrole_id:
+          type: integer
+          writeOnly: true
           nullable: true
         depreciation_id:
           type: integer
@@ -18152,7 +18473,7 @@ components:
           - $ref: '#/components/schemas/SubscriptionTypeEnum'
           title: Subscription Type
         status:
-          $ref: '#/components/schemas/StatusE67Enum'
+          $ref: '#/components/schemas/Status098Enum'
         tenant_id:
           type: integer
           writeOnly: true
@@ -18222,7 +18543,7 @@ components:
       description: Serializer for updating only the status of a Subscription.
       properties:
         status:
-          $ref: '#/components/schemas/StatusE67Enum'
+          $ref: '#/components/schemas/Status098Enum'
     PatchedSupplierRequest:
       type: object
       properties:
@@ -18824,21 +19145,7 @@ components:
       required:
       - manufacturer_id
       - name
-    Status7dbEnum:
-      enum:
-      - pending
-      - approved
-      - denied
-      - fulfilled
-      - cancelled
-      type: string
-      description: |-
-        * `pending` - Pending
-        * `approved` - Approved
-        * `denied` - Denied
-        * `fulfilled` - Fulfilled
-        * `cancelled` - Cancelled
-    StatusE67Enum:
+    Status098Enum:
       enum:
       - active
       - expired
@@ -18856,6 +19163,20 @@ components:
         * `suspended` - Suspended
         * `renewing` - Renewing
         * `trial` - Trial
+    Status3dcEnum:
+      enum:
+      - pending
+      - approved
+      - denied
+      - fulfilled
+      - cancelled
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `approved` - Approved
+        * `denied` - Denied
+        * `fulfilled` - Fulfilled
+        * `cancelled` - Cancelled
     StatusLabel:
       type: object
       properties:
@@ -18966,7 +19287,7 @@ components:
           type: string
           readOnly: true
         status:
-          $ref: '#/components/schemas/StatusE67Enum'
+          $ref: '#/components/schemas/Status098Enum'
         status_display:
           type: string
           readOnly: true
@@ -19163,7 +19484,7 @@ components:
           - $ref: '#/components/schemas/SubscriptionTypeEnum'
           title: Subscription Type
         status:
-          $ref: '#/components/schemas/StatusE67Enum'
+          $ref: '#/components/schemas/Status098Enum'
         tenant_id:
           type: integer
           writeOnly: true
@@ -19236,7 +19557,7 @@ components:
       description: Serializer for updating only the status of a Subscription.
       properties:
         status:
-          $ref: '#/components/schemas/StatusE67Enum'
+          $ref: '#/components/schemas/Status098Enum'
       required:
       - status
     SubscriptionTypeEnum:

@@ -2,10 +2,22 @@ from django.db import transaction
 from django.db.models import Sum
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
+from typing import Tuple, Any, Optional
 from .models import AccessoryAssignment, ConsumableAssignment, AccessoryStock, ConsumableStock
 
 
-def checkout_accessory(accessory, qty, holder=None, location=None, asset=None, user=None, notes="", source_location=None, request=None, **kwargs):
+def checkout_accessory(
+    accessory: Any,
+    qty: int,
+    holder: Optional[Any] = None,
+    location: Optional[Any] = None,
+    asset: Optional[Any] = None,
+    user: Optional[Any] = None,
+    notes: str = "",
+    source_location: Optional[Any] = None,
+    request: Optional[Any] = None,
+    **kwargs: Any
+) -> AccessoryAssignment:
     if not holder and not location and not asset:
         raise ValidationError("Either holder, location, or asset must be specified.")
 
@@ -37,7 +49,7 @@ def checkout_accessory(accessory, qty, holder=None, location=None, asset=None, u
     return assignment
 
 
-def checkin_accessory(assignment_pk, user=None):
+def checkin_accessory(assignment_pk: Any, user: Optional[Any] = None) -> Tuple[Any, int, Any]:
     assignment = get_object_or_404(AccessoryAssignment, pk=assignment_pk)
     accessory = assignment.accessory
     qty = assignment.qty
@@ -47,7 +59,18 @@ def checkin_accessory(assignment_pk, user=None):
     return accessory, qty, recipient
 
 
-def checkout_consumable(consumable, qty, holder=None, location=None, asset=None, user=None, notes="", source_location=None, request=None, **kwargs):
+def checkout_consumable(
+    consumable: Any,
+    qty: int,
+    holder: Optional[Any] = None,
+    location: Optional[Any] = None,
+    asset: Optional[Any] = None,
+    user: Optional[Any] = None,
+    notes: str = "",
+    source_location: Optional[Any] = None,
+    request: Optional[Any] = None,
+    **kwargs: Any
+) -> ConsumableAssignment:
     if not holder and not location and not asset:
         raise ValidationError("Either holder, location, or asset must be specified.")
 
@@ -77,3 +100,63 @@ def checkout_consumable(consumable, qty, holder=None, location=None, asset=None,
             notes=notes
         )
     return assignment
+
+
+def adjust_inventory_stock(
+    assignment_instance: Any,
+    is_delete: bool = False,
+    old_instance: Optional[Any] = None
+) -> None:
+    """
+    Unified stock adjustment logic for AccessoryAssignment and ConsumableAssignment.
+    """
+    from django.db import transaction
+    from django.core.exceptions import ValidationError
+    
+    if hasattr(assignment_instance, 'accessory'):
+        item_field = 'accessory'
+        from .models import AccessoryStock as StockModel
+    elif hasattr(assignment_instance, 'consumable'):
+        item_field = 'consumable'
+        from .models import ConsumableStock as StockModel
+    else:
+        raise ValueError("Unknown assignment type for stock adjustment.")
+
+    item = getattr(assignment_instance, item_field)
+    
+    def update_stock(item_val, location, qty_diff, allow_overallocate):
+        stock, _ = StockModel.objects.select_for_update().get_or_create(
+            location=location,
+            **{item_field: item_val},
+            defaults={'qty': 0}
+        )
+        if qty_diff < 0: # Deducting stock
+            if not allow_overallocate and stock.qty < abs(qty_diff):
+                raise ValidationError(
+                    f"Insufficient stock at {location}. Available: {stock.qty}, Requested: {abs(qty_diff)}"
+                )
+        stock.qty = max(0, stock.qty + qty_diff)
+        stock.save(update_fields=['qty'])
+
+    with transaction.atomic():
+        if is_delete:
+            if assignment_instance.from_location:
+                update_stock(item, assignment_instance.from_location, assignment_instance.qty, item.allow_overallocate)
+        else:
+            is_new = assignment_instance.pk is None
+            if is_new:
+                if assignment_instance.from_location:
+                    update_stock(item, assignment_instance.from_location, -assignment_instance.qty, item.allow_overallocate)
+            else:
+                if old_instance is None:
+                    old_instance = assignment_instance.__class__.objects.get(pk=assignment_instance.pk)
+                
+                # Revert old stock allocation
+                if old_instance.from_location:
+                    old_item = getattr(old_instance, item_field)
+                    update_stock(old_item, old_instance.from_location, old_instance.qty, old_item.allow_overallocate)
+                
+                # Apply new stock allocation
+                if assignment_instance.from_location:
+                    update_stock(item, assignment_instance.from_location, -assignment_instance.qty, item.allow_overallocate)
+

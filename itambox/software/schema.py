@@ -26,7 +26,7 @@ class Query(graphene.ObjectType):
 
     def resolve_software_list(self, info, limit=None, offset=None, sort_by=None, **kwargs):
         check_permission(info, 'software.view_software')
-        qs = Software.objects.all()
+        qs = Software.objects.select_related('manufacturer').all()
         for key, val in kwargs.items():
             if val is not None:
                 qs = qs.filter(**{key: val})
@@ -37,7 +37,7 @@ class Query(graphene.ObjectType):
     def resolve_software(self, info, id):
         check_permission(info, 'software.view_software')
         try:
-            return Software.objects.get(pk=id)
+            return Software.objects.select_related('manufacturer').get(pk=id)
         except Software.DoesNotExist:
             return None
 
