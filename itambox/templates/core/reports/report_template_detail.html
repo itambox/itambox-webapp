@@ -14,11 +14,11 @@
             <i class="mdi mdi-printer"></i>
             {% trans "Print Report" %}
         </a>
-        <a href="{% url 'reporttemplate_download' object.pk %}?format=html" class="btn btn-outline-info d-none d-sm-inline-block">
+        <a href="{% url 'reporttemplate_download' object.pk %}?format=html" class="btn btn-outline-info d-none d-sm-inline-block" hx-boost="false">
             <i class="mdi mdi-download me-1"></i>
             {% trans "Export HTML" %}
         </a>
-        <a href="{% url 'reporttemplate_download' object.pk %}?format=csv" class="btn btn-outline-success d-none d-sm-inline-block">
+        <a href="{% url 'reporttemplate_download' object.pk %}?format=csv" class="btn btn-outline-success d-none d-sm-inline-block" hx-boost="false">
             <i class="mdi mdi-download me-1"></i>
             {% trans "Export CSV" %}
         </a>
