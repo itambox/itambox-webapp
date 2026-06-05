@@ -38,7 +38,13 @@ class QuickAddMixin:
                 if hasattr(self, 'model') and self.model
                 else ''
             )
-            context['quick_add_form'] = context.get('form')
+            form = context.get('form')
+            if form:
+                if not hasattr(form, 'helper') or form.helper is None:
+                    from crispy_forms.helper import FormHelper
+                    form.helper = FormHelper(form)
+                form.helper.form_tag = False
+            context['quick_add_form'] = form
         return context
 
     def form_valid(self, form):
