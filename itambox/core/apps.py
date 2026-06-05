@@ -40,5 +40,19 @@ class CoreConfig(AppConfig):
                     except Exception:
                         pass
 
+            # Auto-apply TomSelect attribute to all select fields (excluding CheckboxSelectMultiple/RadioSelect/TableConfigForm/listboxes)
+            from django import forms
+            class_name = self.__class__.__name__
+            if 'TableConfig' not in class_name:
+                for field in self.fields.values():
+                    if isinstance(field.widget, (forms.Select, forms.SelectMultiple)) and not isinstance(field.widget, (forms.RadioSelect, forms.CheckboxSelectMultiple)):
+                        # Do not apply to listboxes (select elements with a size attribute)
+                        if 'size' in field.widget.attrs:
+                            continue
+                        widget_classes = field.widget.attrs.get('class', '')
+                        if 'available-columns' not in widget_classes and 'selected-columns' not in widget_classes:
+                            if 'data-tom-select' not in field.widget.attrs:
+                                field.widget.attrs['data-tom-select'] = ''
+
         BaseForm.__init__ = scoped_baseform_init
 

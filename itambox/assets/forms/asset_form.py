@@ -151,17 +151,24 @@ class AssetForm(forms.ModelForm):
 
         # Calculate suggested tag based on selected tenant and asset_type
         # 1. Resolve tenant
+        from organization.models import Tenant
         selected_tenant = None
+        raw_tenant = None
         if self.is_bound and self.data.get('tenant'):
-            from organization.models import Tenant
-            try:
-                selected_tenant = Tenant.objects.get(pk=self.data.get('tenant'))
-            except (Tenant.DoesNotExist, ValueError):
-                pass
+            raw_tenant = self.data.get('tenant')
         elif self.initial.get('tenant'):
-            selected_tenant = self.initial.get('tenant')
+            raw_tenant = self.initial.get('tenant')
         elif self.instance and self.instance.tenant:
-            selected_tenant = self.instance.tenant
+            raw_tenant = self.instance.tenant
+
+        if raw_tenant:
+            if isinstance(raw_tenant, Tenant):
+                selected_tenant = raw_tenant
+            else:
+                try:
+                    selected_tenant = Tenant.objects.get(pk=raw_tenant)
+                except (Tenant.DoesNotExist, ValueError, TypeError):
+                    pass
 
         # 2. Resolve asset_type object
         selected_type = None
@@ -207,7 +214,7 @@ class AssetForm(forms.ModelForm):
             try:
                 asset_type_obj = AssetType.objects.get(pk=asset_type_id)
                 if asset_type_obj.custom_fieldset:
-                    custom_fields = asset_type_obj.custom_fieldset.fields.all()
+                    custom_fields = asset_type_obj.custom_fieldset.fields.filter(model_level=False)
             except AssetType.DoesNotExist:
                 pass
 

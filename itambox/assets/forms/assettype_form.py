@@ -91,7 +91,7 @@ class AssetTypeForm(SlugModelForm):
             from extras.models import CustomFieldset, CustomField
             try:
                 fieldset_obj = CustomFieldset.objects.get(pk=custom_fieldset_id)
-                custom_fields = fieldset_obj.fields.all()
+                custom_fields = fieldset_obj.fields.filter(model_level=True)
             except CustomFieldset.DoesNotExist:
                 pass
 

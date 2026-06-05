@@ -11,7 +11,8 @@
 {% if object.asset_type and object.asset_type.custom_fieldset and object.asset_type.custom_fieldset.fields.exists %}
 <div class="row g-3">
     {% for field in object.asset_type.custom_fieldset.fields.all %}
-        {% with val=object.asset_type.custom_values|lookup:field.name %}
+        {% if field.model_level %}
+            {% with val=object.asset_type.custom_values|lookup:field.name %}
             {% if val is not None and val != "" %}
             <div class="col-md-6">
                 <div class="d-flex align-items-center mb-1">
@@ -35,6 +36,7 @@
             </div>
             {% endif %}
         {% endwith %}
+        {% endif %}
     {% endfor %}
 </div>
 {% endif %}

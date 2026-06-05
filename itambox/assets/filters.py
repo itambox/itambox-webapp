@@ -1,6 +1,6 @@
 import django_filters
 from .models import Asset, AssetRole, Manufacturer, AssetType, StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence, AuditSession, AssetAudit
-from organization.models import Location, Tenant
+from organization.models import Location, Tenant, AssetHolder
 from extras.models import Tag
 from django import forms
 from django.db.models import Q
@@ -33,6 +33,12 @@ class AssetFilterSet(django_filters.FilterSet):
         label='Manufacturer',
         widget=forms.Select(attrs={'class': 'form-select'})
     )
+    category = django_filters.ModelChoiceFilter(
+        field_name='asset_type__category',
+        queryset=Category.objects.all(),
+        label='Category',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
     location = django_filters.ModelChoiceFilter(
         queryset=Location.objects.all().select_related('site'),
         widget=forms.Select(attrs={'class': 'form-select'})
@@ -41,6 +47,13 @@ class AssetFilterSet(django_filters.FilterSet):
         queryset=Tenant.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'}),
         label='Tenant'
+    )
+    assigned_to = django_filters.ModelChoiceFilter(
+        field_name='assignments__assigned_user',
+        queryset=AssetHolder.objects.all(),
+        label='Assigned To',
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        method='filter_assigned_to'
     )
     supplier = django_filters.ModelChoiceFilter(
         queryset=Supplier.objects.all(),
@@ -88,6 +101,11 @@ class AssetFilterSet(django_filters.FilterSet):
             Q(asset_tag__icontains=value) |
             Q(serial_number__icontains=value)
         ).distinct()
+
+    def filter_assigned_to(self, queryset, name, value):
+        if not value:
+            return queryset
+        return queryset.filter(assignments__assigned_user=value, assignments__is_active=True)
 
 # --- AssetRole Filter --- 
 class AssetRoleFilterSet(django_filters.FilterSet):

@@ -344,60 +344,82 @@ class Command(BaseCommand):
             )
             self._manufacturers[slug] = obj
 
-        # CustomFields
+        # CustomFields: (name, label, field_type, required, choices, model_level)
         cf_data = [
-            ('sim_number', 'SIM Number', 'text', False, None),
-            ('imei', 'IMEI', 'text', False, None),
-            ('screen_size', 'Screen Size (inches)', 'number', False, None),
-            ('vehicle_vin', 'VIN Number', 'text', False, None),
-            ('hostname', 'Hostname', 'text', True, None),
-            ('os_version', 'OS Version', 'text', False, None),
-            ('department', 'Department', 'select', False, 'Engineering\nFinance\nHR\nMarketing\nSales\nOperations'),
-            ('floor', 'Floor', 'number', False, None),
-            ('asset_lifecycle', 'Lifecycle Stage', 'select', False, 'Procurement\nDeployment\nActive\nMaintenance\nRetirement'),
-            ('encrypted', 'Disk Encrypted', 'boolean', False, None),
-            ('cpu_architecture', 'CPU Architecture', 'select', False, 'x86_64\nARM64'),
-            ('ram_slot_count', 'RAM Slots Count', 'number', False, None),
-            ('ip_address', 'IP Address', 'text', False, None),
-            ('port_count', 'Port Count', 'number', False, None),
-            ('poe_budget_w', 'PoE Budget (Watts)', 'number', False, None),
-            ('firmware_version', 'Firmware Version', 'text', False, None),
-            ('sim_carrier', 'SIM Carrier', 'select', False, 'Deutsche Telekom\nVodafone\nO2\nSwisscom\nOrange'),
-            ('apn_profile', 'APN Profile', 'text', False, None),
-            ('puk_code', 'PUK Code', 'text', False, None),
-            ('screen_resolution', 'Screen Resolution', 'text', False, None),
-            ('input_ports', 'Input Ports', 'text', False, None),
-            ('mounted_state', 'Mounted State', 'select', False, 'Wall-Mounted\nCeiling-Mounted\nTable-Top\nMobile-Stand'),
+            ('sim_number', 'SIM Number', 'text', False, None, False),
+            ('imei', 'IMEI', 'text', False, None, False),
+            ('screen_size', 'Screen Size (inches)', 'number', False, None, True),
+            ('vehicle_vin', 'VIN Number', 'text', False, None, False),
+            ('hostname', 'Hostname', 'text', True, None, False),
+            ('os_version', 'OS Version', 'text', False, None, False),
+            ('department', 'Department', 'select', False, 'Engineering\nFinance\nHR\nMarketing\nSales\nOperations', False),
+            ('floor', 'Floor', 'number', False, None, False),
+            ('asset_lifecycle', 'Lifecycle Stage', 'select', False, 'Procurement\nDeployment\nActive\nMaintenance\nRetirement', False),
+            ('encrypted', 'Disk Encrypted', 'boolean', False, None, False),
+            ('cpu_architecture', 'CPU Architecture', 'select', False, 'x86_64\nARM64', True),
+            ('ram_slot_count', 'RAM Slots Count', 'number', False, None, True),
+            ('ip_address', 'IP Address', 'text', False, None, False),
+            ('port_count', 'Port Count', 'number', False, None, True),
+            ('poe_budget_w', 'PoE Budget (Watts)', 'number', False, None, True),
+            ('firmware_version', 'Firmware Version', 'text', False, None, False),
+            ('sim_carrier', 'SIM Carrier', 'select', False, 'Deutsche Telekom\nVodafone\nO2\nSwisscom\nOrange', False),
+            ('apn_profile', 'APN Profile', 'text', False, None, False),
+            ('puk_code', 'PUK Code', 'text', False, None, False),
+            ('screen_resolution', 'Screen Resolution', 'text', False, None, True),
+            ('input_ports', 'Input Ports', 'text', False, None, True),
+            ('mounted_state', 'Mounted State', 'select', False, 'Wall-Mounted\nCeiling-Mounted\nTable-Top\nMobile-Stand', False),
+            # New model-level specs
+            ('cpu', 'CPU Model', 'text', False, None, True),
+            ('ram_gb', 'RAM (GB)', 'number', False, None, True),
+            ('storage_gb', 'Storage (GB)', 'number', False, None, True),
+            ('storage_type', 'Storage Type', 'select', False, 'NVMe\nSSD\nHDD\nSSD RAID\nSATA SSD', True),
+            ('gpu', 'GPU Model', 'text', False, None, True),
         ]
         self._custom_fields = {}
-        for name, label, ftype, required, choices in cf_data:
+        for name, label, ftype, required, choices, model_level in cf_data:
             obj, _ = CustomField.objects.get_or_create(
                 name=name,
-                defaults={'label': label, 'field_type': ftype, 'required': required, 'choices': choices}
+                defaults={'label': label, 'field_type': ftype, 'required': required, 'choices': choices, 'model_level': model_level}
             )
+            # Sync model_level if existing field had a different value
+            if obj.model_level != model_level:
+                obj.model_level = model_level
+                obj.save(update_fields=['model_level'])
             self._custom_fields[name] = obj
 
         # CustomFieldsets
         self._laptop_fieldset = CustomFieldset.objects.create(name='Laptop Specs')
         self._laptop_fieldset.fields.add(
+            self._custom_fields['cpu'],
+            self._custom_fields['ram_gb'],
+            self._custom_fields['storage_gb'],
+            self._custom_fields['storage_type'],
+            self._custom_fields['gpu'],
+            self._custom_fields['cpu_architecture'],
+            self._custom_fields['ram_slot_count'],
             self._custom_fields['hostname'],
             self._custom_fields['os_version'],
             self._custom_fields['encrypted'],
             self._custom_fields['department'],
-            self._custom_fields['cpu_architecture'],
-            self._custom_fields['ram_slot_count'],
         )
 
         self._mobile_fieldset = CustomFieldset.objects.create(name='Mobile Device Specs')
         self._mobile_fieldset.fields.add(
-            self._custom_fields['sim_number'],
-            self._custom_fields['imei'],
+            self._custom_fields['cpu'],
+            self._custom_fields['ram_gb'],
+            self._custom_fields['storage_gb'],
             self._custom_fields['screen_size'],
             self._custom_fields['os_version'],
+            self._custom_fields['sim_number'],
+            self._custom_fields['imei'],
         )
 
         self._server_fieldset = CustomFieldset.objects.create(name='Server Specs')
         self._server_fieldset.fields.add(
+            self._custom_fields['cpu'],
+            self._custom_fields['ram_gb'],
+            self._custom_fields['storage_gb'],
+            self._custom_fields['storage_type'],
             self._custom_fields['hostname'],
             self._custom_fields['os_version'],
             self._custom_fields['department'],
@@ -406,10 +428,10 @@ class Command(BaseCommand):
 
         self._switch_fieldset = CustomFieldset.objects.create(name='Network Switch Specs')
         self._switch_fieldset.fields.add(
-            self._custom_fields['hostname'],
-            self._custom_fields['ip_address'],
             self._custom_fields['port_count'],
             self._custom_fields['poe_budget_w'],
+            self._custom_fields['hostname'],
+            self._custom_fields['ip_address'],
             self._custom_fields['firmware_version'],
         )
 
@@ -823,6 +845,53 @@ class Command(BaseCommand):
             role_slug = data[13]
             category_obj = self._categories.get(category_slug)
             role_obj = self._asset_roles.get(role_slug)
+            
+            # Resolve model-level custom specifications based on fieldset and slug
+            c_values = {}
+            if data[10]: # if custom_fieldset is set
+                fieldset_name = data[10].name
+                # Save standard CPU/RAM/Storage specs if defined in the row
+                if len(data) > 4 and data[4]: c_values['cpu'] = data[4]
+                if len(data) > 5 and data[5]: c_values['ram_gb'] = data[5]
+                if len(data) > 6 and data[6]: c_values['storage_gb'] = data[6]
+                if len(data) > 7 and data[7]: c_values['storage_type'] = data[7]
+                if len(data) > 8 and data[8]: c_values['gpu'] = data[8]
+
+                # Specific specs based on model slug
+                if fieldset_name == 'Laptop Specs':
+                    if 'macbook' in slug:
+                        c_values['cpu_architecture'] = 'ARM64'
+                        c_values['ram_slot_count'] = 0
+                    else:
+                        c_values['cpu_architecture'] = 'x86_64'
+                        if '7960' in slug:
+                            c_values['ram_slot_count'] = 8
+                        else:
+                            c_values['ram_slot_count'] = 2
+                elif fieldset_name == 'Mobile Device Specs':
+                    if 'iphone' in slug:
+                        c_values['screen_size'] = 6.1
+                    elif 'galaxy' in slug:
+                        c_values['screen_size'] = 6.8
+                    elif 'ipad' in slug:
+                        c_values['screen_size'] = 12.9
+                    elif 'surface' in slug:
+                        c_values['screen_size'] = 13.0
+                elif fieldset_name == 'Network Switch Specs':
+                    if 'catalyst' in slug:
+                        c_values['port_count'] = 48
+                        c_values['poe_budget_w'] = 740
+                    elif 'switch-pro-48' in slug:
+                        c_values['port_count'] = 48
+                        c_values['poe_budget_w'] = 600
+                    elif 'dream-machine' in slug:
+                        c_values['port_count'] = 8
+                        c_values['poe_budget_w'] = 0
+                elif fieldset_name == 'AV & Conference Specs':
+                    if 'meetup' in slug:
+                        c_values['screen_resolution'] = '3840x2160 (4K)'
+                        c_values['input_ports'] = 'HDMI, USB-C, DisplayPort'
+
             obj, _ = AssetType.objects.get_or_create(
                 slug=slug,
                 defaults={
@@ -830,8 +899,13 @@ class Command(BaseCommand):
                     'part_number': data[3] or '', 'eol_months': data[9],
                     'custom_fieldset': data[10], 'depreciation': data[11],
                     'category': category_obj, 'asset_role': role_obj,
+                    'custom_values': c_values,
                 }
             )
+            # Sync custom_values if existing object had different values
+            if obj.custom_values != c_values:
+                obj.custom_values = c_values
+                obj.save(update_fields=['custom_values'])
             self._asset_types[slug] = obj
 
         # --- Components ---
@@ -1109,7 +1183,7 @@ class Command(BaseCommand):
             # If checked out to a holder, physical location is None in Asset table
             base_location = None if (holder and status_slug == 'in-use') else location
 
-            # Construct dynamic custom values based on custom fieldsets
+            # Construct dynamic custom values based on custom fieldsets (only instance-level details)
             c_values = {}
             asset_type = self._asset_types.get(at_slug)
             if asset_type and asset_type.custom_fieldset:
@@ -1120,14 +1194,11 @@ class Command(BaseCommand):
                         'os_version': random.choice(['Windows 11 23H2', 'macOS Sequoia 15.1', 'Ubuntu 24.04 LTS']),
                         'encrypted': True,
                         'department': random.choice(['Engineering', 'Finance', 'HR', 'Marketing', 'Sales', 'Operations']),
-                        'cpu_architecture': random.choice(['x86_64', 'ARM64']),
-                        'ram_slot_count': random.choice([2, 4]),
                     }
                 elif fs_name == 'Mobile Device Specs':
                     c_values = {
                         'sim_number': f"+49-170-{random.randint(1000000, 9999999)}",
                         'imei': f"35{random.randint(100000000000, 999999999999)}",
-                        'screen_size': random.choice([6.1, 6.7, 11.0]),
                         'os_version': random.choice(['iOS 17.5', 'Android 14']),
                     }
                 elif fs_name == 'Server Specs':
@@ -1141,15 +1212,11 @@ class Command(BaseCommand):
                     c_values = {
                         'hostname': f"sw-{tag.lower()}.local",
                         'ip_address': f"10.100.{random.randint(1, 254)}.{random.randint(1, 254)}",
-                        'port_count': random.choice([24, 48]),
-                        'poe_budget_w': random.choice([370, 740]),
                         'firmware_version': 'v16.12.8',
                     }
                 elif fs_name == 'AV & Conference Specs':
                     c_values = {
-                        'screen_resolution': '3840x2160 (4K)',
-                        'input_ports': 'HDMI, DisplayPort, USB-C',
-                        'mounted_state': random.choice(['Wall-Mounted', 'Ceiling-Mounted']),
+                        'mounted_state': random.choice(['Wall-Mounted', 'Ceiling-Mounted', 'Table-Top']),
                     }
 
             obj, created = Asset.objects.get_or_create(
@@ -1167,6 +1234,10 @@ class Command(BaseCommand):
                     'custom_values': c_values,
                 }
             )
+            # Sync custom_values if existing object had different values
+            if not created and obj.custom_values != c_values:
+                obj.custom_values = c_values
+                obj.save(update_fields=['custom_values'])
             self._assets[tag] = obj
 
             # Create proper checkout log entries for new or unassigned assets

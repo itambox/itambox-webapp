@@ -76,13 +76,14 @@ class TagFilterForm(FilterForm):
 class CustomFieldForm(forms.ModelForm):
     class Meta:
         model = CustomField
-        fields = ['name', 'label', 'field_type', 'choices', 'required']
+        fields = ['name', 'label', 'field_type', 'choices', 'required', 'model_level']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'label': forms.TextInput(attrs={'class': 'form-control'}),
             'field_type': forms.Select(attrs={'class': 'form-select'}),
             'choices': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Value 1\nValue 2'}),
             'required': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'model_level': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -101,6 +102,7 @@ class CustomFieldForm(forms.ModelForm):
             'field_type',
             'choices',
             Div('required', css_class='mb-3 form-check'),
+            Div('model_level', css_class='mb-3 form-check'),
             HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),

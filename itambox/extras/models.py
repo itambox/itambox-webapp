@@ -119,6 +119,12 @@ class CustomField(ChangeLoggingMixin, BaseModel):
     field_type = models.CharField(max_length=50, choices=FIELD_TYPE_CHOICES, default=FIELD_TYPE_TEXT, db_index=True, verbose_name="Field Type")
     choices = models.TextField(blank=True, null=True, help_text="New-line separated list of choices (only for 'select' type)")
     required = models.BooleanField(default=False, db_index=True, verbose_name="Required")
+    model_level = models.BooleanField(
+        default=False,
+        db_index=True,
+        verbose_name="Model Level / Specification",
+        help_text="If True, this field defines a hardware specification on the Asset Type (e.g. CPU, RAM) rather than a device-specific instance detail (e.g. Hostname, OS version)."
+    )
 
     class Meta:
         ordering = ['label']

@@ -34,6 +34,10 @@
       create: false,
       allowEmptyOption: true,
       preload: 'focus',
+      sortField: [
+        { field: '$score', direction: 'desc' },
+        { field: '$order' }
+      ],
       render: {
         no_results: function () {
           return '<div class="no-results">No results found</div>';

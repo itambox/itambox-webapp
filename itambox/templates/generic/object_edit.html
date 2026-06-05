@@ -12,7 +12,7 @@
 
 {% block page_actions %}
     {% if return_url %}
-    <a href="{% url return_url %}" class="btn btn-outline-secondary">
+    <a href="{% url return_url %}" class="btn btn-outline-secondary" data-no-dirty-track="true">
         <i class="mdi mdi-arrow-left"></i>
         {% translate "Cancel" %}
     </a>

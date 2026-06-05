@@ -13,5 +13,5 @@ def add_standard_buttons(helper, instance, list_url_name):
         Submit('submit', button_text, css_class='btn btn-primary')
     )
     helper.layout.append(
-        HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>')
+        HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2" data-no-dirty-track="true">Cancel</a>')
     )

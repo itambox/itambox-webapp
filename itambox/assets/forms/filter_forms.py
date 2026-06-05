@@ -39,6 +39,16 @@ class AssetFilterForm(FilterForm):
             'value_field': 'slug',
             'label_field': 'name',
         },
+        'category': {
+            'url_name': 'api:assets_api:category-list',
+            'value_field': 'id',
+            'label_field': 'name',
+        },
+        'assigned_to': {
+            'url_name': 'api:organization_api:assetholder-list',
+            'value_field': 'id',
+            'label_field': 'upn',
+        },
      }
 
 class AssetRoleFilterForm(FilterForm):
