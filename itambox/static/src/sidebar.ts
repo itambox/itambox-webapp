@@ -72,6 +72,15 @@
   document.addEventListener('DOMContentLoaded', updateSidebarActiveState);
   document.body.addEventListener('htmx:afterSettle', function () {
     updateSidebarActiveState();
+
+    // Automatically hide mobile offcanvas menu after navigation
+    const sidebar = document.getElementById('sidebar-menu');
+    if (sidebar && typeof bootstrap !== 'undefined' && bootstrap.Offcanvas) {
+      const offcanvasInstance = bootstrap.Offcanvas.getInstance(sidebar);
+      if (offcanvasInstance) {
+        offcanvasInstance.hide();
+      }
+    }
   });
   window.addEventListener('popstate', updateSidebarActiveState);
 })();

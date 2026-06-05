@@ -9,7 +9,7 @@
     {# Sidebar #}
     <aside class="navbar navbar-vertical navbar-expand-lg">
         <div class="container-fluid">
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu" aria-controls="sidebar-menu" aria-expanded="false" aria-label="{% translate 'Toggle navigation' %}">
+            <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebar-menu" aria-controls="sidebar-menu" aria-expanded="false" aria-label="{% translate 'Toggle navigation' %}">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <h1 class="navbar-brand">
@@ -119,19 +119,25 @@
                 </div>
             </div>
 
-            <div class="collapse navbar-collapse" id="sidebar-menu">
-                <!-- Mobile Quick Search (inside collapse menu) -->
-                <div class="d-flex d-lg-none px-3 py-2 border-bottom mb-2 w-100">
-                    <form hx-get="{% url 'search' %}" hx-target="#page-content-wrapper" hx-push-url="true" autocomplete="off" class="w-100">
-                        <div class="input-icon">
-                            <span class="input-icon-addon">
-                                <i class="mdi mdi-magnify"></i>
-                            </span>
-                            <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="form-control" placeholder="{% translate 'Search…' %}" aria-label="{% translate 'Search' %}">
-                        </div>
-                    </form>
+            <div class="offcanvas-lg offcanvas-start" tabindex="-1" id="sidebar-menu" aria-labelledby="sidebar-menu-label">
+                <div class="offcanvas-header d-flex d-lg-none align-items-center justify-content-between px-3 py-2 border-bottom">
+                    <h5 class="offcanvas-title font-weight-bold mb-0" id="sidebar-menu-label">{% translate "Menu" %}</h5>
+                    <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" data-bs-target="#sidebar-menu" aria-label="{% translate 'Close' %}"></button>
                 </div>
-                {% nav %}
+                <div class="offcanvas-body p-0 d-flex flex-column">
+                    <!-- Mobile Quick Search (inside collapse menu) -->
+                    <div class="d-flex d-lg-none px-3 py-2 border-bottom mb-2 w-100">
+                        <form hx-get="{% url 'search' %}" hx-target="#page-content-wrapper" hx-push-url="true" autocomplete="off" class="w-100">
+                            <div class="input-icon">
+                                <span class="input-icon-addon">
+                                    <i class="mdi mdi-magnify"></i>
+                                </span>
+                                <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="form-control" placeholder="{% translate 'Search…' %}" aria-label="{% translate 'Search' %}">
+                            </div>
+                        </form>
+                    </div>
+                    {% nav %}
+                </div>
             </div>
         </div>
     </aside>
