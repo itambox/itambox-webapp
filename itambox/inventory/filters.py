@@ -1,4 +1,5 @@
 import django_filters
+from core.filters import BaseFilterSet
 from django import forms
 from django.db.models import Q
 
@@ -12,7 +13,7 @@ from .models import (
 
 
 
-class AccessoryFilterSet(django_filters.FilterSet):
+class AccessoryFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
         label='Search',
@@ -43,7 +44,7 @@ class AccessoryFilterSet(django_filters.FilterSet):
         ).distinct()
 
 
-class ConsumableFilterSet(django_filters.FilterSet):
+class ConsumableFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
         label='Search',
@@ -74,7 +75,7 @@ class ConsumableFilterSet(django_filters.FilterSet):
         ).distinct()
 
 
-class KitFilterSet(django_filters.FilterSet):
+class KitFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(method='search', label='Search')
     tenant = django_filters.ModelChoiceFilter(
         queryset=Tenant.objects.all(),
@@ -95,7 +96,7 @@ class KitFilterSet(django_filters.FilterSet):
         ).distinct()
 
 
-class AccessoryStockFilterSet(django_filters.FilterSet):
+class AccessoryStockFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
         label='Search',
@@ -125,7 +126,7 @@ class AccessoryStockFilterSet(django_filters.FilterSet):
         ).distinct()
 
 
-class ConsumableStockFilterSet(django_filters.FilterSet):
+class ConsumableStockFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
         label='Search',
@@ -155,7 +156,7 @@ class ConsumableStockFilterSet(django_filters.FilterSet):
         ).distinct()
 
 
-class AccessoryAssignmentFilterSet(django_filters.FilterSet):
+class AccessoryAssignmentFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(method='search', label='Search')
     accessory = django_filters.ModelChoiceFilter(
         queryset=Accessory.objects.all(),
@@ -193,7 +194,7 @@ class AccessoryAssignmentFilterSet(django_filters.FilterSet):
         ).distinct()
 
 
-class ConsumableAssignmentFilterSet(django_filters.FilterSet):
+class ConsumableAssignmentFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(method='search', label='Search')
     consumable = django_filters.ModelChoiceFilter(
         queryset=Consumable.objects.all(),
@@ -231,7 +232,7 @@ class ConsumableAssignmentFilterSet(django_filters.FilterSet):
         ).distinct()
 
 
-class KitItemFilterSet(django_filters.FilterSet):
+class KitItemFilterSet(BaseFilterSet):
     kit = django_filters.ModelChoiceFilter(
         queryset=Kit.objects.all(),
         label='Kit',

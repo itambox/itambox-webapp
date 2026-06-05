@@ -1,4 +1,5 @@
 import django_filters
+from core.filters import BaseFilterSet
 from django.db.models import Q
 from django import forms
 from extras.filters import TagFilter # Assuming TagFilter exists for M2M
@@ -6,7 +7,7 @@ from assets.models import Manufacturer
 from extras.models import Tag
 from .models import Software
 
-class SoftwareFilterSet(django_filters.FilterSet):
+class SoftwareFilterSet(BaseFilterSet):
     """FilterSet for querying Software instances."""
     q = django_filters.CharFilter(
         method='search',

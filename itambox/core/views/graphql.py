@@ -42,6 +42,12 @@ class PrivateGraphQLView(GraphQLView):
                 return redirect(f"{resolve_url(settings.LOGIN_URL)}?next={quote(request.get_full_path())}")
         
         elif request.method == 'POST':
+            if request.user.is_authenticated:
+                from django.middleware.csrf import CsrfViewMiddleware
+                csrf_reject = CsrfViewMiddleware(lambda r: None).process_view(request, None, (), {})
+                if csrf_reject:
+                    return csrf_reject
+
             if not request.user.is_authenticated:
                 try:
                     auth_result = TokenAuthentication().authenticate(request)

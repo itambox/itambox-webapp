@@ -675,18 +675,18 @@ class ExportTemplate(BaseModel):
         return reverse('export_template_detail', kwargs={'pk': self.pk})
 
     def render(self, obj):
-        from django.template import Template, Context
-        template = Template(self.template_code)
-        context = Context({'obj': obj})
-        return template.render(context)
+        from jinja2.sandbox import SandboxedEnvironment
+        env = SandboxedEnvironment()
+        template = env.from_string(self.template_code)
+        return template.render(obj=obj)
 
     def render_queryset(self, queryset):
-        from django.template import Template, Context
-        template = Template(self.template_code)
+        from jinja2.sandbox import SandboxedEnvironment
+        env = SandboxedEnvironment()
+        template = env.from_string(self.template_code)
         results = []
         for obj in queryset:
-            context = Context({'obj': obj})
-            results.append(template.render(context))
+            results.append(template.render(obj=obj))
         return '\n'.join(results)
 
 

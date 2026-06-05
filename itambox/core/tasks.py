@@ -536,9 +536,8 @@ def generate_scheduled_report_task(scheduled_report_id):
                         })
                     email_body = jinja_template.render(context_data)
                 except Exception as je:
-                    logger.error(f"Jinja2 sandboxed render failed: {je}. Falling back to Django template engine.")
-                    django_template = Template(template.template_content)
-                    email_body = django_template.render(Context(context_data))
+                    logger.exception(f"Jinja2 sandboxed render failed: {je}")
+                    raise je
             else:
                 html_template_str = get_polished_system_html_template()
                 django_template = Template(html_template_str)

@@ -16,10 +16,10 @@
     </dd>
 
     <dt class="col-sm-3">{% translate "Description:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{{ object.description|linebreaksbr|default:"<span class='text-muted'><i>No description provided.</i></span>"|safe }}</dd>
+    <dd class="col-sm-9 text-secondary">{% if object.description %}{{object.description|linebreaksbr}}{% else %}<span class='text-muted'><i>No description provided.</i></span>{% endif %}</dd>
 
     <dt class="col-sm-3">{% translate "Comments:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{{ object.comments|linebreaksbr|default:"<span class='text-muted'><i>None</i></span>"|safe }}</dd>
+    <dd class="col-sm-9 text-secondary">{% if object.comments %}{{object.comments|linebreaksbr}}{% else %}<span class='text-muted'><i>None</i></span>{% endif %}</dd>
 
     {% if object.tags.all %}
     <dt class="col-sm-3">{% translate "Tags:" %}</dt>

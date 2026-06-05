@@ -13,7 +13,7 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
     <title>{% block title %}{% translate "ITAMbox" %}{% endblock %}</title>
     {# FOUC prevention: apply stored theme before CSS loads #}
-    <script>
+    <script nonce="{{ request.csp_nonce }}">
         (function(){try{var t=localStorage.getItem('itambox.theme');if(t)document.documentElement.setAttribute('data-bs-theme',t);else if(window.matchMedia('(prefers-color-scheme:dark)').matches)document.documentElement.setAttribute('data-bs-theme','dark');}catch(e){}})();
     </script>
     <!-- CSS files -->
@@ -72,7 +72,7 @@
     <span id="page-title-block" style="display:none" aria-hidden="true">{% translate "ITAMbox" %}</span>
 
     {# --- Premium Physical Scanning Audio Engine --- #}
-    <script>
+    <script nonce="{{ request.csp_nonce }}">
         (function() {
             // Global HTMX CSRF Token Integration
             document.addEventListener('htmx:configRequest', function(event) {

@@ -1,11 +1,12 @@
 import django_filters
+from core.filters import BaseFilterSet
 from django.db.models import Q
 from django import forms
 from organization.models import Tenant
 from .models import Provider, Subscription, SubscriptionAssignment, SubscriptionStatusChoices, SubscriptionTypeChoices
 
 
-class SubscriptionFilterSet(django_filters.FilterSet):
+class SubscriptionFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
         label='Search',
@@ -62,7 +63,7 @@ class SubscriptionFilterSet(django_filters.FilterSet):
         return queryset
 
 
-class ProviderFilterSet(django_filters.FilterSet):
+class ProviderFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
         label='Search',
@@ -93,7 +94,7 @@ class ProviderFilterSet(django_filters.FilterSet):
         return queryset  # Unchecked = show all
 
 
-class SubscriptionAssignmentFilterSet(django_filters.FilterSet):
+class SubscriptionAssignmentFilterSet(BaseFilterSet):
     class Meta:
         model = SubscriptionAssignment
         fields = ['subscription', 'content_type', 'object_id']

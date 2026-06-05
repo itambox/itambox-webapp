@@ -1,4 +1,5 @@
 import django_filters
+from core.filters import BaseFilterSet
 from django.db.models import Q
 from django import forms
 from extras.models import Tag
@@ -8,7 +9,7 @@ from assets.models import Asset
 from .models import License, LicenseTypeChoices, LicenseSeatAssignment
 
 
-class LicenseFilterSet(django_filters.FilterSet):
+class LicenseFilterSet(BaseFilterSet):
     """FilterSet for querying License entitlements."""
     q = django_filters.CharFilter(
         method='search',
@@ -55,7 +56,7 @@ class LicenseFilterSet(django_filters.FilterSet):
         ).distinct()
 
 
-class LicenseSeatAssignmentFilterSet(django_filters.FilterSet):
+class LicenseSeatAssignmentFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(method='search', label='Search')
     license = django_filters.ModelChoiceFilter(
         queryset=License.objects.all(),

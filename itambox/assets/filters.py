@@ -1,11 +1,12 @@
 import django_filters
+from core.filters import BaseFilterSet
 from .models import Asset, AssetRole, Manufacturer, AssetType, StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence, AuditSession, AssetAudit
 from organization.models import Location, Tenant, AssetHolder
 from extras.models import Tag
 from django import forms
 from django.db.models import Q
 
-class AssetFilterSet(django_filters.FilterSet):
+class AssetFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
         label='Search',
@@ -108,7 +109,7 @@ class AssetFilterSet(django_filters.FilterSet):
         return queryset.filter(assignments__assigned_user=value, assignments__is_active=True)
 
 # --- AssetRole Filter --- 
-class AssetRoleFilterSet(django_filters.FilterSet):
+class AssetRoleFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
         label='Search',
@@ -128,7 +129,7 @@ class AssetRoleFilterSet(django_filters.FilterSet):
         ).distinct()
 
 # --- Manufacturer Filter --- 
-class ManufacturerFilterSet(django_filters.FilterSet):
+class ManufacturerFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
         label='Search',
@@ -147,7 +148,7 @@ class ManufacturerFilterSet(django_filters.FilterSet):
             Q(description__icontains=value)
         ).distinct()
 
-class AssetTypeFilterSet(django_filters.FilterSet):
+class AssetTypeFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
         label='Search',
@@ -177,7 +178,7 @@ class AssetTypeFilterSet(django_filters.FilterSet):
         ).distinct()
 
 
-class StatusLabelFilterSet(django_filters.FilterSet):
+class StatusLabelFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
         label='Search',
@@ -201,7 +202,7 @@ class StatusLabelFilterSet(django_filters.FilterSet):
         ).distinct()
 
 
-class DepreciationFilterSet(django_filters.FilterSet):
+class DepreciationFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(method='search', label='Search')
 
     class Meta:
@@ -214,7 +215,7 @@ class DepreciationFilterSet(django_filters.FilterSet):
         return queryset.filter(
             Q(name__icontains=value)
         ).distinct()
-class SupplierFilterSet(django_filters.FilterSet):
+class SupplierFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(method='search', label='Search', widget=forms.TextInput(attrs={'placeholder': 'Name...'}))
 
     class Meta:
@@ -229,7 +230,7 @@ class SupplierFilterSet(django_filters.FilterSet):
         ).distinct()
 
 
-class CategoryFilterSet(django_filters.FilterSet):
+class CategoryFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(method='search', label='Search', widget=forms.TextInput(attrs={'placeholder': 'Name...'}))
 
     class Meta:
@@ -244,7 +245,7 @@ class CategoryFilterSet(django_filters.FilterSet):
         ).distinct()
 
 
-class AssetRequestFilterSet(django_filters.FilterSet):
+class AssetRequestFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(method='search', label='Search', widget=forms.TextInput(attrs={'placeholder': 'Search...'}))
     status = django_filters.ChoiceFilter(choices=AssetRequest.STATUS_CHOICES, widget=forms.Select(attrs={'class': 'form-select'}))
 
@@ -263,7 +264,7 @@ class AssetRequestFilterSet(django_filters.FilterSet):
         ).distinct()
 
 
-class AssetTagSequenceFilterSet(django_filters.FilterSet):
+class AssetTagSequenceFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
         label='Search',
@@ -296,7 +297,7 @@ class AssetTagSequenceFilterSet(django_filters.FilterSet):
         ).distinct()
 
 
-class AuditSessionFilterSet(django_filters.FilterSet):
+class AuditSessionFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(method='search', label='Search', widget=forms.TextInput(attrs={'placeholder': 'Name...'}))
     status = django_filters.ChoiceFilter(
         choices=[
@@ -324,7 +325,7 @@ class AuditSessionFilterSet(django_filters.FilterSet):
         ).distinct()
 
 
-class AssetAuditFilterSet(django_filters.FilterSet):
+class AssetAuditFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(method='search', label='Search', widget=forms.TextInput(attrs={'placeholder': 'Notes...'}))
     session = django_filters.ModelChoiceFilter(
         queryset=AuditSession.objects.all(),

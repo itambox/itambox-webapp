@@ -15,3 +15,10 @@ EMAIL_PORT = 1025
 EMAIL_USE_TLS = False
 EMAIL_USE_SSL = False
 
+# Add debug_toolbar dynamically for development
+if 'debug_toolbar' not in INSTALLED_APPS:
+    INSTALLED_APPS.append('debug_toolbar')
+if 'debug_toolbar.middleware.DebugToolbarMiddleware' not in MIDDLEWARE:
+    MIDDLEWARE.append('debug_toolbar.middleware.DebugToolbarMiddleware')
+
+

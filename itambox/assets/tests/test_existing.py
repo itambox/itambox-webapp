@@ -323,7 +323,7 @@ class ComponentTrackingTestCase(TestCase):
             from_location=self.location,
             qty=3
         )
-        self.assertEqual(con.remaining_qty, -1)
+        self.assertEqual(con.remaining_qty, 0)
         self.assertTrue(Notification.objects.filter(subject__contains="Thermal Paste MX-4", level=Notification.LEVEL_DANGER).exists())
 
         # Test Notification Center UI / mark read

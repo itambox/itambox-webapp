@@ -40,7 +40,7 @@
     </dd>
 
     <dt class="col-sm-3">{% translate "Purchase Date:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{{ object.purchase_date|date:"Y-m-d"|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
+    <dd class="col-sm-9 text-secondary">{% if object.purchase_date %}{{object.purchase_date|date:"Y-m-d"}}{% else %}<span class='text-muted'><i>Not Set</i></span>{% endif %}</dd>
 
     <dt class="col-sm-3">{% translate "Purchase Cost:" %}</dt>
     <dd class="col-sm-9 text-secondary">
@@ -52,7 +52,7 @@
     </dd>
 
     <dt class="col-sm-3">{% translate "Order Number:" %}</dt>
-    <dd class="col-sm-9 text-secondary"><code>{{ object.order_number|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</code></dd>
+    <dd class="col-sm-9 text-secondary"><code>{% if object.order_number %}{{object.order_number}}{% else %}<span class='text-muted'><i>Not Set</i></span>{% endif %}</code></dd>
 
     <dt class="col-sm-3">{% translate "Expiration Date:" %}</dt>
     <dd class="col-sm-9 text-secondary">

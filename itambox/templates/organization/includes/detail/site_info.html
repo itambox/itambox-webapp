@@ -42,19 +42,19 @@
     </dd>
 
     <dt class="col-sm-3">{% translate "Description:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{{ object.description|linebreaksbr|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
+    <dd class="col-sm-9 text-secondary">{% if object.description %}{{object.description|linebreaksbr}}{% else %}<span class='text-muted'><i>Not Set</i></span>{% endif %}</dd>
 
     <dt class="col-sm-3">{% translate "Facility:" %}</dt>
-    <dd class="col-sm-9">{{ object.facility|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
+    <dd class="col-sm-9">{% if object.facility %}{{object.facility}}{% else %}<span class='text-muted'><i>Not Set</i></span>{% endif %}</dd>
 
     <dt class="col-sm-3">{% translate "Time Zone:" %}</dt>
     <dd class="col-sm-9"><span class="badge bg-purple-lt">{{ object.time_zone|default:"UTC" }}</span></dd>
 
     <dt class="col-sm-3">{% translate "Physical Address:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{{ object.physical_address|linebreaksbr|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
+    <dd class="col-sm-9 text-secondary">{% if object.physical_address %}{{object.physical_address|linebreaksbr}}{% else %}<span class='text-muted'><i>Not Set</i></span>{% endif %}</dd>
 
     <dt class="col-sm-3">{% translate "Shipping Address:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{{ object.shipping_address|linebreaksbr|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
+    <dd class="col-sm-9 text-secondary">{% if object.shipping_address %}{{object.shipping_address|linebreaksbr}}{% else %}<span class='text-muted'><i>Not Set</i></span>{% endif %}</dd>
 
     <dt class="col-sm-3">{% translate "GPS Coordinates:" %}</dt>
     <dd class="col-sm-9">
@@ -69,7 +69,7 @@
     </dd>
 
     <dt class="col-sm-3">{% translate "Comments:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{{ object.comments|linebreaksbr|default:"<span class='text-muted'><i>None</i></span>"|safe }}</dd>
+    <dd class="col-sm-9 text-secondary">{% if object.comments %}{{object.comments|linebreaksbr}}{% else %}<span class='text-muted'><i>None</i></span>{% endif %}</dd>
 
     {% if object.tags.all %}
     <dt class="col-sm-3">{% translate "Tags:" %}</dt>

@@ -9,7 +9,67 @@ from core.choices import ObjectChangeActionChoices
 
 User = get_user_model()
 
-class ObjectChangeFilterSet(django_filters.FilterSet):
+
+class BaseFilterSet(django_filters.FilterSet):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from core.managers import get_current_tenant
+        current_tenant = get_current_tenant()
+        if not current_tenant:
+            return
+
+        for field_name, filter_obj in self.filters.items():
+            if isinstance(filter_obj, (django_filters.ModelChoiceFilter, django_filters.ModelMultipleChoiceFilter)):
+                queryset = filter_obj.extra.get('queryset')
+                if queryset is not None:
+                    model = queryset.model
+                    
+                    # 1. If model is Tenant, limit choices to the active tenant
+                    if model.__name__ == 'Tenant':
+                        filtered_qs = queryset.filter(pk=current_tenant.pk)
+                    
+                    # 2. If model has tenant field, filter by active tenant
+                    elif hasattr(model, 'tenant') or any(f.name == 'tenant' for f in model._meta.fields):
+                        filtered_qs = queryset.filter(tenant=current_tenant)
+                    
+                    # 3. If global models, filter by relation to tenant-owned objects
+                    elif model.__name__ == 'Manufacturer':
+                        filtered_qs = queryset.filter(
+                            Q(asset_types__assets__tenant=current_tenant) |
+                            Q(accessories__tenant=current_tenant) |
+                            Q(consumables__tenant=current_tenant)
+                        ).distinct()
+                    elif model.__name__ == 'AssetType':
+                        filtered_qs = queryset.filter(
+                            assets__tenant=current_tenant
+                        ).distinct()
+                    elif model.__name__ == 'Supplier':
+                        filtered_qs = queryset.filter(
+                            Q(assets__tenant=current_tenant) |
+                            Q(supplier_accessories__tenant=current_tenant)
+                        ).distinct()
+                    elif model.__name__ == 'Category':
+                        filtered_qs = queryset.filter(
+                            Q(asset_types__assets__tenant=current_tenant) |
+                            Q(accessories__tenant=current_tenant) |
+                            Q(consumables__tenant=current_tenant)
+                        ).distinct()
+                    elif model.__name__ == 'StatusLabel':
+                        filtered_qs = queryset.filter(
+                            assets__tenant=current_tenant
+                        ).distinct()
+                    elif model.__name__ == 'AssetRole':
+                        filtered_qs = queryset.filter(
+                            asset__tenant=current_tenant
+                        ).distinct()
+                    else:
+                        continue
+                    
+                    filter_obj.queryset = filtered_qs
+                    filter_obj.extra['queryset'] = filtered_qs
+
+
+class ObjectChangeFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
         label='Search',

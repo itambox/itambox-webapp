@@ -16,7 +16,7 @@
     </dd>
 
     <dt class="col-sm-3">{% translate "Description:" %}</dt>
-    <dd class="col-sm-9">{{ object.description|linebreaksbr|default:"<i>Not Set</i>"|safe }}</dd>
+    <dd class="col-sm-9">{% if object.description %}{{object.description|linebreaksbr}}{% else %}<i>Not Set</i>{% endif %}</dd>
 
     {% if object.tags.all %}
     <dt class="col-sm-3">{% translate "Tags:" %}</dt>

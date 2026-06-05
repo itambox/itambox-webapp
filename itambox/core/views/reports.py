@@ -311,8 +311,8 @@ class ReportTemplatePreviewView(PermissionRequiredMixin, View):
                         })
                     rendered_html = jinja_template.render(context_data)
                 except Exception as je:
-                    django_template = Template(template_content)
-                    rendered_html = django_template.render(Context(context_data))
+                    logger.exception(f"Jinja2 sandboxed render failed: {je}")
+                    raise je
             else:
                 html_template_str = get_polished_system_html_template()
                 django_template = Template(html_template_str)
@@ -388,9 +388,9 @@ class ReportTemplateDownloadView(PermissionRequiredMixin, LoginRequiredMixin, Vi
                                 'location_distribution': [{'location': k, 'count': len(v)} for k, v in grouped_data.items()]
                             })
                         rendered_html = jinja_template.render(context_data)
-                    except Exception:
-                        django_template = Template(template.template_content)
-                        rendered_html = django_template.render(Context(context_data))
+                    except Exception as je:
+                        logger.exception(f"Jinja2 sandboxed render failed: {je}")
+                        raise je
                 else:
                     html_template_str = get_polished_system_html_template()
                     django_template = Template(html_template_str)

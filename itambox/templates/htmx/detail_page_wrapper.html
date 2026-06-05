@@ -75,13 +75,13 @@
                 </div>
             </div>
             {% if object.comments %}
-            <div class="card mt-4"><div class="card-header"><h3 class="card-title">{% translate "Comments" %}</h3></div><div class="card-body">{{ object.comments|linebreaksbr|safe }}</div></div>
+            <div class="card mt-4"><div class="card-header"><h3 class="card-title">{% translate "Comments" %}</h3></div><div class="card-body">{{ object.comments|linebreaksbr }}</div></div>
             {% endif %}
             {% if object.notes %}
-             <div class="card mt-4"><div class="card-header"><h3 class="card-title">{% translate "Notes" %}</h3></div><div class="card-body">{{ object.notes|linebreaksbr|safe }}</div></div>
+             <div class="card mt-4"><div class="card-header"><h3 class="card-title">{% translate "Notes" %}</h3></div><div class="card-body">{{ object.notes|linebreaksbr }}</div></div>
             {% endif %}
              {% if object.description %}
-             <div class="card mt-4"><div class="card-header"><h3 class="card-title">{% translate "Description" %}</h3></div><div class="card-body">{{ object.description|linebreaksbr|safe }}</div></div>
+             <div class="card mt-4"><div class="card-header"><h3 class="card-title">{% translate "Description" %}</h3></div><div class="card-body">{{ object.description|linebreaksbr }}</div></div>
             {% endif %}
             {% block hierarchy %}{% endblock hierarchy %}
             {% block extra_cards_left %}{% endblock %}

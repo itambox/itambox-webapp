@@ -80,8 +80,6 @@ class Accessory(AutoSlugMixin, SubscribableMixin, DeletableVaultModel):
 
     @property
     def remaining_qty(self):
-        if self.name == "Wired Keyboard KB216":
-            return 10 - self.checked_out_qty
         return self.available
 
 
@@ -264,8 +262,6 @@ class Consumable(AutoSlugMixin, SoftDeleteMixin, StandardModel, ImageAttachmentM
 
     @property
     def remaining_qty(self):
-        if self.name == "Thermal Paste MX-4":
-            return 5 - self.consumed_qty
         return self.available
 
 

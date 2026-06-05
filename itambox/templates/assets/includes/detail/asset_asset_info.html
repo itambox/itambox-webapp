@@ -5,7 +5,7 @@
     <dd class="col-sm-9"><span class="badge bg-blue-lt px-2.5 py-1"><strong>{{ object.asset_tag }}</strong></span></dd>
 
     <dt class="col-sm-3">{% translate "Serial Number:" %}</dt>
-    <dd class="col-sm-9"><code>{{ object.serial_number|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</code></dd>
+    <dd class="col-sm-9"><code>{% if object.serial_number %}{{object.serial_number}}{% else %}<span class='text-muted'><i>Not Set</i></span>{% endif %}</code></dd>
     
     <dt class="col-sm-3">{% translate "Asset Type / Model:" %}</dt>
     <dd class="col-sm-9">
@@ -63,10 +63,10 @@
     </dd>
     
     <dt class="col-sm-3">{% translate "Purchase Date:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{{ object.purchase_date|date:"Y-m-d"|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
+    <dd class="col-sm-9 text-secondary">{% if object.purchase_date %}{{object.purchase_date|date:"Y-m-d"}}{% else %}<span class='text-muted'><i>Not Set</i></span>{% endif %}</dd>
 
     <dt class="col-sm-3">{% translate "Warranty Expiration:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{{ object.warranty_expiration|date:"Y-m-d"|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
+    <dd class="col-sm-9 text-secondary">{% if object.warranty_expiration %}{{object.warranty_expiration|date:"Y-m-d"}}{% else %}<span class='text-muted'><i>Not Set</i></span>{% endif %}</dd>
 
     <dt class="col-sm-3">{% translate "Purchase Cost:" %}</dt>
     <dd class="col-sm-9 text-secondary">
@@ -78,7 +78,7 @@
     </dd>
 
     <dt class="col-sm-3">{% translate "Supplier:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{{ object.supplier|default:"<span class='text-muted'><i>Not Set</i></span>"|safe }}</dd>
+    <dd class="col-sm-9 text-secondary">{% if object.supplier %}{{object.supplier}}{% else %}<span class='text-muted'><i>Not Set</i></span>{% endif %}</dd>
 
     <dt class="col-sm-3">{% translate "Order Number:" %}</dt>
     <dd class="col-sm-9 text-secondary">

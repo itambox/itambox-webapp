@@ -402,10 +402,10 @@ class LabelPrintView(LoginRequiredMixin, View):
                 obj = None
 
         if label_template.template_code:
-            from django.template import Template, Context
-            template = Template(label_template.template_code)
-            context = Context({'obj': obj, 'barcode_format': label_template.barcode_format})
-            html = template.render(context)
+            from jinja2.sandbox import SandboxedEnvironment
+            env = SandboxedEnvironment()
+            template = env.from_string(label_template.template_code)
+            html = template.render(obj=obj, barcode_format=label_template.barcode_format)
         else:
             html = self._render_default_label(obj, label_template)
 

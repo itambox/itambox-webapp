@@ -44,29 +44,44 @@ class CSPMiddleware:
     """
     Adds Content-Security-Policy headers to all responses.
     
-    'unsafe-inline' is required because the FOUC-prevention theme script
-    in base.html must run before any external JS/CSS loads. Once that
-    inline script is replaced with a CSP nonce-based approach, the
-    'unsafe-inline' allowance can be removed from script-src.
+    Uses a cryptographically secure random nonce for inline scripts to eliminate
+    the need for 'unsafe-inline' in script-src.
     """
     def __init__(self, get_response=None):
         self.get_response = get_response
 
     def __call__(self, request):
+        import base64
+        import os
+        # Generate a cryptographically secure random base64 nonce for this request
+        request.csp_nonce = base64.b64encode(os.urandom(16)).decode('utf-8')
         response = self.get_response(request)
         return self.process_response(request, response)
 
     def process_response(self, request, response):
-        response['Content-Security-Policy'] = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
-            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://rsms.me; "
-            "img-src 'self' data:; "
-            "font-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
-            "media-src 'self' data:; "
-            "connect-src 'self'; "
-            "frame-ancestors 'self'"
-        )
+        nonce = getattr(request, 'csp_nonce', '')
+        if nonce:
+            response['Content-Security-Policy'] = (
+                "default-src 'self'; "
+                f"script-src 'self' 'nonce-{nonce}' https://cdn.jsdelivr.net https://unpkg.com; "
+                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://rsms.me; "
+                "img-src 'self' data:; "
+                "font-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+                "media-src 'self' data:; "
+                "connect-src 'self'; "
+                "frame-ancestors 'self'"
+            )
+        else:
+            response['Content-Security-Policy'] = (
+                "default-src 'self'; "
+                "script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; "
+                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://rsms.me; "
+                "img-src 'self' data:; "
+                "font-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+                "media-src 'self' data:; "
+                "connect-src 'self'; "
+                "frame-ancestors 'self'"
+            )
         return response
 
 

@@ -365,10 +365,10 @@ def asset_label_print(request, pk, template_id=None):
         from core.models import LabelTemplate
         label_template = get_object_or_404(LabelTemplate, pk=template_id)
         if label_template.template_code:
-            from django.template import Template, Context
-            tpl = Template(label_template.template_code)
-            ctx = Context({'obj': asset, 'barcode_format': label_template.barcode_format})
-            html = tpl.render(ctx)
+            from jinja2.sandbox import SandboxedEnvironment
+            env = SandboxedEnvironment()
+            tpl = env.from_string(label_template.template_code)
+            html = tpl.render(obj=asset, barcode_format=label_template.barcode_format)
             return HttpResponse(html)
 
     qr_data = request.build_absolute_uri(asset.get_absolute_url())

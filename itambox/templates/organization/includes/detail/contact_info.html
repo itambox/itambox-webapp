@@ -4,7 +4,7 @@
     <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
 
     <dt class="col-sm-3">{% translate "Title:" %}</dt>
-    <dd class="col-sm-9">{{ object.title|default:"<i>No title</i>"|safe }}</dd>
+    <dd class="col-sm-9">{% if object.title %}{{object.title}}{% else %}<i>No title</i>{% endif %}</dd>
 
     <dt class="col-sm-3">{% translate "Phone:" %}</dt>
     <dd class="col-sm-9">
@@ -34,10 +34,10 @@
     </dd>
 
     <dt class="col-sm-3">{% translate "Description:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{{ object.description|linebreaksbr|default:"<i>No description provided.</i>"|safe }}</dd>
+    <dd class="col-sm-9 text-secondary">{% if object.description %}{{object.description|linebreaksbr}}{% else %}<i>No description provided.</i>{% endif %}</dd>
 
     <dt class="col-sm-3">{% translate "Comments:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{{ object.comments|linebreaksbr|default:"<span class='text-muted'><i>None</i></span>"|safe }}</dd>
+    <dd class="col-sm-9 text-secondary">{% if object.comments %}{{object.comments|linebreaksbr}}{% else %}<span class='text-muted'><i>None</i></span>{% endif %}</dd>
 
     {% if object.tags.all %}
     <dt class="col-sm-3">{% translate "Tags:" %}</dt>

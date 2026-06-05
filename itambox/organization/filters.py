@@ -1,4 +1,5 @@
 import django_filters
+from core.filters import BaseFilterSet
 from django import forms
 from django.db.models import Q
 from django.contrib.contenttypes.models import ContentType
@@ -10,7 +11,7 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML # Import Helper, Layout, Submit
 
 # --- Base Search Filter --- 
-class BaseOrgFilterSet(django_filters.FilterSet):
+class BaseOrgFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
         label='Search',

@@ -7,7 +7,7 @@
     <dd class="col-sm-9"><code>{{ object.slug }}</code></dd>
 
     <dt class="col-sm-3">{% translate "Description:" %}</dt>
-    <dd class="col-sm-9 text-secondary mb-3">{{ object.description|linebreaksbr|default:"<i>No description provided.</i>"|safe }}</dd>
+    <dd class="col-sm-9 text-secondary mb-3">{% if object.description %}{{object.description|linebreaksbr}}{% else %}<i>No description provided.</i>{% endif %}</dd>
 
     <hr class="my-3 text-muted">
     <h4 class="text-secondary mb-2 uppercase font-sans small font-weight-bold" style="letter-spacing: 0.05em;">Support &amp; Contracts</h4>

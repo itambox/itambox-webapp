@@ -1,11 +1,12 @@
 import django_filters
+from core.filters import BaseFilterSet
 from django import forms
 from django.db.models import Q
 from assets.models import Asset
 from organization.models import AssetHolder
 from .models import AssetMaintenance, CustodyReceipt
 
-class CustodyReceiptFilterSet(django_filters.FilterSet):
+class CustodyReceiptFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
         label='Search',
@@ -48,7 +49,7 @@ class CustodyReceiptFilterSet(django_filters.FilterSet):
         ).distinct()
 
 
-class AssetMaintenanceFilterSet(django_filters.FilterSet):
+class AssetMaintenanceFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
         label='Search',

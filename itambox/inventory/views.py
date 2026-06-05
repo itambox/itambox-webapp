@@ -491,10 +491,12 @@ class ConsumableAssignmentListView(ObjectListView):
 
 class AccessoryStockAdjustView(LoginRequiredMixin, View):
     def post(self, request, pk):
-        from django.http import HttpResponse
+        from django.http import HttpResponse, HttpResponseForbidden
         from django.utils.html import format_html
         
         stock = get_object_or_404(AccessoryStock, pk=pk)
+        if not request.user.has_perm('inventory.change_accessorystock', obj=stock.accessory):
+            return HttpResponseForbidden("Permission denied.")
         action = request.GET.get('action')
         
         if action == 'increment':
@@ -525,10 +527,12 @@ class AccessoryStockAdjustView(LoginRequiredMixin, View):
 
 class ConsumableStockAdjustView(LoginRequiredMixin, View):
     def post(self, request, pk):
-        from django.http import HttpResponse
+        from django.http import HttpResponse, HttpResponseForbidden
         from django.utils.html import format_html
         
         stock = get_object_or_404(ConsumableStock, pk=pk)
+        if not request.user.has_perm('inventory.change_consumablestock', obj=stock.consumable):
+            return HttpResponseForbidden("Permission denied.")
         action = request.GET.get('action')
         
         if action == 'increment':

@@ -26,11 +26,18 @@ if env_path.exists():
             os.environ.setdefault(k, v)
 
 VERSION = '1.0.0-alpha'
+DEBUG = False
 
 SECRET_KEY = os.environ.get('ITAMBOX_SECRET_KEY', '')
 
 if not SECRET_KEY:
+    import warnings
     SECRET_KEY = 'django-insecure-dev-only-change-me-in-production'
+    warnings.warn(
+        "ITAMBOX_SECRET_KEY environment variable is not set. Using insecure default key. "
+        "Do NOT use this configuration in production!",
+        UserWarning
+    )
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -53,7 +60,6 @@ INSTALLED_APPS = [
     'django_filters',
     'crispy_forms',
     'crispy_bootstrap5',
-    'debug_toolbar',
     'itambox.apps.ITAMBoxConfig',
     'core.apps.CoreConfig',
     'extras.apps.ExtrasConfig',
@@ -79,7 +85,6 @@ MIDDLEWARE = [
     'itambox.middleware.CSPMiddleware',
     'itambox.middleware.CurrentUserMiddleware',
     'itambox.middleware.TenantMiddleware',
-    'debug_toolbar.middleware.DebugToolbarMiddleware',
 ]
 
 INTERNAL_IPS = [
@@ -332,13 +337,16 @@ REQUIRE_CUSTODY_SIGNIN = os.environ.get('ITAMBOX_REQUIRE_CUSTODY_SIGNIN', 'True'
 PLUGINS = [
     'itambox_esign',
 ]
+
+IS_TESTING = 'test' in sys.argv or any('test' in arg or 'pytest' in arg for arg in sys.argv)
+
 PLUGINS_CONFIG = {
     'itambox_esign': {
-        'DOCUSIGN_INTEGRATION_KEY': 'mock-integration-key-guid',
-        'DOCUSIGN_USER_ID': 'mock-user-id-guid',
-        'DOCUSIGN_ACCOUNT_ID': 'mock-account-id-guid',
-        'DOCUSIGN_RSA_PRIVATE_KEY': '-----BEGIN RSA PRIVATE KEY-----\nMockKey\n-----END RSA PRIVATE KEY-----',
-        'DOCUSIGN_SANDBOX': True,
+        'DOCUSIGN_INTEGRATION_KEY': os.environ.get('DOCUSIGN_INTEGRATION_KEY', 'mock-integration-key-guid' if IS_TESTING else ''),
+        'DOCUSIGN_USER_ID': os.environ.get('DOCUSIGN_USER_ID', 'mock-user-id-guid' if IS_TESTING else ''),
+        'DOCUSIGN_ACCOUNT_ID': os.environ.get('DOCUSIGN_ACCOUNT_ID', 'mock-account-id-guid' if IS_TESTING else ''),
+        'DOCUSIGN_RSA_PRIVATE_KEY': os.environ.get('DOCUSIGN_RSA_PRIVATE_KEY', '-----BEGIN RSA PRIVATE KEY-----\nMockKey\n-----END RSA PRIVATE KEY-----' if IS_TESTING else ''),
+        'DOCUSIGN_SANDBOX': os.environ.get('DOCUSIGN_SANDBOX', 'True').lower() in ('true', '1', 't'),
     }
 }
 

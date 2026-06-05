@@ -1,9 +1,11 @@
 import base64
 import hashlib
+import logging
+import os
 from django.conf import settings
 from cryptography.fernet import Fernet, MultiFernet, InvalidToken
 
-import os
+logger = logging.getLogger(__name__)
 
 def get_fernet():
     """
@@ -70,6 +72,6 @@ def decrypt_string(cipher_text: str) -> str:
         encrypted_part = cipher_text[4:]
         decrypted_bytes = fernet.decrypt(encrypted_part.encode('ascii'))
         return decrypted_bytes.decode('utf-8')
-    except (InvalidToken, Exception):
-        # Fail-safe fallback: return original if key changes or decryption fails
-        return cipher_text
+    except Exception as e:
+        logger.error(f"Failed to decrypt string: {e}", exc_info=True)
+        raise ValueError(f"Decryption failed: {str(e)}") from e
