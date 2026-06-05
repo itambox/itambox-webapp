@@ -3,7 +3,7 @@
 <div class="modal modal-blur fade" id="quick-add-modal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <form hx-post="{{ request.path }}"
+            <form hx-post="{{ request.get_full_path }}"
                   hx-target="#quick-add-modal-content"
                   hx-swap="innerHTML">
                 {% csrf_token %}

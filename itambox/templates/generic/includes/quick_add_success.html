@@ -17,7 +17,13 @@ Context variables:
             opt.textContent = '{{ value }}';
             opt.selected = true;
             targetSelect.insertBefore(opt, targetSelect.firstChild);
-            targetSelect.dispatchEvent(new Event('change', { bubbles: true }));
+
+            if (targetSelect.tomselect) {
+                targetSelect.tomselect.addOption({ value: '{{ pk }}', text: '{{ value }}' });
+                targetSelect.tomselect.setValue('{{ pk }}');
+            } else {
+                targetSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            }
         }
 
         var modal = document.getElementById('quick-add-modal');
