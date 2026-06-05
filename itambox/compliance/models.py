@@ -22,6 +22,7 @@ class MaintenanceStatusChoices(models.TextChoices):
 
 class CustodyTemplate(TaggableMixin, CloneableMixin, ExportableMixin, ChangeLoggingMixin, BaseModel):
     objects = TenantScopingManager()
+    allow_global_tenant = True
 
     tenant = models.ForeignKey(
         to='organization.Tenant',

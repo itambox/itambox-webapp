@@ -324,6 +324,11 @@ class AssetCheckOutAPISerializer(serializers.Serializer):
     holder_id = serializers.IntegerField(required=False, allow_null=True)
     location_id = serializers.IntegerField(required=False, allow_null=True)
     asset_target_id = serializers.IntegerField(required=False, allow_null=True)
+    status_id = serializers.PrimaryKeyRelatedField(
+        queryset=StatusLabel.objects.filter(type='deployed'),
+        required=False,
+        allow_null=True
+    )
     expected_checkin = serializers.DateField(required=False, allow_null=True)
     notes = serializers.CharField(required=False, default='', allow_blank=True)
 
@@ -362,5 +367,20 @@ class AssetCheckOutAPISerializer(serializers.Serializer):
                 raise serializers.ValidationError({"asset_target_id": "Specified target asset does not exist."})
                 
         return data
+
+
+class AssetCheckInAPISerializer(serializers.Serializer):
+    status_id = serializers.PrimaryKeyRelatedField(
+        queryset=StatusLabel.objects.exclude(type='deployed'),
+        required=False,
+        allow_null=True
+    )
+    location_id = serializers.PrimaryKeyRelatedField(
+        queryset=Location.objects.all(),
+        required=False,
+        allow_null=True
+    )
+    checkin_date = serializers.DateField(required=False, allow_null=True)
+    notes = serializers.CharField(required=False, default='', allow_blank=True)
 
 

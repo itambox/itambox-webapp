@@ -1,5 +1,5 @@
 from datetime import date, timedelta
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from model_bakery import baker
@@ -101,6 +101,7 @@ class AssetMaintenanceViewTests(TestCase):
         self.assertFalse(AssetMaintenance.objects.filter(pk=self.maintenance.pk).exists())
 
 
+@override_settings(REQUIRE_CUSTODY_SIGNIN=False)
 class CustodyReceiptViewTests(TestCase):
     def setUp(self):
         self.asset = baker.make(Asset, name='LT-02', asset_tag='TAG-LT-02', tenant=None)
@@ -179,6 +180,24 @@ class CustodyReceiptViewTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'expired')
+
+    def test_sign_portal_redirect_when_signin_required_unauthenticated(self):
+        from django.test import override_settings
+        with override_settings(REQUIRE_CUSTODY_SIGNIN=True):
+            url = reverse('compliance:custody_eula_sign', kwargs={'token': self.receipt.token})
+            self.client.logout()
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 302)
+            self.assertIn(reverse('login'), response.url)
+
+    def test_sign_portal_allowed_when_signin_required_authenticated(self):
+        from django.test import override_settings
+        with override_settings(REQUIRE_CUSTODY_SIGNIN=True):
+            user = baker.make(User)
+            self.client.force_login(user)
+            url = reverse('compliance:custody_eula_sign', kwargs={'token': self.receipt.token})
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
 
 
 from ..models import CustodyTemplate

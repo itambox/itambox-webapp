@@ -12,13 +12,13 @@
 {% block extra_page_actions %}
     {# Check In Button (if assigned) #}
     {% if assignment and assignment.is_active %}
-        <form method="post" action="{% url 'assets:asset_checkin' pk=object.pk %}" class="d-inline">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-success">
-                 <i class="mdi mdi-download"></i>
-                {% translate "Check In" %}
-            </button>
-        </form>
+        <button type="button" class="btn btn-success"
+                hx-get="{% url 'assets:asset_checkin' pk=object.pk %}"
+                hx-target="#modal-placeholder"
+                hx-swap="innerHTML">
+             <i class="mdi mdi-download"></i>
+            {% translate "Check In..." %}
+        </button>
     {% else %}
         {# Check Out Button (only visible if not checked out) #}
         <button type="button" class="btn btn-info"

@@ -1,10 +1,11 @@
+import datetime
 from django import forms
 from django.core.exceptions import ValidationError
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, HTML
 
 from organization.models import Location, AssetHolder
-from assets.models import Asset
+from assets.models import Asset, StatusLabel
 
 
 class AssetCheckOutForm(forms.Form):
@@ -36,6 +37,12 @@ class AssetCheckOutForm(forms.Form):
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
         label="Parent Asset"
+    )
+    status = forms.ModelChoiceField(
+        queryset=StatusLabel.objects.filter(type='deployed').order_by('name'),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Status"
     )
     checkout_date = forms.DateField(
         required=False,
@@ -77,6 +84,12 @@ class AssetCheckOutForm(forms.Form):
             self.fields['asset_target'].queryset = Asset.objects.exclude(pk=asset.pk).exclude(status__type='undeployable').order_by('name')
             if asset.tenant:
                 self.fields['asset_holder'].queryset = AssetHolder.objects.filter(tenant=asset.tenant).order_by('last_name', 'first_name')
+                self.fields['location'].queryset = Location.objects.filter(tenant=asset.tenant).select_related('site').order_by('site__name', 'name')
+        
+        initial_status = StatusLabel.objects.filter(type='deployed').first()
+        if initial_status:
+            self.fields['status'].initial = initial_status
+
         self.helper = FormHelper()
         self.helper.form_tag = False
         self.helper.layout = Layout(
@@ -84,8 +97,64 @@ class AssetCheckOutForm(forms.Form):
             'asset_holder',
             'location',
             'asset_target',
+            'status',
             'checkout_date',
             'expected_checkin',
+            'notes',
+        )
+
+
+class AssetCheckInForm(forms.Form):
+    status = forms.ModelChoiceField(
+        queryset=StatusLabel.objects.exclude(type='deployed').order_by('name'),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Status"
+    )
+    location = forms.ModelChoiceField(
+        queryset=Location.objects.all().select_related('site').order_by('site__name', 'name'),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Location"
+    )
+    checkin_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        label="Checkin Date"
+    )
+    notes = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
+        required=False,
+        label="Notes"
+    )
+
+    def __init__(self, *args, **kwargs):
+        asset = kwargs.pop('asset', None)
+        super().__init__(*args, **kwargs)
+        
+        initial_status = None
+        if asset:
+            active_assignment = asset.active_assignment
+            if active_assignment:
+                initial_status = active_assignment.pre_checkout_status
+            if not initial_status:
+                initial_status = StatusLabel.objects.filter(type='deployable').first()
+            if asset.tenant:
+                self.fields['location'].queryset = Location.objects.filter(tenant=asset.tenant).select_related('site').order_by('site__name', 'name')
+        else:
+            initial_status = StatusLabel.objects.filter(type='deployable').first()
+            
+        if initial_status:
+            self.fields['status'].initial = initial_status
+
+        self.fields['checkin_date'].initial = datetime.date.today()
+
+        self.helper = FormHelper()
+        self.helper.form_tag = False
+        self.helper.layout = Layout(
+            'status',
+            'location',
+            'checkin_date',
             'notes',
         )
 

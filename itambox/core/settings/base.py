@@ -323,6 +323,7 @@ if 'test' in sys.argv or any('test' in arg or 'pytest' in arg for arg in sys.arg
 
 
 ALLOW_GLOBAL_CUSTODY_TEMPLATES = os.environ.get('ITAMBOX_ALLOW_GLOBAL_CUSTODY_TEMPLATES', 'True') == 'True'
+REQUIRE_CUSTODY_SIGNIN = os.environ.get('ITAMBOX_REQUIRE_CUSTODY_SIGNIN', 'True') == 'True'
 
 
 # ==============================================================================

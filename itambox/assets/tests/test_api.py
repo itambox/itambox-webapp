@@ -207,3 +207,54 @@ class ITAMBoxAPITestCase(APITestCase):
         checkout_url_b = reverse('api:assets_api:asset-checkout', kwargs={'pk': self.asset_b.pk})
         response = self.client.post(checkout_url_b, data={'holder_id': self.holder_b.id}, format='json')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_asset_checkout_and_checkin_actions_with_custom_status_location_and_date(self):
+        self.client.force_authenticate(user=self.superuser)
+        
+        # Create statuses and locations for checkout/checkin
+        deployed_status = StatusLabel.objects.create(name="Assigned-InUse", slug="assigned-inuse", type=StatusLabel.TYPE_DEPLOYED)
+        returned_status = StatusLabel.objects.create(name="Staging-NeedsInspect", slug="staging-needsinspect", type=StatusLabel.TYPE_PENDING)
+        return_location = Location.objects.create(name="Storage Closet 2", slug="storage-closet-2", site=self.site, tenant=self.tenant_a)
+
+        # 1. Test Checkout Action with status_id
+        checkout_url = reverse('api:assets_api:asset-checkout', kwargs={'pk': self.asset_a.pk})
+        data = {
+            'holder_id': self.holder_a.id, 
+            'status_id': deployed_status.id,
+            'notes': 'Checked out to holder A with custom status via API'
+        }
+        
+        response = self.client.post(checkout_url, data=data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # Verify asset is checked out and has custom status
+        self.asset_a.refresh_from_db()
+        self.assertEqual(self.asset_a.status, deployed_status)
+        self.assertEqual(self.asset_a.assigned_to, self.holder_a)
+
+        # 2. Test Checkin Action with status_id, location_id, checkin_date, and notes
+        checkin_url = reverse('api:assets_api:asset-checkin', kwargs={'pk': self.asset_a.pk})
+        import datetime
+        checkin_date = (datetime.date.today() - datetime.timedelta(days=2)).isoformat()
+        
+        checkin_data = {
+            'status_id': returned_status.id,
+            'location_id': return_location.id,
+            'checkin_date': checkin_date,
+            'notes': 'Check in asset A with custom status and location via API'
+        }
+        
+        response = self.client.post(checkin_url, data=checkin_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Verify asset is checked in with custom status and location
+        self.asset_a.refresh_from_db()
+        self.assertIsNone(self.asset_a.active_assignment)
+        self.assertEqual(self.asset_a.status, returned_status)
+        self.assertEqual(self.asset_a.location, return_location)
+        
+        # Verify assignment record details
+        assignment = self.asset_a.assignments.order_by('-created_at').first()
+        self.assertFalse(assignment.is_active)
+        self.assertEqual(assignment.checked_in_at.date().isoformat(), checkin_date)
+        self.assertIn('Check in asset A with custom status and location via API', assignment.notes)

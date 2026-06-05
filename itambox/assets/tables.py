@@ -89,7 +89,7 @@ class AssetTable(BaseTable): # Inherit from BaseTable
         if record.active_assignment:
             url = reverse('assets:asset_checkin', kwargs={'pk': record.pk})
             return format_html(
-                '<div class="d-inline-block"><a class="btn btn-sm btn-success" hx-post="{}" hx-swap="none" href="javascript:void(0)">'
+                '<div class="d-inline-block"><a class="btn btn-sm btn-success" hx-get="{}" hx-target="#modal-placeholder" hx-swap="innerHTML" href="javascript:void(0)">'
                 '<i class="mdi mdi-keyboard-return"></i> Check-in</a></div>', url
             )
         else:

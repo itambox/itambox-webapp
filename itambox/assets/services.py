@@ -31,7 +31,8 @@ def checkout_asset(
     request: HttpRequest | None = None,
     expected_checkin: datetime.date | None = None,
     notes: str = '',
-    checkout_date: datetime.datetime | None = None
+    checkout_date: datetime.datetime | None = None,
+    status: StatusLabel | None = None
 ) -> AssetHolder | Location | Asset:
     target = holder or location or asset_target
     if not target:
@@ -46,9 +47,11 @@ def checkout_asset(
 
         original_status = asset.status
 
-        in_use_status = StatusLabel.objects.filter(type='deployed').first()
-        if in_use_status:
-            asset.status = in_use_status
+        resolved_status = status
+        if not resolved_status:
+            resolved_status = StatusLabel.objects.filter(type='deployed').first()
+        if resolved_status:
+            asset.status = resolved_status
 
         if holder:
             asset.location = None
@@ -159,25 +162,41 @@ def checkout_asset(
     return target
 
 
-def checkin_asset(asset: Asset, user: AbstractBaseUser | None = None, notes: str = '') -> str | None:
+def checkin_asset(
+    asset: Asset,
+    user: AbstractBaseUser | None = None,
+    notes: str = '',
+    status: StatusLabel | None = None,
+    location: Location | None = None,
+    checkin_date: datetime.date | None = None,
+    request: HttpRequest | None = None,
+) -> str | None:
     active = asset.active_assignment
     if active:
         target = active.assigned_target
         with transaction.atomic():
             active.is_active = False
-            active.checked_in_at = timezone.now()
+            
+            if checkin_date:
+                dt = datetime.datetime.combine(checkin_date, datetime.time.min)
+                active.checked_in_at = timezone.make_aware(dt)
+            else:
+                active.checked_in_at = timezone.now()
+                
             active.checked_in_by = user
             if notes:
                 active.notes = (active.notes + '\n' + notes).strip()
             active.save()
 
-            revert_status = active.pre_checkout_status
+            revert_status = status
+            if not revert_status:
+                revert_status = active.pre_checkout_status
             if not revert_status:
                 revert_status = StatusLabel.objects.filter(type='deployable').first()
             
             if revert_status:
                 asset.status = revert_status
-            asset.location = None
+            asset.location = location
             asset._changelog_action = 'checkin'
             asset._changelog_message = f"Checked in from {target}"
             asset.save(update_fields=['status', 'location'])
@@ -186,10 +205,12 @@ def checkin_asset(asset: Asset, user: AbstractBaseUser | None = None, notes: str
     elif asset.location:
         with transaction.atomic():
             checked_in_from = asset.location
-            asset.location = None
-            available_status = StatusLabel.objects.filter(type='deployable').first()
-            if available_status:
-                asset.status = available_status
+            revert_status = status
+            if not revert_status:
+                revert_status = StatusLabel.objects.filter(type='deployable').first()
+            if revert_status:
+                asset.status = revert_status
+            asset.location = location
             asset._changelog_action = 'checkin'
             asset._changelog_message = f"Checked in from Location: {checked_in_from}"
             asset.save(update_fields=['status', 'location'])

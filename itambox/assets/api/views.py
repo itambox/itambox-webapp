@@ -23,7 +23,8 @@ from .serializers import (
     InstalledSoftwareSerializer, StatusLabelSerializer, DepreciationSerializer,
     SupplierSerializer, CategorySerializer, AssetRequestSerializer,
     AssetTagSequenceSerializer, AssetAssignmentSerializer,
-    AuditSessionSerializer, AssetAuditSerializer, AssetCheckOutAPISerializer
+    AuditSessionSerializer, AssetAuditSerializer, AssetCheckOutAPISerializer,
+    AssetCheckInAPISerializer
 )
 from assets.services import checkout_asset, checkin_asset
 
@@ -53,7 +54,8 @@ class AssetViewSet(ITAMBoxModelViewSet):
             location=serializer.validated_data.get('location'),
             asset_target=serializer.validated_data.get('asset_target'),
             expected_checkin=serializer.validated_data.get('expected_checkin'),
-            notes=serializer.validated_data.get('notes', '')
+            notes=serializer.validated_data.get('notes', ''),
+            status=serializer.validated_data.get('status_id')
         )
         
         return Response(
@@ -61,13 +63,23 @@ class AssetViewSet(ITAMBoxModelViewSet):
             status=status.HTTP_200_OK
         )
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], serializer_class=AssetCheckInAPISerializer)
     def checkin(self, request, pk=None):
         """
         API Action to check in an asset.
         """
         asset = self.get_object()
-        checkin_asset(asset, user=request.user, notes=request.data.get('notes', ''))
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        checkin_asset(
+            asset=asset,
+            user=request.user,
+            notes=serializer.validated_data.get('notes', ''),
+            status=serializer.validated_data.get('status_id'),
+            location=serializer.validated_data.get('location_id'),
+            checkin_date=serializer.validated_data.get('checkin_date')
+        )
         return Response(
             {"status": "success", "message": f"Asset {asset.asset_tag} checked in successfully."},
             status=status.HTTP_200_OK
@@ -159,7 +171,7 @@ class AssetAssignmentViewSet(ITAMBoxModelViewSet):
     ).prefetch_related('tags')
     serializer_class = AssetAssignmentSerializer
     filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ['asset_id', 'is_active', 'checked_out_by_id']
+    filterset_fields = ['asset_id', 'is_active', 'checked_out_by_id', 'assigned_user_id']
 
 
 class AuditSessionViewSet(ITAMBoxModelViewSet):

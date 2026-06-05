@@ -10,6 +10,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django_tables2 import RequestConfig
 from django.db.models import Count
+from django.db import transaction
 
 from ..models import Asset, InstalledSoftware, StatusLabel, AssetAssignment
 from .. import forms, tables, filters
@@ -223,16 +224,67 @@ class AssetCheckoutView(GenericTransactionView):
     def get_success_message(self, result=None):
         return f"Asset '{self.get_object()}' checked out to {result}."
 
+    def form_valid(self, form):
+        obj = self.get_object()
+        try:
+            with transaction.atomic():
+                result = self.__class__.service_callable(
+                    obj, user=self.request.user, request=self.request,
+                    **self.get_service_kwargs(form)
+                )
 
-class AssetCheckinView(SimplePostView):
+            messages.success(self.request, self.get_success_message(result))
+
+            if self.request.headers.get('HX-Request') or getattr(self.request, 'htmx', False):
+                response = HttpResponse()
+                response['HX-Redirect'] = obj.get_absolute_url()
+                return response
+            return redirect(obj.get_absolute_url())
+
+        except Exception as e:
+            form.add_error(None, str(e))
+            return self.form_invalid(form)
+
+
+class AssetCheckinView(GenericTransactionView):
     permission_required = ('assets.change_asset',)
     queryset = Asset.objects.all()
+    model_form = forms.AssetCheckInForm
+    service_callable = checkin_asset
+    context_object_name = 'asset'
+    template_name = 'assets/includes/asset_checkin_modal.html'
+    success_message = "Asset checked in successfully."
+    hx_trigger = "assetListUpdated"
 
-    def perform_action(self, asset, request):
-        msg = checkin_asset(asset, user=request.user)
-        if msg:
-            return {'message': f"Asset '{asset}' checked in."}
-        return {'message': f"No active assignment for '{asset}'."}
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        del kwargs['instance']
+        kwargs['asset'] = self.get_object()
+        return kwargs
+
+    def get_success_message(self, result=None):
+        return f"Asset '{self.get_object()}' checked in successfully."
+
+    def form_valid(self, form):
+        obj = self.get_object()
+        try:
+            with transaction.atomic():
+                result = self.__class__.service_callable(
+                    obj, user=self.request.user, request=self.request,
+                    **self.get_service_kwargs(form)
+                )
+
+            messages.success(self.request, self.get_success_message(result))
+
+            if self.request.headers.get('HX-Request') or getattr(self.request, 'htmx', False):
+                response = HttpResponse()
+                response['HX-Redirect'] = obj.get_absolute_url()
+                return response
+            return redirect(obj.get_absolute_url())
+
+        except Exception as e:
+            form.add_error(None, str(e))
+            return self.form_invalid(form)
 
 
 class AssetAuditView(SimplePostView):

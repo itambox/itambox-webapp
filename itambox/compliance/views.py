@@ -55,6 +55,11 @@ class AssetMaintenanceDeleteView(ObjectDeleteView):
 
 
 def custody_eula_sign(request, token):
+    from django.conf import settings
+    if getattr(settings, 'REQUIRE_CUSTODY_SIGNIN', False) and not request.user.is_authenticated:
+        from django.contrib.auth.views import redirect_to_login
+        return redirect_to_login(request.get_full_path())
+
     receipt = get_object_or_404(CustodyReceipt, token=token)
 
     if receipt.signature_provider != 'local':

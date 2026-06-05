@@ -67,12 +67,31 @@ class CustodyReceiptTable(BaseTable):
     custody_template = tables.LinkColumn('compliance:custodytemplate_detail', args=[A('custody_template_id')], accessor='custody_template.name', verbose_name='Template')
     acceptance_status = tables.Column(verbose_name='Status')
     signed_at = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name='Signed At')
-    actions = ActionsColumn()
+    actions = tables.Column(
+        verbose_name='',
+        orderable=False,
+        empty_values=(),
+        attrs={
+            'th': {'class': 'col-actions text-nowrap'},
+            'td': {'class': 'text-end text-nowrap noprint p-1 col-actions'}
+        },
+    )
 
     class Meta(BaseTable.Meta):
         model = CustodyReceipt
         fields = ('pk', 'asset', 'holder', 'custody_template', 'acceptance_status', 'signed_at', 'actions')
         default_columns = ('pk', 'asset', 'holder', 'custody_template', 'acceptance_status', 'signed_at', 'actions')
+
+    def render_actions(self, record):
+        from django.urls import reverse
+        from django.utils.html import format_html
+        url = reverse('compliance:custody_eula_sign', kwargs={'token': record.token})
+        return format_html(
+            '<a class="btn btn-sm btn-primary" href="{}" target="_blank" title="View/Sign Receipt">'
+            '<i class="mdi mdi-eye-outline me-1"></i>View'
+            '</a>',
+            url
+        )
 
     def render_acceptance_status(self, value):
         badges = {

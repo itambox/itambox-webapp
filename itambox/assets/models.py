@@ -23,13 +23,15 @@ class AssetStateMachine:
     ALLOWED_TRANSITIONS = {
         'pending': ['deployable', 'undeployable', 'archived'],
         'deployable': ['pending', 'undeployable', 'archived', 'deployed'],
-        'deployed': ['deployable', 'undeployable', 'archived'],
+        'deployed': ['deployable', 'undeployable', 'archived', 'pending'],
         'undeployable': ['pending', 'deployable', 'archived'],
         'archived': ['pending']
     }
 
     @staticmethod
     def validate_transition(current_status_type, new_status_type, is_checked_out):
+        if current_status_type == new_status_type:
+            return
         if new_status_type not in AssetStateMachine.ALLOWED_TRANSITIONS.get(current_status_type, []):
             raise ValidationError(f"Illegal state transition from {current_status_type} to {new_status_type}")
         if is_checked_out and new_status_type in ['undeployable', 'archived']:
