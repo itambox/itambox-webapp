@@ -456,6 +456,28 @@ html,
         }
     }
 
+    // Force left-alignment and vertical layout for navigation elements (desktop & mobile)
+    .navbar-nav {
+        text-align: left !important;
+        flex-direction: column !important;
+    }
+
+    .nav-link {
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: flex-start !important;
+        align-items: center !important;
+        text-align: left !important;
+    }
+
+    .dropdown-menu {
+        text-align: left !important;
+    }
+
+    .dropdown-header {
+        text-align: left !important;
+    }
+
     // Sidebar Category / Dropdown Headers
     .dropdown-header,
     .text-info {
@@ -572,27 +594,6 @@ html,
         .offcanvas-body {
             background-color: var(--itambox-sidebar-bg, var(--tblr-bg-surface)) !important;
             padding: 0 !important;
-        }
-
-        // Force left-alignment for all navigation elements
-        .navbar-nav {
-            text-align: left !important;
-        }
-
-        .nav-link {
-            display: flex !important;
-            flex-direction: row !important;
-            justify-content: flex-start !important;
-            align-items: center !important;
-            text-align: left !important;
-        }
-
-        .dropdown-menu {
-            text-align: left !important;
-        }
-
-        .dropdown-header {
-            text-align: left !important;
         }
     }
 }
