@@ -239,7 +239,7 @@ class AssetRequestSerializer(BaseModelSerializer):
 class AssetTagSequenceSerializer(BaseModelSerializer):
     class Meta:
         model = AssetTagSequence
-        fields = ['id', 'prefix', 'next_value', 'zero_padding', 'created_at', 'updated_at']
+        fields = ['id', 'prefix', 'next_value', 'zero_padding', 'tenant', 'category', 'is_active', 'created_at', 'updated_at']
         brief_fields = ['id', 'prefix', 'next_value']
 
 

@@ -9,11 +9,14 @@ from ..models import AssetTagSequence
 class AssetTagSequenceForm(forms.ModelForm):
     class Meta:
         model = AssetTagSequence
-        fields = ['prefix', 'next_value', 'zero_padding']
+        fields = ['prefix', 'next_value', 'zero_padding', 'tenant', 'category', 'is_active']
         widgets = {
             'prefix': forms.TextInput(attrs={'class': 'form-control'}),
             'next_value': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
             'zero_padding': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 20}),
+            'tenant': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+            'category': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -29,6 +32,9 @@ class AssetTagSequenceForm(forms.ModelForm):
             'prefix',
             'next_value',
             'zero_padding',
+            'tenant',
+            'category',
+            'is_active',
             HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),

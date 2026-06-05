@@ -251,10 +251,24 @@ class AssetTagSequenceFilterSet(django_filters.FilterSet):
         label='Search',
         widget=forms.TextInput(attrs={'placeholder': 'Prefix...'})
     )
+    tenant = django_filters.ModelChoiceFilter(
+        queryset=Tenant.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Tenant'
+    )
+    category = django_filters.ModelChoiceFilter(
+        queryset=Category.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Category'
+    )
+    is_active = django_filters.BooleanFilter(
+        widget=forms.Select(choices=[('', 'All'), ('True', 'Active'), ('False', 'Inactive')], attrs={'class': 'form-select'}),
+        label='Active'
+    )
 
     class Meta:
         model = AssetTagSequence
-        fields = ['prefix']
+        fields = ['prefix', 'tenant', 'category', 'is_active']
 
     def search(self, queryset, name, value):
         if not value.strip():

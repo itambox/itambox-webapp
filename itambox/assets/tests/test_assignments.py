@@ -219,3 +219,130 @@ class AssetAssignmentTestCase(TestCase):
         self.assertEqual(self.peripheral_monitor.status, in_use_status)
 
 
+class AssetTagSequenceTestCase(TestCase):
+    def setUp(self):
+        from organization.models import Tenant
+        from assets.models import Category, AssetType, Manufacturer
+        
+        self.tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
+        self.tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
+        
+        self.category_laptop = Category.objects.create(name="Laptops", slug="laptops")
+        self.category_server = Category.objects.create(name="Servers", slug="servers")
+        
+        self.manufacturer = Manufacturer.objects.create(name="Dell", slug="dell")
+        
+        # Create AssetTypes with categories
+        self.asset_type_laptop = AssetType.objects.create(
+            manufacturer=self.manufacturer,
+            model="Laptop Model",
+            category=self.category_laptop
+        )
+        self.asset_type_server = AssetType.objects.create(
+            manufacturer=self.manufacturer,
+            model="Server Model",
+            category=self.category_server
+        )
+        
+        self.status, _ = StatusLabel.objects.get_or_create(
+            name="Deployable",
+            defaults={'type': 'deployable'}
+        )
+
+    def test_sequence_resolution_hierarchy(self):
+        from assets.models import AssetTagSequence
+        
+        # 1. Create global default sequence
+        AssetTagSequence.all_objects.create(prefix="GLOBAL-", next_value=100, zero_padding=3)
+        
+        # 2. Create global category sequence (LAPTOP-)
+        AssetTagSequence.all_objects.create(prefix="GLAP-", category=self.category_laptop, next_value=200, zero_padding=3)
+        
+        # 3. Create tenant-specific default sequence (TENANTA-)
+        AssetTagSequence.all_objects.create(tenant=self.tenant_a, prefix="TA-", next_value=300, zero_padding=3)
+        
+        # 4. Create tenant-specific + category-specific sequence (TA-LAP-)
+        AssetTagSequence.all_objects.create(tenant=self.tenant_a, category=self.category_laptop, prefix="TALAP-", next_value=400, zero_padding=3)
+        
+        # --- Test 1: Tenant A + Category Laptop -> should match TALAP-400 ---
+        asset_1 = Asset.objects.create(name="Laptop 1", status=self.status, tenant=self.tenant_a, asset_type=self.asset_type_laptop)
+        self.assertEqual(asset_1.asset_tag, "TALAP-400")
+        
+        # --- Test 2: Tenant A + Category Server -> should fall back to TA-300 ---
+        asset_2 = Asset.objects.create(name="Server 1", status=self.status, tenant=self.tenant_a, asset_type=self.asset_type_server)
+        self.assertEqual(asset_2.asset_tag, "TA-300")
+        
+        # --- Test 3: Tenant B + Category Laptop -> should fall back to GLAP-200 (since no Tenant B sequence exists) ---
+        asset_3 = Asset.objects.create(name="Laptop 2", status=self.status, tenant=self.tenant_b, asset_type=self.asset_type_laptop)
+        self.assertEqual(asset_3.asset_tag, "GLAP-200")
+        
+        # --- Test 4: Tenant B + Category Server -> should fall back to GLOBAL-000001 (auto created) ---
+        asset_4 = Asset.objects.create(name="Server 2", status=self.status, tenant=self.tenant_b, asset_type=self.asset_type_server)
+        self.assertEqual(asset_4.asset_tag, "ASSET-000001")
+
+    def test_tenant_scoped_tag_uniqueness(self):
+        from django.db import IntegrityError, transaction
+        
+        # Two different tenants can have the same asset tag
+        Asset.objects.create(name="Asset A", asset_tag="TAG-100", status=self.status, tenant=self.tenant_a)
+        
+        try:
+            Asset.objects.create(name="Asset B", asset_tag="TAG-100", status=self.status, tenant=self.tenant_b)
+        except IntegrityError:
+            self.fail("IntegrityError was raised for identical tags in different tenants.")
+            
+        # Same tenant cannot have duplicate tag
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                Asset.objects.create(name="Asset C", asset_tag="TAG-100", status=self.status, tenant=self.tenant_a)
+            
+        # Global assets cannot have duplicate tag
+        Asset.objects.create(name="Asset Global 1", asset_tag="GLOBAL-TAG", status=self.status, tenant=None)
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                Asset.objects.create(name="Asset Global 2", asset_tag="GLOBAL-TAG", status=self.status, tenant=None)
+
+    def test_form_requires_asset_tag_and_suggests_it(self):
+        from assets.forms.asset_form import AssetForm
+        from assets.models import AssetTagSequence
+        
+        # Create global default sequence
+        seq = AssetTagSequence.all_objects.create(prefix="FORM-", category=self.category_laptop, next_value=1, zero_padding=3)
+
+        
+        # Form validation fails if asset_tag is left blank (not allowed anymore!)
+        form_data_blank = {
+            'name': 'Test Asset',
+            'asset_tag': '',  # Leave blank!
+            'status': self.status.pk,
+            'asset_type': self.asset_type_laptop.pk,
+            'tenant': self.tenant_a.pk,
+        }
+        form_blank = AssetForm(data=form_data_blank)
+        self.assertFalse(form_blank.is_valid())
+        self.assertIn('asset_tag', form_blank.errors)
+        
+        # Check that the form has a help_text displaying the suggested next tag
+        self.assertIn("FORM-001", form_blank.fields['asset_tag'].help_text)
+        
+        # Submit the form with the suggestion:
+        form_data_valid = {
+            'name': 'Test Asset 2',
+            'asset_tag': 'FORM-001',
+            'status': self.status.pk,
+            'asset_type': self.asset_type_laptop.pk,
+            'tenant': self.tenant_a.pk,
+        }
+        form_valid = AssetForm(data=form_data_valid)
+        self.assertTrue(form_valid.is_valid(), form_valid.errors)
+        asset = form_valid.save()
+        self.assertEqual(asset.asset_tag, "FORM-001")
+        
+        # Verify that saving the asset incremented the sequence!
+        seq.refresh_from_db()
+        self.assertEqual(seq.next_value, 2)
+
+
+
+
+

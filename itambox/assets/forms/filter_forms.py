@@ -67,6 +67,18 @@ class AssetRequestFilterForm(FilterForm):
 
 class AssetTagSequenceFilterForm(FilterForm):
     filterset_class = AssetTagSequenceFilterSet
+    ajax_fields = {
+        'tenant': {
+            'url_name': 'api:organization_api:tenant-list',
+            'value_field': 'id',
+            'label_field': 'name',
+        },
+        'category': {
+            'url_name': 'api:assets_api:category-list',
+            'value_field': 'id',
+            'label_field': 'name',
+        },
+    }
 
 class AuditSessionFilterForm(FilterForm):
     filterset_class = AuditSessionFilterSet

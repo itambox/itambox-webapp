@@ -306,14 +306,17 @@ class AssetRequestTable(BaseTable):
 class AssetTagSequenceTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     prefix = tables.LinkColumn('assets:assettagsequence_detail', args=[A('pk')], verbose_name='Prefix')
+    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant.name', verbose_name='Tenant')
+    category = tables.LinkColumn('assets:category_detail', args=[A('category_id')], accessor='category.name', verbose_name='Category')
     next_value = tables.Column(verbose_name='Next Value')
     zero_padding = tables.Column(verbose_name='Zero Padding')
+    is_active = tables.BooleanColumn(verbose_name='Active')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = AssetTagSequence
-        fields = ('pk', 'prefix', 'next_value', 'zero_padding', 'actions')
-        default_columns = ('pk', 'prefix', 'next_value', 'zero_padding', 'actions')
+        fields = ('pk', 'prefix', 'tenant', 'category', 'next_value', 'zero_padding', 'is_active', 'actions')
+        default_columns = ('pk', 'prefix', 'tenant', 'category', 'next_value', 'zero_padding', 'is_active', 'actions')
 
 
 class AssetAuditTable(BaseTable):

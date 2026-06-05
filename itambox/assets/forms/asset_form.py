@@ -64,7 +64,7 @@ class AssetForm(forms.ModelForm):
         ]
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'asset_tag': forms.TextInput(attrs={'class': 'form-control'}),
+            'asset_tag': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Leave blank to auto-generate'}),
             'serial_number': forms.TextInput(attrs={'class': 'form-control'}),
             'purchase_cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'salvage_value': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
@@ -112,8 +112,59 @@ class AssetForm(forms.ModelForm):
                 asset_type_id = asset_type_val.pk
             else:
                 asset_type_id = asset_type_val
-        elif self.instance and self.instance.pk and self.instance.asset_type:
             asset_type_id = self.instance.asset_type.pk
+
+        # Ensure asset_tag is required in the form
+        self.fields['asset_tag'].required = True
+
+        # Hook up HTMX trigger on tenant field to update suggestion on change
+        if 'tenant' in self.fields:
+            self.fields['tenant'].widget.attrs.update({
+                'hx-post': '',
+                'hx-trigger': 'change',
+                'hx-target': 'closest form',
+                'hx-swap': 'outerHTML',
+                'hx-vals': '{"_reload": "1"}',
+                'hx-include': 'closest form',
+            })
+
+        # Calculate suggested tag based on selected tenant and asset_type
+        # 1. Resolve tenant
+        selected_tenant = None
+        if self.is_bound and self.data.get('tenant'):
+            from organization.models import Tenant
+            try:
+                selected_tenant = Tenant.objects.get(pk=self.data.get('tenant'))
+            except (Tenant.DoesNotExist, ValueError):
+                pass
+        elif self.initial.get('tenant'):
+            selected_tenant = self.initial.get('tenant')
+        elif self.instance and self.instance.tenant:
+            selected_tenant = self.instance.tenant
+
+        # 2. Resolve asset_type object
+        selected_type = None
+        if asset_type_id:
+            try:
+                selected_type = AssetType.objects.get(pk=asset_type_id)
+            except AssetType.DoesNotExist:
+                pass
+
+        # 3. Resolve sequence preview
+        from django.utils.safestring import mark_safe
+        from ..models import AssetTagSequence
+        dummy_asset = Asset(tenant=selected_tenant, asset_type=selected_type)
+        seq = AssetTagSequence.resolve_sequence_for_asset(dummy_asset)
+        if seq:
+            suggested_tag = seq.next_tag_preview
+            self.fields['asset_tag'].help_text = mark_safe(
+                f'<span class="text-muted small">Suggested: <a href="javascript:void(0)" onclick="document.getElementById(\'id_asset_tag\').value = \'{suggested_tag}\'; return false;" class="text-primary font-monospace">{suggested_tag}</a></span>'
+            )
+        else:
+            self.fields['asset_tag'].help_text = mark_safe(
+                f'<span class="text-muted small">No active tag sequence found for this scope.</span>'
+            )
+
         # Default the asset role from the selected asset type if not already set
         if not self.instance.pk and asset_type_id:
             current_role = None
