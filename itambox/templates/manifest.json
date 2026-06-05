@@ -1,0 +1,30 @@
+{
+  "name": "ITAMbox",
+  "short_name": "ITAMbox",
+  "description": "IT Asset Management System",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0c0a09",
+  "theme_color": "#2fb344",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/static/dist/logo-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/dist/logo-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/dist/logo-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

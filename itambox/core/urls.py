@@ -16,6 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.views.generic import TemplateView
 from assets import views as asset_views # Import the assets views
 from itambox.views.generic import (
     ObjectBulkDeleteView, ObjectBulkEditView, table_config,
@@ -56,6 +57,11 @@ from core.auth.oidc import TenantOIDCAuthorizeView, TenantOIDCCallbackView
 
 # Main URL Patterns
 urlpatterns = [
+    # PWA Routes
+    path('manifest.json', TemplateView.as_view(template_name='manifest.json', content_type='application/json'), name='manifest.json'),
+    path('service-worker.js', TemplateView.as_view(template_name='service-worker.js', content_type='application/javascript'), name='service-worker.js'),
+    path('offline/', TemplateView.as_view(template_name='offline.html'), name='offline'),
+
     path('admin/', admin.site.urls),
     path('accounts/', include('django.contrib.auth.urls')),
     path('', asset_views.DashboardView.as_view(), name='dashboard'), # Root path for dashboard
