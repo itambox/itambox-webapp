@@ -117,6 +117,27 @@ class AssetForm(forms.ModelForm):
         # Ensure asset_tag is required in the form
         self.fields['asset_tag'].required = True
 
+        from django.utils.safestring import mark_safe
+        # Configure quick-add buttons inside labels instead of layout divs
+        if 'asset_type' in self.fields:
+            url_type = reverse('assets:assettype_create') + '?_quickadd=1'
+            self.fields['asset_type'].label = mark_safe(
+                f'Asset Type <button type="button" class="btn btn-link p-0 ms-1 align-baseline border-0 bg-transparent text-primary" style="font-size: 1.1rem; line-height: 1;" title="Add new Asset Type" hx-get="{url_type}" hx-target="#modal-placeholder"><i class="mdi mdi-plus-circle-outline"></i></button>'
+            )
+
+        if 'asset_role' in self.fields:
+            url_role = reverse('assets:assetrole_create') + '?_quickadd=1'
+            self.fields['asset_role'].label = mark_safe(
+                f'Asset Role <button type="button" class="btn btn-link p-0 ms-1 align-baseline border-0 bg-transparent text-primary" style="font-size: 1.1rem; line-height: 1;" title="Add new Asset Role" hx-get="{url_role}" hx-target="#modal-placeholder"><i class="mdi mdi-plus-circle-outline"></i></button>'
+            )
+
+        if 'location' in self.fields:
+            url_loc = reverse('organization:location_create') + '?_quickadd=1'
+            self.fields['location'].label = mark_safe(
+                f'Location <button type="button" class="btn btn-link p-0 ms-1 align-baseline border-0 bg-transparent text-primary" style="font-size: 1.1rem; line-height: 1;" title="Add new Location" hx-get="{url_loc}" hx-target="#modal-placeholder"><i class="mdi mdi-plus-circle-outline"></i></button>'
+            )
+
+
         # Hook up HTMX trigger on tenant field to update suggestion on change
         if 'tenant' in self.fields:
             self.fields['tenant'].widget.attrs.update({
@@ -249,26 +270,8 @@ class AssetForm(forms.ModelForm):
                 css_class='row'
             ),
             Div(
-                Div(
-                    HTML(render_to_string('generic/includes/quick_add_button.html', {
-                        'model_label': 'Asset Type',
-                        'quick_add_url': 'assets:assettype_create',
-                        'target_select_id': 'id_asset_type',
-                        'quick_add_url_params': '_quickadd=1',
-                    })),
-                    'asset_type',
-                    css_class='col-md-6'
-                ),
-                Div(
-                    HTML(render_to_string('generic/includes/quick_add_button.html', {
-                        'model_label': 'Asset Role',
-                        'quick_add_url': 'assets:assetrole_create',
-                        'target_select_id': 'id_asset_role',
-                        'quick_add_url_params': '_quickadd=1',
-                    })),
-                    'asset_role',
-                    css_class='col-md-6'
-                ),
+                Div('asset_type', css_class='col-md-6'),
+                Div('asset_role', css_class='col-md-6'),
                 css_class='row'
             ),
             Div(
@@ -277,16 +280,7 @@ class AssetForm(forms.ModelForm):
                 css_class='row'
             ),
             Div(
-                Div(
-                    HTML(render_to_string('generic/includes/quick_add_button.html', {
-                        'model_label': 'Location',
-                        'quick_add_url': 'organization:location_create',
-                        'target_select_id': 'id_location',
-                        'quick_add_url_params': '_quickadd=1',
-                    })),
-                    'location',
-                    css_class='col-md-6'
-                ),
+                Div('location', css_class='col-md-6'),
                 Div('tenant', css_class='col-md-6'),
                 css_class='row'
             ),
