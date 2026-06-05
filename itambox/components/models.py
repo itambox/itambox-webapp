@@ -49,6 +49,7 @@ class AllObjectsComponentManager(models.Manager.from_queryset(ComponentQuerySet)
 class Component(AutoSlugMixin, SoftDeleteMixin, StandardModel, ImageAttachmentMixin):
     objects = TenantScopingComponentManager()
     all_objects = AllObjectsComponentManager()
+    allow_global_tenant = True
 
     """Catalog entry for a hardware component (e.g. 'Crucial 16GB DDR4')."""
     slug_source = ('manufacturer__name', 'name')

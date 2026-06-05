@@ -13,6 +13,7 @@ from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingSof
 class Accessory(AutoSlugMixin, SubscribableMixin, DeletableVaultModel):
     objects = TenantScopingSoftDeleteManager()
     all_objects = AllObjectsManager()
+    allow_global_tenant = True
 
     """Bulk non-serialized returnable peripherals tracked in inventory (e.g. Dell Keyboard)."""
     name = models.CharField(max_length=255)
@@ -205,6 +206,7 @@ class AccessoryAssignment(ChangeLoggingMixin, BaseModel):
 class Consumable(AutoSlugMixin, SoftDeleteMixin, StandardModel, ImageAttachmentMixin, SubscribableMixin):
     objects = TenantScopingSoftDeleteManager()
     all_objects = AllObjectsManager()
+    allow_global_tenant = True
 
     """Non-returnable bulk items that are permanently consumed (e.g. thermal paste, printer toner)."""
     name = models.CharField(max_length=255)
@@ -388,6 +390,7 @@ class ConsumableAssignment(ChangeLoggingMixin, BaseModel):
 class Kit(JournalingMixin, TaggableMixin, CloneableMixin, ExportableMixin, SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
     objects = TenantScopingSoftDeleteManager()
     all_objects = AllObjectsManager()
+    allow_global_tenant = True
 
     name = models.CharField(max_length=100, unique=True, verbose_name="Kit Name")
     description = models.TextField(blank=True, verbose_name="Description")

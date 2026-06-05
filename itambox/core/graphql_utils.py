@@ -11,6 +11,11 @@ def paginate_queryset(qs, limit=None, offset=None, max_limit=MAX_PAGINATION_LIMI
     Paginate a queryset safely, clamping offset and limit to prevent negative slices
     or excessively large limits.
     """
+    if offset is not None and offset < 0:
+        raise ValueError("Offset cannot be negative.")
+    if limit is not None and limit < 0:
+        raise ValueError("Limit cannot be negative.")
+        
     offset = max(offset or 0, 0)
     limit = max(min(limit or max_limit, max_limit), 0)
     return qs[offset:offset + limit]
