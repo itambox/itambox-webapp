@@ -456,26 +456,30 @@ html,
         }
     }
 
-    // Force left-alignment and vertical layout for navigation elements (desktop & mobile)
-    .navbar-nav {
-        text-align: left !important;
-        flex-direction: column !important;
-    }
+    // Force left-alignment and vertical layout for navigation elements inside the sidebar menu (desktop & mobile)
+    #sidebar-menu {
+        .navbar-nav {
+            text-align: left !important;
+            flex-direction: column !important;
+        }
 
-    .nav-link {
-        display: flex !important;
-        flex-direction: row !important;
-        justify-content: flex-start !important;
-        align-items: center !important;
-        text-align: left !important;
-    }
+        .nav-link {
+            display: flex !important;
+            flex-direction: row !important;
+            justify-content: flex-start !important;
+            align-items: center !important;
+            text-align: left !important;
+        }
 
-    .dropdown-menu {
-        text-align: left !important;
-    }
+        .dropdown-menu {
+            position: static !important;
+            float: none !important;
+            text-align: left !important;
+        }
 
-    .dropdown-header {
-        text-align: left !important;
+        .dropdown-header {
+            text-align: left !important;
+        }
     }
 
     // Sidebar Category / Dropdown Headers
@@ -537,8 +541,6 @@ html,
 
         // Expanded nested items
         .dropdown-menu {
-            position: static !important;
-            float: none !important;
             background-color: transparent !important;
             border: none !important;
             box-shadow: none !important;
