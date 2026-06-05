@@ -11,11 +11,14 @@
     const sidebar = document.getElementById('sidebar-menu');
     if (!sidebar) return;
 
-    sidebar.querySelectorAll('.nav-item.active, .nav-link.active, .dropdown-item.active, .dropdown-menu.show').forEach(
+    sidebar.querySelectorAll('.nav-item.active, .nav-link.active, .nav-link.show, .dropdown-item.active, .dropdown-menu.show').forEach(
       function (el: Element) {
         el.classList.remove('active');
-        if (el.classList.contains('dropdown-menu')) {
+        if (el.classList.contains('dropdown-menu') || el.classList.contains('nav-link')) {
           el.classList.remove('show');
+        }
+        if (el.classList.contains('nav-link')) {
+          el.setAttribute('aria-expanded', 'false');
         }
       },
     );
@@ -52,7 +55,11 @@
       if (navItem) {
         navItem.classList.add('active');
         const navLink = navItem.querySelector<HTMLElement>(':scope > .nav-link');
-        if (navLink) navLink.classList.add('active');
+        if (navLink) {
+          navLink.classList.add('active');
+          navLink.classList.add('show');
+          navLink.setAttribute('aria-expanded', 'true');
+        }
         const dropdownMenu = navItem.querySelector<HTMLElement>(':scope > .dropdown-menu');
         if (dropdownMenu) dropdownMenu.classList.add('show');
       }
