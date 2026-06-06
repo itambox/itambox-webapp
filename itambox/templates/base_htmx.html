@@ -77,6 +77,9 @@
             {% endblock %}
         </div>
     </div>
+
+    {% block page_modals %}{% endblock %}
+
     {# --- Scripts (must be inside #page-content-wrapper so HTMX processes them during swaps) --- #}
     {% block javascript %}{% endblock %}
     {% block extra_scripts %}{% endblock %}
