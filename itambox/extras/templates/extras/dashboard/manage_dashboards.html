@@ -84,15 +84,3 @@
     <button type="button" class="btn btn-outline-secondary ms-auto" data-bs-dismiss="modal">{% trans "Close" %}</button>
 </div>
 
-<script>
-    // Show save check button dynamically when user renames dashboard name input
-    document.querySelectorAll('#dashboard-modal-content input[name="name"]').forEach(function(input) {
-        input.addEventListener('input', function() {
-            var form = this.closest('form');
-            var saveBtn = form.querySelector('.rename-save-btn');
-            if (saveBtn) {
-                saveBtn.classList.remove('d-none');
-            }
-        });
-    });
-</script>

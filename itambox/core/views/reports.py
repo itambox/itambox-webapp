@@ -316,6 +316,7 @@ class ReportTemplatePreviewView(PermissionRequiredMixin, View):
             else:
                 html_template_str = get_polished_system_html_template()
                 django_template = Template(html_template_str)
+                context_data['request'] = request
                 rendered_html = django_template.render(Context(context_data))
             
             return HttpResponse(rendered_html)
@@ -394,6 +395,7 @@ class ReportTemplateDownloadView(PermissionRequiredMixin, LoginRequiredMixin, Vi
                 else:
                     html_template_str = get_polished_system_html_template()
                     django_template = Template(html_template_str)
+                    context_data['request'] = request
                     rendered_html = django_template.render(Context(context_data))
                     
                 response = HttpResponse(rendered_html, content_type='text/html')

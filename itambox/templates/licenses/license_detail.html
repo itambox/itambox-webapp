@@ -86,11 +86,5 @@
     </div>
 {% endblock extra_tab_panes %}
 
-{# --- HTMX Auto-Refresh Script --- #}
 {% block javascript %}
-<script>
-    document.body.addEventListener('licenseUpdated', function() {
-        htmx.ajax('GET', window.location.href, {target: 'body', swap: 'outerHTML'});
-    });
-</script>
 {% endblock javascript %}

@@ -13,10 +13,13 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
     <title>{% block title %}{% translate "ITAMbox" %}{% endblock %}</title>
     
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    
     {# PWA Meta and Capabilities #}
     <link rel="manifest" href="{% url 'manifest.json' %}">
     <meta name="theme-color" content="#2fb344">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="{% static 'dist/logo-icon-192.png' %}">
     {# FOUC prevention: apply stored theme before CSS loads #}
@@ -78,46 +81,6 @@
     {# Standalone OOB target for dynamic title swaps #}
     <span id="page-title-block" style="display:none" aria-hidden="true">{% translate "ITAMbox" %}</span>
 
-    {# --- Premium Physical Scanning Audio Engine --- #}
-    <script nonce="{{ request.csp_nonce }}">
-        (function() {
-            // Global HTMX CSRF Token Integration
-            document.addEventListener('htmx:configRequest', function(event) {
-                event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
-            });
-
-            function playBeep(frequency, duration, type) {
-                try {
-                    var AudioCtx = window.AudioContext || window.webkitAudioContext;
-                    if (!AudioCtx) return;
-                    var context = new AudioCtx();
-                    var oscillator = context.createOscillator();
-                    var gain = context.createGain();
-                    oscillator.type = type || 'sine';
-                    oscillator.frequency.value = frequency;
-                    gain.gain.setValueAtTime(0.08, context.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + duration);
-                    oscillator.connect(gain);
-                    gain.connect(context.destination);
-                    oscillator.start();
-                    oscillator.stop(context.currentTime + duration);
-                } catch(e) {
-                    console.warn("Web Audio beep failed", e);
-                }
-            }
-
-            document.addEventListener('playAuditSound', function() {
-                playBeep(1000, 0.10);
-            });
-
-            document.addEventListener('playAuditFailSound', function() {
-                playBeep(180, 0.15, 'triangle');
-                setTimeout(function() {
-                    playBeep(180, 0.15, 'triangle');
-                }, 150);
-            });
-        })();
-    </script>
     {# PWA Service Worker Registration #}
     <script nonce="{{ request.csp_nonce }}">
         if ('serviceWorker' in navigator) {

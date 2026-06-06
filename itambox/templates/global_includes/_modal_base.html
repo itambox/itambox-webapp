@@ -41,18 +41,4 @@
         </div>
     </div>
 </div>
-
-{# Basic script to show the modal once loaded via HTMX #}
-<script type="text/javascript">
-    (function() {
-        const modalElement = document.getElementById('{{ modal_id|default:'htmxModal' }}');
-        if (modalElement) {
-            const modal = new bootstrap.Modal(modalElement);
-            // Ensure modal is removed from DOM after hiding to prevent duplicates
-            modalElement.addEventListener('hidden.bs.modal', event => {
-                modalElement.remove();
-            });
-            modal.show();
-        }
-    })();
-</script> 
+ 

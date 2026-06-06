@@ -108,4 +108,44 @@
     });
     // Let the event bubble naturally so HTMX or the browser processes the submit
   });
+
+  // Delegated click handler for bulk delete/edit to align with strict CSP
+  document.addEventListener('click', function (event) {
+    const target = event.target as HTMLElement;
+
+    // 1. Bulk Delete
+    const deleteBtn = target.closest('.btn-bulk-delete');
+    if (deleteBtn) {
+      event.preventDefault();
+      if (!confirm('Delete selected items? This cannot be undone.')) {
+        return;
+      }
+      const form = document.getElementById('bulk-delete-form') as HTMLFormElement | null;
+      const input = document.getElementById('bulk-delete-pks') as HTMLInputElement | null;
+      if (form && input) {
+        const checked = document.querySelectorAll<HTMLInputElement>(
+          '#object-list-table-container input[type="checkbox"][name="pk"]:checked'
+        );
+        input.value = Array.from(checked).map(cb => cb.value).join(',');
+        form.submit();
+      }
+      return;
+    }
+
+    // 2. Bulk Edit
+    const editBtn = target.closest('.btn-bulk-edit');
+    if (editBtn) {
+      event.preventDefault();
+      const form = document.getElementById('bulk-edit-form') as HTMLFormElement | null;
+      const input = document.getElementById('bulk-edit-pks') as HTMLInputElement | null;
+      if (form && input) {
+        const checked = document.querySelectorAll<HTMLInputElement>(
+          '#object-list-table-container input[type="checkbox"][name="pk"]:checked'
+        );
+        input.value = Array.from(checked).map(cb => cb.value).join(',');
+        form.submit();
+      }
+      return;
+    }
+  });
 })();

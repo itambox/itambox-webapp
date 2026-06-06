@@ -80,31 +80,3 @@
     </div>
 </div>
 {% endblock content %}
-
-{% block extra_scripts %}
-    {# Add script block to initialize Tom Select #}
-    {{ block.super }}
-    <script>
-      (function() {
-        function initSearchTomSelect() {
-          var el = document.getElementById('id_obj_type_select');
-          if (el && !el.tomselect) {
-            new TomSelect(el, {
-              plugins: {
-                remove_button: {
-                  title: 'Remove this item',
-                }
-              }
-            });
-          }
-        }
-
-        // Run immediately if DOM is already loaded
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', initSearchTomSelect);
-        } else {
-          initSearchTomSelect();
-        }
-      })();
-    </script>
-{% endblock extra_scripts %}

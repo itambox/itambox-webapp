@@ -45,6 +45,8 @@ const ITAMboxState: ITAMboxStateType = (function () {
   }
 
   function getCSRFToken(): string {
+    const metaEl = document.querySelector<HTMLMetaElement>('meta[name=csrf-token]');
+    if (metaEl && metaEl.content) return metaEl.content;
     const el = document.querySelector<HTMLInputElement>('[name=csrfmiddlewaretoken]');
     if (el && el.value) return el.value;
     const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/);
@@ -55,3 +57,12 @@ const ITAMboxState: ITAMboxStateType = (function () {
 })();
 
 (window as unknown as Record<string, unknown>).ITAMboxState = ITAMboxState;
+
+// Global HTMX CSRF Token Integration
+document.addEventListener('htmx:configRequest', (event: any) => {
+  const token = (window as any).ITAMboxState?.getCSRFToken();
+  if (token) {
+    event.detail.headers['X-CSRFToken'] = token;
+  }
+});
+

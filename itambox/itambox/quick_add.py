@@ -54,11 +54,15 @@ class QuickAddMixin:
             value = str(self.object)
             pk = self.object.pk
 
-            script = render_to_string('generic/includes/quick_add_success.html', {
-                'target_id': target,
-                'value': value,
-                'pk': pk,
+            import json
+            response = HttpResponse("Object created successfully")
+            response['HX-Trigger'] = json.dumps({
+                'quickAddSuccess': {
+                    'target_id': target,
+                    'value': value,
+                    'pk': str(pk),
+                }
             })
-            return HttpResponse(script)
+            return response
 
         return super().form_valid(form)

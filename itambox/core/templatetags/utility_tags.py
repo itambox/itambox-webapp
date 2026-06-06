@@ -140,3 +140,17 @@ def has_object_perm(user, perm, obj):
     if not user or not user.is_authenticated:
         return False
     return user.has_perm(perm, obj)
+
+
+@register.filter
+def pretty_json(value):
+    """Render value as a pretty-printed JSON string."""
+    import json
+    if value is None:
+        return ""
+    try:
+        if isinstance(value, str):
+            value = json.loads(value)
+        return json.dumps(value, indent=2)
+    except Exception:
+        return str(value)

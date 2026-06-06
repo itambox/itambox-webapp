@@ -275,7 +275,7 @@
             Sent automatically by ITAMbox — IT Asset Management Console.
         </div>
     </div>
-    <script>
+    <script nonce="{{ request.csp_nonce }}">
         if (window.location.search.includes('print=true')) {
             window.onload = function() {
                 window.print();

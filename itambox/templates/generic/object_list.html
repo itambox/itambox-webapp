@@ -164,8 +164,7 @@
                                 <input type="hidden" name="model_name" value="{{ model_name_str }}">
                                 <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
                                 <input type="hidden" name="pk" value="" id="bulk-delete-pks">
-                                <button type="button" class="btn btn-sm btn-outline-danger"
-                                        onclick="if(!confirm('Delete selected items? This cannot be undone.'))return false;var form=document.getElementById('bulk-delete-form');form.querySelector('#bulk-delete-pks').value=Array.from(document.querySelectorAll('#object-list-table-container input[type=checkbox][name=pk]:checked')).map(function(cb){return cb.value;}).join(',');form.submit();">
+                                <button type="button" class="btn btn-sm btn-outline-danger btn-bulk-delete">
                                     <i class="mdi mdi-trash-can-outline me-1"></i>
                                     {% translate "Delete Selected" %}
                                 </button>
@@ -175,8 +174,7 @@
                                 <input type="hidden" name="model_name" value="{{ model_name_str }}">
                                 <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
                                 <input type="hidden" name="pk" value="" id="bulk-edit-pks">
-                                <button type="button" class="btn btn-sm btn-outline-primary"
-                                        onclick="var form=document.getElementById('bulk-edit-form');form.querySelector('#bulk-edit-pks').value=Array.from(document.querySelectorAll('#object-list-table-container input[type=checkbox][name=pk]:checked')).map(function(cb){return cb.value;}).join(',');form.submit();">
+                                <button type="button" class="btn btn-sm btn-outline-primary btn-bulk-edit">
                                     <i class="mdi mdi-pencil-outline me-1"></i>
                                     {% translate "Edit Selected" %}
                                 </button>
@@ -214,13 +212,11 @@
                         {% translate "Print Labels" %}
                     </button>
                     {% endif %}
-                    <button type="button" class="btn btn-sm btn-outline-danger btn-bulk-delete-bottom"
-                            onclick="var form=document.getElementById('bulk-delete-form'); if(!confirm('Delete selected items? This cannot be undone.'))return false; form.querySelector('#bulk-delete-pks').value=Array.from(document.querySelectorAll('#object-list-table-container input[type=checkbox][name=pk]:checked')).map(function(cb){return cb.value;}).join(','); form.submit();">
+                    <button type="button" class="btn btn-sm btn-outline-danger btn-bulk-delete">
                         <i class="mdi mdi-trash-can-outline me-1"></i>
                         {% translate "Delete Selected" %}
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-primary btn-bulk-edit-bottom"
-                            onclick="var form=document.getElementById('bulk-edit-form'); form.querySelector('#bulk-edit-pks').value=Array.from(document.querySelectorAll('#object-list-table-container input[type=checkbox][name=pk]:checked')).map(function(cb){return cb.value;}).join(','); form.submit();">
+                    <button type="button" class="btn btn-sm btn-outline-primary btn-bulk-edit">
                         <i class="mdi mdi-pencil-outline me-1"></i>
                         {% translate "Edit Selected" %}
                     </button>
@@ -245,7 +241,7 @@
                     <i class="mdi mdi-tune me-2 text-muted"></i>
                     {% translate "Filters" %}
                 </h3>
-                <a href="#" class="link-secondary ms-auto d-flex align-items-center" onclick="window.toggleFilters(); return false;" title="{% translate 'Collapse Panel' %}">
+                <a href="#" class="link-secondary ms-auto d-flex align-items-center collapse-filters-btn" title="{% translate 'Collapse Panel' %}">
                     <i class="mdi mdi-chevron-right"></i>
                 </a>
             </div>

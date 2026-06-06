@@ -79,12 +79,20 @@
   (window as unknown as Record<string, unknown>).toggleFilters = toggleFilters;
   (window as unknown as Record<string, unknown>).initFiltersToggle = initFiltersToggle;
 
-  // Delegate click on #toggle-filters-btn at document level
+  // Delegate click on #toggle-filters-btn and .collapse-filters-btn at document level
   document.addEventListener('click', function (event) {
-    const toggleBtn = (event.target as HTMLElement).closest('#toggle-filters-btn');
+    const target = event.target as HTMLElement;
+    const toggleBtn = target.closest('#toggle-filters-btn');
     if (toggleBtn) {
       event.preventDefault();
       toggleFilters();
+      return;
+    }
+    const collapseBtn = target.closest('.collapse-filters-btn');
+    if (collapseBtn) {
+      event.preventDefault();
+      toggleFilters();
+      return;
     }
   });
 

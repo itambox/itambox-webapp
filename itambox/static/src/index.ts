@@ -17,3 +17,9 @@ import './sidebar';
 import './dashboard';
 import './modal-handler';
 import './audit';
+import './form-toggles';
+import './report-designer';
+import './object-detail';
+import './object-import';
+import './permission-matrix';
+

@@ -412,10 +412,20 @@ class StatusLabelsWidget(DashboardWidget):
             ).order_by('-asset_count')
             total_assets = Asset.objects.count()
 
+        chart_data = []
+        for status in statuses:
+            if status.asset_count > 0:
+                chart_data.append({
+                    'name': status.name,
+                    'count': status.asset_count,
+                    'color': f"#{status.color}" if status.color else "#626976"
+                })
+
         return {
             'total_assets': total_assets,
             'status_stats': statuses,
             'chart_type': self.get_config_value('chart_type', 'doughnut'),
+            'chart_data_json': json.dumps(chart_data),
         }
 
     def get_footer_links(self, request):
@@ -907,10 +917,18 @@ class AssetAgeWidget(DashboardWidget):
                 buckets['gt7y'] += 1
 
         avg_age = round(total_age / count, 1) if count > 0 else 0
+        chart_data = [
+            { 'name': "< 1 Year", 'count': buckets['lt1y'], 'color': "#2fb344" },
+            { 'name': "1 - 3 Years", 'count': buckets['1_3y'], 'color': "#206bc4" },
+            { 'name': "3 - 5 Years", 'count': buckets['3_5y'], 'color': "#f59f00" },
+            { 'name': "5 - 7 Years", 'count': buckets['5_7y'], 'color': "#fd7e14" },
+            { 'name': "7+ Years", 'count': buckets['gt7y'], 'color': "#d63939" }
+        ]
         return {
             'age_buckets': buckets,
             'avg_asset_age_years': avg_age,
             'chart_format': self.get_config_value('chart_format', 'bar'),
+            'chart_data_json': json.dumps(chart_data),
         }
 
     def get_footer_links(self, request):
@@ -974,10 +992,19 @@ class TenantSpendWidget(DashboardWidget):
             total=Sum('purchase_cost')
         ).order_by('-total')[:limit]
         
+        spend_list = list(spend)
+        chart_data = []
+        for t in spend_list:
+            chart_data.append({
+                'name': t['tenant__name'] or 'Unassigned',
+                'total': float(t['total'] or 0.0)
+            })
+
         return {
-            'tenant_spend': list(spend),
+            'tenant_spend': spend_list,
             'chart_type': chart_type,
             'currency': currency,
+            'chart_data_json': json.dumps(chart_data),
         }
 
     def get_footer_links(self, request):

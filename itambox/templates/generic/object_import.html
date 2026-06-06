@@ -95,7 +95,7 @@
             </div>
         </div>
         {% else %}
-        <form method="post" enctype="multipart/form-data" id="import-form">
+        <form method="post" enctype="multipart/form-data" id="import-form" data-active-tab-id="{{ form.active_tab.id_for_label }}" data-import-text-id="{{ form.import_text.id_for_label }}" data-field-names='[{% for name in form.field_names %}"{{ name }}"{% if not forloop.last %}, {% endif %}{% endfor %}]'>
             {% csrf_token %}
             {{ form.active_tab }}
             
@@ -272,59 +272,6 @@
         </div>
         {% endif %}
 
-
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                const tabUploadBtn = document.getElementById('btn-tab-upload');
-                const tabEditorBtn = document.getElementById('btn-tab-editor');
-                const activeTabInput = document.getElementById('{{ form.active_tab.id_for_label }}');
-
-                const formatCsvRadio = document.getElementById('format-csv');
-                const formatYamlRadio = document.getElementById('format-yaml');
-                const delimiterContainer = document.getElementById('delimiter-container');
-                const importTextarea = document.getElementById('{{ form.import_text.id_for_label }}');
-
-                const fieldNames = [{% for name in form.field_names %}"{{ name }}"{% if not forloop.last %}, {% endif %}{% endfor %}];
-                
-                const csvPlaceholder = fieldNames.join(',') + '\n' + fieldNames.map(f => 'value').join(',');
-                const yamlPlaceholder = '- ' + fieldNames.map((f, i) => (i === 0 ? '' : '  ') + f + ': "value"').join('\n');
-
-                function updatePlaceholdersAndInputs() {
-                    const selectedFormat = formatCsvRadio.checked ? 'csv' : 'yaml';
-                    
-                    if (selectedFormat === 'csv') {
-                        delimiterContainer.classList.remove('d-none');
-                        importTextarea.placeholder = csvPlaceholder;
-                    } else {
-                        delimiterContainer.classList.add('d-none');
-                        importTextarea.placeholder = yamlPlaceholder;
-                    }
-                }
-
-                formatCsvRadio.addEventListener('change', updatePlaceholdersAndInputs);
-                formatYamlRadio.addEventListener('change', updatePlaceholdersAndInputs);
-
-                tabUploadBtn.addEventListener('shown.bs.tab', function () {
-                    activeTabInput.value = 'upload';
-                });
-                tabUploadBtn.addEventListener('click', function () {
-                    activeTabInput.value = 'upload';
-                });
-                tabEditorBtn.addEventListener('shown.bs.tab', function () {
-                    activeTabInput.value = 'editor';
-                });
-                tabEditorBtn.addEventListener('click', function () {
-                    activeTabInput.value = 'editor';
-                });
-
-                if (activeTabInput.value === 'editor') {
-                    const tabTrigger = new bootstrap.Tab(tabEditorBtn);
-                    tabTrigger.show();
-                }
-
-                updatePlaceholdersAndInputs();
-            });
-        </script>
         {% endif %}
         {% endif %}
 

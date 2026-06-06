@@ -30,7 +30,7 @@ class SearchForm(forms.Form):
         label='Object type(s)',
         choices=OBJ_TYPE_CHOICES,
         required=False,
-        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'id': 'id_obj_type_select'})
+        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'id': 'id_obj_type_select', 'data-tom-select': ''})
     )
     lookup_choices = (
         ('icontains', 'Partial match'),

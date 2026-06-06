@@ -79,11 +79,7 @@
                         <tr>
                             <td colspan="2" class="border-top pt-2">
                                 <strong>{% trans "Task Result Summary" %}:</strong>
-                                <pre class="bg-surface-secondary text-primary border rounded p-2 mt-2 mb-0 fs-6">{{ object.result|json_script:"job-result-data" }}
-<script>
-    // Format JSON outcome cleanly
-    document.write(JSON.stringify(JSON.parse(document.getElementById('job-result-data').textContent), null, 2));
-</script></pre>
+                                <pre class="bg-surface-secondary text-primary border rounded p-2 mt-2 mb-0 fs-6">{{ object.result|pretty_json }}</pre>
                             </td>
                         </tr>
                         {% endif %}

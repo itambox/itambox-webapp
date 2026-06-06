@@ -153,11 +153,5 @@
 </div>
 {% endif %}
 {% endblock full_width_content %}
-
 {% block javascript %}
-<script>
-    document.body.addEventListener('tableRefreshRequired', function() {
-        htmx.ajax('GET', window.location.href, {target: 'body', swap: 'outerHTML'});
-    });
-</script>
 {% endblock javascript %}
