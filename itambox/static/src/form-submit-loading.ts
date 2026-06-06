@@ -25,25 +25,15 @@
     (submitBtn as any)._originalContent = originalText;
     (submitBtn as any)._originalDisabledState = (submitBtn as any).disabled;
 
-    // If the button has a name, create a hidden input to preserve its value during form submission
-    if (submitBtn instanceof HTMLButtonElement || submitBtn instanceof HTMLInputElement) {
-      const name = submitBtn.name;
-      if (name) {
-        const val = submitBtn.getAttribute('value') || submitBtn.value || '1';
-        const hiddenInput = document.createElement('input');
-        hiddenInput.type = 'hidden';
-        hiddenInput.name = name;
-        hiddenInput.value = val;
-        hiddenInput.setAttribute('data-added-by-loading', 'true');
-        form.appendChild(hiddenInput);
+    // Disable button to prevent double clicks (deferred to avoid canceling submit or stripping parameters)
+    setTimeout(function () {
+      if (submitBtn) {
+        if ('disabled' in submitBtn) {
+          (submitBtn as any).disabled = true;
+        }
+        submitBtn.classList.add('disabled');
       }
-    }
-
-    // Disable button to prevent double clicks
-    if ('disabled' in submitBtn) {
-      (submitBtn as any).disabled = true;
-    }
-    submitBtn.classList.add('disabled');
+    }, 0);
 
     // Inject spinner based on element type
     if (submitBtn instanceof HTMLInputElement) {
@@ -59,17 +49,6 @@
   function restoreLoadingState(form: HTMLFormElement): void {
     const submitBtn = activeSubmits.get(form);
     if (!submitBtn) return;
-
-    // Clean up dynamic hidden input if present
-    if (submitBtn instanceof HTMLButtonElement || submitBtn instanceof HTMLInputElement) {
-      const name = submitBtn.name;
-      if (name) {
-        const hiddenInput = form.querySelector(`input[type="hidden"][name="${name}"][data-added-by-loading="true"]`);
-        if (hiddenInput) {
-          hiddenInput.remove();
-        }
-      }
-    }
 
     // Restore original content and disabled status
     const originalContent = (submitBtn as any)._originalContent;
