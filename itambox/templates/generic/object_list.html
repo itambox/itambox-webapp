@@ -256,8 +256,7 @@
 </div>
 {% endblock content %}
 
-{% block modals %}
-    {{ block.super }}
+{% block page_modals %}
     {% if table_config_form %}
         {% include 'core/modals/table_config.html' %}
     {% endif %}
@@ -334,7 +333,7 @@
         </div>
     </div>
     {% endif %}
-{% endblock modals %}
+{% endblock page_modals %}
 
 {% block title %}{{ title|default:"List View" }} {% translate "- ITAMbox" %}{% endblock %}
 
