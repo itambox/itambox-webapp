@@ -1,0 +1,39 @@
+{% extends 'generic/object_list.html' %}
+{% load i18n %}
+
+{% block title %}{% translate "Inventory & Stock" %} {% translate "- ITAMbox" %}{% endblock %}
+
+{% block page_header %}
+    <div class="page-pretitle">
+        {% translate "Manage" %}
+    </div>
+    <h2 class="page-title">
+        {% translate "Inventory Catalog" %}
+    </h2>
+{% endblock %}
+
+{% block tabs %}
+<ul class="nav nav-tabs page-header-tabs mb-3" role="tablist">
+    {% if perms.components.view_component %}
+    <li class="nav-item">
+        <a class="nav-link {% if current_type == 'components' %}active fw-bold{% endif %}" href="{% url 'inventory:inventory_list' %}?type=components" hx-boost="true">
+            <i class="mdi mdi-cube-outline me-2"></i>{% translate "Components" %}
+        </a>
+    </li>
+    {% endif %}
+    {% if perms.inventory.view_accessory %}
+    <li class="nav-item">
+        <a class="nav-link {% if current_type == 'accessories' %}active fw-bold{% endif %}" href="{% url 'inventory:inventory_list' %}?type=accessories" hx-boost="true">
+            <i class="mdi mdi-keyboard-outline me-2"></i>{% translate "Accessories" %}
+        </a>
+    </li>
+    {% endif %}
+    {% if perms.inventory.view_consumable %}
+    <li class="nav-item">
+        <a class="nav-link {% if current_type == 'consumables' %}active fw-bold{% endif %}" href="{% url 'inventory:inventory_list' %}?type=consumables" hx-boost="true">
+            <i class="mdi mdi-water-outline me-2"></i>{% translate "Consumables" %}
+        </a>
+    </li>
+    {% endif %}
+</ul>
+{% endblock tabs %}

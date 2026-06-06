@@ -11,6 +11,7 @@ urlpatterns = [
     path('<int:pk>/edit/', views.ComponentEditView.as_view(), name='component_update'),
     path('<int:pk>/delete/', views.ComponentDeleteView.as_view(), name='component_delete'),
     path('<int:pk>/clone/', views.ComponentCloneView.as_view(), name='component_clone'),
+    path('<int:pk>/add-stock/', views.ComponentStockCreateModalView.as_view(), name='component_add_stock'),
 
     # Component Stock
     path('stocks/', views.ComponentStockListView.as_view(), name='componentstock_list'),

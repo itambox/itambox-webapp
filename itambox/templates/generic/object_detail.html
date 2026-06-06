@@ -446,6 +446,15 @@
                 }
             });
         });
+
+        // 3. Listen for tableRefreshRequired event from HTMX modal submissions
+        document.body.addEventListener('tableRefreshRequired', function() {
+            if (typeof htmx !== 'undefined') {
+                htmx.ajax('GET', window.location.href, {target: 'body', swap: 'outerHTML'});
+            } else {
+                window.location.reload();
+            }
+        });
     });
 </script>
 {% endblock javascript %}

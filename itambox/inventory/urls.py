@@ -4,6 +4,9 @@ from . import views
 app_name = 'inventory'
 
 urlpatterns = [
+    # Unified Inventory
+    path('inventory/', views.InventoryListView.as_view(), name='inventory_list'),
+
     # Accessories
     path('accessories/', views.AccessoryListView.as_view(), name='accessory_list'),
     path('accessories/add/', views.AccessoryEditView.as_view(), name='accessory_create'),
@@ -15,6 +18,7 @@ urlpatterns = [
     path('accessories/<int:pk>/delete/', views.AccessoryDeleteView.as_view(), name='accessory_delete'),
     path('accessories/<int:pk>/clone/', views.AccessoryCloneView.as_view(), name='accessory_clone'),
     path('accessories/<int:pk>/checkout/', views.AccessoryCheckoutView.as_view(), name='accessory_checkout'),
+    path('accessories/<int:pk>/add-stock/', views.AccessoryStockCreateModalView.as_view(), name='accessory_add_stock'),
     path('accessories/assignments/<int:pk>/checkin/', views.AccessoryCheckinView.as_view(), name='accessory_checkin'),
     path('accessories/import/', views.AccessoryImportView.as_view(), name='accessory_import'),
     path('accessory-stocks/', views.AccessoryStockListView.as_view(), name='accessorystock_list'),
@@ -34,6 +38,7 @@ urlpatterns = [
     path('consumables/<int:pk>/delete/', views.ConsumableDeleteView.as_view(), name='consumable_delete'),
     path('consumables/<int:pk>/clone/', views.ConsumableCloneView.as_view(), name='consumable_clone'),
     path('consumables/<int:pk>/checkout/', views.ConsumableCheckoutView.as_view(), name='consumable_checkout'),
+    path('consumables/<int:pk>/add-stock/', views.ConsumableStockCreateModalView.as_view(), name='consumable_add_stock'),
     path('consumables/import/', views.ConsumableImportView.as_view(), name='consumable_import'),
     path('consumable-stocks/', views.ConsumableStockListView.as_view(), name='consumablestock_list'),
     path('consumable-stocks/add/', views.ConsumableStockEditView.as_view(), name='consumablestock_create'),

@@ -185,3 +185,18 @@ class ComponentStockFilterForm(FilterForm):
 class ComponentAllocationFilterForm(FilterForm):
     from .filters import ComponentAllocationFilterSet
     filterset_class = ComponentAllocationFilterSet
+
+
+class ComponentStockModalForm(forms.ModelForm):
+    class Meta:
+        model = ComponentStock
+        fields = ['location', 'qty']
+        widgets = {
+            'location': forms.Select(attrs={'class': 'form-select'}),
+            'qty': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_tag = False

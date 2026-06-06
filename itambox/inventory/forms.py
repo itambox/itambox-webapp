@@ -464,4 +464,31 @@ class ConsumableAssignmentFilterForm(FilterForm):
     filterset_class = ConsumableAssignmentFilterSet
 
 
+class AccessoryStockModalForm(forms.ModelForm):
+    class Meta:
+        model = AccessoryStock
+        fields = ['location', 'qty']
+        widgets = {
+            'location': forms.Select(attrs={'class': 'form-select'}),
+            'qty': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+        }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_tag = False
+
+
+class ConsumableStockModalForm(forms.ModelForm):
+    class Meta:
+        model = ConsumableStock
+        fields = ['location', 'qty']
+        widgets = {
+            'location': forms.Select(attrs={'class': 'form-select'}),
+            'qty': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_tag = False

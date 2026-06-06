@@ -66,6 +66,9 @@ class ComponentTrackingTestCase(TestCase):
 
     def test_component_list_view(self):
         response = self.client.get(reverse('components:component_list'))
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, reverse('inventory:inventory_list') + '?type=components')
+        response = self.client.get(reverse('inventory:inventory_list') + '?type=components')
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "16GB DDR5 RAM")
 
@@ -221,6 +224,9 @@ class ComponentTrackingTestCase(TestCase):
 
         # 1. List View
         response = self.client.get(reverse('inventory:accessory_list'))
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, reverse('inventory:inventory_list') + '?type=accessories')
+        response = self.client.get(reverse('inventory:inventory_list') + '?type=accessories')
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Wired Keyboard KB216")
 

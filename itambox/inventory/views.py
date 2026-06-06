@@ -9,6 +9,7 @@ from django.http import HttpResponse, HttpResponseBadRequest
 from django.views.generic import View
 from django.db.models import Count, Sum
 from django.db.models.functions import Coalesce
+from django.utils.translation import gettext as _
 
 from django_tables2 import RequestConfig
 
@@ -32,12 +33,92 @@ from assets.services import checkout_kit
 from inventory.services import checkout_accessory, checkin_accessory, checkout_consumable
 
 
+class InventoryListView(ObjectListView):
+    template_name = 'inventory/inventory_list.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        from components.models import Component
+        from components.filters import ComponentFilterSet
+        from components.forms import ComponentFilterForm
+        from components.tables import ComponentTable
+        from django import forms as django_forms
+        from django.core.exceptions import PermissionDenied
+        from django.db.models import Sum
+        from django.db.models.functions import Coalesce
+
+        accessible_types = []
+        if request.user.has_perm('components.view_component'):
+            accessible_types.append('components')
+        if request.user.has_perm('inventory.view_accessory'):
+            accessible_types.append('accessories')
+        if request.user.has_perm('inventory.view_consumable'):
+            accessible_types.append('consumables')
+
+        if not accessible_types:
+            raise PermissionDenied("You do not have permission to view inventory.")
+
+        self.current_type = request.GET.get('type')
+        if self.current_type not in accessible_types:
+            self.current_type = accessible_types[0]
+
+        if self.current_type == 'components':
+            self.queryset = Component.objects.with_counts().select_related('manufacturer', 'category').prefetch_related('tags')
+            self.filterset = ComponentFilterSet
+            self.filterset_form = ComponentFilterForm
+            self.table = ComponentTable
+            self.action_buttons = ('add',)
+        elif self.current_type == 'accessories':
+            self.queryset = Accessory.objects.select_related('tenant', 'manufacturer').prefetch_related('tags').annotate(
+                _total_stock=Coalesce(Sum('stocks__qty'), 0),
+                _checked_out=Coalesce(Sum('assignments__qty'), 0)
+            )
+            self.filterset = filters.AccessoryFilterSet
+            self.filterset_form = forms.AccessoryFilterForm
+            self.table = tables.AccessoryTable
+            self.action_buttons = ('add',)
+        elif self.current_type == 'consumables':
+            self.queryset = Consumable.objects.select_related('tenant', 'manufacturer').prefetch_related('tags').annotate(
+                _total_stock=Coalesce(Sum('stocks__qty'), 0),
+                _consumed=Coalesce(Sum('consumptions__qty'), 0)
+            )
+            self.filterset = filters.ConsumableFilterSet
+            self.filterset_form = forms.ConsumableFilterForm
+            self.table = tables.ConsumableTable
+            self.action_buttons = ('add',)
+
+        view_self = self
+
+        class DynamicFilterForm(self.filterset_form):
+            type = django_forms.CharField(widget=django_forms.HiddenInput(), required=False)
+
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.fields['type'].initial = view_self.current_type
+
+        self.filterset_form = DynamicFilterForm
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['current_type'] = self.current_type
+        context['title'] = _('Inventory Catalog')
+        context['breadcrumbs'] = [
+            (reverse('dashboard'), _('Dashboard')),
+            (None, _('Inventory & Stock'))
+        ]
+        return context
+
+
 class AccessoryListView(ObjectListView):
     queryset = Accessory.objects.select_related('tenant', 'manufacturer').prefetch_related('tags').annotate(_total_stock=Coalesce(Sum('stocks__qty'), 0), _checked_out=Coalesce(Sum('assignments__qty'), 0))
     filterset = filters.AccessoryFilterSet
     filterset_form = forms.AccessoryFilterForm
     table = tables.AccessoryTable
     action_buttons = ('add',)
+
+    def get(self, request, *args, **kwargs):
+        return redirect(reverse('inventory:inventory_list') + '?type=accessories')
 
 
 class AccessoryDetailView(ObjectDetailView):
@@ -110,6 +191,9 @@ class ConsumableListView(ObjectListView):
     filterset_form = forms.ConsumableFilterForm
     table = tables.ConsumableTable
     action_buttons = ('add',)
+
+    def get(self, request, *args, **kwargs):
+        return redirect(reverse('inventory:inventory_list') + '?type=consumables')
 
 
 class ConsumableDetailView(ObjectDetailView):
@@ -559,5 +643,83 @@ class ConsumableStockAdjustView(LoginRequiredMixin, View):
             stock.qty,
             reverse('inventory:consumablestock_adjust', kwargs={'pk': stock.pk}) + '?action=increment'
         ))
+
+
+class AccessoryStockCreateModalView(LoginRequiredMixin, View):
+    def get(self, request, pk):
+        accessory = get_object_or_404(Accessory, pk=pk)
+        from .forms import AccessoryStockModalForm
+        form = AccessoryStockModalForm()
+        return render(request, 'generic/includes/add_stock_modal.html', {
+            'object': accessory,
+            'form': form,
+            'post_url': reverse('inventory:accessory_add_stock', kwargs={'pk': accessory.pk}),
+        })
+
+    def post(self, request, pk):
+        accessory = get_object_or_404(Accessory, pk=pk)
+        from .forms import AccessoryStockModalForm
+        form = AccessoryStockModalForm(request.POST)
+        if form.is_valid():
+            stock = form.save(commit=False)
+            stock.accessory = accessory
+            stock.save()
+            if request.headers.get('HX-Request'):
+                response = HttpResponse(status=204)
+                response['HX-Trigger'] = json.dumps({
+                    "closeModalEvent": None,
+                    "tableRefreshRequired": None,
+                    "showMessage": {
+                        "message": f"Added stock pool for {stock.location}.",
+                        "level": "success"
+                    }
+                })
+                return response
+            return redirect(accessory.get_absolute_url())
+
+        return render(request, 'generic/includes/add_stock_modal.html', {
+            'object': accessory,
+            'form': form,
+            'post_url': reverse('inventory:accessory_add_stock', kwargs={'pk': accessory.pk}),
+        })
+
+
+class ConsumableStockCreateModalView(LoginRequiredMixin, View):
+    def get(self, request, pk):
+        consumable = get_object_or_404(Consumable, pk=pk)
+        from .forms import ConsumableStockModalForm
+        form = ConsumableStockModalForm()
+        return render(request, 'generic/includes/add_stock_modal.html', {
+            'object': consumable,
+            'form': form,
+            'post_url': reverse('inventory:consumable_add_stock', kwargs={'pk': consumable.pk}),
+        })
+
+    def post(self, request, pk):
+        consumable = get_object_or_404(Consumable, pk=pk)
+        from .forms import ConsumableStockModalForm
+        form = ConsumableStockModalForm(request.POST)
+        if form.is_valid():
+            stock = form.save(commit=False)
+            stock.consumable = consumable
+            stock.save()
+            if request.headers.get('HX-Request'):
+                response = HttpResponse(status=204)
+                response['HX-Trigger'] = json.dumps({
+                    "closeModalEvent": None,
+                    "tableRefreshRequired": None,
+                    "showMessage": {
+                        "message": f"Added stock pool for {stock.location}.",
+                        "level": "success"
+                    }
+                })
+                return response
+            return redirect(consumable.get_absolute_url())
+
+        return render(request, 'generic/includes/add_stock_modal.html', {
+            'object': consumable,
+            'form': form,
+            'post_url': reverse('inventory:consumable_add_stock', kwargs={'pk': consumable.pk}),
+        })
 
 

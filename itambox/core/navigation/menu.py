@@ -57,136 +57,37 @@ INVENTORY_MENU = Menu(
     icon_class='mdi mdi-package-variant-closed',
     groups=(
         MenuGroup(
-            label=_('Component Inventory'),
+            label=_('Inventory Catalog'),
             items=(
                 MenuItem(
-                    link='components:component_list',
-                    link_text=_('Components'),
-                    permissions=['components.view_component'],
+                    link='inventory:inventory_list',
+                    link_text=_('Inventory'),
+                    auth_required=True,
                     buttons=(
                         MenuItemButton(
                             link='components:component_create',
-                            title='Add',
+                            title='Add Component',
                             icon_class='mdi mdi-plus-thick',
                             permissions=['components.add_component'],
                         ),
                         MenuItemButton(
-                            link='/import/components/component/',
-                            title='Import',
-                            icon_class='mdi mdi-upload',
-                            permissions=['components.add_component'],
-                            color='outline text-success',
-                        ),
-                    ),
-                ),
-                MenuItem(
-                    link='components:componentstock_list',
-                    link_text=_('Component Stocks'),
-                    permissions=['components.view_componentstock'],
-                    buttons=(
-                        MenuItemButton(
-                            link='components:componentstock_create',
-                            title='Add',
+                            link='inventory:accessory_create',
+                            title='Add Accessory',
                             icon_class='mdi mdi-plus-thick',
-                            permissions=['components.add_componentstock'],
+                            permissions=['inventory.add_accessory'],
                         ),
                         MenuItemButton(
-                            link='/import/components/componentstock/',
-                            title='Import',
-                            icon_class='mdi mdi-upload',
-                            permissions=['components.add_componentstock'],
-                            color='outline text-success',
-                        ),
-                    ),
-                ),
-                MenuItem(
-                    link='components:componentallocation_list',
-                    link_text=_('Component Allocations'),
-                    permissions=['components.view_componentallocation'],
-                    buttons=(
-                        MenuItemButton(
-                            link='components:componentallocation_create',
-                            title='Add',
+                            link='inventory:consumable_create',
+                            title='Add Consumable',
                             icon_class='mdi mdi-plus-thick',
-                            permissions=['components.add_componentallocation'],
-                        ),
-                        MenuItemButton(
-                            link='/import/components/componentallocation/',
-                            title='Import',
-                            icon_class='mdi mdi-upload',
-                            permissions=['components.add_componentallocation'],
-                            color='outline text-success',
+                            permissions=['inventory.add_consumable'],
                         ),
                     ),
                 ),
             ),
         ),
         MenuGroup(
-            label=_('Accessory Inventory'),
-            items=(
-                get_model_item('inventory', 'accessory', _('Accessories')),
-                MenuItem(
-                    link='inventory:accessorystock_list',
-                    link_text=_('Accessory Stocks'),
-                    permissions=['inventory.view_accessorystock'],
-                    buttons=(
-                        MenuItemButton(
-                            link='inventory:accessorystock_create',
-                            title='Add',
-                            icon_class='mdi mdi-plus-thick',
-                            permissions=['inventory.add_accessorystock'],
-                        ),
-                        MenuItemButton(
-                            link='/import/inventory/accessorystock/',
-                            title='Import',
-                            icon_class='mdi mdi-upload',
-                            permissions=['inventory.add_accessorystock'],
-                            color='outline text-success',
-                        ),
-                    ),
-                ),
-                MenuItem(
-                    link='inventory:accessoryassignment_list',
-                    link_text=_('Accessory Assignments'),
-                    permissions=['inventory.view_accessoryassignment'],
-                    buttons=(),
-                ),
-            ),
-        ),
-        MenuGroup(
-            label=_('Consumable Inventory'),
-            items=(
-                get_model_item('inventory', 'consumable', _('Consumables')),
-                MenuItem(
-                    link='inventory:consumablestock_list',
-                    link_text=_('Consumable Stocks'),
-                    permissions=['inventory.view_consumablestock'],
-                    buttons=(
-                        MenuItemButton(
-                            link='inventory:consumablestock_create',
-                            title='Add',
-                            icon_class='mdi mdi-plus-thick',
-                            permissions=['inventory.add_consumablestock'],
-                        ),
-                        MenuItemButton(
-                            link='/import/inventory/consumablestock/',
-                            title='Import',
-                            icon_class='mdi mdi-upload',
-                            permissions=['inventory.add_consumablestock'],
-                            color='outline text-success',
-                        ),
-                    ),
-                ),
-                MenuItem(
-                    link='inventory:consumableassignment_list',
-                    link_text=_('Consumable Consumptions'),
-                    permissions=['inventory.view_consumableassignment'],
-                    buttons=(),
-                ),
-            ),
-        ),
-        MenuGroup(
-            label=_('Kits & Lifecycle'),
+            label=_('Bundles & Lifecycle'),
             items=(
                 get_model_item('inventory', 'kit', _('Kits')),
                 get_model_item('assets', 'depreciation', _('Depreciation')),

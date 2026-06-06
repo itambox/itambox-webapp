@@ -28,6 +28,11 @@ class ComponentListView(ObjectListView):
     table = ComponentTable
     action_buttons = ('add',)
 
+    def get(self, request, *args, **kwargs):
+        from django.shortcuts import redirect
+        from django.urls import reverse
+        return redirect(reverse('inventory:inventory_list') + '?type=components')
+
 
 class ComponentDetailView(ObjectDetailView):
     queryset = Component.objects.select_related('manufacturer', 'category').prefetch_related('tags', 'stocks', 'allocations')
@@ -157,4 +162,49 @@ class ComponentStockAdjustView(LoginRequiredMixin, View):
             stock.qty,
             reverse('components:componentstock_adjust', kwargs={'pk': stock.pk}) + '?action=increment'
         ))
+
+
+class ComponentStockCreateModalView(LoginRequiredMixin, View):
+    def get(self, request, pk):
+        from django.shortcuts import get_object_or_404, render
+        from django.urls import reverse
+        from .forms import ComponentStockModalForm
+        component = get_object_or_404(Component, pk=pk)
+        form = ComponentStockModalForm()
+        return render(request, 'generic/includes/add_stock_modal.html', {
+            'object': component,
+            'form': form,
+            'post_url': reverse('components:component_add_stock', kwargs={'pk': component.pk}),
+        })
+
+    def post(self, request, pk):
+        from django.shortcuts import get_object_or_404, render, redirect
+        from django.http import HttpResponse
+        from django.urls import reverse
+        from .forms import ComponentStockModalForm
+        import json
+        component = get_object_or_404(Component, pk=pk)
+        form = ComponentStockModalForm(request.POST)
+        if form.is_valid():
+            stock = form.save(commit=False)
+            stock.component = component
+            stock.save()
+            if request.headers.get('HX-Request'):
+                response = HttpResponse(status=204)
+                response['HX-Trigger'] = json.dumps({
+                    "closeModalEvent": None,
+                    "tableRefreshRequired": None,
+                    "showMessage": {
+                        "message": f"Added stock pool for {stock.location}.",
+                        "level": "success"
+                    }
+                })
+                return response
+            return redirect(component.get_absolute_url())
+
+        return render(request, 'generic/includes/add_stock_modal.html', {
+            'object': component,
+            'form': form,
+            'post_url': reverse('components:component_add_stock', kwargs={'pk': component.pk}),
+        })
 
