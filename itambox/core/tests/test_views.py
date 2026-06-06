@@ -141,3 +141,189 @@ class CoreViewsTestCase(TestCase):
         response = self.client.get(reverse('objectchange_list') + f"?changed_object_type={ct_mfr.pk}")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Intel unique-filter-1")
+
+    def test_softdelete_management_views(self):
+        """Test frontend soft-delete Recycle Bin, Restore, Purge, and Bulk actions."""
+        self.client.force_login(self.user)
+        
+        # 1. Setup sample objects
+        mfr = Manufacturer.objects.create(name="SoftDelete Manufacturer", slug="sd-mfr")
+        role = AssetRole.objects.create(name="Laptop", slug="laptop")
+        asset_type = AssetType.objects.create(manufacturer=mfr, model="ThinkPad", slug="thinkpad")
+        
+        asset = Asset.objects.create(
+            name="Alice ThinkPad",
+            asset_tag="TP-001",
+            asset_type=asset_type,
+            asset_role=role
+        )
+        
+        # Verify active asset shows up in active list view but not in Recycle Bin
+        active_list_url = reverse('assets:asset_list')
+        response = self.client.get(active_list_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Alice ThinkPad")
+        
+        recycle_bin_url = active_list_url + "?deleted=true"
+        response = self.client.get(recycle_bin_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Alice ThinkPad")
+        self.assertContains(response, "Recycle Bin — Assets")
+        
+        # Soft-delete the asset
+        asset.delete()
+        self.assertIsNotNone(Asset.all_objects.get(pk=asset.pk).deleted_at)
+        self.assertFalse(Asset.objects.filter(pk=asset.pk).exists())
+        
+        # Verify it shows up in Recycle Bin but not active list
+        response = self.client.get(active_list_url)
+        self.assertNotContains(response, "Alice ThinkPad")
+        
+        response = self.client.get(recycle_bin_url)
+        self.assertContains(response, "Alice ThinkPad")
+        
+        # 2. Test Single Restore View
+        from django.contrib.contenttypes.models import ContentType
+        ct = ContentType.objects.get_for_model(Asset)
+        restore_url = reverse('object_restore', kwargs={'content_type_id': ct.pk, 'object_id': asset.pk})
+        
+        response = self.client.post(restore_url, follow=True)
+        self.assertEqual(response.status_code, 200)
+        
+        # Verify asset is restored (deleted_at is None)
+        asset.refresh_from_db()
+        self.assertIsNone(asset.deleted_at)
+        self.assertTrue(Asset.objects.filter(pk=asset.pk).exists())
+        
+        # Soft-delete again to test purge
+        asset.delete()
+        
+        # 3. Test Single Purge View
+        purge_url = reverse('object_purge', kwargs={'content_type_id': ct.pk, 'object_id': asset.pk})
+        response = self.client.post(purge_url, follow=True)
+        self.assertEqual(response.status_code, 200)
+        
+        # Verify asset is physically gone
+        self.assertFalse(Asset.all_objects.filter(pk=asset.pk).exists())
+        
+        # 4. Test Bulk Restore / Purge Views
+        asset2 = Asset.objects.create(
+            name="Bob ThinkPad",
+            asset_tag="TP-002",
+            asset_type=asset_type,
+            asset_role=role
+        )
+        asset3 = Asset.objects.create(
+            name="Charlie ThinkPad",
+            asset_tag="TP-003",
+            asset_type=asset_type,
+            asset_role=role
+        )
+        
+        # Soft-delete both
+        asset2.delete()
+        asset3.delete()
+        
+        bulk_restore_url = reverse('object_bulk_restore', kwargs={'content_type_id': ct.pk})
+        response = self.client.post(bulk_restore_url, {'pk': [asset2.pk, asset3.pk]}, follow=True)
+        self.assertEqual(response.status_code, 200)
+        
+        # Verify both are restored
+        asset2.refresh_from_db()
+        asset3.refresh_from_db()
+        self.assertIsNone(asset2.deleted_at)
+        self.assertIsNone(asset3.deleted_at)
+        
+        # Soft-delete both again
+        asset2.delete()
+        asset3.delete()
+        
+        # Bulk Purge
+        bulk_purge_url = reverse('object_bulk_purge', kwargs={'content_type_id': ct.pk})
+        response = self.client.post(bulk_purge_url, {'pk': [asset2.pk, asset3.pk]}, follow=True)
+        self.assertEqual(response.status_code, 200)
+        
+        # Verify both are completely purged
+        self.assertFalse(Asset.all_objects.filter(pk__in=[asset2.pk, asset3.pk]).exists())
+
+    def test_recycle_bin_permissions(self):
+        """Test Recycle Bin access control for superusers, standard roles, and restricted users."""
+        from organization.models import Tenant, TenantRole, TenantMembership
+        from django.contrib.contenttypes.models import ContentType
+        
+        # 1. Setup tenant and standard user
+        tenant = Tenant.objects.create(name="ACME Corp", slug="acme")
+        std_user = User.objects.create_user(username='stduser', password='password123')
+        
+        # Setup asset
+        mfr = Manufacturer.objects.create(name="Perm Mfr", slug="perm-mfr")
+        role = AssetRole.objects.create(name="Laptop", slug="laptop")
+        asset_type = AssetType.objects.create(manufacturer=mfr, model="ThinkPad", slug="thinkpad")
+        
+        asset = Asset.objects.create(
+            name="Bob ThinkPad",
+            asset_tag="TP-999",
+            asset_type=asset_type,
+            asset_role=role,
+            tenant=tenant
+        )
+        asset.delete()
+        
+        # 2. Try to view Recycle Bin without permissions
+        self.client.force_login(std_user)
+        active_list_url = reverse('assets:asset_list')
+        recycle_bin_url = active_list_url + "?deleted=true"
+        
+        response = self.client.get(recycle_bin_url)
+        self.assertEqual(response.status_code, 403) # Forbidden
+        
+        # Try to restore without permissions
+        ct = ContentType.objects.get_for_model(Asset)
+        restore_url = reverse('object_restore', kwargs={'content_type_id': ct.pk, 'object_id': asset.pk})
+        response = self.client.post(restore_url)
+        self.assertEqual(response.status_code, 403) # Forbidden
+        
+        # Try to purge without permissions
+        purge_url = reverse('object_purge', kwargs={'content_type_id': ct.pk, 'object_id': asset.pk})
+        response = self.client.post(purge_url)
+        self.assertEqual(response.status_code, 403) # Forbidden
+        
+        # 3. Create TenantRole with Recycle Bin permissions
+        # We need to give view_asset/change_asset/delete_asset permissions as well for the standard asset views
+        role_obj = TenantRole.objects.create(
+            tenant=tenant,
+            name="Recycle Bin Manager",
+            permissions=[
+                'assets.view_asset',
+                'assets.change_asset',
+                'assets.delete_asset',
+                'core.view_recyclebin',
+                'core.change_recyclebin',
+                'core.delete_recyclebin',
+            ]
+        )
+        TenantMembership.objects.create(user=std_user, tenant=tenant, role=role_obj)
+        
+        # 4. Try again with permissions
+        # Force a reload of the user object to update cached memberships
+        std_user = User.objects.get(pk=std_user.pk)
+        
+        # Set active tenant in session or request context if needed (scoping middleware handles it based on membership)
+        response = self.client.get(recycle_bin_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Bob ThinkPad")
+        
+        # Test restore
+        response = self.client.post(restore_url, follow=True)
+        self.assertEqual(response.status_code, 200)
+        asset.refresh_from_db()
+        self.assertIsNone(asset.deleted_at)
+        
+        # Soft-delete again for purge test
+        asset.delete()
+        
+        # Test purge
+        response = self.client.post(purge_url, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Asset.all_objects.filter(pk=asset.pk).exists())
+

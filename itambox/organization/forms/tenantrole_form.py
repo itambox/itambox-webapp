@@ -247,6 +247,12 @@ MATRIX_MODELS = {
         'model_name': 'labeltemplate',
         'group': 'System & Reporting',
     },
+    'recyclebin': {
+        'label': 'Recycle Bin',
+        'app': 'core',
+        'model_name': 'recyclebin',
+        'group': 'System & Reporting',
+    },
 
     # Compliance & Custody
     'custodytemplate': {

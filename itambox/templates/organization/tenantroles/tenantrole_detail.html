@@ -44,10 +44,12 @@
                     {% endif %}
                 </td>
                 <td class="text-center">
-                    {% if item.create_codename in object.permissions %}
-                        <span class="badge bg-success text-success-fg"><i class="mdi mdi-check"></i> {% translate "Yes" %}</span>
-                    {% else %}
-                        <span class="badge bg-secondary-lt text-muted"><i class="mdi mdi-close"></i> {% translate "No" %}</span>
+                    {% if "recyclebin" not in item.create_codename %}
+                        {% if item.create_codename in object.permissions %}
+                            <span class="badge bg-success text-success-fg"><i class="mdi mdi-check"></i> {% translate "Yes" %}</span>
+                        {% else %}
+                            <span class="badge bg-secondary-lt text-muted"><i class="mdi mdi-close"></i> {% translate "No" %}</span>
+                        {% endif %}
                     {% endif %}
                 </td>
                 <td class="text-center">

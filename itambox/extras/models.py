@@ -3,10 +3,13 @@ from django.db import models
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from core.models import BaseModel, ChangeLoggingMixin
-from core.managers import TenantScopingManager
+from core.managers import TenantScopingManager, SoftDeleteManager, AllObjectsManager
+from core.mixins import SoftDeleteMixin
 
 
-class Tag(ChangeLoggingMixin, BaseModel):
+class Tag(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     color = models.CharField(max_length=6, blank=True) # Store hex color without #
@@ -100,7 +103,9 @@ class Dashboard(models.Model):
             self.save(update_fields=['layout'])
 
 
-class CustomField(ChangeLoggingMixin, BaseModel):
+class CustomField(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
     FIELD_TYPE_TEXT = 'text'
     FIELD_TYPE_NUMBER = 'number'
     FIELD_TYPE_DATE = 'date'
@@ -140,7 +145,9 @@ class CustomField(ChangeLoggingMixin, BaseModel):
         return reverse('assets:customfield_detail', kwargs={'pk': self.pk})
 
 
-class CustomFieldset(ChangeLoggingMixin, BaseModel):
+class CustomFieldset(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
     name = models.CharField(max_length=100, unique=True, verbose_name="Fieldset Name")
     fields = models.ManyToManyField(CustomField, related_name='fieldsets', blank=True, verbose_name="Custom Fields")
 

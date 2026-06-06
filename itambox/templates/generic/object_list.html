@@ -77,12 +77,19 @@
             </div>
             {% endif %}
 
-            {# Main Results Container (target for search/pagination swaps) #}
             <div id="object-list-dynamic-content"
                  hx-get="{{ request.get_full_path }}"
                  hx-trigger="tableRefreshRequired from:body"
                  hx-target="#object-list-dynamic-content"
                  hx-swap="innerHTML">
+                 {% if is_deleted_view %}
+                 <div class="alert alert-warning border-0 rounded-0 border-bottom d-flex align-items-center mb-0 px-3 py-2">
+                     <i class="mdi mdi-alert-circle-outline me-2 fs-3"></i>
+                     <div>
+                         {% blocktranslate %}You are viewing soft-deleted items in the Recycle Bin. Restoring parent objects does not automatically restore their deleted child dependencies.{% endblocktranslate %}
+                     </div>
+                 </div>
+                 {% endif %}
                  {# Row for Search and Action Buttons #}
                  <div class="py-2 px-3 border-bottom d-flex justify-content-between align-items-center">
                      {# Quick Search Input Group #}
@@ -145,6 +152,24 @@
                     <div id="batch-actions-bar-top" class="batch-actions-bar d-none">
                         <div class="d-flex align-items-center gap-2 px-3 py-2 bg-body-tertiary border-bottom">
                             <span id="batch-selected-count" class="fw-bold me-2">{% translate "0 selected" %}</span>
+                            {% if is_deleted_view %}
+                            <form id="bulk-restore-form" method="post" action="{{ bulk_restore_url }}" class="d-inline" hx-boost="false">
+                                {% csrf_token %}
+                                <div id="bulk-restore-pks-container" class="d-inline"></div>
+                                <button type="button" class="btn btn-sm btn-success btn-bulk-restore">
+                                    <i class="mdi mdi-backup-restore me-1"></i>
+                                    {% translate "Restore Selected" %}
+                                </button>
+                            </form>
+                            <form id="bulk-purge-form" method="post" action="{{ bulk_purge_url }}" class="d-inline" hx-boost="false">
+                                {% csrf_token %}
+                                <div id="bulk-purge-pks-container" class="d-inline"></div>
+                                <button type="button" class="btn btn-sm btn-outline-danger btn-bulk-purge">
+                                    <i class="mdi mdi-delete-forever me-1"></i>
+                                    {% translate "Purge Selected" %}
+                                </button>
+                            </form>
+                            {% else %}
                             {% if model_name_str == 'assets.asset' %}
                             <button type="button" class="btn btn-sm btn-primary" id="btn-bulk-assign"
                                     data-bs-toggle="modal" data-bs-target="#bulk-assign-modal"
@@ -179,6 +204,7 @@
                                     {% translate "Edit Selected" %}
                                 </button>
                             </form>
+                            {% endif %}
                         </div>
                     </div>
 
@@ -192,12 +218,21 @@
                        {% endif %}
                     </div>
                 </div>
-            </div> {# End #object-list-dynamic-content #}
 
             {# Batch Actions Bar — Bottom #}
             <div id="batch-actions-bar-bottom" class="batch-actions-bar d-none">
                 <div class="d-flex align-items-center gap-2 px-3 py-2 bg-body-tertiary border-top">
                     <span class="batch-selected-count-bottom fw-bold me-2">{% translate "0 selected" %}</span>
+                    {% if is_deleted_view %}
+                    <button type="button" class="btn btn-sm btn-success btn-bulk-restore">
+                        <i class="mdi mdi-backup-restore me-1"></i>
+                        {% translate "Restore Selected" %}
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger btn-bulk-purge">
+                        <i class="mdi mdi-delete-forever me-1"></i>
+                        {% translate "Purge Selected" %}
+                    </button>
+                    {% else %}
                     {% if model_name_str == 'assets.asset' %}
                     <button type="button" class="btn btn-sm btn-primary btn-bulk-assign-bottom"
                             data-bs-toggle="modal" data-bs-target="#bulk-assign-modal"
@@ -220,8 +255,10 @@
                         <i class="mdi mdi-pencil-outline me-1"></i>
                         {% translate "Edit Selected" %}
                     </button>
+                    {% endif %}
                 </div>
             </div>
+            </div> {# End #object-list-dynamic-content #}
 
             {# Pagination Controls Container (Persistently outside dynamic content) #}
             <div id="object-list-pagination">
@@ -350,60 +387,76 @@
     <div class="btn-list">
         {% block extra_controls %}{% endblock %}
 
-        {% if can_add %}
-            {% if create_url_name %}
-            <a href="{% url create_url_name %}" class="btn btn-primary">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
-                {% blocktranslate %}Create {{ object_type }}{% endblocktranslate %}
+        {% if is_deleted_view %}
+            {% if has_soft_delete %}
+            <a href="?deleted=false" class="btn btn-outline-secondary" hx-get="?deleted=false" hx-push-url="true" hx-target="#object-list-dynamic-content">
+                <i class="mdi mdi-arrow-left me-1"></i>
+                {% translate "Back to Active Items" %}
             </a>
             {% endif %}
+        {% else %}
+            {% if can_add %}
+                {% if create_url_name %}
+                <a href="{% url create_url_name %}" class="btn btn-primary">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+                    {% blocktranslate %}Create {{ object_type }}{% endblocktranslate %}
+                </a>
+                {% endif %}
 
-            {% if import_url %}
-            <a href="{{ import_url }}" class="btn btn-secondary d-none d-sm-inline-block">
-                <i class="mdi mdi-upload me-1"></i>
-                {% trans "Import" %}
+                {% if import_url %}
+                <a href="{{ import_url }}" class="btn btn-secondary d-none d-sm-inline-block">
+                    <i class="mdi mdi-upload me-1"></i>
+                    {% trans "Import" %}
+                </a>
+                {% endif %}
+            {% endif %}
+
+            <div class="dropdown d-none d-sm-inline-block">
+                <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <i class="mdi mdi-download me-1"></i>
+                    {% trans "Export" %}
+                </button>
+                <div class="dropdown-menu dropdown-menu-end">
+                    <div class="dropdown-header">{% trans "Current View" %}</div>
+                    <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=0 %}?format=csv&export_scope=filtered&{{ request.GET.urlencode }}" hx-boost="false">
+                        <i class="mdi mdi-file-delimited-outline me-2 text-muted"></i>
+                        {% trans "CSV Format" %}
+                    </a>
+                    <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=0 %}?format=yaml&export_scope=filtered&{{ request.GET.urlencode }}" hx-boost="false">
+                        <i class="mdi mdi-file-code-outline me-2 text-muted"></i>
+                        {% trans "YAML Format" %}
+                    </a>
+
+                    <div class="dropdown-divider"></div>
+                    <div class="dropdown-header">{% trans "All Data" %}</div>
+                    <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=0 %}?format=csv&export_scope=all" hx-boost="false">
+                        <i class="mdi mdi-file-delimited-outline me-2 text-muted"></i>
+                        {% trans "CSV Format" %}
+                    </a>
+                    <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=0 %}?format=yaml&export_scope=all" hx-boost="false">
+                        <i class="mdi mdi-file-code-outline me-2 text-muted"></i>
+                        {% trans "YAML Format" %}
+                    </a>
+
+                    {% if export_templates %}
+                        <div class="dropdown-divider"></div>
+                        <div class="dropdown-header">{% trans "Export Templates" %}</div>
+                        {% for template in export_templates %}
+                        <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=template.pk %}" hx-boost="false">
+                            <i class="mdi mdi-file-code-outline me-2 text-muted"></i>
+                            {{ template.name }} ({{ template.file_extension|upper }})
+                        </a>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if has_soft_delete %}
+            <a href="?deleted=true" class="btn btn-outline-danger" hx-get="?deleted=true" hx-push-url="true" hx-target="#object-list-dynamic-content">
+                <i class="mdi mdi-trash-can-outline me-1"></i>
+                {% translate "Recycle Bin" %}
             </a>
             {% endif %}
         {% endif %}
-
-        <div class="dropdown d-none d-sm-inline-block">
-            <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                <i class="mdi mdi-download me-1"></i>
-                {% trans "Export" %}
-            </button>
-            <div class="dropdown-menu dropdown-menu-end">
-                <div class="dropdown-header">{% trans "Current View" %}</div>
-                <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=0 %}?format=csv&export_scope=filtered&{{ request.GET.urlencode }}" hx-boost="false">
-                    <i class="mdi mdi-file-delimited-outline me-2 text-muted"></i>
-                    {% trans "CSV Format" %}
-                </a>
-                <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=0 %}?format=yaml&export_scope=filtered&{{ request.GET.urlencode }}" hx-boost="false">
-                    <i class="mdi mdi-file-code-outline me-2 text-muted"></i>
-                    {% trans "YAML Format" %}
-                </a>
-
-                <div class="dropdown-divider"></div>
-                <div class="dropdown-header">{% trans "All Data" %}</div>
-                <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=0 %}?format=csv&export_scope=all" hx-boost="false">
-                    <i class="mdi mdi-file-delimited-outline me-2 text-muted"></i>
-                    {% trans "CSV Format" %}
-                </a>
-                <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=0 %}?format=yaml&export_scope=all" hx-boost="false">
-                    <i class="mdi mdi-file-code-outline me-2 text-muted"></i>
-                    {% trans "YAML Format" %}
-                </a>
-
-                {% if export_templates %}
-                    <div class="dropdown-divider"></div>
-                    <div class="dropdown-header">{% trans "Export Templates" %}</div>
-                    {% for template in export_templates %}
-                    <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=template.pk %}" hx-boost="false">
-                        <i class="mdi mdi-file-code-outline me-2 text-muted"></i>
-                        {{ template.name }} ({{ template.file_extension|upper }})
-                    </a>
-                    {% endfor %}
-                {% endif %}
-            </div>
-        </div>
     </div>
 {% endblock page_actions %}

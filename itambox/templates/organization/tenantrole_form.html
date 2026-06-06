@@ -113,7 +113,9 @@
                                 </td>
                                 <td class="text-center">
                                     <div class="form-check d-inline-block create-checkbox">
-                                        {{ item.create_field }}
+                                        {% if item.key != 'recyclebin' %}
+                                            {{ item.create_field }}
+                                        {% endif %}
                                     </div>
                                 </td>
                                 <td class="text-center">

@@ -17,17 +17,32 @@
 {# --- OOB Block: Page Actions --- #}
 <div id="page-actions-block" hx-swap-oob="true">
     <div class="btn-list">
-        {% if create_url_name %}
-        <a href="{% url create_url_name %}" class="btn btn-primary">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
-            {% translate "Create" %} {{ object_type|default:"Object" }}
-        </a>
-        {% endif %}
-        {% if export_url_name %}
-        <a href="#" class="btn btn-secondary d-none d-sm-inline-block">
-            <i class="mdi mdi-download me-1"></i>
-            {% translate "Export" %}
-        </a>
+        {% if is_deleted_view %}
+            {% if has_soft_delete %}
+            <a href="?deleted=false" class="btn btn-outline-secondary" hx-get="?deleted=false" hx-push-url="true" hx-target="#object-list-dynamic-content">
+                <i class="mdi mdi-arrow-left me-1"></i>
+                {% translate "Back to Active Items" %}
+            </a>
+            {% endif %}
+        {% else %}
+            {% if create_url_name and can_add %}
+            <a href="{% url create_url_name %}" class="btn btn-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+                {% translate "Create" %} {{ object_type|default:"Object" }}
+            </a>
+            {% endif %}
+            {% if export_url_name %}
+            <a href="#" class="btn btn-secondary d-none d-sm-inline-block">
+                <i class="mdi mdi-download me-1"></i>
+                {% translate "Export" %}
+            </a>
+            {% endif %}
+            {% if has_soft_delete %}
+            <a href="?deleted=true" class="btn btn-outline-danger" hx-get="?deleted=true" hx-push-url="true" hx-target="#object-list-dynamic-content">
+                <i class="mdi mdi-trash-can-outline me-1"></i>
+                {% translate "Recycle Bin" %}
+            </a>
+            {% endif %}
         {% endif %}
     </div>
 </div>

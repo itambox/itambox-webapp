@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.utils import timezone
 from software.models import Software
 from core.models import BaseModel, ChangeLoggingMixin, StandardModel, DeletableVaultModel
-from core.mixins import CustomFieldDataMixin, JournalingMixin, TaggableMixin, AutoSlugMixin, BookmarkableMixin, SubscribableMixin
+from core.mixins import CustomFieldDataMixin, JournalingMixin, TaggableMixin, AutoSlugMixin, BookmarkableMixin, SubscribableMixin, SoftDeleteMixin
 from extras.models import CustomFieldset
 from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -16,7 +16,7 @@ from compliance.models import generate_token
 User = get_user_model()
 
 
-from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager, TenantScopingManager
+from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager, TenantScopingManager, TenantScopingAllObjectsManager
 
 
 class AssetStateMachine:
@@ -38,7 +38,9 @@ class AssetStateMachine:
             raise ValidationError("Cannot mark an actively checked-out asset as undeployable or archived. Check it in first.")
 
 
-class StatusLabel(AutoSlugMixin, StandardModel):
+class StatusLabel(AutoSlugMixin, StandardModel, SoftDeleteMixin):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
     TYPE_DEPLOYABLE = 'deployable'
     TYPE_DEPLOYED = 'deployed'
     TYPE_PENDING = 'pending'
@@ -72,7 +74,9 @@ class StatusLabel(AutoSlugMixin, StandardModel):
 
 
 
-class AssetRole(StandardModel):
+class AssetRole(StandardModel, SoftDeleteMixin):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
     """Categorizes assets based on their functional role (e.g., Laptop, Monitor, Server)."""
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
@@ -96,7 +100,9 @@ class AssetRole(StandardModel):
         # Use standardized URL name
         return reverse('assets:assetrole_detail', args=[self.pk])
 
-class Manufacturer(StandardModel):
+class Manufacturer(StandardModel, SoftDeleteMixin):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
     name = models.CharField(max_length=255, unique=True)
     slug = models.SlugField(max_length=255, unique=True)  # Re-add unique=True
     description = models.TextField(blank=True, null=True)
@@ -129,7 +135,9 @@ class Manufacturer(StandardModel):
         
         return assignment.contact if assignment else None
 
-class Depreciation(StandardModel):
+class Depreciation(StandardModel, SoftDeleteMixin):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
     name = models.CharField(max_length=100, unique=True, verbose_name="Depreciation Name")
     months = models.PositiveIntegerField(verbose_name="Lifespan (Months)", help_text="Useful lifespan in months for straight-line calculations")
 
@@ -145,7 +153,9 @@ class Depreciation(StandardModel):
         return reverse('assets:depreciation_detail', kwargs={'pk': self.pk})
 
 
-class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel):
+class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMixin):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
     """Defines a specific type of asset (e.g., a specific laptop model)."""
     slug_source = ('manufacturer__name', 'model')
     
@@ -552,7 +562,9 @@ class InstalledSoftware(ChangeLoggingMixin, BaseModel):
         return self.asset.get_absolute_url()
 
 
-class Supplier(AutoSlugMixin, StandardModel):
+class Supplier(AutoSlugMixin, StandardModel, SoftDeleteMixin):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
     name = models.CharField(max_length=255, unique=True)
     slug = models.SlugField(max_length=255, unique=True)
     website = models.URLField(max_length=500, blank=True, null=True)
@@ -577,7 +589,9 @@ class Supplier(AutoSlugMixin, StandardModel):
 
 
 
-class Category(AutoSlugMixin, StandardModel):
+class Category(AutoSlugMixin, StandardModel, SoftDeleteMixin):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
     name = models.CharField(max_length=255, unique=True)
     slug = models.SlugField(max_length=255, unique=True)
     color = models.CharField(max_length=6, blank=True, null=True, help_text="RGB color in hexadecimal (e.g. 00ff00)")
@@ -599,7 +613,9 @@ class Category(AutoSlugMixin, StandardModel):
 
 
 
-class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
+class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
     STATUS_PENDING = 'pending'
     STATUS_APPROVED = 'approved'
     STATUS_DENIED = 'denied'
@@ -655,9 +671,9 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
 
 
 
-class AssetTagSequence(ChangeLoggingMixin, BaseModel):
-    objects = TenantScopingManager()
-    all_objects = AllObjectsManager()
+class AssetTagSequence(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
     allow_global_tenant = True
 
     tenant = models.ForeignKey(

@@ -5,14 +5,15 @@ from django.urls import reverse
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.conf import settings # Import settings
-from core.models import BaseModel, ChangeLoggingMixin, StandardModel, VaultModel
-from core.managers import TenantScopingManager
-from core.mixins import ExportableMixin, TaggableMixin, JournalingMixin, AutoSlugMixin, CloneableMixin, ImageAttachmentMixin, FileAttachmentMixin, BookmarkableMixin, SubscribableMixin
+from core.models import BaseModel, ChangeLoggingMixin, StandardModel, VaultModel, DeletableVaultModel
+from core.managers import TenantScopingManager, SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager, TenantScopingAllObjectsManager
+from core.mixins import ExportableMixin, TaggableMixin, JournalingMixin, AutoSlugMixin, CloneableMixin, ImageAttachmentMixin, FileAttachmentMixin, BookmarkableMixin, SubscribableMixin, SoftDeleteMixin
 
 # Create your models here.
 
-class Location(SubscribableMixin, StandardModel):
-    objects = TenantScopingManager()
+class Location(SubscribableMixin, StandardModel, SoftDeleteMixin):
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
     STATUS_PLANNED = 'planned'
     STATUS_STAGING = 'staging'
     STATUS_ACTIVE = 'active'
@@ -81,7 +82,9 @@ class Location(SubscribableMixin, StandardModel):
     def get_absolute_url(self):
         return reverse('organization:location_detail', kwargs={'pk': self.pk})
 
-class Region(StandardModel):
+class Region(StandardModel, SoftDeleteMixin):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     parent = models.ForeignKey(
@@ -106,7 +109,9 @@ class Region(StandardModel):
     def get_absolute_url(self):
         return reverse('organization:region_detail', kwargs={'pk': self.pk})
 
-class SiteGroup(StandardModel):
+class SiteGroup(StandardModel, SoftDeleteMixin):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     parent = models.ForeignKey(
@@ -130,7 +135,9 @@ class SiteGroup(StandardModel):
     def get_absolute_url(self):
         return reverse('organization:sitegroup_detail', kwargs={'pk': self.pk})
 
-class TenantGroup(StandardModel):
+class TenantGroup(StandardModel, SoftDeleteMixin):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     parent = models.ForeignKey(
@@ -154,8 +161,9 @@ class TenantGroup(StandardModel):
     def get_absolute_url(self):
         return reverse('organization:tenantgroup_detail', kwargs={'pk': self.pk})
 
-class Tenant(VaultModel, BookmarkableMixin):
-    objects = TenantScopingManager()
+class Tenant(DeletableVaultModel, BookmarkableMixin):
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     group = models.ForeignKey(
@@ -180,8 +188,9 @@ class Tenant(VaultModel, BookmarkableMixin):
     def __str__(self):
         return self.name
 
-class Site(VaultModel, BookmarkableMixin):
-    objects = TenantScopingManager()
+class Site(DeletableVaultModel, BookmarkableMixin):
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
     STATUS_PLANNED = 'planned'
     STATUS_STAGING = 'staging'
     STATUS_ACTIVE = 'active'
@@ -224,8 +233,9 @@ class Site(VaultModel, BookmarkableMixin):
         return reverse('organization:site_detail', kwargs={'pk': self.pk})
 
 # +++ AssetHolder Model +++
-class AssetHolder(SubscribableMixin, StandardModel):
-    objects = TenantScopingManager()
+class AssetHolder(SubscribableMixin, StandardModel, SoftDeleteMixin):
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL, # Keep holder if user is deleted, set user link to null
@@ -278,7 +288,9 @@ class AssetHolder(SubscribableMixin, StandardModel):
 
 
 
-class ContactRole(AutoSlugMixin, StandardModel):
+class ContactRole(AutoSlugMixin, StandardModel, SoftDeleteMixin):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     description = models.TextField(blank=True)
@@ -295,7 +307,9 @@ class ContactRole(AutoSlugMixin, StandardModel):
         return reverse('organization:contactrole_detail', kwargs={'pk': self.pk})
 
 
-class Contact(StandardModel):
+class Contact(StandardModel, SoftDeleteMixin):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
     name = models.CharField(max_length=100)
     title = models.CharField(max_length=100, blank=True)
     phone = models.CharField(max_length=50, blank=True)
@@ -353,8 +367,9 @@ import uuid
 from django.utils import timezone
 from django.db import transaction
 
-class TenantRole(StandardModel):
-    objects = TenantScopingManager()
+class TenantRole(StandardModel, SoftDeleteMixin):
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
 
     tenant = models.ForeignKey(
         'organization.Tenant',

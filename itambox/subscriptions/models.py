@@ -3,7 +3,7 @@ from django.conf import settings
 from django.urls import reverse, NoReverseMatch
 from core.models import BaseModel, ChangeLoggingMixin, StandardModel, DeletableVaultModel
 from core.mixins import TaggableMixin, JournalingMixin, ExportableMixin, AutoSlugMixin, ImageAttachmentMixin, FileAttachmentMixin, CloneableMixin, SoftDeleteMixin, BookmarkableMixin
-from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager, TenantScopingManager
+from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager, TenantScopingManager, TenantScopingAllObjectsManager
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import gettext_lazy as _
@@ -12,9 +12,9 @@ from django.utils.text import slugify
 from extras.models import Tag
 
 
-class Provider(AutoSlugMixin, StandardModel):
-    objects = TenantScopingManager()
-    all_objects = models.Manager()
+class Provider(AutoSlugMixin, StandardModel, SoftDeleteMixin):
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
     allow_global_tenant = True
 
     """Represents the vendor/supplier of a subscription or service."""

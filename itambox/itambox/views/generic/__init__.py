@@ -91,7 +91,23 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         return ['generic/object_list.html']
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        model = getattr(self, 'model', None)
+        if model is None and hasattr(self, 'queryset') and self.queryset is not None:
+            model = self.queryset.model
+
+        show_deleted = self.request.GET.get('deleted') == 'true'
+        if show_deleted and model and registry.model_has_feature(model, 'soft_delete'):
+            from django.core.exceptions import PermissionDenied
+            if not self.request.user.is_superuser and not self.request.user.has_perm('core.view_recyclebin'):
+                raise PermissionDenied("You do not have permission to view the Recycle Bin.")
+            manager = getattr(model, 'all_objects', model._base_manager)
+            queryset = manager.all()
+            if hasattr(queryset, 'filter_by_tenant'):
+                queryset = queryset.filter_by_tenant()
+            queryset = queryset.filter(deleted_at__isnull=False)
+        else:
+            queryset = super().get_queryset()
+
         if self.filterset:
             self.filter = self.filterset(self.request.GET, queryset)
             if not self.filter.is_valid():
@@ -202,10 +218,37 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         if 'add' in self.action_buttons and not context['create_url_name']:
             logger.debug("'add' action button enabled but create URL not resolvable for %s", self.model)
 
-        base_breadcrumbs = [
-            (reverse('dashboard'), _('Dashboard')),
-            (None, context['title'])
-        ]
+        has_soft_delete = registry.model_has_feature(_model, 'soft_delete')
+        show_deleted = self.request.GET.get('deleted') == 'true'
+
+        if show_deleted and has_soft_delete:
+            context['title'] = _("Recycle Bin — {verbose_name_plural}").format(
+                verbose_name_plural=_model._meta.verbose_name_plural
+            )
+            context['pretitle'] = _("Trash")
+            context['is_deleted_view'] = True
+
+            try:
+                ct = ContentType.objects.get_for_model(_model)
+                context['bulk_restore_url'] = reverse('object_bulk_restore', kwargs={'content_type_id': ct.pk})
+                context['bulk_purge_url'] = reverse('object_bulk_purge', kwargs={'content_type_id': ct.pk})
+            except Exception:
+                context['bulk_restore_url'] = None
+                context['bulk_purge_url'] = None
+
+            base_breadcrumbs = [
+                (reverse('dashboard'), _('Dashboard')),
+                (reverse(get_model_viewname(_model, 'list')), _model._meta.verbose_name_plural),
+                (None, _("Recycle Bin"))
+            ]
+        else:
+            base_breadcrumbs = [
+                (reverse('dashboard'), _('Dashboard')),
+                (None, context['title'])
+            ]
+
+        context['has_soft_delete'] = has_soft_delete
+        context['is_deleted_view'] = show_deleted
         context['breadcrumbs'] = getattr(self, 'get_breadcrumbs', lambda: base_breadcrumbs)()
         context['help_url'] = get_help_url(self, _model._meta.app_label, _model._meta.model_name)
         return context
@@ -1272,3 +1315,204 @@ class GenericObjectImportView(ObjectImportView):
         app_label = self.kwargs.get('app_label')
         model_name = self.kwargs.get('model_name')
         return apps.get_model(app_label, model_name)
+
+
+class ObjectRestoreView(PermissionRequiredMixin, LoginRequiredMixin, View):
+    def has_permission(self):
+        self.content_type = get_object_or_404(ContentType, pk=self.kwargs['content_type_id'])
+        self.model = self.content_type.model_class()
+        app_label = self.model._meta.app_label
+        model_name = self.model._meta.model_name
+        
+        manager = getattr(self.model, 'all_objects', self.model._base_manager)
+        self.object = get_object_or_404(manager, pk=self.kwargs['object_id'])
+        
+        if not self.request.user.is_superuser and not self.request.user.has_perm('core.change_recyclebin'):
+            return False
+            
+        return self.request.user.has_perm(f'{app_label}.change_{model_name}', self.object)
+
+    def post(self, request, *args, **kwargs):
+        import json
+        from django.http import HttpResponse
+        self.object.restore()
+        
+        success_msg = _("Restored {model} {object}").format(
+            model=self.model._meta.verbose_name,
+            object=self.object
+        )
+        
+        if request.headers.get('HX-Request') or getattr(request, 'htmx', False):
+            response = HttpResponse(status=204)
+            response['HX-Trigger'] = json.dumps({
+                "tableRefreshRequired": None,
+                "showMessage": {
+                    "message": success_msg,
+                    "level": "success"
+                }
+            })
+            return response
+
+        messages.success(request, success_msg)
+        try:
+            list_url = reverse(get_model_viewname(self.model, 'list')) + "?deleted=true"
+        except Exception:
+            list_url = '/'
+        referrer = request.META.get('HTTP_REFERER') or list_url
+        return HttpResponseRedirect(referrer)
+
+
+class ObjectPurgeView(PermissionRequiredMixin, LoginRequiredMixin, View):
+    def has_permission(self):
+        self.content_type = get_object_or_404(ContentType, pk=self.kwargs['content_type_id'])
+        self.model = self.content_type.model_class()
+        app_label = self.model._meta.app_label
+        model_name = self.model._meta.model_name
+        
+        manager = getattr(self.model, 'all_objects', self.model._base_manager)
+        self.object = get_object_or_404(manager, pk=self.kwargs['object_id'])
+        
+        if not self.request.user.is_superuser and not self.request.user.has_perm('core.delete_recyclebin'):
+            return False
+            
+        return self.request.user.has_perm(f'{app_label}.delete_{model_name}', self.object)
+
+    def post(self, request, *args, **kwargs):
+        import json
+        from django.http import HttpResponse
+        obj_repr = str(self.object)
+        self.object.delete(force_hard_delete=True)
+        
+        success_msg = _("Permanently purged {model} {object}").format(
+            model=self.model._meta.verbose_name,
+            object=obj_repr
+        )
+        
+        if request.headers.get('HX-Request') or getattr(request, 'htmx', False):
+            response = HttpResponse(status=204)
+            response['HX-Trigger'] = json.dumps({
+                "tableRefreshRequired": None,
+                "showMessage": {
+                    "message": success_msg,
+                    "level": "success"
+                }
+            })
+            return response
+
+        messages.success(request, success_msg)
+        try:
+            list_url = reverse(get_model_viewname(self.model, 'list')) + "?deleted=true"
+        except Exception:
+            list_url = '/'
+        referrer = request.META.get('HTTP_REFERER') or list_url
+        return HttpResponseRedirect(referrer)
+
+
+class ObjectBulkRestoreView(PermissionRequiredMixin, LoginRequiredMixin, View):
+    def has_permission(self):
+        self.content_type = get_object_or_404(ContentType, pk=self.kwargs['content_type_id'])
+        self.model = self.content_type.model_class()
+        app_label = self.model._meta.app_label
+        model_name = self.model._meta.model_name
+        
+        if not self.request.user.is_superuser and not self.request.user.has_perm('core.change_recyclebin'):
+            return False
+            
+        return self.request.user.has_perm(f'{app_label}.change_{model_name}')
+
+    def post(self, request, *args, **kwargs):
+        import json
+        from django.http import HttpResponse
+        pks = request.POST.getlist('pk')
+        if not pks:
+            messages.warning(request, _("No items selected."))
+            return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
+            
+        manager = getattr(self.model, 'all_objects', self.model._base_manager)
+        queryset = manager.filter(pk__in=pks, deleted_at__isnull=False)
+        
+        count = 0
+        from django.db import transaction
+        with transaction.atomic():
+            for obj in queryset:
+                obj.restore()
+                count += 1
+                
+        success_msg = _("Successfully restored {count} {model_plural}.").format(
+            count=count,
+            model_plural=self.model._meta.verbose_name_plural
+        )
+        
+        if request.headers.get('HX-Request') or getattr(request, 'htmx', False):
+            response = HttpResponse(status=204)
+            response['HX-Trigger'] = json.dumps({
+                "tableRefreshRequired": None,
+                "showMessage": {
+                    "message": success_msg,
+                    "level": "success"
+                }
+            })
+            return response
+
+        messages.success(request, success_msg)
+        try:
+            list_url = reverse(get_model_viewname(self.model, 'list')) + "?deleted=true"
+        except Exception:
+            list_url = '/'
+        referrer = request.META.get('HTTP_REFERER') or list_url
+        return HttpResponseRedirect(referrer)
+
+
+class ObjectBulkPurgeView(PermissionRequiredMixin, LoginRequiredMixin, View):
+    def has_permission(self):
+        self.content_type = get_object_or_404(ContentType, pk=self.kwargs['content_type_id'])
+        self.model = self.content_type.model_class()
+        app_label = self.model._meta.app_label
+        model_name = self.model._meta.model_name
+        
+        if not self.request.user.is_superuser and not self.request.user.has_perm('core.delete_recyclebin'):
+            return False
+            
+        return self.request.user.has_perm(f'{app_label}.delete_{model_name}')
+
+    def post(self, request, *args, **kwargs):
+        import json
+        from django.http import HttpResponse
+        pks = request.POST.getlist('pk')
+        if not pks:
+            messages.warning(request, _("No items selected."))
+            return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
+            
+        manager = getattr(self.model, 'all_objects', self.model._base_manager)
+        queryset = manager.filter(pk__in=pks, deleted_at__isnull=False)
+        
+        count = 0
+        from django.db import transaction
+        with transaction.atomic():
+            for obj in queryset:
+                obj.delete(force_hard_delete=True)
+                count += 1
+                
+        success_msg = _("Successfully permanently purged {count} {model_plural}.").format(
+            count=count,
+            model_plural=self.model._meta.verbose_name_plural
+        )
+        
+        if request.headers.get('HX-Request') or getattr(request, 'htmx', False):
+            response = HttpResponse(status=204)
+            response['HX-Trigger'] = json.dumps({
+                "tableRefreshRequired": None,
+                "showMessage": {
+                    "message": success_msg,
+                    "level": "success"
+                }
+            })
+            return response
+
+        messages.success(request, success_msg)
+        try:
+            list_url = reverse(get_model_viewname(self.model, 'list')) + "?deleted=true"
+        except Exception:
+            list_url = '/'
+        referrer = request.META.get('HTTP_REFERER') or list_url
+        return HttpResponseRedirect(referrer)

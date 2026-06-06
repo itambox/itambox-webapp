@@ -28,6 +28,15 @@
 
 {# --- Main Content Area (Rendered directly, replaces innerHTML of #object-list-dynamic-content) --- #}
 
+{% if is_deleted_view %}
+<div class="alert alert-warning border-0 rounded-0 border-bottom d-flex align-items-center mb-0 px-3 py-2">
+    <i class="mdi mdi-alert-circle-outline me-2 fs-3"></i>
+    <div>
+        {% blocktranslate %}You are viewing soft-deleted items in the Recycle Bin. Restoring parent objects does not automatically restore their deleted child dependencies.{% endblocktranslate %}
+    </div>
+</div>
+{% endif %}
+
 {% include "htmx/includes/list_toolbar.html" with show_filter_toggle=True %}
 
 {# Table Rendering Container #}
@@ -37,6 +46,24 @@
     <div id="batch-actions-bar-top" class="batch-actions-bar d-none">
         <div class="d-flex align-items-center gap-2 px-3 py-2 bg-body-tertiary border-bottom">
             <span id="batch-selected-count" class="fw-bold me-2">{% translate "0 selected" %}</span>
+            {% if is_deleted_view %}
+            <form id="bulk-restore-form" method="post" action="{{ bulk_restore_url }}" class="d-inline" hx-boost="false">
+                {% csrf_token %}
+                <div id="bulk-restore-pks-container" class="d-inline"></div>
+                <button type="button" class="btn btn-sm btn-success btn-bulk-restore">
+                    <i class="mdi mdi-backup-restore me-1"></i>
+                    {% translate "Restore Selected" %}
+                </button>
+            </form>
+            <form id="bulk-purge-form" method="post" action="{{ bulk_purge_url }}" class="d-inline" hx-boost="false">
+                {% csrf_token %}
+                <div id="bulk-purge-pks-container" class="d-inline"></div>
+                <button type="button" class="btn btn-sm btn-outline-danger btn-bulk-purge">
+                    <i class="mdi mdi-delete-forever me-1"></i>
+                    {% translate "Purge Selected" %}
+                </button>
+            </form>
+            {% else %}
             {% if model_name_str == 'assets.asset' %}
             <button type="button" class="btn btn-sm btn-primary" id="btn-bulk-assign"
                     data-bs-toggle="modal" data-bs-target="#bulk-assign-modal"
@@ -71,8 +98,50 @@
                     {% translate "Edit Selected" %}
                 </button>
             </form>
+            {% endif %}
         </div>
     </div>
 
     {% include "htmx/includes/list_table_block.html" %}
 </div>
+
+{# Batch Actions Bar — Bottom #}
+<div id="batch-actions-bar-bottom" class="batch-actions-bar d-none">
+    <div class="d-flex align-items-center gap-2 px-3 py-2 bg-body-tertiary border-top">
+        <span class="batch-selected-count-bottom fw-bold me-2">{% translate "0 selected" %}</span>
+        {% if is_deleted_view %}
+        <button type="button" class="btn btn-sm btn-success btn-bulk-restore">
+            <i class="mdi mdi-backup-restore me-1"></i>
+            {% translate "Restore Selected" %}
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-danger btn-bulk-purge">
+            <i class="mdi mdi-delete-forever me-1"></i>
+            {% translate "Purge Selected" %}
+        </button>
+        {% else %}
+        {% if model_name_str == 'assets.asset' %}
+        <button type="button" class="btn btn-sm btn-primary btn-bulk-assign-bottom"
+                data-bs-toggle="modal" data-bs-target="#bulk-assign-modal"
+                title="{% translate 'Assign selected assets to a holder' %}">
+            <i class="mdi mdi-account-plus-outline me-1"></i>
+            {% translate "Assign Selected" %}
+        </button>
+        <button type="button" class="btn btn-sm btn-info text-white btn-bulk-print-bottom"
+                data-bs-toggle="modal" data-bs-target="#bulk-print-modal"
+                title="{% translate 'Print labels for selected assets' %}">
+            <i class="mdi mdi-printer me-1"></i>
+            {% translate "Print Labels" %}
+        </button>
+        {% endif %}
+        <button type="button" class="btn btn-sm btn-outline-danger btn-bulk-delete">
+            <i class="mdi mdi-trash-can-outline me-1"></i>
+            {% translate "Delete Selected" %}
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-primary btn-bulk-edit">
+            <i class="mdi mdi-pencil-outline me-1"></i>
+            {% translate "Edit Selected" %}
+        </button>
+        {% endif %}
+    </div>
+</div>
+

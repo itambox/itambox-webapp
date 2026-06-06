@@ -173,4 +173,10 @@ class TenantScopingSoftDeleteManager(models.Manager.from_queryset(TenantScopingS
             return qs
 
 
+class TenantScopingAllObjectsManager(models.Manager.from_queryset(TenantScopingSoftDeleteQuerySet)):
+    def get_queryset(self):
+        return super().get_queryset().filter_by_tenant()
+
+
+
 

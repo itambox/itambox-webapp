@@ -20,7 +20,8 @@ from django.views.generic import TemplateView, RedirectView
 from assets import views as asset_views # Import the assets views
 from itambox.views.generic import (
     ObjectBulkDeleteView, ObjectBulkEditView, table_config,
-    GenericObjectImportView,
+    GenericObjectImportView, ObjectRestoreView, ObjectPurgeView,
+    ObjectBulkRestoreView, ObjectBulkPurgeView,
 )
 from core.views.graphql import PrivateGraphQLView
 from core.schema import schema
@@ -151,6 +152,12 @@ urlpatterns = [
     # Bulk Actions
     path('bulk-delete/', ObjectBulkDeleteView.as_view(), name='bulk_delete'),
     path('bulk-edit/', ObjectBulkEditView.as_view(), name='bulk_edit'),
+
+    # Soft Delete Management Actions
+    path('object/<int:content_type_id>/<int:object_id>/restore/', ObjectRestoreView.as_view(), name='object_restore'),
+    path('object/<int:content_type_id>/<int:object_id>/purge/', ObjectPurgeView.as_view(), name='object_purge'),
+    path('object/<int:content_type_id>/bulk-restore/', ObjectBulkRestoreView.as_view(), name='object_bulk_restore'),
+    path('object/<int:content_type_id>/bulk-purge/', ObjectBulkPurgeView.as_view(), name='object_bulk_purge'),
 
     # Export Templates
     path('export-templates/', ExportTemplateListView.as_view(), name='export_template_list'),

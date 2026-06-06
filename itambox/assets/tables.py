@@ -82,6 +82,8 @@ class AssetTable(BaseTable): # Inherit from BaseTable
         return value.strftime("%Y-%m-%d") if value else "—"
 
     def render_checkout_checkin(self, record):
+        if getattr(record, 'deleted_at', None) is not None:
+            return mark_safe('<span class="text-muted small">—</span>')
         request = getattr(self, 'request', None)
         if not request or not self.has_perm(request.user, 'assets.change_asset', record):
             return mark_safe('<span class="text-muted small">—</span>')
@@ -100,6 +102,37 @@ class AssetTable(BaseTable): # Inherit from BaseTable
             )
 
     def render_actions(self, record):
+        if getattr(record, 'deleted_at', None) is not None:
+            from django.contrib.contenttypes.models import ContentType
+            from django.utils.translation import gettext as _
+            ct = ContentType.objects.get_for_model(record)
+            
+            restore_url = reverse('object_restore', kwargs={'content_type_id': ct.pk, 'object_id': record.pk})
+            purge_url = reverse('object_purge', kwargs={'content_type_id': ct.pk, 'object_id': record.pk})
+            
+            restore_title = _("Restore")
+            purge_title = _("Delete Permanently")
+            
+            restore_confirm = _("Are you sure you want to restore this asset?")
+            purge_confirm = _("Are you sure you want to PERMANENTLY delete this asset? This action cannot be undone!")
+
+            restore_btn = (
+                f'<a class="btn btn-sm btn-success me-1" href="{restore_url}" '
+                f'hx-post="{restore_url}" hx-target="#object-list-dynamic-content" '
+                f'hx-confirm="{restore_confirm}" '
+                f'title="{restore_title}" aria-label="{restore_title}">'
+                f'<i class="mdi mdi-backup-restore"></i></a>'
+            )
+            purge_btn = (
+                f'<a class="btn btn-sm btn-danger" href="{purge_url}" '
+                f'hx-post="{purge_url}" hx-target="#object-list-dynamic-content" '
+                f'hx-confirm="{purge_confirm}" '
+                f'title="{purge_title}" aria-label="{purge_title}">'
+                f'<i class="mdi mdi-delete-forever"></i></a>'
+            )
+            
+            return mark_safe(restore_btn + purge_btn)
+
         request = getattr(self, 'request', None)
         if not request:
             return ""

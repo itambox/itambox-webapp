@@ -74,6 +74,8 @@ class CheckableInventoryTableMixin(tables.Table):
     )
 
     def render_checkout_checkin(self, record) -> str:
+        if getattr(record, 'deleted_at', None) is not None:
+            return mark_safe('<span class="text-muted small">—</span>')
         request = getattr(self, 'request', None)
         if not request:
             return ""

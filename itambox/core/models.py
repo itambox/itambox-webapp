@@ -15,7 +15,7 @@ from django.utils.http import urlencode
 from itambox.middleware import get_current_request_id, get_current_user
 from itambox.registry import registry
 from core.choices import ObjectChangeActionChoices, EventActionChoices, JobStatusChoices
-from core.managers import TenantScopingManager
+from core.managers import TenantScopingManager, SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager, TenantScopingAllObjectsManager
 from core.mixins import (
     JournalingMixin, TaggableMixin,
     ImageAttachmentMixin, FileAttachmentMixin, ExportableMixin, CloneableMixin,
@@ -555,8 +555,9 @@ class Job(ChangeLoggingMixin, BaseModel):
         self.save(update_fields=['logs'])
 
 
-class NotificationChannel(ChangeLoggingMixin, BaseModel):
-    objects = TenantScopingManager()
+class NotificationChannel(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
     allow_global_tenant = True
 
     TYPE_EMAIL = 'email'
@@ -749,8 +750,9 @@ class DeletableVaultModel(VaultModel, SoftDeleteMixin):
         abstract = True
 
 
-class ReportTemplate(ChangeLoggingMixin, BaseModel):
-    objects = TenantScopingManager()
+class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
     allow_global_tenant = True
 
     REPORT_TYPE_ASSET_SUMMARY = 'asset_summary'
@@ -959,8 +961,9 @@ class ReportGenerationArchive(ChangeLoggingMixin, BaseModel):
 
 
 
-class AlertRule(ChangeLoggingMixin, BaseModel):
-    objects = TenantScopingManager()
+class AlertRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
     allow_global_tenant = True
 
     ALERT_TYPE_LOW_STOCK = 'low_stock'
@@ -1091,5 +1094,17 @@ class AlertLog(BaseModel):
 
     def __str__(self):
         return f"[{self.get_status_display()}] {self.subject}"
+
+
+class RecycleBin(models.Model):
+    class Meta:
+        managed = False
+        default_permissions = ()
+        permissions = [
+            ('view_recyclebin', 'Can view Recycle Bin'),
+            ('change_recyclebin', 'Can restore from Recycle Bin'),
+            ('delete_recyclebin', 'Can purge from Recycle Bin'),
+        ]
+
 
 

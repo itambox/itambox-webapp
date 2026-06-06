@@ -2,7 +2,8 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.urls import reverse
 from extras.models import Tag
-from core.models import BaseModel, ChangeLoggingMixin, VaultModel
+from core.models import BaseModel, ChangeLoggingMixin, VaultModel, DeletableVaultModel
+from core.managers import SoftDeleteManager, AllObjectsManager
 
 class SoftwareCategoryChoices(models.TextChoices):
     OPERATING_SYSTEM = 'operating_system', 'Operating System'
@@ -19,7 +20,10 @@ class SoftwareLicenseTypeChoices(models.TextChoices):
     SHAREWARE = 'shareware', 'Shareware'
     SUBSCRIPTION = 'subscription', 'Subscription'
 
-class Software(VaultModel):
+class Software(DeletableVaultModel):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
+
     """
     Represents a catalog entry for a software product.
     """
