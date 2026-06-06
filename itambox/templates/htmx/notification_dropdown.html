@@ -13,7 +13,7 @@
                             <span class="status-dot status-dot-animated {% if notif.level == 'danger' %}bg-red{% elif notif.level == 'warning' %}bg-warning{% else %}bg-blue{% endif %} d-block"></span>
                         </div>
                         <div class="col text-truncate">
-                            <a href="{% url 'users:view_notification' pk=notif.pk %}" class="text-body d-block font-weight-bold">{{ notif.subject }}</a>
+                            <a href="{% url 'users:view_notification' pk=notif.pk %}" class="text-body d-block font-weight-bold" hx-boost="false">{{ notif.subject }}</a>
                             <div class="d-block text-muted text-truncate mt-n1 small">
                                 {{ notif.message }}
                             </div>

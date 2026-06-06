@@ -29,7 +29,7 @@
                         <div class="col">
                             <div class="d-flex align-items-center mb-1">
                                 <span class="font-weight-bold text-dark d-block">
-                                    <a href="{% url 'users:view_notification' pk=notif.pk %}" class="text-decoration-none text-reset">
+                                    <a href="{% url 'users:view_notification' pk=notif.pk %}" class="text-decoration-none text-reset" hx-boost="false">
                                         {% if not notif.is_read %}
                                             <strong>{{ notif.subject }}</strong>
                                         {% else %}
