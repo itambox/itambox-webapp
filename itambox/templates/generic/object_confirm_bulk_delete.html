@@ -16,6 +16,7 @@
     {% csrf_token %}
     {# Pass back the primary keys and the model type #}
     <input type="hidden" name="model_name" value="{{ model_name }}" />
+    <input type="hidden" name="return_url" value="{{ return_url }}" />
     {% for pk in object_pks %}
         <input type="hidden" name="pk" value="{{ pk }}" />
     {% endfor %}
