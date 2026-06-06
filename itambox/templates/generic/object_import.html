@@ -307,7 +307,13 @@
                 tabUploadBtn.addEventListener('shown.bs.tab', function () {
                     activeTabInput.value = 'upload';
                 });
+                tabUploadBtn.addEventListener('click', function () {
+                    activeTabInput.value = 'upload';
+                });
                 tabEditorBtn.addEventListener('shown.bs.tab', function () {
+                    activeTabInput.value = 'editor';
+                });
+                tabEditorBtn.addEventListener('click', function () {
                     activeTabInput.value = 'editor';
                 });
 

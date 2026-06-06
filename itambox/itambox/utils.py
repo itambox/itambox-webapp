@@ -232,7 +232,9 @@ def get_help_url(view_instance, app_label=None, model_name=None):
     """
     doc_path = getattr(view_instance, 'document_path', None)
     if not doc_path and app_label and model_name:
-        doc_path = f"models/{app_label}/{model_name}"
+        # Resolve path mismatch for components which belong to the inventory app
+        resolved_app = 'components' if app_label == 'inventory' and model_name.startswith('component') else app_label
+        doc_path = f"models/{resolved_app}/{model_name}"
 
     if not doc_path:
         return None

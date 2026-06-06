@@ -88,6 +88,26 @@
     }
   });
 
+  // Delegate click on .clear-search-btn to bypass strict CSP (which blocks inline onclick)
+  document.addEventListener('click', function (event) {
+    const clearBtn = (event.target as HTMLElement).closest('.clear-search-btn');
+    if (clearBtn) {
+      event.preventDefault();
+      const form = clearBtn.closest('form');
+      if (form) {
+        const input = form.querySelector('input[name="q"]') as HTMLInputElement | null;
+        if (input) {
+          input.value = '';
+          if (typeof form.requestSubmit === 'function') {
+            form.requestSubmit();
+          } else {
+            form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+          }
+        }
+      }
+    }
+  });
+
   function scheduleFilterInit(): void {
     queueMicrotask(() => {
       initFiltersToggle();

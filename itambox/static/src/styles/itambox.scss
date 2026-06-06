@@ -1086,6 +1086,53 @@ textarea {
     }
 }
 
+// Style input-group-flat to ensure input and clear button merge seamlessly and center the icon
+.input-group-flat {
+    .form-control,
+    input[type="search"] {
+        border-right: 0 !important;
+        border-top-right-radius: 0 !important;
+        border-bottom-right-radius: 0 !important;
+    }
+
+    .input-group-text {
+        border-left: 0 !important;
+        border-top-left-radius: 0 !important;
+        border-bottom-left-radius: 0 !important;
+        background-color: var(--tblr-input-bg, #ffffff) !important;
+        border-color: var(--tblr-input-border-color, #cbd5e1) !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding-left: 0.25rem !important;
+        padding-right: 0.5rem !important;
+        align-self: stretch !important;
+
+        a {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            line-height: 1 !important;
+            height: 100% !important;
+            width: 100% !important;
+            color: var(--tblr-secondary-color, #a8a29e) !important;
+            text-decoration: none !important;
+
+            &:hover {
+                color: var(--tblr-body-color, #1c1917) !important;
+            }
+        }
+
+        i {
+            line-height: 1 !important;
+            font-size: 1rem !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+    }
+}
+
 
 
 

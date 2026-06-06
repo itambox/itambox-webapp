@@ -1,5 +1,5 @@
 from core.search import SearchIndex, register_search
-from .models import Accessory, Consumable, Kit
+from .models import Accessory, Consumable, Kit, Component
 
 
 @register_search()
@@ -20,4 +20,11 @@ class ConsumableIndex(SearchIndex):
 class KitIndex(SearchIndex):
     model = Kit
     fields = ('name', 'description')
+    order_by = ('name',)
+
+
+@register_search()
+class ComponentIndex(SearchIndex):
+    model = Component
+    fields = ('name', 'part_number', 'notes', 'manufacturer__name')
     order_by = ('name',)

@@ -5,11 +5,15 @@ from itambox.views.htmx import BaseHTMXView
 
 class DashboardView(LoginRequiredMixin, BaseHTMXView, TemplateView):
     template_name = 'dashboard.html'
+    document_path = 'dashboard'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Dashboard'
         context['breadcrumbs'] = [(None, 'Dashboard')]
+
+        from itambox.utils import get_help_url
+        context['help_url'] = get_help_url(self)
 
         # Resolve active dashboard ID from query params or session cache
         dashboard_id = self.request.GET.get('dashboard')

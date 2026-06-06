@@ -5,17 +5,19 @@ from core.api.viewsets import ITAMBoxModelViewSet
 from inventory.models import (
     Accessory, AccessoryStock, AccessoryAssignment,
     Consumable, ConsumableStock, ConsumableAssignment,
-    Kit, KitItem
+    Kit, KitItem, Component, ComponentStock, ComponentAllocation
 )
 from inventory.filters import (
     AccessoryFilterSet, AccessoryStockFilterSet, AccessoryAssignmentFilterSet,
     ConsumableFilterSet, ConsumableStockFilterSet, ConsumableAssignmentFilterSet,
-    KitFilterSet, KitItemFilterSet
+    KitFilterSet, KitItemFilterSet,
+    ComponentFilterSet, ComponentStockFilterSet, ComponentAllocationFilterSet
 )
 from .serializers import (
     AccessorySerializer, AccessoryStockSerializer, AccessoryAssignmentSerializer,
     ConsumableSerializer, ConsumableStockSerializer, ConsumableAssignmentSerializer,
-    KitSerializer, KitItemSerializer
+    KitSerializer, KitItemSerializer,
+    ComponentSerializer, ComponentStockSerializer, ComponentAllocationSerializer
 )
 
 
@@ -87,4 +89,30 @@ class KitItemViewSet(ITAMBoxModelViewSet):
     serializer_class = KitItemSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = KitItemFilterSet
+
+
+class ComponentViewSet(ITAMBoxModelViewSet):
+    permission_classes = [TokenPermissions, StrictTenantPermission]
+    queryset = Component.objects.select_related('manufacturer', 'tenant', 'category').prefetch_related('tags').all()
+    serializer_class = ComponentSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = ComponentFilterSet
+
+
+class ComponentStockViewSet(ITAMBoxModelViewSet):
+    permission_classes = [TokenPermissions, StrictTenantPermission]
+    queryset = ComponentStock.objects.select_related('component', 'location').all()
+    serializer_class = ComponentStockSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = ComponentStockFilterSet
+
+
+class ComponentAllocationViewSet(ITAMBoxModelViewSet):
+    permission_classes = [TokenPermissions, StrictTenantPermission]
+    queryset = ComponentAllocation.objects.select_related(
+        'component__manufacturer', 'assigned_holder', 'assigned_location', 'assigned_asset', 'from_location'
+    ).all()
+    serializer_class = ComponentAllocationSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = ComponentAllocationFilterSet
 

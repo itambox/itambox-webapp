@@ -6,7 +6,6 @@ from django.conf import settings
 import assets.schema
 import software.schema
 import licenses.schema
-import components.schema
 import inventory.schema
 
 logger = logging.getLogger(__name__)
@@ -15,7 +14,6 @@ query_bases = [
     assets.schema.Query,
     software.schema.Query,
     licenses.schema.Query,
-    components.schema.Query,
     inventory.schema.Query,
 ]
 
@@ -23,7 +21,6 @@ mutation_bases = [
     assets.schema.Mutation,
     software.schema.Mutation,
     licenses.schema.Mutation,
-    components.schema.Mutation,
     inventory.schema.Mutation,
 ]
 

@@ -174,14 +174,14 @@ class AccessoryViewTests(TestCase):
     def test_list_view(self):
         url = reverse('inventory:accessory_list')
         response = self.client.get(url)
-        self.assertEqual(response.status_code, 302)
-        self.assertIn('/inventory/?type=accessories', response.url)
-
-        # Test unified inventory view for accessories
-        unified_url = reverse('inventory:inventory_list') + '?type=accessories'
-        response = self.client.get(unified_url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'MX Master 3S')
+
+        # Test unified inventory view for accessories redirect
+        unified_url = reverse('inventory:inventory_list') + '?type=accessories'
+        response = self.client.get(unified_url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/inventory/accessories/', response.url)
 
     def test_detail_view(self):
         url = reverse('inventory:accessory_detail', kwargs={'pk': self.accessory.pk})

@@ -4,11 +4,12 @@ from django import forms
 from django.db.models import Q
 
 from organization.models import Tenant, Location, AssetHolder
-from assets.models import Manufacturer, AssetType
+from assets.models import Manufacturer, AssetType, Category, Asset
 from licenses.models import License
 from .models import (
     Accessory, Consumable, Kit, AccessoryStock, ConsumableStock,
-    AccessoryAssignment, ConsumableAssignment, KitItem
+    AccessoryAssignment, ConsumableAssignment, KitItem,
+    Component, ComponentStock, ComponentAllocation
 )
 
 
@@ -262,5 +263,114 @@ class KitItemFilterSet(BaseFilterSet):
     class Meta:
         model = KitItem
         fields = ['kit', 'asset_type', 'accessory', 'license', 'consumable']
+
+
+class ComponentFilterSet(BaseFilterSet):
+    q = django_filters.CharFilter(
+        method='search',
+        label='Search',
+        widget=forms.TextInput(attrs={'placeholder': 'Name, Part Number...'})
+    )
+    manufacturer = django_filters.ModelChoiceFilter(
+        queryset=Manufacturer.objects.all(),
+        label='Manufacturer',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    category = django_filters.ModelChoiceFilter(
+        queryset=Category.objects.filter(applies_to__component=True),
+        label='Category',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    tenant = django_filters.ModelChoiceFilter(
+        queryset=Tenant.objects.all(),
+        label='Tenant',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    class Meta:
+        model = Component
+        fields = ['manufacturer', 'category', 'tenant']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(part_number__icontains=value) |
+            Q(notes__icontains=value)
+        ).distinct()
+
+
+class ComponentStockFilterSet(BaseFilterSet):
+    q = django_filters.CharFilter(
+        method='search',
+        label='Search',
+        widget=forms.TextInput(attrs={'placeholder': 'Component or Location...'})
+    )
+    component = django_filters.ModelChoiceFilter(
+        queryset=Component.objects.all(),
+        label='Component',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    location = django_filters.ModelChoiceFilter(
+        queryset=Location.objects.all().select_related('site'),
+        label='Location',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    class Meta:
+        model = ComponentStock
+        fields = ['component', 'location']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(component__name__icontains=value) |
+            Q(location__name__icontains=value)
+        ).distinct()
+
+
+class ComponentAllocationFilterSet(BaseFilterSet):
+    q = django_filters.CharFilter(method='search', label='Search')
+    component = django_filters.ModelChoiceFilter(
+        queryset=Component.objects.all(),
+        label='Component',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    assigned_holder = django_filters.ModelChoiceFilter(
+        queryset=AssetHolder.objects.all(),
+        label='Assigned Holder',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    assigned_location = django_filters.ModelChoiceFilter(
+        queryset=Location.objects.all(),
+        label='Assigned Location',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    assigned_asset = django_filters.ModelChoiceFilter(
+        queryset=Asset.objects.all(),
+        label='Assigned Asset',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    from_location = django_filters.ModelChoiceFilter(
+        queryset=Location.objects.all(),
+        label='From Location',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    class Meta:
+        model = ComponentAllocation
+        fields = ['component', 'assigned_holder', 'assigned_location', 'assigned_asset', 'from_location']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(notes__icontains=value) |
+            Q(component__name__icontains=value) |
+            Q(assigned_holder__first_name__icontains=value) |
+            Q(assigned_holder__last_name__icontains=value)
+        ).distinct()
 
 

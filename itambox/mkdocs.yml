@@ -45,6 +45,7 @@ markdown_extensions:
 
 nav:
   - Introduction: 'index.md'
+  - Dashboard: 'dashboard.md'
   - Organization & Tenancy:
       - Sites: 'models/organization/site.md'
       - Regions: 'models/organization/region.md'

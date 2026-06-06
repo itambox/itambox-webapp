@@ -9,9 +9,8 @@
                value="{{ request.GET.q|default:'' }}"
                hx-trigger="keyup changed delay:500ms, search">
         <span class="input-group-text {% if not request.GET.q %}d-none{% endif %}">
-            <a href="#" class="link-secondary"
-               title="{% translate 'Clear search' %}" data-bs-toggle="tooltip"
-               onclick="this.closest('form').querySelector('input[name=q]').value=''; this.closest('form').dispatchEvent(new Event('submit', { bubbles: true })); return false;">
+            <a href="#" class="link-secondary clear-search-btn"
+               title="{% translate 'Clear search' %}" data-bs-toggle="tooltip">
                 <i class="mdi mdi-close"></i>
             </a>
         </span>

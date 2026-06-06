@@ -26,99 +26,58 @@ from itambox.panels import Panel
 from assets.forms.import_forms import AccessoryBulkImportForm, ConsumableBulkImportForm
 
 # Inventory models, forms, tables, filters
-from .models import Accessory, Consumable, Kit, KitItem, AccessoryStock, ConsumableStock, AccessoryAssignment, ConsumableAssignment
+from .models import Accessory, Consumable, Kit, KitItem, AccessoryStock, ConsumableStock, AccessoryAssignment, ConsumableAssignment, Component, ComponentStock, ComponentAllocation
 from . import forms, tables, filters
 from assets.models import Asset
 from assets.services import checkout_kit
-from inventory.services import checkout_accessory, checkin_accessory, checkout_consumable
+from inventory.services import checkout_accessory, checkin_accessory, checkout_consumable, checkout_component, checkin_component
 
 
-class InventoryListView(ObjectListView):
-    template_name = 'inventory/inventory_list.html'
-
-    def dispatch(self, request, *args, **kwargs):
-        from components.models import Component
-        from components.filters import ComponentFilterSet
-        from components.forms import ComponentFilterForm
-        from components.tables import ComponentTable
-        from django import forms as django_forms
+class InventoryListView(LoginRequiredMixin, View):
+    def get(self, request, *args, **kwargs):
         from django.core.exceptions import PermissionDenied
-        from django.db.models import Sum
-        from django.db.models.functions import Coalesce
+        
+        target_type = request.GET.get('type')
+        if target_type == 'accessories' and request.user.has_perm('inventory.view_accessory'):
+            return redirect('inventory:accessory_list')
+        elif target_type == 'consumables' and request.user.has_perm('inventory.view_consumable'):
+            return redirect('inventory:consumable_list')
+        elif target_type == 'components' and request.user.has_perm('inventory.view_component'):
+            return redirect('inventory:component_list')
 
-        accessible_types = []
-        if request.user.has_perm('components.view_component'):
-            accessible_types.append('components')
-        if request.user.has_perm('inventory.view_accessory'):
-            accessible_types.append('accessories')
-        if request.user.has_perm('inventory.view_consumable'):
-            accessible_types.append('consumables')
+        accessible_url = None
+        if request.user.has_perm('inventory.view_component'):
+            accessible_url = reverse('inventory:component_list')
+        elif request.user.has_perm('inventory.view_accessory'):
+            accessible_url = reverse('inventory:accessory_list')
+        elif request.user.has_perm('inventory.view_consumable'):
+            accessible_url = reverse('inventory:consumable_list')
 
-        if not accessible_types:
+        if not accessible_url:
             raise PermissionDenied("You do not have permission to view inventory.")
 
-        self.current_type = request.GET.get('type')
-        if self.current_type not in accessible_types:
-            self.current_type = accessible_types[0]
-
-        if self.current_type == 'components':
-            self.queryset = Component.objects.with_counts().select_related('manufacturer', 'category').prefetch_related('tags')
-            self.filterset = ComponentFilterSet
-            self.filterset_form = ComponentFilterForm
-            self.table = ComponentTable
-            self.action_buttons = ('add',)
-        elif self.current_type == 'accessories':
-            self.queryset = Accessory.objects.select_related('tenant', 'manufacturer').prefetch_related('tags').annotate(
-                _total_stock=Coalesce(Sum('stocks__qty'), 0),
-                _checked_out=Coalesce(Sum('assignments__qty'), 0)
-            )
-            self.filterset = filters.AccessoryFilterSet
-            self.filterset_form = forms.AccessoryFilterForm
-            self.table = tables.AccessoryTable
-            self.action_buttons = ('add',)
-        elif self.current_type == 'consumables':
-            self.queryset = Consumable.objects.select_related('tenant', 'manufacturer').prefetch_related('tags').annotate(
-                _total_stock=Coalesce(Sum('stocks__qty'), 0),
-                _consumed=Coalesce(Sum('consumptions__qty'), 0)
-            )
-            self.filterset = filters.ConsumableFilterSet
-            self.filterset_form = forms.ConsumableFilterForm
-            self.table = tables.ConsumableTable
-            self.action_buttons = ('add',)
-
-        view_self = self
-
-        class DynamicFilterForm(self.filterset_form):
-            type = django_forms.CharField(widget=django_forms.HiddenInput(), required=False)
-
-            def __init__(self, *args, **kwargs):
-                super().__init__(*args, **kwargs)
-                self.fields['type'].initial = view_self.current_type
-
-        self.filterset_form = DynamicFilterForm
-
-        return super().dispatch(request, *args, **kwargs)
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['current_type'] = self.current_type
-        context['title'] = _('Inventory Catalog')
-        context['breadcrumbs'] = [
-            (reverse('dashboard'), _('Dashboard')),
-            (None, _('Inventory & Stock'))
-        ]
-        return context
+        return redirect(accessible_url)
 
 
 class AccessoryListView(ObjectListView):
-    queryset = Accessory.objects.select_related('tenant', 'manufacturer').prefetch_related('tags').annotate(_total_stock=Coalesce(Sum('stocks__qty'), 0), _checked_out=Coalesce(Sum('assignments__qty'), 0))
+    queryset = Accessory.objects.select_related('tenant', 'manufacturer').prefetch_related('tags').annotate(
+        _total_stock=Coalesce(Sum('stocks__qty'), 0),
+        _checked_out=Coalesce(Sum('assignments__qty'), 0)
+    )
     filterset = filters.AccessoryFilterSet
     filterset_form = forms.AccessoryFilterForm
     table = tables.AccessoryTable
     action_buttons = ('add',)
 
-    def get(self, request, *args, **kwargs):
-        return redirect(reverse('inventory:inventory_list') + '?type=accessories')
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = _('Accessories')
+        context['breadcrumbs'] = [
+            (reverse('dashboard'), _('Dashboard')),
+            (None, _('Inventory & Stock')),
+            (None, _('Accessories'))
+        ]
+        return context
 
 
 class AccessoryDetailView(ObjectDetailView):
@@ -186,14 +145,24 @@ class AccessoryCloneView(ObjectCloneView):
 
 
 class ConsumableListView(ObjectListView):
-    queryset = Consumable.objects.select_related('tenant', 'manufacturer').prefetch_related('tags').annotate(_total_stock=Coalesce(Sum('stocks__qty'), 0), _consumed=Coalesce(Sum('consumptions__qty'), 0))
+    queryset = Consumable.objects.select_related('tenant', 'manufacturer').prefetch_related('tags').annotate(
+        _total_stock=Coalesce(Sum('stocks__qty'), 0),
+        _consumed=Coalesce(Sum('consumptions__qty'), 0)
+    )
     filterset = filters.ConsumableFilterSet
     filterset_form = forms.ConsumableFilterForm
     table = tables.ConsumableTable
     action_buttons = ('add',)
 
-    def get(self, request, *args, **kwargs):
-        return redirect(reverse('inventory:inventory_list') + '?type=consumables')
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = _('Consumables')
+        context['breadcrumbs'] = [
+            (reverse('dashboard'), _('Dashboard')),
+            (None, _('Inventory & Stock')),
+            (None, _('Consumables'))
+        ]
+        return context
 
 
 class ConsumableDetailView(ObjectDetailView):
@@ -513,6 +482,16 @@ class AccessoryStockListView(ObjectListView):
     filterset = filters.AccessoryStockFilterSet
     filterset_form = forms.AccessoryStockFilterForm
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = _('Accessory Stocks')
+        context['breadcrumbs'] = [
+            (reverse('dashboard'), _('Dashboard')),
+            (reverse('inventory:accessory_list'), _('Accessories')),
+            (None, _('Stocks'))
+        ]
+        return context
+
 
 class AccessoryStockEditView(ObjectEditView):
     queryset = AccessoryStock.objects.all()
@@ -535,6 +514,16 @@ class ConsumableStockListView(ObjectListView):
     action_buttons = ('add',)
     filterset = filters.ConsumableStockFilterSet
     filterset_form = forms.ConsumableStockFilterForm
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = _('Consumable Stocks')
+        context['breadcrumbs'] = [
+            (reverse('dashboard'), _('Dashboard')),
+            (reverse('inventory:consumable_list'), _('Consumables')),
+            (None, _('Stocks'))
+        ]
+        return context
 
 
 
@@ -562,6 +551,16 @@ class AccessoryAssignmentListView(ObjectListView):
     filterset = filters.AccessoryAssignmentFilterSet
     filterset_form = forms.AccessoryAssignmentFilterForm
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = _('Accessory Assignments')
+        context['breadcrumbs'] = [
+            (reverse('dashboard'), _('Dashboard')),
+            (reverse('inventory:accessory_list'), _('Accessories')),
+            (None, _('Assignments'))
+        ]
+        return context
+
 
 class ConsumableAssignmentListView(ObjectListView):
     queryset = ConsumableAssignment.objects.select_related(
@@ -571,6 +570,16 @@ class ConsumableAssignmentListView(ObjectListView):
     action_buttons = ()
     filterset = filters.ConsumableAssignmentFilterSet
     filterset_form = forms.ConsumableAssignmentFilterForm
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = _('Consumable Consumptions')
+        context['breadcrumbs'] = [
+            (reverse('dashboard'), _('Dashboard')),
+            (reverse('inventory:consumable_list'), _('Consumables')),
+            (None, _('Consumptions'))
+        ]
+        return context
 
 
 class AccessoryStockAdjustView(LoginRequiredMixin, View):
@@ -649,7 +658,11 @@ class AccessoryStockCreateModalView(LoginRequiredMixin, View):
     def get(self, request, pk):
         accessory = get_object_or_404(Accessory, pk=pk)
         from .forms import AccessoryStockModalForm
-        form = AccessoryStockModalForm()
+        initial = {}
+        location_id = request.GET.get('location')
+        if location_id:
+            initial['location'] = location_id
+        form = AccessoryStockModalForm(initial=initial)
         return render(request, 'generic/includes/add_stock_modal.html', {
             'object': accessory,
             'form': form,
@@ -688,7 +701,11 @@ class ConsumableStockCreateModalView(LoginRequiredMixin, View):
     def get(self, request, pk):
         consumable = get_object_or_404(Consumable, pk=pk)
         from .forms import ConsumableStockModalForm
-        form = ConsumableStockModalForm()
+        initial = {}
+        location_id = request.GET.get('location')
+        if location_id:
+            initial['location'] = location_id
+        form = ConsumableStockModalForm(initial=initial)
         return render(request, 'generic/includes/add_stock_modal.html', {
             'object': consumable,
             'form': form,
@@ -721,5 +738,252 @@ class ConsumableStockCreateModalView(LoginRequiredMixin, View):
             'form': form,
             'post_url': reverse('inventory:consumable_add_stock', kwargs={'pk': consumable.pk}),
         })
+
+
+class ComponentListView(ObjectListView):
+    queryset = Component.objects.with_counts().select_related('manufacturer', 'category').prefetch_related('tags')
+    filterset = filters.ComponentFilterSet
+    filterset_form = forms.ComponentFilterForm
+    table = tables.ComponentTable
+    action_buttons = ('add',)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = _('Components')
+        context['breadcrumbs'] = [
+            (reverse('dashboard'), _('Dashboard')),
+            (None, _('Inventory & Stock')),
+            (None, _('Components'))
+        ]
+        return context
+
+
+class ComponentDetailView(ObjectDetailView):
+    queryset = Component.objects.select_related('manufacturer', 'category').prefetch_related('tags', 'stocks', 'allocations')
+    template_name = 'inventory/components/component_detail.html'
+
+    layout = (
+        ((Panel('metrics', 'Metrics Overview'),),),
+        ((Panel('info', 'Component Details'),),),
+    )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        component = self.get_object()
+
+        stocks_table = tables.ComponentStockTable(component.stocks.all(), request=self.request)
+        stocks_table.configure(self.request)
+        context['stocks_table'] = stocks_table
+
+        allocations_table = tables.ComponentAllocationTable(
+            component.allocations.filter(deleted_at__isnull=True),
+            request=self.request
+        )
+        allocations_table.configure(self.request)
+        context['allocations_table'] = allocations_table
+
+        return context
+
+
+class ComponentEditView(ObjectEditView):
+    queryset = Component.objects.all()
+    model = Component
+    model_form = forms.ComponentForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'inventory:component_list'
+
+
+class ComponentDeleteView(ObjectDeleteView):
+    queryset = Component.objects.all()
+    model = Component
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('inventory:component_list')
+
+
+class ComponentCloneView(ObjectCloneView):
+    model = Component
+    model_form = forms.ComponentForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'inventory:component_list'
+
+
+class ComponentStockListView(ObjectListView):
+    queryset = ComponentStock.objects.select_related('component', 'location')
+    filterset = filters.ComponentStockFilterSet
+    filterset_form = forms.ComponentStockFilterForm
+    table = tables.ComponentStockTable
+    action_buttons = ('add',)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = _('Component Stocks')
+        context['breadcrumbs'] = [
+            (reverse('dashboard'), _('Dashboard')),
+            (reverse('inventory:component_list'), _('Components')),
+            (None, _('Stocks'))
+        ]
+        return context
+
+
+class ComponentStockEditView(ObjectEditView):
+    queryset = ComponentStock.objects.all()
+    model = ComponentStock
+    model_form = forms.ComponentStockForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'inventory:component_list'
+
+
+class ComponentStockDeleteView(ObjectDeleteView):
+    queryset = ComponentStock.objects.all()
+    model = ComponentStock
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('inventory:component_list')
+
+
+class ComponentAllocationListView(ObjectListView):
+    queryset = ComponentAllocation.objects.select_related('component', 'assigned_holder', 'assigned_location', 'assigned_asset').prefetch_related('tags')
+    filterset = filters.ComponentAllocationFilterSet
+    filterset_form = forms.ComponentAllocationFilterForm
+    table = tables.ComponentAllocationTable
+    action_buttons = ('add',)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = _('Component Allocations')
+        context['breadcrumbs'] = [
+            (reverse('dashboard'), _('Dashboard')),
+            (reverse('inventory:component_list'), _('Components')),
+            (None, _('Allocations'))
+        ]
+        return context
+
+
+class ComponentAllocationEditView(ObjectEditView):
+    queryset = ComponentAllocation.objects.all()
+    model = ComponentAllocation
+    model_form = forms.ComponentAllocationForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'inventory:component_list'
+
+
+class ComponentAllocationDeleteView(ObjectDeleteView):
+    queryset = ComponentAllocation.objects.all()
+    model = ComponentAllocation
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('inventory:component_list')
+
+
+class ComponentStockAdjustView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        from django.http import HttpResponse, HttpResponseForbidden
+        from django.utils.html import format_html
+        
+        stock = get_object_or_404(ComponentStock, pk=pk)
+        if not request.user.has_perm('inventory.change_componentstock', obj=stock.component):
+            return HttpResponseForbidden("Permission denied.")
+        action = request.GET.get('action')
+        
+        if action == 'increment':
+            stock.qty += 1
+            stock.save()
+        elif action == 'decrement':
+            if stock.qty > 0:
+                stock.qty -= 1
+                stock.save()
+                
+        return HttpResponse(format_html(
+            '<div class="d-flex align-items-center justify-content-start">'
+            '  <button class="btn btn-sm btn-icon btn-outline-secondary me-2 px-1 py-0 lh-1" '
+            '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
+            '    <i class="mdi mdi-minus" style="font-size: 0.75rem;"></i>'
+            '  </button>'
+            '  <span class="badge bg-blue-lt text-blue font-weight-bold px-2 py-1" style="font-size: 0.85rem;">{}</span>'
+            '  <button class="btn btn-sm btn-icon btn-outline-secondary ms-2 px-1 py-0 lh-1" '
+            '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
+            '    <i class="mdi mdi-plus" style="font-size: 0.75rem;"></i>'
+            '  </button>'
+            '</div>',
+            reverse('inventory:componentstock_adjust', kwargs={'pk': stock.pk}) + '?action=decrement',
+            stock.qty,
+            reverse('inventory:componentstock_adjust', kwargs={'pk': stock.pk}) + '?action=increment'
+        ))
+
+
+class ComponentStockCreateModalView(LoginRequiredMixin, View):
+    def get(self, request, pk):
+        component = get_object_or_404(Component, pk=pk)
+        from .forms import ComponentStockModalForm
+        initial = {}
+        location_id = request.GET.get('location')
+        if location_id:
+            initial['location'] = location_id
+        form = ComponentStockModalForm(initial=initial)
+        return render(request, 'generic/includes/add_stock_modal.html', {
+            'object': component,
+            'form': form,
+            'post_url': reverse('inventory:component_add_stock', kwargs={'pk': component.pk}),
+        })
+
+    def post(self, request, pk):
+        component = get_object_or_404(Component, pk=pk)
+        from .forms import ComponentStockModalForm
+        form = ComponentStockModalForm(request.POST)
+        if form.is_valid():
+            stock = form.save(commit=False)
+            stock.component = component
+            stock.save()
+            if request.headers.get('HX-Request'):
+                response = HttpResponse(status=204)
+                response['HX-Trigger'] = json.dumps({
+                    "closeModalEvent": None,
+                    "tableRefreshRequired": None,
+                    "showMessage": {
+                        "message": f"Added stock pool for {stock.location}.",
+                        "level": "success"
+                    }
+                })
+                return response
+            return redirect(component.get_absolute_url())
+
+        return render(request, 'generic/includes/add_stock_modal.html', {
+            'object': component,
+            'form': form,
+            'post_url': reverse('inventory:component_add_stock', kwargs={'pk': component.pk}),
+        })
+
+
+class ComponentCheckoutView(GenericTransactionView):
+    queryset = Component.objects.all()
+    model_form = forms.ComponentCheckoutForm
+    service_callable = checkout_component
+    context_object_name = 'component'
+    template_name = 'assets/includes/component_checkout_modal.html'
+    success_message = "Component checked out successfully."
+    form_field_map = {
+        'assigned_holder': 'holder',
+        'assigned_location': 'location',
+        'assigned_asset': 'asset',
+        'from_location': 'source_location',
+    }
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        del kwargs['instance']
+        kwargs['component'] = self.get_object()
+        return kwargs
+
+
+class ComponentCheckinView(SimplePostView):
+    queryset = ComponentAllocation.objects.all()
+
+    def perform_action(self, assignment, request):
+        component, qty, recipient = checkin_component(assignment.pk, user=request.user)
+        return {
+            'message': f"Checked in {qty}x '{component}' from {recipient}.",
+            'redirect': component.get_absolute_url(),
+        }
+
+    def get_success_redirect(self, obj, result):
+        return redirect(result.get('redirect') or '/')
 
 

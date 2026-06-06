@@ -152,7 +152,7 @@
             <!-- Page header -->
             <div class="page-header d-print-none">
                 <div class="container-fluid">
-                    <div id="breadcrumbs-block" class="d-flex justify-content-between align-items-center">
+                    <div id="breadcrumbs-block" class="d-flex justify-content-between align-items-center" {% if breadcrumbs or help_url %}style="min-height: 2.25rem;"{% endif %}>
                     {% if breadcrumbs %}
                         <ol class="breadcrumb breadcrumb-arrows mb-0" aria-label="{% translate 'breadcrumbs' %}">
                             {% for url, label in breadcrumbs %}

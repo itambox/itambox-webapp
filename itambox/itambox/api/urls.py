@@ -1,5 +1,6 @@
 from django.urls import path, include
 from itambox.api.views import APIRootView, StatusView, AuthenticationCheckView
+from inventory.api.views import ComponentViewSet, ComponentStockViewSet, ComponentAllocationViewSet
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularSwaggerView,
@@ -16,7 +17,14 @@ urlpatterns = [
 
     path('assets/', include('assets.api.urls', namespace='assets_api')),
     path('compliance/', include('compliance.api.urls', namespace='compliance_api')),
-    path('components/', include('components.api.urls', namespace='components_api')),
+    path('components/', include(([
+        path('components/', ComponentViewSet.as_view({'get': 'list', 'post': 'create'})),
+        path('components/<int:pk>/', ComponentViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='component-detail'),
+        path('component-stocks/', ComponentStockViewSet.as_view({'get': 'list', 'post': 'create'})),
+        path('component-stocks/<int:pk>/', ComponentStockViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='componentstock-detail'),
+        path('component-allocations/', ComponentAllocationViewSet.as_view({'get': 'list', 'post': 'create'})),
+        path('component-allocations/<int:pk>/', ComponentAllocationViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='componentallocation-detail'),
+    ], 'components_api'), namespace='components_api')),
     path('core/', include('core.api.urls', namespace='core_api')),
     path('extras/', include('extras.api.urls', namespace='extras_api')),
     path('inventory/', include('inventory.api.urls', namespace='inventory_api')),

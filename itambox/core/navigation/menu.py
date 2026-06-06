@@ -60,16 +60,30 @@ INVENTORY_MENU = Menu(
             label=_('Inventory Catalog'),
             items=(
                 MenuItem(
-                    link='inventory:inventory_list',
-                    link_text=_('Inventory'),
-                    auth_required=True,
+                    link='inventory:component_list',
+                    link_text=_('Components'),
+                    permissions=['inventory.view_component'],
                     buttons=(
                         MenuItemButton(
-                            link='components:component_create',
+                            link='inventory:component_create',
                             title='Add Component',
                             icon_class='mdi mdi-plus-thick',
-                            permissions=['components.add_component'],
+                            permissions=['inventory.add_component'],
                         ),
+                        MenuItemButton(
+                            link='/import/inventory/component/',
+                            title='Import Components',
+                            icon_class='mdi mdi-upload',
+                            permissions=['inventory.add_component'],
+                            color='outline text-success',
+                        ),
+                    ),
+                ),
+                MenuItem(
+                    link='inventory:accessory_list',
+                    link_text=_('Accessories'),
+                    permissions=['inventory.view_accessory'],
+                    buttons=(
                         MenuItemButton(
                             link='inventory:accessory_create',
                             title='Add Accessory',
@@ -77,10 +91,31 @@ INVENTORY_MENU = Menu(
                             permissions=['inventory.add_accessory'],
                         ),
                         MenuItemButton(
+                            link='inventory:accessory_import',
+                            title='Import Accessories',
+                            icon_class='mdi mdi-upload',
+                            permissions=['inventory.add_accessory'],
+                            color='outline text-success',
+                        ),
+                    ),
+                ),
+                MenuItem(
+                    link='inventory:consumable_list',
+                    link_text=_('Consumables'),
+                    permissions=['inventory.view_consumable'],
+                    buttons=(
+                        MenuItemButton(
                             link='inventory:consumable_create',
                             title='Add Consumable',
                             icon_class='mdi mdi-plus-thick',
                             permissions=['inventory.add_consumable'],
+                        ),
+                        MenuItemButton(
+                            link='inventory:consumable_import',
+                            title='Import Consumables',
+                            icon_class='mdi mdi-upload',
+                            permissions=['inventory.add_consumable'],
+                            color='outline text-success',
                         ),
                     ),
                 ),

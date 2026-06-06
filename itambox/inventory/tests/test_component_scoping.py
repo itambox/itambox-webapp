@@ -1,7 +1,7 @@
 from django.test import TestCase
 from assets.models import Manufacturer, Category
 from organization.models import Tenant, TenantGroup
-from components.models import Component
+from inventory.models import Component
 
 class ComponentTenantScopingTests(TestCase):
     def setUp(self):

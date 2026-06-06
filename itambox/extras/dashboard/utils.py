@@ -22,7 +22,7 @@ def get_default_dashboard():
                 'organization.site',
                 'organization.tenant',
                 'licenses.license',
-                'components.component',
+                'inventory.component',
                 'inventory.accessory',
                 'inventory.consumable',
                 'software.software'

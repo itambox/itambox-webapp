@@ -14,16 +14,16 @@
     {# Action Buttons #}
     <div class="ms-auto d-flex gap-2">
         {% if table_config_key %}
-            <button type="button" class="btn btn-outline-secondary d-flex align-items-center"
+            <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center"
                     hx-get="{% url 'table_config' model_name=table_config_key %}"
-                    hx-target="#modal-placeholder">>
+                    hx-target="#modal-placeholder">
                 <i class="mdi mdi-cog-outline me-1"></i>
                 {% translate "Configure Table" %}
             </button>
         {% endif %}
 
         {% if show_filter_toggle and filter_form %}
-            <button type="button" class="btn btn-outline-secondary d-flex align-items-center" id="toggle-filters-btn" title="{% translate 'Toggle Filters' %}">
+            <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center" id="toggle-filters-btn" title="{% translate 'Toggle Filters' %}">
                 <i class="mdi mdi-filter-outline me-1"></i>
                 {% translate "Filters" %}
                 <span class="badge bg-primary ms-2 {% if not filter_form.applied_filters %}d-none{% endif %}">

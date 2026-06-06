@@ -158,14 +158,14 @@ class ConsumableViewTests(TestCase):
     def test_list_view(self):
         url = reverse('inventory:consumable_list')
         response = self.client.get(url)
-        self.assertEqual(response.status_code, 302)
-        self.assertIn('/inventory/?type=consumables', response.url)
-
-        # Test unified inventory view for consumables
-        unified_url = reverse('inventory:inventory_list') + '?type=consumables'
-        response = self.client.get(unified_url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'LaserJet Toner Cartridge')
+
+        # Test unified inventory view for consumables redirect
+        unified_url = reverse('inventory:inventory_list') + '?type=consumables'
+        response = self.client.get(unified_url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/inventory/consumables/', response.url)
 
     def test_detail_view(self):
         url = reverse('inventory:consumable_detail', kwargs={'pk': self.consumable.pk})

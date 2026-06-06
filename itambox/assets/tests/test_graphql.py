@@ -9,8 +9,7 @@ from organization.models import Tenant, Location, TenantGroup, TenantMembership,
 from assets.models import Asset, AssetType, StatusLabel, AssetRole, Manufacturer, Category, Supplier
 from software.models import Software
 from licenses.models import License
-from components.models import Component
-from inventory.models import Accessory, Consumable, Kit
+from inventory.models import Accessory, Consumable, Kit, Component
 from users.models import Token
 
 User = get_user_model()
@@ -44,7 +43,7 @@ class GraphQLTestCase(TestCase):
                 'assets.view_asset', 'assets.add_asset', 'assets.change_asset', 'assets.delete_asset',
                 'software.view_software', 'software.add_software', 'software.change_software', 'software.delete_software',
                 'licenses.view_license', 'licenses.add_license', 'licenses.change_license', 'licenses.delete_license',
-                'components.view_component', 'components.add_component', 'components.change_component', 'components.delete_component',
+                'inventory.view_component', 'inventory.add_component', 'inventory.change_component', 'inventory.delete_component',
                 'inventory.view_accessory', 'inventory.add_accessory', 'inventory.change_accessory', 'inventory.delete_accessory',
                 'inventory.view_consumable', 'inventory.add_consumable', 'inventory.change_consumable', 'inventory.delete_consumable',
                 'inventory.view_kit', 'inventory.add_kit', 'inventory.change_kit', 'inventory.delete_kit',
@@ -57,7 +56,7 @@ class GraphQLTestCase(TestCase):
                 'assets.view_asset', 'assets.add_asset', 'assets.change_asset', 'assets.delete_asset',
                 'software.view_software', 'software.add_software', 'software.change_software', 'software.delete_software',
                 'licenses.view_license', 'licenses.add_license', 'licenses.change_license', 'licenses.delete_license',
-                'components.view_component', 'components.add_component', 'components.change_component', 'components.delete_component',
+                'inventory.view_component', 'inventory.add_component', 'inventory.change_component', 'inventory.delete_component',
                 'inventory.view_accessory', 'inventory.add_accessory', 'inventory.change_accessory', 'inventory.delete_accessory',
                 'inventory.view_consumable', 'inventory.add_consumable', 'inventory.change_consumable', 'inventory.delete_consumable',
                 'inventory.view_kit', 'inventory.add_kit', 'inventory.change_kit', 'inventory.delete_kit',
@@ -70,7 +69,7 @@ class GraphQLTestCase(TestCase):
         for user in [self.staff_a, self.staff_b]:
             for app, model in [
                 ('assets', 'asset'), ('software', 'software'), ('licenses', 'license'),
-                ('components', 'component'), ('inventory', 'accessory'), ('inventory', 'consumable'),
+                ('inventory', 'component'), ('inventory', 'accessory'), ('inventory', 'consumable'),
                 ('inventory', 'kit')
             ]:
                 ct = ContentType.objects.get(app_label=app, model=model)

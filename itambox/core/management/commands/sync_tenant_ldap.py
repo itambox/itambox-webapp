@@ -160,7 +160,7 @@ class Command(BaseCommand):
                                     'inventory.view_accessory', 'inventory.add_accessory', 'inventory.change_accessory',
                                     'inventory.view_consumable', 'inventory.add_consumable', 'inventory.change_consumable',
                                     'inventory.view_kit', 'inventory.add_kit', 'inventory.change_kit',
-                                    'components.view_component', 'components.add_component', 'components.change_component',
+                                    'inventory.view_component', 'inventory.add_component', 'inventory.change_component',
                                     'organization.view_location', 'organization.add_location', 'organization.change_location',
                                     'organization.view_site', 'organization.add_site', 'organization.change_site',
                                     'organization.view_assetholder', 'organization.add_assetholder', 'organization.change_assetholder',

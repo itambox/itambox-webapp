@@ -5,7 +5,7 @@
 {# Expected context variable: breadcrumbs = [(url, label), (url, label), ...] #}
 {# The last item is treated as the active page. #}
 
-<div class="d-flex justify-content-between align-items-center w-100">
+<div class="d-flex justify-content-between align-items-center w-100" {% if breadcrumbs or help_url %}style="min-height: 2.25rem;"{% endif %}>
     {% if breadcrumbs %}
     <ol class="breadcrumb breadcrumb-arrows mb-0" aria-label="{% translate 'breadcrumbs' %}">
         {% for url, label in breadcrumbs %}

@@ -8,20 +8,24 @@
              <span class="text-muted"><i>{% translate "None" %}</i></span>
         {% endif %}
     </dd>
-
+ 
     <dt class="col-sm-3">{% translate "Name:" %}</dt>
     <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
-
+ 
     <dt class="col-sm-3">{% translate "Slug:" %}</dt>
     <dd class="col-sm-9"><code>{{ object.slug }}</code></dd>
-
+ 
     <dt class="col-sm-3">{% translate "Category:" %}</dt>
     <dd class="col-sm-9">
-        <span class="badge bg-blue-lt px-2.5 py-1 text-uppercase">
-            {{ object.get_category_display }}
-        </span>
+        {% if object.category %}
+            <a href="{{ object.category.get_absolute_url }}" class="badge bg-blue-lt px-2.5 py-1 text-uppercase text-decoration-none">
+                {{ object.category.name }}
+            </a>
+        {% else %}
+             <span class="text-muted"><i>{% translate "None" %}</i></span>
+        {% endif %}
     </dd>
-
+ 
     <dt class="col-sm-3">{% translate "Part Number / SKU:" %}</dt>
     <dd class="col-sm-9">
         {% if object.part_number %}
@@ -30,13 +34,9 @@
             <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
         {% endif %}
     </dd>
-
-    <dt class="col-sm-3">{% translate "Specifications:" %}</dt>
+ 
+    <dt class="col-sm-3">{% translate "Min Stock Level:" %}</dt>
     <dd class="col-sm-9">
-        {% if object.specs %}
-            <span class="text-secondary font-weight-medium">{{ object.specs }}</span>
-        {% else %}
-            <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
-        {% endif %}
+        <span class="badge bg-warning-lt">{{ object.min_qty }}</span>
     </dd>
 </dl>

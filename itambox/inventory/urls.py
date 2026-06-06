@@ -53,7 +53,32 @@ urlpatterns = [
     path('kits/<int:pk>/edit/', views.KitEditView.as_view(), name='kit_update'),
     path('kits/<int:pk>/delete/', views.KitDeleteView.as_view(), name='kit_delete'),
     path('kits/<int:pk>/checkout/', views.KitCheckoutView.as_view(), name='kit_checkout_modal'),
+    # Kit Items
     path('kit-items/add/', views.KitItemEditView.as_view(), name='kititem_create'),
     path('kit-items/<int:pk>/edit/', views.KitItemEditView.as_view(), name='kititem_update'),
     path('kit-items/<int:pk>/delete/', views.KitItemDeleteView.as_view(), name='kititem_delete'),
+
+    # Components
+    path('components/', views.ComponentListView.as_view(), name='component_list'),
+    path('components/add/', views.ComponentEditView.as_view(), name='component_create'),
+    path('components/<int:pk>/', views.ComponentDetailView.as_view(), name='component_detail'),
+    path('components/<int:pk>/edit/', views.ComponentEditView.as_view(), name='component_update'),
+    path('components/<int:pk>/delete/', views.ComponentDeleteView.as_view(), name='component_delete'),
+    path('components/<int:pk>/clone/', views.ComponentCloneView.as_view(), name='component_clone'),
+    path('components/<int:pk>/checkout/', views.ComponentCheckoutView.as_view(), name='component_checkout'),
+    path('components/<int:pk>/add-stock/', views.ComponentStockCreateModalView.as_view(), name='component_add_stock'),
+    path('components/allocations/<int:pk>/checkin/', views.ComponentCheckinView.as_view(), name='component_checkin'),
+
+    # Component Stocks
+    path('component-stocks/', views.ComponentStockListView.as_view(), name='componentstock_list'),
+    path('component-stocks/add/', views.ComponentStockEditView.as_view(), name='componentstock_create'),
+    path('component-stocks/<int:pk>/edit/', views.ComponentStockEditView.as_view(), name='componentstock_update'),
+    path('component-stocks/<int:pk>/delete/', views.ComponentStockDeleteView.as_view(), name='componentstock_delete'),
+    path('component-stocks/<int:pk>/adjust/', views.ComponentStockAdjustView.as_view(), name='componentstock_adjust'),
+
+    # Component Allocations
+    path('component-allocations/', views.ComponentAllocationListView.as_view(), name='componentallocation_list'),
+    path('component-allocations/add/', views.ComponentAllocationEditView.as_view(), name='componentallocation_create'),
+    path('component-allocations/<int:pk>/edit/', views.ComponentAllocationEditView.as_view(), name='componentallocation_update'),
+    path('component-allocations/<int:pk>/delete/', views.ComponentAllocationDeleteView.as_view(), name='componentallocation_delete'),
 ]

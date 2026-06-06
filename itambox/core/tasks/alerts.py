@@ -41,8 +41,7 @@ def evaluate_alert_rules_task():
         
         try:
             if rule.alert_type == AlertRule.ALERT_TYPE_LOW_STOCK:
-                from inventory.models import Accessory, Consumable, AccessoryStock, AccessoryAssignment, ConsumableStock, ConsumableAssignment
-                from components.models import Component, ComponentStock, ComponentAllocation
+                from inventory.models import Accessory, Consumable, AccessoryStock, AccessoryAssignment, ConsumableStock, ConsumableAssignment, Component, ComponentStock, ComponentAllocation
                 
                 # --- ACCESSORIES ---
                 # Subquery to aggregate stocks
@@ -133,22 +132,24 @@ def evaluate_alert_rules_task():
                     deleted_at__isnull=True
                 )
                 if rule.tenant:
-                    comp_allocs_sub = comp_allocs_sub.filter(asset__tenant=rule.tenant)
+                    comp_allocs_sub = comp_allocs_sub.filter(assigned_asset__tenant=rule.tenant)
                 comp_allocs_sum = Subquery(
-                    comp_allocs_sub.values('component').annotate(total=Sum('qty_allocated')).values('total')
+                    comp_allocs_sub.values('component').annotate(total=Sum('qty')).values('total')
                 )
                 
                 comp_qs = Component.objects.filter(deleted_at__isnull=True).annotate(
                     annotated_total_stock=Coalesce(comp_stocks_sum, 0),
                     annotated_allocated_stock=Coalesce(comp_allocs_sum, 0)
                 )
+                if rule.tenant:
+                    comp_qs = comp_qs.filter(tenant=rule.tenant)
                 
                 for comp in comp_qs:
                     total_stock = comp.annotated_total_stock
                     allocated = comp.annotated_allocated_stock
                     available = total_stock - allocated
                     
-                    threshold = comp.min_stock_level if (comp.min_stock_level and comp.min_stock_level > 0) else rule.threshold_value
+                    threshold = comp.min_qty if (comp.min_qty and comp.min_qty > 0) else rule.threshold_value
                     if available <= threshold:
                         matches.append({
                             'obj': comp,

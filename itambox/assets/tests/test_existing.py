@@ -2,8 +2,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from assets.models import Manufacturer, Asset, AssetType, AssetRole, StatusLabel, Depreciation, Supplier, Category, AssetRequest
-from components.models import Component, ComponentAllocation
-from inventory.models import Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, Kit, KitItem
+from inventory.models import Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, Kit, KitItem, Component, ComponentAllocation
 from compliance.models import CustodyReceipt, AssetMaintenance
 from extras.models import CustomField, CustomFieldset
 from core.models import Notification
@@ -34,7 +33,8 @@ class ComponentTrackingTestCase(TestCase):
             slug="dell-16gb-ddr5-ram",
             category=self.category,
             specs={"capacity_gb": 16, "type": "DDR5", "speed_mhz": 4800},
-            part_number="RAM-16G-D5"
+            part_number="RAM-16G-D5",
+            allow_overallocate=True
         )
 
         self.role = AssetRole.objects.create(name="Server", slug="server")
@@ -53,27 +53,32 @@ class ComponentTrackingTestCase(TestCase):
 
         self.allocation = ComponentAllocation.objects.create(
             component=self.component,
-            asset=self.asset,
-            qty_allocated=2,
+            assigned_asset=self.asset,
+            qty=2,
             notes="Initial RAM allocation"
         )
 
     def test_component_detail_view(self):
         # We replace any reference to specific request views that might be affected
-        response = self.client.get(reverse('components:component_detail', kwargs={'pk': self.component.pk}))
+        response = self.client.get(reverse('inventory:component_detail', kwargs={'pk': self.component.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "16GB DDR5 RAM")
 
     def test_component_list_view(self):
         response = self.client.get(reverse('components:component_list'))
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(response.url, reverse('inventory:inventory_list') + '?type=components')
+        
+        response = self.client.get(response.url)
         self.assertEqual(response.status_code, 302)
-        self.assertRedirects(response, reverse('inventory:inventory_list') + '?type=components')
-        response = self.client.get(reverse('inventory:inventory_list') + '?type=components')
+        self.assertEqual(response.url, reverse('inventory:component_list'))
+        
+        response = self.client.get(response.url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "16GB DDR5 RAM")
 
     def test_component_create_view(self):
-        response = self.client.get(reverse('components:component_create'))
+        response = self.client.get(reverse('inventory:component_create'))
         self.assertEqual(response.status_code, 200)
 
         post_data = {
@@ -82,17 +87,17 @@ class ComponentTrackingTestCase(TestCase):
             'slug': 'dell-2tb-nvme-ssd',
             'category': self.category.pk,
             'part_number': 'SSD-2TB-NVME',
-            'min_stock_level': 0,
+            'min_qty': 0,
             'specs': '{}',
-            'description': 'Samsung SSD for server storage',
+            'notes': 'Samsung SSD for server storage',
             'tags': [],
         }
-        response = self.client.post(reverse('components:component_create'), data=post_data)
+        response = self.client.post(reverse('inventory:component_create'), data=post_data)
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Component.objects.filter(name='2TB NVMe SSD').exists())
 
     def test_component_update_view(self):
-        response = self.client.get(reverse('components:component_update', kwargs={'pk': self.component.pk}))
+        response = self.client.get(reverse('inventory:component_update', kwargs={'pk': self.component.pk}))
         self.assertEqual(response.status_code, 200)
 
         post_data = {
@@ -101,57 +106,57 @@ class ComponentTrackingTestCase(TestCase):
             'slug': 'dell-16gb-ddr5-ram',
             'category': self.category.pk,
             'part_number': 'RAM-16G-D5-UPDATED',
-            'min_stock_level': 0,
+            'min_qty': 0,
             'specs': '{}',
-            'description': 'Updated spec RAM',
+            'notes': 'Updated spec RAM',
             'tags': [],
         }
-        response = self.client.post(reverse('components:component_update', kwargs={'pk': self.component.pk}), data=post_data)
+        response = self.client.post(reverse('inventory:component_update', kwargs={'pk': self.component.pk}), data=post_data)
         self.assertEqual(response.status_code, 302)
         self.component.refresh_from_db()
         self.assertEqual(self.component.name, '16GB DDR5 RAM (Updated)')
 
     def test_component_delete_view(self):
-        response = self.client.post(reverse('components:component_delete', kwargs={'pk': self.component.pk}))
+        response = self.client.post(reverse('inventory:component_delete', kwargs={'pk': self.component.pk}))
         self.assertEqual(response.status_code, 302)
         self.assertFalse(Component.objects.filter(pk=self.component.pk).exists())
 
     def test_componentallocation_list_view(self):
-        response = self.client.get(reverse('components:componentallocation_list'))
+        response = self.client.get(reverse('inventory:componentallocation_list'))
         self.assertEqual(response.status_code, 200)
 
     def test_componentallocation_create_view(self):
-        response = self.client.get(reverse('components:componentallocation_create'))
+        response = self.client.get(reverse('inventory:componentallocation_create'))
         self.assertEqual(response.status_code, 200)
 
         post_data = {
             'component': self.component.pk,
-            'asset': self.asset.pk,
-            'qty_allocated': 1,
+            'assigned_asset': self.asset.pk,
+            'qty': 1,
             'notes': 'Secondary RAM stick'
         }
-        response = self.client.post(reverse('components:componentallocation_create'), data=post_data)
+        response = self.client.post(reverse('inventory:componentallocation_create'), data=post_data)
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(ComponentAllocation.objects.filter(qty_allocated=1, notes='Secondary RAM stick').exists())
+        self.assertTrue(ComponentAllocation.objects.filter(qty=1, notes='Secondary RAM stick').exists())
 
     def test_componentallocation_update_view(self):
-        response = self.client.get(reverse('components:componentallocation_update', kwargs={'pk': self.allocation.pk}))
+        response = self.client.get(reverse('inventory:componentallocation_update', kwargs={'pk': self.allocation.pk}))
         self.assertEqual(response.status_code, 200)
 
         post_data = {
             'component': self.component.pk,
-            'asset': self.asset.pk,
-            'qty_allocated': 3,
+            'assigned_asset': self.asset.pk,
+            'qty': 3,
             'notes': 'Updated RAM allocation'
         }
-        response = self.client.post(reverse('components:componentallocation_update', kwargs={'pk': self.allocation.pk}), data=post_data)
+        response = self.client.post(reverse('inventory:componentallocation_update', kwargs={'pk': self.allocation.pk}), data=post_data)
         self.assertEqual(response.status_code, 302)
         self.allocation.refresh_from_db()
-        self.assertEqual(self.allocation.qty_allocated, 3)
+        self.assertEqual(self.allocation.qty, 3)
         self.assertEqual(self.allocation.notes, 'Updated RAM allocation')
 
     def test_componentallocation_delete_view(self):
-        response = self.client.post(reverse('components:componentallocation_delete', kwargs={'pk': self.allocation.pk}))
+        response = self.client.post(reverse('inventory:componentallocation_delete', kwargs={'pk': self.allocation.pk}))
         self.assertEqual(response.status_code, 302)
         self.assertFalse(ComponentAllocation.objects.filter(pk=self.allocation.pk).exists())
 
@@ -224,9 +229,6 @@ class ComponentTrackingTestCase(TestCase):
 
         # 1. List View
         response = self.client.get(reverse('inventory:accessory_list'))
-        self.assertEqual(response.status_code, 302)
-        self.assertRedirects(response, reverse('inventory:inventory_list') + '?type=accessories')
-        response = self.client.get(reverse('inventory:inventory_list') + '?type=accessories')
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Wired Keyboard KB216")
 

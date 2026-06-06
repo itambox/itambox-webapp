@@ -7,7 +7,17 @@
  */
 (function () {
   function updateSidebarActiveState(): void {
-    const currentPath = window.location.pathname;
+    let currentPath = window.location.pathname;
+
+    // Custom normalization for inventory sub-paths that don't match folder naming conventions
+    if (currentPath.startsWith('/inventory/component-allocations') || currentPath.startsWith('/inventory/component-stocks')) {
+      currentPath = '/inventory/components/';
+    } else if (currentPath.startsWith('/inventory/accessory-stocks')) {
+      currentPath = '/inventory/accessories/';
+    } else if (currentPath.startsWith('/inventory/consumable-stocks')) {
+      currentPath = '/inventory/consumables/';
+    }
+
     const sidebar = document.getElementById('sidebar-menu');
     if (!sidebar) return;
 
@@ -38,7 +48,12 @@
           return;
         }
 
-        if (currentPath === resolved || (resolved !== '/' && currentPath.indexOf(resolved + '/') === 0)) {
+        let normalizedResolved = resolved;
+        if (normalizedResolved.endsWith('/') && normalizedResolved !== '/') {
+          normalizedResolved = normalizedResolved.slice(0, -1);
+        }
+
+        if (currentPath === resolved || (normalizedResolved !== '/' && currentPath.indexOf(normalizedResolved + '/') === 0)) {
           if (resolved.length > bestMatchLength) {
             bestMatch = link;
             bestMatchLength = resolved.length;

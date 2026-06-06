@@ -28,7 +28,7 @@
             <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
                 <h3 class="card-title">{% translate "Component Stocks" %}</h3>
                 <button type="button" class="btn btn-sm btn-primary"
-                        hx-get="{% url 'components:component_add_stock' pk=object.pk %}"
+                        hx-get="{% url 'inventory:component_add_stock' pk=object.pk %}"
                         hx-target="#modal-placeholder"
                         hx-swap="innerHTML">
                     <i class="mdi mdi-plus"></i> {% translate "Add Stock..." %}

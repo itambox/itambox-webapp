@@ -35,17 +35,17 @@
         </div>
     </div>
     <div class="col-sm-4">
-        <div class="card card-sm {% if object.available_stock <= 0 %}bg-danger-lt{% elif object.available_stock < object.min_stock_level %}bg-warning-lt{% else %}bg-success-lt{% endif %} border-0 shadow-none">
+        <div class="card card-sm {% if object.available_stock <= 0 %}bg-danger-lt{% elif object.available_stock < object.min_qty %}bg-warning-lt{% else %}bg-success-lt{% endif %} border-0 shadow-none">
             <div class="card-body">
                 <div class="row align-items-center">
                     <div class="col-auto">
-                        <span class="{% if object.available_stock <= 0 %}bg-danger{% elif object.available_stock < object.min_stock_level %}bg-warning{% else %}bg-success{% endif %} text-white avatar rounded shadow-sm">
+                        <span class="{% if object.available_stock <= 0 %}bg-danger{% elif object.available_stock < object.min_qty %}bg-warning{% else %}bg-success{% endif %} text-white avatar rounded shadow-sm">
                             <i class="mdi mdi-check-circle-outline"></i>
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium {% if object.available_stock <= 0 %}text-danger{% elif object.available_stock < object.min_stock_level %}text-warning{% else %}text-success{% endif %} small uppercase font-sans">{% translate "Available Stock" %}</div>
-                        <div class="{% if object.available_stock <= 0 %}text-danger{% elif object.available_stock < object.min_stock_level %}text-warning{% else %}text-success{% endif %} h1 mb-0 font-weight-bold">
+                        <div class="font-weight-medium {% if object.available_stock <= 0 %}text-danger{% elif object.available_stock < object.min_qty %}text-warning{% else %}text-success{% endif %} small uppercase font-sans">{% translate "Available Stock" %}</div>
+                        <div class="{% if object.available_stock <= 0 %}text-danger{% elif object.available_stock < object.min_qty %}text-warning{% else %}text-success{% endif %} h1 mb-0 font-weight-bold">
                             {{ object.available_stock }}
                         </div>
                     </div>

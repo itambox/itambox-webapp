@@ -1,0 +1,36 @@
+{% load i18n %}
+{% load crispy_forms_tags %}
+{% load partials %}
+
+{% startpartial checkout-modal-form %}
+    {% if form.errors %}
+        <div class="alert alert-danger">
+            {% translate "Please correct the errors below." %}
+        </div>
+    {% endif %}
+    {% crispy form %}
+{% endpartial %}
+
+<div class="modal modal-blur fade" id="component-checkout-modal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{% translate "Check Out Component:" %} {{ component }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+            </div>
+            <form id="component-checkout-form"
+                  hx-post="{% url 'inventory:component_checkout' pk=component.pk %}"
+                  hx-target="#component-checkout-modal-form-container"
+                  hx-swap="innerHTML">
+                {% csrf_token %}
+                <div class="modal-body" id="component-checkout-modal-form-container">
+                    {% partial checkout-modal-form %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                    <button type="submit" class="btn btn-primary">{% translate "Check Out" %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

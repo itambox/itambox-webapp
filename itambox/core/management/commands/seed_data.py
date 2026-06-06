@@ -73,8 +73,8 @@ class Command(BaseCommand):
             ('organization', 'TenantMembership'),
             ('organization', 'TenantInvitation'),
             ('organization', 'TenantRole'),
-            ('components', 'ComponentAllocation'),
-            ('components', 'ComponentStock'),
+            ('inventory', 'ComponentAllocation'),
+            ('inventory', 'ComponentStock'),
             ('compliance', 'CustodyReceipt'),
             ('compliance', 'CustodyTemplate'),
             ('core', 'ObjectChange'),
@@ -91,7 +91,7 @@ class Command(BaseCommand):
             ('inventory', 'Kit'),
             ('assets', 'Asset'),
             ('assets', 'AssetType'),
-            ('components', 'Component'),
+            ('inventory', 'Component'),
             ('inventory', 'Accessory'),
             ('inventory', 'Consumable'),
             ('licenses', 'License'),
@@ -764,8 +764,7 @@ class Command(BaseCommand):
 
     def _seed_phase2(self):
         from assets.models import AssetType, Category
-        from components.models import Component
-        from inventory.models import Accessory, Consumable
+        from inventory.models import Component, Accessory, Consumable
 
         self.stdout.write('--- Phase 2: Asset Infrastructure ---')
 
@@ -1005,9 +1004,8 @@ class Command(BaseCommand):
         from assets.models import (
             Asset, InstalledSoftware,
         )
-        from inventory.models import AccessoryAssignment, ConsumableAssignment, AccessoryStock, ConsumableStock
+        from inventory.models import AccessoryAssignment, ConsumableAssignment, AccessoryStock, ConsumableStock, ComponentStock, ComponentAllocation
         from compliance.models import CustodyReceipt, CustodyTemplate
-        from components.models import ComponentStock, ComponentAllocation
 
         self.stdout.write('--- Phase 3: Hardware Assets ---')
 
@@ -1417,8 +1415,8 @@ class Command(BaseCommand):
         for comp_slug, asset_tag, qty in alloc_data:
             ComponentAllocation.objects.get_or_create(
                 component=self._components[comp_slug],
-                asset=self._assets[asset_tag],
-                defaults={'qty_allocated': qty},
+                assigned_asset=self._assets[asset_tag],
+                defaults={'qty': qty},
             )
 
         # --- AccessoryAssignments ---

@@ -66,8 +66,8 @@ class LocationDetailView(ObjectDetailView):
         context['consumable_stocks_table'] = consumable_stocks_table
 
         # Component Stocks
-        from components.models import ComponentStock
-        from components.tables import ComponentStockTable
+        from inventory.models import ComponentStock
+        from inventory.tables import ComponentStockTable
         comp_stock_qs = ComponentStock.objects.filter(location=location)
         component_stocks_table = ComponentStockTable(comp_stock_qs, request=self.request)
         component_stocks_table.configure(self.request)
@@ -123,7 +123,7 @@ class LocationDetailView(ObjectDetailView):
             related_objects_list.append({
                 'label': 'Component Stocks',
                 'count': component_count,
-                'url': f"{reverse('components:componentstock_list')}?location={location.slug}"
+                'url': f"{reverse('inventory:componentstock_list')}?location={location.slug}"
             })
         checkout_count = asset_assignments_qs.count()
         if checkout_count:

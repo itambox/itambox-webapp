@@ -80,14 +80,22 @@ class BulkImportForm(forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
-        active_tab = cleaned_data.get('active_tab') or self.data.get('active_tab', 'upload')
         import_format = cleaned_data.get('import_format') or self.data.get('import_format', 'csv')
+
+        csv_file = cleaned_data.get('csv_file')
+        import_text = cleaned_data.get('import_text') or ''
+        active_tab = cleaned_data.get('active_tab') or self.data.get('active_tab', 'upload')
+
+        # Auto-detect active tab based on which data is provided
+        if csv_file:
+            active_tab = 'upload'
+        elif import_text.strip():
+            active_tab = 'editor'
 
         self._rows_data = []
         raw_data = ""
 
         if active_tab == 'upload':
-            csv_file = cleaned_data.get('csv_file')
             if not csv_file:
                 raise ValidationError(_('Please select a file to upload.'))
             try:
@@ -99,9 +107,9 @@ class BulkImportForm(forms.Form):
                 except Exception:
                     raise ValidationError(_('Unable to decode file. Please upload a valid text-based CSV or YAML file.'))
         else:
-            raw_data = cleaned_data.get('import_text') or ''
-            if not raw_data.strip():
+            if not import_text.strip():
                 raise ValidationError(_('Please paste data in the editor tab.'))
+            raw_data = import_text
 
         if import_format == 'csv':
             delimiter = cleaned_data.get('delimiter') or ','

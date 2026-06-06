@@ -44,8 +44,8 @@ class CategoryDetailView(ObjectDetailView):
         context['accessories_table'] = accessories_table
 
         # Components
-        from components.models import Component
-        from components.tables import ComponentTable
+        from inventory.models import Component
+        from inventory.tables import ComponentTable
         cat_components = Component.objects.filter(category=category).select_related('manufacturer', 'category', 'tenant').prefetch_related('tags')
         components_table = ComponentTable(cat_components, request=self.request)
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(components_table)
@@ -86,7 +86,7 @@ class CategoryDetailView(ObjectDetailView):
             related_objects_list.append({
                 'label': 'Components',
                 'count': component_count,
-                'url': f"{reverse('components:component_list')}?category={category.slug}"
+                'url': f"{reverse('inventory:component_list')}?category={category.slug}"
             })
         consumable_count = cat_consumables.count()
         if consumable_count:

@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from django.views.generic import TemplateView
+from django.views.generic import TemplateView, RedirectView
 from assets import views as asset_views # Import the assets views
 from itambox.views.generic import (
     ObjectBulkDeleteView, ObjectBulkEditView, table_config,
@@ -71,7 +71,24 @@ urlpatterns = [
 
     # UI Paths
     path('assets/', include('assets.urls', namespace='assets')),
-    path('components/', include('components.urls', namespace='components')),
+    path('components/', include(([
+        path('', RedirectView.as_view(url='/inventory/inventory/?type=components', permanent=True), name='component_list'),
+        path('add/', RedirectView.as_view(url='/inventory/components/add/', permanent=True), name='component_create'),
+        path('<int:pk>/', RedirectView.as_view(url='/inventory/components/%(pk)d/', permanent=True), name='component_detail'),
+        path('<int:pk>/edit/', RedirectView.as_view(url='/inventory/components/%(pk)d/edit/', permanent=True), name='component_update'),
+        path('<int:pk>/delete/', RedirectView.as_view(url='/inventory/components/%(pk)d/delete/', permanent=True), name='component_delete'),
+        path('<int:pk>/clone/', RedirectView.as_view(url='/inventory/components/%(pk)d/clone/', permanent=True), name='component_clone'),
+        path('<int:pk>/add-stock/', RedirectView.as_view(url='/inventory/components/%(pk)d/add-stock/', permanent=True), name='component_add_stock'),
+        path('stocks/', RedirectView.as_view(url='/inventory/component-stocks/', permanent=True), name='componentstock_list'),
+        path('stocks/add/', RedirectView.as_view(url='/inventory/component-stocks/add/', permanent=True), name='componentstock_create'),
+        path('stocks/<int:pk>/edit/', RedirectView.as_view(url='/inventory/component-stocks/%(pk)d/edit/', permanent=True), name='componentstock_update'),
+        path('stocks/<int:pk>/delete/', RedirectView.as_view(url='/inventory/component-stocks/%(pk)d/delete/', permanent=True), name='componentstock_delete'),
+        path('stocks/<int:pk>/adjust/', RedirectView.as_view(url='/inventory/component-stocks/%(pk)d/adjust/', permanent=True), name='componentstock_adjust'),
+        path('allocations/', RedirectView.as_view(url='/inventory/component-allocations/', permanent=True), name='componentallocation_list'),
+        path('allocations/add/', RedirectView.as_view(url='/inventory/component-allocations/add/', permanent=True), name='componentallocation_create'),
+        path('allocations/<int:pk>/edit/', RedirectView.as_view(url='/inventory/component-allocations/%(pk)d/edit/', permanent=True), name='componentallocation_update'),
+        path('allocations/<int:pk>/delete/', RedirectView.as_view(url='/inventory/component-allocations/%(pk)d/delete/', permanent=True), name='componentallocation_delete'),
+    ], 'components'), namespace='components')),
     path('inventory/', include('inventory.urls', namespace='inventory')),
     path('compliance/', include('compliance.urls', namespace='compliance')),
     path('organization/', include('organization.urls', namespace='organization')),

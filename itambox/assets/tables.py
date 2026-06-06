@@ -243,10 +243,9 @@ class AssetTypeTable(BaseTable):
         if value is not None:
             return f"{value} month{'s' if value != 1 else ''}"
         return "—"
-from components.tables import ComponentAllocationTable
 from compliance.tables import AssetMaintenanceTable
 from extras.tables import CustomFieldTable, CustomFieldsetTable
-from inventory.tables import AccessoryTable, ConsumableTable, KitTable
+from inventory.tables import AccessoryTable, ConsumableTable, KitTable, ComponentAllocationTable
 
 class DepreciationTable(BaseTable):
     pk = ToggleColumn(accessor='pk')

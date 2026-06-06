@@ -224,7 +224,7 @@ OBJECT_COUNT_MODEL_CHOICES = [
     ('assets.assettype', 'Asset Types'),
     ('assets.manufacturer', 'Manufacturers'),
     ('assets.statuslabel', 'Status Labels'),
-    ('components.component', 'Components'),
+    ('inventory.component', 'Components'),
     ('inventory.accessory', 'Accessories'),
     ('inventory.consumable', 'Consumables'),
     ('organization.site', 'Sites'),
@@ -273,14 +273,14 @@ class ObjectCountsWidget(DashboardWidget):
             return {'counts': [], 'has_data': False}
         from organization.models import Site, Tenant, Location
         from software.models import Software
-        from components.models import Component
+        from inventory.models import Component
         from assets.models import AssetType, Manufacturer
         model_map = {
             'assets.asset': (Asset, 'assets:asset_list'),
             'assets.assettype': (AssetType, 'assets:assettype_list'),
             'assets.manufacturer': (Manufacturer, 'assets:manufacturer_list'),
             'assets.statuslabel': (StatusLabel, 'assets:statuslabel_list'),
-            'components.component': (Component, 'components:component_list'),
+            'inventory.component': (Component, 'inventory:component_list'),
             'inventory.accessory': (Accessory, 'inventory:accessory_list'),
             'inventory.consumable': (Consumable, 'inventory:consumable_list'),
             'organization.site': (Site, 'organization:site_list'),
@@ -812,8 +812,8 @@ class LowStockWidget(DashboardWidget):
         # Scoped Component calculation (Annotated in single query)
         low_components = []
         if include_comp:
-            from components.models import Component, ComponentStock, ComponentAllocation
-            comp_qs = Component.objects.filter(min_stock_level__gt=0).order_by('name')
+            from inventory.models import Component, ComponentStock, ComponentAllocation
+            comp_qs = Component.objects.filter(min_qty__gt=0).order_by('name')
             
             # Scoped total stock subquery
             stock_sub = ComponentStock.objects.filter(component=OuterRef('pk'))
@@ -824,8 +824,8 @@ class LowStockWidget(DashboardWidget):
             # Scoped allocated subquery
             allocation_sub = ComponentAllocation.objects.filter(component=OuterRef('pk'), deleted_at__isnull=True)
             if active_tenant:
-                allocation_sub = allocation_sub.filter(asset__tenant=active_tenant)
-            allocation_sub = allocation_sub.values('component').annotate(sum_qty=Sum('qty_allocated')).values('sum_qty')
+                allocation_sub = allocation_sub.filter(assigned_asset__tenant=active_tenant)
+            allocation_sub = allocation_sub.values('component').annotate(sum_qty=Sum('qty')).values('sum_qty')
             
             comp_qs = comp_qs.annotate(
                 _total_stock_annotated=Coalesce(Subquery(stock_sub), 0),
@@ -834,13 +834,13 @@ class LowStockWidget(DashboardWidget):
             
             for comp in comp_qs:
                 available = comp._total_stock_annotated - comp._total_allocated_annotated
-                if available < comp.min_stock_level:
+                if available < comp.min_qty:
                     low_components.append({
                         'component': comp,
                         'available_stock': available,
                         'total_stock': comp._total_stock_annotated,
                         'total_allocated': comp._total_allocated_annotated,
-                        'min_stock_level': comp.min_stock_level,
+                        'min_qty': comp.min_qty,
                     })
 
         return {
@@ -854,7 +854,7 @@ class LowStockWidget(DashboardWidget):
 
     def get_footer_links(self, request):
         return [
-            {'url': reverse('components:component_list'), 'label': _('Components')},
+            {'url': reverse('inventory:component_list'), 'label': _('Components')},
             {'url': reverse('inventory:accessory_list'), 'label': _('Accessories')},
             {'url': reverse('inventory:consumable_list'), 'label': _('Consumables')},
         ]

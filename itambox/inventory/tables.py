@@ -1,14 +1,19 @@
 import django_tables2 as tables
 from django.urls import reverse
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
+from django.utils.translation import gettext_lazy as _
 from django_tables2.utils import A
 
 from core.tables import BaseTable, ToggleColumn, ActionsColumn
 from extras.tables import TagColumn
-from .models import Accessory, AccessoryAssignment, AccessoryStock, Consumable, ConsumableAssignment, ConsumableStock, Kit
+from .models import Accessory, AccessoryAssignment, AccessoryStock, Consumable, ConsumableAssignment, ConsumableStock, Kit, Component, ComponentStock, ComponentAllocation
 
 
-class AccessoryTable(BaseTable):
+from .mixins import CheckableInventoryTableMixin
+
+
+class AccessoryTable(CheckableInventoryTableMixin, BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('inventory:accessory_detail', args=[A('pk')], verbose_name='Name')
     manufacturer = tables.Column(linkify=True)
@@ -23,8 +28,8 @@ class AccessoryTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = Accessory
-        fields = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'part_number', 'total_stock', 'checked_out_qty', 'available', 'tags', 'actions')
-        default_columns = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'total_stock', 'checked_out_qty', 'available', 'tags', 'actions')
+        fields = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'part_number', 'total_stock', 'checked_out_qty', 'available', 'tags', 'checkout_checkin', 'actions')
+        default_columns = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'total_stock', 'checked_out_qty', 'available', 'tags', 'checkout_checkin', 'actions')
 
     def render_available(self, value, record):
         if value <= 0:
@@ -39,29 +44,53 @@ class AccessoryStockTable(BaseTable):
     accessory = tables.LinkColumn('inventory:accessory_detail', args=[A('accessory.pk')], verbose_name='Accessory')
     location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], verbose_name='Location')
     qty = tables.Column(verbose_name='Quantity')
-    actions = ActionsColumn()
+    add_stock = tables.Column(
+        verbose_name='',
+        orderable=False,
+        empty_values=(),
+        attrs={
+            'th': {'class': 'col-checkout text-nowrap'},
+            'td': {'class': 'text-center text-nowrap noprint p-1 col-checkout'}
+        },
+    )
+    actions = tables.TemplateColumn(
+        template_code="""
+        <a class="btn btn-sm btn-danger px-2" href="{% url 'inventory:accessorystock_delete' record.pk %}" title="Delete">
+            <i class="mdi mdi-trash-can-outline m-0"></i>
+        </a>
+        """,
+        verbose_name='',
+        orderable=False,
+        attrs={
+            'th': {'class': 'col-actions text-nowrap'},
+            'td': {'class': 'text-end text-nowrap noprint p-1 col-actions'}
+        }
+    )
 
     class Meta(BaseTable.Meta):
         model = AccessoryStock
-        fields = ('pk', 'accessory', 'location', 'qty', 'actions')
-        default_columns = ('pk', 'accessory', 'location', 'qty', 'actions')
+        fields = ('pk', 'accessory', 'location', 'qty', 'add_stock', 'actions')
+        default_columns = ('pk', 'accessory', 'location', 'qty', 'add_stock', 'actions')
 
     def render_qty(self, value, record):
         return format_html(
-            '<div class="d-flex align-items-center justify-content-start">'
-            '  <button class="btn btn-sm btn-icon btn-outline-secondary me-2 px-1 py-0 lh-1" '
-            '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
-            '    <i class="mdi mdi-minus" style="font-size: 0.75rem;"></i>'
-            '  </button>'
-            '  <span class="badge bg-blue-lt text-blue font-weight-bold px-2 py-1" style="font-size: 0.85rem;">{}</span>'
-            '  <button class="btn btn-sm btn-icon btn-outline-secondary ms-2 px-1 py-0 lh-1" '
-            '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
-            '    <i class="mdi mdi-plus" style="font-size: 0.75rem;"></i>'
+            '<span class="badge bg-blue-lt text-blue font-weight-bold px-2 py-1" style="font-size: 0.85rem;">{}</span>',
+            value
+        )
+
+    def render_add_stock(self, record):
+        request = getattr(self, 'request', None)
+        if not request or not self.has_perm(request.user, 'inventory.change_accessorystock', record.accessory):
+            return mark_safe('<span class="text-muted small">—</span>')
+        return format_html(
+            '<div class="d-inline-block">'
+            '  <button type="button" class="btn btn-sm btn-primary d-flex align-items-center" '
+            '          hx-get="{}?location={}" hx-target="#modal-placeholder" hx-swap="innerHTML" title="Add Stock">'
+            '    <i class="mdi mdi-plus me-1"></i> Add Stock'
             '  </button>'
             '</div>',
-            reverse('inventory:accessorystock_adjust', kwargs={'pk': record.pk}) + '?action=decrement',
-            value,
-            reverse('inventory:accessorystock_adjust', kwargs={'pk': record.pk}) + '?action=increment'
+            reverse('inventory:accessory_add_stock', kwargs={'pk': record.accessory.pk}),
+            record.location.pk
         )
 
 
@@ -71,7 +100,15 @@ class AccessoryAssignmentTable(BaseTable):
     assigned_to = tables.Column(verbose_name='Assigned To', orderable=False)
     qty = tables.Column(verbose_name='Qty')
     assigned_date = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name='Date')
-    actions = ActionsColumn()
+    actions = tables.Column(
+        verbose_name='',
+        orderable=False,
+        empty_values=(),
+        attrs={
+            'th': {'class': 'col-actions text-nowrap'},
+            'td': {'class': 'text-end text-nowrap noprint p-1 col-actions'}
+        }
+    )
 
     class Meta(BaseTable.Meta):
         model = AccessoryAssignment
@@ -90,8 +127,27 @@ class AccessoryAssignmentTable(BaseTable):
             return format_html('<a href="{}">Asset: {}</a>', url, record.assigned_asset)
         return "—"
 
+    def render_actions(self, record):
+        request = getattr(self, 'request', None)
+        if not request or not self.has_perm(request.user, 'inventory.change_accessory', record.accessory):
+            return mark_safe('<span class="text-muted small">—</span>')
+        
+        url = reverse('inventory:accessory_checkin', kwargs={'pk': record.pk})
+        confirm_msg = _("Are you sure you want to check in this accessory assignment?")
+        return format_html(
+            '<div class="d-flex gap-1 justify-content-end">'
+            '  <button hx-post="{}" hx-confirm="{}" '
+            '          class="btn btn-sm btn-outline-success d-flex align-items-center" title="Check-in">'
+            '    <i class="mdi mdi-keyboard-return me-1"></i> {}'
+            '  </button>'
+            '</div>',
+            url,
+            confirm_msg,
+            _("Check-in")
+        )
 
-class ConsumableTable(BaseTable):
+
+class ConsumableTable(CheckableInventoryTableMixin, BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('inventory:consumable_detail', args=[A('pk')], verbose_name='Name')
     manufacturer = tables.Column(linkify=True)
@@ -106,8 +162,8 @@ class ConsumableTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = Consumable
-        fields = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'part_number', 'total_stock', 'consumed_qty', 'available', 'tags', 'actions')
-        default_columns = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'total_stock', 'consumed_qty', 'available', 'tags', 'actions')
+        fields = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'part_number', 'total_stock', 'consumed_qty', 'available', 'tags', 'checkout_checkin', 'actions')
+        default_columns = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'total_stock', 'consumed_qty', 'available', 'tags', 'checkout_checkin', 'actions')
 
     def render_available(self, value, record):
         if value <= 0:
@@ -122,29 +178,53 @@ class ConsumableStockTable(BaseTable):
     consumable = tables.LinkColumn('inventory:consumable_detail', args=[A('consumable.pk')], verbose_name='Consumable')
     location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], verbose_name='Location')
     qty = tables.Column(verbose_name='Quantity')
-    actions = ActionsColumn()
+    add_stock = tables.Column(
+        verbose_name='',
+        orderable=False,
+        empty_values=(),
+        attrs={
+            'th': {'class': 'col-checkout text-nowrap'},
+            'td': {'class': 'text-center text-nowrap noprint p-1 col-checkout'}
+        },
+    )
+    actions = tables.TemplateColumn(
+        template_code="""
+        <a class="btn btn-sm btn-danger px-2" href="{% url 'inventory:consumablestock_delete' record.pk %}" title="Delete">
+            <i class="mdi mdi-trash-can-outline m-0"></i>
+        </a>
+        """,
+        verbose_name='',
+        orderable=False,
+        attrs={
+            'th': {'class': 'col-actions text-nowrap'},
+            'td': {'class': 'text-end text-nowrap noprint p-1 col-actions'}
+        }
+    )
 
     class Meta(BaseTable.Meta):
         model = ConsumableStock
-        fields = ('pk', 'consumable', 'location', 'qty', 'actions')
-        default_columns = ('pk', 'consumable', 'location', 'qty', 'actions')
+        fields = ('pk', 'consumable', 'location', 'qty', 'add_stock', 'actions')
+        default_columns = ('pk', 'consumable', 'location', 'qty', 'add_stock', 'actions')
 
     def render_qty(self, value, record):
         return format_html(
-            '<div class="d-flex align-items-center justify-content-start">'
-            '  <button class="btn btn-sm btn-icon btn-outline-secondary me-2 px-1 py-0 lh-1" '
-            '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
-            '    <i class="mdi mdi-minus" style="font-size: 0.75rem;"></i>'
-            '  </button>'
-            '  <span class="badge bg-blue-lt text-blue font-weight-bold px-2 py-1" style="font-size: 0.85rem;">{}</span>'
-            '  <button class="btn btn-sm btn-icon btn-outline-secondary ms-2 px-1 py-0 lh-1" '
-            '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
-            '    <i class="mdi mdi-plus" style="font-size: 0.75rem;"></i>'
+            '<span class="badge bg-blue-lt text-blue font-weight-bold px-2 py-1" style="font-size: 0.85rem;">{}</span>',
+            value
+        )
+
+    def render_add_stock(self, record):
+        request = getattr(self, 'request', None)
+        if not request or not self.has_perm(request.user, 'inventory.change_consumablestock', record.consumable):
+            return mark_safe('<span class="text-muted small">—</span>')
+        return format_html(
+            '<div class="d-inline-block">'
+            '  <button type="button" class="btn btn-sm btn-primary d-flex align-items-center" '
+            '          hx-get="{}?location={}" hx-target="#modal-placeholder" hx-swap="innerHTML" title="Add Stock">'
+            '    <i class="mdi mdi-plus me-1"></i> Add Stock'
             '  </button>'
             '</div>',
-            reverse('inventory:consumablestock_adjust', kwargs={'pk': record.pk}) + '?action=decrement',
-            value,
-            reverse('inventory:consumablestock_adjust', kwargs={'pk': record.pk}) + '?action=increment'
+            reverse('inventory:consumable_add_stock', kwargs={'pk': record.consumable.pk}),
+            record.location.pk
         )
 
 
@@ -186,3 +266,130 @@ class KitTable(BaseTable):
         model = Kit
         fields = ('pk', 'name', 'tenant', 'description', 'item_count', 'actions')
         default_columns = ('pk', 'name', 'tenant', 'description', 'item_count', 'actions')
+
+
+class ComponentTable(CheckableInventoryTableMixin, BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    name = tables.LinkColumn('inventory:component_detail', args=[A('pk')], verbose_name='Name')
+    manufacturer = tables.Column(linkify=True)
+    category = tables.Column(accessor='category.name', verbose_name='Category')
+    part_number = tables.Column(verbose_name='Part Number')
+    total_stock = tables.Column(verbose_name='Total Stock', orderable=False)
+    available_stock = tables.Column(verbose_name='Available', orderable=False)
+    min_qty = tables.Column(verbose_name='Safety Threshold')
+    tenant = tables.Column(linkify=True)
+    tags = TagColumn(url_name='inventory:component_list')
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = Component
+        fields = ('pk', 'name', 'manufacturer', 'category', 'part_number', 'total_stock', 'available_stock', 'min_qty', 'tenant', 'tags', 'checkout_checkin', 'actions')
+        default_columns = ('pk', 'name', 'manufacturer', 'category', 'part_number', 'total_stock', 'available_stock', 'min_qty', 'tenant', 'tags', 'checkout_checkin', 'actions')
+
+
+class ComponentStockTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    component = tables.LinkColumn('inventory:component_detail', args=[A('component.pk')], verbose_name='Component')
+    location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], verbose_name='Location')
+    qty = tables.Column(verbose_name='Quantity')
+    add_stock = tables.Column(
+        verbose_name='',
+        orderable=False,
+        empty_values=(),
+        attrs={
+            'th': {'class': 'col-checkout text-nowrap'},
+            'td': {'class': 'text-center text-nowrap noprint p-1 col-checkout'}
+        },
+    )
+    actions = tables.TemplateColumn(
+        template_code="""
+        <a class="btn btn-sm btn-danger px-2" href="{% url 'inventory:componentstock_delete' record.pk %}" title="Delete">
+            <i class="mdi mdi-trash-can-outline m-0"></i>
+        </a>
+        """,
+        verbose_name='',
+        orderable=False,
+        attrs={
+            'th': {'class': 'col-actions text-nowrap'},
+            'td': {'class': 'text-end text-nowrap noprint p-1 col-actions'}
+        }
+    )
+
+    class Meta(BaseTable.Meta):
+        model = ComponentStock
+        fields = ('pk', 'component', 'location', 'qty', 'add_stock', 'actions')
+        default_columns = ('pk', 'component', 'location', 'qty', 'add_stock', 'actions')
+
+    def render_qty(self, value, record):
+        return format_html(
+            '<span class="badge bg-blue-lt text-blue font-weight-bold px-2 py-1" style="font-size: 0.85rem;">{}</span>',
+            value
+        )
+
+    def render_add_stock(self, record):
+        request = getattr(self, 'request', None)
+        if not request or not self.has_perm(request.user, 'inventory.change_componentstock', record.component):
+            return mark_safe('<span class="text-muted small">—</span>')
+        return format_html(
+            '<div class="d-inline-block">'
+            '  <button type="button" class="btn btn-sm btn-primary d-flex align-items-center" '
+            '          hx-get="{}?location={}" hx-target="#modal-placeholder" hx-swap="innerHTML" title="Add Stock">'
+            '    <i class="mdi mdi-plus me-1"></i> Add Stock'
+            '  </button>'
+            '</div>',
+            reverse('inventory:component_add_stock', kwargs={'pk': record.component.pk}),
+            record.location.pk
+        )
+
+
+class ComponentAllocationTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    component = tables.LinkColumn('inventory:component_detail', args=[A('component__pk')], verbose_name='Component')
+    assigned_to = tables.Column(verbose_name='Assigned To', orderable=False)
+    qty = tables.Column(verbose_name='Qty')
+    assigned_date = tables.DateTimeColumn(format='Y-m-d H:i', verbose_name='Date')
+    actions = tables.Column(
+        verbose_name='',
+        orderable=False,
+        empty_values=(),
+        attrs={
+            'th': {'class': 'col-actions text-nowrap'},
+            'td': {'class': 'text-end text-nowrap noprint p-1 col-actions'}
+        }
+    )
+
+    class Meta(BaseTable.Meta):
+        model = ComponentAllocation
+        fields = ('pk', 'component', 'assigned_to', 'qty', 'assigned_date', 'actions')
+        default_columns = ('pk', 'component', 'assigned_to', 'qty', 'assigned_date', 'actions')
+
+    def render_assigned_to(self, record):
+        if record.assigned_holder:
+            url = reverse('organization:assetholder_detail', kwargs={'pk': record.assigned_holder.pk})
+            return format_html('<a href="{}">Holder: {}</a>', url, record.assigned_holder)
+        elif record.assigned_location:
+            url = reverse('organization:location_detail', kwargs={'pk': record.assigned_location.pk})
+            return format_html('<a href="{}">Location: {}</a>', url, record.assigned_location)
+        elif record.assigned_asset:
+            url = reverse('assets:asset_detail', kwargs={'pk': record.assigned_asset.pk})
+            return format_html('<a href="{}">Asset: {}</a>', url, record.assigned_asset)
+        return "—"
+
+    def render_actions(self, record):
+        request = getattr(self, 'request', None)
+        if not request or not self.has_perm(request.user, 'inventory.change_component', record.component):
+            return mark_safe('<span class="text-muted small">—</span>')
+        
+        url = reverse('inventory:component_checkin', kwargs={'pk': record.pk})
+        confirm_msg = _("Are you sure you want to check in this component allocation?")
+        return format_html(
+            '<div class="d-flex gap-1 justify-content-end">'
+            '  <button hx-post="{}" hx-confirm="{}" '
+            '          class="btn btn-sm btn-outline-success d-flex align-items-center" title="Check-in">'
+            '    <i class="mdi mdi-keyboard-return me-1"></i> {}'
+            '  </button>'
+            '</div>',
+            url,
+            confirm_msg,
+            _("Check-in")
+        )

@@ -69,8 +69,8 @@ class ManufacturerDetailView(ObjectDetailView):
         context['related_objects_list'] = related_objects_list
 
         # Components
-        from components.models import Component
-        from components.tables import ComponentTable
+        from inventory.models import Component
+        from inventory.tables import ComponentTable
         comp_qs = Component.objects.filter(manufacturer=manufacturer).select_related('category', 'tenant')
         components_table = ComponentTable(comp_qs, request=self.request)
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(components_table)
