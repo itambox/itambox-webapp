@@ -1136,3 +1136,20 @@ class EnterpriseITAMTestCase(TestCase):
         self.assertIn(holder_b, holders_qs_kit)
         self.assertNotIn(holder_a, holders_qs_kit)
 
+
+class CategoryTestCase(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='testadmin', password='testpassword', is_staff=True, is_superuser=True)
+        self.client.login(username='testadmin', password='testpassword')
+
+    def test_category_list_view_and_color_rendering(self):
+        # Create a category with color code
+        category = Category.objects.create(name="Laptop Category", slug="laptop-category", color="ff0000")
+
+        response = self.client.get(reverse('assets:category_list'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Laptop Category")
+        # Check that the color hex is displayed, and the badge span contains the background-color style
+        self.assertContains(response, 'background-color: #ff0000')
+        self.assertContains(response, '#ff0000')
+

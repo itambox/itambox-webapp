@@ -24,8 +24,8 @@ from django_tables2 import RequestConfig
 
 class TenantListView(ObjectListView):
     queryset = Tenant.objects.select_related('group').prefetch_related('tags').annotate(
-        site_count=Count('sites'),
-        location_count=Count('locations'),
+        site_count=Count('sites', distinct=True),
+        location_count=Count('locations', distinct=True),
     )
     filterset = TenantFilterSet
     filterset_form = TenantFilterForm

@@ -20,8 +20,8 @@ from django_tables2 import RequestConfig
 
 class SiteListView(ObjectListView):
     queryset = Site.objects.select_related('region', 'group', 'tenant').prefetch_related('tags').annotate(
-        location_count=Count('locations'),
-        asset_count=Count('locations__assets'),
+        location_count=Count('locations', distinct=True),
+        asset_count=Count('locations__assets', distinct=True),
     )
     filterset = SiteFilterSet
     filterset_form = SiteFilterForm

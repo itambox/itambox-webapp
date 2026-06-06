@@ -57,6 +57,64 @@ class SiteViewTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
+    def test_list_view_counts(self):
+        from assets.models import Asset, AssetType, Manufacturer, AssetRole, StatusLabel
+        # Setup required metadata models for creating assets
+        manufacturer = Manufacturer.objects.create(name="Dell", slug="dell")
+        role = AssetRole.objects.create(name="Workstation", slug="workstation")
+        status = StatusLabel.objects.create(name="Ready", slug="ready", type=StatusLabel.TYPE_DEPLOYABLE)
+        asset_type = AssetType.objects.create(
+            manufacturer=manufacturer,
+            model="Latitude 5520",
+            slug="latitude-5520"
+        )
+        
+        # Create locations for the site
+        loc1 = Location.objects.create(name="Location 1", slug="loc-1", site=self.site)
+        loc2 = Location.objects.create(name="Location 2", slug="loc-2", site=self.site)
+        
+        # Create assets in those locations
+        Asset.objects.create(
+            name="Asset 1",
+            asset_tag="TAG-1",
+            asset_type=asset_type,
+            asset_role=role,
+            status=status,
+            location=loc1
+        )
+        Asset.objects.create(
+            name="Asset 2",
+            asset_tag="TAG-2",
+            asset_type=asset_type,
+            asset_role=role,
+            status=status,
+            location=loc2
+        )
+        Asset.objects.create(
+            name="Asset 3",
+            asset_tag="TAG-3",
+            asset_type=asset_type,
+            asset_role=role,
+            status=status,
+            location=loc2
+        )
+        
+        url = reverse('organization:site_list')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Get the site object from the table's annotated queryset
+        table = response.context['table']
+        site_obj = None
+        for row in table.data:
+            if row.pk == self.site.pk:
+                site_obj = row
+                break
+        
+        self.assertIsNotNone(site_obj)
+        self.assertEqual(site_obj.location_count, 2)
+        self.assertEqual(site_obj.asset_count, 3)
+
     def test_detail_view(self):
         url = reverse('organization:site_detail', kwargs={'pk': self.site.pk})
         response = self.client.get(url)

@@ -277,6 +277,7 @@ class SupplierTable(BaseTable):
 class CategoryTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('assets:category_detail', args=[A('pk')], verbose_name='Name')
+    color = tables.Column(verbose_name='Color', orderable=False)
     tags = TagColumn(url_name='assets:category_list')
     actions = ActionsColumn()
 
@@ -284,6 +285,11 @@ class CategoryTable(BaseTable):
         model = Category
         fields = ('pk', 'name', 'color', 'tags', 'actions')
         default_columns = ('pk', 'name', 'color', 'tags', 'actions')
+
+    def render_color(self, value):
+        if value:
+            return mark_safe(f'<span class="badge" style="background-color: #{value};">&nbsp;</span> #{value}')
+        return "—"
 
 
 class AssetRequestTable(BaseTable):

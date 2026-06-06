@@ -19,6 +19,33 @@ class TenantViewTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
+    def test_list_view_counts(self):
+        from organization.models import Site, Location
+        # Create 2 sites for this tenant
+        Site.objects.create(name="Site 1", slug="site-1", tenant=self.tenant)
+        Site.objects.create(name="Site 2", slug="site-2", tenant=self.tenant)
+        
+        # Create 3 locations for this tenant
+        dummy_site = Site.objects.create(name="Dummy Site", slug="dummy-site")
+        Location.objects.create(name="Location 1", slug="loc-1", site=dummy_site, tenant=self.tenant)
+        Location.objects.create(name="Location 2", slug="loc-2", site=dummy_site, tenant=self.tenant)
+        Location.objects.create(name="Location 3", slug="loc-3", site=dummy_site, tenant=self.tenant)
+        
+        url = reverse('organization:tenant_list')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        
+        table = response.context['table']
+        tenant_obj = None
+        for row in table.data:
+            if row.pk == self.tenant.pk:
+                tenant_obj = row
+                break
+        
+        self.assertIsNotNone(tenant_obj)
+        self.assertEqual(tenant_obj.site_count, 2)
+        self.assertEqual(tenant_obj.location_count, 3)
+
     def test_detail_view(self):
         url = reverse('organization:tenant_detail', kwargs={'pk': self.tenant.pk})
         response = self.client.get(url)
