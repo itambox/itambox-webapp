@@ -23,17 +23,12 @@
     // Store original contents to restore on completion/error
     const originalText = submitBtn instanceof HTMLInputElement ? submitBtn.value : submitBtn.innerHTML;
     (submitBtn as any)._originalContent = originalText;
-    (submitBtn as any)._originalDisabledState = (submitBtn as any).disabled;
+    (submitBtn as any)._originalPointerEvents = submitBtn.style.pointerEvents;
 
-    // Disable button to prevent double clicks (deferred to avoid canceling submit or stripping parameters)
-    setTimeout(function () {
-      if (submitBtn) {
-        if ('disabled' in submitBtn) {
-          (submitBtn as any).disabled = true;
-        }
-        submitBtn.classList.add('disabled');
-      }
-    }, 0);
+    // Prevent pointer events to block double clicking, and add disabled styling
+    submitBtn.style.pointerEvents = 'none';
+    submitBtn.classList.add('disabled');
+    form.dataset.submitting = 'true';
 
     // Inject spinner based on element type
     if (submitBtn instanceof HTMLInputElement) {
@@ -50,7 +45,7 @@
     const submitBtn = activeSubmits.get(form);
     if (!submitBtn) return;
 
-    // Restore original content and disabled status
+    // Restore original content and pointer events
     const originalContent = (submitBtn as any)._originalContent;
     if (originalContent !== undefined) {
       if (submitBtn instanceof HTMLInputElement) {
@@ -60,11 +55,10 @@
       }
     }
 
-    const originalDisabled = (submitBtn as any)._originalDisabledState;
-    if ('disabled' in submitBtn) {
-      (submitBtn as any).disabled = originalDisabled !== undefined ? originalDisabled : false;
-    }
+    const originalPointerEvents = (submitBtn as any)._originalPointerEvents;
+    submitBtn.style.pointerEvents = originalPointerEvents !== undefined ? originalPointerEvents : '';
     submitBtn.classList.remove('disabled');
+    delete form.dataset.submitting;
 
     activeSubmits.delete(form);
   }
@@ -73,6 +67,10 @@
   document.body.addEventListener('submit', function (evt) {
     const form = evt.target as HTMLFormElement;
     if (form && form.tagName === 'FORM') {
+      if (form.dataset.submitting === 'true') {
+        evt.preventDefault();
+        return;
+      }
       const submitter = (evt as SubmitEvent).submitter || undefined;
       showLoadingState(form, submitter);
     }
