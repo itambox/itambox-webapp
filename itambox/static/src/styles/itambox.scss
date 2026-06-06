@@ -646,10 +646,10 @@ html,
         content: "";
         position: absolute;
         top: 0;
-        right: -6px;
+        right: -4px;
         bottom: 0;
-        width: 6px;
-        background: linear-gradient(to right, rgba(0, 0, 0, 0.08), transparent);
+        width: 4px;
+        background: linear-gradient(to right, rgba(0, 0, 0, 0.04), transparent);
         pointer-events: none;
     }
 
@@ -658,10 +658,10 @@ html,
         content: "";
         position: absolute;
         top: 0;
-        left: -6px;
+        left: -4px;
         bottom: 0;
-        width: 6px;
-        background: linear-gradient(to left, rgba(0, 0, 0, 0.08), transparent);
+        width: 4px;
+        background: linear-gradient(to left, rgba(0, 0, 0, 0.04), transparent);
         pointer-events: none;
     }
 
@@ -670,10 +670,10 @@ html,
         content: "";
         position: absolute;
         top: 0;
-        left: -6px;
+        left: -4px;
         bottom: 0;
-        width: 6px;
-        background: linear-gradient(to left, rgba(0, 0, 0, 0.08), transparent);
+        width: 4px;
+        background: linear-gradient(to left, rgba(0, 0, 0, 0.04), transparent);
         pointer-events: none;
     }
 
@@ -786,11 +786,11 @@ html,
 
     // Shadow opacity boost in dark mode
     td:first-child::after {
-        background: linear-gradient(to right, rgba(0, 0, 0, 0.35), transparent) !important;
+        background: linear-gradient(to right, rgba(0, 0, 0, 0.15), transparent) !important;
     }
     td:last-child::before,
     td.col-checkout::before {
-        background: linear-gradient(to left, rgba(0, 0, 0, 0.35), transparent) !important;
+        background: linear-gradient(to left, rgba(0, 0, 0, 0.15), transparent) !important;
     }
 }
 
