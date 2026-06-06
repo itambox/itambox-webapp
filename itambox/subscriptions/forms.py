@@ -3,7 +3,7 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Div, Row, Column
 from django.urls import reverse
 from core.forms import FilterForm
-from organization.models import Tenant, AssetHolder, Location
+from organization.models import Tenant, TenantGroup, AssetHolder, Location
 from assets.models import Asset
 from django.db import models as db_models
 from .models import Provider, Subscription, SubscriptionAssignment
@@ -17,24 +17,24 @@ class ProviderForm(forms.ModelForm):
         widget=forms.Select(attrs={'class': 'form-select'}),
         label="Tenant"
     )
+    tenant_group = forms.ModelChoiceField(
+        queryset=TenantGroup.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Tenant Group"
+    )
 
     class Meta:
         model = Provider
         fields = (
-            'name', 'slug', 'account_id', 'portal_url', 'website',
-            'contact_email', 'contact_phone', 'admin_notes',
-            'support_contact', 'is_active', 'tags',
+            'name', 'slug', 'tenant', 'tenant_group', 'account_id', 'portal_url', 'admin_notes', 'is_active', 'tags',
         )
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'slug': forms.TextInput(attrs={'class': 'form-control'}),
             'account_id': forms.TextInput(attrs={'class': 'form-control'}),
             'portal_url': forms.URLInput(attrs={'class': 'form-control'}),
-            'website': forms.URLInput(attrs={'class': 'form-control'}),
-            'contact_email': forms.EmailInput(attrs={'class': 'form-control'}),
-            'contact_phone': forms.TextInput(attrs={'class': 'form-control'}),
             'admin_notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
-            'support_contact': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
             'tags': forms.SelectMultiple(attrs={'class': 'form-select'}),
         }
 
@@ -53,19 +53,15 @@ class ProviderForm(forms.ModelForm):
                 Column('slug', css_class='col-md-6'),
             ),
             Row(
-                Column('portal_url', css_class='col-md-6'),
-                Column('website', css_class='col-md-6'),
+                Column('portal_url', css_class='col-md-12'),
             ),
             Row(
-                Column('account_id', css_class='col-md-6'),
-                Column('is_active', css_class='col-md-6'),
-            ),
-            Row(
-                Column('contact_email', css_class='col-md-6'),
-                Column('contact_phone', css_class='col-md-6'),
+                Column('account_id', css_class='col-md-3'),
+                Column('tenant', css_class='col-md-3'),
+                Column('tenant_group', css_class='col-md-3'),
+                Column('is_active', css_class='col-md-3'),
             ),
             'admin_notes',
-            'support_contact',
             'tags',
             HTML('<div class="mt-3 d-flex justify-content-between">'),
             Submit('submit', button_text, css_class='btn btn-primary'),

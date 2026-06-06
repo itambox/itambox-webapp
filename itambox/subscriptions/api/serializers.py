@@ -4,8 +4,8 @@ from django.contrib.contenttypes.models import ContentType
 
 from core.api.base import BaseModelSerializer
 from subscriptions.models import Provider, Subscription, SubscriptionAssignment
-from organization.api.serializers import NestedTenantSerializer
-from organization.models import Tenant
+from organization.api.serializers import NestedTenantSerializer, NestedTenantGroupSerializer, ContactAssignmentSerializer
+from organization.models import Tenant, TenantGroup
 from extras.api.serializers import TagSerializer
 
 User = get_user_model()
@@ -15,16 +15,28 @@ class ProviderSerializer(BaseModelSerializer):
     tags = TagSerializer(many=True, read_only=True)
     subscription_count = serializers.IntegerField(read_only=True)
     slug = serializers.SlugField(required=False, allow_blank=True)
+    tenant = NestedTenantSerializer(read_only=True)
+    tenant_id = serializers.PrimaryKeyRelatedField(
+        queryset=Tenant.objects.all(),
+        source='tenant', write_only=True, required=False, allow_null=True
+    )
+    tenant_group = NestedTenantGroupSerializer(read_only=True)
+    tenant_group_id = serializers.PrimaryKeyRelatedField(
+        queryset=TenantGroup.objects.all(),
+        source='tenant_group', write_only=True, required=False, allow_null=True
+    )
+    contacts = ContactAssignmentSerializer(many=True, read_only=True)
 
     class Meta:
         model = Provider
         fields = (
-            'id', 'name', 'slug', 'account_id', 'portal_url', 'website',
-            'contact_email', 'contact_phone', 'admin_notes', 'support_contact',
-            'is_active', 'subscription_count', 'tags', 'created_at', 'updated_at'
+            'id', 'name', 'slug', 'tenant', 'tenant_id', 'tenant_group', 'tenant_group_id',
+            'account_id', 'portal_url', 'admin_notes', 'is_active', 'subscription_count',
+            'tags', 'contacts', 'created_at', 'updated_at'
         )
         read_only_fields = ('created_at', 'updated_at')
         brief_fields = ('id', 'name', 'slug', 'is_active', 'subscription_count')
+        validators = []
 
 
 class SubscriptionSerializer(BaseModelSerializer):

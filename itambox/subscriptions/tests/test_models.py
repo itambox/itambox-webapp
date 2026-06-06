@@ -19,15 +19,32 @@ class ProviderModelTests(TestCase):
             name="AWS",
             account_id="aws-12345",
             portal_url="https://aws.amazon.com/console",
-            website="https://aws.amazon.com",
-            contact_email="support@aws.example.com",
-            contact_phone="+1-800-555-0199",
             is_active=True,
         )
 
     def test_provider_creation(self):
         self.assertEqual(str(self.provider), "AWS")
         self.assertTrue(self.provider.is_active)
+
+    def test_provider_contact_resolution(self):
+        from organization.models import Contact, ContactRole, ContactAssignment
+        role, _ = ContactRole.objects.get_or_create(
+            slug="primary-contact",
+            defaults={"name": "Primary Contact", "description": "Primary Contact"}
+        )
+        contact = Contact.objects.create(
+            name="AWS Account Manager",
+            email="manager@aws.example.com",
+            phone="+1-800-555-0199"
+        )
+        ContactAssignment.objects.create(
+            contact=contact,
+            role=role,
+            content_type=ContentType.objects.get_for_model(Provider),
+            object_id=self.provider.pk,
+            priority="primary"
+        )
+        self.assertEqual(self.provider.primary_contact, contact)
 
     def test_provider_absolute_url(self):
         url = self.provider.get_absolute_url()

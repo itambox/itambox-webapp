@@ -12,9 +12,9 @@ class SubscriptionAssignmentInline(admin.TabularInline):
 
 @admin.register(Provider)
 class ProviderAdmin(admin.ModelAdmin):
-    list_display = ('name', 'slug', 'is_active', 'account_id', 'contact_email', 'contact_phone')
+    list_display = ('name', 'slug', 'is_active', 'account_id')
     list_filter = ('is_active', 'tags')
-    search_fields = ('name', 'account_id', 'contact_email', 'admin_notes', 'support_contact')
+    search_fields = ('name', 'account_id', 'admin_notes')
     readonly_fields = ('created_at', 'updated_at')
     prepopulated_fields = {'slug': ('name',)}
     filter_horizontal = ('tags',)

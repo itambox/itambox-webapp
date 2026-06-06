@@ -1,6 +1,6 @@
 {% load i18n %}
 {# HTMX poll target for notification bell dropdown content #}
-<div class="card" hx-swap-oob="true" id="notification-dropdown-content">
+<div class="card">
     <div class="card-header">
         <h3 class="card-title">{% translate "Unread Alerts (" %}<span id="unread-count">{{ unread_notifications_count }}</span>)</h3>
     </div>

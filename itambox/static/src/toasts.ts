@@ -11,8 +11,9 @@
  */
 (function () {
   function initToastsInContainer(container: HTMLElement): void {
-    const toasts = container.querySelectorAll<HTMLElement>('.toast');
+    const toasts = container.querySelectorAll<HTMLElement>('.toast:not(.initialized)');
     toasts.forEach(function (toastEl) {
+      toastEl.classList.add('initialized');
       const toast = new bootstrap.Toast(toastEl);
       toast.show();
       toastEl.addEventListener('hidden.bs.toast', function () {
@@ -44,12 +45,14 @@
 
   document.body.addEventListener('htmx:afterSwap', function (evt: Event) {
     const detail = (evt as CustomEvent).detail;
-    if (detail.target && detail.target.id === 'django-messages') {
-      initToastsInContainer(detail.target as HTMLElement);
-      return;
+    
+    // Always check for and initialize any new toasts in #django-messages container
+    const container = document.getElementById('django-messages');
+    if (container) {
+      initToastsInContainer(container);
     }
+    
     if (detail.elt) {
-      initToastsInContainer(detail.elt as HTMLElement);
       initTooltips(detail.elt as HTMLElement);
     }
   });

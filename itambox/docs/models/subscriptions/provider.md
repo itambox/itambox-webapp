@@ -7,13 +7,12 @@ A **SaaS Provider** represents a cloud platform hosting provider, software vendo
 | Field | Description | Type | Required |
 | --- | --- | --- | --- |
 | **Name** | Unique name of the SaaS provider (e.g., Adobe Inc.). | String | Yes |
-| **Slug** | URL-friendly identifier. | Slug | Yes |
-| **Account ID** | customer account number with this provider. | String | No |
+| **Slug** | URL-friendly identifier (auto-generated if blank). | Slug | Yes |
+| **Account ID** | Customer account number with this provider. | String | No |
 | **Admin Portal URL**| Administration or configuration management console portal link. | URL | No |
-| **Company Website**| Public website address of the provider. | URL | No |
-| **Contact Email** | Primary support or account rep email address. | Email | No |
-| **Contact Phone** | Primary support or billing telephone number. | String | No |
-| **Support Details**| Escalation paths, contact hours, or support ticket URLs. | Text | No |
 | **Admin Notes** | Internal administrative notes. | Text | No |
 | **Active** | Toggle to show/hide this provider in selections. | Boolean | Yes |
-| **Description** | Optional notes detailing contract SLAs or SSO integrations. | Text | No |
+| **Tenant** | Optional tenant scoping this provider. Null represents system-wide/global. | ForeignKey | No |
+| **Tenant Group**| Optional tenant group scoping this provider. | ForeignKey | No |
+| **Contacts** | Assigned contacts from the unified organization contact system. | GenericRelation | No |
+| **Tags** | Categorization labels. | Many-to-Many | No |

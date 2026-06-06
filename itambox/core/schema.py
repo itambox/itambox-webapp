@@ -7,6 +7,7 @@ import assets.schema
 import software.schema
 import licenses.schema
 import inventory.schema
+import subscriptions.schema
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,7 @@ query_bases = [
     software.schema.Query,
     licenses.schema.Query,
     inventory.schema.Query,
+    subscriptions.schema.Query,
 ]
 
 mutation_bases = [
@@ -22,6 +24,7 @@ mutation_bases = [
     software.schema.Mutation,
     licenses.schema.Mutation,
     inventory.schema.Mutation,
+    subscriptions.schema.Mutation,
 ]
 
 # Dynamically import plugin schemas

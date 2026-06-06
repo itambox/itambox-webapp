@@ -180,13 +180,19 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
             bulk_delete_url_name = get_model_viewname(_model, 'bulk_delete')
             context['bulk_delete_url'] = reverse(bulk_delete_url_name)
         except NoReverseMatch:
-            context['bulk_delete_url'] = None
+            try:
+                context['bulk_delete_url'] = reverse('bulk_delete')
+            except NoReverseMatch:
+                context['bulk_delete_url'] = None
 
         try:
             bulk_edit_url_name = get_model_viewname(_model, 'bulk_edit')
             context['bulk_edit_url'] = reverse(bulk_edit_url_name)
         except NoReverseMatch:
-            context['bulk_edit_url'] = None
+            try:
+                context['bulk_edit_url'] = reverse('bulk_edit')
+            except NoReverseMatch:
+                context['bulk_edit_url'] = None
 
         # Check permissions in Python
         can_add = self.request.user.has_perm(f"{_model._meta.app_label}.add_{_model._meta.model_name}")
@@ -1041,6 +1047,14 @@ class ObjectBulkEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXVi
             return self.model
         if self.form_class and hasattr(self.form_class, '_meta'):
             return self.form_class._meta.model
+        if hasattr(self, 'request') and self.request:
+            model_name = self.request.POST.get('model_name') or self.request.GET.get('model_name')
+            if model_name:
+                try:
+                    app_label, model_name = model_name.split('.')
+                    return apps.get_model(app_label, model_name)
+                except (ValueError, LookupError):
+                    pass
         return None
 
     def _get_queryset(self, pks):
@@ -1120,6 +1134,7 @@ class ObjectBulkEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXVi
         context = {
             'form': form,
             'model': model,
+            'model_name': f'{model._meta.app_label}.{model._meta.model_name}',
             'objects': queryset,
             'object_pks': pks,
             'return_url': return_url,
@@ -1150,6 +1165,14 @@ class ObjectBulkDeleteView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMX
             return self.queryset.model
         if hasattr(self, 'model') and self.model:
             return self.model
+        if hasattr(self, 'request') and self.request:
+            model_name = self.request.POST.get('model_name') or self.request.GET.get('model_name')
+            if model_name:
+                try:
+                    app_label, model_name = model_name.split('.')
+                    return apps.get_model(app_label, model_name)
+                except (ValueError, LookupError):
+                    pass
         return None
 
     def _get_queryset(self, pks):

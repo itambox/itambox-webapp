@@ -3,8 +3,8 @@ from django.conf import settings
 from django.urls import reverse, NoReverseMatch
 from core.models import BaseModel, ChangeLoggingMixin, StandardModel, DeletableVaultModel
 from core.mixins import TaggableMixin, JournalingMixin, ExportableMixin, AutoSlugMixin, ImageAttachmentMixin, FileAttachmentMixin, CloneableMixin, SoftDeleteMixin, BookmarkableMixin
-from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager
-from django.contrib.contenttypes.fields import GenericForeignKey
+from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager, TenantScopingManager
+from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
@@ -13,15 +13,17 @@ from extras.models import Tag
 
 
 class Provider(AutoSlugMixin, StandardModel):
+    objects = TenantScopingManager()
+    all_objects = models.Manager()
+    allow_global_tenant = True
+
     """Represents the vendor/supplier of a subscription or service."""
     name = models.CharField(
         max_length=255,
-        unique=True,
         help_text="Unique name of the provider (e.g., Adobe Inc.)"
     )
     slug = models.SlugField(
         max_length=255,
-        unique=True,
         null=True,
         blank=True,
         help_text="URL-friendly identifier (auto-generated from name if left blank)"
@@ -37,30 +39,10 @@ class Provider(AutoSlugMixin, StandardModel):
         verbose_name="Admin Portal URL",
         help_text="URL for the provider's management/administration portal"
     )
-    website = models.URLField(
-        blank=True,
-        verbose_name="Company Website",
-        help_text="General public website of the provider"
-    )
-    contact_email = models.EmailField(
-        blank=True,
-        verbose_name="Contact Email",
-        help_text="Primary support or account manager email"
-    )
-    contact_phone = models.CharField(
-        max_length=50,
-        blank=True,
-        verbose_name="Contact Phone",
-        help_text="Primary support phone number"
-    )
     admin_notes = models.TextField(
         blank=True,
         verbose_name="Admin Notes",
         help_text="Optional internal administrative notes"
-    )
-    support_contact = models.TextField(
-        blank=True,
-        help_text="Additional support contact details (hours, escalation, etc.)"
     )
     is_active = models.BooleanField(
         default=True,
@@ -73,11 +55,71 @@ class Provider(AutoSlugMixin, StandardModel):
         blank=True,
         related_name='subscription_providers'
     )
+    tenant = models.ForeignKey(
+        'organization.Tenant',
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        related_name='subscription_providers',
+        db_index=True,
+        help_text="The tenant owning this provider. Null represents system-wide/global providers."
+    )
+    tenant_group = models.ForeignKey(
+        'organization.TenantGroup',
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        related_name='subscription_providers',
+        db_index=True,
+        help_text="The tenant group owning this provider."
+    )
+    contacts = GenericRelation('organization.ContactAssignment')
+
+    @property
+    def primary_contact(self):
+        assignment = self.contacts.filter(priority='primary').first() or self.contacts.first()
+        return assignment.contact if assignment else None
 
     class Meta:
         ordering = ('name',)
         verbose_name = _("Provider")
         verbose_name_plural = _("Providers")
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(tenant__isnull=True) | models.Q(tenant_group__isnull=True),
+                name='provider_tenant_or_group'
+            ),
+            models.UniqueConstraint(
+                fields=['tenant', 'name'],
+                condition=models.Q(tenant__isnull=False),
+                name='unique_tenant_provider_name'
+            ),
+            models.UniqueConstraint(
+                fields=['tenant', 'slug'],
+                condition=models.Q(tenant__isnull=False),
+                name='unique_tenant_provider_slug'
+            ),
+            models.UniqueConstraint(
+                fields=['tenant_group', 'name'],
+                condition=models.Q(tenant_group__isnull=False),
+                name='unique_tenant_group_provider_name'
+            ),
+            models.UniqueConstraint(
+                fields=['tenant_group', 'slug'],
+                condition=models.Q(tenant_group__isnull=False),
+                name='unique_tenant_group_provider_slug'
+            ),
+            models.UniqueConstraint(
+                fields=['name'],
+                condition=models.Q(tenant__isnull=True) & models.Q(tenant_group__isnull=True),
+                name='unique_global_provider_name'
+            ),
+            models.UniqueConstraint(
+                fields=['slug'],
+                condition=models.Q(tenant__isnull=True) & models.Q(tenant_group__isnull=True),
+                name='unique_global_provider_slug'
+            )
+        ]
 
     def __str__(self):
         return self.name

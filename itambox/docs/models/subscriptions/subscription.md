@@ -8,7 +8,7 @@ A **SaaS Subscription** represents a recurring subscription contract for SaaS pl
 | --- | --- | --- | --- |
 | **Provider** | The SaaS Provider hosting the platform (e.g., `GitHub`). | Foreign Key | Yes |
 | **Name** | A clear name identifying the contract plan (e.g. `Dev DevOps Github Plan`). | String | Yes |
-| **Slug** | URL-friendly identifier. | Slug | Yes |
+| **Slug** | URL-friendly identifier (auto-generated if blank). | Slug | Yes |
 | **Status** | The active contract state (`active`, `expired`, `cancelled`, `trial`, etc.). | Choice | Yes |
 | **Renewal Cost** | Recurring pricing cost per period. | Decimal | No |
 | **Currency** | Currency code for payment (e.g. `USD`, `EUR`). | String | No |
@@ -22,7 +22,10 @@ A **SaaS Subscription** represents a recurring subscription contract for SaaS pl
 | **Start Date** | Contract activation date. | Date | No |
 | **Next Renewal Date** | The next upcoming billing renewal date. | Date | No |
 | **Cancellation Date**| Timestamp when the subscription was cancelled. | Date | No |
+| **Tenant** | The tenant scoping boundary for this subscription. | Foreign Key | No |
+| **Description** | Optional text detailing coverage or terms. | Text | No |
 | **Notes** | Internal notes concerning renewal logic or terms. | Text | No |
+| **Tags** | Categorization labels. | Many-to-Many | No |
 
 ## Allocations
 SaaS subscriptions support a polymorphic generic relation allowing them to be assigned to `Asset Holders` (users) or departments (`Tenants`), enabling clear contract utilization audits.
