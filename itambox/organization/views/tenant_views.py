@@ -1,7 +1,10 @@
-from django.shortcuts import redirect, render
+from django.shortcuts import redirect, render, get_object_or_404
 from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 from django.db.models import Count
+from django.http import HttpResponse
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
 
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView,
@@ -49,11 +52,15 @@ class TenantDetailView(ObjectDetailView):
         context['tenant_consumable_count'] = tenant.consumables.count()
         context['tenant_component_count'] = tenant.components.count()
         
+        from django.conf import settings
         from compliance.models import CustodyTemplate
         context['tenant_custody_count'] = CustodyTemplate.objects.filter(tenant=tenant).count()
         context['tenant_license_count'] = tenant.licenses.count()
         context['tenant_kit_count'] = tenant.kits.count()
         context['tenant_subscription_count'] = tenant.subscriptions_org.count()
+
+        tenant_configs = getattr(settings, 'ITAMBOX_TENANT_LDAP_CONFIGS', {})
+        context['has_ldap'] = tenant.slug in tenant_configs
         return context
 
     def get_tab_sites(self, request):
@@ -124,7 +131,7 @@ class TenantDetailView(ObjectDetailView):
 
     def get_tab_components(self, request):
         tenant = self.get_object()
-        from components.tables import ComponentTable
+        from inventory.tables import ComponentTable
         table = ComponentTable(tenant.components.all(), request=request)
         table.configure(request)
         return render(request, "generic/tab_table.html", {
@@ -217,3 +224,73 @@ class TenantBulkEditView(ObjectBulkEditView):
 
 class TenantBulkDeleteView(ObjectBulkDeleteView):
     queryset = Tenant.objects.all()
+
+
+@login_required
+@require_POST
+def tenant_ldap_sync(request, pk):
+    from django_q.tasks import async_task
+    from django.conf import settings
+    from django.db import transaction
+    from core.models import Job
+    from django.contrib.contenttypes.models import ContentType
+    from core.managers import get_current_tenant
+    from django.urls import reverse, NoReverseMatch
+
+    tenant = get_object_or_404(Tenant, pk=pk)
+
+    # Security check: verify user has permission to sync LDAP or change tenant
+    if not request.user.has_perm('organization.change_tenant'):
+        messages.error(request, "You do not have permission to sync directory settings for this tenant.")
+        return redirect(tenant.get_absolute_url())
+
+    tenant_configs = getattr(settings, 'ITAMBOX_TENANT_LDAP_CONFIGS', {})
+    if tenant.slug not in tenant_configs:
+        messages.error(request, f"No LDAP configuration found for tenant '{tenant.name}'.")
+        return redirect(tenant.get_absolute_url())
+
+    ct = ContentType.objects.get_for_model(Tenant)
+    current_tenant = get_current_tenant()
+    tenant_id = current_tenant.pk if current_tenant else None
+
+    job = Job.objects.create(
+        name=f"LDAP Sync: {tenant.name}",
+        model=ct,
+        status=Job.STATUS_PENDING
+    )
+
+    if getattr(settings, 'Q_CLUSTER', {}).get('sync', False):
+        async_task(
+            'core.tasks.sync_tenant_ldap_task',
+            job.pk,
+            tenant.slug,
+            request.user.pk,
+            tenant_id
+        )
+    else:
+        transaction.on_commit(
+            lambda: async_task(
+                'core.tasks.sync_tenant_ldap_task',
+                job.pk,
+                tenant.slug,
+                request.user.pk,
+                tenant_id
+            )
+        )
+
+    messages.success(
+        request,
+        f"LDAP synchronization job '{job.name}' enqueued successfully! Tracking progress in real-time."
+    )
+
+    try:
+        redirect_url = reverse('job_detail', kwargs={'pk': job.pk})
+    except NoReverseMatch:
+        redirect_url = f"/jobs/{job.pk}/"
+
+    if request.headers.get('HX-Request') or getattr(request, 'htmx', False):
+        response = HttpResponse()
+        response['HX-Redirect'] = redirect_url
+        return response
+
+    return redirect(redirect_url)

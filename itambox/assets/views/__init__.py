@@ -3,7 +3,7 @@ from .asset_views import (
     AssetListView, AssetDetailView, AssetEditView, AssetDeleteView,
     AssetCloneView, AssetImportView, AssetBulkEditView, AssetBulkDeleteView,
     AssetCheckoutView, AssetCheckinView, AssetAuditView, asset_label_print,
-    bulk_assign_assets,
+    bulk_assign_assets, bulk_print_labels,
 )
 from .assetrole_views import (
     AssetRoleListView, AssetRoleDetailView, AssetRoleEditView, AssetRoleDeleteView,

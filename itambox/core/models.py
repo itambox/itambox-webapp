@@ -526,6 +526,9 @@ class Job(ChangeLoggingMixin, BaseModel):
     def __str__(self):
         return f"Job: {self.name} ({self.get_status_display()})"
 
+    def get_absolute_url(self):
+        return reverse('job_detail', kwargs={'pk': self.pk})
+
     def mark_running(self):
         self.status = self.STATUS_RUNNING
         self.started = timezone.now()

@@ -395,55 +395,67 @@ def bulk_assign_assets(request):
         return HttpResponseRedirect(request.META.get('HTTP_REFERER', reverse('assets:asset_list')))
 
     holder = get_object_or_404(AssetHolder, pk=holder_id)
-    assets = Asset.objects.filter(pk__in=object_pks).select_related('status')
-    ct = ContentType.objects.get_for_model(Asset)
-    in_use_status = StatusLabel.objects.filter(type='deployed').first()
 
+    from django_q.tasks import async_task
+    from django.contrib.contenttypes.models import ContentType
+    from core.models import Job
+    from core.managers import get_current_tenant
+    from django.conf import settings
     from django.db import transaction
-    assigned = 0
-    skipped = 0
 
-    with transaction.atomic():
-        for asset in assets:
-            if asset.active_assignment:
-                if asset.active_assignment.assigned_to == holder:
-                    skipped += 1
-                    continue
+    ct = ContentType.objects.get_for_model(Asset)
+    current_tenant = get_current_tenant()
+    tenant_id = current_tenant.pk if current_tenant else None
 
+    job = Job.objects.create(
+        name=f"Bulk Checkout: {len(object_pks)} Assets to {holder}",
+        model=ct,
+        status=Job.STATUS_PENDING
+    )
 
-
-            if in_use_status:
-                asset.status = in_use_status
-                asset.location = None
-                asset._changelog_action = 'checkout'
-                asset._changelog_message = f'Bulk assigned to {holder}'
-                asset.save(update_fields=['status', 'location'])
-
-            AssetAssignment.objects.create(
-                asset=asset,
-                assigned_user=holder,
-                checked_out_by=request.user,
-                notes=f'Bulk assigned to {holder}'
+    if getattr(settings, 'Q_CLUSTER', {}).get('sync', False):
+        async_task(
+            'core.tasks.bulk_checkout_task',
+            job.pk,
+            object_pks,
+            'assetholder',
+            holder.pk,
+            request.user.pk,
+            f'Bulk assigned to {holder}',
+            None,
+            tenant_id
+        )
+    else:
+        transaction.on_commit(
+            lambda: async_task(
+                'core.tasks.bulk_checkout_task',
+                job.pk,
+                object_pks,
+                'assetholder',
+                holder.pk,
+                request.user.pk,
+                f'Bulk assigned to {holder}',
+                None,
+                tenant_id
             )
-            assigned += 1
+        )
+
+    try:
+        redirect_url = reverse('job_detail', kwargs={'pk': job.pk})
+    except NoReverseMatch:
+        redirect_url = f"/jobs/{job.pk}/"
 
     messages.success(
         request,
-        f"{assigned} asset(s) assigned to {holder}. {skipped} already assigned (skipped)."
+        f"Asynchronous checkout job '{job.name}' enqueued successfully! Tracking progress in real-time."
     )
 
     if request.htmx:
         response = HttpResponse(status=204)
-        response['HX-Trigger'] = json.dumps({
-            "assetListUpdated": None,
-            "showMessage": {
-                "message": f"{assigned} asset(s) assigned to {holder}.",
-                "level": "success"
-            }
-        })
+        response['HX-Redirect'] = redirect_url
         return response
 
-    return HttpResponseRedirect(request.META.get('HTTP_REFERER', reverse('assets:asset_list')))
+    return HttpResponseRedirect(redirect_url)
 
 
 class AssetImportView(ObjectImportView):
@@ -457,3 +469,71 @@ class AssetBulkEditView(ObjectBulkEditView):
 
 class AssetBulkDeleteView(ObjectBulkDeleteView):
     queryset = Asset.objects.all()
+
+
+@login_required
+def bulk_print_labels(request):
+    if request.method != 'POST':
+        return HttpResponse(status=405)
+
+    object_pks = request.POST.getlist('pk')
+    label_format = request.POST.get('label_format', 'qr')
+
+    if not object_pks:
+        messages.error(request, "No assets selected for label printing.")
+        return HttpResponseRedirect(request.META.get('HTTP_REFERER', reverse('assets:asset_list')))
+
+    from django_q.tasks import async_task
+    from django.contrib.contenttypes.models import ContentType
+    from core.models import Job
+    from core.managers import get_current_tenant
+    from django.conf import settings
+    from django.db import transaction
+
+    ct = ContentType.objects.get_for_model(Asset)
+    current_tenant = get_current_tenant()
+    tenant_id = current_tenant.pk if current_tenant else None
+
+    job = Job.objects.create(
+        name=f"Label Batch Generation: {len(object_pks)} Assets",
+        model=ct,
+        status=Job.STATUS_PENDING
+    )
+
+    if getattr(settings, 'Q_CLUSTER', {}).get('sync', False):
+        async_task(
+            'core.tasks.generate_label_batch_task',
+            job.pk,
+            object_pks,
+            label_format,
+            request.user.pk,
+            tenant_id
+        )
+    else:
+        transaction.on_commit(
+            lambda: async_task(
+                'core.tasks.generate_label_batch_task',
+                job.pk,
+                object_pks,
+                label_format,
+                request.user.pk,
+                tenant_id
+            )
+        )
+
+    try:
+        redirect_url = reverse('job_detail', kwargs={'pk': job.pk})
+    except NoReverseMatch:
+        redirect_url = f"/jobs/{job.pk}/"
+
+    messages.success(
+        request,
+        f"Asynchronous label generation job '{job.name}' enqueued successfully! Tracking progress in real-time."
+    )
+
+    if request.htmx:
+        response = HttpResponse(status=204)
+        response['HX-Redirect'] = redirect_url
+        return response
+
+    return HttpResponseRedirect(redirect_url)

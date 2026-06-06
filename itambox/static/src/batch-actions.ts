@@ -71,11 +71,11 @@
     updateBatchBar();
   }
 
-  // Bulk Assign modal submit handler (using event delegation to support dynamically loaded modals)
+  // Bulk Assign and Bulk Print modal submit handler (using event delegation to support dynamically loaded modals)
   document.addEventListener('submit', function (event) {
     const target = event.target as HTMLElement;
-    const assignForm = target.closest<HTMLFormElement>('#bulk-assign-form');
-    if (!assignForm) return;
+    const form = target.closest<HTMLFormElement>('#bulk-assign-form') || target.closest<HTMLFormElement>('#bulk-print-form');
+    if (!form) return;
 
     const checkboxes = document.querySelectorAll<HTMLInputElement>(
       '#object-list-table-container input[type="checkbox"][name="pk"]',
@@ -91,11 +91,12 @@
       return;
     }
 
-    let container = assignForm.querySelector<HTMLElement>('#bulk-assign-pks');
+    const containerId = form.id === 'bulk-assign-form' ? 'bulk-assign-pks' : 'bulk-print-pks';
+    let container = form.querySelector<HTMLElement>('#' + containerId);
     if (!container) {
       container = document.createElement('div');
-      container.id = 'bulk-assign-pks';
-      assignForm.appendChild(container);
+      container.id = containerId;
+      form.appendChild(container);
     }
     container.innerHTML = '';
     pks.forEach(function (pk) {

@@ -16,6 +16,7 @@ from .tenantgroup_views import (
 )
 from .tenant_views import (
     TenantListView, TenantDetailView, TenantEditView, TenantDeleteView, TenantBulkEditView, TenantBulkDeleteView,
+    tenant_ldap_sync,
 )
 from .assetholder_views import (
     AssetHolderListView, AssetHolderDetailView, AssetHolderEditView, AssetHolderDeleteView,

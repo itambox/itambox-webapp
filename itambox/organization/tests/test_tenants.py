@@ -1,6 +1,7 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from unittest.mock import patch
 from organization.models import Tenant, TenantGroup, AssetHolder, TenantRole
 
 User = get_user_model()
@@ -52,6 +53,48 @@ class TenantViewTests(TestCase):
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
         self.assertFalse(Tenant.objects.filter(pk=self.tenant.pk).exists())
+
+    @patch('django_q.tasks.async_task')
+    def test_tenant_ldap_sync_view(self, mock_async):
+        from django.test import override_settings
+        with override_settings(ITAMBOX_TENANT_LDAP_CONFIGS={'acme-corp': {'SERVER_URI': 'ldap://localhost'}}):
+            url = reverse('organization:tenant_ldap_sync', kwargs={'pk': self.tenant.pk})
+            response = self.client.post(url)
+            self.assertEqual(response.status_code, 302)
+            
+            # Verify Job was created
+            from core.models import Job
+            job = Job.objects.filter(name=f"LDAP Sync: {self.tenant.name}").first()
+            self.assertIsNotNone(job)
+            self.assertEqual(job.status, Job.STATUS_PENDING)
+            
+            # Verify async_task was called
+            mock_async.assert_called_once()
+            args = mock_async.call_args[0]
+            self.assertEqual(args[0], 'core.tasks.sync_tenant_ldap_task')
+            self.assertEqual(args[1], job.pk)
+            self.assertEqual(args[2], self.tenant.slug)
+
+    @patch('core.tasks.ldap.call_command')
+    def test_sync_tenant_ldap_task(self, mock_call_command):
+        from core.models import Job
+        from django.contrib.contenttypes.models import ContentType
+        from core.tasks.ldap import sync_tenant_ldap_task
+        
+        ct = ContentType.objects.get_for_model(Tenant)
+        job = Job.objects.create(
+            name="Test LDAP Sync Job",
+            model=ct,
+            status=Job.STATUS_PENDING
+        )
+        
+        sync_tenant_ldap_task(job.pk, self.tenant.slug, self.user.pk)
+        
+        job.refresh_from_db()
+        self.assertEqual(job.status, Job.STATUS_COMPLETED)
+        mock_call_command.assert_called_once()
+        self.assertEqual(mock_call_command.call_args[0][0], 'sync_tenant_ldap')
+        self.assertEqual(mock_call_command.call_args[1]['tenant'], self.tenant.slug)
 
 class TenantGroupViewTests(TestCase):
     def setUp(self):
@@ -112,7 +155,7 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
                 'inventory.view_accessory', 'inventory.add_accessory', 'inventory.change_accessory', 'inventory.delete_accessory',
                 'inventory.view_consumable', 'inventory.add_consumable', 'inventory.change_consumable', 'inventory.delete_consumable',
                 'inventory.view_kit', 'inventory.add_kit', 'inventory.change_kit', 'inventory.delete_kit',
-                'components.view_component', 'components.add_component', 'components.change_component', 'components.delete_component',
+                'inventory.view_component', 'inventory.add_component', 'inventory.change_component', 'inventory.delete_component',
                 'organization.view_location', 'organization.add_location', 'organization.change_location', 'organization.delete_location',
                 'organization.view_site', 'organization.add_site', 'organization.change_site', 'organization.delete_site',
                 'organization.view_assetholder', 'organization.add_assetholder', 'organization.change_assetholder', 'organization.delete_assetholder',
@@ -127,7 +170,7 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
                 'inventory.view_accessory', 'inventory.add_accessory', 'inventory.change_accessory',
                 'inventory.view_consumable', 'inventory.add_consumable', 'inventory.change_consumable',
                 'inventory.view_kit', 'inventory.add_kit', 'inventory.change_kit',
-                'components.view_component', 'components.add_component', 'components.change_component',
+                'inventory.view_component', 'inventory.add_component', 'inventory.change_component',
                 'organization.view_location', 'organization.add_location', 'organization.change_location',
                 'organization.view_site', 'organization.add_site', 'organization.change_site',
                 'organization.view_assetholder', 'organization.add_assetholder', 'organization.change_assetholder',
@@ -142,7 +185,7 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
                 'inventory.view_accessory',
                 'inventory.view_consumable',
                 'inventory.view_kit',
-                'components.view_component',
+                'inventory.view_component',
                 'organization.view_location',
                 'organization.view_site',
                 'organization.view_assetholder',

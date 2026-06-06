@@ -1,6 +1,6 @@
 from django.urls import path, include
 from . import views
-from components import views as component_views
+from inventory import views as component_views
 from extras import views as extras_views
 
 app_name = 'assets'
@@ -8,6 +8,7 @@ app_name = 'assets'
 urlpatterns = [
     # Dashboard path removed, handled in core.urls
     path('assets/bulk-assign/', views.bulk_assign_assets, name='asset_bulk_assign'),
+    path('assets/bulk-print-labels/', views.bulk_print_labels, name='asset_bulk_print_labels'),
 
     # Asset bulk operations
     path('assets/edit/', views.AssetBulkEditView.as_view(), name='asset_bulk_edit'),

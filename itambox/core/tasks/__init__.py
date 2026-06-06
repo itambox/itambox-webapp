@@ -5,3 +5,6 @@ from .expiration import nightly_expiration_check_task
 from .reports import generate_scheduled_report_task
 from .alerts import evaluate_alert_rules_task
 from .depreciation import calculate_depreciation
+from .webhooks import send_webhook_task
+from .ldap import sync_tenant_ldap_task
+

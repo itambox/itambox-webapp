@@ -136,51 +136,40 @@ def _send_webhook(rule, event):
     headers = config.get('headers', {})
     secret = config.get('secret', '')
 
-    def worker():
-        if 'hooks.slack.com' in url:
-            _send_slack_notification(url, f"Event: {event.action} on {event.model.model} (ID: {event.object_id})")
-            return
-
-        if 'webhook.office.com' in url or 'outlook.office.com/webhook' in url:
-            _send_teams_notification(url, f"Event: {event.action} on {event.model.model} (ID: {event.object_id})")
-            return
-
-        payload = {
-            'event': event.action,
-            'model': f"{event.model.app_label}.{event.model.model}",
-            'object_id': event.object_id,
-            'timestamp': event.timestamp.isoformat(),
-            'data': event.data,
-        }
-
-        body = json.dumps(payload, default=str)
-
-        if secret:
-            signature = hmac.new(
-                secret.encode('utf-8'),
-                body.encode('utf-8'),
-                hashlib.sha256,
-            ).hexdigest()
-            headers['X-Hub-Signature-256'] = f'sha256={signature}'
-
-        headers.setdefault('Content-Type', 'application/json')
-
-        try:
-            response = requests.request(
-                method=method,
-                url=url,
-                headers=headers,
-                data=body,
-                timeout=10,
-            )
-            response.raise_for_status()
-            logger.info("Webhook sent to %s — status %s", url, response.status_code)
-        except requests.RequestException as e:
-            logger.error("Webhook to %s failed: %s", url, e)
-
-    import threading
+    from django_q.tasks import async_task
     from django.db import transaction
-    transaction.on_commit(lambda: threading.Thread(target=worker, daemon=True).start())
+    from django.conf import settings
+
+    if getattr(settings, 'Q_CLUSTER', {}).get('sync', False):
+        async_task(
+            'core.tasks.send_webhook_task',
+            url=url,
+            method=method,
+            headers=headers,
+            secret=secret,
+            event_action=event.action,
+            event_model_app_label=event.model.app_label,
+            event_model_name=event.model.model,
+            event_object_id=event.object_id,
+            event_timestamp_iso=event.timestamp.isoformat(),
+            event_data=event.data,
+        )
+    else:
+        transaction.on_commit(
+            lambda: async_task(
+                'core.tasks.send_webhook_task',
+                url=url,
+                method=method,
+                headers=headers,
+                secret=secret,
+                event_action=event.action,
+                event_model_app_label=event.model.app_label,
+                event_model_name=event.model.model,
+                event_object_id=event.object_id,
+                event_timestamp_iso=event.timestamp.isoformat(),
+                event_data=event.data,
+            )
+        )
 
 
 def _send_notification(rule, event):

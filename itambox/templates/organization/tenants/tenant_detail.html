@@ -198,3 +198,15 @@
         </div>
     </div>
 {% endblock extra_tab_panes %}
+
+{% block extra_page_actions %}
+    {% if has_ldap %}
+    <form method="post" action="{% url 'organization:tenant_ldap_sync' pk=object.pk %}" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-primary">
+            <i class="mdi mdi-sync me-1"></i>
+            {% translate "Sync Directory Now" %}
+        </button>
+    </form>
+    {% endif %}
+{% endblock %}

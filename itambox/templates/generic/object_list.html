@@ -15,21 +15,21 @@
     {# Main Content / Table Column #}
     <div class="col-12 {% if filter_form %}col-md-9 order-2 order-md-1{% endif %}" id="object-list-main-col">
         <div class="card">
-            {% if app_label == 'components' %}
+            {% if app_label == 'inventory' and model_name in 'component,componentstock,componentallocation' %}
             <div class="card-header">
               <ul class="nav nav-tabs card-header-tabs">
                 <li class="nav-item">
-                  <a class="nav-link {% if model_name == 'component' %}active fw-bold{% endif %}" href="{% url 'components:component_list' %}">
+                  <a class="nav-link {% if model_name == 'component' %}active fw-bold{% endif %}" href="{% url 'inventory:component_list' %}">
                     <i class="mdi mdi-book-open-outline me-2"></i>{% trans "Catalog" %}
                   </a>
                 </li>
                 <li class="nav-item">
-                  <a class="nav-link {% if model_name == 'componentstock' %}active fw-bold{% endif %}" href="{% url 'components:componentstock_list' %}">
+                  <a class="nav-link {% if model_name == 'componentstock' %}active fw-bold{% endif %}" href="{% url 'inventory:componentstock_list' %}">
                     <i class="mdi mdi-warehouse me-2"></i>{% trans "Stocks" %}
                   </a>
                 </li>
                 <li class="nav-item">
-                  <a class="nav-link {% if model_name == 'componentallocation' %}active fw-bold{% endif %}" href="{% url 'components:componentallocation_list' %}">
+                  <a class="nav-link {% if model_name == 'componentallocation' %}active fw-bold{% endif %}" href="{% url 'inventory:componentallocation_list' %}">
                     <i class="mdi mdi-account-arrow-right me-2"></i>{% trans "Allocations" %}
                   </a>
                 </li>
@@ -98,8 +98,7 @@
                                             value="{{ request.GET.q|default:"" }}"
                                             hx-trigger="keyup changed delay:500ms, search">
                                      <span class="input-group-text {% if not request.GET.q %}d-none{% endif %}">
-                                         <a href="#" class="link-secondary" title="{% trans "Clear search" %}" data-bs-toggle="tooltip"
-                                            onclick="this.closest('form').querySelector('input[name=q]').value=''; this.closest('form').dispatchEvent(new Event('submit', { bubbles: true })); return false;">
+                                         <a href="#" class="link-secondary clear-search-btn" title="{% trans "Clear search" %}" data-bs-toggle="tooltip">
                                              <i class="mdi mdi-close"></i>
                                          </a>
                                      </span>
@@ -153,6 +152,12 @@
                                 <i class="mdi mdi-account-plus-outline me-1"></i>
                                 {% translate "Assign Selected" %}
                             </button>
+                            <button type="button" class="btn btn-sm btn-info text-white" id="btn-bulk-print"
+                                    data-bs-toggle="modal" data-bs-target="#bulk-print-modal"
+                                    title="{% translate 'Print labels for selected assets' %}">
+                                <i class="mdi mdi-printer me-1"></i>
+                                {% translate "Print Labels" %}
+                            </button>
                             {% endif %}
                             <form id="bulk-delete-form" method="post" action="{{ bulk_delete_url }}" class="d-inline">
                                 {% csrf_token %}
@@ -201,6 +206,12 @@
                             title="{% translate 'Assign selected assets to a holder' %}">
                         <i class="mdi mdi-account-plus-outline me-1"></i>
                         {% translate "Assign Selected" %}
+                    </button>
+                    <button type="button" class="btn btn-sm btn-info text-white btn-bulk-print-bottom"
+                            data-bs-toggle="modal" data-bs-target="#bulk-print-modal"
+                            title="{% translate 'Print labels for selected assets' %}">
+                        <i class="mdi mdi-printer me-1"></i>
+                        {% translate "Print Labels" %}
                     </button>
                     {% endif %}
                     <button type="button" class="btn btn-sm btn-outline-danger btn-bulk-delete-bottom"
@@ -355,6 +366,32 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
                     <button type="submit" class="btn btn-primary">{% translate "Assign" %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal modal-blur fade" id="bulk-print-modal" tabindex="-1" aria-labelledby="bulkPrintModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="bulk-print-form" method="post" action="{% url 'assets:asset_bulk_print_labels' %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title" id="bulkPrintModalLabel">{% translate "Bulk Print Labels" %}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted">{% translate "Select the label template format to render for the selected assets:" %}</p>
+                    <label for="bulk-print-format" class="form-label">{% translate "Label Format" %}</label>
+                    <select name="label_format" id="bulk-print-format" class="form-select" required>
+                        <option value="qr">{% translate "QR Code" %}</option>
+                        <option value="barcode">{% translate "Barcode (Code 128)" %}</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                    <button type="submit" class="btn btn-primary">{% translate "Queue Print Job" %}</button>
                 </div>
             </form>
         </div>

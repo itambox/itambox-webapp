@@ -53,6 +53,7 @@ urlpatterns = [
     path('tenants/<int:pk>/', views.TenantDetailView.as_view(), name='tenant_detail'),
     path('tenants/<int:pk>/edit/', views.TenantEditView.as_view(), name='tenant_update'),
     path('tenants/<int:pk>/delete/', views.TenantDeleteView.as_view(), name='tenant_delete'),
+    path('tenants/<int:pk>/ldap-sync/', views.tenant_ldap_sync, name='tenant_ldap_sync'),
 
     # Asset Holders
     path('asset-holders/', views.AssetHolderListView.as_view(), name='assetholder_list'),
