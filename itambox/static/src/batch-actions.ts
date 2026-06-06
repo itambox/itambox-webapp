@@ -134,9 +134,6 @@
     const deleteBtn = target.closest('.btn-bulk-delete');
     if (deleteBtn) {
       event.preventDefault();
-      if (!confirm('Delete selected items? This cannot be undone.')) {
-        return;
-      }
       const form = document.getElementById('bulk-delete-form') as HTMLFormElement | null;
       if (form) {
         const checked = document.querySelectorAll<HTMLInputElement>(
