@@ -290,6 +290,7 @@ class BulkEditForm(forms.Form):
         from django.db.models import ForeignKey, ManyToManyField
         from django.db.models.fields import related
 
+        choices = []
         for field in model._meta.get_fields():
             if field.name in BULK_EDIT_FIELD_BLACKLIST:
                 continue
@@ -321,6 +322,9 @@ class BulkEditForm(forms.Form):
                     ]
 
             self.fields[field.name] = form_field_cls(**field_kwargs)
+            choices.append((field.name, field.name))
+
+        self.fields['_selected_fields'].choices = choices
 
         # Auto-apply TomSelect attribute to all select fields (excluding CheckboxSelectMultiple/RadioSelect/listboxes)
         for field in self.fields.values():

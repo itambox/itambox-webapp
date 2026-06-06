@@ -477,10 +477,17 @@ def bulk_print_labels(request):
         return HttpResponse(status=405)
 
     object_pks = request.POST.getlist('pk')
-    label_format = request.POST.get('label_format', 'qr')
+    template_id = request.POST.get('template_id')
+    layout_mode = request.POST.get('layout_mode', 'roll')
 
     if not object_pks:
         messages.error(request, "No assets selected for label printing.")
+        return HttpResponseRedirect(request.META.get('HTTP_REFERER', reverse('assets:asset_list')))
+
+    try:
+        template_id = int(template_id)
+    except (TypeError, ValueError):
+        messages.error(request, "No valid label template specified.")
         return HttpResponseRedirect(request.META.get('HTTP_REFERER', reverse('assets:asset_list')))
 
     from django_q.tasks import async_task
@@ -502,20 +509,22 @@ def bulk_print_labels(request):
 
     if getattr(settings, 'Q_CLUSTER', {}).get('sync', False):
         async_task(
-            'core.tasks.generate_label_batch_task',
+            'core.tasks.labels.generate_label_pdf_batch_task',
             job.pk,
             object_pks,
-            label_format,
+            template_id,
+            layout_mode,
             request.user.pk,
             tenant_id
         )
     else:
         transaction.on_commit(
             lambda: async_task(
-                'core.tasks.generate_label_batch_task',
+                'core.tasks.labels.generate_label_pdf_batch_task',
                 job.pk,
                 object_pks,
-                label_format,
+                template_id,
+                layout_mode,
                 request.user.pk,
                 tenant_id
             )

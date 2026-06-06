@@ -159,21 +159,21 @@
                                 {% translate "Print Labels" %}
                             </button>
                             {% endif %}
-                            <form id="bulk-delete-form" method="post" action="{{ bulk_delete_url }}" class="d-inline">
+                            <form id="bulk-delete-form" method="post" action="{{ bulk_delete_url }}" class="d-inline" hx-boost="false">
                                 {% csrf_token %}
                                 <input type="hidden" name="model_name" value="{{ model_name_str }}">
                                 <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
-                                <input type="hidden" name="pk" value="" id="bulk-delete-pks">
+                                <div id="bulk-delete-pks-container" class="d-inline"></div>
                                 <button type="button" class="btn btn-sm btn-outline-danger btn-bulk-delete">
                                     <i class="mdi mdi-trash-can-outline me-1"></i>
                                     {% translate "Delete Selected" %}
                                 </button>
                             </form>
-                            <form id="bulk-edit-form" method="post" action="{{ bulk_edit_url }}" class="d-inline">
+                            <form id="bulk-edit-form" method="post" action="{{ bulk_edit_url }}" class="d-inline" hx-boost="false">
                                 {% csrf_token %}
                                 <input type="hidden" name="model_name" value="{{ model_name_str }}">
                                 <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
-                                <input type="hidden" name="pk" value="" id="bulk-edit-pks">
+                                <div id="bulk-edit-pks-container" class="d-inline"></div>
                                 <button type="button" class="btn btn-sm btn-outline-primary btn-bulk-edit">
                                     <i class="mdi mdi-pencil-outline me-1"></i>
                                     {% translate "Edit Selected" %}
@@ -261,6 +261,79 @@
     {% if table_config_form %}
         {% include 'core/modals/table_config.html' %}
     {% endif %}
+
+    {# Bulk Assign & Print Modals — only rendered on Asset list page #}
+    {% if model_name_str == 'assets.asset' %}
+    <div class="modal modal-blur fade" id="bulk-assign-modal" tabindex="-1" aria-labelledby="bulkAssignModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form id="bulk-assign-form" method="post" action="{% url 'assets:asset_bulk_assign' %}" hx-boost="false">
+                    {% csrf_token %}
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="bulkAssignModalLabel">{% translate "Bulk Assign Assets" %}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted">{% translate "Select an Asset Holder to assign the selected assets to:" %}</p>
+                        <label for="bulk-assign-holder" class="form-label">{% translate "Asset Holder" %}</label>
+                        <select name="holder_id" id="bulk-assign-holder" class="form-select" required>
+                            <option value="">{% translate "— Select an Asset Holder —" %}</option>
+                            {% for holder in asset_holders %}
+                            <option value="{{ holder.pk }}">{{ holder }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                        <button type="submit" class="btn btn-primary">{% translate "Assign" %}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal modal-blur fade" id="bulk-print-modal" tabindex="-1" aria-labelledby="bulkPrintModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form id="bulk-print-form" method="post" action="{% url 'assets:asset_bulk_print_labels' %}" hx-boost="false">
+                    {% csrf_token %}
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="bulkPrintModalLabel">{% translate "Bulk Print Labels" %}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted">{% translate "Select the label template and layout for the selected assets:" %}</p>
+                        
+                        <div class="mb-3">
+                            <label for="bulk-print-template" class="form-label">{% translate "Label Template" %}</label>
+                            <select name="template_id" id="bulk-print-template" class="form-select" required>
+                                <option value="">{% translate "— Select a Template —" %}</option>
+                                {% for template in label_templates %}
+                                <option value="{{ template.pk }}">{{ template.name }}</option>
+                                {% empty %}
+                                <option value="" disabled>{% translate "No templates found in database" %}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="bulk-print-layout" class="form-label">{% translate "Layout Mode" %}</label>
+                            <select name="layout_mode" id="bulk-print-layout" class="form-select" required>
+                                <option value="roll">{% translate "Roll Printer" %}</option>
+                                <option value="a4_grid">{% translate "A4 Grid (3x8)" %}</option>
+                                <option value="letter_grid">{% translate "Letter Grid (3x8)" %}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                        <button type="submit" class="btn btn-primary">{% translate "Queue Print Job" %}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 {% endblock modals %}
 
 {% block title %}{{ title|default:"List View" }} {% translate "- ITAMbox" %}{% endblock %}
@@ -335,62 +408,3 @@
         </div>
     </div>
 {% endblock page_actions %}
-
-{# batch-actions.js is now bundled in itambox.js via base.html #}
-
-{# Bulk Assign Modal — only rendered on Asset list page #}
-{% if model_name_str == 'assets.asset' %}
-<div class="modal modal-blur fade" id="bulk-assign-modal" tabindex="-1" aria-labelledby="bulkAssignModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <form id="bulk-assign-form" method="post" action="{% url 'assets:asset_bulk_assign' %}">
-                {% csrf_token %}
-                <div class="modal-header">
-                    <h5 class="modal-title" id="bulkAssignModalLabel">{% translate "Bulk Assign Assets" %}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="text-muted">{% translate "Select an Asset Holder to assign the selected assets to:" %}</p>
-                    <label for="bulk-assign-holder" class="form-label">{% translate "Asset Holder" %}</label>
-                    <select name="holder_id" id="bulk-assign-holder" class="form-select" required>
-                        <option value="">{% translate "— Select an Asset Holder —" %}</option>
-                        {% for holder in asset_holders %}
-                        <option value="{{ holder.pk }}">{{ holder }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
-                    <button type="submit" class="btn btn-primary">{% translate "Assign" %}</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<div class="modal modal-blur fade" id="bulk-print-modal" tabindex="-1" aria-labelledby="bulkPrintModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <form id="bulk-print-form" method="post" action="{% url 'assets:asset_bulk_print_labels' %}">
-                {% csrf_token %}
-                <div class="modal-header">
-                    <h5 class="modal-title" id="bulkPrintModalLabel">{% translate "Bulk Print Labels" %}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="text-muted">{% translate "Select the label template format to render for the selected assets:" %}</p>
-                    <label for="bulk-print-format" class="form-label">{% translate "Label Format" %}</label>
-                    <select name="label_format" id="bulk-print-format" class="form-select" required>
-                        <option value="qr">{% translate "QR Code" %}</option>
-                        <option value="barcode">{% translate "Barcode (Code 128)" %}</option>
-                    </select>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
-                    <button type="submit" class="btn btn-primary">{% translate "Queue Print Job" %}</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-{% endif %}

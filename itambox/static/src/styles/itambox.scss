@@ -302,14 +302,14 @@ html,
     --tblr-card-title-color: #fafaf9; // stone-50
 
     // Form inputs and textboxes
-    --tblr-input-bg: #0c0a09;             // stone-950 inputs
-    --tblr-input-color: #e7e5e4;          // stone-200 input text
-    --tblr-input-border-color: #292524;   // stone-800 input border
+    --tblr-input-bg: #0c0a09; // stone-950 inputs
+    --tblr-input-color: #e7e5e4; // stone-200 input text
+    --tblr-input-border-color: #292524; // stone-800 input border
     --tblr-input-placeholder-color: #57534e; // stone-600
     --tblr-input-focus-bg: #0c0a09;
     --tblr-input-focus-border-color: #2fb344;
     --tblr-input-focus-color: #e7e5e4;
-    --tblr-input-disabled-bg: #1c1917;    // stone-900
+    --tblr-input-disabled-bg: #1c1917; // stone-900
     --tblr-input-disabled-border-color: #292524;
 
     // Tables
@@ -319,7 +319,7 @@ html,
     --tblr-table-hover-bg: rgba(255, 255, 255, 0.05);
 
     // Dropdowns
-    --tblr-dropdown-bg: #1c1917;          // stone-900
+    --tblr-dropdown-bg: #1c1917; // stone-900
     --tblr-dropdown-border-color: #292524; // stone-800
     --tblr-dropdown-color: #e7e5e4;
     --tblr-dropdown-link-color: #e7e5e4;
@@ -401,10 +401,10 @@ html,
 
         thead th {
             color: var(--tblr-secondary-color) !important;
-            
+
             a {
                 color: var(--tblr-primary) !important;
-                
+
                 &:hover {
                     color: var(--tblr-link-hover-color) !important;
                 }
@@ -583,16 +583,16 @@ html,
         background-color: var(--itambox-sidebar-bg, var(--tblr-bg-surface)) !important;
         border-right: 1px solid var(--itambox-sidebar-border, var(--tblr-border-color)) !important;
         width: var(--itambox-sidebar-width, 250px) !important;
-        
+
         .offcanvas-header {
             background-color: var(--itambox-sidebar-bg, var(--tblr-bg-surface)) !important;
             border-bottom: 1px solid var(--itambox-sidebar-border, var(--tblr-border-color)) !important;
-            
+
             .offcanvas-title {
                 color: var(--tblr-body-color) !important;
             }
         }
-        
+
         .offcanvas-body {
             background-color: var(--itambox-sidebar-bg, var(--tblr-bg-surface)) !important;
             padding: 0 !important;
@@ -648,7 +648,7 @@ html,
         top: 0;
         right: -4px;
         bottom: 0;
-        width: 4px;
+        width: 5px;
         background: linear-gradient(to right, rgba(0, 0, 0, 0.04), transparent);
         pointer-events: none;
     }
@@ -660,7 +660,7 @@ html,
         top: 0;
         left: -4px;
         bottom: 0;
-        width: 4px;
+        width: 5px;
         background: linear-gradient(to left, rgba(0, 0, 0, 0.04), transparent);
         pointer-events: none;
     }
@@ -678,7 +678,7 @@ html,
     }
 
     // Remove the last-child shadow if col-checkout is present in the row
-    td.col-checkout ~ td:last-child::before {
+    td.col-checkout~td:last-child::before {
         content: none !important;
     }
 
@@ -788,6 +788,7 @@ html,
     td:first-child::after {
         background: linear-gradient(to right, rgba(0, 0, 0, 0.15), transparent) !important;
     }
+
     td:last-child::before,
     td.col-checkout::before {
         background: linear-gradient(to left, rgba(0, 0, 0, 0.15), transparent) !important;
@@ -976,7 +977,7 @@ html {
         background-color: var(--tblr-bg-surface) !important;
         border: 1px solid var(--tblr-border-color) !important;
         box-shadow: var(--tblr-box-shadow-lg) !important;
-        
+
         .card-header {
             background-color: var(--tblr-bg-surface) !important;
             border-bottom: 1px solid var(--tblr-border-color) !important;
@@ -988,7 +989,7 @@ html {
             border-top: 1px solid var(--tblr-border-color) !important;
             margin-top: -1px; // prevent double borders
             color: var(--tblr-secondary-color) !important;
-            
+
             &.active {
                 background-color: rgba(var(--tblr-primary-rgb), 0.1) !important;
             }
@@ -1014,7 +1015,8 @@ html {
         background: transparent !important;
     }
 
-    th, td {
+    th,
+    td {
         padding: 0.45rem 0.75rem !important;
         vertical-align: middle;
         border-color: var(--tblr-border-color) !important;
@@ -1035,10 +1037,12 @@ html {
         width: 70%;
         color: var(--tblr-body-color);
     }
-    
+
     // Remove the bottom border on the last row to sit flush in card
     tr:last-child {
-        th, td {
+
+        th,
+        td {
             border-bottom: 0 !important;
         }
     }
@@ -1079,6 +1083,7 @@ textarea {
 
 // Ensure search/icon input text padding
 .input-icon {
+
     .form-control,
     input[type="text"],
     input[type="search"] {
@@ -1088,6 +1093,7 @@ textarea {
 
 // Style input-group-flat to ensure input and clear button merge seamlessly and center the icon
 .input-group-flat {
+
     .form-control,
     input[type="search"] {
         border-right: 0 !important;
@@ -1132,11 +1138,3 @@ textarea {
         }
     }
 }
-
-
-
-
-
-
-
-

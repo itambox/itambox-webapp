@@ -14,6 +14,7 @@
     {% csrf_token %}
     <input type="hidden" name="model_name" value="{{ model_name }}">
     <input type="hidden" name="return_url" value="{{ return_url }}">
+    <input type="hidden" name="_apply" value="1">
     {% for pk in object_pks %}
         <input type="hidden" name="pk" value="{{ pk }}">
     {% endfor %}
@@ -46,7 +47,7 @@
                                     <input class="form-check-input bulk-edit-selector" type="checkbox"
                                            name="_selected_fields" value="{{ field.name }}"
                                            id="select_{{ field.name }}"
-                                           onchange="var container=document.getElementById('field_container_{{ field.name }}'); if(container){container.style.display=this.checked?'':'none';}">
+                                           {% if field.name in selected_fields %}checked{% endif %}>
                                     <label class="form-check-label fw-bold" for="select_{{ field.name }}">{{ field.label }}</label>
                                 </div>
                             </div>

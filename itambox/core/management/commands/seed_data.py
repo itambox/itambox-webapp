@@ -1796,8 +1796,11 @@ class Command(BaseCommand):
         )
         LabelTemplate.objects.get_or_create(
             name='Standard QR Label',
-            description='2x1 inch label with QR code',
-            template_code='^XA^FO50,50^BQN,2,10^FDQA,{{ asset.tag }}^FS^XZ'
+            defaults={
+                'description': '2x1 inch label with QR code',
+                'barcode_format': 'qr',
+                'template_code': '^XA^FO50,50^BQN,2,10^FDQA,{{ asset.tag }}^FS^XZ'
+            }
         )
 
         # 4. Asset Requests

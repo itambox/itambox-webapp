@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from assets.models import Manufacturer, Asset, AssetType, AssetRole, StatusLabel
 from organization.models import AssetHolder, Tenant
-from core.models import Job
+from core.models import Job, LabelTemplate
 
 User = get_user_model()
 
@@ -54,6 +54,13 @@ class BulkActionsTestCase(TestCase):
             tenant=self.tenant
         )
 
+        self.label_template = LabelTemplate.objects.create(
+            name="Standard QR",
+            description="Standard QR label",
+            barcode_format="qr",
+            template_code="<div>{{ asset.name }}</div>"
+        )
+
     @patch('django_q.tasks.async_task')
     def test_bulk_assign_assets(self, mock_async):
         url = reverse('assets:asset_bulk_assign')
@@ -84,7 +91,8 @@ class BulkActionsTestCase(TestCase):
         url = reverse('assets:asset_bulk_print_labels')
         post_data = {
             'pk': [self.asset1.pk, self.asset2.pk],
-            'label_format': 'qr',
+            'template_id': self.label_template.pk,
+            'layout_mode': 'roll',
         }
 
         response = self.client.post(url, post_data)
@@ -98,7 +106,59 @@ class BulkActionsTestCase(TestCase):
         # Verify async_task was called
         mock_async.assert_called_once()
         args = mock_async.call_args[0]
-        self.assertEqual(args[0], 'core.tasks.generate_label_batch_task')
+        self.assertEqual(args[0], 'core.tasks.labels.generate_label_pdf_batch_task')
         self.assertEqual(args[1], job.pk)
         self.assertEqual(args[2], [str(self.asset1.pk), str(self.asset2.pk)])
-        self.assertEqual(args[3], 'qr')
+        self.assertEqual(args[3], self.label_template.pk)
+        self.assertEqual(args[4], 'roll')
+
+    def test_bulk_delete_assets_get(self):
+        url = reverse('assets:asset_bulk_delete')
+        post_data = {
+            'pk': [self.asset1.pk, self.asset2.pk],
+        }
+        response = self.client.post(url, post_data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'generic/object_confirm_bulk_delete.html')
+
+    def test_bulk_delete_assets_confirm(self):
+        url = reverse('assets:asset_bulk_delete')
+        post_data = {
+            'pk': [self.asset1.pk, self.asset2.pk],
+            '_confirm': 'Confirm',
+        }
+        response = self.client.post(url, post_data)
+        self.assertEqual(response.status_code, 302)
+        # Check that assets were deleted
+        self.assertFalse(Asset.objects.filter(pk=self.asset1.pk).exists())
+        self.assertFalse(Asset.objects.filter(pk=self.asset2.pk).exists())
+
+    def test_bulk_edit_assets_get(self):
+        url = reverse('assets:asset_bulk_edit')
+        post_data = {
+            'pk': [self.asset1.pk, self.asset2.pk],
+        }
+        response = self.client.post(url, post_data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'generic/object_bulk_edit.html')
+
+    def test_bulk_edit_assets_apply(self):
+        status2 = StatusLabel.objects.create(
+            name="Archived",
+            slug="archived",
+            type="archived"
+        )
+        url = reverse('assets:asset_bulk_edit')
+        post_data = {
+            'pk': [self.asset1.pk, self.asset2.pk],
+            '_selected_fields': ['status'],
+            'status': status2.pk,
+            '_apply': 'Apply',
+        }
+        response = self.client.post(url, post_data)
+        self.assertEqual(response.status_code, 302)
+        # Check that assets were updated
+        self.asset1.refresh_from_db()
+        self.asset2.refresh_from_db()
+        self.assertEqual(self.asset1.status, status2)
+        self.assertEqual(self.asset2.status, status2)

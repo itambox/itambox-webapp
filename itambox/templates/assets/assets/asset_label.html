@@ -122,7 +122,7 @@
     <div class="print-helper">
         <h3>{% translate "Thermal Label Preview" %}</h3>
         <p>{% translate "Pre-formatted for" %} <strong>2.25" x 1.25"</strong> {% translate "thermal rolls. Clicking print will launch the print settings modal." %}</p>
-        <button class="print-btn" onclick="window.print()">{% translate "Print Label" %}</button>
+        <button class="print-btn">{% translate "Print Label" %}</button>
         <p style="font-size: 8pt; color: #777; margin-top: 10px;">{% translate 'Ensure margins are set to "None" in your print options.' %}</p>
     </div>
 
@@ -139,5 +139,16 @@
             {% endif %}
         </div>
     </div>
+
+    <script nonce="{{ request.csp_nonce }}">
+        document.addEventListener('DOMContentLoaded', function() {
+            var btn = document.querySelector('.print-btn');
+            if (btn) {
+                btn.addEventListener('click', function() {
+                    window.print();
+                });
+            }
+        });
+    </script>
 </body>
 </html>

@@ -39,6 +39,8 @@ from itambox.views.utility import SearchView, health # Import core views, aliase
 from itambox.views.jobs import JobListView, JobDetailView, JobCancelView
 from django.conf import settings # Import settings
 from django.conf.urls.static import static # Import static
+import mimetypes
+mimetypes.add_type('application/zip', '.zip')
 
 # Scheduled Reporting & Alerts Views
 from core.views.alerts import (

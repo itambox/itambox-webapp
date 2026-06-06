@@ -7,7 +7,6 @@
 (function () {
   function updateBatchBar(): void {
     const bars = document.querySelectorAll<HTMLElement>('.batch-actions-bar');
-    const deletePksInput = document.getElementById('bulk-delete-pks') as HTMLInputElement | null;
     const checkboxes = document.querySelectorAll<HTMLInputElement>(
       '#object-list-table-container input[type="checkbox"][name="pk"]',
     );
@@ -23,14 +22,6 @@
       if (cnt) cnt.textContent = count + ' selected';
     });
 
-    if (deletePksInput) {
-      deletePksInput.value = selected
-        .map(function (cb) {
-          return cb.value;
-        })
-        .join(',');
-    }
-
     const selectAllCb = document.querySelector<HTMLInputElement>(
       '#object-list-table-container input[type="checkbox"][name="select_all"]',
     );
@@ -42,9 +33,30 @@
     }
   }
 
+  function initBulkEditSelectors(): void {
+    const selectors = document.querySelectorAll<HTMLInputElement>('.bulk-edit-selector');
+    selectors.forEach(function (cb) {
+      const fieldName = cb.value;
+      const container = document.getElementById('field_container_' + fieldName);
+      if (container) {
+        container.style.display = cb.checked ? '' : 'none';
+      }
+    });
+  }
+
   document.addEventListener('change', function (event) {
     const target = event.target as HTMLInputElement;
     if (target.type !== 'checkbox') return;
+
+    if (target.classList.contains('bulk-edit-selector')) {
+      const fieldName = target.value;
+      const container = document.getElementById('field_container_' + fieldName);
+      if (container) {
+        container.style.display = target.checked ? '' : 'none';
+      }
+      return;
+    }
+
     if (!target.closest('#object-list-table-container')) return;
 
     if (target.name === 'pk') {
@@ -62,13 +74,18 @@
 
   document.body.addEventListener('htmx:afterSettle', function () {
     updateBatchBar();
+    initBulkEditSelectors();
   });
 
   // Initial run
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', updateBatchBar);
+    document.addEventListener('DOMContentLoaded', function () {
+      updateBatchBar();
+      initBulkEditSelectors();
+    });
   } else {
     updateBatchBar();
+    initBulkEditSelectors();
   }
 
   // Bulk Assign and Bulk Print modal submit handler (using event delegation to support dynamically loaded modals)
@@ -121,12 +138,28 @@
         return;
       }
       const form = document.getElementById('bulk-delete-form') as HTMLFormElement | null;
-      const input = document.getElementById('bulk-delete-pks') as HTMLInputElement | null;
-      if (form && input) {
+      if (form) {
         const checked = document.querySelectorAll<HTMLInputElement>(
           '#object-list-table-container input[type="checkbox"][name="pk"]:checked'
         );
-        input.value = Array.from(checked).map(cb => cb.value).join(',');
+        if (checked.length === 0) {
+          alert('No items selected.');
+          return;
+        }
+        let container = form.querySelector<HTMLElement>('#bulk-delete-pks-container');
+        if (!container) {
+          container = document.createElement('div');
+          container.id = 'bulk-delete-pks-container';
+          form.appendChild(container);
+        }
+        container.innerHTML = '';
+        checked.forEach(function (cb) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'pk';
+          input.value = cb.value;
+          container.appendChild(input);
+        });
         form.submit();
       }
       return;
@@ -137,12 +170,28 @@
     if (editBtn) {
       event.preventDefault();
       const form = document.getElementById('bulk-edit-form') as HTMLFormElement | null;
-      const input = document.getElementById('bulk-edit-pks') as HTMLInputElement | null;
-      if (form && input) {
+      if (form) {
         const checked = document.querySelectorAll<HTMLInputElement>(
           '#object-list-table-container input[type="checkbox"][name="pk"]:checked'
         );
-        input.value = Array.from(checked).map(cb => cb.value).join(',');
+        if (checked.length === 0) {
+          alert('No items selected.');
+          return;
+        }
+        let container = form.querySelector<HTMLElement>('#bulk-edit-pks-container');
+        if (!container) {
+          container = document.createElement('div');
+          container.id = 'bulk-edit-pks-container';
+          form.appendChild(container);
+        }
+        container.innerHTML = '';
+        checked.forEach(function (cb) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'pk';
+          input.value = cb.value;
+          container.appendChild(input);
+        });
         form.submit();
       }
       return;

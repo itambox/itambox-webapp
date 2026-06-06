@@ -145,12 +145,17 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
 
         context.setdefault('title', _model._meta.verbose_name_plural)
 
-        from core.models import ExportTemplate
+        from core.models import ExportTemplate, LabelTemplate
         try:
             content_type = ContentType.objects.get_for_model(_model)
             context['export_templates'] = list(ExportTemplate.objects.filter(content_type=content_type))
         except Exception:
             context['export_templates'] = []
+
+        try:
+            context['label_templates'] = list(LabelTemplate.objects.all())
+        except Exception:
+            context['label_templates'] = []
 
         try:
             create_url_name = get_model_viewname(_model, 'create')
@@ -170,6 +175,18 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
                 })
             except NoReverseMatch:
                 context['import_url'] = None
+
+        try:
+            bulk_delete_url_name = get_model_viewname(_model, 'bulk_delete')
+            context['bulk_delete_url'] = reverse(bulk_delete_url_name)
+        except NoReverseMatch:
+            context['bulk_delete_url'] = None
+
+        try:
+            bulk_edit_url_name = get_model_viewname(_model, 'bulk_edit')
+            context['bulk_edit_url'] = reverse(bulk_edit_url_name)
+        except NoReverseMatch:
+            context['bulk_edit_url'] = None
 
         # Check permissions in Python
         can_add = self.request.user.has_perm(f"{_model._meta.app_label}.add_{_model._meta.model_name}")
@@ -1046,6 +1063,7 @@ class ObjectBulkEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXVi
         pks = request.POST.getlist('pk')
         model = self._get_model()
         return_url = request.POST.get('return_url') or request.META.get('HTTP_REFERER', reverse('dashboard'))
+        selected_fields = request.POST.getlist('_selected_fields')
 
         if not pks:
             messages.warning(request, f"No {model._meta.verbose_name_plural} were selected.")
@@ -1055,7 +1073,6 @@ class ObjectBulkEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXVi
 
         if '_apply' in request.POST:
             form = self._get_bulk_edit_form(request.POST, model)
-            selected_fields = request.POST.getlist('_selected_fields')
 
             if form.is_valid() and (selected_fields or form.cleaned_data.get('add_tags') or form.cleaned_data.get('remove_tags')):
                 updated_count = 0
@@ -1067,7 +1084,11 @@ class ObjectBulkEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXVi
 
                         for field_name in selected_fields:
                             if field_name in form.cleaned_data:
-                                setattr(obj, field_name, form.cleaned_data[field_name])
+                                val = form.cleaned_data[field_name]
+                                field = model._meta.get_field(field_name)
+                                if field.is_relation and val == '':
+                                    val = None
+                                setattr(obj, field.attname, val)
 
                         obj.full_clean()
                         obj.save()
@@ -1088,6 +1109,10 @@ class ObjectBulkEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXVi
             else:
                 if not (selected_fields or form.cleaned_data.get('add_tags') or form.cleaned_data.get('remove_tags')):
                     messages.warning(request, "No fields or tags were selected for editing.")
+                else:
+                    for field_name, errors in form.errors.items():
+                        field_label = form[field_name].label if field_name in form else field_name
+                        messages.error(request, f"Error in field '{field_label}': {', '.join(errors)}")
                 form = self._get_bulk_edit_form(request.POST if '_apply' in request.POST else None, model)
         else:
             form = self._get_bulk_edit_form(model=model)
@@ -1098,6 +1123,7 @@ class ObjectBulkEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXVi
             'objects': queryset,
             'object_pks': pks,
             'return_url': return_url,
+            'selected_fields': selected_fields,
             'verbose_name': model._meta.verbose_name,
             'verbose_name_plural': model._meta.verbose_name_plural,
             'title': f'Bulk Edit {str(model._meta.verbose_name_plural).title()}',

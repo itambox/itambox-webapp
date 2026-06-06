@@ -44,32 +44,29 @@
                 <i class="mdi mdi-account-plus-outline me-1"></i>
                 {% translate "Assign Selected" %}
             </button>
+            <button type="button" class="btn btn-sm btn-info text-white" id="btn-bulk-print"
+                    data-bs-toggle="modal" data-bs-target="#bulk-print-modal"
+                    title="{% translate 'Print labels for selected assets' %}">
+                <i class="mdi mdi-printer me-1"></i>
+                {% translate "Print Labels" %}
+            </button>
             {% endif %}
-            <form id="bulk-delete-form" method="post" action="{{ bulk_delete_url }}" class="d-inline">
+            <form id="bulk-delete-form" method="post" action="{{ bulk_delete_url }}" class="d-inline" hx-boost="false">
                 {% csrf_token %}
                 <input type="hidden" name="model_name" value="{{ model_name_str }}">
                 <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
-                <input type="hidden" name="pk" value="" id="bulk-delete-pks">
+                <div id="bulk-delete-pks-container" class="d-inline"></div>
                 <button type="button" class="btn btn-sm btn-outline-danger btn-bulk-delete">
                     <i class="mdi mdi-trash-can-outline me-1"></i>
                     {% translate "Delete Selected" %}
                 </button>
             </form>
-            <form id="bulk-edit-form" method="post" action="{{ bulk_edit_url }}" class="d-inline">
+            <form id="bulk-edit-form" method="post" action="{{ bulk_edit_url }}" class="d-inline" hx-boost="false">
                 {% csrf_token %}
                 <input type="hidden" name="model_name" value="{{ model_name_str }}">
                 <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
-                <input type="hidden" name="pk" value="" id="bulk-edit-pks">
+                <div id="bulk-edit-pks-container" class="d-inline"></div>
                 <button type="button" class="btn btn-sm btn-outline-primary btn-bulk-edit">
-                    <i class="mdi mdi-pencil-outline me-1"></i>
-                    {% translate "Edit Selected" %}
-                </button>
-            </form>
-            <form id="bulk-edit-form" method="post" action="{{ bulk_edit_url }}" class="d-inline">
-                {% csrf_token %}
-                <input type="hidden" name="model_name" value="{{ model_name_str }}">
-                <input type="hidden" name="pk" value="" id="bulk-edit-pks">
-                <button type="submit" class="btn btn-sm btn-outline-primary">
                     <i class="mdi mdi-pencil-outline me-1"></i>
                     {% translate "Edit Selected" %}
                 </button>
