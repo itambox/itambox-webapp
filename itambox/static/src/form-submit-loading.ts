@@ -8,23 +8,41 @@
 (function () {
   let activeSubmits: Map<HTMLFormElement, HTMLElement> = new Map();
 
-  function showLoadingState(form: HTMLFormElement): void {
+  function showLoadingState(form: HTMLFormElement, submitter?: HTMLElement): void {
     if (!form || activeSubmits.has(form)) return;
 
-    // Find the primary submit button in the form
-    const submitBtn = form.querySelector<HTMLButtonElement | HTMLInputElement>(
-      'button[type="submit"], input[type="submit"], .btn-primary'
-    );
+    let submitBtn = submitter;
+    if (!submitBtn || submitBtn === form) {
+      submitBtn = form.querySelector<HTMLButtonElement | HTMLInputElement>(
+        'button[type="submit"], input[type="submit"], .btn-primary'
+      ) as HTMLElement | null;
+    }
 
     if (!submitBtn) return;
 
     // Store original contents to restore on completion/error
     const originalText = submitBtn instanceof HTMLInputElement ? submitBtn.value : submitBtn.innerHTML;
     (submitBtn as any)._originalContent = originalText;
-    (submitBtn as any)._originalDisabledState = submitBtn.disabled;
+    (submitBtn as any)._originalDisabledState = (submitBtn as any).disabled;
+
+    // If the button has a name, create a hidden input to preserve its value during form submission
+    if (submitBtn instanceof HTMLButtonElement || submitBtn instanceof HTMLInputElement) {
+      const name = submitBtn.name;
+      if (name) {
+        const val = submitBtn.getAttribute('value') || submitBtn.value || '1';
+        const hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = name;
+        hiddenInput.value = val;
+        hiddenInput.setAttribute('data-added-by-loading', 'true');
+        form.appendChild(hiddenInput);
+      }
+    }
 
     // Disable button to prevent double clicks
-    submitBtn.disabled = true;
+    if ('disabled' in submitBtn) {
+      (submitBtn as any).disabled = true;
+    }
     submitBtn.classList.add('disabled');
 
     // Inject spinner based on element type
@@ -42,6 +60,17 @@
     const submitBtn = activeSubmits.get(form);
     if (!submitBtn) return;
 
+    // Clean up dynamic hidden input if present
+    if (submitBtn instanceof HTMLButtonElement || submitBtn instanceof HTMLInputElement) {
+      const name = submitBtn.name;
+      if (name) {
+        const hiddenInput = form.querySelector(`input[type="hidden"][name="${name}"][data-added-by-loading="true"]`);
+        if (hiddenInput) {
+          hiddenInput.remove();
+        }
+      }
+    }
+
     // Restore original content and disabled status
     const originalContent = (submitBtn as any)._originalContent;
     if (originalContent !== undefined) {
@@ -53,7 +82,9 @@
     }
 
     const originalDisabled = (submitBtn as any)._originalDisabledState;
-    submitBtn.disabled = originalDisabled !== undefined ? originalDisabled : false;
+    if ('disabled' in submitBtn) {
+      (submitBtn as any).disabled = originalDisabled !== undefined ? originalDisabled : false;
+    }
     submitBtn.classList.remove('disabled');
 
     activeSubmits.delete(form);
@@ -63,7 +94,8 @@
   document.body.addEventListener('submit', function (evt) {
     const form = evt.target as HTMLFormElement;
     if (form && form.tagName === 'FORM') {
-      showLoadingState(form);
+      const submitter = (evt as SubmitEvent).submitter || undefined;
+      showLoadingState(form, submitter);
     }
   });
 
@@ -73,7 +105,7 @@
     const detail = (evt as CustomEvent).detail;
     const form = detail.form || (detail.elt ? detail.elt.closest('form') : null);
     if (form) {
-      showLoadingState(form);
+      showLoadingState(form, detail.elt);
     }
   });
 
