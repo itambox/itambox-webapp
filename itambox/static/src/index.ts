@@ -17,6 +17,7 @@ import './sidebar';
 import './dashboard';
 import './modal-handler';
 import './audit';
+import './scanner';
 import './form-toggles';
 import './report-designer';
 import './object-detail';

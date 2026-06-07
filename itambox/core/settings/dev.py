@@ -6,7 +6,7 @@ To use: set DJANGO_SETTINGS_MODULE=core.settings.dev or ITAMBOX_ENV=dev
 from .base import *
 
 DEBUG = True
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.50.54']
 
 # Mailpit local SMTP catcher settings for local development
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'

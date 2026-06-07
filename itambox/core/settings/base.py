@@ -113,6 +113,7 @@ TEMPLATES = [
                 'itambox.context_processors.breadcrumbs',
                 'itambox.context_processors.notifications_processor',
                 'itambox.context_processors.tenant_switcher_processor',
+                'itambox.context_processors.base_template_processor',
             ],
             'loaders': partial_loaders,
             'libraries': {

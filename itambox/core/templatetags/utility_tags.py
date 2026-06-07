@@ -154,3 +154,10 @@ def pretty_json(value):
         return json.dumps(value, indent=2)
     except Exception:
         return str(value)
+
+
+@register.filter
+def status_color(status):
+    """Template filter to get color code for a status."""
+    from itambox.utils import get_status_color
+    return get_status_color(status)

@@ -49,15 +49,23 @@
     
     <dt class="col-sm-3">{% translate "Requestable Status:" %}</dt>
     <dd class="col-sm-9">
-        {% if object.requestable %}
+        {% if object.is_requestable %}
             <span class="badge bg-green-lt text-success d-inline-flex align-items-center">
                 <i class="mdi mdi-checkbox-outline me-1"></i>
-                {% translate "Requestable by Staff" %}
+                {% if object.requestable is None %}
+                    {% translate "Requestable by Staff (Inherited)" %}
+                {% else %}
+                    {% translate "Requestable by Staff" %}
+                {% endif %}
             </span>
         {% else %}
             <span class="badge bg-secondary-lt text-secondary d-inline-flex align-items-center">
                 <i class="mdi mdi-lock me-1"></i>
-                {% translate "Administrative Custody Only" %}
+                {% if object.requestable is None %}
+                    {% translate "Administrative Custody Only (Inherited)" %}
+                {% else %}
+                    {% translate "Administrative Custody Only" %}
+                {% endif %}
             </span>
         {% endif %}
     </dd>

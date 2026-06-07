@@ -154,4 +154,28 @@ def tenant_switcher_processor(request):
             'all_tenants_switcher': [],
             'grouped_tenants_switcher': [],
             'grouped_memberships_switcher': grouped_memberships_switcher
-        }
+        }
+
+
+def base_template_processor(request):
+    """
+    Determine the base template to extend based on whether the request is a boosted HTMX request.
+    This ensures that views do not double-render the main layout when loaded via HTMX boosted links,
+    while still rendering the full layout for direct page loads.
+    """
+    if hasattr(request, 'base_template'):
+        return {'base_template': request.base_template}
+
+    base_template = 'layout.html'
+    if getattr(request, 'htmx', False):
+        target = getattr(request.htmx, 'target', '') or ''
+        is_boosted_main_swap = (
+            getattr(request.htmx, 'boosted', False) or
+            getattr(request.htmx, 'history_restore_request', False) or
+            target in ('page-content-wrapper', '#page-content-wrapper', 'page-body-main', '#page-body-main')
+        )
+        if is_boosted_main_swap:
+            base_template = 'base_htmx.html'
+
+    return {'base_template': base_template}
+

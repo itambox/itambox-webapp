@@ -316,7 +316,13 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
         blank=True,
         verbose_name="Custom Values"
     )
-    requestable = models.BooleanField(default=False, db_index=True, help_text="Allow users to request this asset")
+    requestable = models.BooleanField(null=True, blank=True, default=None, db_index=True, help_text="Allow users to request this asset")
+
+    @property
+    def is_requestable(self):
+        if self.requestable is not None:
+            return self.requestable
+        return self.asset_type.requestable if self.asset_type else False
 
     @property
     def manufacturer(self):
@@ -614,8 +620,8 @@ class Category(AutoSlugMixin, StandardModel, SoftDeleteMixin):
 
 
 class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
-    objects = SoftDeleteManager()
-    all_objects = AllObjectsManager()
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
     STATUS_PENDING = 'pending'
     STATUS_APPROVED = 'approved'
     STATUS_DENIED = 'denied'
@@ -629,6 +635,14 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
         (STATUS_CANCELLED, 'Cancelled'),
     ]
 
+    tenant = models.ForeignKey(
+        'organization.Tenant',
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        related_name='asset_requests',
+        db_index=True
+    )
     requester = models.ForeignKey(User, on_delete=models.PROTECT, related_name='asset_requests', db_index=True)
     asset = models.ForeignKey('Asset', on_delete=models.SET_NULL, null=True, blank=True, related_name='requests', db_index=True)
     asset_type = models.ForeignKey(AssetType, on_delete=models.SET_NULL, null=True, blank=True, related_name='requests', db_index=True)
@@ -636,9 +650,48 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
     request_date = models.DateTimeField(auto_now_add=True, db_index=True)
     response_date = models.DateTimeField(null=True, blank=True)
     responded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='asset_request_responses')
+    
+    # Intended assignee target fields (delegated targets)
+    assigned_user = models.ForeignKey(
+        'organization.AssetHolder',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='asset_requests'
+    )
+    assigned_location = models.ForeignKey(
+        'organization.Location',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='asset_requests'
+    )
+    assigned_asset = models.ForeignKey(
+        'Asset',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='child_requests_for'
+    )
+
     notes = models.TextField(blank=True, null=True)
     response_notes = models.TextField(blank=True, null=True)
     tags = models.ManyToManyField('extras.Tag', related_name='asset_requests_tagged', blank=True)
+
+    @property
+    def assigned_target(self):
+        return self.assigned_user or self.assigned_location or self.assigned_asset
+
+    @property
+    def assigned_to(self):
+        return self.assigned_target
+
+    @property
+    def assigned_to_type(self):
+        if self.assigned_user: return 'assetholder'
+        if self.assigned_location: return 'location'
+        if self.assigned_asset: return 'asset'
+        return None
 
     def clean(self):
         from django.core.exceptions import ValidationError
@@ -646,14 +699,32 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
         if not self.asset and not self.asset_type:
             raise ValidationError("You must specify either an asset type or a specific asset.")
         if not self.pk:
-            if self.asset and not self.asset.requestable:
+            if self.asset and not self.asset.is_requestable:
                 raise ValidationError(f"The asset '{self.asset}' is not requestable.")
             if self.asset_type and not self.asset_type.requestable:
                 raise ValidationError(f"The asset type '{self.asset_type}' is not requestable.")
+            if self.asset and self.asset.status and self.asset.status.type != 'deployable':
+                raise ValidationError(f"The asset '{self.asset}' is currently not available (Status: {self.asset.status.name}).")
+            
+            # Check for duplicate pending or approved requests by the same requester
+            if self.requester_id:
+                duplicate_qs = AssetRequest.objects.filter(
+                    requester_id=self.requester_id,
+                    status__in=[AssetRequest.STATUS_PENDING, AssetRequest.STATUS_APPROVED]
+                )
+                if self.asset:
+                    if duplicate_qs.filter(asset=self.asset).exists():
+                        raise ValidationError(f"You already have a pending or approved request for the asset '{self.asset}'.")
+                elif self.asset_type:
+                    if duplicate_qs.filter(asset_type=self.asset_type, asset__isnull=True).exists():
+                        raise ValidationError(f"You already have a pending or approved request for the asset type '{self.asset_type}'.")
         if self.asset and self.asset_type and self.asset.asset_type != self.asset_type:
             raise ValidationError("The selected asset does not match the requested asset type.")
 
     def save(self, *args, **kwargs):
+        if not self.tenant:
+            from core.managers import get_current_tenant
+            self.tenant = get_current_tenant()
         self.full_clean()
         super().save(*args, **kwargs)
 
@@ -661,6 +732,20 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
         ordering = ['-request_date']
         verbose_name = _("Asset Request")
         verbose_name_plural = _("Asset Requests")
+        permissions = [
+            ("add_delegated_assetrequest", "Can request assets on behalf of others"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    (models.Q(assigned_user__isnull=True) & models.Q(assigned_location__isnull=True) & models.Q(assigned_asset__isnull=True)) |
+                    (models.Q(assigned_user__isnull=False) & models.Q(assigned_location__isnull=True) & models.Q(assigned_asset__isnull=True)) |
+                    (models.Q(assigned_user__isnull=True) & models.Q(assigned_location__isnull=False) & models.Q(assigned_asset__isnull=True)) |
+                    (models.Q(assigned_user__isnull=True) & models.Q(assigned_location__isnull=True) & models.Q(assigned_asset__isnull=False))
+                ),
+                name='at_most_one_request_target'
+            )
+        ]
 
     def __str__(self):
         target = str(self.asset) if self.asset else str(self.asset_type) if self.asset_type else "Any Asset"

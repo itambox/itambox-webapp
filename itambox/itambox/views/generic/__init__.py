@@ -1120,7 +1120,8 @@ class ObjectBulkEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXVi
         pks = request.POST.getlist('pk')
         model = self._get_model()
         return_url = request.POST.get('return_url') or request.META.get('HTTP_REFERER', reverse('dashboard'))
-        selected_fields = request.POST.getlist('_selected_fields')
+        raw_selected_fields = request.POST.getlist('_selected_fields')
+        selected_fields = [f for f in raw_selected_fields if f not in ('add_tags', 'remove_tags')]
 
         if not pks:
             messages.warning(request, f"No {model._meta.verbose_name_plural} were selected.")
@@ -1131,7 +1132,7 @@ class ObjectBulkEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXVi
         if '_apply' in request.POST:
             form = self._get_bulk_edit_form(request.POST, model)
 
-            if form.is_valid() and (selected_fields or form.cleaned_data.get('add_tags') or form.cleaned_data.get('remove_tags')):
+            if form.is_valid() and (selected_fields or ('add_tags' in raw_selected_fields and form.cleaned_data.get('add_tags')) or ('remove_tags' in raw_selected_fields and form.cleaned_data.get('remove_tags'))):
                 updated_count = 0
 
                 with transaction.atomic():
@@ -1151,9 +1152,9 @@ class ObjectBulkEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXVi
                         obj.save()
 
                         if hasattr(obj, 'tags'):
-                            if form.cleaned_data.get('add_tags'):
+                            if 'add_tags' in raw_selected_fields and form.cleaned_data.get('add_tags'):
                                 obj.tags.add(*form.cleaned_data['add_tags'])
-                            if form.cleaned_data.get('remove_tags'):
+                            if 'remove_tags' in raw_selected_fields and form.cleaned_data.get('remove_tags'):
                                 obj.tags.remove(*form.cleaned_data['remove_tags'])
 
                         updated_count += 1

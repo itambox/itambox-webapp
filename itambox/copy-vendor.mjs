@@ -60,5 +60,8 @@ cpSync('node_modules/tom-select/dist/js/tom-select.complete.min.js', dist('tom-s
 // ApexCharts
 cpSync('node_modules/apexcharts/dist/apexcharts.min.js', dist('apexcharts.min.js'));
 
+// HTML5 QR Code Scanner fallback
+cpSync('node_modules/html5-qrcode/html5-qrcode.min.js', dist('html5-qrcode.min.js'));
+
 console.log('[itambox] Vendor assets copied to static/dist/vendor/');
 

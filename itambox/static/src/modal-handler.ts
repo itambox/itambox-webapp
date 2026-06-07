@@ -32,17 +32,22 @@
     });
   });
 
-  // 2. Dynamic target fields toggling for checkout forms (Assets, Licenses, Subscriptions)
+  // 2. Dynamic target fields toggling for checkout and request forms (Assets, Licenses, Subscriptions)
   function updateCheckoutFormFields(form: HTMLFormElement) {
     const targetTypeSelect = form.querySelector('select[name=target_type]') as HTMLSelectElement | null;
     if (!targetTypeSelect) return;
     const targetType = targetTypeSelect.value;
 
-    const holderDiv = form.querySelector('#div_id_asset_holder, #div_id_assigned_holder') as HTMLElement | null;
-    const locationDiv = form.querySelector('#div_id_location') as HTMLElement | null;
-    const assetDiv = form.querySelector('#div_id_asset, #div_id_asset_target') as HTMLElement | null;
+    const holderDiv = form.querySelector('#div_id_asset_holder, #div_id_assigned_holder, #div_id_assigned_user') as HTMLElement | null;
+    const locationDiv = form.querySelector('#div_id_location, #div_id_assigned_location') as HTMLElement | null;
+    
+    // For requests, we have both #div_id_assigned_asset and #div_id_asset (which is the requested asset itself).
+    // We only want to toggle the target #div_id_assigned_asset, not the requested asset.
+    const isRequestForm = !!form.querySelector('[name=assigned_asset], [name=assigned_user], [name=assigned_location]');
+    const assignedAssetDiv = form.querySelector('#div_id_assigned_asset') as HTMLElement | null;
+    const assetDiv = isRequestForm ? assignedAssetDiv : (assignedAssetDiv || (form.querySelector('#div_id_asset_target, #div_id_asset') as HTMLElement | null));
 
-    if (holderDiv) holderDiv.style.display = (targetType === 'holder') ? '' : 'none';
+    if (holderDiv) holderDiv.style.display = (targetType === 'holder' || targetType === 'assetholder') ? '' : 'none';
     if (locationDiv) locationDiv.style.display = (targetType === 'location') ? '' : 'none';
     if (assetDiv) assetDiv.style.display = (targetType === 'asset') ? '' : 'none';
   }

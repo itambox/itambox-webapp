@@ -20,7 +20,7 @@
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
             <form id="asset-checkout-form"
-                  hx-post="{% url 'assets:asset_checkout_modal' pk=asset.pk %}"
+                  hx-post="{% url 'assets:asset_checkout_modal' pk=asset.pk %}{% if request.GET.request_id %}?request_id={{ request.GET.request_id }}{% endif %}"
                   hx-target="#asset-checkout-modal-body"
                   hx-swap="innerHTML">
                 {% csrf_token %}

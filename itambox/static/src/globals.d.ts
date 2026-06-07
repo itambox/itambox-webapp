@@ -117,6 +117,27 @@ declare function refreshCurrentPage(): void;
 declare function toggleFilters(): void;
 declare function initFiltersToggle(): void;
 
+// BarcodeDetector browser API
+declare class BarcodeDetector {
+  constructor(options?: { formats: string[] });
+  static getSupportedFormats(): Promise<string[]>;
+  detect(image: ImageBitmapSource): Promise<Array<{ rawValue: string }>>;
+}
+
+// html5-qrcode library fallback
+declare class Html5Qrcode {
+  constructor(elementId: string, verbose?: boolean | Record<string, any>);
+  start(
+    cameraIdOrConfig: string | { facingMode: string } | Record<string, any>,
+    configuration: Record<string, any>,
+    qrCodeSuccessCallback: (decodedText: string, result: any) => void,
+    qrCodeErrorCallback: (errorMessage: string, error: any) => void
+  ): Promise<any>;
+  stop(): Promise<any>;
+  clear(): void;
+  isScanning: boolean;
+}
+
 // Window extensions
 interface Window {
   ITAMboxState?: ITAMboxStateType;
@@ -125,4 +146,5 @@ interface Window {
   initFiltersToggle?: () => void;
   __gsInitialized?: boolean;
   _itamboxAuditReady?: boolean;
+  AssetScannerInstance?: any;
 }

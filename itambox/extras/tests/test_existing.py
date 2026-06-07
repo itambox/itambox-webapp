@@ -294,3 +294,68 @@ class CustomFieldsetViewTests(TestCase):
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
         self.assertFalse(CustomFieldset.objects.filter(pk=self.cfs.pk).exists())
+
+
+class TagColumnTests(TestCase):
+    def test_tag_column_rendering(self):
+        from extras.tables import TagColumn
+
+        t1 = Tag.objects.create(name='Tag1', slug='tag1', color='ffffff')  # white bg -> dark text
+        t2 = Tag.objects.create(name='Tag2', slug='tag2', color='000000')  # black bg -> white text
+        t3 = Tag.objects.create(name='Tag3', slug='tag3', color='20c997')
+        t4 = Tag.objects.create(name='Tag4', slug='tag4', color='111111')
+
+        column = TagColumn(url_name='extras:tag_list')
+
+        # Test empty tags
+        self.assertEqual(column.render(Tag.objects.none()), "")
+
+        # Test up to 3 tags
+        qs_3 = Tag.objects.filter(name__in=['Tag1', 'Tag2', 'Tag3'])
+        html_3 = column.render(qs_3)
+        self.assertIn('background-color: #ffffff', html_3)
+        self.assertIn('color: #212529', html_3)  # contrast text for white bg
+        self.assertIn('background-color: #000000', html_3)
+        self.assertIn('color: #ffffff', html_3)  # contrast text for black bg
+        self.assertNotIn('+1', html_3)
+
+        # Test 4 tags (limit exceeded)
+        qs_4 = Tag.objects.all()
+        html_4 = column.render(qs_4)
+        self.assertIn('+1', html_4)
+
+
+class BulkEditFormTests(TestCase):
+    def test_bulk_edit_form_choices_and_styling(self):
+        from django import forms
+        from core.forms import BulkEditForm
+        from organization.models import Location
+
+        # Construct form with Location model
+        form = BulkEditForm(model=Location)
+
+        # Check 'status' field (it has choices on the model)
+        self.assertIn('status', form.fields)
+        self.assertIsInstance(form.fields['status'], forms.ChoiceField)
+        
+        # Check that it includes the STATUS_CHOICES plus '---------'
+        status_choices = dict(form.fields['status'].choices)
+        self.assertIn('planned', status_choices)
+        self.assertIn('active', status_choices)
+        self.assertEqual(status_choices[''], '---------')
+
+        # Check that appropriate styling classes are added to widgets
+        # 'status' (Select widget) should have 'form-select' class
+        status_class = form.fields['status'].widget.attrs.get('class', '')
+        self.assertIn('form-select', status_class)
+        self.assertIn('data-tom-select', form.fields['status'].widget.attrs)
+
+        # 'name' (TextInput widget) should have 'form-control' class
+        name_class = form.fields['name'].widget.attrs.get('class', '')
+        self.assertIn('form-control', name_class)
+
+        # 'description' (Textarea widget) should have 'form-control' class
+        desc_class = form.fields['description'].widget.attrs.get('class', '')
+        self.assertIn('form-control', desc_class)
+
+

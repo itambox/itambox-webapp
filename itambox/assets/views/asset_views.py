@@ -218,7 +218,29 @@ class AssetCheckoutView(GenericTransactionView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         del kwargs['instance']
-        kwargs['asset'] = self.get_object()
+        asset = self.get_object()
+        kwargs['asset'] = asset
+
+        request_id = self.request.GET.get('request_id')
+        if request_id:
+            from ..models import AssetRequest
+            try:
+                asset_request = AssetRequest.objects.get(pk=request_id)
+                if 'initial' not in kwargs:
+                    kwargs['initial'] = {}
+                initial = kwargs['initial']
+                if asset_request.assigned_user:
+                    initial['target_type'] = 'holder'
+                    initial['asset_holder'] = asset_request.assigned_user
+                elif asset_request.assigned_location:
+                    initial['target_type'] = 'location'
+                    initial['location'] = asset_request.assigned_location
+                elif asset_request.assigned_asset:
+                    initial['target_type'] = 'asset'
+                    initial['asset_target'] = asset_request.assigned_asset
+            except AssetRequest.DoesNotExist:
+                pass
+
         return kwargs
 
     def get_success_message(self, result=None):
@@ -232,6 +254,20 @@ class AssetCheckoutView(GenericTransactionView):
                     obj, user=self.request.user, request=self.request,
                     **self.get_service_kwargs(form)
                 )
+
+                request_id = self.request.GET.get('request_id')
+                if request_id:
+                    from ..models import AssetRequest
+                    try:
+                        asset_request = AssetRequest.objects.get(pk=request_id)
+                        if asset_request.status in (AssetRequest.STATUS_PENDING, AssetRequest.STATUS_APPROVED):
+                            asset_request.status = AssetRequest.STATUS_FULFILLED
+                            asset_request.response_date = timezone.now()
+                            asset_request.responded_by = self.request.user
+                            asset_request.asset = obj
+                            asset_request.save(update_fields=['status', 'response_date', 'responded_by', 'asset'])
+                    except AssetRequest.DoesNotExist:
+                        pass
 
             messages.success(self.request, self.get_success_message(result))
 

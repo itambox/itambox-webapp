@@ -82,6 +82,7 @@ class AssetFilterSet(BaseFilterSet):
         widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
     )
     requestable = django_filters.BooleanFilter(
+        method='filter_requestable',
         label='Requestable',
         widget=forms.Select(choices=[('', 'Any'), ('true', 'Yes'), ('false', 'No')], attrs={'class': 'form-select'})
     )
@@ -90,6 +91,18 @@ class AssetFilterSet(BaseFilterSet):
         model = Asset
         # All filters defined explicitly above — no auto-generated fields needed
         fields = []
+
+    def filter_requestable(self, queryset, name, value):
+        if value is None:
+            return queryset
+        if value:
+            return queryset.filter(
+                Q(requestable=True) | Q(requestable__isnull=True, asset_type__requestable=True)
+            )
+        else:
+            return queryset.filter(
+                Q(requestable=False) | Q(requestable__isnull=True, asset_type__isnull=True) | Q(requestable__isnull=True, asset_type__requestable=False)
+            )
 
     def search(self, queryset, name, value):
         """Perform basic search across designated fields."""

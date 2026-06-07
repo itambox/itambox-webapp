@@ -331,14 +331,33 @@ class AssetRequestTable(BaseTable):
     asset = tables.LinkColumn('assets:asset_detail', args=[A('asset_id')], verbose_name='Asset')
 
     asset_type = tables.Column(accessor='asset_type.model', verbose_name='Asset Type')
+    requested_for = tables.Column(verbose_name='Request For', orderable=False, empty_values=())
     status = tables.Column(verbose_name='Status')
     request_date = tables.Column(verbose_name='Request Date')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = AssetRequest
-        fields = ('pk', 'requester', 'asset', 'asset_type', 'status', 'request_date', 'notes', 'actions')
-        default_columns = ('pk', 'requester', 'asset', 'asset_type', 'status', 'request_date', 'actions')
+        fields = ('pk', 'requester', 'asset', 'asset_type', 'requested_for', 'status', 'request_date', 'notes', 'actions')
+        default_columns = ('pk', 'requester', 'asset', 'asset_type', 'requested_for', 'status', 'request_date', 'actions')
+
+    def render_requested_for(self, value, record):
+        target = record.assigned_target
+        if not target:
+            return "Myself"
+        return str(target)
+
+    def render_status(self, value):
+        status_classes = {
+            'pending': 'bg-warning text-warning-fg',
+            'approved': 'bg-info text-info-fg',
+            'fulfilled': 'bg-success text-success-fg',
+            'denied': 'bg-danger text-danger-fg',
+            'cancelled': 'bg-secondary text-secondary-fg',
+        }
+        badge_class = status_classes.get(value, 'bg-secondary text-secondary-fg')
+        display = value.title()
+        return format_html('<span class="badge {}">{}</span>', badge_class, display)
 
 
 class AssetTagSequenceTable(BaseTable):

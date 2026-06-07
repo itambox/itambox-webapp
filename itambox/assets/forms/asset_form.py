@@ -52,6 +52,16 @@ class AssetForm(forms.ModelForm):
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
         required=False
     )
+    requestable = forms.ChoiceField(
+        choices=[
+            ('', 'Inherit from Asset Type (Default)'),
+            ('true', 'Yes (Force Requestable)'),
+            ('false', 'No (Force Unrequestable)'),
+        ],
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+        label="Requestable Status"
+    )
 
     class Meta:
         model = Asset
@@ -85,6 +95,14 @@ class AssetForm(forms.ModelForm):
             raise forms.ValidationError(f"Invalid status label: {status}")
         return status
 
+    def clean_requestable(self):
+        val = self.cleaned_data.get('requestable')
+        if val == 'true':
+            return True
+        elif val == 'false':
+            return False
+        return None
+
     def __init__(self, *args, **kwargs):
         request = kwargs.pop('request', None)
         super().__init__(*args, **kwargs)
@@ -113,6 +131,14 @@ class AssetForm(forms.ModelForm):
             else:
                 asset_type_id = asset_type_val
             asset_type_id = self.instance.asset_type.pk
+
+        if self.instance and self.instance.pk:
+            if self.instance.requestable is None:
+                self.initial['requestable'] = ''
+            elif self.instance.requestable is True:
+                self.initial['requestable'] = 'true'
+            else:
+                self.initial['requestable'] = 'false'
 
         # Ensure asset_tag is required in the form
         self.fields['asset_tag'].required = True
@@ -298,6 +324,7 @@ class AssetForm(forms.ModelForm):
             ),
             Div(
                 Div('tags', css_class='col-md-6'),
+                Div('requestable', css_class='col-md-6'),
                 css_class='row'
             ),
             Div(

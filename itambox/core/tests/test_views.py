@@ -327,3 +327,42 @@ class CoreViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Asset.all_objects.filter(pk=asset.pk).exists())
 
+    def test_base_template_context_processor(self):
+        """Test that the base_template_processor context processor correctly returns the expected base templates."""
+        from django_htmx.middleware import HtmxDetails
+        from itambox.context_processors import base_template_processor
+
+        # 1. Normal Request (Non-HTMX)
+        request = self.factory.get('/')
+        context = base_template_processor(request)
+        self.assertEqual(context['base_template'], 'layout.html')
+
+        # 2. HTMX request but not boosted main swap
+        request.htmx = HtmxDetails(request)
+        context = base_template_processor(request)
+        self.assertEqual(context['base_template'], 'layout.html')
+
+        # 3. Boosted HTMX Request
+        boosted_request = self.factory.get('/', HTTP_HX_REQUEST='true', HTTP_HX_BOOSTED='true')
+        boosted_request.htmx = HtmxDetails(boosted_request)
+        context = base_template_processor(boosted_request)
+        self.assertEqual(context['base_template'], 'base_htmx.html')
+
+        # 4. History Restore HTMX Request
+        restore_request = self.factory.get('/', HTTP_HX_REQUEST='true', HTTP_HX_HISTORY_RESTORE_REQUEST='true')
+        restore_request.htmx = HtmxDetails(restore_request)
+        context = base_template_processor(restore_request)
+        self.assertEqual(context['base_template'], 'base_htmx.html')
+
+        # 5. Targeted swap HTMX Request
+        targeted_request = self.factory.get('/', HTTP_HX_REQUEST='true', HTTP_HX_TARGET='page-content-wrapper')
+        targeted_request.htmx = HtmxDetails(targeted_request)
+        context = base_template_processor(targeted_request)
+        self.assertEqual(context['base_template'], 'base_htmx.html')
+
+        # 6. Override base template using request attribute
+        request.base_template = 'custom_base.html'
+        context = base_template_processor(request)
+        self.assertEqual(context['base_template'], 'custom_base.html')
+
+

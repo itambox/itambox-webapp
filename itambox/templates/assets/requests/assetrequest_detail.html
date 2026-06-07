@@ -24,6 +24,16 @@
         </button>
     {% endif %}
 
+    {% if request.user.is_staff and object.status == 'approved' and object.asset %}
+        <button type="button" class="btn btn-primary"
+                hx-get="{% url 'assets:asset_checkout_modal' pk=object.asset.pk %}?request_id={{ object.pk }}"
+                hx-target="#modal-placeholder"
+                hx-swap="innerHTML">
+            <i class="mdi mdi-export"></i>
+            {% translate "Check-out & Fulfill..." %}
+        </button>
+    {% endif %}
+
     {% if object.status == 'pending' or object.status == 'approved' %}
         {% if object.requester == request.user or request.user.is_staff %}
             <form method="post" action="{% url 'assets:request_cancel' pk=object.pk %}" class="d-inline">
@@ -70,6 +80,20 @@
                                 <a href="{{ object.asset.get_absolute_url }}">{{ object.asset }}</a>
                             {% else %}
                                 <span class="text-muted">—</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">{% translate "Request For" %}</div>
+                        <div class="datagrid-content">
+                            {% if object.assigned_user %}
+                                <span class="badge bg-purple-lt"><i class="mdi mdi-account me-1"></i>{{ object.assigned_user }}</span>
+                            {% elif object.assigned_location %}
+                                <span class="badge bg-azure-lt"><i class="mdi mdi-map-marker me-1"></i>{{ object.assigned_location }}</span>
+                            {% elif object.assigned_asset %}
+                                <span class="badge bg-indigo-lt"><i class="mdi mdi-monitor me-1"></i>{{ object.assigned_asset }}</span>
+                            {% else %}
+                                <span class="text-muted">{% translate "Requester (Myself)" %}</span>
                             {% endif %}
                         </div>
                     </div>

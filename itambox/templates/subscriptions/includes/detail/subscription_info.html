@@ -1,4 +1,5 @@
 {% load i18n %}
+{% load utility_tags %}
 <dl class="row mb-0">
     <dt class="col-sm-3">{% translate "Provider:" %}</dt>
     <dd class="col-sm-9">
@@ -14,7 +15,7 @@
 
     <dt class="col-sm-3">{% translate "Status:" %}</dt>
     <dd class="col-sm-9">
-        <span class="badge {% if object.status == 'active' %}bg-success{% elif object.status == 'expired' %}bg-danger{% elif object.status == 'cancelled' %}bg-secondary{% elif object.status == 'pending' %}bg-warning{% elif object.status == 'suspended' %}bg-dark{% elif object.status == 'renewing' %}bg-info{% endif %}">
+        <span class="badge px-2.5 py-1 text-uppercase" style="background-color: #{{ object.status|status_color }}1a; color: #{{ object.status|status_color }}; border: 1px solid #{{ object.status|status_color }}33;">
             {{ object.get_status_display }}
         </span>
         {% if object.auto_renewal %}<span class="badge bg-info ms-1">{% translate "Auto-Renewal" %}</span>{% endif %}

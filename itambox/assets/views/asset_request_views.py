@@ -35,6 +35,11 @@ class AssetRequestCreateView(ObjectEditView):
     template_name = "generic/object_edit.html"
     default_return_url = "assets:assetrequest_list"
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['request'] = self.request
+        return kwargs
+
     def form_valid(self, form):
         form.instance.requester = self.request.user
         return super().form_valid(form)

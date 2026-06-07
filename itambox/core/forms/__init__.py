@@ -290,7 +290,10 @@ class BulkEditForm(forms.Form):
         from django.db.models import ForeignKey, ManyToManyField
         from django.db.models.fields import related
 
-        choices = []
+        choices = [
+            ('add_tags', 'add_tags'),
+            ('remove_tags', 'remove_tags'),
+        ]
         for field in model._meta.get_fields():
             if field.name in BULK_EDIT_FIELD_BLACKLIST:
                 continue
@@ -304,7 +307,10 @@ class BulkEditForm(forms.Form):
                 continue
 
             internal_type = field.get_internal_type()
-            form_field_cls = BULK_EDIT_FIELD_TYPE_MAP.get(internal_type)
+            if getattr(field, 'choices', None):
+                form_field_cls = forms.ChoiceField
+            else:
+                form_field_cls = BULK_EDIT_FIELD_TYPE_MAP.get(internal_type)
             if form_field_cls is None:
                 continue
 
@@ -313,7 +319,9 @@ class BulkEditForm(forms.Form):
                 'required': False,
             }
 
-            if isinstance(field, ForeignKey):
+            if getattr(field, 'choices', None):
+                field_kwargs['choices'] = [('', '---------')] + list(field.choices)
+            elif isinstance(field, ForeignKey):
                 related_model = field.remote_field.model
                 if related_model:
                     field_kwargs['choices'] = [('', '---------')] + [
@@ -326,8 +334,25 @@ class BulkEditForm(forms.Form):
 
         self.fields['_selected_fields'].choices = choices
 
-        # Auto-apply TomSelect attribute to all select fields (excluding CheckboxSelectMultiple/RadioSelect/listboxes)
-        for field in self.fields.values():
+        # Auto-apply Bootstrap classes and TomSelect attribute to all fields in BulkEditForm
+        for field_name, field in self.fields.items():
+            if field_name == '_selected_fields':
+                continue
+
+            # Apply dynamic classes
+            existing_classes = field.widget.attrs.get('class', '').split()
+            if isinstance(field.widget, (forms.CheckboxInput, forms.RadioSelect, forms.CheckboxSelectMultiple)):
+                target_class = 'form-check-input'
+            elif isinstance(field.widget, (forms.Select, forms.SelectMultiple)):
+                target_class = 'form-select'
+            else:
+                target_class = 'form-control'
+
+            if target_class not in existing_classes:
+                existing_classes.append(target_class)
+                field.widget.attrs['class'] = ' '.join(existing_classes)
+
+            # Auto-apply TomSelect attribute to all select fields (excluding CheckboxSelectMultiple/RadioSelect/listboxes)
             if isinstance(field.widget, (forms.Select, forms.SelectMultiple)) and not isinstance(field.widget, (forms.RadioSelect, forms.CheckboxSelectMultiple)):
                 if 'size' in field.widget.attrs:
                     continue

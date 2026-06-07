@@ -1,4 +1,5 @@
 {% load i18n %}
+{% load utility_tags %}
 {# Panel: Site basic information #}
 <dl class="row mb-0">
     <dt class="col-sm-3">{% translate "Name:" %}</dt>
@@ -9,7 +10,7 @@
 
     <dt class="col-sm-3">{% translate "Status:" %}</dt>
     <dd class="col-sm-9">
-        <span class="badge {% if object.status == 'active' %}bg-success-lt text-success{% elif object.status == 'planned' %}bg-info-lt text-info{% else %}bg-secondary-lt text-secondary{% endif %} px-2.5 py-1 text-uppercase">
+        <span class="badge px-2.5 py-1 text-uppercase" style="background-color: #{{ object.status|status_color }}1a; color: #{{ object.status|status_color }}; border: 1px solid #{{ object.status|status_color }}33;">
             {{ object.get_status_display }}
         </span>
     </dd>

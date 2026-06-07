@@ -13,22 +13,52 @@ from core.tables import ActionsColumn, BaseTable, ToggleColumn
 
 class TagColumn(tables.ManyToManyColumn):
     """
-A table column which renders linked tags for an object.
+    A table column which renders linked tags for an object.
     """
     def __init__(self, url_name=None, *args, **kwargs):
         self.url_name = url_name
-        # Default transform to render tags with links
-        kwargs.setdefault('transform', self.render_tags)
         # Prevent default linking of ManyToManyColumn
         kwargs.setdefault('linkify_item', False) 
         super().__init__(*args, **kwargs)
 
-    def render_tags(self, value):
-        url = reverse(self.url_name or 'extras:tag_list') + '?tag=' + escape(value.slug)
-        return format_html(
-            '<a href="{}" class="badge bg-primary me-1" style="background-color: #{};">{}</a>',
-            url, value.color, value.name
-        )
+    def render(self, value):
+        if not value:
+            return self.default or ""
+        tags = list(self.filter(value))
+        if not tags:
+            return self.default or ""
+
+        limit = 3
+        visible_tags = tags[:limit]
+        remaining_count = len(tags) - limit
+
+        rendered_tags = []
+        for tag in visible_tags:
+            color_hex = tag.color or "6c757d"  # fallback default color if empty
+            
+            # calculate contrast color using YIQ formula
+            try:
+                r = int(color_hex[0:2], 16)
+                g = int(color_hex[2:4], 16)
+                b = int(color_hex[4:6], 16)
+                yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000
+                text_color = "#212529" if yiq >= 150 else "#ffffff"
+            except Exception:
+                text_color = "#ffffff"
+
+            url = reverse(self.url_name or 'extras:tag_list') + '?tag=' + escape(tag.slug)
+            rendered_tags.append(format_html(
+                '<a href="{}" class="badge me-1" style="background-color: #{}; color: {};">{}</a>',
+                url, color_hex, text_color, tag.name
+            ))
+
+        if remaining_count > 0:
+            rendered_tags.append(format_html(
+                '<span class="badge bg-secondary" title="{} tags total">+{}</span>',
+                len(tags), remaining_count
+            ))
+
+        return mark_safe("".join(rendered_tags))
 
 # =============================================================================
 # Model Tables

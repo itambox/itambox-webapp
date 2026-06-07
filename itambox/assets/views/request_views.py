@@ -24,7 +24,7 @@ def approve_asset_request(request_instance, user, request=None, **kwargs):
     
     asset = kwargs.get('allocated_asset')
     if asset:
-        if not asset.requestable:
+        if not asset.is_requestable:
             raise ValidationError(f"Allocated asset '{asset.name}' is not marked as requestable.")
         if asset.status.type != 'deployable':
             raise ValidationError("Allocated asset must be in a deployable status.")
@@ -86,6 +86,11 @@ class RequestCreateView(ObjectEditView):
     model_form = AssetRequestForm
     template_name = 'assets/requests/assetrequest_form.html'
     default_return_url = 'assets:request_list'
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['request'] = self.request
+        return kwargs
 
     def form_valid(self, form):
         form.instance.requester = self.request.user

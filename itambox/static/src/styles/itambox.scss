@@ -205,6 +205,7 @@ pre.block {
 html,
 :root {
     margin-left: 0px !important;
+    scrollbar-gutter: stable;
 
     // --- Tabler Stone Theme Base ---
     --tblr-gray-50: #fafaf9;
@@ -268,6 +269,18 @@ html,
     --itambox-sidebar-hover-color: #2fb344;
     --itambox-sidebar-active-bg: rgba(47, 179, 68, 0.08);
     --itambox-sidebar-active-color: #2fb344;
+}
+
+body.modal-open,
+body.offcanvas-open {
+    padding-right: 0 !important;
+
+    .fixed-top,
+    .fixed-bottom,
+    .is-fixed,
+    .sticky-top {
+        padding-right: 0 !important;
+    }
 }
 
 // Dark Mode Overrides
@@ -955,6 +968,36 @@ html {
 }
 
 // ============================================================
+//  Tabler Badge Color Fixes
+// ============================================================
+// By default, Tabler's `.badge` sets `color: var(--tblr-badge-color)` (which defaults to `var(--tblr-secondary)`).
+// When combined with background utilities like `.bg-secondary`, the text color matches the background color,
+// making the text invisible. These rules ensure high contrast text on solid background badges.
+.badge {
+    &.bg-primary { color: var(--tblr-primary-fg) !important; }
+    &.bg-secondary { color: var(--tblr-secondary-fg) !important; }
+    &.bg-success { color: var(--tblr-success-fg) !important; }
+    &.bg-info { color: var(--tblr-info-fg) !important; }
+    &.bg-warning { color: var(--tblr-warning-fg) !important; }
+    &.bg-danger { color: var(--tblr-danger-fg) !important; }
+    &.bg-dark { color: var(--tblr-dark-fg) !important; }
+    &.bg-light { color: var(--tblr-light-fg, inherit) !important; }
+
+    &.bg-blue { color: var(--tblr-blue-fg) !important; }
+    &.bg-azure { color: var(--tblr-azure-fg) !important; }
+    &.bg-indigo { color: var(--tblr-indigo-fg) !important; }
+    &.bg-purple { color: var(--tblr-purple-fg) !important; }
+    &.bg-pink { color: var(--tblr-pink-fg) !important; }
+    &.bg-red { color: var(--tblr-red-fg) !important; }
+    &.bg-orange { color: var(--tblr-orange-fg) !important; }
+    &.bg-yellow { color: var(--tblr-yellow-fg) !important; }
+    &.bg-lime { color: var(--tblr-lime-fg) !important; }
+    &.bg-green { color: var(--tblr-green-fg) !important; }
+    &.bg-teal { color: var(--tblr-teal-fg) !important; }
+    &.bg-cyan { color: var(--tblr-cyan-fg) !important; }
+}
+
+// ============================================================
 //  Card Actions & Buttons Alignment
 // ============================================================
 .card-actions {
@@ -1137,4 +1180,71 @@ textarea {
             justify-content: center !important;
         }
     }
+}
+
+// ============================================================
+//  Camera Barcode/QR Scanner Styles
+// ============================================================
+.scanner-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 9999;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+}
+
+.scanner-viewfinder {
+    position: relative;
+    width: 280px;
+    height: 280px;
+    border-radius: 24px;
+    overflow: hidden;
+    border: 3px solid #2fb344;
+    box-shadow: 0 0 25px rgba(47, 179, 68, 0.4);
+    background: #000000;
+
+    video {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+    }
+}
+
+.scanner-laser {
+    position: absolute;
+    top: 0;
+    left: 5%;
+    width: 90%;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, #2fb344, transparent);
+    box-shadow: 0 0 10px #2fb344;
+    z-index: 5;
+    animation: scanner-sweep 2s infinite linear;
+}
+
+@keyframes scanner-sweep {
+    0% { top: 0%; }
+    50% { top: 100%; }
+    100% { top: 0%; }
+}
+
+.scanner-viewfinder::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 20px;
+    pointer-events: none;
+    box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.7);
 }

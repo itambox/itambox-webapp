@@ -162,3 +162,36 @@ class BulkActionsTestCase(TestCase):
         self.asset2.refresh_from_db()
         self.assertEqual(self.asset1.status, status2)
         self.assertEqual(self.asset2.status, status2)
+
+    def test_bulk_edit_assets_apply_tags(self):
+        from extras.models import Tag
+        tag1 = Tag.objects.create(name="Tag 1", slug="tag-1")
+        tag2 = Tag.objects.create(name="Tag 2", slug="tag-2")
+        
+        # Add tag1 initially to asset1
+        self.asset1.tags.add(tag1)
+        
+        url = reverse('assets:asset_bulk_edit')
+        post_data = {
+            'pk': [self.asset1.pk, self.asset2.pk],
+            '_selected_fields': ['add_tags', 'remove_tags'],
+            'add_tags': [tag2.pk],
+            'remove_tags': [tag1.pk],
+            '_apply': 'Apply',
+        }
+        
+        response = self.client.post(url, post_data)
+        self.assertEqual(response.status_code, 302)
+        
+        # Verify tag changes
+        self.asset1.refresh_from_db()
+        self.asset2.refresh_from_db()
+        
+        # asset1 should have tag2 but not tag1
+        self.assertIn(tag2, self.asset1.tags.all())
+        self.assertNotIn(tag1, self.asset1.tags.all())
+        
+        # asset2 should have tag2 but not tag1
+        self.assertIn(tag2, self.asset2.tags.all())
+        self.assertNotIn(tag1, self.asset2.tags.all())
+

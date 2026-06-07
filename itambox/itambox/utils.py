@@ -297,3 +297,27 @@ def generate_unique_slug(instance, slug_source=None, slug_field='slug'):
         
     setattr(instance, slug_field, current_slug)
 
+
+def get_status_color(status):
+    """Map Site, Location, and Subscription status names/slugs to suiting hex colors."""
+    if not status:
+        return '6c757d'
+    status_lower = str(status).lower()
+    status_colors = {
+        # Site / Location
+        'planned': '0d6efd',
+        'staging': 'fd7e14',
+        'active': '20c997',
+        'decommissioning': 'e83e8c',
+        'retired': '6c757d',
+        # Subscription
+        'expired': 'dc3545',
+        'cancelled': '6f42c1',
+        'pending': 'ffc107',
+        'suspended': 'fd7e14',
+        'renewing': '0d6efd',
+        'trial': '17a2b8',
+    }
+    return status_colors.get(status_lower, '6c757d')
+
+

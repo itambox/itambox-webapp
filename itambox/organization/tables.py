@@ -63,6 +63,17 @@ class SiteTable(BaseTable):
     def render_asset_count(self, value, record=None):
         return value or 0
 
+    def render_status(self, value, record):
+        if record and record.status:
+            from itambox.utils import get_status_color
+            color = get_status_color(record.status)
+            display = record.get_status_display()
+            return format_html(
+                '<span class="badge" style="background-color: #{}1a; color: #{}; border: 1px solid #{}33;">{}</span>',
+                color, color, color, display
+            )
+        return "—"
+
 class LocationTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:location_detail', args=[A('pk')], verbose_name='Name')
@@ -79,6 +90,17 @@ class LocationTable(BaseTable):
 
     def render_asset_count(self, value, record=None):
         return value or 0
+
+    def render_status(self, value, record):
+        if record and record.status:
+            from itambox.utils import get_status_color
+            color = get_status_color(record.status)
+            display = record.get_status_display()
+            return format_html(
+                '<span class="badge" style="background-color: #{}1a; color: #{}; border: 1px solid #{}33;">{}</span>',
+                color, color, color, display
+            )
+        return "—"
 
 class TenantGroupTable(BaseTable):
     pk = ToggleColumn(accessor='pk')

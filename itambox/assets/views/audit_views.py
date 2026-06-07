@@ -36,11 +36,11 @@ class AuditSessionTable(BaseTable):
 
     def render_status(self, value):
         badges = {
-            'planned': 'bg-secondary text-secondary-invert',
-            'active': 'bg-primary text-primary-invert',
-            'completed': 'bg-success text-success-invert',
+            'planned': 'bg-secondary text-secondary-fg',
+            'active': 'bg-primary text-primary-fg',
+            'completed': 'bg-success text-success-fg',
         }
-        badge_class = badges.get(value, 'bg-secondary')
+        badge_class = badges.get(value, 'bg-secondary text-secondary-fg')
         display = value.title() if value else 'Planned'
         from django.utils.html import format_html
         return format_html('<span class="badge {}">{}</span>', badge_class, display)

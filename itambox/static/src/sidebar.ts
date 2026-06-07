@@ -85,15 +85,19 @@
   }
 
   document.addEventListener('DOMContentLoaded', updateSidebarActiveState);
-  document.body.addEventListener('htmx:afterSettle', function () {
+  document.body.addEventListener('htmx:afterSettle', function (evt: Event) {
     updateSidebarActiveState();
 
-    // Automatically hide mobile offcanvas menu after navigation
-    const sidebar = document.getElementById('sidebar-menu');
-    if (sidebar && typeof bootstrap !== 'undefined' && bootstrap.Offcanvas) {
-      const offcanvasInstance = bootstrap.Offcanvas.getInstance(sidebar);
-      if (offcanvasInstance) {
-        offcanvasInstance.hide();
+    // Automatically hide mobile offcanvas menu only after page navigation (swap target is page-content-wrapper)
+    const detail = (evt as CustomEvent).detail;
+    const target = detail && (detail.target as HTMLElement);
+    if (target && target.id === 'page-content-wrapper') {
+      const sidebar = document.getElementById('sidebar-menu');
+      if (sidebar && typeof bootstrap !== 'undefined' && bootstrap.Offcanvas) {
+        const offcanvasInstance = bootstrap.Offcanvas.getInstance(sidebar);
+        if (offcanvasInstance) {
+          offcanvasInstance.hide();
+        }
       }
     }
   });

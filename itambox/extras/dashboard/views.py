@@ -1,6 +1,7 @@
 import json
 import logging
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db import transaction
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.template.loader import render_to_string
@@ -25,6 +26,7 @@ class DashboardWidgetAddView(LoginRequiredMixin, View):
         }, request=request)
         return HttpResponse(html)
 
+    @transaction.atomic
     def post(self, request, dashboard_id):
         form = DashboardWidgetAddForm(request.POST)
         if form.is_valid():
@@ -74,6 +76,7 @@ class DashboardWidgetConfigView(LoginRequiredMixin, View):
         }, request=request)
         return HttpResponse(html)
 
+    @transaction.atomic
     def post(self, request, dashboard_id, index):
         dashboard = get_dashboard(request.user, dashboard_id=dashboard_id, for_update=True)
         if not (0 <= index < len(dashboard.layout)):
@@ -127,6 +130,7 @@ class DashboardWidgetDeleteView(LoginRequiredMixin, View):
         }, request=request)
         return HttpResponse(html)
 
+    @transaction.atomic
     def post(self, request, dashboard_id, index):
         dashboard = get_dashboard(request.user, dashboard_id=dashboard_id, for_update=True)
         dashboard.remove_widget(index)
@@ -140,6 +144,7 @@ class DashboardWidgetDeleteView(LoginRequiredMixin, View):
 class DashboardResetView(LoginRequiredMixin, View):
     """Reset dashboard to default layout."""
 
+    @transaction.atomic
     def post(self, request, dashboard_id):
         dashboard = get_dashboard(request.user, dashboard_id=dashboard_id, for_update=True)
         dashboard.layout = get_default_dashboard()
@@ -150,6 +155,7 @@ class DashboardResetView(LoginRequiredMixin, View):
 class DashboardSaveLayoutView(LoginRequiredMixin, View):
     """Save grid positions (w, h, x, y) from GridStack.js drag-and-drop/resize."""
 
+    @transaction.atomic
     def post(self, request, dashboard_id):
         import json
         logger = logging.getLogger(__name__)

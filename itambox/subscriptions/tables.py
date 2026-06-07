@@ -49,16 +49,16 @@ class SubscriptionTable(BaseTable):
             'renewal_date', 'renewal_cost', 'tags', 'days_until_renewal', 'actions',
         )
 
-    def render_status(self, value):
-        badge_map = {
-            'active': 'bg-success', 'expired': 'bg-danger', 'cancelled': 'bg-secondary',
-            'pending': 'bg-warning', 'suspended': 'bg-dark', 'renewing': 'bg-info',
-        }
-        display = dict(SubscriptionStatusChoices.choices).get(value, value)
-        badge = badge_map.get(value, 'bg-light')
-        return format_html(
-            '<span class="badge {}">{}</span>', badge, display
-        )
+    def render_status(self, value, record):
+        if record and record.status:
+            from itambox.utils import get_status_color
+            display = record.get_status_display()
+            color = get_status_color(record.status)
+            return format_html(
+                '<span class="badge" style="background-color: #{}1a; color: #{}; border: 1px solid #{}33;">{}</span>',
+                color, color, color, display
+            )
+        return "—"
 
     def render_renewal_cost(self, value, record):
         if value is not None:

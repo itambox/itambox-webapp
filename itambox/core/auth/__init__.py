@@ -77,6 +77,8 @@ class TenantMembershipBackend:
         # Fallback to active membership if no object-specific tenant is resolved
         if not membership:
             membership = get_current_membership()
+            if membership and membership.user_id != user_obj.pk:
+                membership = None
 
         if not membership:
             from organization.models import TenantMembership
@@ -105,6 +107,8 @@ class TenantMembershipBackend:
         if user_obj.is_superuser:
             return True
         membership = get_current_membership()
+        if membership and membership.user_id != user_obj.pk:
+            membership = None
         if not membership:
             from organization.models import TenantMembership
             membership = TenantMembership.objects.filter(user=user_obj).select_related('tenant', 'role').first()

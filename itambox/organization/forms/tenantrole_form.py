@@ -11,6 +11,12 @@ MATRIX_MODELS = {
         'model_name': 'asset',
         'group': 'Inventory & Hardware',
     },
+    'assetrequest': {
+        'label': 'Asset Requests',
+        'app': 'assets',
+        'model_name': 'assetrequest',
+        'group': 'Inventory & Hardware',
+    },
     'auditsession': {
         'label': 'Audit Sessions',
         'app': 'assets',
