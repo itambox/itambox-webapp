@@ -1,0 +1,75 @@
+{% extends 'generic/object_detail.html' %}
+{% load i18n %}
+
+{% block page_title %}{% translate "Receive Purchase Order" %}: {{ object.order_number }}{% endblock %}
+
+{% block details_tab %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card shadow-sm border-0">
+            <div class="card-header border-0 bg-transparent pb-0">
+                <h3 class="card-title text-secondary">{% translate "Receive Stock - Step 2: Provision Assets" %}</h3>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">{% translate "Enter serial numbers and verify asset tags for the hardware items being received. Asset tags have been pre-filled based on your active sequence but remain editable." %}</p>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="step" value="2">
+                    {{ formset.management_form }}
+                    
+                    <div class="table-responsive mt-3 mb-4">
+                        <table class="table table-vcenter table-striped card-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 50px;">#</th>
+                                    <th>{% translate "Hardware Model" %}</th>
+                                    <th>{% translate "Asset Name" %}</th>
+                                    <th>{% translate "Serial Number" %}</th>
+                                    <th>{% translate "Asset Tag" %}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for line, form in lines_info %}
+                                    <tr>
+                                        <td><strong>{{ forloop.counter }}</strong></td>
+                                        <td>
+                                            {{ form.line_id }}
+                                            <strong>{{ line.asset_type }}</strong>
+                                        </td>
+                                        <td>
+                                            {{ form.name }}
+                                            {% if form.name.errors %}
+                                                <div class="invalid-feedback d-block">{{ form.name.errors }}</div>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {{ form.serial_number }}
+                                            {% if form.serial_number.errors %}
+                                                <div class="invalid-feedback d-block">{{ form.serial_number.errors }}</div>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {{ form.asset_tag }}
+                                            {% if form.asset_tag.errors %}
+                                                <div class="invalid-feedback d-block">{{ form.asset_tag.errors }}</div>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{{ object.get_absolute_url }}" class="btn btn-outline-secondary">{% translate "Cancel" %}</a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="mdi mdi-download me-1"></i> {% translate "Confirm & Receive" %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

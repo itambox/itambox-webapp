@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     'itambox.apps.ITAMBoxConfig',
     'core.apps.CoreConfig',
     'extras.apps.ExtrasConfig',
+    'procurement.apps.ProcurementConfig',
     'rest_framework',
     'drf_spectacular',
     'users',

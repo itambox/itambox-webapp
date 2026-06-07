@@ -13,8 +13,8 @@ class ContactsTestCase(TestCase):
         self.client.force_login(self.user)
         
         self.manufacturer = Manufacturer.objects.create(name='Dell Technologies', slug='dell')
-        self.support_role = ContactRole.objects.create(name='Technical Support')
-        self.sales_role = ContactRole.objects.create(name='Sales Rep')
+        self.support_role, _ = ContactRole.objects.get_or_create(name='Technical Support')
+        self.sales_role, _ = ContactRole.objects.get_or_create(name='Sales Rep')
         
         self.contact = Contact.objects.create(
             name='Dell Enterprise Support',

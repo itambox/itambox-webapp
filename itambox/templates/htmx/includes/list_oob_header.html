@@ -38,10 +38,12 @@
             </a>
             {% endif %}
             {% if has_soft_delete %}
-            <a href="?deleted=true" class="btn btn-outline-danger" hx-get="?deleted=true" hx-push-url="true" hx-target="#object-list-dynamic-content">
-                <i class="mdi mdi-trash-can-outline me-1"></i>
-                {% translate "Recycle Bin" %}
-            </a>
+                {% if request.user.is_superuser or perms.core.view_recyclebin %}
+                <a href="?deleted=true" class="btn btn-outline-danger" hx-get="?deleted=true" hx-push-url="true" hx-target="#object-list-dynamic-content">
+                    <i class="mdi mdi-trash-can-outline me-1"></i>
+                    {% translate "Recycle Bin" %}
+                </a>
+                {% endif %}
             {% endif %}
         {% endif %}
     </div>

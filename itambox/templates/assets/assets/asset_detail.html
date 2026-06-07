@@ -12,22 +12,37 @@
 {% block extra_page_actions %}
     {# Check In Button (if assigned) #}
     {% if assignment and assignment.is_active %}
-        <button type="button" class="btn btn-success"
-                hx-get="{% url 'assets:asset_checkin' pk=object.pk %}"
-                hx-target="#modal-placeholder"
-                hx-swap="innerHTML">
-             <i class="mdi mdi-download"></i>
-            {% translate "Check In..." %}
-        </button>
+        {% if request.user.is_staff or perms.assets.change_asset %}
+            <button type="button" class="btn btn-success"
+                    hx-get="{% url 'assets:asset_checkin' pk=object.pk %}"
+                    hx-target="#modal-placeholder"
+                    hx-swap="innerHTML">
+                 <i class="mdi mdi-download"></i>
+                {% translate "Check In..." %}
+            </button>
+        {% endif %}
     {% else %}
         {# Check Out Button (only visible if not checked out) #}
-        <button type="button" class="btn btn-info"
-                hx-get="{% url 'assets:asset_checkout_modal' pk=object.pk %}"
-                hx-target="#modal-placeholder"
-                hx-swap="innerHTML">
-            <i class="mdi mdi-upload"></i>
-            {% translate "Check Out..." %}
-        </button>
+        {% if request.user.is_staff or perms.assets.change_asset %}
+            <button type="button" class="btn btn-info"
+                    hx-get="{% url 'assets:asset_checkout_modal' pk=object.pk %}"
+                    hx-target="#modal-placeholder"
+                    hx-swap="innerHTML">
+                <i class="mdi mdi-upload"></i>
+                {% translate "Check Out..." %}
+            </button>
+        {% endif %}
+    {% endif %}
+
+    {# Claim Button (visible to requester/assignee/staff if there is an approved request for this asset) #}
+    {% if approved_request %}
+        <form method="post" action="{% url 'assets:request_claim' pk=approved_request.pk %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-success" onclick="return confirm('Are you sure you want to claim this asset and confirm pickup?')">
+                <i class="mdi mdi-package-down"></i>
+                {% translate "Claim & Confirm Pickup" %}
+            </button>
+        </form>
     {% endif %}
 {% endblock extra_page_actions %}
 

@@ -16,6 +16,10 @@ class AssetRequestListView(ObjectListView):
     filterset_form = forms.AssetRequestFilterForm
     table = tables.AssetRequestTable
     action_buttons = ("add",)
+    
+    def get_queryset(self):
+        qs = super().get_queryset().filter(parent__isnull=True)
+        return qs
 
 
 class AssetRequestDetailView(ObjectDetailView):
@@ -32,7 +36,7 @@ class AssetRequestDetailView(ObjectDetailView):
 class AssetRequestCreateView(ObjectEditView):
     model = AssetRequest
     model_form = forms.AssetRequestForm
-    template_name = "generic/object_edit.html"
+    template_name = "assets/requests/assetrequest_form.html"
     default_return_url = "assets:assetrequest_list"
 
     def get_form_kwargs(self):
@@ -42,13 +46,38 @@ class AssetRequestCreateView(ObjectEditView):
 
     def form_valid(self, form):
         form.instance.requester = self.request.user
-        return super().form_valid(form)
+        qty = form.cleaned_data.get('qty') or 1
+        asset_type = form.instance.asset_type
+        if asset_type and qty > 1:
+            # Create the parent group request
+            form.instance.qty = qty
+            form.instance.is_group = True
+            response = super().form_valid(form)
+            
+            # Create the individual child requests
+            for _ in range(qty):
+                req = AssetRequest(
+                    tenant=form.instance.tenant,
+                    requester=self.request.user,
+                    asset_type=asset_type,
+                    qty=1,
+                    parent=form.instance,
+                    assigned_user=form.instance.assigned_user,
+                    assigned_location=form.instance.assigned_location,
+                    assigned_asset=form.instance.assigned_asset,
+                    notes=form.instance.notes,
+                )
+                req._skip_duplicate_check = True
+                req.save()
+            return response
+        else:
+            return super().form_valid(form)
 
 
 class AssetRequestEditView(ObjectEditView):
     queryset = AssetRequest.objects.all()
     model = AssetRequest
-    model_form = forms.AssetRequestResponseForm
+    model_form = forms.AssetRequestForm
     template_name = "generic/object_edit.html"
 
     def form_valid(self, form):
@@ -56,6 +85,17 @@ class AssetRequestEditView(ObjectEditView):
             form.instance.response_date = timezone.now()
             form.instance.responded_by = self.request.user
         response = super().form_valid(form)
+        
+        # Cascade status changes to sub_requests
+        if form.instance.is_group and form.instance.status in ("approved", "denied", "cancelled"):
+            for child in form.instance.sub_requests.exclude(status=form.instance.status):
+                if child.status not in ("fulfilled", "cancelled"):
+                    child.status = form.instance.status
+                    child.response_date = form.instance.response_date
+                    child.responded_by = form.instance.responded_by
+                    child.response_notes = form.instance.response_notes
+                    child.save()
+                    
         try:
             from core.events import dispatch_event
             from core.models import Notification
@@ -91,3 +131,13 @@ class AssetRequestDeleteView(ObjectDeleteView):
     model = AssetRequest
     template_name = "generic/object_confirm_delete.html"
     success_url = reverse_lazy("assets:assetrequest_list")
+
+
+from django.views import View
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.views.generic.base import TemplateResponseMixin
+from django.http import HttpResponseRedirect
+from django.shortcuts import redirect
+from django.db import transaction
+
+

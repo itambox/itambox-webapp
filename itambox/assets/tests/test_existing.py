@@ -1063,7 +1063,8 @@ class EnterpriseITAMTestCase(TestCase):
         request_obj = AssetRequest.objects.create(
             requester=self.user,
             asset_type=asset_type,
-            notes="Need a development machine."
+            notes="Need a development machine.",
+            status="approved"
         )
         
         detail_url = reverse('assets:assetrequest_detail', kwargs={'pk': request_obj.pk})
@@ -1072,7 +1073,7 @@ class EnterpriseITAMTestCase(TestCase):
         self.assertContains(response, "Asset Request Details")
         self.assertContains(response, "Decision &amp; Response Details")
         self.assertContains(response, "Need a development machine.")
-        self.assertContains(response, "Pending")
+        self.assertContains(response, "Approved")
 
     def test_tenant_scoped_checkout_holders(self):
         from organization.models import Tenant, AssetHolder

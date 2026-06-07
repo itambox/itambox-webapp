@@ -16,10 +16,21 @@
     const target = detail.target as HTMLElement;
     if (target.id !== 'modal-placeholder') return;
 
+    const triggerEl = detail.elt as HTMLElement | null;
     const modals = target.querySelectorAll<HTMLElement>('.modal');
     modals.forEach(function (modal) {
       try {
         const inst = bootstrap.Modal.getOrCreateInstance(modal);
+        
+        // Restore focus to trigger element on hide to prevent aria-hidden focus warnings
+        modal.addEventListener('hide.bs.modal', function () {
+          if (triggerEl && typeof triggerEl.focus === 'function') {
+            triggerEl.focus();
+          } else if (document.activeElement && modal.contains(document.activeElement)) {
+            (document.activeElement as HTMLElement).blur();
+          }
+        });
+
         // Clean up modal from DOM after it is hidden
         modal.addEventListener('hidden.bs.modal', function () {
           modal.remove();

@@ -96,6 +96,7 @@ urlpatterns = [
     path('compliance/', include('compliance.urls', namespace='compliance')),
     path('organization/', include('organization.urls', namespace='organization')),
     path('extras/', include('extras.urls')),
+    path('procurement/', include('procurement.urls', namespace='procurement')),
     path('software/', include('software.urls', namespace='software')),
     path('licenses/', include('licenses.urls', namespace='licenses')),
     path('subscriptions/', include('subscriptions.urls', namespace='subscriptions')),

@@ -1,5 +1,6 @@
 from django.urls import path, include
 from . import views
+from .views import request_views
 from inventory import views as component_views
 from extras import views as extras_views
 
@@ -104,8 +105,9 @@ urlpatterns = [
 
     # Asset Requests
     path('requests/', views.AssetRequestListView.as_view(), name='assetrequest_list'),
+
     path('requests/add/', views.AssetRequestCreateView.as_view(), name='assetrequest_create'),
-    path('requests/<int:pk>/', views.AssetRequestDetailView.as_view(), name='assetrequest_detail'),
+    path('requests/<int:pk>/', request_views.RequestDetailView.as_view(), name='assetrequest_detail'),
     path('requests/<int:pk>/edit/', views.AssetRequestEditView.as_view(), name='assetrequest_update'),
     path('requests/<int:pk>/delete/', views.AssetRequestDeleteView.as_view(), name='assetrequest_delete'),
 

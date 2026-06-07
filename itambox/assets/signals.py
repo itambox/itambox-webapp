@@ -62,15 +62,18 @@ def on_asset_request_save(sender, instance, created, **kwargs):
     try:
         if created:
             dispatch_event(sender, instance, action='create')
-            admins = User.objects.filter(is_staff=True)
-            for admin in admins:
-                Notification.objects.create(
-                    user=admin,
-                    subject=f"New Asset Request from {instance.requester}",
-                    message=f"{instance.requester} has requested {instance}.",
-                    level=Notification.LEVEL_INFO,
-                    target_url=instance.get_absolute_url()
-                )
+            
+            # Only notify admins for parent requests or standalone requests
+            if instance.parent is None:
+                admins = User.objects.filter(is_staff=True)
+                for admin in admins:
+                    Notification.objects.create(
+                        user=admin,
+                        subject=f"New Asset Request from {instance.requester}",
+                        message=f"{instance.requester} has requested {instance}.",
+                        level=Notification.LEVEL_INFO,
+                        target_url=instance.get_absolute_url()
+                    )
     except DatabaseError as e:
         logger.exception("Database error occurred while processing asset request notification: %s", e)
     except Exception as e:
@@ -94,10 +97,10 @@ def auto_fulfill_asset_requests(sender, instance, created, **kwargs):
         if isinstance(assignee, AssetHolder) and assignee.user:
             user = assignee.user
             
-            # Identify any matching pending/approved requests
+            # Identify any matching pending/approved/procurement requests
             matching_requests = AssetRequest.objects.filter(
                 requester=user,
-                status__in=[AssetRequest.STATUS_PENDING, AssetRequest.STATUS_APPROVED]
+                status__in=[AssetRequest.STATUS_PENDING, AssetRequest.STATUS_APPROVED, AssetRequest.STATUS_PROCUREMENT]
             ).filter(
                 models.Q(asset=asset) | 
                 models.Q(asset_type=asset.asset_type, asset__isnull=True)

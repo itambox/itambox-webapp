@@ -327,10 +327,9 @@ class CategoryTable(BaseTable):
 
 class AssetRequestTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
+    request_id = tables.LinkColumn('assets:assetrequest_detail', args=[A('pk')], accessor='pk', verbose_name='Req #')
     requester = tables.Column(accessor='requester.username', verbose_name='Requester')
-    asset = tables.LinkColumn('assets:asset_detail', args=[A('asset_id')], verbose_name='Asset')
-
-    asset_type = tables.Column(accessor='asset_type.model', verbose_name='Asset Type')
+    item = tables.Column(verbose_name='Requested Item', empty_values=(), orderable=False)
     requested_for = tables.Column(verbose_name='Request For', orderable=False, empty_values=())
     status = tables.Column(verbose_name='Status')
     request_date = tables.Column(verbose_name='Request Date')
@@ -338,8 +337,28 @@ class AssetRequestTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = AssetRequest
-        fields = ('pk', 'requester', 'asset', 'asset_type', 'requested_for', 'status', 'request_date', 'notes', 'actions')
-        default_columns = ('pk', 'requester', 'asset', 'asset_type', 'requested_for', 'status', 'request_date', 'actions')
+        fields = ('pk', 'request_id', 'requester', 'item', 'requested_for', 'status', 'request_date', 'notes', 'actions')
+        default_columns = ('pk', 'request_id', 'requester', 'item', 'requested_for', 'status', 'request_date', 'actions')
+
+    def render_item(self, record):
+        if record.asset:
+            url = reverse('assets:asset_detail', args=[record.asset_id])
+            return format_html('<a href="{}">{} (Asset)</a>', url, record.asset)
+        elif record.asset_type:
+            url = reverse('assets:assettype_detail', args=[record.asset_type_id])
+            if getattr(record, 'is_group', False) or getattr(record, 'qty', 1) > 1:
+                return format_html('<a href="{}">{}x {} (Asset Type)</a>', url, record.qty, record.asset_type)
+            return format_html('<a href="{}">{} (Asset Type)</a>', url, record.asset_type)
+        elif record.component:
+            url = reverse('inventory:component_detail', args=[record.component_id])
+            return format_html('<a href="{}">{} (Component, x{})</a>', url, record.component, record.qty)
+        elif record.accessory:
+            url = reverse('inventory:accessory_detail', args=[record.accessory_id])
+            return format_html('<a href="{}">{} (Accessory, x{})</a>', url, record.accessory, record.qty)
+        elif record.consumable:
+            url = reverse('inventory:consumable_detail', args=[record.consumable_id])
+            return format_html('<a href="{}">{} (Consumable, x{})</a>', url, record.consumable, record.qty)
+        return "—"
 
     def render_requested_for(self, value, record):
         target = record.assigned_target

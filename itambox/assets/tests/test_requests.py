@@ -6,12 +6,17 @@ from django.utils import timezone
 from decimal import Decimal
 
 from assets.models import (
-    Asset, AssetType, AssetRequest, StatusLabel, AssetRole, Manufacturer, Category
+    Asset, AssetType, AssetRequest, StatusLabel, AssetRole, Manufacturer, Category, AssetTagSequence, Supplier
 )
 from organization.models import AssetHolder, Site, Location, Tenant, TenantRole, TenantMembership
 from assets.views.request_views import approve_asset_request, deny_asset_request
 from assets.services import checkout_asset
 from core.managers import set_current_tenant, set_current_membership
+from inventory.models import (
+    Component, ComponentStock, ComponentAllocation,
+    Accessory, AccessoryStock, AccessoryAssignment,
+    Consumable, ConsumableStock, ConsumableAssignment
+)
 
 User = get_user_model()
 
@@ -84,13 +89,15 @@ class RequisitionSystemTestCase(TestCase):
             manufacturer=self.manufacturer,
             model="ThinkPad T14",
             slug="thinkpad-t14",
-            requestable=True
+            requestable=True,
+            asset_role=self.role
         )
         self.type_not_requestable = AssetType.objects.create(
             manufacturer=self.manufacturer,
             model="ThinkPad T16",
             slug="thinkpad-t16",
-            requestable=False
+            requestable=False,
+            asset_role=self.role
         )
 
         # Create Assets
@@ -491,6 +498,12 @@ class RequisitionSystemTestCase(TestCase):
         form_delegated = AssetRequestForm(data=form_data, request=request_delegated)
         self.assertTrue(form_delegated.is_valid())
 
+        # Test form validation for staff user (can delegate)
+        request_staff = factory.post('/')
+        request_staff.user = self.staff
+        form_staff = AssetRequestForm(data=form_data, request=request_staff)
+        self.assertTrue(form_staff.is_valid())
+
     def test_prefilled_checkout_and_fulfillment(self):
         # Create an approved request delegated to a location
         req = AssetRequest.objects.create(
@@ -543,3 +556,547 @@ class RequisitionSystemTestCase(TestCase):
         req.refresh_from_db()
         self.assertEqual(req.status, AssetRequest.STATUS_FULFILLED)
         self.assertEqual(req.asset, self.asset_requestable)
+
+    def test_self_service_claim(self):
+        # 1. Successful claim by requester
+        req = AssetRequest.objects.create(
+            requester=self.requester_user,
+            asset_type=self.type_requestable,
+            tenant=self.tenant
+        )
+        # Approve and allocate asset
+        approve_asset_request(
+            request_instance=req,
+            user=self.staff,
+            allocated_asset=self.asset_inherited_requestable,
+            response_notes="Ready for pickup"
+        )
+        
+        self.client.login(username='requesteruser', password='password123')
+        response = self.client.post(reverse('assets:request_claim', kwargs={'pk': req.pk}))
+        self.assertEqual(response.status_code, 302) # Redirects on success
+        
+        req.refresh_from_db()
+        self.assertEqual(req.status, AssetRequest.STATUS_FULFILLED)
+        self.assertEqual(req.responded_by, self.requester_user)
+        self.assertIsNotNone(req.response_date)
+        
+        # Verify asset was checked out to the requester's profile
+        self.asset_inherited_requestable.refresh_from_db()
+        self.assertEqual(self.asset_inherited_requestable.status.type, 'deployed')
+        self.assertTrue(self.asset_inherited_requestable.assignments.filter(assigned_user=self.holder, is_active=True).exists())
+
+        # 2. Permission Denied if unauthorized user attempts to claim
+        req_other = AssetRequest.objects.create(
+            requester=self.requester_user,
+            asset_type=self.type_requestable,
+            tenant=self.tenant
+        )
+        approve_asset_request(
+            request_instance=req_other,
+            user=self.staff,
+            allocated_asset=self.asset_requestable,
+            response_notes="Ready for pickup"
+        )
+        
+        self.client.login(username='otheruser', password='password123')
+        response = self.client.post(reverse('assets:request_claim', kwargs={'pk': req_other.pk}))
+        self.assertEqual(response.status_code, 403) # PermissionDenied -> 403 response
+        
+        req_other.refresh_from_db()
+        self.assertEqual(req_other.status, AssetRequest.STATUS_APPROVED)
+
+        # 3. Validation block on non-approved requests
+        req_pending = AssetRequest.objects.create(
+            requester=self.requester_user,
+            asset_type=self.type_requestable,
+            tenant=self.tenant
+        )
+        # Temporarily assign an asset without changing status to approved
+        req_pending.asset = self.asset_requestable
+        req_pending.save()
+        
+        self.client.login(username='requesteruser', password='password123')
+        response = self.client.post(reverse('assets:request_claim', kwargs={'pk': req_pending.pk}))
+        self.assertEqual(response.status_code, 302)
+        from django.contrib import messages
+        messages_list = list(messages.get_messages(response.wsgi_request))
+        self.assertTrue(any("Only approved requests can be claimed." in m.message for m in messages_list))
+
+        # 4. Validation block if request has no asset allocated
+        req_no_asset = AssetRequest.objects.create(
+            requester=self.requester_user,
+            asset_type=self.type_requestable,
+            tenant=self.tenant
+        )
+        req_no_asset.status = AssetRequest.STATUS_APPROVED
+        req_no_asset.save()
+        
+        response = self.client.post(reverse('assets:request_claim', kwargs={'pk': req_no_asset.pk}))
+        self.assertEqual(response.status_code, 302)
+        messages_list = list(messages.get_messages(response.wsgi_request))
+        self.assertTrue(any("No asset has been allocated to this request." in m.message for m in messages_list))
+
+        # 5. Validation block if requester has no asset holder profile
+        new_user = User.objects.create_user(
+            username='noprofileuser', password='password123', is_staff=False, is_superuser=False
+        )
+        TenantMembership.objects.create(
+            user=new_user,
+            tenant=self.tenant,
+            role=self.role_standard
+        )
+        req_no_profile = AssetRequest.objects.create(
+            requester=new_user,
+            asset_type=self.type_requestable,
+            tenant=self.tenant
+        )
+        approve_asset_request(
+            request_instance=req_no_profile,
+            user=self.staff,
+            allocated_asset=self.asset_requestable,
+            response_notes="Ready for pickup"
+        )
+        
+        self.client.login(username='noprofileuser', password='password123')
+        response = self.client.post(reverse('assets:request_claim', kwargs={'pk': req_no_profile.pk}))
+        self.assertEqual(response.status_code, 302)
+        messages_list = list(messages.get_messages(response.wsgi_request))
+        self.assertTrue(any("Requester does not have an active Asset Holder profile to assign the asset to." in m.message for m in messages_list))
+
+        # 6. Successful claim by delegated assigned user
+        req_delegated = AssetRequest.objects.create(
+            requester=self.other_user,
+            asset_type=self.type_requestable,
+            assigned_user=self.holder,
+            tenant=self.tenant
+        )
+        approve_asset_request(
+            request_instance=req_delegated,
+            user=self.staff,
+            allocated_asset=self.asset_requestable,
+            response_notes="Delegated approved"
+        )
+        
+        # Log in as the delegated user (requester_user associated with self.holder)
+        self.client.login(username='requesteruser', password='password123')
+        response = self.client.post(reverse('assets:request_claim', kwargs={'pk': req_delegated.pk}))
+        self.assertEqual(response.status_code, 302)
+        
+        req_delegated.refresh_from_db()
+        self.assertEqual(req_delegated.status, AssetRequest.STATUS_FULFILLED)
+        
+        self.asset_requestable.refresh_from_db()
+        self.assertTrue(self.asset_requestable.assignments.filter(assigned_user=self.holder, is_active=True).exists())
+
+    def test_asset_detail_claim_and_checkout_buttons(self):
+        # Grant view_asset permission to standard role for this test
+        self.role_standard.permissions.append("assets.view_asset")
+        self.role_standard.save()
+
+        # 1. Requester without approved request visits asset page:
+        # Should NOT see Check-out button (lacks assets.change_asset) and NOT see Claim button.
+        self.client.login(username='requesteruser', password='password123')
+        response = self.client.get(reverse('assets:asset_detail', kwargs={'pk': self.asset_requestable.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'Check Out...')
+        self.assertNotContains(response, 'Claim & Confirm Pickup')
+
+        # 2. Admin visits asset page:
+        # Should see Check-out button (has permission) but NOT see Claim button.
+        self.client.login(username='adminuser', password='password123')
+        response = self.client.get(reverse('assets:asset_detail', kwargs={'pk': self.asset_requestable.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Check Out...')
+        self.assertNotContains(response, 'Claim & Confirm Pickup')
+
+        # 3. Create approved request for requester allocating this asset
+        req = AssetRequest.objects.create(
+            requester=self.requester_user,
+            asset_type=self.type_requestable,
+            tenant=self.tenant
+        )
+        approve_asset_request(
+            request_instance=req,
+            user=self.admin,
+            allocated_asset=self.asset_requestable,
+            response_notes="Ready for pickup"
+        )
+
+        # 4. Requester visits asset page now:
+        # Should NOT see Check-out button (still lacks permission) but MUST see Claim & Confirm Pickup button!
+        self.client.login(username='requesteruser', password='password123')
+        response = self.client.get(reverse('assets:asset_detail', kwargs={'pk': self.asset_requestable.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'Check Out...')
+        self.assertContains(response, 'Claim & Confirm Pickup')
+
+    def test_inventory_request_validation(self):
+        # Setup inventory items
+        comp_cat = Category.objects.create(name="Components", slug="components", applies_to={"component": True})
+        acc_cat = Category.objects.create(name="Accessories", slug="accessories", applies_to={"accessory": True})
+        
+        comp = Component.objects.create(name="16GB DDR5 RAM", manufacturer=self.manufacturer, category=comp_cat)
+        acc = Accessory.objects.create(name="USB-C Dock", manufacturer=self.manufacturer, category=acc_cat)
+
+        # 1. Valid request for component
+        req_comp = AssetRequest.objects.create(
+            requester=self.requester_user,
+            component=comp,
+            qty=2,
+            tenant=self.tenant
+        )
+        self.assertEqual(req_comp.status, AssetRequest.STATUS_PENDING)
+        self.assertEqual(req_comp.qty, 2)
+
+        # 2. Requesting multiple categories (e.g. component and accessory) should fail
+        with self.assertRaises(ValidationError):
+            AssetRequest.objects.create(
+                requester=self.requester_user,
+                component=comp,
+                accessory=acc,
+                qty=1,
+                tenant=self.tenant
+            )
+
+        # 3. Invalid quantity (<= 0) should fail
+        with self.assertRaises(ValidationError):
+            AssetRequest.objects.create(
+                requester=self.requester_user,
+                component=comp,
+                qty=0,
+                tenant=self.tenant
+            )
+
+        # 4. Duplicate request check: duplicate pending should raise ValidationError
+        with self.assertRaises(ValidationError):
+            AssetRequest.objects.create(
+                requester=self.requester_user,
+                component=comp,
+                qty=1,
+                tenant=self.tenant
+            )
+
+    def test_auto_approval_thresholds(self):
+        acc_cat = Category.objects.create(name="Accessories", slug="accessories", applies_to={"accessory": True})
+        acc = Accessory.objects.create(name="Wireless Mouse", manufacturer=self.manufacturer, category=acc_cat)
+        
+        # Add stock (required for auto-approval check to succeed)
+        AccessoryStock.objects.create(accessory=acc, location=self.location, qty=10)
+
+        # Default limit for accessory is 3 (defined in save())
+        # Qty = 2 (<= 3) -> should auto-approve
+        req_approved = AssetRequest.objects.create(
+            requester=self.requester_user,
+            accessory=acc,
+            qty=2,
+            tenant=self.tenant
+        )
+        self.assertEqual(req_approved.status, AssetRequest.STATUS_APPROVED)
+        self.assertIn("Automatically approved based on available stock.", req_approved.response_notes)
+
+        # Qty = 4 (> 3) -> should remain pending
+        req_pending = AssetRequest.objects.create(
+            requester=self.other_user,
+            accessory=acc,
+            qty=4,
+            tenant=self.tenant
+        )
+        self.assertEqual(req_pending.status, AssetRequest.STATUS_PENDING)
+
+        # Override via ConfigContext
+        from extras.models import ConfigContext
+        ConfigContext.objects.create(
+            name="Auto Approval Settings",
+            data={'requisition_auto_approval_thresholds': {'accessory': 5}},
+            weight=100
+        ).tenants.add(self.tenant)
+
+        # Delete the previous approved request for this user/accessory to avoid duplicate check validation error
+        req_approved.delete()
+
+        # Now, Qty = 4 (<= 5) -> should auto-approve
+        req_cc_approved = AssetRequest.objects.create(
+            requester=self.requester_user,
+            accessory=acc,
+            qty=4,
+            tenant=self.tenant
+        )
+        self.assertEqual(req_cc_approved.status, AssetRequest.STATUS_APPROVED)
+
+    def test_partial_approval_and_location(self):
+        from assets.forms.request_forms import AssetRequestActionForm
+        comp_cat = Category.objects.create(name="Components", slug="components", applies_to={"component": True})
+        comp = Component.objects.create(name="512GB SSD", manufacturer=self.manufacturer, category=comp_cat)
+
+        req = AssetRequest.objects.create(
+            requester=self.requester_user,
+            component=comp,
+            qty=5,
+            tenant=self.tenant
+        )
+
+        # 1. Action form validation: requires stock location for inventory items
+        form = AssetRequestActionForm(data={
+            'qty': 3,
+            'response_notes': 'Partial approval'
+        }, request_instance=req)
+        self.assertFalse(form.is_valid())
+        self.assertIn('allocated_location', form.errors)
+
+        # 2. Action form validation: approved qty cannot exceed requested qty
+        form = AssetRequestActionForm(data={
+            'allocated_location': self.location.pk,
+            'qty': 6,
+            'response_notes': 'Invalid quantity'
+        }, request_instance=req)
+        self.assertFalse(form.is_valid())
+        self.assertIn('qty', form.errors)
+
+        # 3. Valid partial approval
+        form = AssetRequestActionForm(data={
+            'allocated_location': self.location.pk,
+            'qty': 3,
+            'response_notes': 'Reduced to 3 units'
+        }, request_instance=req)
+        self.assertTrue(form.is_valid())
+
+        approve_asset_request(
+            request_instance=req,
+            user=self.staff,
+            allocated_location=self.location,
+            qty=3,
+            response_notes='Reduced to 3 units'
+        )
+        req.refresh_from_db()
+        self.assertEqual(req.status, AssetRequest.STATUS_APPROVED)
+        self.assertEqual(req.qty, 3)
+        self.assertEqual(req.source_location, self.location)
+
+    def test_claiming_inventory_items(self):
+        comp_cat = Category.objects.create(name="Components", slug="components", applies_to={"component": True})
+        acc_cat = Category.objects.create(name="Accessories", slug="accessories", applies_to={"accessory": True})
+        cons_cat = Category.objects.create(name="Consumables", slug="consumables", applies_to={"consumable": True})
+
+        comp = Component.objects.create(name="GPU RTX 4070", manufacturer=self.manufacturer, category=comp_cat)
+        acc = Accessory.objects.create(name="Keyboard", manufacturer=self.manufacturer, category=acc_cat)
+        cons = Consumable.objects.create(name="AAA Battery", manufacturer=self.manufacturer, category=cons_cat)
+
+        # Add stock
+        comp_stock = ComponentStock.objects.create(component=comp, location=self.location, qty=5)
+        acc_stock = AccessoryStock.objects.create(accessory=acc, location=self.location, qty=10)
+        cons_stock = ConsumableStock.objects.create(consumable=cons, location=self.location, qty=20)
+
+        # 1. Component Claim
+        req_comp = AssetRequest.objects.create(
+            requester=self.requester_user,
+            component=comp,
+            qty=2,
+            status=AssetRequest.STATUS_APPROVED,
+            source_location=self.location,
+            tenant=self.tenant
+        )
+        self.client.login(username='requesteruser', password='password123')
+        response = self.client.post(reverse('assets:request_claim', kwargs={'pk': req_comp.pk}))
+        self.assertEqual(response.status_code, 302)
+        
+        req_comp.refresh_from_db()
+        self.assertEqual(req_comp.status, AssetRequest.STATUS_FULFILLED)
+        self.assertTrue(ComponentAllocation.objects.filter(component=comp, assigned_holder=self.holder, qty=2).exists())
+        comp_stock.refresh_from_db()
+        self.assertEqual(comp_stock.qty, 3) # 5 - 2 = 3
+
+        # 2. Accessory Claim
+        req_acc = AssetRequest.objects.create(
+            requester=self.requester_user,
+            accessory=acc,
+            qty=3,
+            status=AssetRequest.STATUS_APPROVED,
+            source_location=self.location,
+            tenant=self.tenant
+        )
+        response = self.client.post(reverse('assets:request_claim', kwargs={'pk': req_acc.pk}))
+        self.assertEqual(response.status_code, 302)
+
+        req_acc.refresh_from_db()
+        self.assertEqual(req_acc.status, AssetRequest.STATUS_FULFILLED)
+        self.assertTrue(AccessoryAssignment.objects.filter(accessory=acc, assigned_holder=self.holder, qty=3).exists())
+        acc_stock.refresh_from_db()
+        self.assertEqual(acc_stock.qty, 7) # 10 - 3 = 7
+
+        # 3. Consumable Claim
+        req_cons = AssetRequest.objects.create(
+            requester=self.requester_user,
+            consumable=cons,
+            qty=5,
+            status=AssetRequest.STATUS_APPROVED,
+            source_location=self.location,
+            tenant=self.tenant
+        )
+        response = self.client.post(reverse('assets:request_claim', kwargs={'pk': req_cons.pk}))
+        self.assertEqual(response.status_code, 302)
+
+        req_cons.refresh_from_db()
+        self.assertEqual(req_cons.status, AssetRequest.STATUS_FULFILLED)
+        self.assertTrue(ConsumableAssignment.objects.filter(consumable=cons, assigned_holder=self.holder, qty=5).exists())
+        cons_stock.refresh_from_db()
+        self.assertEqual(cons_stock.qty, 15) # 20 - 5 = 15
+
+    def test_asset_type_bulk_request_splitting(self):
+        self.client.login(username='requesteruser', password='password123')
+        
+        post_data = {
+            'request_category': 'asset_type',
+            'asset_type': self.type_requestable.pk,
+            'qty': 3,
+            'notes': 'Need 3 laptops for team'
+        }
+        
+        response = self.client.post(reverse('assets:assetrequest_create'), data=post_data)
+        self.assertEqual(response.status_code, 302) # Redirects on success
+        
+        # Verify 3 separate request rows were created, each with qty=1
+        new_requests = AssetRequest.objects.filter(asset_type=self.type_requestable, notes='Need 3 laptops for team', parent__isnull=False)
+        self.assertEqual(new_requests.count(), 3)
+        for req in new_requests:
+            self.assertEqual(req.qty, 1)
+            self.assertEqual(req.requester, self.requester_user)
+            self.assertEqual(req.status, AssetRequest.STATUS_PENDING)
+
+    def test_request_bulk_receive_workflow(self):
+        # Create approved requests for AssetType
+        self.client.login(username='adminuser', password='password123')
+
+        # Create 2 approved requests for laptops (AssetType)
+        req1 = AssetRequest.objects.create(
+            requester=self.requester_user,
+            asset_type=self.type_requestable,
+            status=AssetRequest.STATUS_APPROVED,
+            tenant=self.tenant
+        )
+        req2 = AssetRequest.objects.create(
+            requester=self.other_user,
+            asset_type=self.type_requestable,
+            status=AssetRequest.STATUS_APPROVED,
+            tenant=self.tenant
+        )
+
+        # Get initial next expected tag sequence value
+        dummy = Asset(tenant=self.tenant, asset_type=self.type_requestable)
+        seq = AssetTagSequence.resolve_sequence_for_asset(dummy)
+        next_tag_val = seq.next_value
+
+        # Create a test supplier
+        supplier = Supplier.objects.create(name="Bechtle GmbH", slug="bechtle")
+
+        # Test initial load / bulk-receive endpoint with POST of PKs
+        post_pks = {
+            'pk': [req1.pk, req2.pk]
+        }
+        url = reverse('assets:request_bulk_receive')
+        response = self.client.post(url, data=post_pks)
+        self.assertEqual(response.status_code, 200) # Formset rendering
+        self.assertContains(response, f"{seq.prefix}{next_tag_val:0{seq.zero_padding}d}")
+        self.assertContains(response, f"{seq.prefix}{next_tag_val+1:0{seq.zero_padding}d}")
+
+        # Test valid submission of the formset
+        status = StatusLabel.objects.filter(type='deployable').first()
+        
+        formset_data = {
+            'form-TOTAL_FORMS': 2,
+            'form-INITIAL_FORMS': 0,
+            'form-MIN_NUM_FORMS': 0,
+            'form-MAX_NUM_FORMS': 1000,
+            
+            # Form 0
+            'form-0-request_id': req1.pk,
+            'form-0-asset_tag': f"{seq.prefix}{next_tag_val:0{seq.zero_padding}d}",
+            'form-0-serial_number': 'SERIAL-REC-1111',
+            'form-0-name': 'HP EliteBook 860 G11',
+            'form-0-status': status.pk,
+            'form-0-location': self.location.pk,
+            'form-0-supplier': supplier.pk,
+            'form-0-order_number': 'ORD-999-AA',
+            'form-0-purchase_cost': '1250.00',
+            'form-0-purchase_date': '2026-06-01',
+            'form-0-warranty_expiration': '2029-06-01',
+            
+            # Form 1
+            'form-1-request_id': req2.pk,
+            'form-1-asset_tag': f"{seq.prefix}{next_tag_val+1:0{seq.zero_padding}d}",
+            'form-1-serial_number': 'SERIAL-REC-2222',
+            'form-1-name': 'HP EliteBook 860 G11',
+            'form-1-status': status.pk,
+            'form-1-location': self.location.pk,
+            'form-1-supplier': supplier.pk,
+            'form-1-order_number': 'ORD-999-AA',
+            'form-1-purchase_cost': '1250.00',
+            'form-1-purchase_date': '2026-06-01',
+            'form-1-warranty_expiration': '2029-06-01',
+            
+            'submit': 'Receive & Allocate Stock'
+        }
+        
+        response = self.client.post(url, data=formset_data)
+        self.assertEqual(response.status_code, 302) # Success redirect
+
+        # Verify assets are created in the database and linked to the requests
+        req1.refresh_from_db()
+        req2.refresh_from_db()
+        
+        self.assertIsNotNone(req1.asset)
+        self.assertEqual(req1.asset.serial_number, 'SERIAL-REC-1111')
+        self.assertEqual(req1.asset.asset_tag, f"{seq.prefix}{next_tag_val:0{seq.zero_padding}d}")
+        self.assertEqual(req1.asset.status, status)
+        self.assertEqual(req1.asset.asset_role, self.role)
+        self.assertEqual(req1.asset.supplier, supplier)
+        self.assertEqual(req1.asset.order_number, 'ORD-999-AA')
+        self.assertEqual(req1.asset.purchase_cost, Decimal('1250.00'))
+        self.assertEqual(req1.asset.purchase_date.strftime('%Y-%m-%d'), '2026-06-01')
+        self.assertEqual(req1.asset.warranty_expiration.strftime('%Y-%m-%d'), '2029-06-01')
+        
+        self.assertIsNotNone(req2.asset)
+        self.assertEqual(req2.asset.serial_number, 'SERIAL-REC-2222')
+        self.assertEqual(req2.asset.asset_tag, f"{seq.prefix}{next_tag_val+1:0{seq.zero_padding}d}")
+        self.assertEqual(req2.asset.status, status)
+        self.assertEqual(req2.asset.asset_role, self.role)
+        self.assertEqual(req2.asset.supplier, supplier)
+        self.assertEqual(req2.asset.order_number, 'ORD-999-AA')
+        self.assertEqual(req2.asset.purchase_cost, Decimal('1250.00'))
+        self.assertEqual(req2.asset.purchase_date.strftime('%Y-%m-%d'), '2026-06-01')
+        self.assertEqual(req2.asset.warranty_expiration.strftime('%Y-%m-%d'), '2029-06-01')
+
+        # Verify the sequence was incremented
+        seq.refresh_from_db()
+        self.assertEqual(seq.next_value, next_tag_val + 2)
+
+        # Test validation failures - duplicate serial number
+        req3 = AssetRequest.objects.create(
+            requester=self.requester_user,
+            asset_type=self.type_requestable,
+            status=AssetRequest.STATUS_APPROVED,
+            tenant=self.tenant
+        )
+        
+        formset_data_duplicate = {
+            'form-TOTAL_FORMS': 1,
+            'form-INITIAL_FORMS': 0,
+            'form-MIN_NUM_FORMS': 0,
+            'form-MAX_NUM_FORMS': 1000,
+            
+            'form-0-request_id': req3.pk,
+            'form-0-asset_tag': f"{seq.prefix}{next_tag_val+2:0{seq.zero_padding}d}",
+            'form-0-serial_number': 'SERIAL-REC-1111', # Existing serial!
+            'form-0-name': 'HP EliteBook 860 G11',
+            'form-0-status': status.pk,
+            'form-0-location': self.location.pk,
+            
+            'submit': 'Receive & Allocate Stock'
+        }
+        
+        response = self.client.post(url, data=formset_data_duplicate)
+        self.assertEqual(response.status_code, 200) # Returns form with validation errors
+        self.assertContains(response, "Asset with this serial number already exists.")
+
+
+

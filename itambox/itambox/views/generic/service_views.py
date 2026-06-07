@@ -133,11 +133,28 @@ class SimplePostView(PermissionRequiredMixin, LoginRequiredMixin, View):
         return self.request.user.has_perms(perms, obj=obj)
 
     def post(self, request, *args, **kwargs):
+        from django.contrib import messages
+        from django.core.exceptions import ValidationError
+        
         obj = self.get_object()
-        result = self.perform_action(obj, request)
-        if getattr(request, 'htmx', False):
-            return self._htmx_success_response(obj, result)
-        return self.get_success_redirect(obj, result)
+        try:
+            result = self.perform_action(obj, request)
+            if getattr(request, 'htmx', False):
+                return self._htmx_success_response(obj, result)
+            messages.success(request, result.get('message', 'Action completed successfully.'))
+            return self.get_success_redirect(obj, result)
+        except ValidationError as e:
+            if hasattr(e, 'message_dict'):
+                msg = "; ".join([f"{k}: {', '.join(v)}" for k, v in e.message_dict.items()])
+            elif hasattr(e, 'messages'):
+                msg = "; ".join(e.messages)
+            else:
+                msg = str(e)
+            
+            if getattr(request, 'htmx', False):
+                return self._htmx_error_response(msg)
+            messages.error(request, msg)
+            return redirect(obj.get_absolute_url())
 
     def get_queryset(self):
         if self.queryset is None:
@@ -173,6 +190,16 @@ class SimplePostView(PermissionRequiredMixin, LoginRequiredMixin, View):
             "showMessage": {
                 "message": result.get('message', 'Done.'),
                 "level": "success"
+            }
+        })
+        return response
+
+    def _htmx_error_response(self, message):
+        response = HttpResponse(status=204)
+        response['HX-Trigger'] = json.dumps({
+            "showMessage": {
+                "message": message,
+                "level": "danger"
             }
         })
         return response

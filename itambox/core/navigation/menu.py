@@ -182,6 +182,19 @@ OPERATIONS_MENU = Menu(
             label=_('Procurement'),
             items=(
                 MenuItem(
+                    link='procurement:purchaseorder_list',
+                    link_text=_('Purchase Orders'),
+                    permissions=['procurement.view_purchaseorder'],
+                    buttons=(
+                        MenuItemButton(
+                            link='procurement:purchaseorder_create',
+                            title='Add',
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=['procurement.add_purchaseorder'],
+                        ),
+                    ),
+                ),
+                MenuItem(
                     link='assets:request_list',
                     link_text=_('Requests'),
                     permissions=['assets.view_assetrequest'],

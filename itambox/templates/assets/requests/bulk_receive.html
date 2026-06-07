@@ -1,0 +1,325 @@
+{% extends "layout.html" %}
+{% load i18n %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ title }} {% translate "- ITAMbox" %}{% endblock %}
+
+{% block page_header %}
+    <div class="page-pretitle">
+        {% translate "Procurement" %}
+    </div>
+    <h2 class="page-title">
+        {{ title }}
+    </h2>
+{% endblock %}
+
+{% block page_actions %}
+    <a href="{% url 'assets:assetrequest_list' %}" class="btn btn-outline-secondary">
+        <i class="mdi mdi-arrow-left me-1"></i>
+        {% translate "Cancel" %}
+    </a>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        {# Summary Card #}
+        <div class="card mb-4 border-0 shadow-sm bg-primary-subtle text-primary-emphasis">
+            <div class="card-body d-flex align-items-center">
+                <div class="me-3 fs-1 text-primary">
+                    <i class="mdi mdi-archive-plus-outline"></i>
+                </div>
+                <div>
+                    <h4 class="mb-1 fw-bold">{% translate "Bulk Stock Receipt & Allocation" %}</h4>
+                    <p class="mb-0 text-muted">
+                        {% blocktranslate with count=requests_data|length %}You are receiving hardware to fulfill {{ count }} approved request(s). Enter the serial numbers and unique details for each asset below. Creating these assets will automatically allocate them to the corresponding requests.{% endblocktranslate %}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        {# Bulk Receipt Form #}
+        <form method="post" action="" hx-boost="false">
+            {% csrf_token %}
+            {{ formset.management_form }}
+
+            {# Formset Global Errors #}
+            {% if formset.non_form_errors %}
+                <div class="alert alert-danger shadow-sm mb-4">
+                    <h4 class="alert-title fw-bold"><i class="mdi mdi-alert-circle me-1"></i> {% translate "Error validating batch" %}</h4>
+                    <ul class="mb-0">
+                        {% for error in formset.non_form_errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+
+        {# Bulk Fill Panel #}
+        <div class="card mb-3 border-0 shadow-sm">
+            <div class="card-header bg-body-tertiary">
+                <h3 class="card-title text-secondary d-flex align-items-center mb-0">
+                    <i class="mdi mdi-creation me-2 text-primary"></i>
+                    {% translate "Autofill Details (Apply to All Rows)" %}
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="row g-2">
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted">{% translate "Status" %}</label>
+                        <select id="bulk-fill-status" class="form-select" data-tom-select>
+                            <option value="">{% translate "— Select Status —" %}</option>
+                            {% for status in formset.forms.0.fields.status.queryset %}
+                                <option value="{{ status.pk }}">{{ status.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted">{% translate "Location Target" %}</label>
+                        <select id="bulk-fill-location" class="form-select" data-tom-select>
+                            <option value="">{% translate "— Select Location —" %}</option>
+                            {% for loc in formset.forms.0.fields.location.queryset %}
+                                <option value="{{ loc.pk }}">{{ loc }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted">{% translate "Supplier" %}</label>
+                        <select id="bulk-fill-supplier" class="form-select" data-tom-select>
+                            <option value="">{% translate "— Select Supplier —" %}</option>
+                            {% for supplier in formset.forms.0.fields.supplier.queryset %}
+                                <option value="{{ supplier.pk }}">{{ supplier.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted">{% translate "Order Number" %}</label>
+                        <input type="text" id="bulk-fill-order-number" class="form-control" placeholder="{% translate "Order #" %}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small text-muted">{% translate "Purchase Cost" %}</label>
+                        <input type="number" id="bulk-fill-purchase-cost" class="form-control" step="0.01" min="0" placeholder="0.00">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small text-muted">{% translate "Purchase Date" %}</label>
+                        <input type="date" id="bulk-fill-purchase-date" class="form-control">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small text-muted">{% translate "Warranty Expiration" %}</label>
+                        <input type="date" id="bulk-fill-warranty-expiration" class="form-control">
+                    </div>
+                </div>
+                <div class="mt-3 text-end">
+                    <button type="button" id="btn-apply-bulk-fill" class="btn btn-sm btn-primary d-inline-flex align-items-center">
+                        <i class="mdi mdi-arrow-down-bold-circle-outline me-1"></i>
+                        {% translate "Apply to All Rows" %}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table table-hover align-middle mb-0" style="min-width: 1200px;">
+                    <thead class="bg-light text-secondary text-uppercase fs-6">
+                        <tr>
+                            <th style="width: 15%;">{% translate "Requested Item / Requester" %}</th>
+                            <th style="width: 12%;">{% translate "Asset Tag *" %}</th>
+                            <th style="width: 12%;">{% translate "Serial Number *" %}</th>
+                            <th style="width: 12%;">{% translate "Asset Name *" %}</th>
+                            <th style="width: 10%;">{% translate "Status *" %}</th>
+                            <th style="width: 10%;">{% translate "Location" %}</th>
+                            <th style="width: 10%;">{% translate "Supplier" %}</th>
+                            <th style="width: 7%;">{% translate "Order #" %}</th>
+                            <th style="width: 6%;">{% translate "Cost" %}</th>
+                            <th style="width: 8%;">{% translate "Purchase Date" %}</th>
+                            <th style="width: 8%;">{% translate "Warranty Exp" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req, form in requests_data %}
+                            <tr {% if form.errors %}class="table-danger-subtle"{% endif %}>
+                                <td>
+                                    {{ form.request_id }}
+                                    <div class="d-flex flex-column">
+                                        <span class="fw-bold">{{ req.asset_type }}</span>
+                                        <span class="text-muted small">
+                                            <i class="mdi mdi-account-outline me-1"></i>{{ req.requester }}
+                                        </span>
+                                        {% if req.assigned_target %}
+                                            <span class="badge bg-secondary-subtle text-secondary align-self-start mt-1">
+                                                {% translate "Target:" %} {{ req.assigned_target }}
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    {{ form.asset_tag }}
+                                    {% if form.asset_tag.errors %}
+                                        <div class="invalid-feedback d-block mt-1">
+                                            {{ form.asset_tag.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ form.serial_number }}
+                                    {% if form.serial_number.errors %}
+                                        <div class="invalid-feedback d-block mt-1">
+                                            {{ form.serial_number.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ form.name }}
+                                    {% if form.name.errors %}
+                                        <div class="invalid-feedback d-block mt-1">
+                                            {{ form.name.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ form.status }}
+                                    {% if form.status.errors %}
+                                        <div class="invalid-feedback d-block mt-1">
+                                            {{ form.status.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ form.location }}
+                                    {% if form.location.errors %}
+                                        <div class="invalid-feedback d-block mt-1">
+                                            {{ form.location.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ form.supplier }}
+                                    {% if form.supplier.errors %}
+                                        <div class="invalid-feedback d-block mt-1">
+                                            {{ form.supplier.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ form.order_number }}
+                                    {% if form.order_number.errors %}
+                                        <div class="invalid-feedback d-block mt-1">
+                                            {{ form.order_number.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ form.purchase_cost }}
+                                    {% if form.purchase_cost.errors %}
+                                        <div class="invalid-feedback d-block mt-1">
+                                            {{ form.purchase_cost.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ form.purchase_date }}
+                                    {% if form.purchase_date.errors %}
+                                        <div class="invalid-feedback d-block mt-1">
+                                            {{ form.purchase_date.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ form.warranty_expiration }}
+                                    {% if form.warranty_expiration.errors %}
+                                        <div class="invalid-feedback d-block mt-1">
+                                            {{ form.warranty_expiration.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="card-footer d-flex justify-content-end gap-2 p-3">
+                <a href="{% url 'assets:assetrequest_list' %}" class="btn btn-outline-secondary">
+                    {% translate "Cancel" %}
+                </a>
+                <button type="submit" name="submit" class="btn btn-success d-flex align-items-center">
+                    <i class="mdi mdi-check-bold me-1"></i>
+                    {% translate "Receive & Allocate Stock" %}
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+</div>
+{% endblock %}
+
+{% block javascript %}
+<script nonce="{{ request.csp_nonce }}">
+document.addEventListener('DOMContentLoaded', function() {
+    const applyBtn = document.getElementById('btn-apply-bulk-fill');
+    if (!applyBtn) return;
+
+    applyBtn.addEventListener('click', function() {
+        const statusVal = document.getElementById('bulk-fill-status').value;
+        const locationVal = document.getElementById('bulk-fill-location').value;
+        const supplierVal = document.getElementById('bulk-fill-supplier').value;
+        const orderNumberVal = document.getElementById('bulk-fill-order-number').value.trim();
+        const purchaseCostVal = document.getElementById('bulk-fill-purchase-cost').value.trim();
+        const purchaseDateVal = document.getElementById('bulk-fill-purchase-date').value;
+        const warrantyVal = document.getElementById('bulk-fill-warranty-expiration').value;
+
+        // Iterate over all forms in formset
+        const totalForms = parseInt(document.getElementById('id_form-TOTAL_FORMS').value, 10);
+        for (let i = 0; i < totalForms; i++) {
+            if (statusVal) {
+                const select = document.querySelector(`[name="form-${i}-status"]`);
+                if (select) {
+                    if (select.tomselect) {
+                        select.tomselect.setValue(statusVal);
+                    } else {
+                        select.value = statusVal;
+                    }
+                }
+            }
+            if (locationVal) {
+                const select = document.querySelector(`[name="form-${i}-location"]`);
+                if (select) {
+                    if (select.tomselect) {
+                        select.tomselect.setValue(locationVal);
+                    } else {
+                        select.value = locationVal;
+                    }
+                }
+            }
+            if (supplierVal) {
+                const select = document.querySelector(`[name="form-${i}-supplier"]`);
+                if (select) {
+                    if (select.tomselect) {
+                        select.tomselect.setValue(supplierVal);
+                    } else {
+                        select.value = supplierVal;
+                    }
+                }
+            }
+            if (orderNumberVal !== '') {
+                const input = document.querySelector(`[name="form-${i}-order_number"]`);
+                if (input) input.value = orderNumberVal;
+            }
+            if (purchaseCostVal !== '') {
+                const input = document.querySelector(`[name="form-${i}-purchase_cost"]`);
+                if (input) input.value = purchaseCostVal;
+            }
+            if (purchaseDateVal) {
+                const input = document.querySelector(`[name="form-${i}-purchase_date"]`);
+                if (input) input.value = purchaseDateVal;
+            }
+            if (warrantyVal) {
+                const input = document.querySelector(`[name="form-${i}-warranty_expiration"]`);
+                if (input) input.value = warrantyVal;
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -184,6 +184,7 @@
                                 {% translate "Print Labels" %}
                             </button>
                             {% endif %}
+
                             <form id="bulk-delete-form" method="post" action="{{ bulk_delete_url }}" class="d-inline" hx-boost="false">
                                 {% csrf_token %}
                                 <input type="hidden" name="model_name" value="{{ model_name_str }}">
@@ -245,6 +246,12 @@
                             title="{% translate 'Print labels for selected assets' %}">
                         <i class="mdi mdi-printer me-1"></i>
                         {% translate "Print Labels" %}
+                    </button>
+                    {% endif %}
+                    {% if model_name_str == 'assets.assetrequest' %}
+                    <button type="button" class="btn btn-sm btn-success btn-bulk-receive">
+                        <i class="mdi mdi-plus-box-outline me-1"></i>
+                        {% translate "Receive & Allocate Stock" %}
                     </button>
                     {% endif %}
                     <button type="button" class="btn btn-sm btn-outline-danger btn-bulk-delete">
@@ -452,10 +459,12 @@
             </div>
 
             {% if has_soft_delete %}
-            <a href="?deleted=true" class="btn btn-outline-danger" hx-get="?deleted=true" hx-push-url="true" hx-target="#object-list-dynamic-content">
-                <i class="mdi mdi-trash-can-outline me-1"></i>
-                {% translate "Recycle Bin" %}
-            </a>
+                {% if request.user.is_superuser or perms.core.view_recyclebin %}
+                <a href="?deleted=true" class="btn btn-outline-danger" hx-get="?deleted=true" hx-push-url="true" hx-target="#object-list-dynamic-content">
+                    <i class="mdi mdi-trash-can-outline me-1"></i>
+                    {% translate "Recycle Bin" %}
+                </a>
+                {% endif %}
             {% endif %}
         {% endif %}
     </div>

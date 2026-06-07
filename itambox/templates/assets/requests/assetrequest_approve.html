@@ -20,16 +20,21 @@
                     {% endif %}
                     
                     <p>{% translate "You are approving the request from" %} <strong>{{ object.requester }}</strong> {% translate "for" %} 
-                    <strong>{% if object.asset_type %}{{ object.asset_type }}{% else %}{% translate "Any Asset" %}{% endif %}</strong>.</p>
-                    
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">{% translate "Allocate Specific Asset (Optional)" %}</label>
-                        {{ form.allocated_asset }}
-                        {% if form.allocated_asset.errors %}
-                            <div class="invalid-feedback d-block">{{ form.allocated_asset.errors|join:", " }}</div>
+                    <strong>
+                        {% if object.component %}
+                            {{ object.component }} (Component, Qty: {{ object.qty }})
+                        {% elif object.accessory %}
+                            {{ object.accessory }} (Accessory, Qty: {{ object.qty }})
+                        {% elif object.consumable %}
+                            {{ object.consumable }} (Consumable, Qty: {{ object.qty }})
+                        {% elif object.asset %}
+                            {{ object.asset }} (Asset)
+                        {% elif object.asset_type %}
+                            {{ object.asset_type }} (Asset Type)
+                        {% else %}
+                            {% translate "Any Asset" %}
                         {% endif %}
-                        <small class="form-hint text-muted">{% translate "Only requestable and deployable assets are shown." %}</small>
-                    </div>
+                    </strong>.</p>
                     
                     <div class="mb-3">
                         <label class="form-label fw-bold">{% translate "Response/Decision Notes" %}</label>
@@ -41,7 +46,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
-                    <button type="submit" class="btn btn-success">Approve &amp; Allocate</button>
+                    <button type="submit" class="btn btn-success">{% translate "Approve Request" %}</button>
                 </div>
             </form>
         </div>

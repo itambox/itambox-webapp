@@ -165,6 +165,22 @@ class AssetDetailView(ObjectDetailView):
         context['custody_receipt'] = custody_receipt
         context['eula_token'] = eula_token
 
+        # Check if current user has an approved request for this asset
+        approved_request = None
+        if self.request.user.is_authenticated:
+            from assets.models import AssetRequest
+            approved_request_qs = AssetRequest.objects.filter(
+                asset=asset,
+                status=AssetRequest.STATUS_APPROVED
+            )
+            for req in approved_request_qs:
+                is_requester = req.requester == self.request.user
+                is_assigned = req.assigned_user and req.assigned_user.user == self.request.user
+                if is_requester or is_assigned or self.request.user.is_staff:
+                    approved_request = req
+                    break
+        context['approved_request'] = approved_request
+
         return context
 
 

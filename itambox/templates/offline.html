@@ -24,7 +24,7 @@
         {% translate "It seems you don't have an active internet connection. Please check your network cables or Wi-Fi settings." %}
       </p>
       <div class="empty-action">
-        <button class="btn btn-primary" onclick="window.location.reload();">
+        <button id="retry-connection-btn" class="btn btn-primary">
           <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -5v5h5" /><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 5v-5h-5" /></svg>
           {% translate "Retry Connection" %}
         </button>
@@ -33,3 +33,11 @@
   </div>
 </div>
 {% endblock %}
+
+{% block javascript %}
+<script nonce="{{ request.csp_nonce }}">
+  document.getElementById('retry-connection-btn').addEventListener('click', function() {
+    window.location.reload();
+  });
+</script>
+{% endblock javascript %}

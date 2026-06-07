@@ -1,0 +1,94 @@
+{% load i18n crispy_forms_tags %}
+
+<div class="table-responsive mb-4">
+    <table class="table table-vcenter card-table">
+        <thead>
+            <tr>
+                <th>{% translate "Item" %}</th>
+                <th>{% translate "Unit Price" %}</th>
+                <th>{% translate "Ordered" %}</th>
+                <th>{% translate "Received" %}</th>
+                <th>{% translate "Total Cost" %}</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for line in lines %}
+                {% if editing_line_id == line.pk %}
+                <tr>
+                    <td>
+                        {% if line.asset_type %}{{ line.asset_type }} <span class="badge bg-blue-lt ms-1">{% translate "Asset Type" %}</span>{% endif %}
+                        {% if line.component %}{{ line.component }} <span class="badge bg-green-lt ms-1">{% translate "Component" %}</span>{% endif %}
+                        {% if line.accessory %}{{ line.accessory }} <span class="badge bg-yellow-lt ms-1">{% translate "Accessory" %}</span>{% endif %}
+                        {% if line.consumable %}{{ line.consumable }} <span class="badge bg-purple-lt ms-1">{% translate "Consumable" %}</span>{% endif %}
+                        {% if line.license %}{{ line.license }} <span class="badge bg-orange-lt ms-1">{% translate "License" %}</span>{% endif %}
+                    </td>
+                    <td>
+                        <input type="number" step="0.01" name="unit_price" value="{{ line.unit_price|default:'' }}" class="form-control form-control-sm" style="width: 100px;">
+                    </td>
+                    <td>
+                        <input type="number" name="qty_ordered" value="{{ line.qty_ordered }}" class="form-control form-control-sm" style="width: 80px;" min="1">
+                    </td>
+                    <td>{{ line.qty_received }}</td>
+                    <td>{% if line.total_cost %}${{ line.total_cost|floatformat:2 }}{% else %}-{% endif %}</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-success"
+                                hx-post="{% url 'procurement:purchaseorderline_edit' pk=line.pk %}"
+                                hx-include="closest tr"
+                                hx-target="#line-items-container">
+                            <i class="mdi mdi-check"></i>
+                        </button>
+                        <button class="btn btn-sm btn-secondary"
+                                hx-get="{% url 'procurement:purchaseorderline_add' po_pk=object.pk %}"
+                                hx-target="#line-items-container">
+                            <i class="mdi mdi-close"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td>
+                        {% if line.asset_type %}{{ line.asset_type }} <span class="badge bg-blue-lt ms-1">{% translate "Asset Type" %}</span>{% endif %}
+                        {% if line.component %}{{ line.component }} <span class="badge bg-green-lt ms-1">{% translate "Component" %}</span>{% endif %}
+                        {% if line.accessory %}{{ line.accessory }} <span class="badge bg-yellow-lt ms-1">{% translate "Accessory" %}</span>{% endif %}
+                        {% if line.consumable %}{{ line.consumable }} <span class="badge bg-purple-lt ms-1">{% translate "Consumable" %}</span>{% endif %}
+                        {% if line.license %}{{ line.license }} <span class="badge bg-orange-lt ms-1">{% translate "License" %}</span>{% endif %}
+                    </td>
+                    <td>{% if line.unit_price %}${{ line.unit_price|floatformat:2 }}{% else %}-{% endif %}</td>
+                    <td>{{ line.qty_ordered }}</td>
+                    <td>{{ line.qty_received }}</td>
+                    <td>{% if line.total_cost %}${{ line.total_cost|floatformat:2 }}{% else %}-{% endif %}</td>
+                    <td class="text-end">
+                        {% if object.status == 'draft' %}
+                        <button class="btn btn-sm btn-outline-secondary me-1"
+                                hx-get="{% url 'procurement:purchaseorderline_edit' pk=line.pk %}"
+                                hx-target="#line-items-container">
+                            <i class="mdi mdi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger"
+                                hx-post="{% url 'procurement:purchaseorderline_delete' pk=line.pk %}"
+                                hx-target="#line-items-container"
+                                hx-confirm="{% translate 'Are you sure?' %}">
+                            <i class="mdi mdi-delete"></i>
+                        </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endif %}
+            {% empty %}
+            <tr>
+                <td colspan="6" class="text-muted text-center py-4">{% translate "No line items added yet." %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if object.status == 'draft' %}
+<h4 class="card-title text-secondary border-top pt-3 mt-3">{% translate "Quick Add Line Item" %}</h4>
+<form hx-post="{% url 'procurement:purchaseorderline_add' po_pk=object.pk %}"
+      hx-target="#line-items-container">
+    {% csrf_token %}
+    {% crispy line_form %}
+</form>
+{% endif %}

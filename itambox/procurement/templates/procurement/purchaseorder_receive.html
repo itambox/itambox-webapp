@@ -1,0 +1,73 @@
+{% extends 'generic/object_detail.html' %}
+{% load i18n crispy_forms_tags %}
+
+{% block page_title %}{% translate "Receive Purchase Order" %}: {{ object.order_number }}{% endblock %}
+
+{% block details_tab %}
+<div class="row">
+    <div class="col-md-10 offset-md-1">
+        <div class="card shadow-sm border-0">
+            <div class="card-header border-0 bg-transparent pb-0">
+                <h3 class="card-title text-secondary">{% translate "Receive Stock - Step 1: Quantities" %}</h3>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">{% translate "Specify the quantity to receive into stock at location:" %} <strong>{{ object.destination_location }}</strong>.</p>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    {{ formset.management_form }}
+                    
+                    <div class="table-responsive mt-3 mb-4">
+                        <table class="table table-vcenter table-striped card-table">
+                            <thead>
+                                <tr>
+                                    <th>{% translate "Item" %}</th>
+                                    <th>{% translate "Ordered" %}</th>
+                                    <th>{% translate "Already Received" %}</th>
+                                    <th>{% translate "Outstanding" %}</th>
+                                    <th style="width: 180px;">{% translate "Receiving Now" %}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for line, form in lines_and_forms %}
+                                    <tr>
+                                        <td>
+                                            {{ form.line_id }}
+                                            {% if line.asset_type %}{{ line.asset_type }} <span class="badge bg-blue-lt ms-1">{% translate "Asset Type" %}</span>{% endif %}
+                                            {% if line.component %}{{ line.component }} <span class="badge bg-green-lt ms-1">{% translate "Component" %}</span>{% endif %}
+                                            {% if line.accessory %}{{ line.accessory }} <span class="badge bg-yellow-lt ms-1">{% translate "Accessory" %}</span>{% endif %}
+                                            {% if line.consumable %}{{ line.consumable }} <span class="badge bg-purple-lt ms-1">{% translate "Consumable" %}</span>{% endif %}
+                                        </td>
+                                        <td>{{ line.qty_ordered }}</td>
+                                        <td>{{ line.qty_received }}</td>
+                                        <td><strong>{{ line.qty_outstanding }}</strong></td>
+                                        <td>
+                                            {{ form.qty_to_receive }}
+                                            {% if form.qty_to_receive.errors %}
+                                                <div class="invalid-feedback d-block">
+                                                    {{ form.qty_to_receive.errors }}
+                                                </div>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted py-4">{% translate "No outstanding items to receive." %}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{{ object.get_absolute_url }}" class="btn btn-outline-secondary">{% translate "Cancel" %}</a>
+                        <button type="submit" class="btn btn-primary" {% if not lines_and_forms %}disabled{% endif %}>
+                            {% translate "Continue" %} <i class="mdi mdi-arrow-right ms-1"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

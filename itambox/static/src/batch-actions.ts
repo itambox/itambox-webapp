@@ -260,5 +260,37 @@
       }
       return;
     }
+
+    // 5. Bulk Receive
+    const receiveBtn = target.closest('.btn-bulk-receive');
+    if (receiveBtn) {
+      event.preventDefault();
+      const form = document.getElementById('bulk-receive-form') as HTMLFormElement | null;
+      if (form) {
+        const checked = document.querySelectorAll<HTMLInputElement>(
+          '#object-list-table-container input[type="checkbox"][name="pk"]:checked'
+        );
+        if (checked.length === 0) {
+          alert('No items selected.');
+          return;
+        }
+        let container = form.querySelector<HTMLElement>('#bulk-receive-pks-container');
+        if (!container) {
+          container = document.createElement('div');
+          container.id = 'bulk-receive-pks-container';
+          form.appendChild(container);
+        }
+        container.innerHTML = '';
+        checked.forEach(function (cb) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'pk';
+          input.value = cb.value;
+          container.appendChild(input);
+        });
+        form.submit();
+      }
+      return;
+    }
   });
 })();

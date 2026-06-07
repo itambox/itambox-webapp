@@ -8,4 +8,7 @@ urlpatterns = [
     path('reqs/<int:pk>/approve/', request_views.RequestApproveView.as_view(), name='request_approve'),
     path('reqs/<int:pk>/deny/', request_views.RequestDenyView.as_view(), name='request_deny'),
     path('reqs/<int:pk>/cancel/', request_views.RequestCancelView.as_view(), name='request_cancel'),
+    path('reqs/<int:pk>/claim/', request_views.RequestClaimView.as_view(), name='request_claim'),
+    path('reqs/<int:pk>/mark-fulfilled/', request_views.RequestMarkFulfilledView.as_view(), name='request_mark_fulfilled'),
+    path('reqs/bulk-receive/', request_views.RequestBulkReceiveView.as_view(), name='request_bulk_receive'),
 ]

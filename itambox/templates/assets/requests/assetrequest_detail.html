@@ -24,6 +24,13 @@
         </button>
     {% endif %}
 
+    {% if request.user.is_staff and object.status == 'approved' and not object.asset %}
+        <a href="{% url 'procurement:purchaseorder_create' %}?from_request={{ object.pk }}" class="btn btn-warning">
+            <i class="mdi mdi-cart-plus"></i>
+            {% translate "Create Purchase Order..." %}
+        </a>
+    {% endif %}
+
     {% if request.user.is_staff and object.status == 'approved' and object.asset %}
         <button type="button" class="btn btn-primary"
                 hx-get="{% url 'assets:asset_checkout_modal' pk=object.asset.pk %}?request_id={{ object.pk }}"
@@ -34,11 +41,12 @@
         </button>
     {% endif %}
 
+
     {% if object.status == 'pending' or object.status == 'approved' %}
         {% if object.requester == request.user or request.user.is_staff %}
             <form method="post" action="{% url 'assets:request_cancel' pk=object.pk %}" class="d-inline">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-outline-secondary" onclick="return confirm('Are you sure you want to cancel this request?')">
+                <button type="submit" class="btn btn-outline-secondary">
                     <i class="mdi mdi-cancel"></i>
                     {% translate "Cancel Request" %}
                 </button>
@@ -51,9 +59,90 @@
 {% block details_tab %}
 <div class="row g-3">
     <div class="col-lg-8 col-12">
+        <!-- Fulfillment Tracker Card -->
         <div class="card shadow-sm border-0 mb-3">
             <div class="card-header border-0 bg-transparent pb-0">
-                <h3 class="card-title text-secondary">{% translate "Request Details" %}</h3>
+                <h3 class="card-title text-secondary">{% translate "Fulfillment Tracker" %}</h3>
+            </div>
+            <div class="card-body">
+                <ul class="steps steps-blue steps-counter my-3">
+                    <!-- Step 1: Created -->
+                    <li class="step-item active" data-bs-toggle="tooltip" title="{{ object.request_date|date:'Y-m-d H:i' }}">
+                        <div class="step-title">{% translate "Request Created" %}</div>
+                        <div class="step-description">{{ object.request_date|date:"Y-m-d" }}</div>
+                    </li>
+                    
+                    <!-- Step 2: Approved / Denied / Cancelled -->
+                    {% if object.status == 'denied' %}
+                        <li class="step-item active bg-danger-lt">
+                            <div class="step-title text-danger">{% translate "Denied" %}</div>
+                            <div class="step-description">{{ object.response_date|date:"Y-m-d"|default:"-" }}</div>
+                        </li>
+                    {% elif object.status == 'cancelled' %}
+                        <li class="step-item active bg-secondary-lt">
+                            <div class="step-title text-muted">{% translate "Cancelled" %}</div>
+                            <div class="step-description">{{ object.updated_at|date:"Y-m-d" }}</div>
+                        </li>
+                    {% else %}
+                        <li class="step-item {% if object.status != 'pending' %}active{% endif %}">
+                            <div class="step-title">{% translate "Approved" %}</div>
+                            <div class="step-description">
+                                {% if object.status != 'pending' and object.response_date %}
+                                    {{ object.response_date|date:"Y-m-d" }}
+                                {% else %}
+                                    {% translate "Awaiting Approval" %}
+                                {% endif %}
+                            </div>
+                        </li>
+                    {% endif %}
+                    
+                    <!-- Step 3: Procurement -->
+                    {% if object.status != 'denied' and object.status != 'cancelled' %}
+                        {% with links=object.fulfillment_links.all %}
+                            <li class="step-item {% if object.status == 'procurement' or object.status == 'fulfilled' or links.exists %}active{% endif %}">
+                                <div class="step-title">{% translate "Procurement" %}</div>
+                                <div class="step-description">
+                                    {% if links.exists %}
+                                        {% for link in links %}
+                                            <a href="{{ link.purchase_order_line.purchase_order.get_absolute_url }}" class="fw-bold">
+                                                {{ link.purchase_order_line.purchase_order.order_number }}
+                                            </a>
+                                            <span class="badge bg-purple-lt ms-1">{{ link.purchase_order_line.purchase_order.get_status_display }}</span>
+                                        {% endfor %}
+                                    {% elif object.status == 'procurement' %}
+                                        {% translate "Awaiting PO creation" %}
+                                    {% else %}
+                                        {% translate "Not Required (Stock)" %}
+                                    {% endif %}
+                                </div>
+                            </li>
+                        {% endwith %}
+                    {% endif %}
+                    
+                    <!-- Step 4: Fulfilled -->
+                    {% if object.status != 'denied' and object.status != 'cancelled' %}
+                        <li class="step-item {% if object.status == 'fulfilled' %}active{% endif %}">
+                            <div class="step-title">{% translate "Fulfilled" %}</div>
+                            <div class="step-description">
+                                {% if object.status == 'fulfilled' %}
+                                    {% if object.asset %}
+                                        <a href="{{ object.asset.get_absolute_url }}" class="fw-bold">{{ object.asset.asset_tag }}</a>
+                                    {% else %}
+                                        {% translate "Fulfill completed" %}
+                                    {% endif %}
+                                {% else %}
+                                    {% translate "Pending pickup/checkout" %}
+                                {% endif %}
+                            </div>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header border-0 bg-transparent pb-0">
+                <h3 class="card-title text-secondary">{% translate "Asset Request Details" %}</h3>
             </div>
             <div class="card-body">
                 <div class="datagrid">
@@ -63,26 +152,62 @@
                             <strong>{{ object.requester }}</strong>
                         </div>
                     </div>
+                    {% if object.asset_type %}
                     <div class="datagrid-item">
                         <div class="datagrid-title">{% translate "Requested Asset Type" %}</div>
                         <div class="datagrid-content">
-                            {% if object.asset_type %}
-                                <a href="{{ object.asset_type.get_absolute_url }}">{{ object.asset_type }}</a>
-                            {% else %}
-                                <span class="text-muted">{% translate "Any Asset Type" %}</span>
-                            {% endif %}
+                            <a href="{{ object.asset_type.get_absolute_url }}">{{ object.asset_type }}</a>
                         </div>
                     </div>
+                    {% endif %}
+                    {% if object.asset %}
                     <div class="datagrid-item">
                         <div class="datagrid-title">{% translate "Requested Specific Asset" %}</div>
                         <div class="datagrid-content">
-                            {% if object.asset %}
-                                <a href="{{ object.asset.get_absolute_url }}">{{ object.asset }}</a>
-                            {% else %}
-                                <span class="text-muted">—</span>
-                            {% endif %}
+                            <a href="{{ object.asset.get_absolute_url }}">{{ object.asset }}</a>
                         </div>
                     </div>
+                    {% endif %}
+                    {% if object.component %}
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">{% translate "Requested Component" %}</div>
+                        <div class="datagrid-content">
+                            <a href="{{ object.component.get_absolute_url }}">{{ object.component }}</a>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if object.accessory %}
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">{% translate "Requested Accessory" %}</div>
+                        <div class="datagrid-content">
+                            <a href="{{ object.accessory.get_absolute_url }}">{{ object.accessory }}</a>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if object.consumable %}
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">{% translate "Requested Consumable" %}</div>
+                        <div class="datagrid-content">
+                            <a href="{{ object.consumable.get_absolute_url }}">{{ object.consumable }}</a>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if object.component or object.accessory or object.consumable %}
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">{% translate "Quantity" %}</div>
+                        <div class="datagrid-content">
+                            <strong>{{ object.qty }}</strong>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if object.source_location %}
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">{% translate "Source Stock Location" %}</div>
+                        <div class="datagrid-content">
+                            <a href="{{ object.source_location.get_absolute_url }}">{{ object.source_location }}</a>
+                        </div>
+                    </div>
+                    {% endif %}
                     <div class="datagrid-item">
                         <div class="datagrid-title">{% translate "Request For" %}</div>
                         <div class="datagrid-content">
@@ -134,10 +259,64 @@
         </div>
         {% endif %}
 
+        {% if object.is_group %}
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header border-0 bg-transparent pb-0">
+                <h3 class="card-title text-secondary">Sub-Requests</h3>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table table-striped table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>{% translate "Req #" %}</th>
+                                <th>{% translate "Status" %}</th>
+                                <th>{% translate "Assigned To" %}</th>
+                                <th>{% translate "Allocated Asset" %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for child in object.sub_requests.all %}
+                            <tr>
+                                <td><a href="{% url 'assets:assetrequest_detail' child.pk %}">{{ child.pk }}</a></td>
+                                <td>
+                                    {% if child.status == 'pending' %}
+                                        <span class="badge bg-warning text-warning-fg">{% translate "Pending" %}</span>
+                                    {% elif child.status == 'approved' %}
+                                        <span class="badge bg-info text-info-fg">{% translate "Approved" %}</span>
+                                    {% elif child.status == 'fulfilled' %}
+                                        <span class="badge bg-success text-success-fg">{% translate "Fulfilled" %}</span>
+                                    {% elif child.status == 'denied' %}
+                                        <span class="badge bg-danger text-danger-fg">{% translate "Denied" %}</span>
+                                    {% elif child.status == 'cancelled' %}
+                                        <span class="badge bg-secondary text-secondary-fg">{% translate "Cancelled" %}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ child.assigned_target|default:"—" }}</td>
+                                <td>
+                                    {% if child.asset %}
+                                        <a href="{% url 'assets:asset_detail' child.asset.pk %}">{{ child.asset.name }}</a>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-muted text-center py-3">No sub-requests found.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         {% if object.status == 'approved' or object.status == 'fulfilled' or object.status == 'denied' %}
         <div class="card shadow-sm border-0 mb-3">
             <div class="card-header border-0 bg-transparent pb-0">
-                <h3 class="card-title text-secondary">Decision &amp; Action Details</h3>
+                <h3 class="card-title text-secondary">{% translate "Decision &amp; Response Details" %}</h3>
             </div>
             <div class="card-body">
                 <div class="datagrid mb-3">
