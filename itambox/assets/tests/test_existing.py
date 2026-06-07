@@ -769,7 +769,7 @@ class AssetMaintenanceAndLifecycleTestCase(TestCase):
         dell = Manufacturer.objects.get(slug='dell-technologies')
         
         # Create dynamic support contact and role and assignment
-        support_role = ContactRole.objects.create(name='Technical Support')
+        support_role, _ = ContactRole.objects.get_or_create(name='Technical Support')
         contact = Contact.objects.create(
             name='Dell Enterprise Support',
             phone='+1 (800) 456-3355',

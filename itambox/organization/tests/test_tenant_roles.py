@@ -54,6 +54,7 @@ class TenantRoleSecurityTests(TestCase):
             'perm_asset_create': True,
             'perm_asset_edit': True,
             'perm_asset_delete': False,
+            'perm_add_delegated_assetrequest': True,
         }
         
         form = TenantRoleForm(data=form_data, tenant=self.tenant_a, user=self.super_user)
@@ -65,6 +66,7 @@ class TenantRoleSecurityTests(TestCase):
         self.assertIn('assets.add_asset', role.permissions)
         self.assertIn('assets.change_asset', role.permissions)
         self.assertNotIn('assets.delete_asset', role.permissions)
+        self.assertIn('assets.add_delegated_assetrequest', role.permissions)
         # Dashboard permissions are automatically added
         self.assertIn('extras.view_dashboard', role.permissions)
         
@@ -74,6 +76,7 @@ class TenantRoleSecurityTests(TestCase):
         self.assertTrue(edit_form.fields['perm_asset_create'].initial)
         self.assertTrue(edit_form.fields['perm_asset_edit'].initial)
         self.assertFalse(edit_form.fields['perm_asset_delete'].initial)
+        self.assertTrue(edit_form.fields['perm_add_delegated_assetrequest'].initial)
 
     def test_permission_backend_resolution(self):
         role = TenantRole.objects.create(
@@ -93,6 +96,59 @@ class TenantRoleSecurityTests(TestCase):
         self.assertTrue(self.user_a.has_perm('assets.view_asset'))
         self.assertFalse(self.user_a.has_perm('assets.add_asset'))
         self.assertFalse(self.user_a.has_perm('assets.delete_asset'))
+        
+        set_current_membership(None)
+        set_current_tenant(None)
+
+    def test_purchase_order_permissions_form_and_backend(self):
+        # Create a role with PO permissions using TenantRoleForm
+        form_data = {
+            'name': 'Procurement Officer',
+            'description': 'Can manage, approve and receive purchase orders',
+            'perm_purchaseorder_read': True,
+            'perm_purchaseorder_create': True,
+            'perm_purchaseorder_edit': True,
+            'perm_purchaseorder_delete': True,
+            'perm_approve_purchaseorder': True,
+            'perm_receive_purchaseorder': True,
+        }
+        
+        form = TenantRoleForm(data=form_data, tenant=self.tenant_a, user=self.super_user)
+        self.assertTrue(form.is_valid(), form.errors)
+        role = form.save()
+        
+        # Verify packed permissions list
+        self.assertIn('procurement.view_purchaseorder', role.permissions)
+        self.assertIn('procurement.add_purchaseorder', role.permissions)
+        self.assertIn('procurement.change_purchaseorder', role.permissions)
+        self.assertIn('procurement.delete_purchaseorder', role.permissions)
+        self.assertIn('procurement.approve_purchaseorder', role.permissions)
+        self.assertIn('procurement.receive_purchaseorder', role.permissions)
+        
+        # Verify deserialization
+        edit_form = TenantRoleForm(instance=role, tenant=self.tenant_a, user=self.super_user)
+        self.assertTrue(edit_form.fields['perm_purchaseorder_read'].initial)
+        self.assertTrue(edit_form.fields['perm_purchaseorder_create'].initial)
+        self.assertTrue(edit_form.fields['perm_purchaseorder_edit'].initial)
+        self.assertTrue(edit_form.fields['perm_purchaseorder_delete'].initial)
+        self.assertTrue(edit_form.fields['perm_approve_purchaseorder'].initial)
+        self.assertTrue(edit_form.fields['perm_receive_purchaseorder'].initial)
+        
+        # Verify backend resolution for user
+        membership = TenantMembership.objects.create(
+            user=self.user_a,
+            tenant=self.tenant_a,
+            role=role
+        )
+        set_current_membership(membership)
+        set_current_tenant(self.tenant_a)
+        
+        self.assertTrue(self.user_a.has_perm('procurement.view_purchaseorder'))
+        self.assertTrue(self.user_a.has_perm('procurement.add_purchaseorder'))
+        self.assertTrue(self.user_a.has_perm('procurement.change_purchaseorder'))
+        self.assertTrue(self.user_a.has_perm('procurement.delete_purchaseorder'))
+        self.assertTrue(self.user_a.has_perm('procurement.approve_purchaseorder'))
+        self.assertTrue(self.user_a.has_perm('procurement.receive_purchaseorder'))
         
         set_current_membership(None)
         set_current_tenant(None)

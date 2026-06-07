@@ -72,6 +72,51 @@
         </tbody>
     </table>
 </div>
+
+{% if 'assets.add_delegated_assetrequest' in object.permissions or 'procurement.approve_purchaseorder' in object.permissions or 'procurement.receive_purchaseorder' in object.permissions %}
+<h4 class="card-title text-primary mt-4 mb-3">{% translate "Additional Capabilities" %}</h4>
+<div class="row">
+    {% if 'assets.add_delegated_assetrequest' in object.permissions %}
+    <div class="col-md-6 mb-3">
+        <div class="card card-sm border shadow-none bg-transparent">
+            <div class="card-body d-flex align-items-center">
+                <span class="badge bg-success text-success-fg me-3"><i class="mdi mdi-check"></i></span>
+                <div>
+                    <strong class="d-block">{% translate "Request on behalf of others" %}</strong>
+                    <span class="text-muted small">{% translate "Allows requesting assets for other users, locations, or parent assets (assets.add_delegated_assetrequest)." %}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% if 'procurement.approve_purchaseorder' in object.permissions %}
+    <div class="col-md-6 mb-3">
+        <div class="card card-sm border shadow-none bg-transparent">
+            <div class="card-body d-flex align-items-center">
+                <span class="badge bg-success text-success-fg me-3"><i class="mdi mdi-check"></i></span>
+                <div>
+                    <strong class="d-block">{% translate "Approve Purchase Orders" %}</strong>
+                    <span class="text-muted small">{% translate "Allows approving/submitting a purchase order (procurement.approve_purchaseorder)." %}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% if 'procurement.receive_purchaseorder' in object.permissions %}
+    <div class="col-md-6 mb-3">
+        <div class="card card-sm border shadow-none bg-transparent">
+            <div class="card-body d-flex align-items-center">
+                <span class="badge bg-success text-success-fg me-3"><i class="mdi mdi-check"></i></span>
+                <div>
+                    <strong class="d-block">{% translate "Receive Purchase Orders" %}</strong>
+                    <span class="text-muted small">{% translate "Allows receiving stock from a purchase order (procurement.receive_purchaseorder)." %}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
 {% else %}
 <p class="text-muted"><em>{% translate "This role has no permissions." %}</em></p>
 {% endif %}

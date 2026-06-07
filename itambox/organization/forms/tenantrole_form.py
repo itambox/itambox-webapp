@@ -17,6 +17,12 @@ MATRIX_MODELS = {
         'model_name': 'assetrequest',
         'group': 'Inventory & Hardware',
     },
+    'purchaseorder': {
+        'label': 'Purchase Orders',
+        'app': 'procurement',
+        'model_name': 'purchaseorder',
+        'group': 'Inventory & Hardware',
+    },
     'auditsession': {
         'label': 'Audit Sessions',
         'app': 'assets',
@@ -367,6 +373,27 @@ class TenantRoleForm(forms.ModelForm):
                 self.fields[f'perm_{key}_edit'].initial = f'{app}.change_{model}' in self.instance.permissions
                 self.fields[f'perm_{key}_delete'].initial = f'{app}.delete_{model}' in self.instance.permissions
 
+        # Add custom delegated asset request permission
+        self.fields['perm_add_delegated_assetrequest'] = forms.BooleanField(
+            required=False,
+            widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+        )
+        if self.instance.pk and self.instance.permissions:
+            self.fields['perm_add_delegated_assetrequest'].initial = 'assets.add_delegated_assetrequest' in self.instance.permissions
+
+        # Add custom purchase order permissions
+        self.fields['perm_receive_purchaseorder'] = forms.BooleanField(
+            required=False,
+            widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+        )
+        self.fields['perm_approve_purchaseorder'] = forms.BooleanField(
+            required=False,
+            widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+        )
+        if self.instance.pk and self.instance.permissions:
+            self.fields['perm_receive_purchaseorder'].initial = 'procurement.receive_purchaseorder' in self.instance.permissions
+            self.fields['perm_approve_purchaseorder'].initial = 'procurement.approve_purchaseorder' in self.instance.permissions
+
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
         self.helper.form_tag = True
@@ -396,6 +423,14 @@ class TenantRoleForm(forms.ModelForm):
                 assigned_perms.add(f'{app}.change_{model}')
             if cleaned_data.get(f'perm_{key}_delete'):
                 assigned_perms.add(f'{app}.delete_{model}')
+
+        if cleaned_data.get('perm_add_delegated_assetrequest'):
+            assigned_perms.add('assets.add_delegated_assetrequest')
+
+        if cleaned_data.get('perm_receive_purchaseorder'):
+            assigned_perms.add('procurement.receive_purchaseorder')
+        if cleaned_data.get('perm_approve_purchaseorder'):
+            assigned_perms.add('procurement.approve_purchaseorder')
 
         # If any permission is set, also grant dashboard viewing/extras permissions
         if assigned_perms:
