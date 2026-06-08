@@ -1,8 +1,16 @@
 import time
 from django.conf import settings
-from django.core.cache import cache
+from django.core.cache import caches
 from django.http import HttpResponse
 from django.utils.translation import gettext_lazy as _
+
+
+def _get_cache():
+    # Allow operators to point RATELIMIT_CACHE at a Redis alias so counters
+    # are shared across all gunicorn workers (LocMemCache is per-process).
+    alias = getattr(settings, 'RATELIMIT_CACHE', 'default')
+    return caches[alias]
+
 
 class RateLimitMiddleware:
     def __init__(self, get_response):
@@ -30,15 +38,16 @@ class RateLimitMiddleware:
                 return self.get_response(request)
             ip = self.get_client_ip(request)
             key = f"ratelimit_{ip}_{path}"
-            
+
             # Retrieve limits from settings or default to 5 requests per 60 seconds
             limit = getattr(settings, 'RATELIMIT_LIMIT', 5)
             period = getattr(settings, 'RATELIMIT_PERIOD', 60)
-            
-            request_count = cache.get(key)
+
+            rl_cache = _get_cache()
+            request_count = rl_cache.get(key)
             if request_count is None:
                 # Key does not exist, initialize it with absolute period timeout
-                cache.add(key, 1, period)
+                rl_cache.add(key, 1, period)
             else:
                 if request_count >= limit:
                     return HttpResponse(
@@ -47,10 +56,10 @@ class RateLimitMiddleware:
                         content_type="text/plain"
                     )
                 try:
-                    cache.incr(key)
+                    rl_cache.incr(key)
                 except ValueError:
                     # Fallback in case key expired between get and incr
-                    cache.add(key, 1, period)
+                    rl_cache.add(key, 1, period)
             
         return self.get_response(request)
 

@@ -27,7 +27,7 @@ from django.template import TemplateDoesNotExist
 from itambox.registry import registry
 from itambox.utils import get_model_viewname, get_table_for_model, get_help_url
 from core.models import ObjectChange, JournalEntry, ImageAttachment, FileAttachment
-from core.tables import ObjectChangeTable
+from core.tables import ObjectChangeTable, BaseTable
 from core.forms import ConfirmationForm, JournalEntryForm, BulkEditForm
 from users.forms import TableConfigForm
 from users.models import UserPreference
@@ -257,6 +257,16 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
     template_name = 'generic/object_detail.html'
     detail_page_body_partial_name = "htmx/detail_page_wrapper.html"
     layout = None
+
+    def render_to_response(self, context, **response_kwargs):
+        # Tables shown in detail-view tabs opt into the shared batch-action bar
+        # (rendered by global_includes/htmx_table.html). django_tables2's
+        # {% render_table %} only passes {table, request} to the table template, so
+        # the flag has to ride on the table instance rather than the page context.
+        for value in context.values():
+            if isinstance(value, BaseTable):
+                value.embed_bulk_bar = True
+        return super().render_to_response(context, **response_kwargs)
 
     def get_permission_required(self):
         model = getattr(self, 'model', None)

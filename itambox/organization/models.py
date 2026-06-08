@@ -36,7 +36,7 @@ class Location(SubscribableMixin, StandardModel, SoftDeleteMixin):
         # No blank=True as per requirements
     )
     name = models.CharField(max_length=100, db_index=True) # Changed max_length based on Site/Region etc.
-    slug = models.SlugField(max_length=100, unique=True)
+    slug = models.SlugField(max_length=100)
     status = models.CharField(
         max_length=50,
         choices=STATUS_CHOICES,
@@ -64,15 +64,11 @@ class Location(SubscribableMixin, StandardModel, SoftDeleteMixin):
 
     class Meta:
         ordering = ['site', 'name']
-        # Ensure unique combination of site and name/slug?
-        # constraints = [
-        #     models.UniqueConstraint(fields=['site', 'name'], name='unique_location_name_per_site'),
-        #     models.UniqueConstraint(fields=['site', 'slug'], name='unique_location_slug_per_site'),
-        # ]
-        # Decided against constraints for now, slug is already unique globally.
-        # Can add site-specific constraints later if needed.
         verbose_name = _("Location")
         verbose_name_plural = _("Locations")
+        constraints = [
+            models.UniqueConstraint(fields=['slug'], condition=models.Q(deleted_at__isnull=True), name='unique_location_slug_active'),
+        ]
 
 
     def __str__(self):
@@ -85,8 +81,8 @@ class Location(SubscribableMixin, StandardModel, SoftDeleteMixin):
 class Region(StandardModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    name = models.CharField(max_length=100, unique=True)
-    slug = models.SlugField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=100)
     parent = models.ForeignKey(
         'self',
         on_delete=models.SET_NULL,
@@ -102,6 +98,10 @@ class Region(StandardModel, SoftDeleteMixin):
         ordering = ['name']
         verbose_name = _("Region")
         verbose_name_plural = _("Regions")
+        constraints = [
+            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_region_name_active'),
+            models.UniqueConstraint(fields=['slug'], condition=models.Q(deleted_at__isnull=True), name='unique_region_slug_active'),
+        ]
 
     def __str__(self):
         return self.name
@@ -112,8 +112,8 @@ class Region(StandardModel, SoftDeleteMixin):
 class SiteGroup(StandardModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    name = models.CharField(max_length=100, unique=True)
-    slug = models.SlugField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=100)
     parent = models.ForeignKey(
         'self',
         on_delete=models.SET_NULL,
@@ -128,6 +128,10 @@ class SiteGroup(StandardModel, SoftDeleteMixin):
         ordering = ['name']
         verbose_name = _("Site Group")
         verbose_name_plural = _("Site Groups")
+        constraints = [
+            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_sitegroup_name_active'),
+            models.UniqueConstraint(fields=['slug'], condition=models.Q(deleted_at__isnull=True), name='unique_sitegroup_slug_active'),
+        ]
 
     def __str__(self):
         return self.name
@@ -138,8 +142,8 @@ class SiteGroup(StandardModel, SoftDeleteMixin):
 class TenantGroup(StandardModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    name = models.CharField(max_length=100, unique=True)
-    slug = models.SlugField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=100)
     parent = models.ForeignKey(
         'self',
         on_delete=models.SET_NULL,
@@ -154,6 +158,10 @@ class TenantGroup(StandardModel, SoftDeleteMixin):
         ordering = ['name']
         verbose_name = _("Tenant Group")
         verbose_name_plural = _("Tenant Groups")
+        constraints = [
+            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_tenantgroup_name_active'),
+            models.UniqueConstraint(fields=['slug'], condition=models.Q(deleted_at__isnull=True), name='unique_tenantgroup_slug_active'),
+        ]
 
     def __str__(self):
         return self.name
@@ -164,8 +172,8 @@ class TenantGroup(StandardModel, SoftDeleteMixin):
 class Tenant(DeletableVaultModel, BookmarkableMixin):
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()
-    name = models.CharField(max_length=100, unique=True)
-    slug = models.SlugField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=100)
     group = models.ForeignKey(
         TenantGroup, # Reference the new TenantGroup model
         on_delete=models.SET_NULL, # Or PROTECT
@@ -181,6 +189,10 @@ class Tenant(DeletableVaultModel, BookmarkableMixin):
         ordering = ['name']
         verbose_name = _("Tenant")
         verbose_name_plural = _("Tenants")
+        constraints = [
+            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_tenant_name_active'),
+            models.UniqueConstraint(fields=['slug'], condition=models.Q(deleted_at__isnull=True), name='unique_tenant_slug_active'),
+        ]
 
     def get_absolute_url(self):
         return reverse('organization:tenant_detail', kwargs={'pk': self.pk})
@@ -204,8 +216,8 @@ class Site(DeletableVaultModel, BookmarkableMixin):
         (STATUS_RETIRED, 'Retired'),
     ]
 
-    name = models.CharField(max_length=100, unique=True)
-    slug = models.SlugField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=100)
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default=STATUS_ACTIVE, db_index=True)
     # Use local models for FKs within the app
     region = models.ForeignKey(Region, on_delete=models.SET_NULL, related_name='sites', blank=True, null=True, db_index=True)
@@ -225,6 +237,10 @@ class Site(DeletableVaultModel, BookmarkableMixin):
         ordering = ['name']
         verbose_name = _("Site")
         verbose_name_plural = _("Sites")
+        constraints = [
+            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_site_name_active'),
+            models.UniqueConstraint(fields=['slug'], condition=models.Q(deleted_at__isnull=True), name='unique_site_slug_active'),
+        ]
 
     def __str__(self):
         return self.name
@@ -292,14 +308,18 @@ class AssetHolder(SubscribableMixin, StandardModel, SoftDeleteMixin):
 class ContactRole(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    name = models.CharField(max_length=100, unique=True)
-    slug = models.SlugField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=100)
     description = models.TextField(blank=True)
 
     class Meta:
         ordering = ['name']
         verbose_name = _("Contact Role")
         verbose_name_plural = _("Contact Roles")
+        constraints = [
+            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_contactrole_name_active'),
+            models.UniqueConstraint(fields=['slug'], condition=models.Q(deleted_at__isnull=True), name='unique_contactrole_slug_active'),
+        ]
 
     def __str__(self):
         return self.name

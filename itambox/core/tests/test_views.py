@@ -142,6 +142,36 @@ class CoreViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Intel unique-filter-1")
 
+    def test_objectchange_hides_system_events_by_default(self):
+        """System (core noise) events are hidden by default but shown when toggled."""
+        from django.contrib.contenttypes.models import ContentType
+        from core.models import Job
+        from core.filters import ObjectChangeFilterSet
+
+        request = self.factory.get('/')
+        request.user = self.user
+        middleware = CurrentUserMiddleware(get_response=lambda r: None)
+        middleware.process_request(request)
+
+        Job.objects.create(name="noisy-job-unique")
+        Manufacturer.objects.create(name="RealChange unique-x", slug="realchange-unique-x")
+
+        middleware.process_response(request, None)
+
+        job_ct = ContentType.objects.get_for_model(Job)
+        mfr_ct = ContentType.objects.get_for_model(Manufacturer)
+
+        # Default: Job (system event) excluded, Manufacturer (real change) retained.
+        default_qs = ObjectChangeFilterSet({}, queryset=ObjectChange.objects.all()).qs
+        self.assertFalse(default_qs.filter(changed_object_type=job_ct).exists())
+        self.assertTrue(default_qs.filter(changed_object_type=mfr_ct).exists())
+
+        # Toggled on: Job changes become visible again.
+        shown_qs = ObjectChangeFilterSet(
+            {'show_system_events': 'on'}, queryset=ObjectChange.objects.all()
+        ).qs
+        self.assertTrue(shown_qs.filter(changed_object_type=job_ct).exists())
+
     def test_softdelete_management_views(self):
         """Test frontend soft-delete Recycle Bin, Restore, Purge, and Bulk actions."""
         self.client.force_login(self.user)

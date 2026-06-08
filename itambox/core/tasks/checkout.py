@@ -26,27 +26,41 @@ def bulk_checkout_task(job_id, asset_pks, target_type_str, target_pk, user_id, n
             job.append_log(f"Assets to process: {len(asset_pks)}")
 
             try:
+                _CT_MAP = {
+                    'assetholder': ('organization', 'assetholder'),
+                    'asset':       ('assets', 'asset'),
+                    'location':    ('organization', 'location'),
+                }
+                app_label, model_name = _CT_MAP.get(target_type_str, ('organization', target_type_str))
                 target_model = ContentType.objects.get(
-                    app_label='organization' if target_type_str == 'assetholder' else 'assets' if target_type_str == 'asset' else 'organization',
-                    model=target_type_str
+                    app_label=app_label,
+                    model=model_name,
                 ).model_class()
-                
+
                 target = target_model.objects.get(pk=target_pk)
                 job.append_log(f"Checkout target assignee: {str(target)}")
 
                 from assets.models import Asset
                 from assets.services import checkout_asset
-                
+
+                # Map target_type_str to the correct checkout_asset keyword argument
+                _TARGET_KWARG = {
+                    'assetholder': 'holder',
+                    'asset':       'asset_target',
+                    'location':    'location',
+                }
+                target_kwarg = _TARGET_KWARG.get(target_type_str, 'location')
+
                 success_count = 0
                 failure_count = 0
-                
+
                 for pk in asset_pks:
                     try:
                         with transaction.atomic():
                             asset = Asset.objects.select_for_update().get(pk=pk)
                             checkout_asset(
                                 asset=asset,
-                                target=target,
+                                **{target_kwarg: target},
                                 user=ctx.user,
                                 notes=notes,
                                 expected_checkin=expected_checkin_date

@@ -205,6 +205,7 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'itambox.api.permissions.TokenPermissions',
+        'itambox.api.permissions.StrictTenantPermission',
     ],
     'DEFAULT_PAGINATION_CLASS': 'itambox.api.pagination.ITAMBoxPagination',
     'DEFAULT_THROTTLE_CLASSES': [

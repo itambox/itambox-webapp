@@ -192,6 +192,13 @@ OPERATIONS_MENU = Menu(
                             icon_class='mdi mdi-plus-thick',
                             permissions=['procurement.add_purchaseorder'],
                         ),
+                        MenuItemButton(
+                            link='/import/procurement/purchaseorder/',
+                            title='Import',
+                            icon_class='mdi mdi-upload',
+                            permissions=['procurement.add_purchaseorder'],
+                            color='outline text-success',
+                        ),
                     ),
                 ),
                 MenuItem(

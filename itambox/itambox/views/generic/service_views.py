@@ -1,11 +1,15 @@
 import json
+import logging
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.http import HttpResponse
 from django.shortcuts import redirect, get_object_or_404
 from django.views.generic import FormView, View
 
 from itambox.views.htmx import BaseHTMXView
+
+logger = logging.getLogger(__name__)
 
 
 class GenericTransactionView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, FormView):
@@ -89,8 +93,13 @@ class GenericTransactionView(PermissionRequiredMixin, LoginRequiredMixin, BaseHT
                 return self._htmx_success_response(obj, result)
             return redirect(obj.get_absolute_url())
 
+        except ValidationError as e:
+            for msg in e.messages:
+                form.add_error(None, msg)
+            return self.form_invalid(form)
         except Exception as e:
-            form.add_error(None, str(e))
+            logger.exception("Unexpected error in %s.form_valid", self.__class__.__name__)
+            form.add_error(None, "An unexpected error occurred. Please try again or contact support.")
             return self.form_invalid(form)
 
     def _htmx_success_response(self, obj, result=None):

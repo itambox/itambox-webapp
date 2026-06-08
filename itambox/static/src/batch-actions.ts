@@ -1,36 +1,43 @@
 /**
- * ITAMbox Batch Actions — checkbox tracking, batch bar visibility, bulk assign.
+ * ITAMbox Batch Actions — checkbox tracking, batch bar visibility, bulk ops.
  *
- * Handles select-all sync, top/bottom batch bar toggling, and bulk-assign
- * modal form wiring. Designed for object list tables inside #object-list-table-container.
+ * Selection is scoped to the nearest `.js-selection-scope` ancestor, so the same
+ * logic drives the main object list and any table embedded in a detail-view tab.
+ * Within a scope, `select_all` toggles every `pk` checkbox, the batch bar shows a
+ * live count, and bulk action buttons collect the checked pks into their form.
  */
 (function () {
-  function updateBatchBar(): void {
-    const bars = document.querySelectorAll<HTMLElement>('.batch-actions-bar');
-    const checkboxes = document.querySelectorAll<HTMLInputElement>(
-      '#object-list-table-container input[type="checkbox"][name="pk"]',
-    );
-    const selected: HTMLInputElement[] = [];
-    checkboxes.forEach(function (cb) {
-      if (cb.checked) selected.push(cb);
-    });
-    const count = selected.length;
+  const SCOPE_SELECTOR = '.js-selection-scope';
 
-    bars.forEach(function (bar) {
+  function pkCheckboxes(scope: HTMLElement): NodeListOf<HTMLInputElement> {
+    return scope.querySelectorAll<HTMLInputElement>('input[type="checkbox"][name="pk"]');
+  }
+
+  function checkedPks(scope: HTMLElement): NodeListOf<HTMLInputElement> {
+    return scope.querySelectorAll<HTMLInputElement>('input[type="checkbox"][name="pk"]:checked');
+  }
+
+  function updateScope(scope: HTMLElement): void {
+    const boxes = pkCheckboxes(scope);
+    const count = scope.querySelectorAll('input[type="checkbox"][name="pk"]:checked').length;
+
+    scope.querySelectorAll<HTMLElement>('.batch-actions-bar').forEach(function (bar) {
       bar.classList.toggle('d-none', count === 0);
-      const cnt = bar.querySelector<HTMLElement>('.fw-bold');
-      if (cnt) cnt.textContent = count + ' selected';
+      bar.querySelectorAll<HTMLElement>('.fw-bold').forEach(function (el) {
+        el.textContent = count + ' selected';
+      });
     });
 
-    const selectAllCb = document.querySelector<HTMLInputElement>(
-      '#object-list-table-container input[type="checkbox"][name="select_all"]',
+    const selectAllCb = scope.querySelector<HTMLInputElement>(
+      'input[type="checkbox"][name="select_all"]',
     );
     if (selectAllCb) {
-      const allCbs = document.querySelectorAll<HTMLInputElement>(
-        '#object-list-table-container input[type="checkbox"][name="pk"]',
-      );
-      selectAllCb.checked = allCbs.length > 0 && selected.length === allCbs.length;
+      selectAllCb.checked = boxes.length > 0 && count === boxes.length;
     }
+  }
+
+  function updateAllScopes(): void {
+    document.querySelectorAll<HTMLElement>(SCOPE_SELECTOR).forEach(updateScope);
   }
 
   function initBulkEditSelectors(): void {
@@ -44,9 +51,33 @@
     });
   }
 
+  /** Collect the checked pks within a scope into hidden inputs on the given form. */
+  function gatherPks(form: HTMLFormElement, scope: HTMLElement): boolean {
+    const checked = checkedPks(scope);
+    if (checked.length === 0) {
+      alert('No items selected.');
+      return false;
+    }
+    let container = form.querySelector<HTMLElement>('.bulk-pks-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.className = 'bulk-pks-container d-inline';
+      form.appendChild(container);
+    }
+    container.innerHTML = '';
+    checked.forEach(function (cb) {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'pk';
+      input.value = cb.value;
+      container!.appendChild(input);
+    });
+    return true;
+  }
+
   document.addEventListener('change', function (event) {
     const target = event.target as HTMLInputElement;
-    if (target.type !== 'checkbox') return;
+    if (!target || target.type !== 'checkbox') return;
 
     if (target.classList.contains('bulk-edit-selector')) {
       const fieldName = target.value;
@@ -57,38 +88,37 @@
       return;
     }
 
-    if (!target.closest('#object-list-table-container')) return;
+    const scope = target.closest<HTMLElement>(SCOPE_SELECTOR);
+    if (!scope) return;
 
     if (target.name === 'pk') {
-      updateBatchBar();
+      updateScope(scope);
     } else if (target.name === 'select_all') {
-      const checkboxes = document.querySelectorAll<HTMLInputElement>(
-        '#object-list-table-container input[type="checkbox"][name="pk"]',
-      );
-      checkboxes.forEach(function (cb) {
+      pkCheckboxes(scope).forEach(function (cb) {
         cb.checked = target.checked;
       });
-      updateBatchBar();
+      updateScope(scope);
     }
   });
 
   document.body.addEventListener('htmx:afterSettle', function () {
-    updateBatchBar();
+    updateAllScopes();
     initBulkEditSelectors();
   });
 
   // Initial run
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () {
-      updateBatchBar();
+      updateAllScopes();
       initBulkEditSelectors();
     });
   } else {
-    updateBatchBar();
+    updateAllScopes();
     initBulkEditSelectors();
   }
 
-  // Bulk Assign and Bulk Print modal submit handler (using event delegation to support dynamically loaded modals)
+  // Bulk Assign and Bulk Print modal submit handler (asset list only). The modal
+  // forms live outside any selection scope, so they read from the list container.
   document.addEventListener('submit', function (event) {
     const target = event.target as HTMLElement;
     const form = target.closest<HTMLFormElement>('#bulk-assign-form') || target.closest<HTMLFormElement>('#bulk-print-form');
@@ -126,168 +156,33 @@
     // Let the event bubble naturally so HTMX or the browser processes the submit
   });
 
-  // Delegated click handler for bulk delete/edit to align with strict CSP
+  // Delegated click handler for bulk delete/edit/restore/purge, scoped to the
+  // selection container the button lives in. Aligns with strict CSP (no inline JS).
+  const BULK_BUTTONS: Array<{ trigger: string; form: string; confirm?: string }> = [
+    { trigger: '.btn-bulk-delete', form: '.bulk-delete-form' },
+    { trigger: '.btn-bulk-edit', form: '.bulk-edit-form' },
+    { trigger: '.btn-bulk-restore', form: '.bulk-restore-form' },
+    {
+      trigger: '.btn-bulk-purge',
+      form: '.bulk-purge-form',
+      confirm: 'Are you sure you want to PERMANENTLY delete the selected items? This cannot be undone!',
+    },
+  ];
+
   document.addEventListener('click', function (event) {
     const target = event.target as HTMLElement;
 
-    // 1. Bulk Delete
-    const deleteBtn = target.closest('.btn-bulk-delete');
-    if (deleteBtn) {
-      event.preventDefault();
-      const form = document.getElementById('bulk-delete-form') as HTMLFormElement | null;
-      if (form) {
-        const checked = document.querySelectorAll<HTMLInputElement>(
-          '#object-list-table-container input[type="checkbox"][name="pk"]:checked'
-        );
-        if (checked.length === 0) {
-          alert('No items selected.');
-          return;
-        }
-        let container = form.querySelector<HTMLElement>('#bulk-delete-pks-container');
-        if (!container) {
-          container = document.createElement('div');
-          container.id = 'bulk-delete-pks-container';
-          form.appendChild(container);
-        }
-        container.innerHTML = '';
-        checked.forEach(function (cb) {
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = 'pk';
-          input.value = cb.value;
-          container.appendChild(input);
-        });
-        form.submit();
-      }
-      return;
-    }
+    for (const spec of BULK_BUTTONS) {
+      const btn = target.closest(spec.trigger);
+      if (!btn) continue;
 
-    // 2. Bulk Edit
-    const editBtn = target.closest('.btn-bulk-edit');
-    if (editBtn) {
       event.preventDefault();
-      const form = document.getElementById('bulk-edit-form') as HTMLFormElement | null;
-      if (form) {
-        const checked = document.querySelectorAll<HTMLInputElement>(
-          '#object-list-table-container input[type="checkbox"][name="pk"]:checked'
-        );
-        if (checked.length === 0) {
-          alert('No items selected.');
-          return;
-        }
-        let container = form.querySelector<HTMLElement>('#bulk-edit-pks-container');
-        if (!container) {
-          container = document.createElement('div');
-          container.id = 'bulk-edit-pks-container';
-          form.appendChild(container);
-        }
-        container.innerHTML = '';
-        checked.forEach(function (cb) {
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = 'pk';
-          input.value = cb.value;
-          container.appendChild(input);
-        });
-        form.submit();
-      }
-      return;
-    }
-
-    // 3. Bulk Restore
-    const restoreBtn = target.closest('.btn-bulk-restore');
-    if (restoreBtn) {
-      event.preventDefault();
-      const form = document.getElementById('bulk-restore-form') as HTMLFormElement | null;
-      if (form) {
-        const checked = document.querySelectorAll<HTMLInputElement>(
-          '#object-list-table-container input[type="checkbox"][name="pk"]:checked'
-        );
-        if (checked.length === 0) {
-          alert('No items selected.');
-          return;
-        }
-        let container = form.querySelector<HTMLElement>('#bulk-restore-pks-container');
-        if (!container) {
-          container = document.createElement('div');
-          container.id = 'bulk-restore-pks-container';
-          form.appendChild(container);
-        }
-        container.innerHTML = '';
-        checked.forEach(function (cb) {
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = 'pk';
-          input.value = cb.value;
-          container.appendChild(input);
-        });
-        form.submit();
-      }
-      return;
-    }
-
-    // 4. Bulk Purge
-    const purgeBtn = target.closest('.btn-bulk-purge');
-    if (purgeBtn) {
-      event.preventDefault();
-      const form = document.getElementById('bulk-purge-form') as HTMLFormElement | null;
-      if (form) {
-        const checked = document.querySelectorAll<HTMLInputElement>(
-          '#object-list-table-container input[type="checkbox"][name="pk"]:checked'
-        );
-        if (checked.length === 0) {
-          alert('No items selected.');
-          return;
-        }
-        if (!confirm('Are you sure you want to PERMANENTLY delete the selected items? This cannot be undone!')) {
-          return;
-        }
-        let container = form.querySelector<HTMLElement>('#bulk-purge-pks-container');
-        if (!container) {
-          container = document.createElement('div');
-          container.id = 'bulk-purge-pks-container';
-          form.appendChild(container);
-        }
-        container.innerHTML = '';
-        checked.forEach(function (cb) {
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = 'pk';
-          input.value = cb.value;
-          container.appendChild(input);
-        });
-        form.submit();
-      }
-      return;
-    }
-
-    // 5. Bulk Receive
-    const receiveBtn = target.closest('.btn-bulk-receive');
-    if (receiveBtn) {
-      event.preventDefault();
-      const form = document.getElementById('bulk-receive-form') as HTMLFormElement | null;
-      if (form) {
-        const checked = document.querySelectorAll<HTMLInputElement>(
-          '#object-list-table-container input[type="checkbox"][name="pk"]:checked'
-        );
-        if (checked.length === 0) {
-          alert('No items selected.');
-          return;
-        }
-        let container = form.querySelector<HTMLElement>('#bulk-receive-pks-container');
-        if (!container) {
-          container = document.createElement('div');
-          container.id = 'bulk-receive-pks-container';
-          form.appendChild(container);
-        }
-        container.innerHTML = '';
-        checked.forEach(function (cb) {
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = 'pk';
-          input.value = cb.value;
-          container.appendChild(input);
-        });
+      const scope = btn.closest<HTMLElement>(SCOPE_SELECTOR);
+      if (!scope) return;
+      const form = scope.querySelector<HTMLFormElement>(spec.form);
+      if (!form) return;
+      if (spec.confirm && !confirm(spec.confirm)) return;
+      if (gatherPks(form, scope)) {
         form.submit();
       }
       return;

@@ -1,16 +1,20 @@
 import json
+import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 from django.http import HttpResponse, HttpResponseRedirect
 from django.contrib.contenttypes.models import ContentType
-from django.urls import reverse, reverse_lazy
+from django.urls import reverse, reverse_lazy, NoReverseMatch
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django_tables2 import RequestConfig
-from django.db.models import Count
+from django.db.models import Count, Prefetch
 from django.db import transaction
+
+logger = logging.getLogger(__name__)
 
 from ..models import Asset, InstalledSoftware, StatusLabel, AssetAssignment
 from .. import forms, tables, filters
@@ -46,7 +50,17 @@ class AssetListView(ObjectListView):
         'tenant',
         'status',
         'supplier',
-    ).prefetch_related('tags', 'maintenances', 'assignments')
+    ).prefetch_related(
+        'tags',
+        'maintenances',
+        Prefetch(
+            'assignments',
+            queryset=AssetAssignment.objects.filter(is_active=True).select_related(
+                'assigned_user', 'assigned_location', 'assigned_asset'
+            ),
+            to_attr='prefetched_active_assignments',
+        ),
+    )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -69,7 +83,13 @@ class AssetDetailView(ObjectDetailView):
     ).prefetch_related(
         'tags',
         'maintenances',
-        'assignments',
+        Prefetch(
+            'assignments',
+            queryset=AssetAssignment.objects.filter(is_active=True).select_related(
+                'assigned_user', 'assigned_location', 'assigned_asset'
+            ),
+            to_attr='prefetched_active_assignments',
+        ),
         'asset_type__custom_fieldset__fields',
         'component_allocations__component',
         'component_allocations__component__manufacturer',
@@ -293,8 +313,13 @@ class AssetCheckoutView(GenericTransactionView):
                 return response
             return redirect(obj.get_absolute_url())
 
+        except ValidationError as e:
+            for msg in e.messages:
+                form.add_error(None, msg)
+            return self.form_invalid(form)
         except Exception as e:
-            form.add_error(None, str(e))
+            logger.exception("Unexpected error during asset checkout for asset pk=%s", obj.pk)
+            form.add_error(None, "An unexpected error occurred. Please try again or contact support.")
             return self.form_invalid(form)
 
 
@@ -436,6 +461,8 @@ def asset_label_print(request, pk, template_id=None):
 
 @login_required
 def bulk_assign_assets(request):
+    if not request.user.has_perm('assets.change_asset'):
+        return HttpResponse(status=403)
     if request.method != 'POST':
         return HttpResponse(status=405)
 
@@ -525,6 +552,8 @@ class AssetBulkDeleteView(ObjectBulkDeleteView):
 
 @login_required
 def bulk_print_labels(request):
+    if not request.user.has_perm('assets.change_asset'):
+        return HttpResponse(status=403)
     if request.method != 'POST':
         return HttpResponse(status=405)
 

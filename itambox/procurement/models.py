@@ -29,7 +29,7 @@ class PurchaseOrder(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixi
     tenant = models.ForeignKey(
         'organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='purchase_orders'
     )
-    order_number = models.CharField(max_length=100, unique=True, db_index=True)
+    order_number = models.CharField(max_length=100, db_index=True)
     supplier = models.ForeignKey(
         'assets.Supplier', on_delete=models.PROTECT, related_name='purchase_orders'
     )
@@ -48,6 +48,9 @@ class PurchaseOrder(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixi
         permissions = [
             ("receive_purchaseorder", "Can receive stock from a purchase order"),
             ("approve_purchaseorder", "Can approve/submit a purchase order"),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=['order_number'], condition=models.Q(deleted_at__isnull=True), name='unique_purchaseorder_number_active'),
         ]
 
     def __str__(self):

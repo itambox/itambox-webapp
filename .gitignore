@@ -46,6 +46,7 @@ test_holders.csv
 
 # Coverage reports
 .coverage
+htmlcov/
 coverage_report*.txt
 
 # Scratch files
@@ -53,6 +54,9 @@ scratch_page.html
 
 # Root-level templates directory (not part of project structure)
 /templates/
+
+# Node
+node_modules/
 
 # E2E test artifacts
 **/tests/e2e/node_modules/

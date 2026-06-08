@@ -585,7 +585,7 @@ class NotificationChannel(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         (TYPE_TEAMS, 'Microsoft Teams'),
     ]
 
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
     channel_type = models.CharField(max_length=20, choices=CHANNEL_TYPE_CHOICES)
     enabled = models.BooleanField(default=True)
     config = models.JSONField(default=dict, blank=True, help_text="Channel-specific config (SMTP settings, webhook URL, etc.)")
@@ -603,6 +603,9 @@ class NotificationChannel(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         ordering = ['name']
         verbose_name = "Notification Channel"
         verbose_name_plural = "Notification Channels"
+        constraints = [
+            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_notificationchannel_name_active'),
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.get_channel_type_display()})"
@@ -782,7 +785,7 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         (REPORT_TYPE_SOFTWARE_INVENTORY, 'Software Catalog & Installations'),
     ]
 
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     tenant = models.ForeignKey(
         'organization.Tenant',
@@ -819,6 +822,9 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         ordering = ['name']
         verbose_name = "Report Template"
         verbose_name_plural = "Report Templates"
+        constraints = [
+            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_reporttemplate_name_active'),
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.get_report_type_display()})"
@@ -999,7 +1005,7 @@ class AlertRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         (SEVERITY_CRITICAL, 'Critical'),
     ]
 
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     alert_type = models.CharField(max_length=50, choices=ALERT_TYPE_CHOICES)
     threshold_value = models.PositiveIntegerField(help_text="Limit count or days horizon")
@@ -1024,6 +1030,9 @@ class AlertRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         ordering = ['name']
         verbose_name = "Alert Rule"
         verbose_name_plural = "Alert Rules"
+        constraints = [
+            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_alertrule_name_active'),
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.get_alert_type_display()})"

@@ -453,7 +453,7 @@ class Kit(JournalingMixin, TaggableMixin, CloneableMixin, ExportableMixin, SoftD
     all_objects = AllObjectsManager()
     allow_global_tenant = True
 
-    name = models.CharField(max_length=100, unique=True, verbose_name="Kit Name")
+    name = models.CharField(max_length=100, verbose_name="Kit Name")
     description = models.TextField(blank=True, verbose_name="Description")
     tenant = models.ForeignKey('organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='kits', db_index=True)
     tags = models.ManyToManyField('extras.Tag', related_name='kits', blank=True)
@@ -462,6 +462,9 @@ class Kit(JournalingMixin, TaggableMixin, CloneableMixin, ExportableMixin, SoftD
         ordering = ['name']
         verbose_name = _("Kit")
         verbose_name_plural = _("Kits")
+        constraints = [
+            models.UniqueConstraint(fields=['name'], condition=Q(deleted_at__isnull=True), name='unique_kit_name_active'),
+        ]
 
     def __str__(self):
         return self.name

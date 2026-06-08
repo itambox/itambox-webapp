@@ -10,8 +10,8 @@ from core.mixins import SoftDeleteMixin
 class Tag(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    name = models.CharField(max_length=100, unique=True)
-    slug = models.SlugField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=100)
     color = models.CharField(max_length=6, blank=True) # Store hex color without #
     description = models.CharField(max_length=200, blank=True)
 
@@ -19,6 +19,10 @@ class Tag(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         ordering = ['name']
         verbose_name = _("Tag")
         verbose_name_plural = _("Tags")
+        constraints = [
+            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_tag_name_active'),
+            models.UniqueConstraint(fields=['slug'], condition=models.Q(deleted_at__isnull=True), name='unique_tag_slug_active'),
+        ]
 
     def __str__(self):
         return self.name
@@ -119,7 +123,7 @@ class CustomField(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         (FIELD_TYPE_SELECT, 'Select / Dropdown'),
     ]
 
-    name = models.SlugField(max_length=50, unique=True, verbose_name="Field Name", help_text="Slug-like name (e.g. sim_card_number)")
+    name = models.SlugField(max_length=50, verbose_name="Field Name", help_text="Slug-like name (e.g. sim_card_number)")
     label = models.CharField(max_length=100, db_index=True, verbose_name="Display Label")
     field_type = models.CharField(max_length=50, choices=FIELD_TYPE_CHOICES, default=FIELD_TYPE_TEXT, db_index=True, verbose_name="Field Type")
     choices = models.TextField(blank=True, null=True, help_text="New-line separated list of choices (only for 'select' type)")
@@ -137,6 +141,9 @@ class CustomField(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         verbose_name_plural = _("Custom Fields")
         db_table = 'assets_customfield'
         app_label = 'assets'
+        constraints = [
+            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_customfield_name_active'),
+        ]
 
     def __str__(self):
         return f"{self.label} ({self.get_field_type_display()})"
@@ -148,7 +155,7 @@ class CustomField(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
 class CustomFieldset(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    name = models.CharField(max_length=100, unique=True, verbose_name="Fieldset Name")
+    name = models.CharField(max_length=100, verbose_name="Fieldset Name")
     fields = models.ManyToManyField(CustomField, related_name='fieldsets', blank=True, verbose_name="Custom Fields")
 
     class Meta:
@@ -157,6 +164,9 @@ class CustomFieldset(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         verbose_name_plural = _("Custom Fieldsets")
         db_table = 'assets_customfieldset'
         app_label = 'assets'
+        constraints = [
+            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_customfieldset_name_active'),
+        ]
 
     def __str__(self):
         return self.name

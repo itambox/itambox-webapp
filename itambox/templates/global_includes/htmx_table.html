@@ -1,7 +1,37 @@
 {% load django_tables2 %}
 {% load i18n %}
 {% load utility_tags %}
+{% load helpers %}
 
+{% if table.embed_bulk_bar %}{% bulk_action_context table as bulk %}<div class="js-selection-scope">{% if bulk.selectable and bulk.can_change and bulk.bulk_edit_url or bulk.selectable and bulk.can_delete and bulk.bulk_delete_url %}
+    <div class="batch-actions-bar d-none">
+        <div class="d-flex align-items-center gap-2 px-3 py-2 bg-body-tertiary border-bottom">
+            <span class="fw-bold me-2">{% translate "0 selected" %}</span>
+            {% if bulk.can_change and bulk.bulk_edit_url %}
+            <form class="bulk-edit-form d-inline" method="post" action="{{ bulk.bulk_edit_url }}" hx-boost="false">
+                {% csrf_token %}
+                <input type="hidden" name="model_name" value="{{ bulk.model_name_str }}">
+                <input type="hidden" name="return_url" value="{{ bulk.return_url }}">
+                <div class="bulk-pks-container d-inline"></div>
+                <button type="button" class="btn btn-sm btn-outline-primary btn-bulk-edit">
+                    <i class="mdi mdi-pencil-outline me-1"></i>{% translate "Edit Selected" %}
+                </button>
+            </form>
+            {% endif %}
+            {% if bulk.can_delete and bulk.bulk_delete_url %}
+            <form class="bulk-delete-form d-inline" method="post" action="{{ bulk.bulk_delete_url }}" hx-boost="false">
+                {% csrf_token %}
+                <input type="hidden" name="model_name" value="{{ bulk.model_name_str }}">
+                <input type="hidden" name="return_url" value="{{ bulk.return_url }}">
+                <div class="bulk-pks-container d-inline"></div>
+                <button type="button" class="btn btn-sm btn-outline-danger btn-bulk-delete">
+                    <i class="mdi mdi-trash-can-outline me-1"></i>{% translate "Delete Selected" %}
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+{% endif %}{% endif %}
 <div class="htmx-container">
     <table{% if table.attrs %} {{ table.attrs.as_html }}{% endif %}>
         {% if table.show_header %}
@@ -54,3 +84,4 @@
         {% endif %}
     </table>
 </div>
+{% if table.embed_bulk_bar %}</div>{% endif %}

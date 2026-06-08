@@ -169,7 +169,6 @@ class Subscription(AutoSlugMixin, BookmarkableMixin, DeletableVaultModel):
     )
     slug = models.SlugField(
         max_length=255,
-        unique=True,
         null=True,
         blank=True,
         help_text="URL-friendly identifier (auto-generated from name if left blank)"
@@ -296,6 +295,9 @@ class Subscription(AutoSlugMixin, BookmarkableMixin, DeletableVaultModel):
         ordering = ('-renewal_date', 'provider', 'name')
         verbose_name = _("Subscription")
         verbose_name_plural = _("Subscriptions")
+        constraints = [
+            models.UniqueConstraint(fields=['slug'], condition=models.Q(deleted_at__isnull=True), name='unique_subscription_slug_active'),
+        ]
 
     def __str__(self):
         return f"{self.provider} - {self.name}"

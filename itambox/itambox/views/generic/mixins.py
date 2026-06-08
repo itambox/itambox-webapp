@@ -28,10 +28,11 @@ class GetReturnURLMixin:
 
     def get_return_url(self, request, obj=None):
         from django.urls import reverse, NoReverseMatch
+        from django.utils.http import url_has_allowed_host_and_scheme
         from itambox.utils import get_model_viewname
 
         return_url = request.GET.get('return_url') or request.POST.get('return_url')
-        if return_url:
+        if return_url and url_has_allowed_host_and_scheme(return_url, allowed_hosts=request.get_host(), require_https=request.is_secure()):
             return return_url
         if obj is not None and obj.pk and hasattr(obj, 'get_absolute_url'):
             return obj.get_absolute_url()

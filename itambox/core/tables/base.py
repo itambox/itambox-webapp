@@ -36,7 +36,42 @@ class BaseTable(tables.Table):
             else:
                 self.empty_text = _('No results found')
 
+        self._apply_default_sequence()
         self._apply_column_width_classes()
+
+    def _apply_default_sequence(self):
+        """Establish a sane default column order at construction time.
+
+        List views run the custom ``configure()`` which calls ``_set_columns()``
+        and builds an explicit ``sequence``. Detail-view tabs, however, only run
+        django_tables2's ``RequestConfig().configure()``, which never touches the
+        sequence — so columns fall back to "declared + Meta.fields" order, dropping
+        ``pk`` out of front and ``checkout_checkin``/``actions`` into the middle.
+        Anchoring the sequence here keeps both paths consistent: ``pk`` first,
+        ``actions`` last, otherwise honouring ``default_columns``/``fields`` order.
+        """
+        meta = getattr(self, 'Meta', None)
+        preferred = list(
+            getattr(meta, 'default_columns', None)
+            or getattr(meta, 'fields', None)
+            or []
+        )
+        if not preferred:
+            return
+
+        all_names = list(self.columns.names())
+        sequence = [c for c in preferred if c in all_names]
+        sequence += [c for c in all_names if c not in sequence]
+
+        if 'pk' in sequence:
+            sequence.remove('pk')
+            sequence.insert(0, 'pk')
+        for trailing in ('checkout_checkin', 'actions'):
+            if trailing in sequence:
+                sequence.remove(trailing)
+                sequence.append(trailing)
+
+        self.sequence = sequence
 
     def _apply_column_width_classes(self):
         width_heuristics = {

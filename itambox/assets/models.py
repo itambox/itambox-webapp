@@ -54,8 +54,8 @@ class StatusLabel(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         (TYPE_ARCHIVED, 'Archived'),
     ]
 
-    name = models.CharField(max_length=100, unique=True)
-    slug = models.SlugField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=100)
     type = models.CharField(max_length=50, choices=TYPE_CHOICES, default=TYPE_DEPLOYABLE, db_index=True)
     description = models.TextField(blank=True)
     color = models.CharField(max_length=6, blank=True, help_text="RGB color in hexadecimal (e.g. 00ff00)")
@@ -65,6 +65,10 @@ class StatusLabel(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         ordering = ['name']
         verbose_name = _("Status Label")
         verbose_name_plural = _("Status Labels")
+        constraints = [
+            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_statuslabel_name_active'),
+            models.UniqueConstraint(fields=['slug'], condition=models.Q(deleted_at__isnull=True), name='unique_statuslabel_slug_active'),
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.get_type_display()})"
@@ -78,8 +82,8 @@ class AssetRole(StandardModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     """Categorizes assets based on their functional role (e.g., Laptop, Monitor, Server)."""
-    name = models.CharField(max_length=100, unique=True)
-    slug = models.SlugField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=100)
     description = models.TextField(blank=True)
     # Add new fields
     color = models.CharField(max_length=6, blank=True, help_text="RGB color in hexadecimal (e.g. 00ff00)")
@@ -92,6 +96,10 @@ class AssetRole(StandardModel, SoftDeleteMixin):
     class Meta:
         verbose_name = _("Asset Role")
         verbose_name_plural = _("Asset Roles")
+        constraints = [
+            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_assetrole_name_active'),
+            models.UniqueConstraint(fields=['slug'], condition=models.Q(deleted_at__isnull=True), name='unique_assetrole_slug_active'),
+        ]
 
     def __str__(self):
         return self.name
@@ -103,10 +111,10 @@ class AssetRole(StandardModel, SoftDeleteMixin):
 class Manufacturer(StandardModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    name = models.CharField(max_length=255, unique=True)
-    slug = models.SlugField(max_length=255, unique=True)  # Re-add unique=True
+    name = models.CharField(max_length=255)
+    slug = models.SlugField(max_length=255)
     description = models.TextField(blank=True, null=True)
-    
+
     contacts = GenericRelation('organization.ContactAssignment')
     tags = models.ManyToManyField('extras.Tag', related_name='manufacturers', blank=True)
 
@@ -114,6 +122,10 @@ class Manufacturer(StandardModel, SoftDeleteMixin):
         ordering = ['name']
         verbose_name = _("Manufacturer")
         verbose_name_plural = _("Manufacturers")
+        constraints = [
+            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_manufacturer_name_active'),
+            models.UniqueConstraint(fields=['slug'], condition=models.Q(deleted_at__isnull=True), name='unique_manufacturer_slug_active'),
+        ]
 
     def __str__(self):
         return self.name
@@ -138,13 +150,16 @@ class Manufacturer(StandardModel, SoftDeleteMixin):
 class Depreciation(StandardModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    name = models.CharField(max_length=100, unique=True, verbose_name="Depreciation Name")
+    name = models.CharField(max_length=100, verbose_name="Depreciation Name")
     months = models.PositiveIntegerField(verbose_name="Lifespan (Months)", help_text="Useful lifespan in months for straight-line calculations")
 
     class Meta:
         ordering = ['name']
         verbose_name = _("Depreciation")
         verbose_name_plural = _("Depreciations")
+        constraints = [
+            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_depreciation_name_active'),
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.months} months)"
@@ -162,7 +177,7 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
 
     manufacturer = models.ForeignKey(Manufacturer, on_delete=models.PROTECT, related_name='asset_types')
     model = models.CharField(max_length=255, db_index=True)
-    slug = models.SlugField(max_length=255, unique=True)
+    slug = models.SlugField(max_length=255)
     part_number = models.CharField(max_length=100, blank=True, db_index=True, help_text="Manufacturer part number or SKU")
 
     eol_months = models.PositiveIntegerField(
@@ -221,7 +236,8 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['manufacturer', 'model'], name='unique_manufacturer_model')
+            models.UniqueConstraint(fields=['manufacturer', 'model'], name='unique_manufacturer_model'),
+            models.UniqueConstraint(fields=['slug'], condition=models.Q(deleted_at__isnull=True), name='unique_assettype_slug_active'),
         ]
         verbose_name = _("Asset Type")
         verbose_name_plural = _("Asset Types")
@@ -444,10 +460,10 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
 
     @property
     def active_assignment(self):
-        for assignment in self.assignments.all():
-            if assignment.is_active:
-                return assignment
-        return None
+        prefetched = getattr(self, 'prefetched_active_assignments', None)
+        if prefetched is not None:
+            return prefetched[0] if prefetched else None
+        return self.assignments.filter(is_active=True).first()
 
     @property
     def assigned_to(self):
@@ -572,8 +588,8 @@ class InstalledSoftware(ChangeLoggingMixin, BaseModel):
 class Supplier(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    name = models.CharField(max_length=255, unique=True)
-    slug = models.SlugField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
+    slug = models.SlugField(max_length=255)
     website = models.URLField(max_length=500, blank=True, null=True)
     contact_email = models.EmailField(max_length=255, blank=True, null=True)
     contact_phone = models.CharField(max_length=50, blank=True, null=True)
@@ -586,6 +602,10 @@ class Supplier(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         ordering = ['name']
         verbose_name = _("Supplier")
         verbose_name_plural = _("Suppliers")
+        constraints = [
+            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_supplier_name_active'),
+            models.UniqueConstraint(fields=['slug'], condition=models.Q(deleted_at__isnull=True), name='unique_supplier_slug_active'),
+        ]
 
     def __str__(self):
         return self.name
@@ -599,8 +619,8 @@ class Supplier(AutoSlugMixin, StandardModel, SoftDeleteMixin):
 class Category(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    name = models.CharField(max_length=255, unique=True)
-    slug = models.SlugField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
+    slug = models.SlugField(max_length=255)
     color = models.CharField(max_length=6, blank=True, null=True, help_text="RGB color in hexadecimal (e.g. 00ff00)")
     description = models.TextField(blank=True, null=True)
     applies_to = models.JSONField(default=dict, blank=True, help_text="Applies to: {'asset': True, 'accessory': True, 'component': True}")
@@ -610,6 +630,10 @@ class Category(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         ordering = ['name']
         verbose_name = _("Category")
         verbose_name_plural = _("Categories")
+        constraints = [
+            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_category_name_active'),
+            models.UniqueConstraint(fields=['slug'], condition=models.Q(deleted_at__isnull=True), name='unique_category_slug_active'),
+        ]
 
     def __str__(self):
         return self.name

@@ -70,12 +70,27 @@ class BaseFilterSet(django_filters.FilterSet):
 
 
 class ObjectChangeFilterSet(BaseFilterSet):
+    # Auto-generated, high-volume core bookkeeping models whose change records are
+    # noise in the audit trail. Hidden by default; surfaced via "show_system_events".
+    NOISE_CONTENT_TYPES = (
+        ('core', 'job'),
+        ('core', 'bookmark'),
+        ('core', 'event'),
+        ('core', 'reportgenerationarchive'),
+    )
+
     q = django_filters.CharFilter(
         method='search',
         label='Search',
         widget=forms.TextInput(attrs={'placeholder': 'Search Username, Object, type...'})
     )
-    
+
+    show_system_events = django_filters.BooleanFilter(
+        method='_noop',
+        label='Show system events',
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+    )
+
     action = django_filters.MultipleChoiceFilter(
         choices=[(c[0], c[1]) for c in ObjectChangeActionChoices().CHOICES],
         label='Action',
@@ -120,3 +135,24 @@ class ObjectChangeFilterSet(BaseFilterSet):
             Q(object_repr__icontains=value) |
             Q(object_type_repr__icontains=value)
         ).distinct()
+
+    def _noop(self, queryset, name, value):
+        # The actual show/hide logic lives in filter_queryset so it can run when
+        # the (unchecked) checkbox submits no value. This keeps the field for the form.
+        return queryset
+
+    def filter_queryset(self, queryset):
+        queryset = super().filter_queryset(queryset)
+        raw = (self.data or {}).get('show_system_events')
+        show_system = str(raw).lower() in ('1', 'true', 'on', 'yes')
+        if not show_system:
+            noise_q = None
+            for app_label, model in self.NOISE_CONTENT_TYPES:
+                clause = Q(
+                    changed_object_type__app_label=app_label,
+                    changed_object_type__model=model,
+                )
+                noise_q = clause if noise_q is None else (noise_q | clause)
+            if noise_q is not None:
+                queryset = queryset.exclude(noise_q)
+        return queryset

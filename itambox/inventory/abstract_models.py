@@ -12,7 +12,7 @@ from .mixins import CheckableInventoryModelMixin
 class AbstractInventoryItem(CheckableInventoryModelMixin, AutoSlugMixin, SubscribableMixin, DeletableVaultModel):
     allow_global_tenant = True
     name = models.CharField(max_length=255)
-    slug = models.SlugField(max_length=255, unique=True)
+    slug = models.SlugField(max_length=255)
     manufacturer = models.ForeignKey(
         'assets.Manufacturer',
         on_delete=models.PROTECT,
@@ -72,6 +72,9 @@ class AbstractInventoryItem(CheckableInventoryModelMixin, AutoSlugMixin, Subscri
     class Meta:
         abstract = True
         ordering = ('manufacturer', 'name')
+        constraints = [
+            models.UniqueConstraint(fields=['slug'], condition=models.Q(deleted_at__isnull=True), name='unique_%(class)s_slug_active'),
+        ]
 
     def __str__(self):
         return f"{self.manufacturer.name} {self.name}"

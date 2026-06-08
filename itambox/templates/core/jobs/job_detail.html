@@ -121,7 +121,7 @@
                     {% endif %}
                 </div>
                 <div class="card-body bg-dark text-light p-0">
-                    <pre class="bg-dark text-light border-0 rounded-0 p-3 mb-0 fs-5 font-monospace text-wrap" style="min-height: 250px; max-height: 500px; overflow-y: auto; font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;">{% if object.logs %}{{ object.logs }}{% else %}[{% trans "Waiting for task initialization..." %}]{% endif %}</pre>
+                    <pre class="bg-dark text-light border-0 rounded-0 p-3 mb-0 fs-5 font-monospace" style="min-height: 250px; max-height: 500px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;">{% if object.logs %}{{ object.logs }}{% else %}[{% trans "Waiting for task initialization..." %}]{% endif %}</pre>
                 </div>
             </div>
         </div>
