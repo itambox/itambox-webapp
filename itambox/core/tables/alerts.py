@@ -1,8 +1,9 @@
 import django_tables2 as tables
 from django.utils.html import format_html
+from django.utils.translation import gettext_lazy as _
 from core.models import AlertLog, AlertRule, NotificationChannel
 from .base import BaseTable
-from .columns import BooleanColumn
+from .columns import BooleanColumn, ToggleColumn
 
 class AlertRuleTable(BaseTable):
     name = tables.Column(linkify=True)
@@ -92,6 +93,7 @@ class NotificationChannelTable(BaseTable):
 
 
 class AlertLogTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
     created_at = tables.DateTimeColumn(verbose_name='Date', format='Y-m-d H:i:s')
     rule = tables.Column(linkify=True)
     subject = tables.Column(linkify=False)
@@ -139,8 +141,9 @@ class AlertLogTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = AlertLog
-        fields = ('created_at', 'rule', 'subject', 'severity', 'status', 'delivery', 'actions')
-        sequence = ('created_at', 'rule', 'subject', 'severity', 'status', 'delivery', 'actions')
+        fields = ('pk', 'created_at', 'rule', 'subject', 'severity', 'status', 'delivery', 'actions')
+        sequence = ('pk', 'created_at', 'rule', 'subject', 'severity', 'status', 'delivery', 'actions')
+        empty_text = _('All clear. No alerts match the current filters.')
 
     def render_severity(self, value):
         color = 'secondary'

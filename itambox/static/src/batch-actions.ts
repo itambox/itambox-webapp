@@ -162,6 +162,8 @@
     { trigger: '.btn-bulk-delete', form: '.bulk-delete-form' },
     { trigger: '.btn-bulk-edit', form: '.bulk-edit-form' },
     { trigger: '.btn-bulk-restore', form: '.bulk-restore-form' },
+    { trigger: '.btn-bulk-acknowledge', form: '.bulk-acknowledge-form' },
+    { trigger: '.btn-bulk-resolve', form: '.bulk-resolve-form' },
     {
       trigger: '.btn-bulk-purge',
       form: '.bulk-purge-form',

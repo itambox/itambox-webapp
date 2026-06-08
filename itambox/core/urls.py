@@ -47,6 +47,7 @@ mimetypes.add_type('application/zip', '.zip')
 from core.views.alerts import (
     AlertRuleListView, AlertRuleDetailView, AlertRuleCreateView, AlertRuleUpdateView,
     AlertRuleDeleteView, AlertRuleRunNowView, AlertLogListView, AlertAcknowledgeView, AlertResolveView,
+    AlertBulkAcknowledgeView, AlertBulkResolveView,
     NotificationChannelListView, NotificationChannelCreateView, NotificationChannelUpdateView,
     NotificationChannelDeleteView, NotificationChannelTestView,
 )
@@ -125,6 +126,8 @@ urlpatterns = [
     path('alerts/', AlertLogListView.as_view(), name='alertlog_list'),
     path('alerts/logs/<int:pk>/acknowledge/', AlertAcknowledgeView.as_view(), name='alertlog_acknowledge'),
     path('alerts/logs/<int:pk>/resolve/', AlertResolveView.as_view(), name='alertlog_resolve'),
+    path('alerts/logs/bulk-acknowledge/', AlertBulkAcknowledgeView.as_view(), name='alertlog_bulk_acknowledge'),
+    path('alerts/logs/bulk-resolve/', AlertBulkResolveView.as_view(), name='alertlog_bulk_resolve'),
     path('alerts/rules/', AlertRuleListView.as_view(), name='alertrule_list'),
     path('alerts/rules/add/', AlertRuleCreateView.as_view(), name='alertrule_add'),
     path('alerts/rules/<int:pk>/', AlertRuleDetailView.as_view(), name='alert_rule_detail'),

@@ -1,9 +1,14 @@
+import json
 import logging
+from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
 from django.urls import reverse
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.utils.decorators import method_decorator
+from django.views.generic import View
 
 from core.models import AlertRule, AlertLog, NotificationChannel
 from core.tables import AlertRuleTable, AlertLogTable, NotificationChannelTable
@@ -169,6 +174,72 @@ class AlertResolveView(SimplePostView):
         return redirect(
             self.request.POST.get('return_url') or reverse('alertlog_list')
         )
+
+
+class _BulkAlertActionView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    """Apply a status transition to many AlertLogs selected in the Alert Center.
+
+    Reads the checked ``pk`` list (gathered by batch-actions.ts) and transitions
+    eligible logs. Tenant-scoped: AlertLog.objects only exposes the current
+    tenant's logs, so a user can never act on another tenant's alerts.
+    """
+    permission_required = ('core.change_alertlog',)
+    hx_trigger = 'tableRefreshRequired'
+    eligible_statuses = ()
+
+    def apply(self, queryset, user):
+        raise NotImplementedError
+
+    def success_message(self, count):
+        raise NotImplementedError
+
+    def post(self, request, *args, **kwargs):
+        pks = request.POST.getlist('pk')
+        return_url = request.POST.get('return_url') or reverse('alertlog_list')
+
+        if not pks:
+            return self._respond(request, "No alerts selected.", 'warning', return_url)
+
+        qs = AlertLog.objects.filter(pk__in=pks)
+        if self.eligible_statuses:
+            qs = qs.filter(status__in=self.eligible_statuses)
+        count = self.apply(qs, request.user)
+        return self._respond(request, self.success_message(count), 'success', return_url)
+
+    def _respond(self, request, message, level, return_url):
+        if getattr(request, 'htmx', False):
+            resp = HttpResponse(status=204)
+            resp['HX-Trigger'] = json.dumps({
+                self.hx_trigger: None,
+                'showMessage': {'message': message, 'level': level},
+            })
+            return resp
+        getattr(messages, level)(request, message)
+        return redirect(return_url)
+
+
+class AlertBulkAcknowledgeView(_BulkAlertActionView):
+    eligible_statuses = (AlertLog.STATUS_ACTIVE,)
+
+    def apply(self, queryset, user):
+        return queryset.update(status=AlertLog.STATUS_ACKNOWLEDGED, acknowledged_by=user)
+
+    def success_message(self, count):
+        return f"{count} alert(s) acknowledged."
+
+
+class AlertBulkResolveView(_BulkAlertActionView):
+    eligible_statuses = (AlertLog.STATUS_ACTIVE, AlertLog.STATUS_ACKNOWLEDGED)
+
+    def apply(self, queryset, user):
+        return queryset.update(
+            status=AlertLog.STATUS_RESOLVED,
+            resolved_by=user,
+            resolved_at=timezone.now(),
+        )
+
+    def success_message(self, count):
+        return f"{count} alert(s) resolved."
 
 
 @method_decorator(login_required, name='dispatch')

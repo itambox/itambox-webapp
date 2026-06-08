@@ -185,6 +185,26 @@
                             </button>
                             {% endif %}
 
+                            {% if model_name_str == 'core.alertlog' %}
+                            <form id="bulk-acknowledge-form" method="post" action="{% url 'alertlog_bulk_acknowledge' %}" class="bulk-acknowledge-form d-inline" hx-boost="false">
+                                {% csrf_token %}
+                                <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+                                <div class="bulk-pks-container d-inline"></div>
+                                <button type="button" class="btn btn-sm btn-outline-warning btn-bulk-acknowledge">
+                                    <i class="mdi mdi-eye-outline me-1"></i>
+                                    {% translate "Acknowledge Selected" %}
+                                </button>
+                            </form>
+                            <form id="bulk-resolve-form" method="post" action="{% url 'alertlog_bulk_resolve' %}" class="bulk-resolve-form d-inline" hx-boost="false">
+                                {% csrf_token %}
+                                <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+                                <div class="bulk-pks-container d-inline"></div>
+                                <button type="button" class="btn btn-sm btn-outline-success btn-bulk-resolve">
+                                    <i class="mdi mdi-check me-1"></i>
+                                    {% translate "Resolve Selected" %}
+                                </button>
+                            </form>
+                            {% else %}
                             <form id="bulk-delete-form" method="post" action="{{ bulk_delete_url }}" class="bulk-delete-form d-inline" hx-boost="false">
                                 {% csrf_token %}
                                 <input type="hidden" name="model_name" value="{{ model_name_str }}">
@@ -205,6 +225,7 @@
                                     {% translate "Edit Selected" %}
                                 </button>
                             </form>
+                            {% endif %}
                             {% endif %}
                         </div>
                     </div>
@@ -254,6 +275,16 @@
                         {% translate "Receive & Allocate Stock" %}
                     </button>
                     {% endif %}
+                    {% if model_name_str == 'core.alertlog' %}
+                    <button type="button" class="btn btn-sm btn-outline-warning btn-bulk-acknowledge">
+                        <i class="mdi mdi-eye-outline me-1"></i>
+                        {% translate "Acknowledge Selected" %}
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-success btn-bulk-resolve">
+                        <i class="mdi mdi-check me-1"></i>
+                        {% translate "Resolve Selected" %}
+                    </button>
+                    {% else %}
                     <button type="button" class="btn btn-sm btn-outline-danger btn-bulk-delete">
                         <i class="mdi mdi-trash-can-outline me-1"></i>
                         {% translate "Delete Selected" %}
@@ -262,6 +293,7 @@
                         <i class="mdi mdi-pencil-outline me-1"></i>
                         {% translate "Edit Selected" %}
                     </button>
+                    {% endif %}
                     {% endif %}
                 </div>
             </div>
