@@ -116,8 +116,8 @@ class CustodyReceipt(ChangeLoggingMixin, BaseModel):
         (STATUS_DECLINED, 'Declined'),
     ]
 
-    asset = models.ForeignKey('assets.Asset', on_delete=models.CASCADE, related_name='custody_receipts', db_index=True)
-    holder = models.ForeignKey('organization.AssetHolder', on_delete=models.CASCADE, related_name='custody_receipts')
+    asset = models.ForeignKey('assets.Asset', on_delete=models.PROTECT, related_name='custody_receipts', db_index=True)
+    holder = models.ForeignKey('organization.AssetHolder', on_delete=models.PROTECT, related_name='custody_receipts')
     token = models.CharField(max_length=64, unique=True, default=generate_token)
     custody_template = models.ForeignKey(
         to='compliance.CustodyTemplate',
@@ -133,7 +133,7 @@ class CustodyReceipt(ChangeLoggingMixin, BaseModel):
     accepted = models.BooleanField(default=False)
     accepted_date = models.DateTimeField(null=True, blank=True)
     acceptance_method = models.CharField(max_length=50, default='link')
-    acceptance_status = models.CharField(max_length=20, choices=ACCEPTANCE_STATUS_CHOICES, default=STATUS_PENDING)
+    acceptance_status = models.CharField(max_length=20, choices=ACCEPTANCE_STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
     signature_data = models.TextField(blank=True, null=True)
     signature_hash = models.CharField(max_length=64, blank=True, null=True)
     verification_hash = models.CharField(max_length=64, unique=True, blank=True, null=True)
@@ -172,7 +172,7 @@ class AssetMaintenance(TaggableMixin, CloneableMixin, ExportableMixin,
         (MAINTENANCE_TYPE_HARDWARE_SUPPORT, 'Hardware Support'),
     ]
 
-    asset = models.ForeignKey('assets.Asset', on_delete=models.CASCADE, related_name='maintenances', db_index=True)
+    asset = models.ForeignKey('assets.Asset', on_delete=models.PROTECT, related_name='maintenances', db_index=True)
     title = models.CharField(max_length=200, default='Maintenance')
     description = models.TextField(blank=True)
     supplier = models.ForeignKey('assets.Supplier', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Supplier/Vendor")

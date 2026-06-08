@@ -12,3 +12,23 @@ def pytest_configure(config):
         settings.DATABASES['default']['TEST']['NAME'] = db_name
 
 
+@pytest.fixture(autouse=True)
+def clear_thread_locals():
+    yield
+    try:
+        from core.managers import set_current_tenant, set_current_tenant_group, set_current_membership
+        set_current_tenant(None)
+        set_current_tenant_group(None)
+        set_current_membership(None)
+    except Exception:
+        pass
+
+    try:
+        from itambox.middleware import _request_id, _current_user
+        _request_id.set(None)
+        _current_user.set(None)
+    except Exception:
+        pass
+
+
+

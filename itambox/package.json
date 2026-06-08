@@ -4,7 +4,7 @@
   "private": true,
   "description": "IT Asset Management System — static assets build pipeline",
   "scripts": {
-    "build:scss": "sass static/src/styles/itambox.scss:static/dist/itambox.css --style=compressed",
+    "build:scss": "sass static/src/styles/itambox.scss static/dist/itambox.css && postcss static/dist/itambox.css -o static/dist/itambox.css",
     "build:vendor": "node copy-vendor.mjs",
     "build": "node bundle.mjs",
     "build:all": "npm run build:scss && npm run build:vendor && npm run build",
@@ -12,9 +12,13 @@
     "watch:css": "sass --watch static/src/styles/itambox.scss:static/dist/itambox.css"
   },
   "devDependencies": {
+    "autoprefixer": "^10.5.0",
+    "cssnano": "^8.0.1",
     "esbuild": "^0.25.0",
     "eslint": "^9.0.0",
     "globals": "^15.0.0",
+    "postcss": "^8.5.15",
+    "postcss-cli": "^11.0.1",
     "sass": "^1.80.0"
   },
   "dependencies": {

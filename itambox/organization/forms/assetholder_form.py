@@ -52,9 +52,15 @@ class AssetHolderForm(forms.ModelForm):
         self.helper.form_method = 'post'
         self.helper.form_tag = True
 
-        # Filter the user choices to only show unlinked users plus the currently linked user
+        # Filter the user choices to only show unlinked users in the active tenant plus the currently linked user
         UserClass = get_user_model()
-        unassigned_users = UserClass.objects.filter(asset_holder_profile__isnull=True)
+        from core.managers import get_current_tenant
+        tenant = getattr(self.instance, 'tenant', None) or get_current_tenant()
+        if tenant:
+            unassigned_users = UserClass.objects.exclude(asset_holder_profiles__tenant=tenant)
+        else:
+            unassigned_users = UserClass.objects.filter(asset_holder_profiles__isnull=True)
+
         if self.instance and self.instance.pk and self.instance.user:
             assigned_user_pk = self.instance.user.pk
             self.fields['user'].queryset = UserClass.objects.filter(

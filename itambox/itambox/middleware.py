@@ -63,10 +63,10 @@ class CSPMiddleware:
         if nonce:
             response['Content-Security-Policy'] = (
                 "default-src 'self'; "
-                f"script-src 'self' 'nonce-{nonce}' https://cdn.jsdelivr.net https://unpkg.com; "
-                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://rsms.me; "
+                f"script-src 'self' 'nonce-{nonce}'; "
+                "style-src 'self' 'unsafe-inline' https://rsms.me; "
                 "img-src 'self' data:; "
-                "font-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+                "font-src 'self'; "
                 "media-src 'self' data:; "
                 "connect-src 'self'; "
                 "frame-ancestors 'self'"
@@ -74,10 +74,10 @@ class CSPMiddleware:
         else:
             response['Content-Security-Policy'] = (
                 "default-src 'self'; "
-                "script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; "
-                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://rsms.me; "
+                "script-src 'self'; "
+                "style-src 'self' 'unsafe-inline' https://rsms.me; "
                 "img-src 'self' data:; "
-                "font-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+                "font-src 'self'; "
                 "media-src 'self' data:; "
                 "connect-src 'self'; "
                 "frame-ancestors 'self'"

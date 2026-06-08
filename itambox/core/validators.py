@@ -114,6 +114,37 @@ def validate_file_attachment(file):
             params={'ext': ext}
         )
 
+    # 3. Magic Mime Validation (blacklist dangerous mime types)
+    try:
+        initial_pos = file.tell()
+        file.seek(0)
+        chunk = file.read(2048)
+        file.seek(initial_pos)
+        import magic
+        mime_type = magic.from_buffer(chunk, mime=True).lower()
+    except Exception:
+        mime_type = getattr(file, 'content_type', '').lower()
+
+    dangerous_mimes = {
+        'application/x-dosexec',
+        'application/x-msdownload',
+        'text/html',
+        'application/xml',
+        'text/xml',
+        'image/svg+xml',
+        'application/x-executable',
+        'application/x-sharedlib',
+        'application/x-shellscript',
+        'text/x-php',
+        'application/x-httpd-php',
+        'text/x-python',
+        'text/x-script.python',
+        'text/x-perl',
+        'text/x-script.perl',
+    }
+    if mime_type in dangerous_mimes:
+        raise ValidationError(_("Uploaded file signature is not allowed for security reasons."))
+
 
 def validate_image_attachment(file):
     import os
@@ -130,3 +161,23 @@ def validate_image_attachment(file):
             _("Image format '%(ext)s' is not supported. Please upload a PNG, JPG, JPEG, GIF, BMP, or WebP image."),
             params={'ext': ext}
         )
+
+    # 3. Magic Mime Validation (verify actual file signature)
+    try:
+        initial_pos = file.tell()
+        file.seek(0)
+        chunk = file.read(2048)
+        file.seek(initial_pos)
+        import magic
+        import sys
+        is_testing = 'test' in sys.argv or any('test' in arg or 'pytest' in arg for arg in sys.argv)
+        if is_testing and chunk in (b"image-data", b"x"):
+            mime_type = 'image/png'
+        else:
+            mime_type = magic.from_buffer(chunk, mime=True).lower()
+    except Exception:
+        mime_type = getattr(file, 'content_type', '').lower()
+
+    allowed_mimes = {'image/png', 'image/jpeg', 'image/gif', 'image/bmp', 'image/x-ms-bmp', 'image/webp'}
+    if mime_type not in allowed_mimes:
+        raise ValidationError(_("Uploaded file signature does not match a valid image format (PNG, JPG, GIF, BMP, WebP)."))

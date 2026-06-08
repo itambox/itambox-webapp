@@ -630,7 +630,8 @@ class ReportTemplateForm(forms.ModelForm):
         instance = super().save(commit=False)
         user = get_current_user()
         if user and not (user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)):
-            profile = getattr(user, 'asset_holder_profile', None)
+            from core.managers import get_current_tenant
+            profile = user.asset_holder_profiles.filter(tenant=get_current_tenant()).first() if get_current_tenant() else user.asset_holder_profiles.first()
             if profile and profile.tenant:
                 instance.tenant = profile.tenant
         if commit:
@@ -666,7 +667,8 @@ class ScheduledReportForm(forms.ModelForm):
             if 'filter_tenants' in self.fields:
                 self.fields.pop('filter_tenants')
             # Filter reports and channels choices dynamically
-            profile = getattr(user, 'asset_holder_profile', None)
+            from core.managers import get_current_tenant
+            profile = user.asset_holder_profiles.filter(tenant=get_current_tenant()).first() if get_current_tenant() else user.asset_holder_profiles.first()
             if profile and profile.tenant:
                 from core.models import ReportTemplate, NotificationChannel
                 from django.db.models import Q
@@ -690,7 +692,8 @@ class ScheduledReportForm(forms.ModelForm):
         instance = super().save(commit=False)
         user = get_current_user()
         if user and not (user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)):
-            profile = getattr(user, 'asset_holder_profile', None)
+            from core.managers import get_current_tenant
+            profile = user.asset_holder_profiles.filter(tenant=get_current_tenant()).first() if get_current_tenant() else user.asset_holder_profiles.first()
             if profile and profile.tenant:
                 instance.tenant = profile.tenant
         if commit:
@@ -721,7 +724,8 @@ class AlertRuleForm(forms.ModelForm):
         instance = super().save(commit=False)
         user = get_current_user()
         if user and not (user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)):
-            profile = getattr(user, 'asset_holder_profile', None)
+            from core.managers import get_current_tenant
+            profile = user.asset_holder_profiles.filter(tenant=get_current_tenant()).first() if get_current_tenant() else user.asset_holder_profiles.first()
             if profile and profile.tenant:
                 instance.tenant = profile.tenant
         if commit:
@@ -761,7 +765,8 @@ class NotificationChannelForm(forms.ModelForm):
         instance = super().save(commit=False)
         user = get_current_user()
         if user and not (user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)):
-            profile = getattr(user, 'asset_holder_profile', None)
+            from core.managers import get_current_tenant
+            profile = user.asset_holder_profiles.filter(tenant=get_current_tenant()).first() if get_current_tenant() else user.asset_holder_profiles.first()
             if profile and profile.tenant:
                 instance.tenant = profile.tenant
         if commit:

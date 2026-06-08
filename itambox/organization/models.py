@@ -29,7 +29,7 @@ class Location(SubscribableMixin, StandardModel, SoftDeleteMixin):
 
     site = models.ForeignKey(
         'Site', # Use string reference
-        on_delete=models.CASCADE, # Or PROTECT if locations shouldn't be deleted when site is
+        on_delete=models.PROTECT, # Or PROTECT if locations shouldn't be deleted when site is
         related_name='locations',
         db_index=True
         # null=True # REMOVED temporary null
@@ -236,16 +236,16 @@ class Site(DeletableVaultModel, BookmarkableMixin):
 class AssetHolder(SubscribableMixin, StandardModel, SoftDeleteMixin):
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()
-    user = models.OneToOneField(
+    user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL, # Keep holder if user is deleted, set user link to null
-        related_name='asset_holder_profile', # Custom related_name
+        related_name='asset_holder_profiles', # Custom related_name
         blank=True,
         null=True
     )
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
-    upn = models.CharField(max_length=255, verbose_name='User Principal Name', unique=True)
+    upn = models.CharField(max_length=255, verbose_name='User Principal Name')
     email = models.EmailField(blank=True, null=True)
     tenant = models.ForeignKey(
         Tenant,
@@ -262,7 +262,8 @@ class AssetHolder(SubscribableMixin, StandardModel, SoftDeleteMixin):
     class Meta:
         ordering = ['last_name', 'first_name', 'upn']
         constraints = [
-            models.UniqueConstraint(fields=['upn'], name='organization_assetholder_unique_upn')
+            models.UniqueConstraint(fields=['tenant', 'user'], name='unique_tenant_user_profile'),
+            models.UniqueConstraint(fields=['tenant', 'upn'], name='unique_tenant_upn'),
         ]
         verbose_name = _("Asset Holder")
         verbose_name_plural = _("Asset Holders")

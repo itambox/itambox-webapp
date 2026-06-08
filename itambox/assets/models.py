@@ -669,21 +669,21 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
     # Intended assignee target fields (delegated targets)
     assigned_user = models.ForeignKey(
         'organization.AssetHolder',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='asset_requests'
     )
     assigned_location = models.ForeignKey(
         'organization.Location',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='asset_requests'
     )
     assigned_asset = models.ForeignKey(
         'Asset',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='child_requests_for'
@@ -1025,18 +1025,21 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
 
 
 
-class AssetAssignment(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
+class AssetAssignment(SoftDeleteMixin, JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
+
     asset = models.ForeignKey(
         Asset, on_delete=models.CASCADE, related_name='assignments', db_index=True
     )
     assigned_user = models.ForeignKey(
-        'organization.AssetHolder', on_delete=models.CASCADE, null=True, blank=True, related_name='asset_assignments'
+        'organization.AssetHolder', on_delete=models.SET_NULL, null=True, blank=True, related_name='asset_assignments'
     )
     assigned_location = models.ForeignKey(
-        'organization.Location', on_delete=models.CASCADE, null=True, blank=True, related_name='asset_assignments'
+        'organization.Location', on_delete=models.SET_NULL, null=True, blank=True, related_name='asset_assignments'
     )
     assigned_asset = models.ForeignKey(
-        'Asset', on_delete=models.CASCADE, null=True, blank=True, related_name='child_assignments'
+        'Asset', on_delete=models.SET_NULL, null=True, blank=True, related_name='child_assignments'
     )
     pre_checkout_status = models.ForeignKey(
         'StatusLabel',
@@ -1074,13 +1077,29 @@ class AssetAssignment(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseMo
                 check=(
                     models.Q(assigned_user__isnull=False, assigned_location__isnull=True, assigned_asset__isnull=True) |
                     models.Q(assigned_user__isnull=True, assigned_location__isnull=False, assigned_asset__isnull=True) |
-                    models.Q(assigned_user__isnull=True, assigned_location__isnull=True, assigned_asset__isnull=False)
+                    models.Q(assigned_user__isnull=True, assigned_location__isnull=True, assigned_asset__isnull=False) |
+                    models.Q(assigned_user__isnull=True, assigned_location__isnull=True, assigned_asset__isnull=True)
                 ),
                 name='exactly_one_assignment_target'
             )
         ]
         verbose_name = _("Asset Assignment")
         verbose_name_plural = _("Asset Assignments")
+
+    def clean(self):
+        super().clean()
+        targets = [self.assigned_user, self.assigned_location, self.assigned_asset]
+        filled = [t for t in targets if t is not None]
+        if self.is_active:
+            if not filled:
+                raise ValidationError(_("Either assigned_user, assigned_location, or assigned_asset must be provided for an active assignment."))
+            if len(filled) > 1:
+                raise ValidationError(_("You can only assign an asset to one target."))
+
+            # Tenant boundary validation
+            target = filled[0]
+            if target and hasattr(target, 'tenant') and target.tenant != self.asset.tenant:
+                raise ValidationError(_("Assignment target must belong to the same tenant as the asset."))
 
     @property
     def assigned_target(self):

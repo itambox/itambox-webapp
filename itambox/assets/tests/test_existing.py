@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from assets.models import Manufacturer, Asset, AssetType, AssetRole, StatusLabel, Depreciation, Supplier, Category, AssetRequest
@@ -13,7 +13,8 @@ from decimal import Decimal
 
 User = get_user_model()
 
-class ComponentTrackingTestCase(TestCase):
+class ComponentTrackingTestCase(TransactionTestCase):
+
     def setUp(self):
         self.user = User.objects.create_user(username='testadmin', password='testpassword', is_staff=True, is_superuser=True)
         self.client.login(username='testadmin', password='testpassword')
@@ -44,11 +45,17 @@ class ComponentTrackingTestCase(TestCase):
             slug="dell-poweredge-r750"
         )
 
+        self.status = StatusLabel.objects.get_or_create(
+            slug='available',
+            defaults={'name': 'Available', 'type': StatusLabel.TYPE_DEPLOYABLE, 'color': '28a745'}
+        )[0]
+
         self.asset = Asset.objects.create(
             name="Web Server 01",
             asset_tag="SRV-001",
             asset_type=self.asset_type,
-            asset_role=self.role
+            asset_role=self.role,
+            status=self.status
         )
 
         self.allocation = ComponentAllocation.objects.create(
@@ -117,9 +124,11 @@ class ComponentTrackingTestCase(TestCase):
         self.assertEqual(self.component.name, '16GB DDR5 RAM (Updated)')
 
     def test_component_delete_view(self):
+        self.allocation.delete(force_hard_delete=True)
         response = self.client.post(reverse('inventory:component_delete', kwargs={'pk': self.component.pk}))
         self.assertEqual(response.status_code, 302)
         self.assertFalse(Component.objects.filter(pk=self.component.pk).exists())
+
 
     def test_componentallocation_list_view(self):
         response = self.client.get(reverse('inventory:componentallocation_list'))

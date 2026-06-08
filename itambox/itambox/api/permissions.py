@@ -67,14 +67,12 @@ class TokenPermissions(BasePermission):
                 set_current_membership(membership)
             else:
                 from organization.models import AssetHolder
-                holder = getattr(request.user, 'asset_holder_profile', None)
+                holder = request.user.asset_holder_profiles.first()
                 if holder and holder.tenant:
                     set_current_tenant(holder.tenant)
                 elif request.user.is_superuser:
-                    from organization.models import Tenant
-                    first_tenant = Tenant.objects.first()
-                    if first_tenant:
-                        set_current_tenant(first_tenant)
+                    # Superusers are global and unscoped by default
+                    pass
                 else:
                     import sys
                     is_testing = 'test' in sys.argv or any('test' in arg or 'pytest' in arg for arg in sys.argv)
@@ -101,7 +99,7 @@ class TokenPermissions(BasePermission):
         if not perms:
             return True
 
-        return request.user.has_perms(perms, obj=obj)
+        return request.user.has_perms(perms)
 
 
 class IsAuthenticatedOrLoginNotRequired(BasePermission):
@@ -109,3 +107,30 @@ class IsAuthenticatedOrLoginNotRequired(BasePermission):
         if not getattr(settings, 'LOGIN_REQUIRED', True):
             return True
         return request.user.is_authenticated
+
+
+class StrictTenantPermission(BasePermission):
+    """
+    Strict Tenant Security Boundary. Enforces that requests targeting
+    specific resources belong strictly to the user's assigned Tenant scope.
+    Raises Http404 on violation to prevent primary key enumeration.
+    """
+    def has_object_permission(self, request, view, obj):
+        if request.user.is_superuser:
+            return True
+            
+        user_tenant = getattr(request, 'active_tenant', None)
+        if not user_tenant:
+            profile = request.user.asset_holder_profiles.first()
+            user_tenant = profile.tenant if profile else None
+        
+        if not user_tenant:
+            from django.http import Http404
+            raise Http404()
+            
+        # Enforce boundary: Object's tenant must match user's tenant
+        if hasattr(obj, 'tenant') and obj.tenant is not None and obj.tenant != user_tenant:
+            from django.http import Http404
+            raise Http404()
+            
+        return True

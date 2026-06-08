@@ -308,7 +308,7 @@ class TenantOIDCTestCase(TestCase):
 
         # Verify user_b was created but has no asset_holder_profile (or it wasn't duplicate created)
         user_b.refresh_from_db()
-        self.assertFalse(hasattr(user_b, 'asset_holder_profile') and user_b.asset_holder_profile is not None)
+        self.assertFalse(user_b.asset_holder_profiles.filter(tenant=self.tenant_alpha).exists())
 
     def test_multitenant_user_login_different_tenant(self):
         backend = TenantOIDCBackend()
@@ -325,7 +325,7 @@ class TenantOIDCTestCase(TestCase):
         user = backend.create_user(claims)
         
         # Verify the user has a profile in tenant-alpha
-        self.assertEqual(user.asset_holder_profile.tenant, self.tenant_alpha)
+        self.assertEqual(user.asset_holder_profiles.filter(tenant=self.tenant_alpha).first().tenant, self.tenant_alpha)
         
         # Now log in on tenant-beta
         set_current_tenant(self.tenant_beta)
@@ -337,16 +337,12 @@ class TenantOIDCTestCase(TestCase):
             "groups": ["beta-users"]
         }
         
-        with self.assertLogs('core.auth.oidc', level='WARNING') as cm:
-            # Should update / sync user and membership without crashing
-            updated_user = backend.update_user(user, beta_claims)
-            self.assertEqual(updated_user, user)
+        # Should update / sync user and membership without crashing, creating a new profile
+        updated_user = backend.update_user(user, beta_claims)
+        self.assertEqual(updated_user, user)
             
-            # Check warning log for multi-tenant asset holder OneToOne constraint
-            log_output = "".join(cm.output)
-            self.assertIn("User already has an AssetHolder profile linked in another tenant. Cannot create a new one due to OneToOneField constraint.", log_output)
-            
-        # Verify membership was created for tenant-beta
+        # Verify membership and profile were created for tenant-beta
+        self.assertTrue(user.asset_holder_profiles.filter(tenant=self.tenant_beta).exists())
         self.assertTrue(TenantMembership.objects.filter(user=user, tenant=self.tenant_beta).exists())
 
     def test_malformed_missing_oidc_claims(self):
@@ -425,16 +421,15 @@ class TenantOIDCTestCase(TestCase):
             "given_name": "User",
             "family_name": "A"
         })
-        self.assertEqual(user_a.asset_holder_profile.upn, "coll@test.com")
-        self.assertEqual(user_a.asset_holder_profile.tenant, self.tenant_alpha)
+        self.assertEqual(user_a.asset_holder_profiles.filter(tenant=self.tenant_alpha).first().upn, "coll@test.com")
+        self.assertEqual(user_a.asset_holder_profiles.filter(tenant=self.tenant_alpha).first().tenant, self.tenant_alpha)
 
-        # Now, try to create User B in Tenant Beta with the same UPN "coll@test.com"
-        # Since UPN has a global unique constraint, this must fail at AssetHolder creation
+        # Now, try to create User B in Tenant Alpha with the same UPN "coll@test.com"
+        # Since UPN has a unique constraint per tenant, this must fail at AssetHolder creation
         # but User B should still log in successfully (without AssetHolder profile)
-        set_current_tenant(self.tenant_beta)
         with self.assertLogs('core.auth.oidc', level='WARNING') as cm:
             user_b = backend.create_user({
-                "email": "userb@beta.com",
+                "email": "userb@alpha.com",
                 "sub": "sub-userb",
                 "upn": "coll@test.com",
                 "given_name": "User",
@@ -443,30 +438,28 @@ class TenantOIDCTestCase(TestCase):
             self.assertIsNotNone(user_b)
             self.assertTrue(any("IntegrityError while creating AssetHolder" in line for line in cm.output))
         
-        # Verify user_b was created, is in tenant_beta, but has no asset_holder_profile
+        # Verify user_b was created, is in tenant_alpha, but has no asset_holder_profile
         user_b.refresh_from_db()
-        self.assertFalse(hasattr(user_b, 'asset_holder_profile') and user_b.asset_holder_profile is not None)
-        self.assertTrue(TenantMembership.objects.filter(user=user_b, tenant=self.tenant_beta).exists())
+        self.assertFalse(user_b.asset_holder_profiles.filter(tenant=self.tenant_alpha).exists())
+        self.assertTrue(TenantMembership.objects.filter(user=user_b, tenant=self.tenant_alpha).exists())
 
-        # OneToOne Constraint Collision:
+        # No OneToOne Constraint Collision:
         # A user already has a linked profile in Tenant Alpha. They now log into Tenant Beta.
-        # It should log warning and not create a new profile in Tenant Beta.
+        # It should succeed and create a new profile in Tenant Beta.
         set_current_tenant(self.tenant_beta)
-        with self.assertLogs('core.auth.oidc', level='WARNING') as cm:
-            updated_user_a = backend.update_user(user_a, {
-                "email": "usera@alpha.com",
-                "sub": "sub-usera",
-                "upn": "coll@test.com",
-                "given_name": "User",
-                "family_name": "A",
-                "groups": ["beta-users"]
-            })
-            self.assertEqual(updated_user_a, user_a)
-            self.assertTrue(any("OneToOneField constraint" in line for line in cm.output))
+        updated_user_a = backend.update_user(user_a, {
+            "email": "usera@alpha.com",
+            "sub": "sub-usera",
+            "upn": "coll@test.com",
+            "given_name": "User",
+            "family_name": "A",
+            "groups": ["beta-users"]
+        })
+        self.assertEqual(updated_user_a, user_a)
         
-        # Verify user_a's profile is still in Tenant Alpha
+        # Verify user_a has a profile in Tenant Beta now
         user_a.refresh_from_db()
-        self.assertEqual(user_a.asset_holder_profile.tenant, self.tenant_alpha)
+        self.assertTrue(user_a.asset_holder_profiles.filter(tenant=self.tenant_beta).exists())
         # Verify user_a has membership in Tenant Beta now
         self.assertTrue(TenantMembership.objects.filter(user=user_a, tenant=self.tenant_beta).exists())
 

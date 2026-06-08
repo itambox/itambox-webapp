@@ -70,13 +70,18 @@ def breadcrumbs(request):
 def notifications_processor(request):
     """Context processor providing unread notification counts and items globally."""
     if request.user.is_authenticated:
+        from django.utils.functional import SimpleLazyObject
         from core.models import Notification
-        unread_qs = Notification.objects.filter(user=request.user, is_read=False)
-        unread_count = unread_qs.count()
-        recent_unread = unread_qs.order_by('-created_at')[:5]
+        
+        def get_unread_count():
+            return Notification.objects.filter(user=request.user, is_read=False).count()
+            
+        def get_recent_unread():
+            return Notification.objects.filter(user=request.user, is_read=False).order_by('-created_at')[:5]
+
         return {
-            'unread_notifications_count': unread_count,
-            'recent_unread_notifications': recent_unread
+            'unread_notifications_count': SimpleLazyObject(get_unread_count),
+            'recent_unread_notifications': SimpleLazyObject(get_recent_unread)
         }
     return {
         'unread_notifications_count': 0,
@@ -93,68 +98,68 @@ def tenant_switcher_processor(request):
             'grouped_memberships_switcher': []
         }
 
+    from django.utils.functional import SimpleLazyObject
     from organization.models import Tenant, TenantMembership
     from collections import defaultdict
 
-    grouped_tenants_switcher = []
-    grouped_memberships_switcher = []
+    def get_all_tenants():
+        if not request.user.is_superuser:
+            return []
+        return Tenant._base_manager.all().order_by('name')
 
-    if request.user.is_superuser:
-        # 1. Fetch all tenants ordered by group and name
+    def get_grouped_tenants():
+        if not request.user.is_superuser:
+            return []
         tenants = Tenant._base_manager.all().select_related('group').order_by('group__name', 'name')
         
-        # Group by group
         group_map = defaultdict(list)
         for t in tenants:
             group_map[t.group].append(t)
             
-        # Separate group list to sort properly (groups with name first, None group last)
         sorted_groups = sorted([g for g in group_map.keys() if g is not None], key=lambda g: g.name.lower())
         
+        grouped = []
         for g in sorted_groups:
-            grouped_tenants_switcher.append({
+            grouped.append({
                 'group': g,
                 'tenants': group_map[g]
             })
         if None in group_map:
-            grouped_tenants_switcher.append({
+            grouped.append({
                 'group': None,
                 'tenants': group_map[None]
             })
-            
-        all_tenants = Tenant._base_manager.all().order_by('name')
-        return {
-            'all_tenants_switcher': all_tenants,
-            'grouped_tenants_switcher': grouped_tenants_switcher,
-            'grouped_memberships_switcher': []
-        }
-    else:
-        # 2. Fetch standard user memberships
+        return grouped
+
+    def get_grouped_memberships():
+        if request.user.is_superuser:
+            return []
         memberships = TenantMembership.objects.filter(user=request.user).select_related('tenant', 'tenant__group').order_by('tenant__group__name', 'tenant__name')
         
-        # Group by group
         group_map = defaultdict(list)
         for m in memberships:
             group_map[m.tenant.group].append(m)
             
         sorted_groups = sorted([g for g in group_map.keys() if g is not None], key=lambda g: g.name.lower())
         
+        grouped = []
         for g in sorted_groups:
-            grouped_memberships_switcher.append({
+            grouped.append({
                 'group': g,
                 'memberships': group_map[g]
             })
         if None in group_map:
-            grouped_memberships_switcher.append({
+            grouped.append({
                 'group': None,
                 'memberships': group_map[None]
             })
+        return grouped
 
-        return {
-            'all_tenants_switcher': [],
-            'grouped_tenants_switcher': [],
-            'grouped_memberships_switcher': grouped_memberships_switcher
-        }
+    return {
+        'all_tenants_switcher': SimpleLazyObject(get_all_tenants),
+        'grouped_tenants_switcher': SimpleLazyObject(get_grouped_tenants),
+        'grouped_memberships_switcher': SimpleLazyObject(get_grouped_memberships)
+    }
 
 
 def base_template_processor(request):

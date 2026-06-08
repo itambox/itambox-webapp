@@ -213,10 +213,12 @@ class ConsumableViewTests(TestCase):
         self.assertEqual(self.consumable.name, 'Updated Toner')
 
     def test_delete_view_post_no_consumptions(self):
+        self.consumable.stocks.all().delete()
         url = reverse('inventory:consumable_delete', kwargs={'pk': self.consumable.pk})
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
         self.assertFalse(Consumable.objects.filter(pk=self.consumable.pk).exists())
+
 
     def test_delete_view_blocked_with_consumptions(self):
         ConsumableAssignment.objects.create(

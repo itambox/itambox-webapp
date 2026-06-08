@@ -137,13 +137,9 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
         upn = claims.get('upn') or claims.get('email') or user.email
         email = claims.get('email') or user.email
 
-        # Check if the user already has a linked profile
-        if hasattr(user, 'asset_holder_profile') and user.asset_holder_profile is not None:
-            holder = user.asset_holder_profile
-            if holder.tenant != tenant:
-                logger.warning("User already has an AssetHolder profile linked in another tenant. Cannot create a new one due to OneToOneField constraint.")
-        else:
-            holder = None
+        # Check if the user already has a linked profile in the target tenant
+        holder = user.asset_holder_profiles.filter(tenant=tenant).first()
+        if not holder:
             if upn:
                 holder = AssetHolder.objects.filter(tenant=tenant, upn=upn).first()
             if not holder and email:

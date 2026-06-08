@@ -220,11 +220,11 @@ class Consumable(AbstractInventoryItem):
 
 class ComponentStock(AbstractStock):
     component = models.ForeignKey(
-        Component, on_delete=models.CASCADE, related_name='stocks', db_index=True
+        Component, on_delete=models.PROTECT, related_name='stocks', db_index=True
     )
     location = models.ForeignKey(
         'organization.Location',
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name='component_stocks',
         db_index=True
     )
@@ -248,7 +248,7 @@ class ComponentStock(AbstractStock):
 
 class AccessoryStock(AbstractStock):
     accessory = models.ForeignKey(
-        Accessory, on_delete=models.CASCADE, related_name='stocks', db_index=True
+        Accessory, on_delete=models.PROTECT, related_name='stocks', db_index=True
     )
 
     class Meta(AbstractStock.Meta):
@@ -270,7 +270,7 @@ class AccessoryStock(AbstractStock):
 
 class ConsumableStock(AbstractStock):
     consumable = models.ForeignKey(
-        Consumable, on_delete=models.CASCADE, related_name='stocks', db_index=True
+        Consumable, on_delete=models.PROTECT, related_name='stocks', db_index=True
     )
 
     class Meta(AbstractStock.Meta):
@@ -302,7 +302,7 @@ class ComponentAllocation(AbstractAssignment):
         super().__init__(*args, **kwargs)
 
     component = models.ForeignKey(
-        Component, on_delete=models.CASCADE, related_name='allocations', db_index=True
+        Component, on_delete=models.PROTECT, related_name='allocations', db_index=True
     )
     assigned_asset = models.ForeignKey(
         'assets.Asset',
@@ -382,7 +382,7 @@ class AccessoryAssignment(AbstractAssignment):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
 
-    accessory = models.ForeignKey(Accessory, on_delete=models.CASCADE, related_name='assignments', db_index=True)
+    accessory = models.ForeignKey(Accessory, on_delete=models.PROTECT, related_name='assignments', db_index=True)
 
     class Meta(AbstractAssignment.Meta):
         verbose_name = _("Accessory Assignment")
@@ -417,7 +417,7 @@ class ConsumableAssignment(AbstractAssignment):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
 
-    consumable = models.ForeignKey(Consumable, on_delete=models.CASCADE, related_name='consumptions', db_index=True)
+    consumable = models.ForeignKey(Consumable, on_delete=models.PROTECT, related_name='consumptions', db_index=True)
 
     class Meta(AbstractAssignment.Meta):
         verbose_name = _("Consumable Consumption")

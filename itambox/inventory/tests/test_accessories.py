@@ -234,10 +234,12 @@ class AccessoryViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_delete_view_post_no_assignments(self):
+        self.accessory.stocks.all().delete()
         url = reverse('inventory:accessory_delete', kwargs={'pk': self.accessory.pk})
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
         self.assertFalse(Accessory.objects.filter(pk=self.accessory.pk).exists())
+
 
     def test_delete_view_blocked_with_assignments(self):
         holder = AssetHolder.objects.create(first_name='Test', last_name='User', upn='test.user')

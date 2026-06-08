@@ -61,8 +61,10 @@ def get_scoped_queryset(model_class, request, config=None):
 
     if not is_global_admin:
         # Standard tenant-bound users are strictly sandboxed to their tenant
-        if hasattr(user, 'asset_holder_profile') and user.asset_holder_profile is not None:
-            active_tenant = user.asset_holder_profile.tenant
+        active_tenant = getattr(request, 'active_tenant', None)
+        if not active_tenant:
+            profile = user.asset_holder_profiles.first()
+            active_tenant = profile.tenant if profile else None
     else:
         # Global Admin or Superuser: Can view system-wide or select a target tenant in config
         tenant_id = config.get('tenant_id')
@@ -81,7 +83,7 @@ def get_scoped_queryset(model_class, request, config=None):
             qs = qs.filter(license__tenant=active_tenant)
         elif model_class.__name__ == 'ObjectChange':
             # Partition audit logs to changes made by members of this tenant
-            qs = qs.filter(user__asset_holder_profile__tenant=active_tenant)
+            qs = qs.filter(user__asset_holder_profiles__tenant=active_tenant)
     elif not is_global_admin:
         # Standard users without an active tenant profile are restricted by default
         return qs.none()
@@ -393,8 +395,10 @@ class StatusLabelsWidget(DashboardWidget):
         active_tenant = None
 
         if not is_global_admin:
-            if hasattr(user, 'asset_holder_profile') and user.asset_holder_profile is not None:
-                active_tenant = user.asset_holder_profile.tenant
+            active_tenant = getattr(request, 'active_tenant', None)
+            if not active_tenant:
+                profile = user.asset_holder_profiles.first()
+                active_tenant = profile.tenant if profile else None
         else:
             tenant_id = self.get_config_value('tenant_id')
             if tenant_id:
@@ -747,8 +751,10 @@ class LowStockWidget(DashboardWidget):
         active_tenant = None
 
         if not is_global_admin:
-            if hasattr(user, 'asset_holder_profile') and user.asset_holder_profile is not None:
-                active_tenant = user.asset_holder_profile.tenant
+            active_tenant = getattr(request, 'active_tenant', None)
+            if not active_tenant:
+                profile = user.asset_holder_profiles.first()
+                active_tenant = profile.tenant if profile else None
         else:
             tenant_id = self.get_config_value('tenant_id')
             if tenant_id:

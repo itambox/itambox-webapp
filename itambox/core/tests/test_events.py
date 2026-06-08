@@ -103,19 +103,9 @@ class EventsSystemTestCase(TransactionTestCase):
             data={'app_label': 'assets', 'model_name': 'manufacturer'},
         )
 
-        # Use patch to run thread synchronously or wait for it
-        with patch('threading.Thread') as mock_thread:
-            # We mock the Thread instantiation to execute its target immediately
-            def mock_init(*args, **kwargs):
-                target = kwargs.get('target')
-                if target:
-                    target()
-                return MagicMock()
-            mock_thread.side_effect = mock_init
-
-            # Execute event rule action (under atomic on_commit context)
-            with transaction.atomic():
-                dispatch_event(Manufacturer, event, 'create')
+        # Execute event rule action (under atomic on_commit context)
+        with transaction.atomic():
+            dispatch_event(Manufacturer, event, 'create')
         
         # Verify webhook request parameters
         self.assertTrue(mock_request.called)

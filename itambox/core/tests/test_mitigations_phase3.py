@@ -149,7 +149,7 @@ class MitigationsPhase3Tests(TestCase):
             supplier=self.supplier
         )
         
-        with self.assertNumQueries(12):  # 1 for Token, 1 for UPDATE token last_used, 1 for Tenant, 2 for TenantMembership, 2 for TenantGroup, 1 for SELECT JOIN Asset, 1 for django_session query, 3 for django_session write/release
+        with self.assertNumQueries(13):  # 1 for Token, 1 for UPDATE token last_used, 1 for Tenant, 2 for TenantMembership, 2 for TenantGroup, 1 for SELECT JOIN Asset, 1 for SELECT software (prefetch), 1 for django_session query, 3 for django_session write/release
             response = self.client.post(
                 self.graphql_url,
                 data=json.dumps({'query': query}),

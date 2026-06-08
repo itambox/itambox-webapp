@@ -268,9 +268,8 @@ class RequestClaimView(SimplePostView):
                 asset_target = req.assigned_asset
 
                 if not holder and not location and not asset_target:
-                    try:
-                        holder = req.requester.asset_holder_profile
-                    except (ObjectDoesNotExist, AttributeError):
+                    holder = req.requester.asset_holder_profiles.filter(tenant=req.tenant).first()
+                    if not holder:
                         raise ValidationError("Requester does not have an active Asset Holder profile to assign the asset to.")
 
                 if req.component:

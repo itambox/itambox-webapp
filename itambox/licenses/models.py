@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel
-from core.mixins import BookmarkableMixin
+from core.mixins import BookmarkableMixin, SoftDeleteMixin
 from extras.models import Tag
 from software.models import Software
 from assets.models import Asset
@@ -107,7 +107,10 @@ class License(BookmarkableMixin, DeletableVaultModel):
             assigned_count = self.assignments.count()
         return max(0, self.seats - assigned_count)
 
-class LicenseSeatAssignment(ChangeLoggingMixin, BaseModel):
+class LicenseSeatAssignment(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
+
     """Tracks the explicit assignment of one license seat to an asset or holder."""
     license = models.ForeignKey(
         to=License,
@@ -117,7 +120,7 @@ class LicenseSeatAssignment(ChangeLoggingMixin, BaseModel):
     )
     asset = models.ForeignKey(
         to=Asset,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True, 
         blank=True,
         related_name='license_assignments',
@@ -125,7 +128,7 @@ class LicenseSeatAssignment(ChangeLoggingMixin, BaseModel):
     )
     assigned_holder = models.ForeignKey(
         to=AssetHolder,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='license_assignments',
@@ -141,7 +144,8 @@ class LicenseSeatAssignment(ChangeLoggingMixin, BaseModel):
         constraints = [
             CheckConstraint(
                 check=Q(asset__isnull=False, assigned_holder__isnull=True) | 
-                      Q(asset__isnull=True, assigned_holder__isnull=False),
+                      Q(asset__isnull=True, assigned_holder__isnull=False) |
+                      Q(asset__isnull=True, assigned_holder__isnull=True),
                 name='chk_assignment_to_one_target'
             )
         ]

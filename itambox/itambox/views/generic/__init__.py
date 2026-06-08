@@ -1133,6 +1133,36 @@ class ObjectBulkEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXVi
             form = self._get_bulk_edit_form(request.POST, model)
 
             if form.is_valid() and (selected_fields or ('add_tags' in raw_selected_fields and form.cleaned_data.get('add_tags')) or ('remove_tags' in raw_selected_fields and form.cleaned_data.get('remove_tags'))):
+                
+                # Validate tenant assignment permissions for bulk edits
+                if 'tenant' in selected_fields and 'tenant' in form.cleaned_data:
+                    selected_tenant = form.cleaned_data['tenant']
+                    if selected_tenant:
+                        app_label = model._meta.app_label
+                        model_name = model._meta.model_name
+                        perm_codename = f'{app_label}.change_{model_name}'
+                        if not request.user.has_perm(perm_codename, obj=selected_tenant):
+                            messages.error(request, f"You do not have permission to assign objects to tenant '{selected_tenant}'.")
+                            form.add_error('tenant', f"You do not have permission to assign objects to tenant '{selected_tenant}'.")
+                            context = {
+                                'form': form,
+                                'model': model,
+                                'model_name': f'{model._meta.app_label}.{model._meta.model_name}',
+                                'objects': queryset,
+                                'object_pks': pks,
+                                'return_url': return_url,
+                                'selected_fields': selected_fields,
+                                'verbose_name': model._meta.verbose_name,
+                                'verbose_name_plural': model._meta.verbose_name_plural,
+                                'title': f'Bulk Edit {str(model._meta.verbose_name_plural).title()}',
+                                'breadcrumbs': [
+                                    (reverse('dashboard'), 'Dashboard'),
+                                    (return_url, str(model._meta.verbose_name_plural).title()),
+                                    (None, f'Bulk Edit ({len(pks)})'),
+                                ],
+                            }
+                            return self.render_to_response(context)
+
                 updated_count = 0
 
                 with transaction.atomic():

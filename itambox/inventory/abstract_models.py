@@ -80,7 +80,7 @@ class AbstractInventoryItem(CheckableInventoryModelMixin, AutoSlugMixin, Subscri
 class AbstractStock(ChangeLoggingMixin, BaseModel):
     location = models.ForeignKey(
         'organization.Location',
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name='%(class)s_stocks',
         db_index=True
     )

@@ -186,7 +186,7 @@ class SoftDeleteMixin(models.Model):
     Objects with a non-null `deleted_at` are considered deleted.
     """
 
-    deleted_at = models.DateTimeField(null=True, blank=True, editable=False)
+    deleted_at = models.DateTimeField(null=True, blank=True, editable=False, db_index=True)
 
     class Meta:
         abstract = True

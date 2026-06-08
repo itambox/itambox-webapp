@@ -228,6 +228,16 @@ class ChangeLoggingMixin:
             super().delete(*args, **kwargs)
             return
 
+        from core.mixins import SoftDeleteMixin
+        force_hard = kwargs.get('force_hard_delete', False)
+        if args and isinstance(args[0], bool):
+            force_hard = args[0]
+            
+        is_soft_delete = isinstance(self, SoftDeleteMixin) and not force_hard
+        if is_soft_delete:
+            super().delete(*args, **kwargs)
+            return
+
         if self._prechange_snapshot is not None:
             prechange_data = self._prechange_snapshot
         else:
@@ -237,6 +247,7 @@ class ChangeLoggingMixin:
         self._log_change(action=action, prechange_data=prechange_data, message=self._changelog_message)
 
         super().delete(*args, **kwargs)
+
 
     @classmethod
     def __init_subclass__(cls, **kwargs):
@@ -1040,7 +1051,7 @@ class AlertLog(BaseModel):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='alert_logs')
     object_id = models.PositiveBigIntegerField()
     content_object = GenericForeignKey('content_type', 'object_id')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ACTIVE)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ACTIVE, db_index=True)
     acknowledged_by = models.ForeignKey(
         to=settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

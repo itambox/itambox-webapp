@@ -27,6 +27,9 @@ class BaseViewSet(GenericViewSet):
         qs = super().get_queryset()
         serializer_class = self.get_serializer_class()
 
+        if not hasattr(serializer_class, 'Meta') or not hasattr(serializer_class.Meta, 'model'):
+            return qs
+
         if prefetch := get_prefetches_for_serializer(serializer_class, **self.field_kwargs):
             qs = qs.prefetch_related(*prefetch)
 
@@ -187,11 +190,16 @@ class ITAMBoxModelViewSet(
     def perform_destroy(self, instance):
         model = self.queryset.model
         logger.info(f"Deleting {model._meta.verbose_name} {instance} (PK: {instance.pk})")
+        from core.managers import get_current_tenant
+        print("PERFORM DESTROY CURRENT TENANT:", get_current_tenant())
+        print("INSTANCE TENANT ID:", getattr(instance, 'tenant_id', None))
 
         try:
             with transaction.atomic(using=router.db_for_write(model)):
                 locked = model.objects.select_for_update().get(pk=instance.pk)
                 self._validate_etag(self.request, locked)
                 super().perform_destroy(instance)
-        except ObjectDoesNotExist:
+        except ObjectDoesNotExist as e:
+            import traceback
+            traceback.print_exc()
             raise PermissionDenied()

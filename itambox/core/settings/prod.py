@@ -16,13 +16,12 @@ if not DEBUG and SECRET_KEY == 'django-insecure-dev-only-change-me-in-production
 
 ALLOWED_HOSTS = os.environ.get('ITAMBOX_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
-if not DEBUG:
-    SECURE_SSL_REDIRECT = os.environ.get('ITAMBOX_SECURE_SSL_REDIRECT', 'True').lower() in ('true', '1', 't')
-    SECURE_HSTS_SECONDS = int(os.environ.get('ITAMBOX_HSTS_SECONDS', '31536000'))
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get('ITAMBOX_HSTS_INCLUDE_SUBDOMAINS', 'True').lower() in ('true', '1', 't')
-    SECURE_HSTS_PRELOAD = os.environ.get('ITAMBOX_HSTS_PRELOAD', 'True').lower() in ('true', '1', 't')
-    SECURE_BROWSER_XSS_FILTER = True
-    SECURE_CONTENT_TYPE_NOSNIFF = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = os.environ.get('ITAMBOX_SECURE_SSL_REDIRECT', 'True').lower() in ('true', '1', 't')
+SECURE_HSTS_SECONDS = int(os.environ.get('ITAMBOX_HSTS_SECONDS', '31536000'))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get('ITAMBOX_HSTS_INCLUDE_SUBDOMAINS', 'True').lower() in ('true', '1', 't')
+SECURE_HSTS_PRELOAD = os.environ.get('ITAMBOX_HSTS_PRELOAD', 'True').lower() in ('true', '1', 't')
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

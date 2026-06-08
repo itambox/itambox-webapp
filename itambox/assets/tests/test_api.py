@@ -163,6 +163,11 @@ class ITAMBoxAPITestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         license_id = response.data['id']
         license_etag = response['ETag']
+        
+        created_lic = License.objects.get(pk=license_id)
+        print("CREATED LICENSE TENANT ID:", created_lic.tenant_id)
+        print("TENANT A ID:", self.tenant_a.id)
+        print("TENANT B ID:", self.tenant_b.id)
 
         # 2. Assign license seat to asset via API
         assigns_url = reverse('api:licenses_api:licenseseatassignment-list')

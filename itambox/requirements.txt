@@ -22,4 +22,4 @@ mozilla-django-oidc>=5.0.2,<6.0.0
 graphene-django>=3.2.0
 graphene>=3.0
 xhtml2pdf>=0.2.16
-
+django-cors-headers

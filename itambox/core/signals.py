@@ -28,16 +28,23 @@ def event_on_save(sender, instance, created, **kwargs):
         return
     if sender.__name__ in ('Event', 'ObjectChange', 'JournalEntry', 'Notification', 'Bookmark'):
         return
+
+    from core.mixins import SoftDeleteMixin
+    is_soft_deleted = isinstance(instance, SoftDeleteMixin) and instance.deleted_at is not None
+
+    action = 'delete' if is_soft_deleted else ('create' if created else 'update')
     try:
-        transaction.on_commit(lambda: _safe_dispatch(sender, instance, 'create' if created else 'update', created))
+        transaction.on_commit(lambda: _safe_dispatch(sender, instance, action, created))
     except Exception:
-        _safe_dispatch(sender, instance, 'create' if created else 'update', created)
+        _safe_dispatch(sender, instance, action, created)
     
     # Notify bookmark subscribers
     try:
-        _notify_bookmark_subscribers(sender, instance, 'created' if created else 'updated')
+        bookmark_action = 'deleted' if is_soft_deleted else ('created' if created else 'updated')
+        _notify_bookmark_subscribers(sender, instance, bookmark_action)
     except Exception as e:
         logger.debug("Failed to notify bookmark subscribers on save: %s", e)
+
 
 
 @receiver(post_delete)

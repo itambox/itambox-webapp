@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'corsheaders',
     'assets',
     'inventory',
     'compliance',
@@ -73,12 +74,13 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'itambox.middleware.RateLimitMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'itambox.middleware.RateLimitMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_htmx.middleware.HtmxMiddleware',
@@ -360,6 +362,17 @@ GRAPHENE = {
     'SCHEMA': 'core.schema.schema',
     'MIDDLEWARE': [],
 }
+
+# ==============================================================================
+# CORS Configuration
+# ==============================================================================
+CORS_ALLOW_ALL_ORIGINS = os.environ.get('ITAMBOX_CORS_ALLOW_ALL_ORIGINS', 'False').lower() in ('true', '1', 'yes')
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get('ITAMBOX_CORS_ALLOWED_ORIGINS', '').split(',')
+    if origin.strip()
+]
+
 
 
 

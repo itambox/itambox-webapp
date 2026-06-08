@@ -96,7 +96,7 @@ class ITAMBoxPagination(LimitOffsetPagination):
                     raise ValueError()
 
                 if limit == 0:
-                    return None
+                    return max_limit
 
                 if MAX_PAGE_SIZE:
                     max_limit = min(MAX_PAGE_SIZE, limit)

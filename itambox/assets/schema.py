@@ -87,6 +87,8 @@ class Query(graphene.ObjectType):
             'location__site',
             'tenant',
             'supplier'
+        ).prefetch_related(
+            'asset_type__manufacturer__software_products'
         ).filter(tenant=active_tenant)
         for key, val in kwargs.items():
             if val is not None:
@@ -111,6 +113,8 @@ class Query(graphene.ObjectType):
                 'location__site',
                 'tenant',
                 'supplier'
+            ).prefetch_related(
+                'asset_type__manufacturer__software_products'
             ).filter(tenant=active_tenant).get(pk=id)
         except Asset.DoesNotExist:
             return None
