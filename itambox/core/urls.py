@@ -46,7 +46,7 @@ mimetypes.add_type('application/zip', '.zip')
 # Scheduled Reporting & Alerts Views
 from core.views.alerts import (
     AlertRuleListView, AlertRuleDetailView, AlertRuleCreateView, AlertRuleUpdateView,
-    AlertRuleDeleteView, AlertLogListView, AlertAcknowledgeView, AlertResolveView,
+    AlertRuleDeleteView, AlertRuleRunNowView, AlertLogListView, AlertAcknowledgeView, AlertResolveView,
     NotificationChannelListView, NotificationChannelCreateView, NotificationChannelUpdateView,
     NotificationChannelDeleteView, NotificationChannelTestView,
 )
@@ -130,6 +130,7 @@ urlpatterns = [
     path('alerts/rules/<int:pk>/', AlertRuleDetailView.as_view(), name='alert_rule_detail'),
     path('alerts/rules/<int:pk>/edit/', AlertRuleUpdateView.as_view(), name='alertrule_edit'),
     path('alerts/rules/<int:pk>/delete/', AlertRuleDeleteView.as_view(), name='alertrule_delete'),
+    path('alerts/rules/<int:pk>/run/', AlertRuleRunNowView.as_view(), name='alertrule_run'),
 
     # Notification Channels
     path('alerts/channels/', NotificationChannelListView.as_view(), name='notificationchannel_list'),

@@ -976,7 +976,19 @@ class AlertRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     alert_type = models.CharField(max_length=50, choices=ALERT_TYPE_CHOICES)
     threshold_value = models.PositiveIntegerField(help_text="Limit count or days horizon")
     severity = models.CharField(max_length=20, choices=SEVERITY_CHOICES, default=SEVERITY_WARNING)
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True, help_text="Inactive rules are not evaluated at all.")
+    is_muted = models.BooleanField(
+        default=False,
+        help_text="Muted rules still track alerts in the Alert Center but send no channel notifications.",
+    )
+    renotify_interval_days = models.PositiveIntegerField(
+        default=0,
+        help_text="0 = notify once. N = re-send channel notifications every N days while an alert stays unresolved.",
+    )
+    last_fired_at = models.DateTimeField(
+        null=True, blank=True, editable=False,
+        help_text="When this rule was last evaluated by the engine.",
+    )
     channels = models.ManyToManyField('core.NotificationChannel', blank=True, related_name='alert_rules')
     tenant = models.ForeignKey(
         'organization.Tenant',
@@ -1033,6 +1045,10 @@ class AlertLog(BaseModel):
         default=dict,
         blank=True,
         help_text="Per-channel delivery result: {channel_pk: 'ok'|'failed'|'error: ...'}"
+    )
+    last_notified_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When channel notifications were last dispatched for this alert (drives re-notify).",
     )
     acknowledged_by = models.ForeignKey(
         to=settings.AUTH_USER_MODEL,

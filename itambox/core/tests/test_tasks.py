@@ -7,7 +7,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 
 from core.models import Job, Notification, AlertRule, AlertLog, NotificationChannel
-from core.tasks import import_csv_task, evaluate_alert_rules_task
+from core.tasks import import_csv_task, evaluate_alert_rules_task, run_alert_rule_now
 from assets.models import Asset, StatusLabel, AssetRole, Manufacturer, AssetType
 from subscriptions.models import Subscription
 
@@ -104,3 +104,81 @@ class TasksTestCase(TransactionTestCase):
         self.assertIsNotNone(alert_log)
         self.assertEqual(alert_log.status, AlertLog.STATUS_ACTIVE)
         self.assertIn("HP Mouse", alert_log.subject)
+
+    def _make_low_stock_accessory(self, name="LowAcc", slug="low-acc", min_qty=3, qty=1):
+        from assets.models import Manufacturer
+        from inventory.models import Accessory, AccessoryStock
+        from organization.models import Location, Site
+
+        mfr = Manufacturer.objects.create(name=f"M-{slug}", slug=f"m-{slug}")
+        accessory = Accessory.objects.create(name=name, slug=slug, manufacturer=mfr, min_qty=min_qty)
+        site = Site.objects.create(name=f"S-{slug}", slug=f"s-{slug}")
+        location = Location.objects.create(name=f"L-{slug}", slug=f"l-{slug}", site=site)
+        AccessoryStock.objects.create(accessory=accessory, location=location, qty=qty)
+        return accessory
+
+    def test_muted_rule_tracks_but_does_not_dispatch(self):
+        rule = AlertRule.objects.create(
+            name="Muted Low Stock",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+            is_active=True,
+            is_muted=True,
+        )
+        # A channel exists, but muting must prevent any dispatch.
+        channel = NotificationChannel.objects.create(
+            name="Muted Slack", channel_type=NotificationChannel.TYPE_SLACK,
+            config={'webhook_url': 'https://hooks.slack.com/x'}, enabled=True,
+        )
+        rule.channels.add(channel)
+        self._make_low_stock_accessory(name="MutedAcc", slug="muted-acc", min_qty=3, qty=1)
+
+        evaluate_alert_rules_task()
+
+        log = AlertLog.objects.filter(rule=rule).first()
+        self.assertIsNotNone(log)  # still tracked in the Alert Center
+        self.assertEqual(log.status, AlertLog.STATUS_ACTIVE)
+        self.assertEqual(log.delivery_status, {})       # no dispatch happened
+        self.assertIsNone(log.last_notified_at)
+
+    def test_run_alert_rule_now_evaluates_single_rule(self):
+        rule = AlertRule.objects.create(
+            name="On-Demand Rule",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+            is_active=True,
+        )
+        self._make_low_stock_accessory(name="OnDemandAcc", slug="ondemand-acc", min_qty=3, qty=1)
+
+        triggered = run_alert_rule_now(rule.pk)
+
+        self.assertEqual(triggered, 1)
+        self.assertEqual(AlertLog.objects.filter(rule=rule).count(), 1)
+
+    def test_renotify_re_dispatches_after_interval(self):
+        from django.utils import timezone
+        rule = AlertRule.objects.create(
+            name="Renotify Rule",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+            is_active=True,
+            renotify_interval_days=7,
+        )
+        self._make_low_stock_accessory(name="RenotifyAcc", slug="renotify-acc", min_qty=3, qty=1)
+
+        # First pass creates the alert and stamps last_notified_at.
+        evaluate_alert_rules_task()
+        log = AlertLog.objects.get(rule=rule)
+        self.assertIsNotNone(log.last_notified_at)
+
+        # Backdate the last notification beyond the re-notify interval.
+        old = timezone.now() - timezone.timedelta(days=10)
+        AlertLog.objects.filter(pk=log.pk).update(last_notified_at=old)
+
+        # Second pass should re-notify (advance last_notified_at) without
+        # creating a duplicate log.
+        fresh = evaluate_alert_rules_task()
+        self.assertEqual(fresh, 0)
+        self.assertEqual(AlertLog.objects.filter(rule=rule).count(), 1)
+        log.refresh_from_db()
+        self.assertGreater(log.last_notified_at, old)

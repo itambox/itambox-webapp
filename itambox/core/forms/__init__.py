@@ -704,9 +704,21 @@ class ScheduledReportForm(forms.ModelForm):
 
 
 class AlertRuleForm(forms.ModelForm):
+    # Alert types whose threshold_value is a *days* horizon rather than a unit count.
+    _DAYS_ALERT_TYPES = {
+        AlertRule.ALERT_TYPE_UPCOMING_EOL,
+        AlertRule.ALERT_TYPE_LICENSE_EXPIRY,
+        AlertRule.ALERT_TYPE_RENEWAL_DUE,
+        AlertRule.ALERT_TYPE_WARRANTY_EXPIRY,
+        AlertRule.ALERT_TYPE_AUDIT_OVERDUE,
+    }
+
     class Meta:
         model = AlertRule
-        fields = ['name', 'description', 'alert_type', 'threshold_value', 'severity', 'is_active', 'channels', 'tenant']
+        fields = [
+            'name', 'description', 'alert_type', 'threshold_value', 'severity',
+            'is_active', 'is_muted', 'renotify_interval_days', 'channels', 'tenant',
+        ]
         widgets = {
             'channels': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
             'tenant': forms.Select(attrs={'class': 'form-select'})
@@ -718,6 +730,26 @@ class AlertRuleForm(forms.ModelForm):
         if user and not (user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)):
             if 'tenant' in self.fields:
                 self.fields.pop('tenant')
+
+        # Make the threshold label/help reflect what the number actually means
+        # for the selected alert type (days horizon vs. unit count).
+        alert_type = (
+            self.data.get('alert_type')
+            or self.initial.get('alert_type')
+            or getattr(self.instance, 'alert_type', None)
+        )
+        threshold = self.fields['threshold_value']
+        if alert_type in self._DAYS_ALERT_TYPES:
+            threshold.label = _('Days horizon')
+            threshold.help_text = _('Alert when the date is within this many days.')
+        elif alert_type == AlertRule.ALERT_TYPE_LOW_STOCK:
+            threshold.label = _('Stock threshold (units)')
+            threshold.help_text = _('Alert when available stock is at or below this many units '
+                                    '(per-item minimum quantity overrides this when set).')
+        else:
+            threshold.help_text = _('Limit count or days horizon, depending on alert type.')
+
+        self.fields['renotify_interval_days'].label = _('Re-notify every (days)')
 
     def save(self, commit=True):
         instance = super().save(commit=False)

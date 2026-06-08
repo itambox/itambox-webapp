@@ -10,6 +10,14 @@
 
 {% block page_actions %}
     <div class="btn-list">
+        <form method="post" action="{% url 'alertrule_run' object.pk %}" class="d-inline">
+            {% csrf_token %}
+            <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+            <button type="submit" class="btn btn-outline-primary" title="{% translate 'Evaluate this rule now' %}">
+                <i class="mdi mdi-play-circle-outline"></i>
+                {% trans "Run now" %}
+            </button>
+        </form>
         <a href="{% url 'alertrule_edit' object.pk %}" class="btn btn-primary d-none d-sm-inline-block">
             <i class="mdi mdi-pencil-outline"></i>
             {% trans "Edit Rule" %}
@@ -61,6 +69,16 @@
                             </td>
                         </tr>
                         <tr>
+                            <td class="text-secondary fw-bold">{% trans "Re-notify" %}</td>
+                            <td>
+                                {% if object.renotify_interval_days %}
+                                    {% blocktrans with days=object.renotify_interval_days %}Every {{ days }} day(s) while unresolved{% endblocktrans %}
+                                {% else %}
+                                    {% trans "Once only" %}
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
                             <td class="text-secondary fw-bold">{% trans "Severity" %}</td>
                             <td>
                                 {% if object.severity == 'info' %}
@@ -73,16 +91,27 @@
                             </td>
                         </tr>
                         <tr>
-                            <td class="text-secondary fw-bold">{% trans "Recipients" %}</td>
-                            <td>{{ object.recipients|default:"Admins" }}</td>
-                        </tr>
-                        <tr>
-                            <td class="text-secondary fw-bold">{% trans "Is Active" %}</td>
+                            <td class="text-secondary fw-bold">{% trans "Status" %}</td>
                             <td>
                                 {% if object.is_active %}
                                     <span class="badge bg-success">{% trans "Active" %}</span>
                                 {% else %}
                                     <span class="badge bg-secondary">{% trans "Inactive" %}</span>
+                                {% endif %}
+                                {% if object.is_muted %}
+                                    <span class="badge bg-warning" title="{% translate 'Tracked in Alert Center, but channel notifications suppressed.' %}">
+                                        <i class="mdi mdi-bell-off-outline"></i> {% trans "Muted" %}
+                                    </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-secondary fw-bold">{% trans "Last Evaluated" %}</td>
+                            <td>
+                                {% if object.last_fired_at %}
+                                    {{ object.last_fired_at|date:"Y-m-d H:i" }}
+                                {% else %}
+                                    <span class="text-muted">{% trans "Never" %}</span>
                                 {% endif %}
                             </td>
                         </tr>

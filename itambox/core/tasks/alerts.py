@@ -11,10 +11,10 @@ logger = logging.getLogger(__name__)
 def evaluate_alert_rules_task():
     """
     Scheduled daily task: evaluate all active AlertRules, create AlertLogs for
-    new matches, auto-resolve logs whose conditions have cleared, and dispatch
-    channel notifications.
+    new matches, auto-resolve logs whose conditions have cleared, re-notify
+    unresolved alerts on the configured cadence, and dispatch channel
+    notifications (unless the rule is muted).
     """
-    from django.contrib.contenttypes.models import ContentType
     from core.managers import set_current_tenant, set_current_membership
 
     # Clear any ambient tenant from a calling request context.
@@ -25,68 +25,125 @@ def evaluate_alert_rules_task():
     logger.info("Evaluating %d active alert rules...", active_rules.count())
 
     today = timezone.now().date()
+    existing_logs = _prefetch_open_logs()
     alerts_triggered_count = 0
-
-    # Pre-fetch active/acknowledged log keys for O(1) dedup lookup.
-    active_logs = set(
-        AlertLog.objects.filter(
-            status__in=[AlertLog.STATUS_ACTIVE, AlertLog.STATUS_ACKNOWLEDGED]
-        ).values_list('rule_id', 'content_type_id', 'object_id')
-    )
 
     for rule in active_rules:
         logger.info(
-            "Evaluating rule: %s (type=%s, threshold=%s)",
+            "Evaluating rule: %s (type=%s, threshold=%s, muted=%s, renotify=%s)",
             rule.name, rule.alert_type, rule.threshold_value,
+            rule.is_muted, rule.renotify_interval_days,
         )
-
         # Use a system-level TaskContext; no specific user_id for scheduled tasks.
         with TaskContext(tenant_id=rule.tenant_id):
-            matched_keys = set()  # (content_type_id, object_id) for this rule run
-            matches = []
-
-            try:
-                matches = _collect_matches(rule, today)
-            except Exception:
-                logger.exception("Error collecting matches for rule %s", rule.name)
-                continue
-
-            for match in matches:
-                obj = match['obj']
-                ct = ContentType.objects.get_for_model(obj)
-                key = (rule.id, ct.id, obj.pk)
-                matched_keys.add((ct.id, obj.pk))
-
-                if key not in active_logs:
-                    alert_log = AlertLog.objects.create(
-                        rule=rule,
-                        subject=match['subject'],
-                        message=match['message'],
-                        severity=rule.severity,
-                        content_type=ct,
-                        object_id=obj.pk,
-                        tenant=match.get('tenant'),
-                    )
-
-                    delivery = _dispatch_channels(rule, match, alert_log)
-                    alert_log.delivery_status = delivery
-                    alert_log.save(update_fields=['delivery_status'])
-
-                    active_logs.add(key)
-                    alerts_triggered_count += 1
-                    logger.info(
-                        "Triggered AlertLog %s for '%s' on '%s'.",
-                        alert_log.pk, match['subject'], obj,
-                    )
-
-            # Auto-resolve logs whose conditions have cleared.
-            _auto_resolve_cleared(rule, matched_keys)
+            alerts_triggered_count += _evaluate_rule(rule, today, existing_logs)
 
     logger.info(
         "Alert evaluation complete. Triggered %d fresh alert(s).",
         alerts_triggered_count,
     )
     return alerts_triggered_count
+
+
+def run_alert_rule_now(rule_id):
+    """Evaluate a single AlertRule immediately (used by the 'Run now' UI action).
+
+    Returns the number of fresh alerts triggered. Runs inline; the caller is
+    responsible for any threading/queueing decision.
+    """
+    from core.managers import set_current_tenant, set_current_membership
+
+    set_current_tenant(None)
+    set_current_membership(None)
+
+    rule = AlertRule.objects.filter(pk=rule_id, is_active=True).select_related('tenant').first()
+    if not rule:
+        logger.warning("run_alert_rule_now: rule %s not found or inactive.", rule_id)
+        return 0
+
+    today = timezone.now().date()
+    existing_logs = _prefetch_open_logs(rule_id=rule.pk)
+
+    with TaskContext(tenant_id=rule.tenant_id):
+        return _evaluate_rule(rule, today, existing_logs)
+
+
+def _prefetch_open_logs(rule_id=None):
+    """Map of (rule_id, content_type_id, object_id) -> AlertLog for open alerts.
+
+    Built with no active tenant so it spans all tenants for cross-tenant dedup.
+    """
+    qs = AlertLog.objects.filter(
+        status__in=[AlertLog.STATUS_ACTIVE, AlertLog.STATUS_ACKNOWLEDGED]
+    )
+    if rule_id is not None:
+        qs = qs.filter(rule_id=rule_id)
+    return {
+        (log.rule_id, log.content_type_id, log.object_id): log
+        for log in qs
+    }
+
+
+def _evaluate_rule(rule, today, existing_logs):
+    """Evaluate one rule: create/renotify alerts and auto-resolve cleared ones.
+
+    Returns the count of freshly-created alerts. Mutates ``existing_logs`` in place.
+    """
+    from django.contrib.contenttypes.models import ContentType
+
+    now = timezone.now()
+    fresh_count = 0
+    matched_keys = set()  # (content_type_id, object_id) for this rule run
+
+    try:
+        matches = _collect_matches(rule, today)
+    except Exception:
+        logger.exception("Error collecting matches for rule %s", rule.name)
+        matches = []
+
+    for match in matches:
+        obj = match['obj']
+        ct = ContentType.objects.get_for_model(obj)
+        key = (rule.id, ct.id, obj.pk)
+        matched_keys.add((ct.id, obj.pk))
+
+        existing = existing_logs.get(key)
+
+        if existing is None:
+            # New alert.
+            alert_log = AlertLog.objects.create(
+                rule=rule,
+                subject=match['subject'],
+                message=match['message'],
+                severity=rule.severity,
+                content_type=ct,
+                object_id=obj.pk,
+                tenant=match.get('tenant'),
+            )
+            if not rule.is_muted:
+                alert_log.delivery_status = _dispatch_channels(rule, match, alert_log)
+                alert_log.last_notified_at = now
+                alert_log.save(update_fields=['delivery_status', 'last_notified_at'])
+            existing_logs[key] = alert_log
+            fresh_count += 1
+            logger.info("Triggered AlertLog %s for '%s' on '%s'.", alert_log.pk, match['subject'], obj)
+
+        elif not rule.is_muted and rule.renotify_interval_days > 0:
+            # Existing unresolved alert — re-notify on cadence.
+            ref = existing.last_notified_at or existing.created_at
+            if ref and (now - ref) >= timezone.timedelta(days=rule.renotify_interval_days):
+                existing.delivery_status = _dispatch_channels(rule, match, existing)
+                existing.last_notified_at = now
+                existing.save(update_fields=['delivery_status', 'last_notified_at'])
+                logger.info("Re-notified AlertLog %s for '%s'.", existing.pk, existing.subject)
+
+    # Auto-resolve logs whose conditions have cleared.
+    _auto_resolve_cleared(rule, matched_keys)
+
+    # Record evaluation time without tripping the change log (system bookkeeping).
+    AlertRule.objects.filter(pk=rule.pk).update(last_fired_at=now)
+
+    return fresh_count
 
 
 def _dispatch_channels(rule, match, alert_log):

@@ -80,6 +80,29 @@ class AlertRuleDeleteView(ObjectDeleteView):
     template_name = 'core/alerts/alert_rule_confirm_delete.html'
 
 
+class AlertRuleRunNowView(SimplePostView):
+    """Evaluate a single alert rule immediately, on demand.
+
+    The evaluation is enqueued as a background task rather than run inline:
+    run_alert_rule_now() deliberately clears tenant/user contextvars (it is
+    designed to run standalone in a worker), so running it inside the request
+    would contaminate the request's context for the remainder of the response.
+    """
+    queryset = AlertRule.objects.all()
+    permission_required = ('core.change_alertrule',)
+
+    def perform_action(self, rule, request):
+        from django_q.tasks import async_task
+        rule_id = rule.pk
+        async_task('core.tasks.run_alert_rule_now', rule_id)
+        return {'message': f"Evaluation queued for '{rule.name}'. New alerts will appear shortly."}
+
+    def get_success_redirect(self, obj, result):
+        return redirect(
+            self.request.POST.get('return_url') or reverse('alert_rule_detail', kwargs={'pk': obj.pk})
+        )
+
+
 @method_decorator(login_required, name='dispatch')
 class AlertLogListView(ObjectListView):
     queryset = AlertLog.objects.select_related('rule', 'content_type').order_by('-created_at')

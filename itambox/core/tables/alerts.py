@@ -10,12 +10,35 @@ class AlertRuleTable(BaseTable):
     threshold_value = tables.Column(verbose_name='Threshold')
     severity = tables.Column()
     is_active = BooleanColumn()
+    is_muted = BooleanColumn(verbose_name='Muted')
     tenant = tables.Column(verbose_name='Tenant', accessor='tenant.name')
+    actions = tables.TemplateColumn(
+        template_code="""
+        <div class="d-flex gap-1 justify-content-end">
+            <form method="post" action="{% url 'alertrule_run' record.pk %}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+                <button type="submit" class="btn btn-sm btn-outline-primary btn-icon" title="Run now">
+                    <i class="mdi mdi-play-circle-outline"></i>
+                </button>
+            </form>
+            <a class="btn btn-sm btn-outline-secondary btn-icon" href="{% url 'alertrule_edit' record.pk %}" title="Edit">
+                <i class="mdi mdi-pencil-outline"></i>
+            </a>
+        </div>
+        """,
+        verbose_name="Actions",
+        orderable=False,
+        attrs={
+            'th': {'class': 'col-actions text-nowrap'},
+            'td': {'class': 'text-end text-nowrap noprint p-1 col-actions'},
+        }
+    )
 
     class Meta(BaseTable.Meta):
         model = AlertRule
-        fields = ('name', 'alert_type', 'threshold_value', 'severity', 'is_active', 'tenant')
-        sequence = ('name', 'alert_type', 'threshold_value', 'severity', 'is_active', 'tenant')
+        fields = ('name', 'alert_type', 'threshold_value', 'severity', 'is_active', 'is_muted', 'tenant', 'actions')
+        sequence = ('name', 'alert_type', 'threshold_value', 'severity', 'is_active', 'is_muted', 'tenant', 'actions')
 
     def render_severity(self, value):
         color = 'secondary'
@@ -74,6 +97,9 @@ class AlertLogTable(BaseTable):
     subject = tables.Column(linkify=False)
     severity = tables.Column()
     status = tables.Column()
+    delivery = tables.Column(
+        verbose_name='Delivery', orderable=False, empty_values=(), accessor='delivery_status'
+    )
     actions = tables.TemplateColumn(
         template_code="""
         <div class="d-flex gap-1 justify-content-end">
@@ -113,8 +139,8 @@ class AlertLogTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = AlertLog
-        fields = ('created_at', 'rule', 'subject', 'severity', 'status', 'actions')
-        sequence = ('created_at', 'rule', 'subject', 'severity', 'status', 'actions')
+        fields = ('created_at', 'rule', 'subject', 'severity', 'status', 'delivery', 'actions')
+        sequence = ('created_at', 'rule', 'subject', 'severity', 'status', 'delivery', 'actions')
 
     def render_severity(self, value):
         color = 'secondary'
@@ -135,3 +161,20 @@ class AlertLogTable(BaseTable):
         elif value == AlertLog.STATUS_RESOLVED:
             color = 'success'
         return format_html('<span class="badge bg-{}">{}</span>', color, value.capitalize())
+
+    def render_delivery(self, record):
+        statuses = record.delivery_status or {}
+        if not statuses:
+            return format_html('<span class="text-muted" title="No channels / not yet dispatched">&mdash;</span>')
+        total = len(statuses)
+        failed = [k for k, v in statuses.items() if v != 'ok']
+        if not failed:
+            return format_html(
+                '<span class="badge bg-success" title="All {} channel(s) delivered">{}/{}</span>',
+                total, total, total,
+            )
+        failed_detail = '; '.join(f"{k}: {statuses[k]}" for k in failed)
+        return format_html(
+            '<span class="badge bg-danger" title="{}">{}/{} failed</span>',
+            failed_detail, len(failed), total,
+        )
