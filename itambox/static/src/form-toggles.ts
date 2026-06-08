@@ -33,6 +33,15 @@
     if (el) el.style.display = show ? '' : 'none';
   }
 
+  function toggleChannelFields() {
+    const select = document.getElementById('id_channel_type') as HTMLSelectElement | null;
+    if (!select) return;
+    const type = select.value;
+    toggleDisplay('div_id_webhook_url', type === 'slack' || type === 'teams');
+    toggleDisplay('div_id_email_recipients', type === 'email');
+    toggleDisplay('div_id_in_app_recipient_users', type === 'in_app');
+  }
+
   function toggleCategoryFields() {
     const categorySelect = document.getElementById('id_request_category') as HTMLSelectElement | null;
     if (!categorySelect) return;
@@ -86,14 +95,19 @@
   document.addEventListener("DOMContentLoaded", () => {
     initScheduleForm();
     toggleCategoryFields();
+    toggleChannelFields();
   });
 
   document.body.addEventListener("htmx:afterSettle", () => {
     initScheduleForm();
     toggleCategoryFields();
+    toggleChannelFields();
   });
 
-  document.body.addEventListener("shown.bs.modal", toggleCategoryFields);
+  document.body.addEventListener("shown.bs.modal", () => {
+    toggleCategoryFields();
+    toggleChannelFields();
+  });
 
   document.body.addEventListener("change", (e) => {
     const target = e.target as HTMLSelectElement;
@@ -103,6 +117,9 @@
     }
     if (target.id === 'id_request_category' || target.name === 'request_category' || target.name === 'item_category') {
       toggleCategoryFields();
+    }
+    if (target.id === 'id_channel_type' || target.name === 'channel_type') {
+      toggleChannelFields();
     }
   });
 })();

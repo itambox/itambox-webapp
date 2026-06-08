@@ -734,52 +734,132 @@ class AlertRuleForm(forms.ModelForm):
 
 
 class NotificationChannelForm(forms.ModelForm):
+    """Channel config via typed, per-type fields rather than a raw JSON blob.
+
+    The model stores everything in a single ``config`` JSONField, but users
+    should never have to hand-build that JSON. We expose friendly fields
+    (webhook URL, recipient list, recipient users) and assemble ``config``
+    on save. ``form-toggles.ts`` shows only the fields relevant to the
+    selected channel type.
+    """
+
+    webhook_url = forms.URLField(
+        required=False,
+        label=_('Incoming webhook URL'),
+        widget=forms.URLInput(attrs={'placeholder': 'https://hooks.slack.com/services/...'}),
+        help_text=_('Paste the incoming-webhook URL from Slack or Microsoft Teams.'),
+    )
+    email_recipients = forms.CharField(
+        required=False,
+        label=_('Recipient email addresses'),
+        widget=forms.Textarea(attrs={'rows': 3, 'placeholder': 'alice@example.com, bob@example.com'}),
+        help_text=_('Comma- or newline-separated email addresses.'),
+    )
+    in_app_recipient_users = forms.ModelMultipleChoiceField(
+        required=False,
+        queryset=None,
+        label=_('Specific recipients'),
+        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
+        help_text=_("Optional. Leave empty to notify every member of this channel's tenant."),
+    )
+
+    field_order = [
+        'name', 'channel_type',
+        'webhook_url', 'email_recipients', 'in_app_recipient_users',
+        'enabled', 'tenant',
+    ]
+
     class Meta:
         model = NotificationChannel
-        fields = ['name', 'channel_type', 'enabled', 'config', 'tenant']
+        fields = ['name', 'channel_type', 'enabled', 'tenant']
         widgets = {
-            'config': forms.Textarea(attrs={'rows': 5, 'placeholder': '{\n  "webhook_url": "https://hooks.slack.com/services/..."\n}', 'style': 'font-family: monospace;'}),
-            'tenant': forms.Select(attrs={'class': 'form-select'})
+            'channel_type': forms.Select(attrs={'class': 'form-select'}),
+            'tenant': forms.Select(attrs={'class': 'form-select'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.instance and self.instance.config:
-            self.initial['config'] = json.dumps(self.instance.config, indent=2)
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+
         user = get_current_user()
-        if user and not (user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)):
+        is_admin = bool(user and (user.is_superuser or getattr(user, 'is_staff', False)))
+
+        # Scope the in-app recipient choices: admins see everyone, tenant
+        # users see only their own tenant's members.
+        if is_admin:
+            self.fields['in_app_recipient_users'].queryset = User.objects.filter(is_active=True)
+        else:
+            from core.managers import get_current_tenant
+            tenant = get_current_tenant()
+            if tenant:
+                self.fields['in_app_recipient_users'].queryset = User.objects.filter(
+                    asset_holder_profiles__tenant=tenant, is_active=True
+                ).distinct()
+            else:
+                self.fields['in_app_recipient_users'].queryset = User.objects.none()
             if 'tenant' in self.fields:
                 self.fields.pop('tenant')
 
-    def clean_config(self):
-        data = self.cleaned_data['config']
-        if isinstance(data, str):
-            try:
-                data = json.loads(data)
-            except json.JSONDecodeError:
-                raise forms.ValidationError('Config must be valid JSON.')
-        return data
+        # Pre-fill typed fields from the stored config JSON (edit view).
+        config = (self.instance.config or {}) if self.instance else {}
+        if config:
+            self.initial.setdefault('webhook_url', config.get('webhook_url', ''))
+            recipients = config.get('recipients') or []
+            if recipients:
+                self.initial.setdefault('email_recipients', '\n'.join(recipients))
+            recipient_users = config.get('recipient_users') or []
+            if recipient_users:
+                self.initial.setdefault('in_app_recipient_users', recipient_users)
 
     def clean(self):
+        import re
+        from django.core.validators import validate_email
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
         cleaned = super().clean()
         channel_type = cleaned.get('channel_type')
-        config = cleaned.get('config') or {}
+        config = {}
 
-        if channel_type == 'email':
-            recipients = config.get('recipients', [])
-            if not recipients or not isinstance(recipients, list):
-                raise forms.ValidationError(
-                    'Email channel requires a "recipients" list in Config, e.g. ["you@example.com"].'
-                )
-        elif channel_type in ('slack', 'teams'):
-            if not config.get('webhook_url'):
-                raise forms.ValidationError(
-                    f'{channel_type.title()} channel requires a "webhook_url" in Config.'
-                )
+        if channel_type == NotificationChannel.TYPE_EMAIL:
+            raw = cleaned.get('email_recipients') or ''
+            parts = [p.strip() for p in re.split(r'[,\n;]+', raw) if p.strip()]
+            if not parts:
+                self.add_error('email_recipients', _('Enter at least one recipient email address.'))
+            else:
+                bad = []
+                for addr in parts:
+                    try:
+                        validate_email(addr)
+                    except DjangoValidationError:
+                        bad.append(addr)
+                if bad:
+                    self.add_error(
+                        'email_recipients',
+                        _('Invalid email address(es): %(bad)s') % {'bad': ', '.join(bad)},
+                    )
+                else:
+                    config['recipients'] = parts
+
+        elif channel_type in (NotificationChannel.TYPE_SLACK, NotificationChannel.TYPE_TEAMS):
+            url = (cleaned.get('webhook_url') or '').strip()
+            if not url:
+                self.add_error('webhook_url', _('This channel type requires an incoming webhook URL.'))
+            else:
+                config['webhook_url'] = url
+
+        elif channel_type == NotificationChannel.TYPE_IN_APP:
+            users = cleaned.get('in_app_recipient_users')
+            if users:
+                config['recipient_users'] = [u.pk for u in users]
+            # Empty is valid — delivery falls back to all tenant members.
+
+        self._assembled_config = config
         return cleaned
 
     def save(self, commit=True):
         instance = super().save(commit=False)
+        instance.config = getattr(self, '_assembled_config', {}) or {}
         user = get_current_user()
         if user and not (user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)):
             from core.managers import get_current_tenant
