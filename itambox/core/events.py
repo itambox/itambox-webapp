@@ -295,11 +295,11 @@ def send_notification_to_channel(channel, subject, body):
         from django.core.mail import get_connection, EmailMessage
         from core.models import EmailSettings
 
-        email_config = EmailSettings.load(tenant_id=channel.tenant_id)
+        email_config = EmailSettings.load()
         if not email_config or not email_config.enabled:
             logger.warning(
-                "Email channel '%s': EmailSettings disabled or not configured for tenant %s.",
-                channel.name, channel.tenant_id,
+                "Email channel '%s': system EmailSettings disabled or not configured.",
+                channel.name,
             )
             return False
 

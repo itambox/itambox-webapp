@@ -620,36 +620,23 @@ class EmailSettings(ChangeLoggingMixin, BaseModel):
     from_name = models.CharField(max_length=255, default='ITAMbox Notifications')
     enabled = models.BooleanField(default=False)
     test_recipient = models.EmailField(max_length=255, blank=True, null=True, help_text="Email address for test notifications")
-    tenant = models.OneToOneField(
-        'organization.Tenant',
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name='email_settings',
-        help_text="Tenant-specific SMTP settings. Leave blank for system-wide defaults.",
-    )
 
     class Meta:
         verbose_name = "Email Settings"
         verbose_name_plural = "Email Settings"
 
     def __str__(self):
-        scope = self.tenant.name if self.tenant_id else 'System'
-        return f"Email Settings [{scope}] ({'Enabled' if self.enabled else 'Disabled'})"
+        return f"Email Settings ({'Enabled' if self.enabled else 'Disabled'})"
+
+    def save(self, *args, **kwargs):
+        # System-wide singleton: one outbound SMTP config for the whole install.
+        # Per-tenant *destinations* are configured on NotificationChannel.config['recipients'].
+        self.pk = 1
+        super().save(*args, **kwargs)
 
     @classmethod
-    def load(cls, tenant_id=None):
-        """Return the most-specific EmailSettings for the given tenant.
-
-        Lookup order:
-          1. Tenant-specific record (if tenant_id provided)
-          2. System-wide record (tenant IS NULL)
-        """
-        if tenant_id:
-            obj = cls.objects.filter(tenant_id=tenant_id).first()
-            if obj:
-                return obj
-        return cls.objects.filter(tenant__isnull=True).first()
+    def load(cls):
+        return cls.objects.first()
 
 
 class ExportTemplate(BaseModel):

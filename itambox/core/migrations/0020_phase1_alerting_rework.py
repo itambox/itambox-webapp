@@ -1,10 +1,8 @@
 """Phase 1 alerting rework:
 
 - Drop dead NotificationTemplate model
-- Add tenant FK to EmailSettings (per-tenant SMTP config)
 - Update AlertRule.alert_type choices to include audit_overdue
 """
-import django.db.models.deletion
 from django.db import migrations, models
 
 
@@ -12,27 +10,12 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('core', '0019_alertrule_warranty_type_alertlog_severity_delivery'),
-        ('organization', '0012_alter_contactrole_name_alter_contactrole_slug_and_more'),
     ]
 
     operations = [
         # Drop the unused NotificationTemplate model
         migrations.DeleteModel(
             name='NotificationTemplate',
-        ),
-
-        # Add per-tenant FK to EmailSettings (nullable → system-wide settings have tenant=NULL)
-        migrations.AddField(
-            model_name='emailsettings',
-            name='tenant',
-            field=models.OneToOneField(
-                blank=True,
-                help_text='Tenant-specific SMTP settings. Leave blank for system-wide defaults.',
-                null=True,
-                on_delete=django.db.models.deletion.CASCADE,
-                related_name='email_settings',
-                to='organization.tenant',
-            ),
         ),
 
         # Extend alert_type choices to include audit_overdue
