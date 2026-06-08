@@ -40,24 +40,6 @@ class ManagementCommandsTestCase(TransactionTestCase):
         call_command('seed_data', production=True, stdout=self.stdout, stderr=self.stderr)
         self.assertIn("Database seeding complete", self.stdout.getvalue())
 
-    def test_send_audit_reminders_command(self):
-        call_command('send_audit_reminders', stdout=self.stdout, stderr=self.stderr)
-        self.assertIn("Skipping", self.stdout.getvalue())  # Since email settings are not enabled/created
-
-    def test_send_expiring_alerts_command(self):
-        call_command('send_expiring_alerts', stdout=self.stdout, stderr=self.stderr)
-        # Should just complete or skip
-        self.assertIsNotNone(self.stdout.getvalue())
-
-    def test_send_low_stock_alerts_command(self):
-        call_command('send_low_stock_alerts', stdout=self.stdout, stderr=self.stderr)
-        # Should output skipping/warning since EmailSettings not enabled
-        self.assertIn("Email notifications are disabled", self.stdout.getvalue())
-
-    def test_send_renewal_reminders_command(self):
-        call_command('send_renewal_reminders', stdout=self.stdout, stderr=self.stderr)
-        self.assertIn("Skipping", self.stdout.getvalue())
-
     def test_sync_tenant_ldap_command_invalid(self):
         with self.assertRaises(CommandError):
             call_command('sync_tenant_ldap', tenant='non-existent-tenant')

@@ -1,19 +1,18 @@
 import logging
-from django.shortcuts import get_object_or_404, redirect
-from django.views.generic import View
-from django.contrib import messages
+from django.shortcuts import redirect
 from django.utils import timezone
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.utils.decorators import method_decorator
-from django.contrib.auth.decorators import login_required
 from django.urls import reverse
+from django.contrib.auth.decorators import login_required
+from django.utils.decorators import method_decorator
 
 from core.models import AlertRule, AlertLog, NotificationChannel
 from core.tables import AlertRuleTable, AlertLogTable, NotificationChannelTable
 from core.forms import AlertRuleForm, NotificationChannelForm
+from core.filters import AlertLogFilterSet
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
 )
+from itambox.views.generic.service_views import SimplePostView
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +86,7 @@ class AlertLogListView(ObjectListView):
     table = AlertLogTable
     template_name = 'core/alerts/alert_list.html'
     action_buttons = ()
+    filterset_class = AlertLogFilterSet
 
     def get_breadcrumbs(self):
         return [
@@ -97,65 +97,55 @@ class AlertLogListView(ObjectListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Alerts Center'
-        
+
         from core.managers import get_current_tenant
         current_tenant = get_current_tenant()
-        
+
         active_qs = AlertLog.objects.filter(status=AlertLog.STATUS_ACTIVE)
         acknowledged_qs = AlertLog.objects.filter(status=AlertLog.STATUS_ACKNOWLEDGED)
-        
+
         if current_tenant:
             active_qs = active_qs.filter(tenant=current_tenant)
             acknowledged_qs = acknowledged_qs.filter(tenant=current_tenant)
-            
+
         context['active_alerts_count'] = active_qs.count()
         context['acknowledged_alerts_count'] = acknowledged_qs.count()
         return context
 
 
-@method_decorator(login_required, name='dispatch')
-class AlertAcknowledgeView(PermissionRequiredMixin, LoginRequiredMixin, View):
+class AlertAcknowledgeView(SimplePostView):
+    queryset = AlertLog.objects.all()
     permission_required = ('core.change_alertlog',)
 
-    def has_permission(self):
-        perms = self.get_permission_required()
-        obj = None
-        try:
-            obj = get_object_or_404(AlertLog, pk=self.kwargs.get('pk'))
-        except Exception:
-            pass
-        return self.request.user.has_perms(perms, obj=obj)
-
-    def post(self, request, pk):
-        alert = get_object_or_404(AlertLog, pk=pk)
+    def perform_action(self, alert, request):
         if alert.status == AlertLog.STATUS_ACTIVE:
             alert.status = AlertLog.STATUS_ACKNOWLEDGED
-            alert.save()
-            messages.success(request, f"Alert '{alert.subject}' has been acknowledged.")
-        return redirect(request.POST.get('return_url') or reverse('alertlog_list'))
+            alert.acknowledged_by = request.user
+            alert.save(update_fields=['status', 'acknowledged_by'])
+        return {'message': f"Alert '{alert.subject}' acknowledged."}
+
+    def get_success_redirect(self, obj, result):
+        return redirect(
+            self.request.POST.get('return_url') or reverse('alertlog_list')
+        )
 
 
-@method_decorator(login_required, name='dispatch')
-class AlertResolveView(PermissionRequiredMixin, LoginRequiredMixin, View):
+class AlertResolveView(SimplePostView):
+    queryset = AlertLog.objects.all()
     permission_required = ('core.change_alertlog',)
 
-    def has_permission(self):
-        perms = self.get_permission_required()
-        obj = None
-        try:
-            obj = get_object_or_404(AlertLog, pk=self.kwargs.get('pk'))
-        except Exception:
-            pass
-        return self.request.user.has_perms(perms, obj=obj)
-
-    def post(self, request, pk):
-        alert = get_object_or_404(AlertLog, pk=pk)
+    def perform_action(self, alert, request):
         if alert.status in [AlertLog.STATUS_ACTIVE, AlertLog.STATUS_ACKNOWLEDGED]:
             alert.status = AlertLog.STATUS_RESOLVED
+            alert.resolved_by = request.user
             alert.resolved_at = timezone.now()
-            alert.save()
-            messages.success(request, f"Alert '{alert.subject}' has been marked as resolved.")
-        return redirect(request.POST.get('return_url') or reverse('alertlog_list'))
+            alert.save(update_fields=['status', 'resolved_by', 'resolved_at'])
+        return {'message': f"Alert '{alert.subject}' marked as resolved."}
+
+    def get_success_redirect(self, obj, result):
+        return redirect(
+            self.request.POST.get('return_url') or reverse('alertlog_list')
+        )
 
 
 @method_decorator(login_required, name='dispatch')
@@ -205,3 +195,23 @@ class NotificationChannelUpdateView(ObjectEditView):
 class NotificationChannelDeleteView(ObjectDeleteView):
     queryset = NotificationChannel.objects.all()
     template_name = 'core/alerts/notificationchannel_confirm_delete.html'
+
+
+class NotificationChannelTestView(SimplePostView):
+    """Send a test notification through a channel and report success/failure inline."""
+    queryset = NotificationChannel.objects.all()
+    permission_required = ('core.change_notificationchannel',)
+
+    def perform_action(self, channel, request):
+        from core.events import send_notification_to_channel
+        ok = send_notification_to_channel(
+            channel,
+            subject="ITAMbox Test Notification",
+            body=f"This is a test message sent to channel '{channel.name}' ({channel.get_channel_type_display()}).",
+        )
+        if ok:
+            return {'message': f"Test notification sent successfully via '{channel.name}'."}
+        raise Exception(f"Channel '{channel.name}' returned a delivery failure.")
+
+    def get_success_redirect(self, obj, result):
+        return redirect(reverse('notificationchannel_list'))

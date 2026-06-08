@@ -706,9 +706,8 @@ class ScheduledReportForm(forms.ModelForm):
 class AlertRuleForm(forms.ModelForm):
     class Meta:
         model = AlertRule
-        fields = ['name', 'description', 'alert_type', 'threshold_value', 'severity', 'recipients', 'is_active', 'channels', 'tenant']
+        fields = ['name', 'description', 'alert_type', 'threshold_value', 'severity', 'is_active', 'channels', 'tenant']
         widgets = {
-            'recipients': forms.Textarea(attrs={'rows': 2, 'placeholder': 'admin, manager, alert@example.com'}),
             'channels': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
             'tenant': forms.Select(attrs={'class': 'form-select'})
         }
@@ -756,10 +755,33 @@ class NotificationChannelForm(forms.ModelForm):
         data = self.cleaned_data['config']
         if isinstance(data, str):
             try:
-                return json.loads(data)
+                data = json.loads(data)
             except json.JSONDecodeError:
                 raise forms.ValidationError('Config must be valid JSON.')
         return data
+
+    def clean(self):
+        cleaned = super().clean()
+        channel_type = cleaned.get('channel_type')
+        config = cleaned.get('config') or {}
+
+        if channel_type == 'email':
+            recipients = config.get('recipients', [])
+            if not recipients or not isinstance(recipients, list):
+                raise forms.ValidationError(
+                    'Email channel requires a "recipients" list in Config, e.g. ["you@example.com"].'
+                )
+        elif channel_type in ('slack', 'teams'):
+            if not config.get('webhook_url'):
+                raise forms.ValidationError(
+                    f'{channel_type.title()} channel requires a "webhook_url" in Config.'
+                )
+        elif channel_type == 'webhook':
+            if not config.get('url'):
+                raise forms.ValidationError(
+                    'Webhook channel requires a "url" in Config.'
+                )
+        return cleaned
 
     def save(self, commit=True):
         instance = super().save(commit=False)

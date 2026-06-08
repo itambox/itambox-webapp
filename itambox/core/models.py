@@ -987,12 +987,14 @@ class AlertRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     ALERT_TYPE_UPCOMING_EOL = 'upcoming_eol'
     ALERT_TYPE_LICENSE_EXPIRY = 'license_expiry'
     ALERT_TYPE_RENEWAL_DUE = 'renewal_due'
+    ALERT_TYPE_WARRANTY_EXPIRY = 'warranty_expiry'
 
     ALERT_TYPE_CHOICES = [
         (ALERT_TYPE_LOW_STOCK, 'Low Stock Alert'),
         (ALERT_TYPE_UPCOMING_EOL, 'Upcoming EOL Planning'),
         (ALERT_TYPE_LICENSE_EXPIRY, 'License Expiry Alert'),
         (ALERT_TYPE_RENEWAL_DUE, 'Renewal Due Alert'),
+        (ALERT_TYPE_WARRANTY_EXPIRY, 'Warranty Expiry Alert'),
     ]
 
     SEVERITY_INFO = 'info'
@@ -1010,10 +1012,6 @@ class AlertRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     alert_type = models.CharField(max_length=50, choices=ALERT_TYPE_CHOICES)
     threshold_value = models.PositiveIntegerField(help_text="Limit count or days horizon")
     severity = models.CharField(max_length=20, choices=SEVERITY_CHOICES, default=SEVERITY_WARNING)
-    recipients = models.TextField(
-        blank=True,
-        help_text="Comma-separated emails or usernames. Defaults to admins."
-    )
     is_active = models.BooleanField(default=True)
     channels = models.ManyToManyField('core.NotificationChannel', blank=True, related_name='alert_rules')
     tenant = models.ForeignKey(
@@ -1057,10 +1055,21 @@ class AlertLog(BaseModel):
     rule = models.ForeignKey(AlertRule, on_delete=models.CASCADE, related_name='logs')
     subject = models.CharField(max_length=255)
     message = models.TextField()
+    severity = models.CharField(
+        max_length=20,
+        choices=AlertRule.SEVERITY_CHOICES,
+        default=AlertRule.SEVERITY_WARNING,
+        db_index=True,
+    )
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='alert_logs')
     object_id = models.PositiveBigIntegerField()
     content_object = GenericForeignKey('content_type', 'object_id')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ACTIVE, db_index=True)
+    delivery_status = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Per-channel delivery result: {channel_pk: 'ok'|'failed'|'error: ...'}"
+    )
     acknowledged_by = models.ForeignKey(
         to=settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -1110,6 +1119,7 @@ class AlertLog(BaseModel):
         indexes = [
             models.Index(fields=['content_type', 'object_id']),
             models.Index(fields=['status']),
+            models.Index(fields=['severity']),
         ]
 
     def __str__(self):

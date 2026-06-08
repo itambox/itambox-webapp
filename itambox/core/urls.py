@@ -47,7 +47,8 @@ mimetypes.add_type('application/zip', '.zip')
 from core.views.alerts import (
     AlertRuleListView, AlertRuleDetailView, AlertRuleCreateView, AlertRuleUpdateView,
     AlertRuleDeleteView, AlertLogListView, AlertAcknowledgeView, AlertResolveView,
-    NotificationChannelListView, NotificationChannelCreateView, NotificationChannelUpdateView, NotificationChannelDeleteView
+    NotificationChannelListView, NotificationChannelCreateView, NotificationChannelUpdateView,
+    NotificationChannelDeleteView, NotificationChannelTestView,
 )
 from core.views.reports import (
     ReportTemplateListView, ReportTemplateDetailView, ReportTemplateCreateView,
@@ -135,6 +136,7 @@ urlpatterns = [
     path('alerts/channels/add/', NotificationChannelCreateView.as_view(), name='notificationchannel_add'),
     path('alerts/channels/<int:pk>/edit/', NotificationChannelUpdateView.as_view(), name='notificationchannel_edit'),
     path('alerts/channels/<int:pk>/delete/', NotificationChannelDeleteView.as_view(), name='notificationchannel_delete'),
+    path('alerts/channels/<int:pk>/test/', NotificationChannelTestView.as_view(), name='notificationchannel_test'),
 
     path('reports/templates/', ReportTemplateListView.as_view(), name='reporttemplate_list'),
     path('reports/templates/preview/', ReportTemplatePreviewView.as_view(), name='reporttemplate_preview'),

@@ -56,3 +56,24 @@ class CoreConfig(AppConfig):
 
         BaseForm.__init__ = scoped_baseform_init
 
+        self._register_alert_schedule()
+
+    def _register_alert_schedule(self):
+        """Ensure the daily alert evaluation schedule exists in django-q2."""
+        try:
+            from django.db import connection
+            tables = connection.introspection.table_names()
+            if 'django_q_schedule' not in tables:
+                return
+            from django_q.models import Schedule
+            Schedule.objects.get_or_create(
+                func='core.tasks.evaluate_alert_rules_task',
+                defaults={
+                    'name': 'Daily Alert Rule Evaluation',
+                    'schedule_type': Schedule.DAILY,
+                    'repeats': -1,
+                },
+            )
+        except Exception:
+            pass
+
