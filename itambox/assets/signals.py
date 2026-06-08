@@ -5,18 +5,9 @@ from django.db import DatabaseError, transaction
 from django_q.tasks import async_task
 
 from assets.models import AssetRequest, AssetAssignment
-from inventory.models import ConsumableAssignment
 from core.events import dispatch_event
 
 logger = logging.getLogger(__name__)
-
-@receiver(post_save, sender=ConsumableAssignment)
-@receiver(post_delete, sender=ConsumableAssignment)
-def check_consumable_stock(sender, instance, **kwargs):
-    consumable = instance.consumable
-    consumable_id = consumable.pk
-    transaction.on_commit(lambda: async_task('assets.tasks.check_consumable_stock_task', consumable_id))
-
 
 @receiver(post_save, sender=AssetAssignment)
 def on_asset_assignment_save(sender, instance, created, **kwargs):

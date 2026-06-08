@@ -572,14 +572,12 @@ class NotificationChannel(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     allow_global_tenant = True
 
     TYPE_EMAIL = 'email'
-    TYPE_WEBHOOK = 'webhook'
     TYPE_IN_APP = 'in_app'
     TYPE_SLACK = 'slack'
     TYPE_TEAMS = 'teams'
 
     CHANNEL_TYPE_CHOICES = [
         (TYPE_EMAIL, 'Email'),
-        (TYPE_WEBHOOK, 'Webhook'),
         (TYPE_IN_APP, 'In-App'),
         (TYPE_SLACK, 'Slack'),
         (TYPE_TEAMS, 'Microsoft Teams'),
@@ -611,44 +609,6 @@ class NotificationChannel(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         return f"{self.name} ({self.get_channel_type_display()})"
 
 
-class NotificationTemplate(ChangeLoggingMixin, BaseModel):
-    EVENT_CREATE = 'create'
-    EVENT_UPDATE = 'update'
-    EVENT_DELETE = 'delete'
-    EVENT_CHECKOUT = 'checkout'
-    EVENT_CHECKIN = 'checkin'
-    EVENT_AUDIT = 'audit'
-    EVENT_EXPIRING = 'expiring'
-    EVENT_LOW_STOCK = 'low_stock'
-    EVENT_RENEWAL = 'renewal'
-
-    EVENT_TYPE_CHOICES = [
-        (EVENT_CREATE, 'Create'),
-        (EVENT_UPDATE, 'Update'),
-        (EVENT_DELETE, 'Delete'),
-        (EVENT_CHECKOUT, 'Checkout'),
-        (EVENT_CHECKIN, 'Checkin'),
-        (EVENT_AUDIT, 'Audit'),
-        (EVENT_EXPIRING, 'Expiring Alert'),
-        (EVENT_LOW_STOCK, 'Low Stock Alert'),
-        (EVENT_RENEWAL, 'Renewal Reminder'),
-    ]
-
-    name = models.CharField(max_length=255, unique=True)
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='notification_templates')
-    event_type = models.CharField(max_length=30, choices=EVENT_TYPE_CHOICES)
-    subject_template = models.CharField(max_length=500, blank=True, help_text="Jinja2 template for notification subject")
-    body_template = models.TextField(blank=True, help_text="Jinja2 template for notification body")
-    channel = models.ForeignKey(NotificationChannel, on_delete=models.CASCADE, related_name='templates', null=True, blank=True)
-
-    class Meta:
-        ordering = ['name']
-        verbose_name = "Notification Template"
-        verbose_name_plural = "Notification Templates"
-
-    def __str__(self):
-        return f"{self.name} ({self.get_event_type_display()})"
-
 
 class EmailSettings(ChangeLoggingMixin, BaseModel):
     smtp_host = models.CharField(max_length=255, default='localhost')
@@ -660,21 +620,36 @@ class EmailSettings(ChangeLoggingMixin, BaseModel):
     from_name = models.CharField(max_length=255, default='ITAMbox Notifications')
     enabled = models.BooleanField(default=False)
     test_recipient = models.EmailField(max_length=255, blank=True, null=True, help_text="Email address for test notifications")
+    tenant = models.OneToOneField(
+        'organization.Tenant',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='email_settings',
+        help_text="Tenant-specific SMTP settings. Leave blank for system-wide defaults.",
+    )
 
     class Meta:
         verbose_name = "Email Settings"
         verbose_name_plural = "Email Settings"
 
     def __str__(self):
-        return f"Email Settings ({'Enabled' if self.enabled else 'Disabled'})"
-
-    def save(self, *args, **kwargs):
-        self.pk = 1
-        super().save(*args, **kwargs)
+        scope = self.tenant.name if self.tenant_id else 'System'
+        return f"Email Settings [{scope}] ({'Enabled' if self.enabled else 'Disabled'})"
 
     @classmethod
-    def load(cls):
-        return cls.objects.first()
+    def load(cls, tenant_id=None):
+        """Return the most-specific EmailSettings for the given tenant.
+
+        Lookup order:
+          1. Tenant-specific record (if tenant_id provided)
+          2. System-wide record (tenant IS NULL)
+        """
+        if tenant_id:
+            obj = cls.objects.filter(tenant_id=tenant_id).first()
+            if obj:
+                return obj
+        return cls.objects.filter(tenant__isnull=True).first()
 
 
 class ExportTemplate(BaseModel):
@@ -988,6 +963,7 @@ class AlertRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     ALERT_TYPE_LICENSE_EXPIRY = 'license_expiry'
     ALERT_TYPE_RENEWAL_DUE = 'renewal_due'
     ALERT_TYPE_WARRANTY_EXPIRY = 'warranty_expiry'
+    ALERT_TYPE_AUDIT_OVERDUE = 'audit_overdue'
 
     ALERT_TYPE_CHOICES = [
         (ALERT_TYPE_LOW_STOCK, 'Low Stock Alert'),
@@ -995,6 +971,7 @@ class AlertRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         (ALERT_TYPE_LICENSE_EXPIRY, 'License Expiry Alert'),
         (ALERT_TYPE_RENEWAL_DUE, 'Renewal Due Alert'),
         (ALERT_TYPE_WARRANTY_EXPIRY, 'Warranty Expiry Alert'),
+        (ALERT_TYPE_AUDIT_OVERDUE, 'Audit Overdue'),
     ]
 
     SEVERITY_INFO = 'info'

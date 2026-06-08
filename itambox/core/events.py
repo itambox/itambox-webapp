@@ -271,60 +271,95 @@ def _send_teams_notification(webhook_url, message_text, title=None):
 
 
 def send_notification_to_channel(channel, subject, body):
+    """Deliver a notification via the given channel.
+
+    Supported channel types: email, in_app, slack, teams.
+    Webhooks are NOT an alert-delivery channel; they belong to the EventRule system.
+    Returns True on success, False on failure.
+    """
     if channel.channel_type == NotificationChannel.TYPE_SLACK:
         return _send_slack_notification(
             webhook_url=channel.config.get('webhook_url', ''),
             message_text=body,
-            title=subject
+            title=subject,
         )
+
     elif channel.channel_type == NotificationChannel.TYPE_TEAMS:
         return _send_teams_notification(
             webhook_url=channel.config.get('webhook_url', ''),
             message_text=body,
-            title=subject
+            title=subject,
         )
-    elif channel.channel_type == NotificationChannel.TYPE_WEBHOOK:
-        try:
-            response = requests.post(
-                channel.config.get('url', ''),
-                json={'subject': subject, 'body': body},
-                timeout=10
-            )
-            response.raise_for_status()
-            return True
-        except requests.RequestException:
-            return False
+
     elif channel.channel_type == NotificationChannel.TYPE_EMAIL:
-        from django.core.mail import send_mail
+        from django.core.mail import get_connection, EmailMessage
         from core.models import EmailSettings
-        email_config = EmailSettings.load()
-        if email_config and email_config.enabled:
-            try:
-                send_mail(
-                    subject=subject,
-                    message=body,
-                    from_email=email_config.from_address,
-                    recipient_list=channel.config.get('recipients', [email_config.from_address]),
-                    fail_silently=True,
-                )
-                return True
-            except Exception:
-                return False
+
+        email_config = EmailSettings.load(tenant_id=channel.tenant_id)
+        if not email_config or not email_config.enabled:
+            logger.warning(
+                "Email channel '%s': EmailSettings disabled or not configured for tenant %s.",
+                channel.name, channel.tenant_id,
+            )
+            return False
+
+        recipients = channel.config.get('recipients', [])
+        if not recipients:
+            logger.warning("Email channel '%s': no recipients configured in config.", channel.name)
+            return False
+
+        try:
+            connection = get_connection(
+                backend='django.core.mail.backends.smtp.EmailBackend',
+                host=email_config.smtp_host,
+                port=email_config.smtp_port,
+                username=email_config.smtp_username or '',
+                password=email_config.smtp_password or '',
+                use_tls=email_config.smtp_use_tls,
+                fail_silently=False,
+            )
+            msg = EmailMessage(
+                subject=subject,
+                body=body,
+                from_email=f"{email_config.from_name} <{email_config.from_address}>",
+                to=recipients,
+                connection=connection,
+            )
+            msg.send()
+            return True
+        except Exception as exc:
+            logger.error("Email delivery via channel '%s' failed: %s", channel.name, exc)
+            return False
+
     elif channel.channel_type == NotificationChannel.TYPE_IN_APP:
         from core.models import Notification
-        Notification.objects.create(user=None, subject=subject, message=body)
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+
+        # Resolve target users: explicit list in config → tenant members → global staff
+        user_ids = channel.config.get('recipient_users', [])
+        if user_ids:
+            users = list(User.objects.filter(pk__in=user_ids, is_active=True))
+        elif channel.tenant_id:
+            users = list(
+                User.objects.filter(
+                    asset_holder_profiles__tenant_id=channel.tenant_id,
+                    is_active=True,
+                ).distinct()
+            )
+        else:
+            users = list(User.objects.filter(is_staff=True, is_active=True))
+
+        if not users:
+            logger.warning("In-App channel '%s': no recipients found — notifications not sent.", channel.name)
+            return False
+
+        Notification.objects.bulk_create([
+            Notification(user=user, subject=subject, message=body)
+            for user in users
+        ])
         return True
+
+    logger.warning("send_notification_to_channel: unhandled channel type '%s'.", channel.channel_type)
     return False
-
-
-def send_notification(subject, body, channel_type=None):
-    channels = NotificationChannel.objects.filter(enabled=True)
-    if channel_type:
-        channels = channels.filter(channel_type=channel_type)
-
-    results = {}
-    for channel in channels:
-        results[channel.name] = send_notification_to_channel(channel, subject, body)
-
-    return results
 

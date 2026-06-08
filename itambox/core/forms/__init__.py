@@ -776,11 +776,6 @@ class NotificationChannelForm(forms.ModelForm):
                 raise forms.ValidationError(
                     f'{channel_type.title()} channel requires a "webhook_url" in Config.'
                 )
-        elif channel_type == 'webhook':
-            if not config.get('url'):
-                raise forms.ValidationError(
-                    'Webhook channel requires a "url" in Config.'
-                )
         return cleaned
 
     def save(self, commit=True):

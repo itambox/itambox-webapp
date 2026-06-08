@@ -89,15 +89,15 @@ class ScheduledReportingAndAlertsTests(TestCase):
     @patch('requests.post')
     def test_generate_report_task_success(self, mock_post, mock_email_message):
         """Test general execution of report generation task, local archiving and dispatches."""
-        # Setup channel
-        channel_webhook = NotificationChannel.objects.create(
-            name='Test Webhook Channel',
-            channel_type=NotificationChannel.TYPE_WEBHOOK,
+        # Setup a Slack channel (report task dispatches to all enabled channels)
+        channel_slack = NotificationChannel.objects.create(
+            name='Test Slack Channel',
+            channel_type=NotificationChannel.TYPE_SLACK,
             enabled=True,
-            config={'url': 'http://example.com/webhook'}
+            config={'webhook_url': 'https://hooks.slack.com/services/test'}
         )
-        
-        # Create a scheduled report with webhook and archive active
+
+        # Create a scheduled report with the Slack channel and archiving active
         sched = ScheduledReport.objects.create(
             name='Full Task Test Schedule',
             report=self.template,
@@ -106,9 +106,9 @@ class ScheduledReportingAndAlertsTests(TestCase):
             recipients='',
             save_to_archive=True
         )
-        sched.channels.add(channel_webhook)
+        sched.channels.add(channel_slack)
 
-        # Mock the requests POST response
+        # Mock the requests POST response (used by Slack dispatch)
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_post.return_value = mock_response
@@ -116,21 +116,21 @@ class ScheduledReportingAndAlertsTests(TestCase):
         # Execute task
         from core.tasks import generate_scheduled_report_task
         success = generate_scheduled_report_task(sched.pk)
-        
+
         self.assertTrue(success)
-        
+
         # Check archive entry was created
         sched.refresh_from_db()
         self.assertEqual(sched.last_status, 'success')
         self.assertIsNotNone(sched.last_run)
-        
+
         archive = ReportGenerationArchive.objects.filter(scheduled_report=sched).first()
         self.assertIsNotNone(archive)
         self.assertEqual(archive.status, 'success')
         self.assertIsNotNone(archive.file)
         self.assertEqual(archive.file.mime_type, 'text/html')
-        
-        # Verify webhook was called
+
+        # Verify Slack channel was called
         mock_post.assert_called_once()
 
     def test_report_preview_compilation_and_view(self):

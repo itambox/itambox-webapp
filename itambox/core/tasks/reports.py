@@ -190,54 +190,20 @@ def generate_scheduled_report_task(scheduled_report_id):
                 email.send(fail_silently=False)
                 email_sent = True
 
-        # 5. Dispatch to custom Notification Channels (Slack, Teams, Webhook, In-App)
+        # 5. Dispatch to configured Notification Channels (email, in_app, Slack, Teams)
+        from core.events import send_notification_to_channel
+        report_subject = f"[Scheduled Report] {sched.name}"
+        report_body = (
+            f"Scheduled report '{sched.name}' was successfully generated "
+            f"on {timezone.now():%Y-%m-%d %H:%M:%S} UTC.\n"
+            f"Format: {sched.format.upper()}\n"
+            f"Total Assets: {total_assets}\n"
+            f"Acquisition Sum: ${acquisition_sum:,.2f}"
+        )
         for channel in sched.channels.all():
             if not channel.enabled:
                 continue
-            
-            from core.models import NotificationChannel
-            if channel.channel_type == NotificationChannel.TYPE_WEBHOOK:
-                payload = {
-                    'report_name': sched.name,
-                    'report_template': template.name,
-                    'generated_at': timezone.now().isoformat(),
-                    'metrics': {
-                        'total_assets': total_assets,
-                        'acquisition_sum': acquisition_sum,
-                        'total_active': total_active,
-                        'total_monthly_spend': total_monthly_spend,
-                    },
-                    'headers': headers,
-                    'rows': [{head: r.get(head, '-') for head in headers} for r in rows]
-                }
-                import requests
-                try:
-                    res = requests.post(channel.config.get('url', ''), json=payload, timeout=10)
-                    res.raise_for_status()
-                except Exception as e:
-                    logger.error(f"Failed to post webhook report to {channel.name}: {e}")
-                    
-            elif channel.channel_type == NotificationChannel.TYPE_IN_APP:
-                from core.models import Notification
-                target_url = f"/attachments/file/download/{file_attach.pk}/" if file_attach else None
-                Notification.objects.create(
-                    user=None,
-                    subject=f"[Scheduled Report] {sched.name}",
-                    message=f"Scheduled report '{sched.name}' was successfully generated. Format: {sched.format.upper()}.",
-                    target_url=target_url
-                )
-                
-            else:
-                # Slack/Teams
-                slack_msg = (
-                    f"**Scheduled Report: {sched.name}**\n"
-                    f"Generated successfully on {timezone.now():%Y-%m-%d %H:%M:%S} UTC.\n"
-                    f"**Format**: {sched.format.upper()}\n"
-                    f"**Total Assets**: {total_assets}\n"
-                    f"**Acquisition Sum**: ${acquisition_sum:,.2f}"
-                )
-                from core.events import send_notification_to_channel
-                send_notification_to_channel(channel, f"[Scheduled Report] {sched.name}", slack_msg)
+            send_notification_to_channel(channel, report_subject, report_body)
 
         sched.last_status = "success"
         sched.save()

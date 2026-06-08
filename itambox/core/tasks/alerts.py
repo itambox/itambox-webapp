@@ -161,6 +161,9 @@ def _collect_matches(rule, today):
     elif rule.alert_type == AlertRule.ALERT_TYPE_WARRANTY_EXPIRY:
         matches.extend(_match_warranty_expiry(rule, today))
 
+    elif rule.alert_type == AlertRule.ALERT_TYPE_AUDIT_OVERDUE:
+        matches.extend(_match_audit_overdue(rule, today))
+
     return matches
 
 
@@ -375,6 +378,42 @@ def _match_warranty_expiry(rule, today):
             'message': (
                 f"Asset {asset.asset_tag} ({asset.name}) warranty expires on "
                 f"{asset.warranty_expiration:%Y-%m-%d} ({days_left} day(s) remaining)."
+            ),
+        })
+    return matches
+
+
+def _match_audit_overdue(rule, today):
+    """Assets whose last audit is older than threshold_value days, or never audited.
+
+    threshold_value = number of days since the last audit before it counts as overdue.
+    An asset that has never been audited (last_audited IS NULL) is always included.
+    """
+    from assets.models import Asset
+    from django.db.models import Q
+
+    cutoff = today - timezone.timedelta(days=rule.threshold_value)
+    qs = Asset.objects.filter(
+        deleted_at__isnull=True,
+    ).filter(
+        Q(last_audited__isnull=True) | Q(last_audited__lt=cutoff)
+    )
+    if rule.tenant:
+        qs = qs.filter(tenant=rule.tenant)
+
+    matches = []
+    for asset in qs:
+        if asset.last_audited:
+            days_overdue = (today - asset.last_audited).days
+            detail = f"last audited {days_overdue} day(s) ago ({asset.last_audited:%Y-%m-%d})"
+        else:
+            detail = "never audited"
+        matches.append({
+            'obj': asset, 'tenant': asset.tenant,
+            'subject': f"Audit Overdue: {asset.asset_tag}",
+            'message': (
+                f"Asset {asset.asset_tag} ({asset.name}) is overdue for an audit "
+                f"({detail}; threshold: every {rule.threshold_value} day(s))."
             ),
         })
     return matches
