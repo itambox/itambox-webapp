@@ -5,6 +5,7 @@ from itambox.views.generic import (
     ObjectDetailView,
     ObjectEditView,
     ObjectDeleteView,
+    ObjectCloneView,
     # BulkImportView, # Add later if needed
     # BulkEditView,  # Add later if needed
     # BulkDeleteView # Add later if needed
@@ -86,4 +87,8 @@ class SoftwareEditView(ObjectEditView):
 class SoftwareDeleteView(ObjectDeleteView):
     queryset = Software.objects.all()
     # Set default return URL
-    default_return_url = 'software:software_list' 
+    default_return_url = 'software:software_list'
+
+
+class SoftwareCloneView(SoftwareEditView, ObjectCloneView):
+    model = Software

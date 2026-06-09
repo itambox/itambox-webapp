@@ -338,6 +338,10 @@ class KitEditView(ObjectEditView):
     default_return_url = 'inventory:kit_list'
 
 
+class KitCloneView(KitEditView, ObjectCloneView):
+    model = Kit
+
+
 class KitDeleteView(ObjectDeleteView):
     queryset = Kit.objects.all()
     model = Kit

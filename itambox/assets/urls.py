@@ -30,6 +30,7 @@ urlpatterns = [
     path('roles/add/', views.AssetRoleEditView.as_view(), name='assetrole_create'),
     path('roles/<int:pk>/', views.AssetRoleDetailView.as_view(), name='assetrole_detail'),
     path('roles/<int:pk>/edit/', views.AssetRoleEditView.as_view(), name='assetrole_update'),
+    path('roles/<int:pk>/clone/', views.AssetRoleCloneView.as_view(), name='assetrole_clone'),
     path('roles/<int:pk>/delete/', views.AssetRoleDeleteView.as_view(), name='assetrole_delete'),
 
     # Status Labels (StatusLabel) URLs
@@ -37,6 +38,7 @@ urlpatterns = [
     path('status-labels/add/', views.StatusLabelEditView.as_view(), name='statuslabel_create'),
     path('status-labels/<int:pk>/', views.StatusLabelDetailView.as_view(), name='statuslabel_detail'),
     path('status-labels/<int:pk>/edit/', views.StatusLabelEditView.as_view(), name='statuslabel_update'),
+    path('status-labels/<int:pk>/clone/', views.StatusLabelCloneView.as_view(), name='statuslabel_clone'),
     path('status-labels/<int:pk>/delete/', views.StatusLabelDeleteView.as_view(), name='statuslabel_delete'),
 
     # Manufacturer URLs
@@ -44,6 +46,7 @@ urlpatterns = [
     path('manufacturers/add/', views.ManufacturerEditView.as_view(), name='manufacturer_create'),
     path('manufacturers/<int:pk>/', views.ManufacturerDetailView.as_view(), name='manufacturer_detail'),
     path('manufacturers/<int:pk>/edit/', views.ManufacturerEditView.as_view(), name='manufacturer_update'),
+    path('manufacturers/<int:pk>/clone/', views.ManufacturerCloneView.as_view(), name='manufacturer_clone'),
     path('manufacturers/<int:pk>/delete/', views.ManufacturerDeleteView.as_view(), name='manufacturer_delete'),
 
     # Asset Types
@@ -85,6 +88,7 @@ urlpatterns = [
     path('depreciations/add/', views.DepreciationEditView.as_view(), name='depreciation_create'),
     path('depreciations/<int:pk>/', views.DepreciationDetailView.as_view(), name='depreciation_detail'),
     path('depreciations/<int:pk>/edit/', views.DepreciationEditView.as_view(), name='depreciation_update'),
+    path('depreciations/<int:pk>/clone/', views.DepreciationCloneView.as_view(), name='depreciation_clone'),
     path('depreciations/<int:pk>/delete/', views.DepreciationDeleteView.as_view(), name='depreciation_delete'),
 
     # Suppliers

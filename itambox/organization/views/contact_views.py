@@ -3,7 +3,7 @@ from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 
 from itambox.views.generic import (
-    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView,
+    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView, ObjectCloneView,
 )
 from itambox.utils import get_paginate_count
 from itambox.panels import Panel
@@ -46,6 +46,13 @@ class ContactEditView(ObjectEditView):
     model = Contact
     model_form = ContactForm
     template_name = 'generic/object_edit.html'
+
+
+class ContactCloneView(ObjectCloneView):
+    model = Contact
+    model_form = ContactForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'organization:contact_list'
 
 
 class ContactDeleteView(ObjectDeleteView):

@@ -185,7 +185,27 @@ class ActionsColumn(tables.Column):
                 f'</span>'
             )
 
-        return mark_safe(html)
+        # Clone — a standalone leading button shown for any model that has a
+        # clone view wired (i.e. uses CloneableMixin + a *_clone URL). Yellow to
+        # match the Asset table's clone button.
+        clone_html = ''
+        clone_viewname = get_model_viewname(model, 'clone')
+        for clone_kwargs in ({'pk': record.pk}, {'slug': getattr(record, 'slug', None)}):
+            if None in clone_kwargs.values():
+                continue
+            try:
+                clone_url = reverse(clone_viewname, kwargs=clone_kwargs)
+            except NoReverseMatch:
+                continue
+            clone_title = _('Clone')
+            clone_html = (
+                f'<a class="btn btn-sm btn-warning me-1" href="{clone_url}" '
+                f'title="{clone_title}" aria-label="{clone_title}">'
+                f'<i class="mdi mdi-content-copy"></i></a>'
+            )
+            break
+
+        return mark_safe(clone_html + html)
 
 
 class AssigneeColumn(tables.Column):

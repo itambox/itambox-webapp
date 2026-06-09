@@ -7,10 +7,11 @@ from .asset_views import (
 )
 from .assetrole_views import (
     AssetRoleListView, AssetRoleDetailView, AssetRoleEditView, AssetRoleDeleteView,
+    AssetRoleCloneView,
 )
 from .manufacturer_views import (
     ManufacturerListView, ManufacturerDetailView, ManufacturerEditView,
-    ManufacturerDeleteView, ManufacturerImportView,
+    ManufacturerDeleteView, ManufacturerImportView, ManufacturerCloneView,
 )
 from .assettype_views import (
     AssetTypeListView, AssetTypeDetailView, AssetTypeEditView, AssetTypeDeleteView,
@@ -18,9 +19,11 @@ from .assettype_views import (
 )
 from .statuslabel_views import (
     StatusLabelListView, StatusLabelDetailView, StatusLabelEditView, StatusLabelDeleteView,
+    StatusLabelCloneView,
 )
 from .depreciation_views import (
     DepreciationListView, DepreciationDetailView, DepreciationEditView, DepreciationDeleteView,
+    DepreciationCloneView,
 )
 from .supplier_views import (
     SupplierListView, SupplierDetailView, SupplierEditView, SupplierDeleteView, SupplierCloneView,

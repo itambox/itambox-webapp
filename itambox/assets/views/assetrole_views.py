@@ -10,7 +10,7 @@ from .. import forms, tables, filters
 from itambox.utils import get_paginate_count
 from itambox.panels import Panel
 from itambox.views.generic import (
-    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
+    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectCloneView,
 )
 from itambox.quick_add import QuickAddMixin
 
@@ -57,6 +57,13 @@ class AssetRoleEditView(QuickAddMixin, ObjectEditView):
     model_form = forms.AssetRoleForm
     template_name = 'generic/object_edit.html'
     quick_add_target = 'id_asset_role'
+
+
+class AssetRoleCloneView(ObjectCloneView):
+    model = AssetRole
+    model_form = forms.AssetRoleForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'assets:assetrole_list'
 
 
 class AssetRoleDeleteView(ObjectDeleteView):

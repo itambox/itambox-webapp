@@ -1,7 +1,7 @@
 import django_tables2 as tables
 from django.utils.translation import gettext_lazy as _
 from assets.models import Manufacturer, InstalledSoftware # Keep import for potential linking
-from core.tables import BaseTable, BooleanColumn, ToggleColumn
+from core.tables import BaseTable, BooleanColumn, ToggleColumn, ActionsColumn
 from extras.tables import TagColumn # Import TagColumn from extras
 from .models import Software
 
@@ -21,11 +21,12 @@ class SoftwareTable(BaseTable):
     tags = TagColumn(
         url_name='software:software_list' # Link back to the list view filtered by tag
     )
+    actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = Software
-        fields = ('pk', 'name', 'manufacturer', 'description', 'tags', 'created_at', 'updated_at')
-        default_columns = ('pk', 'name', 'manufacturer', 'description', 'tags')
+        fields = ('pk', 'name', 'manufacturer', 'description', 'tags', 'created_at', 'updated_at', 'actions')
+        default_columns = ('pk', 'name', 'manufacturer', 'description', 'tags', 'actions')
 
 class InstalledSoftwareTable(BaseTable):
     """Table for displaying InstalledSoftware instances."""

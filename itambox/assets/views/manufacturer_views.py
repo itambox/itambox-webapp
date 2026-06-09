@@ -11,7 +11,7 @@ from itambox.utils import get_paginate_count
 from itambox.panels import Panel
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView,
-    ObjectDeleteView, ObjectImportView,
+    ObjectDeleteView, ObjectImportView, ObjectCloneView,
 )
 
 
@@ -108,6 +108,13 @@ class ManufacturerEditView(ObjectEditView):
     model = Manufacturer
     model_form = forms.ManufacturerForm
     template_name = 'generic/object_edit.html'
+
+
+class ManufacturerCloneView(ObjectCloneView):
+    model = Manufacturer
+    model_form = forms.ManufacturerForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'assets:manufacturer_list'
 
 
 class ManufacturerDeleteView(ObjectDeleteView):

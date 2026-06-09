@@ -5,7 +5,7 @@ from django.db.models import Count
 
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
-    ObjectImportView, ObjectBulkEditView, ObjectBulkDeleteView,
+    ObjectImportView, ObjectBulkEditView, ObjectBulkDeleteView, ObjectCloneView,
 )
 from itambox.quick_add import QuickAddMixin
 from itambox.utils import get_paginate_count
@@ -151,6 +151,13 @@ class LocationEditView(QuickAddMixin, ObjectEditView):
     model_form = LocationForm
     template_name = 'generic/object_edit.html'
     quick_add_target = 'id_location'
+
+
+class LocationCloneView(ObjectCloneView):
+    model = Location
+    model_form = LocationForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'organization:location_list'
 
 
 class LocationDeleteView(ObjectDeleteView):

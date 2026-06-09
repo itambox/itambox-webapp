@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
 
 from itambox.views.generic import (
-    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView,
+    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView, ObjectCloneView,
 )
 from itambox.utils import get_paginate_count
 from itambox.panels import Panel
@@ -50,6 +50,13 @@ class ContactRoleEditView(ObjectEditView):
     model = ContactRole
     model_form = ContactRoleForm
     template_name = 'generic/object_edit.html'
+
+
+class ContactRoleCloneView(ObjectCloneView):
+    model = ContactRole
+    model_form = ContactRoleForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'organization:contactrole_list'
 
 
 class ContactRoleDeleteView(ObjectDeleteView):

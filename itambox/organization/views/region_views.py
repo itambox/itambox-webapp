@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.db.models import Count
 
 from itambox.views.generic import (
-    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView,
+    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView, ObjectCloneView,
 )
 from itambox.utils import get_paginate_count
 from itambox.panels import Panel
@@ -73,6 +73,13 @@ class RegionEditView(ObjectEditView):
     model = Region
     model_form = RegionForm
     template_name = 'generic/object_edit.html'
+
+
+class RegionCloneView(ObjectCloneView):
+    model = Region
+    model_form = RegionForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'organization:region_list'
 
 
 class RegionDeleteView(ObjectDeleteView):

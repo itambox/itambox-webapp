@@ -10,7 +10,7 @@ from .. import forms, tables, filters
 from itambox.utils import get_paginate_count
 from itambox.panels import Panel
 from itambox.views.generic import (
-    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
+    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectCloneView,
 )
 
 
@@ -56,6 +56,13 @@ class StatusLabelEditView(ObjectEditView):
     model = StatusLabel
     model_form = forms.StatusLabelForm
     template_name = 'generic/object_edit.html'
+
+
+class StatusLabelCloneView(ObjectCloneView):
+    model = StatusLabel
+    model_form = forms.StatusLabelForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'assets:statuslabel_list'
 
 
 class StatusLabelDeleteView(ObjectDeleteView):

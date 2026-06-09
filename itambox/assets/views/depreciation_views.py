@@ -5,7 +5,7 @@ from .. import forms, tables, filters
 
 from itambox.panels import Panel
 from itambox.views.generic import (
-    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
+    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectCloneView,
 )
 
 
@@ -58,6 +58,13 @@ class DepreciationDetailView(ObjectDetailView):
 
 class DepreciationEditView(ObjectEditView):
     queryset = Depreciation.objects.all()
+    model = Depreciation
+    model_form = forms.DepreciationForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'assets:depreciation_list'
+
+
+class DepreciationCloneView(ObjectCloneView):
     model = Depreciation
     model_form = forms.DepreciationForm
     template_name = 'generic/object_edit.html'

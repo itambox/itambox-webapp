@@ -1,6 +1,6 @@
 from django.db.models import Count
 from django_tables2 import RequestConfig
-from itambox.views.generic import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView
+from itambox.views.generic import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView, ObjectCloneView
 from itambox.utils import get_paginate_count
 from itambox.panels import Panel
 from django.shortcuts import render, redirect, get_object_or_404
@@ -59,6 +59,10 @@ class ProviderEditView(ObjectEditView):
 class ProviderDeleteView(ObjectDeleteView):
     queryset = Provider.objects.all()
     default_return_url = 'subscriptions:provider_list'
+
+
+class ProviderCloneView(ProviderEditView, ObjectCloneView):
+    model = Provider
 
 
 # =============================================================================
@@ -124,6 +128,10 @@ class SubscriptionEditView(ObjectEditView):
 class SubscriptionDeleteView(ObjectDeleteView):
     queryset = Subscription.objects.all()
     default_return_url = 'subscriptions:subscription_list'
+
+
+class SubscriptionCloneView(SubscriptionEditView, ObjectCloneView):
+    model = Subscription
 
 
 class SubscriptionBulkEditView(ObjectBulkEditView):

@@ -34,6 +34,13 @@
             {% translate "Edit" %}
         </a>
         {% endif %}
+         {% if action_urls.clone %}
+        {# Clone — yellow, matching the table action button. Folds into the [...] menu on mobile. #}
+        <a href="{{ action_urls.clone }}" class="btn btn-warning d-none d-sm-inline-flex" title="{% translate 'Copy/Clone' %}">
+            <i class="mdi mdi-content-copy"></i>
+            {% translate "Clone" %}
+        </a>
+        {% endif %}
          {% if action_urls.delete %}
         {# Delete stays visible on tablet/desktop; on mobile it folds into the [...] menu below. #}
         <a href="{{ action_urls.delete }}" class="btn btn-danger d-none d-sm-inline-flex">
@@ -47,16 +54,24 @@
         {% if object %}{% plugin_template_content object 'buttons' object %}{% endif %}
 
         {# --- Mobile overflow menu — secondary actions collapse here on small screens --- #}
-        {% if action_urls.delete %}
+        {% if action_urls.delete or action_urls.clone %}
         <div class="dropdown d-sm-none">
             <button type="button" class="btn btn-icon" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="{% translate 'More actions' %}">
                 <i class="mdi mdi-dots-vertical"></i>
             </button>
             <div class="dropdown-menu dropdown-menu-end">
+                {% if action_urls.clone %}
+                <a class="dropdown-item text-warning" href="{{ action_urls.clone }}">
+                    <i class="mdi mdi-content-copy me-2"></i>
+                    {% translate "Clone" %}
+                </a>
+                {% endif %}
+                {% if action_urls.delete %}
                 <a class="dropdown-item text-danger" href="{{ action_urls.delete }}">
                     <i class="mdi mdi-trash-can-outline me-2"></i>
                     {% translate "Delete" %}
                 </a>
+                {% endif %}
             </div>
         </div>
         {% endif %}

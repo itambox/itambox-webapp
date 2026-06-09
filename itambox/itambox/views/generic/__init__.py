@@ -368,7 +368,21 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
                         context['delete_url'] = reverse(get_model_viewname(obj, 'delete'), kwargs={'slug': obj.slug})
                     except NoReverseMatch:
                         logger.debug("Delete URL not resolvable for %s obj=%s slug=%s", model_name, obj.pk, obj.slug)
-        
+
+        # Clone is offered generically for any model flagged cloneable (via
+        # CloneableMixin) that has a clone view wired and that the user may add.
+        context['clone_url'] = None
+        if registry.model_has_feature(obj.__class__, 'cloneable') and \
+                self.request.user.has_perm(f'{app_label}.add_{model_name}', obj=obj):
+            try:
+                context['clone_url'] = reverse(get_model_viewname(obj, 'clone'), kwargs={'pk': obj.pk})
+            except NoReverseMatch:
+                if hasattr(obj, 'slug') and obj.slug:
+                    try:
+                        context['clone_url'] = reverse(get_model_viewname(obj, 'clone'), kwargs={'slug': obj.slug})
+                    except NoReverseMatch:
+                        logger.debug("Clone URL not resolvable for %s obj=%s slug=%s", model_name, obj.pk, obj.slug)
+
         context['title'] = str(obj)
         base_breadcrumbs = [
             (reverse('dashboard'), _('Dashboard')),
@@ -401,6 +415,7 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
         context['action_urls'] = {
             'edit': context.get('edit_url'),
             'delete': context.get('delete_url'),
+            'clone': context.get('clone_url'),
         }
         context['content_template_name'] = self.get_template_names()[0]
 
@@ -619,7 +634,8 @@ class ObjectEditView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         return reverse('dashboard')
 
     def form_valid(self, form):
-        is_creating = self.object is None
+        # Unsaved instances (new objects and clones) are creations.
+        is_creating = self.object is None or self.object.pk is None
         _model = self._get_model()
         
         # Enforce scoping check on the selected tenant of the object
@@ -668,14 +684,16 @@ class ObjectEditView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         if not _model:
              raise ImproperlyConfigured(f"{self.__class__.__name__} needs a model attribute, or related form/queryset.")
 
-        is_editing = self.object is not None
+        # A clone is an unsaved instance (pk is None): treat it as creation, not
+        # an edit, so we don't reverse get_absolute_url() with a null pk.
+        is_editing = self.object is not None and self.object.pk is not None
         context['model'] = _model
         context['verbose_name'] = _model._meta.verbose_name
         context['is_editing'] = is_editing
         action_verb = _('Edit') if is_editing else _('Create')
         context['title'] = f"{action_verb} {context['verbose_name']}"
 
-        if self.object and hasattr(self.object, 'get_absolute_url'):
+        if is_editing and hasattr(self.object, 'get_absolute_url'):
             context['cancel_url'] = self.object.get_absolute_url()
         else:
             try:
@@ -694,25 +712,48 @@ class ObjectEditView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         return context
 
 class ObjectCloneView(ObjectEditView):
+    """Render a create form pre-filled from an existing object.
+
+    The clone is NOT persisted on GET — ``get_object`` returns an *unsaved*
+    instance used only to pre-fill the form's fields. The new record is created
+    only when the user submits the form (handled by ``ObjectEditView.form_valid``),
+    so the user can review and adjust the copied values first.
+    """
     def get_object(self, queryset=None):
-        original = get_object_or_404(self.model, pk=self.kwargs['pk'])
-        cloned = original.clone()
-        
+        self.original_object = get_object_or_404(self.model, pk=self.kwargs['pk'])
+        cloned = self.original_object.clone()
+
         if hasattr(cloned, 'name'):
-            cloned.name = f"{original.name} (Copy)"
+            cloned.name = f"{self.original_object.name} (Copy)"
         elif hasattr(cloned, 'model'):
-            cloned.model = f"{original.model} (Copy)"
-            
+            cloned.model = f"{self.original_object.model} (Copy)"
+
         if hasattr(cloned, 'slug'):
             cloned.slug = ''
-            
-        self.pre_save_clone(original, cloned)
-        cloned.save()
-        
-        if hasattr(original, 'tags') and hasattr(cloned, 'tags'):
-            cloned.tags.set(original.tags.all())
-            
+
+        self.pre_save_clone(self.original_object, cloned)
+        # Intentionally NOT saved here — the form's POST creates the record.
         return cloned
+
+    def get_initial(self):
+        # An unsaved instance can't supply its many-to-many values to the form,
+        # so seed them (e.g. tags) from the source object as form initial. Only
+        # fields actually present on the form are rendered/saved.
+        initial = super().get_initial()
+        original = getattr(self, 'original_object', None)
+        if original is not None and original.pk:
+            for field in original._meta.many_to_many:
+                initial.setdefault(
+                    field.name,
+                    list(getattr(original, field.name).values_list('pk', flat=True)),
+                )
+        return initial
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['is_clone'] = True
+        context['title'] = _('Clone %(name)s') % {'name': context['verbose_name']}
+        return context
 
     def pre_save_clone(self, original, cloned):
         pass

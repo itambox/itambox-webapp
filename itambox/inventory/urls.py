@@ -51,6 +51,7 @@ urlpatterns = [
     path('kits/add/', views.KitEditView.as_view(), name='kit_create'),
     path('kits/<int:pk>/', views.KitDetailView.as_view(), name='kit_detail'),
     path('kits/<int:pk>/edit/', views.KitEditView.as_view(), name='kit_update'),
+    path('kits/<int:pk>/clone/', views.KitCloneView.as_view(), name='kit_clone'),
     path('kits/<int:pk>/delete/', views.KitDeleteView.as_view(), name='kit_delete'),
     path('kits/<int:pk>/checkout/', views.KitCheckoutView.as_view(), name='kit_checkout_modal'),
     # Kit Items

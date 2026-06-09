@@ -5,7 +5,7 @@ from django.utils import timezone
 
 from itambox.panels import Panel
 from itambox.views.generic import (
-    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
+    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectCloneView
 )
 
 from .models import AssetMaintenance, CustodyReceipt, CustodyTemplate
@@ -45,6 +45,10 @@ class AssetMaintenanceEditView(ObjectEditView):
         if asset_id:
             initial['asset'] = asset_id
         return initial
+
+
+class AssetMaintenanceCloneView(AssetMaintenanceEditView, ObjectCloneView):
+    model = AssetMaintenance
 
 
 class AssetMaintenanceDeleteView(ObjectDeleteView):
@@ -186,6 +190,10 @@ class CustodyTemplateEditView(ObjectEditView):
         if 'category' in self.request.GET:
             initial['category'] = self.request.GET['category']
         return initial
+
+
+class CustodyTemplateCloneView(CustodyTemplateEditView, ObjectCloneView):
+    model = CustodyTemplate
 
 
 class CustodyTemplateDeleteView(ObjectDeleteView):

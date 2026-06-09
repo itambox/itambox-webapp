@@ -11,6 +11,7 @@ urlpatterns = [
     path('providers/delete/', views.ProviderBulkDeleteView.as_view(), name='provider_bulk_delete'),
     path('providers/<int:pk>/', views.ProviderDetailView.as_view(), name='provider_detail'),
     path('providers/<int:pk>/edit/', views.ProviderEditView.as_view(), name='provider_update'),
+    path('providers/<int:pk>/clone/', views.ProviderCloneView.as_view(), name='provider_clone'),
     path('providers/<int:pk>/delete/', views.ProviderDeleteView.as_view(), name='provider_delete'),
 
     # Subscriptions
@@ -20,6 +21,7 @@ urlpatterns = [
     path('subscriptions/delete/', views.SubscriptionBulkDeleteView.as_view(), name='subscription_bulk_delete'),
     path('subscriptions/<int:pk>/', views.SubscriptionDetailView.as_view(), name='subscription_detail'),
     path('subscriptions/<int:pk>/edit/', views.SubscriptionEditView.as_view(), name='subscription_update'),
+    path('subscriptions/<int:pk>/clone/', views.SubscriptionCloneView.as_view(), name='subscription_clone'),
     path('subscriptions/<int:pk>/delete/', views.SubscriptionDeleteView.as_view(), name='subscription_delete'),
     path('subscriptions/<int:pk>/renew/', views.SubscriptionRenewView.as_view(), name='subscription_renew'),
     path('subscriptions/<int:pk>/cancel/', views.SubscriptionCancelView.as_view(), name='subscription_cancel'),

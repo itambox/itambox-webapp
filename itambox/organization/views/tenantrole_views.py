@@ -1,6 +1,6 @@
 from django.urls import reverse_lazy
 from itambox.views.generic import (
-    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
+    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectCloneView,
 )
 from ..models import TenantRole
 from ..forms import TenantRoleForm
@@ -46,6 +46,31 @@ class TenantRoleEditView(ObjectEditView):
         kwargs['user'] = self.request.user
         kwargs['tenant'] = getattr(self.request, 'active_tenant', None)
         return kwargs
+
+class TenantRoleCloneView(ObjectCloneView):
+    """Clone a role's permission set into (potentially) a different tenant.
+
+    Unlike the default clone flow, the new role is NOT persisted on GET:
+    TenantRole.tenant is non-nullable, so we leave it blank and let the admin
+    pick the target tenant on the form. This makes onboarding a new tenant with
+    a similar permission set a single step.
+    """
+    model = TenantRole
+    model_form = TenantRoleForm
+    template_name = 'organization/tenantrole_form.html'
+
+    def get_form_kwargs(self):
+        # Pass `user` but intentionally NOT `tenant`: with no active tenant bound
+        # and an unsaved instance, TenantRoleForm renders a required tenant
+        # picker so the clone is assigned to a freshly chosen tenant.
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
+    def pre_save_clone(self, original, cloned):
+        # Clear the tenant so the admin must choose a target tenant on the form.
+        cloned.tenant = None
+
 
 class TenantRoleDeleteView(ObjectDeleteView):
     queryset = TenantRole.objects.all()

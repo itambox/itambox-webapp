@@ -9,5 +9,6 @@ urlpatterns = [
     path('software/add/', views.SoftwareEditView.as_view(), name='software_create'),
     path('software/<int:pk>/', views.SoftwareDetailView.as_view(), name='software_detail'),
     path('software/<int:pk>/edit/', views.SoftwareEditView.as_view(), name='software_update'),
+    path('software/<int:pk>/clone/', views.SoftwareCloneView.as_view(), name='software_clone'),
     path('software/<int:pk>/delete/', views.SoftwareDeleteView.as_view(), name='software_delete'),
 ] 

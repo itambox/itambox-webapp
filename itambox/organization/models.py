@@ -413,7 +413,11 @@ class TenantRole(StandardModel, SoftDeleteMixin):
         ]
 
     def __str__(self):
-        return f"{self.name} ({self.tenant.name})"
+        # tenant may be unset transiently (e.g. an unsaved clone awaiting a
+        # tenant assignment), so guard the dereference.
+        if self.tenant_id:
+            return f"{self.name} ({self.tenant.name})"
+        return self.name
 
 
 class TenantMembership(models.Model):

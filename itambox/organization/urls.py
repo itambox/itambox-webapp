@@ -11,6 +11,7 @@ urlpatterns = [
     path('sites/delete/', views.SiteBulkDeleteView.as_view(), name='site_bulk_delete'),
     path('sites/<int:pk>/', views.SiteDetailView.as_view(), name='site_detail'),
     path('sites/<int:pk>/edit/', views.SiteEditView.as_view(), name='site_update'),
+    path('sites/<int:pk>/clone/', views.SiteCloneView.as_view(), name='site_clone'),
     path('sites/<int:pk>/delete/', views.SiteDeleteView.as_view(), name='site_delete'),
 
     # Regions
@@ -20,6 +21,7 @@ urlpatterns = [
     path('regions/delete/', views.RegionBulkDeleteView.as_view(), name='region_bulk_delete'),
     path('regions/<int:pk>/', views.RegionDetailView.as_view(), name='region_detail'),
     path('regions/<int:pk>/edit/', views.RegionEditView.as_view(), name='region_update'),
+    path('regions/<int:pk>/clone/', views.RegionCloneView.as_view(), name='region_clone'),
     path('regions/<int:pk>/delete/', views.RegionDeleteView.as_view(), name='region_delete'),
 
     # Site Groups
@@ -27,6 +29,7 @@ urlpatterns = [
     path('site-groups/add/', views.SiteGroupEditView.as_view(), name='sitegroup_create'),
     path('site-groups/<int:pk>/', views.SiteGroupDetailView.as_view(), name='sitegroup_detail'),
     path('site-groups/<int:pk>/edit/', views.SiteGroupEditView.as_view(), name='sitegroup_update'),
+    path('site-groups/<int:pk>/clone/', views.SiteGroupCloneView.as_view(), name='sitegroup_clone'),
     path('site-groups/<int:pk>/delete/', views.SiteGroupDeleteView.as_view(), name='sitegroup_delete'),
 
     # Locations
@@ -36,6 +39,7 @@ urlpatterns = [
     path('locations/delete/', views.LocationBulkDeleteView.as_view(), name='location_bulk_delete'),
     path('locations/<int:pk>/', views.LocationDetailView.as_view(), name='location_detail'),
     path('locations/<int:pk>/edit/', views.LocationEditView.as_view(), name='location_update'),
+    path('locations/<int:pk>/clone/', views.LocationCloneView.as_view(), name='location_clone'),
     path('locations/<int:pk>/delete/', views.LocationDeleteView.as_view(), name='location_delete'),
 
     # Tenant Groups
@@ -72,6 +76,7 @@ urlpatterns = [
     path('contacts/delete/', views.ContactBulkDeleteView.as_view(), name='contact_bulk_delete'),
     path('contacts/<int:pk>/', views.ContactDetailView.as_view(), name='contact_detail'),
     path('contacts/<int:pk>/edit/', views.ContactEditView.as_view(), name='contact_update'),
+    path('contacts/<int:pk>/clone/', views.ContactCloneView.as_view(), name='contact_clone'),
     path('contacts/<int:pk>/delete/', views.ContactDeleteView.as_view(), name='contact_delete'),
 
     # Contact Roles
@@ -81,6 +86,7 @@ urlpatterns = [
     path('contact-roles/delete/', views.ContactRoleBulkDeleteView.as_view(), name='contactrole_bulk_delete'),
     path('contact-roles/<int:pk>/', views.ContactRoleDetailView.as_view(), name='contactrole_detail'),
     path('contact-roles/<int:pk>/edit/', views.ContactRoleEditView.as_view(), name='contactrole_update'),
+    path('contact-roles/<int:pk>/clone/', views.ContactRoleCloneView.as_view(), name='contactrole_clone'),
     path('contact-roles/<int:pk>/delete/', views.ContactRoleDeleteView.as_view(), name='contactrole_delete'),
 
     # Contact Assignments
@@ -96,6 +102,7 @@ urlpatterns = [
     path('roles/add/', views.TenantRoleEditView.as_view(), name='tenantrole_create'),
     path('roles/<int:pk>/', views.TenantRoleDetailView.as_view(), name='tenantrole_detail'),
     path('roles/<int:pk>/edit/', views.TenantRoleEditView.as_view(), name='tenantrole_update'),
+    path('roles/<int:pk>/clone/', views.TenantRoleCloneView.as_view(), name='tenantrole_clone'),
     path('roles/<int:pk>/delete/', views.TenantRoleDeleteView.as_view(), name='tenantrole_delete'),
 
     # Invitations

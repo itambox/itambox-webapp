@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.db.models import Count
 
 from itambox.views.generic import (
-    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView,
+    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView, ObjectCloneView,
 )
 from itambox.utils import get_paginate_count
 from itambox.panels import Panel
@@ -77,6 +77,13 @@ class SiteEditView(ObjectEditView):
     model = Site
     model_form = SiteForm
     template_name = 'generic/object_edit.html'
+
+
+class SiteCloneView(ObjectCloneView):
+    model = Site
+    model_form = SiteForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'organization:site_list'
 
 
 class SiteDeleteView(ObjectDeleteView):

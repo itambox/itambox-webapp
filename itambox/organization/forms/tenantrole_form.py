@@ -364,8 +364,9 @@ class TenantRoleForm(forms.ModelForm):
                 widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
             )
 
-            # Set initial values if modifying existing instance
-            if self.instance.pk and self.instance.permissions:
+            # Pre-check from the instance's permission set (existing role being
+            # edited, or an unsaved clone carrying the source role's permissions).
+            if self.instance.permissions:
                 app = info['app']
                 model = info['model_name']
                 self.fields[f'perm_{key}_read'].initial = f'{app}.view_{model}' in self.instance.permissions
@@ -378,7 +379,7 @@ class TenantRoleForm(forms.ModelForm):
             required=False,
             widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
         )
-        if self.instance.pk and self.instance.permissions:
+        if self.instance.permissions:
             self.fields['perm_add_delegated_assetrequest'].initial = 'assets.add_delegated_assetrequest' in self.instance.permissions
 
         # Add custom purchase order permissions
@@ -390,7 +391,7 @@ class TenantRoleForm(forms.ModelForm):
             required=False,
             widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
         )
-        if self.instance.pk and self.instance.permissions:
+        if self.instance.permissions:
             self.fields['perm_receive_purchaseorder'].initial = 'procurement.receive_purchaseorder' in self.instance.permissions
             self.fields['perm_approve_purchaseorder'].initial = 'procurement.approve_purchaseorder' in self.instance.permissions
 
