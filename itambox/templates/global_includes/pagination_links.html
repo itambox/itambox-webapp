@@ -2,7 +2,7 @@
 {% load i18n %}
 
 {% if page_obj %}
-<div class="d-flex justify-content-between align-items-center border-top p-2"
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 border-top p-2"
      {% if hx_target %}
      hx-target="{{ hx_target }}"
      hx-swap="innerHTML"
@@ -10,8 +10,8 @@
      {% endif %}>
 
     {% if page_obj.paginator.num_pages > 1 %}
-    <nav aria-label="{% trans "Page selection" %}">
-        <ul class="pagination mb-0">
+    <nav aria-label="{% trans "Page selection" %}" class="pagination-nav-scroll">
+        <ul class="pagination flex-wrap mb-0">
             {% if page_obj.has_previous %}
             <li class="page-item">
                 <a {% if hx_target %}href="#" hx-get="{{ request.path }}{% update_querystring request page=page_obj.previous_page_number tab=tab %}"{% else %}href="{{ request.path }}{% update_querystring request page=page_obj.previous_page_number tab=tab %}"{% endif %}

@@ -26,6 +26,16 @@
         return;
       }
 
+      // On small screens, skip GridStack entirely and keep the responsive
+      // Bootstrap grid (col-12 / col-md-6) intact so widgets stack into at
+      // most 1–2 columns instead of a cramped multi-column absolute layout.
+      // Dragging/resizing isn't practical on touch screens anyway.
+      if (window.innerWidth < 992) {
+        el.classList.remove('grid-stack-loading');
+        window.__gsInitialized = false;
+        return;
+      }
+
       // Collect Bootstrap cols BEFORE removing classes
       const cols: HTMLElement[] = [];
       Array.from(el.children).forEach(function (child) {

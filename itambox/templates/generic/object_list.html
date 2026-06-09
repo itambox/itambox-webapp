@@ -12,8 +12,8 @@
 
 {% block content %}
 <div class="row g-3">
-    {# Main Content / Table Column #}
-    <div class="col-12 {% if filter_form %}col-md-9 order-2 order-md-1{% endif %}" id="object-list-main-col">
+    {# Main Content / Table Column — also the selection scope so the bulk toolbar can live OUTSIDE the table card #}
+    <div class="col-12 js-selection-scope {% if filter_form %}col-md-9 order-2 order-md-1{% endif %}" id="object-list-main-col">
         <div class="card">
             {% if app_label == 'inventory' and model_name in 'component,componentstock,componentallocation' %}
             <div class="card-header">
@@ -77,7 +77,7 @@
             </div>
             {% endif %}
 
-            <div id="object-list-dynamic-content" class="js-selection-scope"
+            <div id="object-list-dynamic-content"
                  hx-get="{{ request.get_full_path }}"
                  hx-trigger="tableRefreshRequired from:body"
                  hx-target="#object-list-dynamic-content"
@@ -94,7 +94,7 @@
                  <div class="py-2 px-3 border-bottom d-flex justify-content-between align-items-center">
                      {# Quick Search Input Group #}
                      {% if filter_form.q is not None %}
-                         <div class="quicksearch-results-tab" style="flex-grow: 1; max-width: 200px; margin-right: 1rem;">
+                         <div class="quicksearch-results-tab" style="flex-grow: 1; max-width: 320px; margin-right: 1rem;">
                              <form method="get" action="" class="filter-form-inline"
                                  hx-get="{{ request.path }}"
                                  hx-target="#object-list-dynamic-content"
@@ -122,21 +122,21 @@
                          <div></div> {# Placeholder #}
                      {% endif %}
  
-                     {# Action Buttons #}
+                     {# Action Buttons — labels collapse on small screens to give the quick search more room #}
                      <div class="ms-auto d-flex gap-2">
                          {% if table_config_key %}
                              <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center"
                                      hx-get="{% url 'table_config' model_name=table_config_key %}"
-                                     hx-target="#modal-placeholder">
-                                 <i class="mdi mdi-cog-outline me-1"></i>
-                                 {% trans "Configure Table" %}
+                                     hx-target="#modal-placeholder" title="{% trans "Configure Table" %}">
+                                 <i class="mdi mdi-cog-outline"></i>
+                                 <span class="d-none d-md-inline ms-1">{% trans "Configure Table" %}</span>
                              </button>
                          {% endif %}
- 
+
                          {% if filter_form %}
                              <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center" id="toggle-filters-btn" title="{% trans "Toggle Filters" %}">
-                                 <i class="mdi mdi-filter-outline me-1"></i>
-                                 {% trans "Filters" %}
+                                 <i class="mdi mdi-filter-outline"></i>
+                                 <span class="d-none d-md-inline ms-1">{% trans "Filters" %}</span>
                                  <span id="filters-applied-count" class="badge bg-primary ms-2 {% if not filter_form.applied_filters %}d-none{% endif %}">
                                      {{ filter_form.applied_filters|length|default:"0" }}
                                  </span>
@@ -147,89 +147,6 @@
 
                 {# Table Rendering Container #}
                 <div id="object-list-table-container">
-
-                    {# Batch Actions Bar — Top #}
-                    <div id="batch-actions-bar-top" class="batch-actions-bar d-none">
-                        <div class="d-flex align-items-center gap-2 px-3 py-2 bg-body-tertiary border-bottom">
-                            <span id="batch-selected-count" class="fw-bold me-2">{% translate "0 selected" %}</span>
-                            {% if is_deleted_view %}
-                            <form id="bulk-restore-form" method="post" action="{{ bulk_restore_url }}" class="bulk-restore-form d-inline" hx-boost="false">
-                                {% csrf_token %}
-                                <div id="bulk-restore-pks-container" class="bulk-pks-container d-inline"></div>
-                                <button type="button" class="btn btn-sm btn-success btn-bulk-restore">
-                                    <i class="mdi mdi-backup-restore me-1"></i>
-                                    {% translate "Restore Selected" %}
-                                </button>
-                            </form>
-                            <form id="bulk-purge-form" method="post" action="{{ bulk_purge_url }}" class="bulk-purge-form d-inline" hx-boost="false">
-                                {% csrf_token %}
-                                <div id="bulk-purge-pks-container" class="bulk-pks-container d-inline"></div>
-                                <button type="button" class="btn btn-sm btn-outline-danger btn-bulk-purge">
-                                    <i class="mdi mdi-delete-forever me-1"></i>
-                                    {% translate "Purge Selected" %}
-                                </button>
-                            </form>
-                            {% else %}
-                            {% if model_name_str == 'assets.asset' %}
-                            <button type="button" class="btn btn-sm btn-primary" id="btn-bulk-assign"
-                                    data-bs-toggle="modal" data-bs-target="#bulk-assign-modal"
-                                    title="{% translate 'Assign selected assets to a holder' %}">
-                                <i class="mdi mdi-account-plus-outline me-1"></i>
-                                {% translate "Assign Selected" %}
-                            </button>
-                            <button type="button" class="btn btn-sm btn-info text-white" id="btn-bulk-print"
-                                    data-bs-toggle="modal" data-bs-target="#bulk-print-modal"
-                                    title="{% translate 'Print labels for selected assets' %}">
-                                <i class="mdi mdi-printer me-1"></i>
-                                {% translate "Print Labels" %}
-                            </button>
-                            {% endif %}
-
-                            {% if model_name_str == 'core.alertlog' %}
-                            <form id="bulk-acknowledge-form" method="post" action="{% url 'alertlog_bulk_acknowledge' %}" class="bulk-acknowledge-form d-inline" hx-boost="false">
-                                {% csrf_token %}
-                                <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
-                                <div class="bulk-pks-container d-inline"></div>
-                                <button type="button" class="btn btn-sm btn-outline-warning btn-bulk-acknowledge">
-                                    <i class="mdi mdi-eye-outline me-1"></i>
-                                    {% translate "Acknowledge Selected" %}
-                                </button>
-                            </form>
-                            <form id="bulk-resolve-form" method="post" action="{% url 'alertlog_bulk_resolve' %}" class="bulk-resolve-form d-inline" hx-boost="false">
-                                {% csrf_token %}
-                                <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
-                                <div class="bulk-pks-container d-inline"></div>
-                                <button type="button" class="btn btn-sm btn-outline-success btn-bulk-resolve">
-                                    <i class="mdi mdi-check me-1"></i>
-                                    {% translate "Resolve Selected" %}
-                                </button>
-                            </form>
-                            {% else %}
-                            <form id="bulk-delete-form" method="post" action="{{ bulk_delete_url }}" class="bulk-delete-form d-inline" hx-boost="false">
-                                {% csrf_token %}
-                                <input type="hidden" name="model_name" value="{{ model_name_str }}">
-                                <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
-                                <div id="bulk-delete-pks-container" class="bulk-pks-container d-inline"></div>
-                                <button type="button" class="btn btn-sm btn-outline-danger btn-bulk-delete">
-                                    <i class="mdi mdi-trash-can-outline me-1"></i>
-                                    {% translate "Delete Selected" %}
-                                </button>
-                            </form>
-                            <form id="bulk-edit-form" method="post" action="{{ bulk_edit_url }}" class="bulk-edit-form d-inline" hx-boost="false">
-                                {% csrf_token %}
-                                <input type="hidden" name="model_name" value="{{ model_name_str }}">
-                                <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
-                                <div id="bulk-edit-pks-container" class="bulk-pks-container d-inline"></div>
-                                <button type="button" class="btn btn-sm btn-outline-primary btn-bulk-edit">
-                                    <i class="mdi mdi-pencil-outline me-1"></i>
-                                    {% translate "Edit Selected" %}
-                                </button>
-                            </form>
-                            {% endif %}
-                            {% endif %}
-                        </div>
-                    </div>
-
                     <div class="table-responsive w-100">
                        {% if table %}
                            {% render_table table "global_includes/htmx_table.html" %}
@@ -241,62 +158,6 @@
                     </div>
                 </div>
 
-            {# Batch Actions Bar — Bottom #}
-            <div id="batch-actions-bar-bottom" class="batch-actions-bar d-none">
-                <div class="d-flex align-items-center gap-2 px-3 py-2 bg-body-tertiary border-top">
-                    <span class="batch-selected-count-bottom fw-bold me-2">{% translate "0 selected" %}</span>
-                    {% if is_deleted_view %}
-                    <button type="button" class="btn btn-sm btn-success btn-bulk-restore">
-                        <i class="mdi mdi-backup-restore me-1"></i>
-                        {% translate "Restore Selected" %}
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-danger btn-bulk-purge">
-                        <i class="mdi mdi-delete-forever me-1"></i>
-                        {% translate "Purge Selected" %}
-                    </button>
-                    {% else %}
-                    {% if model_name_str == 'assets.asset' %}
-                    <button type="button" class="btn btn-sm btn-primary btn-bulk-assign-bottom"
-                            data-bs-toggle="modal" data-bs-target="#bulk-assign-modal"
-                            title="{% translate 'Assign selected assets to a holder' %}">
-                        <i class="mdi mdi-account-plus-outline me-1"></i>
-                        {% translate "Assign Selected" %}
-                    </button>
-                    <button type="button" class="btn btn-sm btn-info text-white btn-bulk-print-bottom"
-                            data-bs-toggle="modal" data-bs-target="#bulk-print-modal"
-                            title="{% translate 'Print labels for selected assets' %}">
-                        <i class="mdi mdi-printer me-1"></i>
-                        {% translate "Print Labels" %}
-                    </button>
-                    {% endif %}
-                    {% if model_name_str == 'assets.assetrequest' %}
-                    <button type="button" class="btn btn-sm btn-success btn-bulk-receive">
-                        <i class="mdi mdi-plus-box-outline me-1"></i>
-                        {% translate "Receive & Allocate Stock" %}
-                    </button>
-                    {% endif %}
-                    {% if model_name_str == 'core.alertlog' %}
-                    <button type="button" class="btn btn-sm btn-outline-warning btn-bulk-acknowledge">
-                        <i class="mdi mdi-eye-outline me-1"></i>
-                        {% translate "Acknowledge Selected" %}
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-success btn-bulk-resolve">
-                        <i class="mdi mdi-check me-1"></i>
-                        {% translate "Resolve Selected" %}
-                    </button>
-                    {% else %}
-                    <button type="button" class="btn btn-sm btn-outline-danger btn-bulk-delete">
-                        <i class="mdi mdi-trash-can-outline me-1"></i>
-                        {% translate "Delete Selected" %}
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-primary btn-bulk-edit">
-                        <i class="mdi mdi-pencil-outline me-1"></i>
-                        {% translate "Edit Selected" %}
-                    </button>
-                    {% endif %}
-                    {% endif %}
-                </div>
-            </div>
             </div> {# End #object-list-dynamic-content #}
 
             {# Pagination Controls Container (Persistently outside dynamic content) #}
@@ -305,6 +166,12 @@
                     {% include 'global_includes/pagination_links.html' with page_obj=table.page hx_target="#object-list-dynamic-content" %}
                 {% endif %}
             </div> {# End #object-list-pagination #}
+        </div>
+
+        {# Bulk-Action Toolbar host — lives OUTSIDE the table card (NetBox-style), right-bound below the table. #}
+        {# Refreshed on HTMX list swaps via an out-of-band update from htmx/list_page_wrapper.html. #}
+        <div id="bulk-action-toolbar-host">
+            {% include 'generic/includes/bulk_action_toolbar.html' %}
         </div>
     </div>
 
@@ -436,9 +303,10 @@
         {% else %}
             {% if can_add %}
                 {% if create_url_name %}
-                <a href="{% url create_url_name %}" class="btn btn-primary">
+                {# On mobile the label collapses, leaving a compact "+" icon button. #}
+                <a href="{% url create_url_name %}" class="btn btn-primary" title="{% blocktranslate %}Create {{ object_type }}{% endblocktranslate %}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
-                    {% blocktranslate %}Create {{ object_type }}{% endblocktranslate %}
+                    <span class="d-none d-sm-inline ms-1">{% blocktranslate %}Create {{ object_type }}{% endblocktranslate %}</span>
                 </a>
                 {% endif %}
 
@@ -450,54 +318,53 @@
                 {% endif %}
             {% endif %}
 
+            {# Export — desktop dropdown #}
             <div class="dropdown d-none d-sm-inline-block">
                 <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                     <i class="mdi mdi-download me-1"></i>
                     {% trans "Export" %}
                 </button>
                 <div class="dropdown-menu dropdown-menu-end">
-                    <div class="dropdown-header">{% trans "Current View" %}</div>
-                    <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=0 %}?format=csv&export_scope=filtered&{{ request.GET.urlencode }}" hx-boost="false">
-                        <i class="mdi mdi-file-delimited-outline me-2 text-muted"></i>
-                        {% trans "CSV Format" %}
-                    </a>
-                    <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=0 %}?format=yaml&export_scope=filtered&{{ request.GET.urlencode }}" hx-boost="false">
-                        <i class="mdi mdi-file-code-outline me-2 text-muted"></i>
-                        {% trans "YAML Format" %}
-                    </a>
-
-                    <div class="dropdown-divider"></div>
-                    <div class="dropdown-header">{% trans "All Data" %}</div>
-                    <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=0 %}?format=csv&export_scope=all" hx-boost="false">
-                        <i class="mdi mdi-file-delimited-outline me-2 text-muted"></i>
-                        {% trans "CSV Format" %}
-                    </a>
-                    <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=0 %}?format=yaml&export_scope=all" hx-boost="false">
-                        <i class="mdi mdi-file-code-outline me-2 text-muted"></i>
-                        {% trans "YAML Format" %}
-                    </a>
-
-                    {% if export_templates %}
-                        <div class="dropdown-divider"></div>
-                        <div class="dropdown-header">{% trans "Export Templates" %}</div>
-                        {% for template in export_templates %}
-                        <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=template.pk %}" hx-boost="false">
-                            <i class="mdi mdi-file-code-outline me-2 text-muted"></i>
-                            {{ template.name }} ({{ template.file_extension|upper }})
-                        </a>
-                        {% endfor %}
-                    {% endif %}
+                    {% include 'generic/includes/export_menu_items.html' %}
                 </div>
             </div>
 
             {% if has_soft_delete %}
                 {% if request.user.is_superuser or perms.core.view_recyclebin %}
-                <a href="?deleted=true" class="btn btn-outline-danger" hx-get="?deleted=true" hx-push-url="true" hx-target="#object-list-dynamic-content">
+                <a href="?deleted=true" class="btn btn-outline-danger d-none d-sm-inline-block" hx-get="?deleted=true" hx-push-url="true" hx-target="#object-list-dynamic-content">
                     <i class="mdi mdi-trash-can-outline me-1"></i>
                     {% translate "Recycle Bin" %}
                 </a>
                 {% endif %}
             {% endif %}
+
+            {# Mobile overflow — folds Import / Export / Recycle Bin into a single [...] menu #}
+            <div class="dropdown d-sm-none">
+                <button type="button" class="btn btn-outline-secondary btn-icon" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="{% trans 'More actions' %}">
+                    <i class="mdi mdi-dots-vertical"></i>
+                </button>
+                <div class="dropdown-menu dropdown-menu-end">
+                    {% if can_add and import_url %}
+                    <a class="dropdown-item" href="{{ import_url }}">
+                        <i class="mdi mdi-upload me-2 text-muted"></i>
+                        {% trans "Import" %}
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    {% endif %}
+
+                    {% include 'generic/includes/export_menu_items.html' %}
+
+                    {% if has_soft_delete %}
+                        {% if request.user.is_superuser or perms.core.view_recyclebin %}
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item text-danger" href="?deleted=true" hx-get="?deleted=true" hx-push-url="true" hx-target="#object-list-dynamic-content">
+                            <i class="mdi mdi-trash-can-outline me-2"></i>
+                            {% translate "Recycle Bin" %}
+                        </a>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
         {% endif %}
     </div>
 {% endblock page_actions %}

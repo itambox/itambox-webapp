@@ -4,28 +4,28 @@
 <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
     {# Quick Search Input Group #}
     {% if filter_form.q is not None %}
-        <div class="quicksearch-results-tab" style="flex-grow: 1; max-width: 200px; margin-right: 1rem;">
+        <div class="quicksearch-results-tab" style="flex-grow: 1; max-width: 320px; margin-right: 1rem;">
             {% include "htmx/quick_search.html" %}
         </div>
     {% else %}
         <div></div> {# Placeholder #}
     {% endif %}
 
-    {# Action Buttons #}
+    {# Action Buttons — labels collapse on small screens to give the quick search more room #}
     <div class="ms-auto d-flex gap-2">
         {% if table_config_key %}
             <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center"
                     hx-get="{% url 'table_config' model_name=table_config_key %}"
-                    hx-target="#modal-placeholder">
-                <i class="mdi mdi-cog-outline me-1"></i>
-                {% translate "Configure Table" %}
+                    hx-target="#modal-placeholder" title="{% translate "Configure Table" %}">
+                <i class="mdi mdi-cog-outline"></i>
+                <span class="d-none d-md-inline ms-1">{% translate "Configure Table" %}</span>
             </button>
         {% endif %}
 
         {% if show_filter_toggle and filter_form %}
             <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center" id="toggle-filters-btn" title="{% translate 'Toggle Filters' %}">
-                <i class="mdi mdi-filter-outline me-1"></i>
-                {% translate "Filters" %}
+                <i class="mdi mdi-filter-outline"></i>
+                <span class="d-none d-md-inline ms-1">{% translate "Filters" %}</span>
                 <span class="badge bg-primary ms-2 {% if not filter_form.applied_filters %}d-none{% endif %}">
                     {{ filter_form.applied_filters|length|default:"0" }}
                 </span>

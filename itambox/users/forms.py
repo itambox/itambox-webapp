@@ -103,7 +103,14 @@ class UserPreferencesForm(forms.Form):
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'})
     )
-    
+    language = forms.ChoiceField(
+        choices=settings.LANGUAGES,
+        required=False,
+        label=_('Language'),
+        help_text=_('Interface language. Applies across the whole application.'),
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
     def __init__(self, user, *args, **kwargs):
         """Load initial data from UserPreference."""
         super().__init__(*args, **kwargs)
@@ -144,6 +151,22 @@ class UserPreferencesForm(forms.Form):
              # Use THEME_LIGHT as the default
             self.fields['theme'].initial = UserPreference.THEME_LIGHT
 
+        # Language initial: stored preference first, else the active language
+        from django.utils import translation
+        valid_languages = dict(settings.LANGUAGES)
+        stored_language = None
+        try:
+            prefs = UserPreference.objects.filter(user=self.user).first()
+            if prefs and prefs.data:
+                stored_language = prefs.data.get('language')
+        except Exception:
+            stored_language = None
+        if stored_language not in valid_languages:
+            stored_language = translation.get_language()
+        if stored_language not in valid_languages:
+            stored_language = settings.LANGUAGE_CODE
+        self.fields['language'].initial = stored_language
+
     def save(self):
         """Save form data to UserPreference."""
         prefs, created_at = UserPreference.objects.get_or_create(user=self.user)
@@ -161,7 +184,12 @@ class UserPreferencesForm(forms.Form):
         if 'theme' not in prefs.data:
             prefs.data['theme'] = {}
         prefs.data['theme']['theme'] = self.cleaned_data['theme']
-        
+
+        # Update language preference (the active cookie is set by the view)
+        language = self.cleaned_data.get('language')
+        if language and language in dict(settings.LANGUAGES):
+            prefs.data['language'] = language
+
         prefs.save()
 
 class TableConfigForm(forms.Form):

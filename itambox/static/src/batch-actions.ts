@@ -20,12 +20,25 @@
   function updateScope(scope: HTMLElement): void {
     const boxes = pkCheckboxes(scope);
     const count = scope.querySelectorAll('input[type="checkbox"][name="pk"]:checked').length;
+    const none = count === 0;
 
+    // Legacy show/hide bars — still used by detail-view embedded tables.
     scope.querySelectorAll<HTMLElement>('.batch-actions-bar').forEach(function (bar) {
-      bar.classList.toggle('d-none', count === 0);
+      bar.classList.toggle('d-none', none);
       bar.querySelectorAll<HTMLElement>('.fw-bold').forEach(function (el) {
         el.textContent = count + ' selected';
       });
+    });
+
+    // Persistent NetBox-style toolbar — always visible; buttons disabled until
+    // a selection exists, and a live count label.
+    scope.querySelectorAll<HTMLElement>('.bulk-selected-count').forEach(function (el) {
+      el.textContent = count + ' selected';
+    });
+    scope.querySelectorAll<HTMLElement>('.bulk-action-btn').forEach(function (btn) {
+      (btn as HTMLButtonElement).disabled = none;
+      btn.classList.toggle('disabled', none);
+      btn.setAttribute('aria-disabled', none ? 'true' : 'false');
     });
 
     const selectAllCb = scope.querySelector<HTMLInputElement>(

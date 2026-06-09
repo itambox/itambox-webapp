@@ -103,3 +103,97 @@
   });
   window.addEventListener('popstate', updateSidebarActiveState);
 })();
+
+/**
+ * ITAMbox Mobile Sidebar Swipe Gestures.
+ *
+ * Edge-swipe right (from the left screen edge) opens the offcanvas menu;
+ * swipe left while it's open closes it. Only active below the lg breakpoint
+ * where #sidebar-menu behaves as a Bootstrap offcanvas. Listeners are passive
+ * so normal vertical scrolling is never blocked.
+ */
+(function () {
+  const LG_BREAKPOINT = 992; // offcanvas is only active below this width
+  const OPEN_EDGE = 30;      // px from the left edge that starts an opening swipe
+  const THRESHOLD = 60;      // px of horizontal travel needed to trigger
+  const VERTICAL_TOLERANCE = 45; // abandon if the gesture drifts mostly vertical
+
+  let startX = 0;
+  let startY = 0;
+  let tracking = false;
+  let fromEdge = false;
+
+  function getSidebar(): HTMLElement | null {
+    return document.getElementById('sidebar-menu');
+  }
+  function isMobile(): boolean {
+    return window.innerWidth < LG_BREAKPOINT;
+  }
+  function isOpen(sb: HTMLElement): boolean {
+    return sb.classList.contains('show');
+  }
+  function offcanvas(sb: HTMLElement) {
+    if (typeof bootstrap === 'undefined' || !bootstrap.Offcanvas) return null;
+    return bootstrap.Offcanvas.getOrCreateInstance(sb);
+  }
+
+  document.addEventListener(
+    'touchstart',
+    function (e: TouchEvent) {
+      if (!isMobile() || e.touches.length !== 1) {
+        tracking = false;
+        return;
+      }
+      const sb = getSidebar();
+      if (!sb) return;
+      const t = e.touches[0];
+      startX = t.clientX;
+      startY = t.clientY;
+      fromEdge = startX <= OPEN_EDGE;
+      // Track an opening swipe (from the edge, while closed) or a closing swipe (while open).
+      tracking = (fromEdge && !isOpen(sb)) || isOpen(sb);
+    },
+    { passive: true },
+  );
+
+  document.addEventListener(
+    'touchmove',
+    function (e: TouchEvent) {
+      if (!tracking || !isMobile()) return;
+      const sb = getSidebar();
+      if (!sb) return;
+      const t = e.touches[0];
+      const dx = t.clientX - startX;
+      const dy = t.clientY - startY;
+
+      // Predominantly vertical movement → abandon and let the page scroll.
+      if (Math.abs(dy) > Math.abs(dx)) {
+        if (Math.abs(dy) > VERTICAL_TOLERANCE) tracking = false;
+        return;
+      }
+
+      // Horizontal opening swipe from the edge: suppress the browser's own
+      // edge back-gesture so ours wins (requires a cancelable, non-passive move).
+      if (fromEdge && !isOpen(sb) && dx > 8 && e.cancelable) {
+        e.preventDefault();
+      }
+
+      if (!isOpen(sb) && fromEdge && dx > THRESHOLD) {
+        offcanvas(sb)?.show();
+        tracking = false;
+      } else if (isOpen(sb) && dx < -THRESHOLD) {
+        offcanvas(sb)?.hide();
+        tracking = false;
+      }
+    },
+    { passive: false },
+  );
+
+  document.addEventListener(
+    'touchend',
+    function () {
+      tracking = false;
+    },
+    { passive: true },
+  );
+})();

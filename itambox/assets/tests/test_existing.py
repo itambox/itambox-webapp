@@ -364,7 +364,7 @@ class ComponentTrackingTestCase(TransactionTestCase):
         response = self.client.get(reverse('assets:asset_label_print', kwargs={'pk': self.asset.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Thermal Label Preview")
-        self.assertContains(response, "<svg") # Pure vector QR code SVG
+        self.assertContains(response, "data:image/png")  # engine-rendered QR card (matches bulk output)
 
     def test_custody_receipt_signoff(self):
         from organization.models import AssetHolder

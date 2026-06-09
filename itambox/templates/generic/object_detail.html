@@ -35,7 +35,8 @@
         </a>
         {% endif %}
          {% if action_urls.delete %}
-        <a href="{{ action_urls.delete }}" class="btn btn-danger">
+        {# Delete stays visible on tablet/desktop; on mobile it folds into the [...] menu below. #}
+        <a href="{{ action_urls.delete }}" class="btn btn-danger d-none d-sm-inline-flex">
             <i class="mdi mdi-trash-can-outline"></i>
             {% translate "Delete" %}
         </a>
@@ -44,6 +45,21 @@
         {# --- Placeholder for Extra Actions (like Check In/Out) --- #}
         {% block extra_page_actions %}{% endblock %}
         {% if object %}{% plugin_template_content object 'buttons' object %}{% endif %}
+
+        {# --- Mobile overflow menu — secondary actions collapse here on small screens --- #}
+        {% if action_urls.delete %}
+        <div class="dropdown d-sm-none">
+            <button type="button" class="btn btn-icon" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="{% translate 'More actions' %}">
+                <i class="mdi mdi-dots-vertical"></i>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end">
+                <a class="dropdown-item text-danger" href="{{ action_urls.delete }}">
+                    <i class="mdi mdi-trash-can-outline me-2"></i>
+                    {% translate "Delete" %}
+                </a>
+            </div>
+        </div>
+        {% endif %}
     </div>
 {% endblock %}
 

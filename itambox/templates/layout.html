@@ -30,27 +30,7 @@
 
             <!-- Mobile Unified Actions Header (visible on mobile only) -->
             <div class="d-flex d-lg-none align-items-center gap-2 ms-auto me-2">
-                {# Mobile Language Selector #}
-                {% get_available_languages as LANGUAGES %}
-                {% get_current_language as CURRENT_LANG %}
-                {% if LANGUAGES|length > 1 %}
-                <div class="nav-item dropdown">
-                    <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" aria-label="{% translate 'Change language' %}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" /><path d="M3.6 9h16.8" /><path d="M3.6 15h16.8" /><path d="M11.5 3a17 17 0 0 0 0 18" /><path d="M12.5 3a17 17 0 0 1 0 18" /></svg>
-                    </a>
-                    <form action="{% url 'set_language' %}" method="post" class="dropdown-menu dropdown-menu-end dropdown-menu-arrow py-1" hx-boost="false">
-                        {% csrf_token %}
-                        <input name="next" type="hidden" value="{{ request.get_full_path }}">
-                        <input name="language" type="hidden" value="">
-                        {% for lang_code, lang_name in LANGUAGES %}
-                        <button type="submit" value="{{ lang_code }}" onclick="this.form.language.value='{{ lang_code }}';"
-                                class="dropdown-item text-start border-0 bg-transparent w-100 {% if lang_code == CURRENT_LANG %}active{% endif %}">
-                            {{ lang_name }}
-                        </button>
-                        {% endfor %}
-                    </form>
-                </div>
-                {% endif %}
+                {# Language selection moved to user Preferences (applies app-wide). #}
 
                 {# Mobile Theme Switcher #}
                 <button class="nav-link px-0 color-mode-toggle hide-theme-dark" title="{% translate 'Enable dark mode' %}">
@@ -60,16 +40,16 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" /><path d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7" /></svg>
                 </button>
 
-                {# Mobile Notifications Dropdown #}
+                {# Mobile Notifications Dropdown — opens as a full-width panel on mobile #}
                 <div class="nav-item dropdown">
-                    <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" aria-label="{% translate 'Show notifications' %}">
+                    <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" data-bs-display="static" aria-label="{% translate 'Show notifications' %}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6" /><path d="M9 17v1a3 3 0 0 0 6 0v-1" /></svg>
                         {% if unread_notifications_count > 0 %}
                             <span class="badge bg-red"></span>
                         {% endif %}
                     </a>
-                    <div class="dropdown-menu dropdown-menu-end dropdown-menu-card dropdown-menu-arrow">
-                        <div class="card" style="width: 250px;">
+                    <div class="dropdown-menu dropdown-menu-end dropdown-menu-card mobile-fullwidth-dropdown">
+                        <div class="card">
                             <div class="card-header py-2">
                                 <h3 class="card-title text-reset fs-6">{% translate "Unread Alerts (" %}{{ unread_notifications_count }})</h3>
                             </div>
@@ -96,10 +76,10 @@
 
                 {# Mobile User Profile Dropdown #}
                 <div class="nav-item dropdown">
-                    <a href="#" class="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown" aria-label="{% translate 'Open user menu' %}">
-                        <div class="ps-2 text-end">
-                            <div class="font-weight-bold">{% if user.is_authenticated %}{{ user.get_full_name|default:user.username }}{% else %}{% translate "Guest" %}{% endif %}</div>
-                            <div class="mt-1 small text-muted fs-7">{% if user.is_staff %}{% translate "Admin" %}{% elif user.is_authenticated %}{% translate "User" %}{% else %}{% translate "Not Logged In" %}{% endif %}</div>
+                    <a href="#" class="nav-link d-flex align-items-center lh-1 text-reset p-0" data-bs-toggle="dropdown" aria-label="{% translate 'Open user menu' %}">
+                        <div class="ps-1 text-end" style="max-width: 96px;">
+                            <div class="fw-bold text-truncate small">{% if user.is_authenticated %}{{ user.get_full_name|default:user.username }}{% else %}{% translate "Guest" %}{% endif %}</div>
+                            <div class="text-muted text-truncate" style="font-size: 0.65rem;">{% if user.is_staff %}{% translate "Admin" %}{% elif user.is_authenticated %}{% translate "User" %}{% else %}{% translate "Not Logged In" %}{% endif %}</div>
                         </div>
                     </a>
                     <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
@@ -125,18 +105,42 @@
                     <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" data-bs-target="#sidebar-menu" aria-label="{% translate 'Close' %}"></button>
                 </div>
                 <div class="offcanvas-body p-0 d-flex flex-column">
-                    <!-- Mobile Quick Search (inside collapse menu) -->
-                    <div class="d-flex d-lg-none px-3 py-2 border-bottom mb-2 w-100">
-                        <form hx-get="{% url 'search' %}" hx-target="#page-content-wrapper" hx-push-url="true" autocomplete="off" class="w-100">
-                            <div class="input-icon">
-                                <span class="input-icon-addon">
-                                    <i class="mdi mdi-magnify"></i>
-                                </span>
-                                <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="form-control" placeholder="{% translate 'Search…' %}" aria-label="{% translate 'Search' %}">
-                            </div>
-                        </form>
+                    {# Scrollable navigation area — search + menu #}
+                    <div class="flex-grow-1 overflow-auto">
+                        <!-- Mobile Quick Search (inside collapse menu) -->
+                        <div class="d-flex d-lg-none px-3 py-2 border-bottom mb-2 w-100">
+                            <form hx-get="{% url 'search' %}" hx-target="#page-content-wrapper" hx-push-url="true" autocomplete="off" class="w-100">
+                                <div class="input-icon">
+                                    <span class="input-icon-addon">
+                                        <i class="mdi mdi-magnify"></i>
+                                    </span>
+                                    <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="form-control" placeholder="{% translate 'Search…' %}" aria-label="{% translate 'Search' %}">
+                                </div>
+                            </form>
+                        </div>
+                        {% nav %}
                     </div>
-                    {% nav %}
+
+                    {# Workspace/Tenant switcher: mobile drawer only; hidden on desktop where the top navbar provides it. #}
+                    {% if request.user.is_authenticated %}
+                    <div class="mobile-tenant-switcher-wrap border-top flex-shrink-0 d-lg-none">
+                        <a class="d-flex align-items-center justify-content-between px-3 py-3 text-reset text-decoration-none"
+                           data-bs-toggle="collapse" href="#mobile-tenant-switcher" role="button" aria-expanded="false" aria-controls="mobile-tenant-switcher">
+                            <span class="d-flex align-items-center gap-2 text-truncate">
+                                <i class="mdi mdi-briefcase-outline fs-3"></i>
+                                <span class="text-truncate">
+                                    {% if request.active_tenant %}{{ request.active_tenant.name }}{% elif request.active_tenant_group %}{{ request.active_tenant_group.name }} {% trans "(Group)" %}{% else %}{% trans "All Tenants" %}{% endif %}
+                                </span>
+                            </span>
+                            <i class="mdi mdi-unfold-more-horizontal text-muted"></i>
+                        </a>
+                        <div class="collapse" id="mobile-tenant-switcher">
+                            <div class="list-group list-group-flush list-group-hoverable border-top" style="max-height: 45vh; overflow-y: auto;">
+                                {% include 'global_includes/_tenant_switcher_list.html' %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>

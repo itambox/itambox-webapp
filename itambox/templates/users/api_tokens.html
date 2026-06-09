@@ -20,14 +20,14 @@
                     <path d="M5 12l5 5l10 -10" />
                 </svg>
             </div>
-            <div>
+            <div class="w-100">
                 <h4 class="alert-title">{% trans "New API Access Token Generated Successfully!" %}</h4>
-                <div class="text-secondary mb-3">
+                <div class="mb-3">
                     {% trans "Please copy this token key now. For your security, it will not be displayed on this page again." %}
                 </div>
                 <div class="input-group">
-                    <input type="text" class="form-control font-monospace font-weight-bold bg-white text-dark select-all" value="{{ new_token_key }}" readonly id="token-key-display">
-                    <button class="btn btn-outline-success" type="button" onclick="navigator.clipboard.writeText('{{ new_token_key }}'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy', 2000)">
+                    <input type="text" class="form-control font-monospace fw-bold select-all" value="{{ new_token_key }}" readonly id="token-key-display">
+                    <button class="btn btn-success" type="button" onclick="navigator.clipboard.writeText('{{ new_token_key }}'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy', 2000)">
                         {% trans "Copy" %}
                     </button>
                 </div>
@@ -60,23 +60,23 @@
                         <tbody>
                             {% for token in tokens %}
                                 <tr>
-                                    <td>
-                                        <code class="font-monospace text-dark font-weight-medium" title="{{ token.key }}">{{ token.key|slice:":6" }}...</code>
+                                    <td data-label="{% trans 'Token' %}">
+                                        <code class="font-monospace text-body fw-medium" title="{{ token.key }}">{{ token.key|slice:":6" }}...</code>
                                     </td>
-                                    <td>
+                                    <td data-label="{% trans 'Description' %}">
                                         <span class="text-secondary small font-weight-medium d-block">{{ token.description|default:"—" }}</span>
                                     </td>
-                                    <td>
+                                    <td data-label="{% trans 'Permissions' %}">
                                         {% if token.write_enabled %}
                                             <span class="badge bg-success-lt text-uppercase font-weight-bold px-2" style="font-size: 0.65rem;">{% trans "Read / Write" %}</span>
                                         {% else %}
                                             <span class="badge bg-info-lt text-uppercase font-weight-bold px-2" style="font-size: 0.65rem;">{% trans "Read-Only" %}</span>
                                         {% endif %}
                                     </td>
-                                    <td>
+                                    <td data-label="{% trans 'Created' %}">
                                         <span class="small text-muted">{{ token.created|date:"Y-m-d" }}</span>
                                     </td>
-                                    <td>
+                                    <td data-label="{% trans 'Expires' %}">
                                         {% if token.expires %}
                                             {% if token.is_expired %}
                                                 <span class="badge bg-danger-lt font-weight-medium">{% trans "Expired" %} ({{ token.expires|date:"Y-m-d" }})</span>
@@ -87,14 +87,14 @@
                                             <span class="small text-muted">{% trans "Never" %}</span>
                                         {% endif %}
                                     </td>
-                                    <td>
+                                    <td data-label="{% trans 'Last Used' %}">
                                         {% if token.last_used %}
                                             <span class="small text-muted font-monospace">{{ token.last_used|date:"Y-m-d H:i" }}</span>
                                         {% else %}
                                             <span class="small text-muted">{% trans "Never" %}</span>
                                         {% endif %}
                                     </td>
-                                    <td class="text-end">
+                                    <td class="text-end" data-label="">
                                         <form method="post" action="{% url 'users:delete_api_token' pk=token.pk %}" class="d-inline" onsubmit="return confirm('{% trans "Are you sure you want to revoke this API token? External scripts using this key will immediately lose access." %}');">
                                             {% csrf_token %}
                                             <button type="submit" class="btn btn-sm btn-ghost-danger border-0 px-2 py-1" title="{% trans "Revoke Token" %}">

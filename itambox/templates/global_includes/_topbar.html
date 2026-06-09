@@ -36,64 +36,7 @@
                                 <h3 class="card-title text-reset fs-6">{% trans "Active Workspace" %}</h3>
                             </div>
                             <div class="list-group list-group-flush list-group-hoverable" style="max-height: 400px; overflow-y: auto;">
-                                {% if request.user.is_superuser %}
-                                    <a href="?switch_tenant=" class="list-group-item list-group-item-action py-2 {% if not request.active_tenant and not request.active_tenant_group %}active{% endif %}">
-                                        <div class="d-flex align-items-center">
-                                            <span class="status-dot bg-blue me-2"></span>
-                                            <strong>{% trans "All Tenants (Global)" %}</strong>
-                                        </div>
-                                    </a>
-                                    {% for item in grouped_tenants_switcher %}
-                                        {% if item.group %}
-                                            <a href="?switch_tenant_group={{ item.group.id }}" class="list-group-header list-group-item-action py-1 px-3 text-muted fs-6 font-weight-bold text-uppercase d-flex justify-content-between align-items-center {% if request.active_tenant_group.id == item.group.id %}active bg-secondary-lt{% endif %}" style="letter-spacing: 0.05em; font-size: 0.7rem !important; cursor: pointer; text-decoration: none;">
-                                                <span>{{ item.group.name }}</span>
-                                                <span class="badge bg-secondary-lt">{% trans "Show All" %}</span>
-                                            </a>
-                                        {% else %}
-                                            <div class="list-group-header py-1 px-3 text-muted fs-6 font-weight-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.7rem !important;">
-                                                {% trans "Ungrouped Tenants" %}
-                                            </div>
-                                        {% endif %}
-                                        {% for tenant in item.tenants %}
-                                            <a href="?switch_tenant={{ tenant.id }}" class="list-group-item list-group-item-action py-2 ps-4 {% if request.active_tenant.id == tenant.id %}active{% endif %}">
-                                                <div class="d-flex align-items-center">
-                                                    <span class="status-dot bg-secondary me-2"></span>
-                                                    <span>{{ tenant.name }}</span>
-                                                </div>
-                                            </a>
-                                        {% endfor %}
-                                    {% empty %}
-                                        <div class="list-group-item text-muted text-center py-3">
-                                            {% trans "No tenants available" %}
-                                        </div>
-                                    {% endfor %}
-                                {% else %}
-                                    {% for item in grouped_memberships_switcher %}
-                                        {% if item.group %}
-                                            <a href="?switch_tenant_group={{ item.group.id }}" class="list-group-header list-group-item-action py-1 px-3 text-muted fs-6 font-weight-bold text-uppercase d-flex justify-content-between align-items-center {% if request.active_tenant_group.id == item.group.id %}active bg-secondary-lt{% endif %}" style="letter-spacing: 0.05em; font-size: 0.7rem !important; cursor: pointer; text-decoration: none;">
-                                                <span>{{ item.group.name }}</span>
-                                                <span class="badge bg-secondary-lt">{% trans "Show All" %}</span>
-                                            </a>
-                                        {% else %}
-                                            <div class="list-group-header py-1 px-3 text-muted fs-6 font-weight-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.7rem !important;">
-                                                {% trans "Ungrouped" %}
-                                            </div>
-                                        {% endif %}
-                                        {% for membership in item.memberships %}
-                                            <a href="?switch_tenant={{ membership.tenant.id }}" class="list-group-item list-group-item-action py-2 ps-4 {% if request.active_tenant.id == membership.tenant.id %}active{% endif %}">
-                                                <div class="d-flex align-items-center">
-                                                    <span class="status-dot {% if membership.role == 'admin' %}bg-red{% elif membership.role == 'member' %}bg-green{% else %}bg-orange{% endif %} me-2"></span>
-                                                    <span class="text-truncate" style="max-width: 130px;">{{ membership.tenant.name }}</span>
-                                                    <span class="badge bg-secondary-lt ms-auto">{{ membership.get_role_display }}</span>
-                                                </div>
-                                            </a>
-                                        {% endfor %}
-                                    {% empty %}
-                                        <div class="list-group-item text-muted text-center py-3">
-                                            {% trans "No workspace memberships" %}
-                                        </div>
-                                    {% endfor %}
-                                {% endif %}
+                                {% include 'global_includes/_tenant_switcher_list.html' %}
                             </div>
                             {% if request.user.is_superuser or request.active_membership.role == 'admin' %}
                                 <div class="card-footer text-center py-2">
@@ -108,25 +51,7 @@
                 </div>
                 {% endif %}
 
-                {% get_available_languages as LANGUAGES %}
-                {% get_current_language as CURRENT_LANG %}
-                {% if LANGUAGES|length > 1 %}
-                <div class="nav-item dropdown me-2">
-                    <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" aria-label="{% translate 'Change language' %}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" /><path d="M3.6 9h16.8" /><path d="M3.6 15h16.8" /><path d="M11.5 3a17 17 0 0 0 0 18" /><path d="M12.5 3a17 17 0 0 1 0 18" /></svg>
-                    </a>
-                    <form action="{% url 'set_language' %}" method="post" class="dropdown-menu dropdown-menu-end dropdown-menu-arrow py-1" hx-boost="false">
-                        {% csrf_token %}
-                        <input name="next" type="hidden" value="{{ request.get_full_path }}">
-                        {% for lang_code, lang_name in LANGUAGES %}
-                        <button type="submit" name="language" value="{{ lang_code }}"
-                                class="dropdown-item text-start border-0 bg-transparent w-100 {% if lang_code == CURRENT_LANG %}active{% endif %}">
-                            {{ lang_name }}
-                        </button>
-                        {% endfor %}
-                    </form>
-                </div>
-                {% endif %}
+                {# Language selection moved to user Preferences (applies app-wide). #}
                 <button class="nav-link px-0 color-mode-toggle hide-theme-dark" title="{% translate 'Enable dark mode' %}" data-bs-toggle="tooltip" data-bs-placement="bottom">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" /></svg>
                 </button>

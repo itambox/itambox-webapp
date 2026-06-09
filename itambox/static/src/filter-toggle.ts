@@ -17,6 +17,7 @@
       filterCol.classList.remove('d-none');
       mainCol.classList.remove('col-md-12');
       mainCol.classList.add('col-md-9');
+      document.documentElement.classList.remove('itambox-filters-hidden');
       if (toggleBtn) {
         toggleBtn.classList.add('active');
         toggleBtn.classList.remove('btn-outline-secondary');
@@ -27,6 +28,7 @@
       filterCol.classList.add('d-none');
       mainCol.classList.remove('col-md-9');
       mainCol.classList.add('col-md-12');
+      document.documentElement.classList.add('itambox-filters-hidden');
       if (toggleBtn) {
         toggleBtn.classList.remove('active');
         toggleBtn.classList.remove('btn-outline-primary');
@@ -59,6 +61,7 @@
       filterCol.classList.remove('d-none');
       mainCol.classList.remove('col-md-12');
       mainCol.classList.add('col-md-9');
+      document.documentElement.classList.remove('itambox-filters-hidden');
       if (toggleBtn) {
         toggleBtn.classList.add('active');
         toggleBtn.classList.remove('btn-outline-secondary');
@@ -68,6 +71,7 @@
       filterCol.classList.add('d-none');
       mainCol.classList.remove('col-md-9');
       mainCol.classList.add('col-md-12');
+      document.documentElement.classList.add('itambox-filters-hidden');
       if (toggleBtn) {
         toggleBtn.classList.remove('active');
         toggleBtn.classList.remove('btn-outline-primary');

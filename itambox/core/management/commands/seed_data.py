@@ -1799,7 +1799,20 @@ class Command(BaseCommand):
             defaults={
                 'description': '2x1 inch label with QR code',
                 'barcode_format': 'qr',
-                'template_code': '^XA^FO50,50^BQN,2,10^FDQA,{{ asset.tag }}^FS^XZ'
+                # Rendered as HTML (Jinja2) by the label engine. Available vars:
+                # asset/obj, barcode_img, barcode_data_uri, barcode_format.
+                'template_code': (
+                    '<table style="width:100%; border-collapse:collapse;">'
+                    '<tr>'
+                    '<td style="width:55%; vertical-align:middle; font-family:Helvetica,Arial,sans-serif;">'
+                    '<div style="font-size:9.5pt; font-weight:bold;">{{ asset.name }}</div>'
+                    '<div style="font-size:8pt; font-family:monospace; background:#000; color:#fff;'
+                    ' padding:1px 3px; display:inline-block; border-radius:2px;">{{ asset.asset_tag }}</div>'
+                    '</td>'
+                    '<td style="width:45%; text-align:right;">{{ barcode_img }}</td>'
+                    '</tr>'
+                    '</table>'
+                )
             }
         )
 

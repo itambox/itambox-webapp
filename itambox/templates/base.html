@@ -26,6 +26,10 @@
     <script nonce="{{ request.csp_nonce }}">
         (function(){try{var t=localStorage.getItem('itambox.theme');if(t)document.documentElement.setAttribute('data-bs-theme',t);else if(window.matchMedia('(prefers-color-scheme:dark)').matches)document.documentElement.setAttribute('data-bs-theme','dark');}catch(e){}})();
     </script>
+    {# FOUC prevention: apply stored filter-panel collapse state before paint (avoids a layout jump on reload) #}
+    <script nonce="{{ request.csp_nonce }}">
+        (function(){try{var p=localStorage.getItem('itambox-show-filters');var show=p==='false'?false:(p==='true'?true:!(window.innerWidth<768));if(!show)document.documentElement.classList.add('itambox-filters-hidden');}catch(e){}})();
+    </script>
     <!-- CSS files -->
     <link href="{% static 'dist/vendor/tabler/css/tabler.min.css' %}" rel="stylesheet"/>
     <link href="{% static 'dist/vendor/tabler/css/tabler-flags.min.css' %}" rel="stylesheet"/>

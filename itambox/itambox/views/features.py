@@ -386,6 +386,8 @@ class LabelSelectView(LoginRequiredMixin, View):
 
 class LabelPrintView(LoginRequiredMixin, View):
     def get(self, request, template_id, object_id):
+        from core.tasks.labels import render_labels_pdf
+
         label_template = get_object_or_404(LabelTemplate, pk=template_id)
         content_type = label_template.content_type if hasattr(label_template, 'content_type') else None
 
@@ -393,54 +395,16 @@ class LabelPrintView(LoginRequiredMixin, View):
             model = content_type.model_class()
             obj = get_object_or_404(model, pk=object_id)
         else:
-            model = None
-            try:
-                # Dynamic model lookup to break circular dependency
-                Asset = apps.get_model('assets', 'Asset')
-                obj = get_object_or_404(Asset, pk=object_id)
-            except Exception:
-                obj = None
+            # Dynamic model lookup to break circular dependency
+            Asset = apps.get_model('assets', 'Asset')
+            obj = get_object_or_404(Asset, pk=object_id)
 
-        if label_template.template_code:
-            from jinja2.sandbox import SandboxedEnvironment
-            env = SandboxedEnvironment()
-            template = env.from_string(label_template.template_code)
-            html = template.render(obj=obj, barcode_format=label_template.barcode_format)
-        else:
-            html = self._render_default_label(obj, label_template)
-
-        response = HttpResponse(html)
-        response['Content-Type'] = 'text/html'
+        # Same engine as the bulk print job — synchronous, no background Job.
+        pdf_bytes = render_labels_pdf([obj], label_template)
+        response = HttpResponse(pdf_bytes, content_type='application/pdf')
+        filename = getattr(obj, 'asset_tag', None) or object_id
+        response['Content-Disposition'] = f'inline; filename="label_{filename}.pdf"'
         return response
-
-    def _render_default_label(self, obj, label_template):
-        barcode_fmt = label_template.barcode_format
-        obj_name = str(obj) if obj else 'Unknown'
-        asset_tag = getattr(obj, 'asset_tag', '') if obj else ''
-        barcode_img = ''
-        if barcode_fmt:
-            barcode_img = self._generate_barcode(asset_tag or obj_name, barcode_fmt)
-        return f'<html><body style="width:{label_template.page_width}in;height:{label_template.page_height}in;margin:0;padding:5pt;font-family:sans-serif;font-size:8pt;"><div style="text-align:center"><h3 style="margin:0">{obj_name}</h3>{barcode_img}<p style="margin:2pt 0">{asset_tag}</p></div></body></html>'
-
-    def _generate_barcode(self, data, fmt):
-        try:
-            import segno
-            qr = segno.make(data)
-            return f'<div style="max-width:100%">{qr.svg_inline(scale=4, border=0)}</div>'
-        except Exception:
-            try:
-                import barcode
-                from barcode.writer import SVGWriter
-                from io import BytesIO
-                buf = BytesIO()
-                if fmt.lower() in ('code128', 'code39'):
-                    bc_class = barcode.get(fmt.lower(), lambda x: x)
-                    bc = bc_class(data, writer=SVGWriter())
-                    bc.write(buf)
-                    return buf.getvalue().decode('utf-8')
-            except Exception:
-                pass
-        return ''
 
 
 @method_decorator(login_required, name='dispatch')

@@ -703,7 +703,7 @@ class LabelTemplate(ChangeLoggingMixin, BaseModel):
         return self.name
 
     def get_absolute_url(self):
-        return reverse('label_template_detail', kwargs={'pk': self.pk})
+        return reverse('labeltemplate_detail', kwargs={'pk': self.pk})
 
 
 

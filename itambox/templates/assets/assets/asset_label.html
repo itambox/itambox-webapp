@@ -20,9 +20,6 @@
             height: 1.25in;
             box-sizing: border-box;
             padding: 0.1in;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
             overflow: hidden;
             border: 1px dashed #ccc; /* Visual indicator for screen */
             margin: 20px auto;
@@ -127,17 +124,8 @@
     </div>
 
     <div class="label-container">
-        <!-- Pure vector QR SVG from segno -->
-        <div class="qr-code-box">
-            {{ qr_svg|safe }}
-        </div>
-        <div class="metadata-box">
-            <span class="asset-tag">{{ asset.asset_tag }}</span>
-            <span class="asset-title">{{ asset.name }}</span>
-            {% if asset.serial_number %}
-                <span class="asset-serial">S/N: {{ asset.serial_number }}</span>
-            {% endif %}
-        </div>
+        {# Same label card the print engine renders — preview == printed output #}
+        {{ label_card|safe }}
     </div>
 
     <script nonce="{{ request.csp_nonce }}">

@@ -1,0 +1,90 @@
+{% load i18n %}
+{# Persistent Bulk-Action Toolbar (NetBox-style). Always docked at the bottom of the #}
+{# list; buttons stay greyed/disabled until one or more rows are selected (toggled by #}
+{# batch-actions.ts). Shared by the full page (object_list.html) and the HTMX partial #}
+{# (htmx/list_page_wrapper.html) so the two never drift apart. #}
+{# Expects: is_deleted_view, model_name_str, bulk_restore_url, bulk_purge_url, bulk_edit_url, bulk_delete_url, request #}
+<div id="bulk-action-toolbar" class="bulk-action-toolbar d-flex flex-wrap justify-content-end align-items-center gap-2 px-3 pt-2 pb-3">
+    <span class="bulk-selected-count text-secondary small me-1">{% translate "0 selected" %}</span>
+    {% if is_deleted_view %}
+    <form method="post" action="{{ bulk_restore_url }}" class="bulk-restore-form d-inline" hx-boost="false">
+        {% csrf_token %}
+        <div class="bulk-pks-container d-inline"></div>
+        <button type="button" class="btn btn-sm btn-success bulk-action-btn btn-bulk-restore" disabled>
+            <i class="mdi mdi-backup-restore me-1"></i>
+            {% translate "Restore Selected" %}
+        </button>
+    </form>
+    <form method="post" action="{{ bulk_purge_url }}" class="bulk-purge-form d-inline" hx-boost="false">
+        {% csrf_token %}
+        <div class="bulk-pks-container d-inline"></div>
+        <button type="button" class="btn btn-sm btn-outline-danger bulk-action-btn btn-bulk-purge" disabled>
+            <i class="mdi mdi-delete-forever me-1"></i>
+            {% translate "Purge Selected" %}
+        </button>
+    </form>
+    {% else %}
+    {% if model_name_str == 'assets.asset' %}
+    <button type="button" class="btn btn-sm btn-primary bulk-action-btn" id="btn-bulk-assign"
+            data-bs-toggle="modal" data-bs-target="#bulk-assign-modal" disabled
+            title="{% translate 'Assign selected assets to a holder' %}">
+        <i class="mdi mdi-account-plus-outline me-1"></i>
+        {% translate "Assign Selected" %}
+    </button>
+    <button type="button" class="btn btn-sm btn-info text-white bulk-action-btn" id="btn-bulk-print"
+            data-bs-toggle="modal" data-bs-target="#bulk-print-modal" disabled
+            title="{% translate 'Print labels for selected assets' %}">
+        <i class="mdi mdi-printer me-1"></i>
+        {% translate "Print Labels" %}
+    </button>
+    {% endif %}
+    {% if model_name_str == 'assets.assetrequest' %}
+    <button type="button" class="btn btn-sm btn-success bulk-action-btn btn-bulk-receive" disabled>
+        <i class="mdi mdi-plus-box-outline me-1"></i>
+        {% translate "Receive & Allocate Stock" %}
+    </button>
+    {% endif %}
+
+    {% if model_name_str == 'core.alertlog' %}
+    <form method="post" action="{% url 'alertlog_bulk_acknowledge' %}" class="bulk-acknowledge-form d-inline" hx-boost="false">
+        {% csrf_token %}
+        <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+        <div class="bulk-pks-container d-inline"></div>
+        <button type="button" class="btn btn-sm btn-outline-warning bulk-action-btn btn-bulk-acknowledge" disabled>
+            <i class="mdi mdi-eye-outline me-1"></i>
+            {% translate "Acknowledge Selected" %}
+        </button>
+    </form>
+    <form method="post" action="{% url 'alertlog_bulk_resolve' %}" class="bulk-resolve-form d-inline" hx-boost="false">
+        {% csrf_token %}
+        <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+        <div class="bulk-pks-container d-inline"></div>
+        <button type="button" class="btn btn-sm btn-outline-success bulk-action-btn btn-bulk-resolve" disabled>
+            <i class="mdi mdi-check me-1"></i>
+            {% translate "Resolve Selected" %}
+        </button>
+    </form>
+    {% else %}
+    <form method="post" action="{{ bulk_edit_url }}" class="bulk-edit-form d-inline" hx-boost="false">
+        {% csrf_token %}
+        <input type="hidden" name="model_name" value="{{ model_name_str }}">
+        <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+        <div class="bulk-pks-container d-inline"></div>
+        <button type="button" class="btn btn-sm btn-outline-primary bulk-action-btn btn-bulk-edit" disabled>
+            <i class="mdi mdi-pencil-outline me-1"></i>
+            {% translate "Edit Selected" %}
+        </button>
+    </form>
+    <form method="post" action="{{ bulk_delete_url }}" class="bulk-delete-form d-inline" hx-boost="false">
+        {% csrf_token %}
+        <input type="hidden" name="model_name" value="{{ model_name_str }}">
+        <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+        <div class="bulk-pks-container d-inline"></div>
+        <button type="button" class="btn btn-sm btn-outline-danger bulk-action-btn btn-bulk-delete" disabled>
+            <i class="mdi mdi-trash-can-outline me-1"></i>
+            {% translate "Delete Selected" %}
+        </button>
+    </form>
+    {% endif %}
+    {% endif %}
+</div>

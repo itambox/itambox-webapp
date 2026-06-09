@@ -64,37 +64,38 @@
         </ul>
     </div>
 
+    {# On phones these controls collapse to icon-only to save space; labels return at ≥sm. #}
     <span id="dashboard-locked-controls">
         <button id="unlock-dashboard" class="btn btn-outline-secondary d-flex align-items-center"
             title="{% trans 'Unlock dashboard to resize and reorder widgets' %}">
-            <i class="mdi mdi-lock-open-outline me-1"></i>
-            {% trans 'Unlock' %}
+            <i class="mdi mdi-lock-open-outline"></i>
+            <span class="d-none d-sm-inline ms-1">{% trans 'Unlock' %}</span>
         </button>
     </span>
     <span id="dashboard-unlocked-controls" style="display:none">
         <button id="save-dashboard" class="btn btn-primary d-flex align-items-center"
             title="{% trans 'Save layout' %}">
-            <i class="mdi mdi-floppy me-1"></i>
-            {% trans 'Save Layout' %}
+            <i class="mdi mdi-floppy"></i>
+            <span class="d-none d-sm-inline ms-1">{% trans 'Save Layout' %}</span>
         </button>
         <button class="btn btn-outline-secondary d-flex align-items-center"
             hx-get="{% url 'extras:dashboard_widget_add' dashboard_id=active_dashboard.id %}" hx-target="#dashboard-modal-content"
-            data-bs-toggle="modal" data-bs-target="#dashboard-modal">
-            <i class="mdi mdi-plus me-1"></i>
-            {% trans 'Add Widget' %}
+            data-bs-toggle="modal" data-bs-target="#dashboard-modal" title="{% trans 'Add Widget' %}">
+            <i class="mdi mdi-plus"></i>
+            <span class="d-none d-sm-inline ms-1">{% trans 'Add Widget' %}</span>
         </button>
         <button id="lock-dashboard" class="btn btn-outline-secondary d-flex align-items-center"
             title="{% trans 'Lock dashboard' %}">
-            <i class="mdi mdi-lock me-1"></i>
-            {% trans 'Lock' %}
+            <i class="mdi mdi-lock"></i>
+            <span class="d-none d-sm-inline ms-1">{% trans 'Lock' %}</span>
         </button>
     </span>
     <form method="post" action="{% url 'extras:dashboard_reset' dashboard_id=active_dashboard.id %}" class="d-inline"
         onsubmit="return confirm('Reset dashboard to default layout? This cannot be undone.')">
         {% csrf_token %}
-        <button type="submit" class="btn btn-outline-danger">
-            <i class="mdi mdi-refresh me-1"></i>
-            {% trans 'Reset' %}
+        <button type="submit" class="btn btn-outline-danger" title="{% trans 'Reset' %}">
+            <i class="mdi mdi-refresh"></i>
+            <span class="d-none d-sm-inline ms-1">{% trans 'Reset' %}</span>
         </button>
     </form>
 </div>

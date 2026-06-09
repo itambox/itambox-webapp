@@ -36,8 +36,6 @@ from itambox.quick_add import QuickAddMixin
 
 from organization.models import AssetHolder
 
-import segno
-
 User = get_user_model()
 
 
@@ -440,21 +438,21 @@ def asset_label_print(request, pk, template_id=None):
 
     if template_id:
         from core.models import LabelTemplate
+        from core.tasks.labels import render_labels_pdf
         label_template = get_object_or_404(LabelTemplate, pk=template_id)
-        if label_template.template_code:
-            from jinja2.sandbox import SandboxedEnvironment
-            env = SandboxedEnvironment()
-            tpl = env.from_string(label_template.template_code)
-            html = tpl.render(obj=asset, barcode_format=label_template.barcode_format)
-            return HttpResponse(html)
+        # Use the same engine as the bulk print job — synchronously, no background Job.
+        pdf_bytes = render_labels_pdf([asset], label_template)
+        response = HttpResponse(pdf_bytes, content_type='application/pdf')
+        response['Content-Disposition'] = f'inline; filename="label_{asset.asset_tag or asset.pk}.pdf"'
+        return response
 
-    qr_data = request.build_absolute_uri(asset.get_absolute_url())
-    qr = segno.make(qr_data)
-    qr_svg = qr.svg_inline(scale=4, border=0)
-
+    # No template chosen — render the on-screen preview using the SAME label card
+    # the print engine produces, so the preview matches the printed (bulk) output.
+    from core.tasks.labels import generate_base64_barcode, _default_label_card
+    barcode_uri = generate_base64_barcode(asset, 'qr')
     context = {
         'asset': asset,
-        'qr_svg': qr_svg,
+        'label_card': _default_label_card(asset, barcode_uri),
     }
     return render(request, "assets/assets/asset_label.html", context)
 

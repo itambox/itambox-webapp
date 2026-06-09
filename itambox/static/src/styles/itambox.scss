@@ -456,16 +456,23 @@ body.offcanvas-open {
         color: var(--tblr-body-color) !important;
     }
 
-    // Center brand on mobile viewports
+    // Keep the brand in normal flow on mobile so it never overlaps the
+    // right-hand action icons (notifications / theme toggle / profile).
     @media (max-width: 991.98px) {
         .navbar-brand {
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
-            margin: 0 !important;
+            position: static;
+            transform: none;
+            margin: 0 0.5rem !important;
             padding-top: 0.5rem !important;
             padding-bottom: 0.5rem !important;
-            z-index: 1;
+            min-width: 0;
+            flex-shrink: 1;
+
+            .navbar-brand-image {
+                height: 28px !important;
+                min-height: 28px !important;
+                max-width: 100%;
+            }
         }
     }
 
@@ -595,7 +602,8 @@ body.offcanvas-open {
     #sidebar-menu.offcanvas-lg {
         background-color: var(--itambox-sidebar-bg, var(--tblr-bg-surface)) !important;
         border-right: 1px solid var(--itambox-sidebar-border, var(--tblr-border-color)) !important;
-        width: var(--itambox-sidebar-width, 250px) !important;
+        // A touch wider for comfortable reading; capped so it never swallows the screen
+        width: min(86vw, 320px) !important;
 
         .offcanvas-header {
             background-color: var(--itambox-sidebar-bg, var(--tblr-bg-surface)) !important;
@@ -609,6 +617,23 @@ body.offcanvas-open {
         .offcanvas-body {
             background-color: var(--itambox-sidebar-bg, var(--tblr-bg-surface)) !important;
             padding: 0 !important;
+
+            // Allow the scrollable nav region to actually shrink & scroll inside
+            // the flex column (min-height:auto would otherwise block overflow).
+            > .flex-grow-1 {
+                min-height: 0;
+            }
+        }
+
+        // Workspace/tenant switcher pinned at the bottom — keep it solidly opaque
+        // so the scrolling nav above never bleeds through it.
+        .mobile-tenant-switcher-wrap {
+            background-color: var(--itambox-sidebar-bg, var(--tblr-bg-surface)) !important;
+
+            .list-group,
+            .list-group-item {
+                background-color: var(--itambox-sidebar-bg, var(--tblr-bg-surface));
+            }
         }
     }
 }
@@ -805,6 +830,22 @@ body.offcanvas-open {
     td:last-child::before,
     td.col-checkout::before {
         background: linear-gradient(to left, rgba(0, 0, 0, 0.15), transparent) !important;
+    }
+}
+
+// ---- Filter panel collapse (FOUC prevention) ----
+// The .itambox-filters-hidden class is set on <html> by a blocking head script
+// (and kept in sync by filter-toggle.ts) so the collapsed state is applied before
+// first paint — no flash of the filter column and no layout jump on reload.
+html.itambox-filters-hidden #object-list-filter-col {
+    display: none !important;
+}
+
+@media (min-width: 768px) {
+    html.itambox-filters-hidden #object-list-main-col {
+        flex: 0 0 100% !important;
+        width: 100% !important;
+        max-width: 100% !important;
     }
 }
 
@@ -1247,4 +1288,227 @@ textarea {
     border-radius: 20px;
     pointer-events: none;
     box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.7);
+}
+
+// ============================================================
+//  Mobile (phone) Responsive Enhancements  —  ≤ 575.98px
+// ============================================================
+// Phones have very little horizontal room. These rules reclaim the
+// wasted left/right gutters, shrink chrome a touch, and convert the
+// wide data tables into stacked "cards" so no horizontal scrolling
+// (and no squashed action columns) is needed on small screens.
+@media (max-width: 575.98px) {
+
+    // ---- Reclaim horizontal space: near edge-to-edge content ----
+    .page-body > .container-fluid,
+    .page-header > .container-fluid {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+
+    // Tighten the grid gutter so list/detail cards sit closer to the edges
+    .page-body > .container-fluid > .row {
+        --bs-gutter-x: 0.5rem;
+        --tblr-gutter-x: 0.5rem;
+    }
+
+    // ---- A tiny bit more compact buttons ----
+    .btn {
+        padding: 0.3125rem 0.625rem;
+        font-size: 0.8125rem;
+    }
+
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+
+    // Page-header action row: shrink the gap so the compact controls fit
+    .page-header .btn-list {
+        gap: 0.375rem;
+    }
+
+    // Quick search reclaims the room freed by the now icon-only toolbar buttons
+    .quicksearch-results-tab {
+        max-width: none !important;
+        margin-right: 0.5rem !important;
+    }
+
+    // ============================================================
+    //  Card-mode tables — stack each row's columns into a card
+    // ============================================================
+    .card-table {
+        display: block;
+        width: 100%;
+
+        // Column headers are redundant once values are labelled inline
+        thead {
+            display: none;
+        }
+
+        tbody,
+        tfoot {
+            display: block;
+            width: 100%;
+        }
+
+        tbody tr {
+            display: block;
+            position: relative;
+            margin: 0 0 0.625rem;
+            padding: 0.25rem 0;
+            border: 1px solid var(--tblr-border-color);
+            border-radius: var(--tblr-border-radius, 6px);
+            background: var(--tblr-bg-surface);
+        }
+
+        // Each cell becomes a "label : value" row
+        td {
+            display: flex !important;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            width: auto !important;
+            min-width: 0 !important;
+            max-width: none !important;
+            position: static !important;
+            inset: auto !important;
+            text-align: right !important;
+            white-space: normal !important;
+            padding: 0.4rem 0.85rem !important;
+            border: 0 !important;
+            border-bottom: 1px solid var(--tblr-border-color) !important;
+
+            // Field label sourced from the cell's data-label attribute
+            &::before {
+                content: attr(data-label);
+                flex: 0 0 auto;
+                margin-right: auto;
+                font-weight: 600;
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                letter-spacing: 0.02em;
+                color: var(--tblr-secondary-color);
+                text-align: left;
+                white-space: nowrap;
+            }
+        }
+
+        // Override the desktop sticky-column rules (these carry !important and
+        // higher specificity, so they must be neutralized at matching specificity)
+        td.col-actions,
+        td.col-checkout {
+            position: static !important;
+            right: auto !important;
+            left: auto !important;
+            width: auto !important;
+            min-width: 0 !important;
+            max-width: none !important;
+            text-align: right !important;
+            justify-content: flex-end;
+        }
+
+        // Remove all desktop sticky edge-shadow pseudo-elements
+        td:first-child::after,
+        td:last-child::before,
+        td.col-checkout::before,
+        td.col-checkout~td:last-child::before {
+            content: none !important;
+        }
+
+        // Cells with no header (checkbox, actions, checkout): drop the empty label
+        td[data-label=""]::before {
+            content: none !important;
+        }
+
+        // Checkbox (select) cell — sit it at the card's top-left
+        td:first-child {
+            justify-content: flex-start;
+        }
+
+        // Flush the final cell against the card's rounded bottom
+        tbody tr td:last-child {
+            border-bottom: 0 !important;
+        }
+
+        // Promote the primary "name" cell to read like the card title
+        td.col-name {
+            font-weight: 600;
+            font-size: 0.9375rem;
+        }
+    }
+}
+
+// ============================================================
+//  Mobile-header action dropdowns (notifications / profile)
+// ============================================================
+// These dropdowns sit inside the vertical navbar but OUTSIDE #sidebar-menu,
+// so they wrongly inherited the sidebar's transparent dropdown styling and
+// rendered invisible. Restore the standard solid dropdown surface.
+.navbar-vertical .d-lg-none .nav-item .dropdown-menu {
+    background-color: var(--tblr-dropdown-bg, var(--tblr-bg-surface)) !important;
+    border: 1px solid var(--tblr-dropdown-border-color, var(--tblr-border-color)) !important;
+    box-shadow: var(--tblr-box-shadow-lg) !important;
+    padding: 0.5rem 0 !important;
+    margin-top: 0.25rem !important;
+
+    .dropdown-item {
+        border-left: 0 !important;
+        border-radius: 0 !important;
+        padding: 0.5rem 1rem !important;
+        font-size: 0.875rem !important;
+        color: var(--tblr-dropdown-link-color, var(--tblr-body-color)) !important;
+
+        &:hover,
+        &:focus {
+            padding-left: 1rem !important; // cancel the sidebar's micro-slide
+            background-color: var(--tblr-dropdown-link-hover-bg, var(--tblr-bg-surface-secondary)) !important;
+            color: var(--tblr-dropdown-link-hover-color, var(--tblr-body-color)) !important;
+        }
+    }
+}
+
+// Full-width mobile dropdown panel (e.g. notifications): span the whole
+// viewport width instead of a narrow card that overflows off-screen.
+// Pairs with data-bs-display="static" on the toggle so Popper doesn't fight us.
+@media (max-width: 991.98px) {
+    .navbar-vertical .d-lg-none .dropdown-menu.mobile-fullwidth-dropdown {
+        position: fixed !important;
+        top: 3.5rem !important;
+        left: 0 !important;
+        right: 0 !important;
+        transform: none !important;
+        width: 100vw !important;
+        max-width: 100vw !important;
+        margin: 0 !important;
+        border-left: 0 !important;
+        border-right: 0 !important;
+        border-radius: 0 !important;
+
+        .card {
+            width: auto !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+            border-left: 0 !important;
+            border-right: 0 !important;
+        }
+    }
+}
+
+// ============================================================
+//  Dashboard widgets on small screens  —  ≤ 991.98px
+// ============================================================
+// GridStack is skipped below 992px (see dashboard.ts), so the native
+// Bootstrap grid (col-12 / col-md-6) drives a 1–2 column stack. Let the
+// widget cards grow to fit their content instead of the fixed gs-h heights.
+@media (max-width: 991.98px) {
+    #dashboard-grid:not(.grid-stack) [data-gs-h] .card {
+        height: auto !important;
+        min-height: 8rem;
+    }
+
+    // Keep the dashboard control buttons on one tidy, wrapping row
+    #dashboard-controls {
+        gap: 0.375rem;
+    }
 }

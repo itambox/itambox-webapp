@@ -111,7 +111,25 @@ class UserPreferencesView(LoginRequiredMixin, BaseHTMXView, TemplateResponseMixi
         if form.is_valid():
             form.save()
             messages.success(request, _("Preferences saved successfully."))
-            return redirect('users:user_preferences')
+            response = redirect('users:user_preferences')
+            # Apply the chosen interface language app-wide via the standard
+            # language cookie (read by Django's LocaleMiddleware on every request).
+            from django.conf import settings
+            from django.utils import translation
+            language = form.cleaned_data.get('language')
+            if language and language in dict(settings.LANGUAGES):
+                translation.activate(language)
+                response.set_cookie(
+                    settings.LANGUAGE_COOKIE_NAME,
+                    language,
+                    max_age=settings.LANGUAGE_COOKIE_AGE,
+                    path=settings.LANGUAGE_COOKIE_PATH,
+                    domain=settings.LANGUAGE_COOKIE_DOMAIN,
+                    secure=settings.LANGUAGE_COOKIE_SECURE,
+                    httponly=settings.LANGUAGE_COOKIE_HTTPONLY,
+                    samesite=settings.LANGUAGE_COOKIE_SAMESITE,
+                )
+            return response
         else:
             messages.error(request, _("There was an error saving your preferences."))
         # Pass invalid form back to context
