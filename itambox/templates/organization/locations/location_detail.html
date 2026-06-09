@@ -31,7 +31,7 @@
 {% block extra_tabs %}
     <li class="nav-item" role="presentation">
         <a href="?tab=assets" class="nav-link {% if request.GET.tab == 'assets' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#assets" role="tab" aria-selected="{% if request.GET.tab == 'assets' %}true{% else %}false{% endif %}">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-green" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l18 0" /><path d="M9 8l1 0" /><path d="M9 12l1 0" /><path d="M9 16l1 0" /><path d="M14 8l1 0" /><path d="M14 12l1 0" /><path d="M14 16l1 0" /><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16" /></svg>
+            <i class="mdi mdi-office-building-outline me-1 text-green"></i>
             {% translate "Assets" %} <span class="badge bg-green-lt ms-2">{{ assets_table.rows|length }}</span>
         </a>
     </li>
@@ -67,7 +67,7 @@
     </li>
     <li class="nav-item" role="presentation">
         <a href="?tab=child-locations" class="nav-link {% if request.GET.tab == 'child-locations' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#child-locations" role="tab" aria-selected="{% if request.GET.tab == 'child-locations' %}true{% else %}false{% endif %}">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-azure" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M3 21v-2a4 4 0 0 1 4 -4h10a4 4 0 0 1 4 4v2" /></svg>
+            <i class="mdi mdi-account-outline me-1 text-azure"></i>
             {% translate "Child Locations" %} <span class="badge bg-azure-lt ms-2">{{ object.children.count }}</span>
         </a>
     </li>

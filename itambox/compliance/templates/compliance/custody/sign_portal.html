@@ -59,7 +59,7 @@
             {% if is_preview %}
                 <div class="alert alert-warning mb-3" role="alert" style="border-left: 4px solid #f59f00;">
                     <div class="d-flex align-items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon me-2 text-warning" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
+                        <i class="mdi mdi-alert-circle-outline alert-icon me-2 text-warning"></i>
                         <div>
                             <strong class="text-warning">{% translate "Live Template Preview Sandbox" %}</strong><br>
                             <span class="small">{% translate "This is a secure simulation showing exactly how users will view this template. Form submissions are completely disabled." %}</span>
@@ -72,7 +72,7 @@
                 <div class="alert alert-danger" role="alert">
                     <div class="d-flex">
                         <div>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
+                            <i class="mdi mdi-alert-circle-outline alert-icon"></i>
                         </div>
                         <div>{{ error }}</div>
                     </div>

@@ -3,7 +3,7 @@
 <div class="alert alert-important alert-danger shadow-sm mb-4" role="alert">
     <div class="d-flex">
         <div>
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9v2m0 4v.01m-6.938 2.002a9 9 0 1 1 13.876 0" /></svg>
+            <i class="mdi mdi-alert-outline alert-icon"></i>
         </div>
         <div>
             <strong>{% translate "Out of Stock Alert:" %}</strong> {% translate "This consumable item is completely depleted. Reorder immediately!" %}
@@ -14,7 +14,7 @@
 <div class="alert alert-important alert-warning shadow-sm mb-4" role="alert">
     <div class="d-flex">
         <div>
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9v2m0 4v.01m-6.938 2.002a9 9 0 1 1 13.876 0" /></svg>
+            <i class="mdi mdi-alert-outline alert-icon"></i>
         </div>
         <div>
             <strong>{% translate "Low Stock Warning:" %}</strong> {% translate "Stock count has dipped below the configured safety threshold of" %} <strong>{{ object.min_qty }}</strong> {% translate "units. Consider replenishing inventory." %}

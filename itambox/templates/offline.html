@@ -8,16 +8,7 @@
   <div class="container container-tight py-4">
     <div class="empty">
       <div class="empty-icon text-danger">
-        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-wifi-off" width="44" height="44" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-          <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-          <line x1="3" y1="3" x2="21" y2="21" />
-          <path d="M18 18a8.994 8.994 0 0 0 -5.048 -2.454m-4.865 -1.046a9 9 0 0 0 -5.087 3.5" />
-          <path d="M12 12a15.998 15.998 0 0 0 -8 5" />
-          <path d="M20 17a16.12 16.12 0 0 0 -3 -2" />
-          <path d="M12 12a16.03 16.03 0 0 1 4 -1" />
-          <path d="M21 8a21.996 21.996 0 0 0 -6.497 -1.503m-4.996 -.497a22 22 0 0 0 -6.507 2" />
-          <line x1="12" y1="18" x2="12.01" y2="18" />
-        </svg>
+        <i class="mdi mdi-wifi-off icon-tabler icon-tabler-wifi-off"></i>
       </div>
       <p class="empty-title">{% translate "You are offline" %}</p>
       <p class="empty-subtitle text-muted">
@@ -25,7 +16,7 @@
       </p>
       <div class="empty-action">
         <button id="retry-connection-btn" class="btn btn-primary">
-          <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -5v5h5" /><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 5v-5h-5" /></svg>
+          <i class="mdi mdi-refresh"></i>
           {% translate "Retry Connection" %}
         </button>
       </div>

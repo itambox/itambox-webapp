@@ -14,7 +14,7 @@
 {% block extra_tabs %}
     <li class="nav-item" role="presentation">
         <a href="?tab=asset-types" data-bs-target="#asset-types" class="nav-link {% if request.GET.tab == 'asset-types' %}active{% endif %}" data-bs-toggle="tab" role="tab">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-blue" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" /><path d="M9 4v16" /><path d="M14 10l2 2l-2 2" /></svg>
+            <i class="mdi mdi-application-outline me-1 text-blue"></i>
             {% translate "Asset Types" %} <span class="badge bg-blue-lt ms-2">{{ asset_types_table.rows|length }}</span>
         </a>
     </li>
@@ -26,7 +26,7 @@
     </li>
     <li class="nav-item" role="presentation">
         <a href="?tab=accessories" data-bs-target="#accessories" class="nav-link {% if request.GET.tab == 'accessories' %}active{% endif %}" data-bs-toggle="tab" role="tab">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-purple" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7h3a1 1 0 0 0 1 -1v-1a2 2 0 0 1 4 0v1a1 1 0 0 0 1 1h3a1 1 0 0 1 1 1v3a1 1 0 0 0 1 1h1a2 2 0 0 1 0 4h-1a1 1 0 0 0 -1 1v3a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-1a2 2 0 0 0 -4 0v1a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1v-1a2 2 0 0 0 0 -4v-1a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1" /></svg>
+            <i class="mdi mdi-cog-outline me-1 text-purple"></i>
             {% translate "Accessories" %} <span class="badge bg-purple-lt ms-2">{{ accessories_table.rows|length }}</span>
         </a>
     </li>
@@ -38,7 +38,7 @@
     </li>
     <li class="nav-item" role="presentation">
         <a href="?tab=custody-policies" data-bs-target="#custody-policies" class="nav-link {% if request.GET.tab == 'custody-policies' %}active{% endif %}" data-bs-toggle="tab" role="tab">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-green" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 12l2 2l4 -4" /><path d="M12 3c-1.2 0 -2.4 .6 -3 1.7c-.6 -1.1 -1.8 -1.7 -3 -1.7c-2 0 -3.5 1.5 -3.5 3.5c0 4.5 6 9 6.5 9.5c.5 -.5 6.5 -5 6.5 -9.5c0 -2 -1.5 -3.5 -3.5 -3.5" /><path d="M19 19m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M17 21l4 -4" /></svg>
+            <i class="mdi mdi-hand-heart-outline me-1 text-green"></i>
             {% translate "Custody EULAs & Policies" %} <span class="badge bg-green-lt ms-2">{{ custody_templates|length }}</span>
         </a>
     </li>
@@ -76,7 +76,7 @@
             <div class="card-header border-0 bg-transparent d-flex align-items-center justify-content-between">
                 <h3 class="card-title">{% translate "Tenant-Scoped Custody Policies & EULAs" %}</h3>
                 <a href="{% url 'compliance:custodytemplate_create' %}?category={{ object.pk }}" class="btn btn-primary btn-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+                    <i class="mdi mdi-plus me-1"></i>
                     {% translate "Add Custody Policy" %}
                 </a>
             </div>
@@ -138,10 +138,10 @@
                                     <td>
                                         <div class="btn-list flex-nowrap">
                                             <a href="{% url 'compliance:custodytemplate_update' pk=temp.pk %}" class="btn btn-outline-secondary btn-icon btn-sm" title="{% translate 'Edit' %}">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" /><path d="M13.5 6.5l4 4" /></svg>
+                                                <i class="mdi mdi-pencil-outline"></i>
                                             </a>
                                             <a href="{% url 'compliance:custodytemplate_delete' pk=temp.pk %}" class="btn btn-outline-danger btn-icon btn-sm" title="{% translate 'Delete' %}">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
+                                                <i class="mdi mdi-trash-can-outline"></i>
                                             </a>
                                         </div>
                                     </td>
@@ -152,7 +152,7 @@
                 </div>
             {% else %}
                 <div class="card-body py-5 text-muted text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-lg mb-3 text-muted" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 12l2 2l4 -4" /><path d="M12 3c-1.2 0 -2.4 .6 -3 1.7c-.6 -1.1 -1.8 -1.7 -3 -1.7c-2 0 -3.5 1.5 -3.5 3.5c0 4.5 6 9 6.5 9.5c.5 -.5 6.5 -5 6.5 -9.5c0 -2 -1.5 -3.5 -3.5 -3.5" /><path d="M19 19m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M17 21l4 -4" /></svg>
+                    <i class="mdi mdi-hand-heart-outline fs-1 mb-3 text-muted"></i>
                     <p class="mb-0">{% translate "No custody policies or templates are currently registered for this category." %}</p>
                 </div>
             {% endif %}

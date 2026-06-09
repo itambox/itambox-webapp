@@ -51,7 +51,7 @@
     {% if object.is_modular %}
     <li class="nav-item" role="presentation">
         <a href="?tab=components" data-bs-target="#components" class="nav-link {% if request.GET.tab == 'components' %}active{% endif %}" data-bs-toggle="tab" role="tab">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-teal" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 5m0 1a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1z" /><path d="M9 9h6v6h-6z" /><path d="M3 10h2" /><path d="M3 14h2" /><path d="M10 3v2" /><path d="M14 3v2" /><path d="M21 10h-2" /><path d="M21 14h-2" /><path d="M14 21v-2" /><path d="M10 21v-2" /></svg>
+            <i class="mdi mdi-chip me-1 text-teal"></i>
             {% translate "Components" %} <span class="badge bg-teal-lt ms-2">{{ object.component_allocations.count }}</span>
         </a>
     </li>
@@ -59,7 +59,7 @@
     {% if object.accessory_assignments.exists %}
     <li class="nav-item" role="presentation">
         <a href="?tab=accessories" data-bs-target="#accessories" class="nav-link {% if request.GET.tab == 'accessories' %}active{% endif %}" data-bs-toggle="tab" role="tab">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-azure" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 4m0 2a2 2 0 0 1 2 -2h16a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-16a2 2 0 0 1 -2 -2z" /><path d="M3 8h18" /><path d="M10 12h4" /></svg>
+            <i class="mdi mdi-application-outline me-1 text-azure"></i>
             {% translate "Accessories" %} <span class="badge bg-azure-lt ms-2">{{ object.accessory_assignments.count }}</span>
         </a>
     </li>
@@ -67,7 +67,7 @@
     {% if object.consumable_consumptions.exists %}
     <li class="nav-item" role="presentation">
         <a href="?tab=consumables" data-bs-target="#consumables" class="nav-link {% if request.GET.tab == 'consumables' %}active{% endif %}" data-bs-toggle="tab" role="tab">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-orange" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9z" /><path d="M12 12l8 -4.5" /><path d="M12 12v9" /><path d="M12 12l-8 -4.5" /></svg>
+            <i class="mdi mdi-package-variant-closed me-1 text-orange"></i>
             {% translate "Consumables" %} <span class="badge bg-orange-lt ms-2">{{ object.consumable_consumptions.count }}</span>
         </a>
     </li>
@@ -80,7 +80,7 @@
     </li>
     <li class="nav-item" role="presentation">
         <a href="?tab=software" data-bs-target="#software" class="nav-link {% if request.GET.tab == 'software' %}active{% endif %}" data-bs-toggle="tab" role="tab">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-purple" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" /><path d="M9 4v16" /><path d="M14 10l2 2l-2 2" /></svg>
+            <i class="mdi mdi-application-outline me-1 text-purple"></i>
             {% translate "Software" %} <span class="badge bg-purple-lt ms-2">{{ object.installed_software.count }}</span>
         </a>
     </li>
@@ -265,7 +265,7 @@
             <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
                 <h3 class="card-title">{% translate "Installed Physical Modules / Components" %}</h3>
                 <a href="{% url 'assets:componentallocation_create' %}?asset={{ object.pk }}" class="btn btn-sm btn-primary">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l12 0" /></svg>
+                    <i class="mdi mdi-plus"></i>
                     {% translate "Add Component" %}
                 </a>
             </div>
@@ -288,7 +288,7 @@
             <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
                 <h3 class="card-title">{% translate "Asset Repair & Upgrade History" %}</h3>
                 <a href="{% url 'compliance:assetmaintenance_create' %}?asset={{ object.pk }}" class="btn btn-sm btn-primary">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l12 0" /></svg>
+                    <i class="mdi mdi-plus"></i>
                     {% translate "Record Maintenance" %}
                 </a>
             </div>
