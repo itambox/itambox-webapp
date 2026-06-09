@@ -44,6 +44,9 @@ test_holders.csv
 # Environment variables
 .env
 
+# Local-only docker compose overrides
+docker-compose.override.yml
+
 # Coverage reports
 .coverage
 htmlcov/

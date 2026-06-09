@@ -25,6 +25,10 @@ graphene>=3.3,<4.0
 django-auth-ldap>=5.1,<6.0
 djangosaml2>=1.9,<2.0
 mozilla-django-oidc>=5.0.2,<6.0.0
+# pysaml2 pulls pyOpenSSL unpinned; pip otherwise resolves the ancient 22.0.0,
+# which references X509_V_FLAG_NOTIFY_POLICY that modern cryptography removed
+# (AttributeError at import). Require a current pyOpenSSL compatible with it.
+pyOpenSSL>=24.3,<27
 
 # API / web
 django-cors-headers>=4.4,<5.0

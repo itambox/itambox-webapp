@@ -240,7 +240,10 @@ CACHE_BACKEND = os.environ.get('ITAMBOX_CACHE_BACKEND', 'locmem')
 if CACHE_BACKEND == 'redis':
     CACHES = {
         'default': {
-            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            # django-redis backend: it accepts the CLIENT_CLASS option below.
+            # Django's built-in django.core.cache.backends.redis.RedisCache does
+            # NOT, and passes it through to the redis client (TypeError).
+            'BACKEND': 'django_redis.cache.RedisCache',
             'LOCATION': os.environ.get('ITAMBOX_REDIS_URL', 'redis://127.0.0.1:6379/1'),
             'TIMEOUT': int(os.environ.get('ITAMBOX_CACHE_TIMEOUT', '300')),
             'OPTIONS': {
