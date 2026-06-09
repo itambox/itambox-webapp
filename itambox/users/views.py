@@ -26,7 +26,6 @@ class UserProfileView(LoginRequiredMixin, BaseHTMXView, UpdateView):
     model = User
     form_class = UserProfileForm
     template_name = 'users/profile.html'
-    page_body_partial_name = "users/partials/user_page_body_wrapper.html" # Use User wrapper
     success_url = reverse_lazy('users:user_profile')
 
     def get_object(self, queryset=None):
@@ -58,7 +57,6 @@ class UserProfileView(LoginRequiredMixin, BaseHTMXView, UpdateView):
 
 class UserPasswordView(LoginRequiredMixin, BaseHTMXView, DjangoPasswordChangeView):
     template_name = 'users/password.html'
-    page_body_partial_name = "users/partials/user_page_body_wrapper.html" # Use User wrapper
     success_url = reverse_lazy('users:user_profile')
 
     def form_valid(self, form):
@@ -83,7 +81,6 @@ class UserPasswordView(LoginRequiredMixin, BaseHTMXView, DjangoPasswordChangeVie
 class UserPreferencesView(LoginRequiredMixin, BaseHTMXView, TemplateResponseMixin, View):
     form_class = UserPreferencesForm
     template_name = 'users/preferences.html'
-    page_body_partial_name = "users/partials/user_page_body_wrapper.html" # Use User wrapper
 
     def get_context_data(self, request, **kwargs):
         context = kwargs
@@ -143,7 +140,6 @@ class UserPreferencesView(LoginRequiredMixin, BaseHTMXView, TemplateResponseMixi
 # Dummy Views for other tabs
 class UserGenericTabView(LoginRequiredMixin, BaseHTMXView, TemplateView):
     template_name = 'users/dummy_tab.html'
-    page_body_partial_name = "users/partials/user_page_body_wrapper.html" # Use User wrapper
     active_tab = ''
     tab_title = _('User Tab') # Add a default title
 

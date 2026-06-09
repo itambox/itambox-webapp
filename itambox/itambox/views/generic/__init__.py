@@ -255,7 +255,6 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
 
 class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, DetailView):
     template_name = 'generic/object_detail.html'
-    detail_page_body_partial_name = "htmx/detail_page_wrapper.html"
     layout = None
 
     def render_to_response(self, context, **response_kwargs):

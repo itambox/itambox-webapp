@@ -4,7 +4,6 @@ from django.urls import reverse
 
 
 class BaseHTMXView:
-    page_body_partial_name = "htmx/page_body_content_wrapper.html"
     content_partial_name = None
 
     def get_template_names(self):
