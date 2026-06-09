@@ -1,56 +1,15 @@
 {% load i18n %}
+{% translate "Total Purchased" as l_total %}
+{% translate "Consumed" as l_consumed %}
+{% translate "Remaining Stock" as l_avail %}
 <div class="row g-3 mb-4">
-    <div class="col-sm-4">
-        <div class="card card-sm bg-blue-lt border-0 shadow-none">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-blue text-white avatar rounded shadow-sm">
-                            <i class="mdi mdi-archive-outline"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-blue small uppercase font-sans">{% translate "Total Purchased" %}</div>
-                        <div class="text-blue h1 mb-0 font-weight-bold">{{ object.total_stock }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-4">
-        <div class="card card-sm bg-purple-lt border-0 shadow-none">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-purple text-white avatar rounded shadow-sm">
-                            <i class="mdi mdi-minus"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-purple small uppercase font-sans">{% translate "Consumed" %}</div>
-                        <div class="text-purple h1 mb-0 font-weight-bold">{{ object.consumed_qty }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-4">
-        <div class="card card-sm {% if object.available <= 0 %}bg-danger-lt{% elif object.available < object.min_qty %}bg-warning-lt{% else %}bg-success-lt{% endif %} border-0 shadow-none">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="{% if object.available <= 0 %}bg-danger{% elif object.available < object.min_qty %}bg-warning{% else %}bg-success{% endif %} text-white avatar rounded shadow-sm">
-                            <i class="mdi mdi-check-circle-outline"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium {% if object.available <= 0 %}text-danger{% elif object.available < object.min_qty %}text-warning{% else %}text-success{% endif %} small uppercase font-sans">{% translate "Remaining Stock" %}</div>
-                        <div class="{% if object.available <= 0 %}text-danger{% elif object.available < object.min_qty %}text-warning{% else %}text-success{% endif %} h1 mb-0 font-weight-bold">
-                            {{ object.available }}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% include "generic/includes/stat_card.html" with col="col-sm-4" color="blue" icon="mdi mdi-archive-outline" label=l_total value=object.total_stock %}
+    {% include "generic/includes/stat_card.html" with col="col-sm-4" color="purple" icon="mdi mdi-minus" label=l_consumed value=object.consumed_qty %}
+    {% if object.available <= 0 %}
+        {% include "generic/includes/stat_card.html" with col="col-sm-4" color="danger" icon="mdi mdi-check-circle-outline" label=l_avail value=object.available %}
+    {% elif object.available < object.min_qty %}
+        {% include "generic/includes/stat_card.html" with col="col-sm-4" color="warning" icon="mdi mdi-check-circle-outline" label=l_avail value=object.available %}
+    {% else %}
+        {% include "generic/includes/stat_card.html" with col="col-sm-4" color="success" icon="mdi mdi-check-circle-outline" label=l_avail value=object.available %}
+    {% endif %}
 </div>

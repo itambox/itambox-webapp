@@ -1,22 +1,5 @@
 {% load i18n %}
-{% load render_table from django_tables2 %}
-
+{% translate "Total Installations Detected" as l_inst %}
 <div class="row g-3 mb-4">
-    <div class="col-sm-12">
-        <div class="card card-sm bg-purple-lt border-0 shadow-none">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-purple text-white avatar rounded shadow-sm">
-                            <i class="mdi mdi-memory"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-purple small uppercase font-sans">{% translate "Total Installations Detected" %}</div>
-                        <div class="text-purple h1 mb-0 font-weight-bold">{{ instances_table.rows|length }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% include "generic/includes/stat_card.html" with col="col-sm-12" color="purple" icon="mdi mdi-memory" label=l_inst value=instances_table.rows|length %}
 </div>

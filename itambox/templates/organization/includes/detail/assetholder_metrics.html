@@ -1,73 +1,13 @@
 {% load i18n %}
+{% translate "Checked Out Assets Assigned" as l_assigned %}
+{% translate "Accessories" as l_acc %}
+{% translate "Consumable Usage" as l_cons %}
+{% translate "License Seats" as l_lic %}
 <div class="row g-3 mb-4">
-    <div class="col-12">
-        <div class="card card-sm bg-indigo-lt border-0 shadow-none">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-indigo text-white avatar rounded shadow-sm">
-                            <i class="mdi mdi-clipboard-check-outline"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-indigo small uppercase font-sans">{% translate "Checked Out Assets Assigned" %}</div>
-                        <div class="text-indigo h1 mb-0 font-weight-bold">{{ assignments_table.rows|length }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% include "generic/includes/stat_card.html" with col="col-12" color="indigo" icon="mdi mdi-clipboard-check-outline" label=l_assigned value=assignments_table.rows|length %}
 </div>
 <div class="row g-3">
-    <div class="col-sm-4">
-        <div class="card card-sm bg-teal-lt border-0 shadow-none">
-            <div class="card-body p-2">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-teal text-white avatar-sm rounded shadow-sm">
-                            <i class="mdi mdi-keyboard-outline"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-teal small uppercase font-sans">{% translate "Accessories" %}</div>
-                        <div class="text-teal h3 mb-0 font-weight-bold">{{ object.accessory_assignments.count }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-4">
-        <div class="card card-sm bg-cyan-lt border-0 shadow-none">
-            <div class="card-body p-2">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-cyan text-white avatar-sm rounded shadow-sm">
-                            <i class="mdi mdi-water-outline"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-cyan small uppercase font-sans">{% translate "Consumable Usage" %}</div>
-                        <div class="text-cyan h3 mb-0 font-weight-bold">{{ object.consumable_consumptions.count }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-4">
-        <div class="card card-sm bg-blue-lt border-0 shadow-none">
-            <div class="card-body p-2">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-blue text-white avatar-sm rounded shadow-sm">
-                            <i class="mdi mdi-key-outline"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-blue small uppercase font-sans">{% translate "License Seats" %}</div>
-                        <div class="text-blue h3 mb-0 font-weight-bold">{{ object.license_assignments.count }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% include "generic/includes/stat_card.html" with col="col-sm-4" color="teal" icon="mdi mdi-keyboard-outline" label=l_acc value=object.accessory_assignments.count size="h3" compact="1" %}
+    {% include "generic/includes/stat_card.html" with col="col-sm-4" color="cyan" icon="mdi mdi-water-outline" label=l_cons value=object.consumable_consumptions.count size="h3" compact="1" %}
+    {% include "generic/includes/stat_card.html" with col="col-sm-4" color="blue" icon="mdi mdi-key-outline" label=l_lic value=object.license_assignments.count size="h3" compact="1" %}
 </div>

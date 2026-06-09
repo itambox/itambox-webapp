@@ -1,37 +1,7 @@
 {% load i18n %}
+{% translate "Meta Type" as l_type %}
+{% translate "Total Assets Assigned" as l_assets %}
 <div class="row g-3 mb-4">
-    <div class="col-sm-6">
-        <div class="card card-sm bg-blue-lt border-0 shadow-none">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-blue text-white avatar rounded shadow-sm">
-                            <i class="mdi mdi-cog-outline"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-blue small uppercase font-sans">{% translate "Meta Type" %}</div>
-                        <div class="text-blue h2 mb-0 font-weight-bold" style="line-height: 1.2;">{{ object.get_type_display }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6">
-        <div class="card card-sm bg-green-lt border-0 shadow-none">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-green text-white avatar rounded shadow-sm">
-                            <i class="mdi mdi-laptop"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-green small uppercase font-sans">{% translate "Total Assets Assigned" %}</div>
-                        <div class="text-green h1 mb-0 font-weight-bold">{{ assets_table.rows|length }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% include "generic/includes/stat_card.html" with color="blue" icon="mdi mdi-cog-outline" label=l_type value=object.get_type_display size="h2" %}
+    {% include "generic/includes/stat_card.html" with color="green" icon="mdi mdi-laptop" label=l_assets value=assets_table.rows|length %}
 </div>

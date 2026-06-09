@@ -1,56 +1,15 @@
 {% load i18n %}
 {# Panel: Asset metrics overview (assignment status + software count) #}
+{% translate "Assignment Status" as l_status %}
+{% translate "Software Inventory" as l_sw %}
+{% blocktranslate count n=object.installed_software.count asvar sw_value %}{{ n }} Item Logged{% plural %}{{ n }} Items Logged{% endblocktranslate %}
 <div class="row g-3 mb-4">
-    <div class="col-sm-6">
-        {% if assignment and assignment.assigned_to %}
-            <div class="card card-sm bg-blue-lt border-0 shadow-none">
-                <div class="card-body">
-                    <div class="row align-items-center">
-                        <div class="col-auto">
-                            <span class="bg-blue text-white avatar rounded shadow-sm">
-                                <i class="mdi mdi-account-check-outline"></i>
-                            </span>
-                        </div>
-                        <div class="col">
-                            <div class="font-weight-medium text-blue small uppercase font-sans">{% translate "Assignment Status" %}</div>
-                            <div class="text-blue h2 mb-0 font-weight-bold">{% translate "Deployed / Checked Out" %}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        {% else %}
-            <div class="card card-sm bg-green-lt border-0 shadow-none">
-                <div class="card-body">
-                    <div class="row align-items-center">
-                        <div class="col-auto">
-                            <span class="bg-green text-white avatar rounded shadow-sm">
-                                <i class="mdi mdi-check"></i>
-                            </span>
-                        </div>
-                        <div class="col">
-                            <div class="font-weight-medium text-green small uppercase font-sans">{% translate "Assignment Status" %}</div>
-                            <div class="text-green h2 mb-0 font-weight-bold">{% translate "Available in Inventory" %}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        {% endif %}
-    </div>
-    <div class="col-sm-6">
-        <div class="card card-sm bg-purple-lt border-0 shadow-none">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-purple text-white avatar rounded shadow-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" /><path d="M9 4v16" /><path d="M14 10l2 2l-2 2" /></svg>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-purple small uppercase font-sans">{% translate "Software Inventory" %}</div>
-                        <div class="text-purple h2 mb-0 font-weight-bold">{{ object.installed_software.count }} {% translate "Items Logged" %}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% if assignment and assignment.assigned_to %}
+        {% translate "Deployed / Checked Out" as v_status %}
+        {% include "generic/includes/stat_card.html" with color="blue" icon="mdi mdi-account-check-outline" label=l_status value=v_status size="h2" %}
+    {% else %}
+        {% translate "Available in Inventory" as v_status %}
+        {% include "generic/includes/stat_card.html" with color="green" icon="mdi mdi-check" label=l_status value=v_status size="h2" %}
+    {% endif %}
+    {% include "generic/includes/stat_card.html" with color="purple" icon="mdi mdi-application-cog-outline" label=l_sw value=sw_value size="h2" %}
 </div>

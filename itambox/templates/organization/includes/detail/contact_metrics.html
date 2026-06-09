@@ -1,20 +1,5 @@
 {% load i18n %}
+{% translate "Active Assignments" as l_assign %}
 <div class="row g-3 mb-4">
-    <div class="col-12">
-        <div class="card card-sm bg-purple-lt border-0 shadow-none">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-purple text-white avatar rounded shadow-sm">
-                            <i class="mdi mdi-link-variant"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-purple small uppercase font-sans">{% translate "Active Assignments" %}</div>
-                        <div class="text-purple h1 mb-0 font-weight-bold">{{ assignments_table.rows|length }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% include "generic/includes/stat_card.html" with col="col-12" color="purple" icon="mdi mdi-link-variant" label=l_assign value=assignments_table.rows|length %}
 </div>

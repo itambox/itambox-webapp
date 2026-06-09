@@ -1,57 +1,12 @@
 {% load i18n %}
-{% load utility_tags %}
-
+{% translate "Total Purchased Seats" as l_total %}
+{% translate "Available Seats" as l_avail %}
 <div class="row g-3 mb-4">
-    <div class="col-sm-6">
-        <div class="card card-sm bg-blue-lt border-0 shadow-none">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-blue text-white avatar rounded shadow-sm">
-                            <i class="mdi mdi-key-outline"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-blue small uppercase font-sans">{% translate "Total Purchased Seats" %}</div>
-                        <div class="text-blue h1 mb-0 font-weight-bold">{{ object.seats }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6">
-        {% if object.available_seats > 0 %}
-            <div class="card card-sm bg-green-lt border-0 shadow-none">
-                <div class="card-body">
-                    <div class="row align-items-center">
-                        <div class="col-auto">
-                            <span class="bg-green text-white avatar rounded shadow-sm">
-                                <i class="mdi mdi-check-circle-outline"></i>
-                            </span>
-                        </div>
-                        <div class="col">
-                            <div class="font-weight-medium text-green small uppercase font-sans">{% translate "Available Seats" %}</div>
-                            <div class="text-green h1 mb-0 font-weight-bold">{{ object.available_seats }}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        {% else %}
-            <div class="card card-sm bg-red-lt border-0 shadow-none">
-                <div class="card-body">
-                    <div class="row align-items-center">
-                        <div class="col-auto">
-                            <span class="bg-red text-white avatar rounded shadow-sm">
-                                <i class="mdi mdi-alert-circle-outline"></i>
-                            </span>
-                        </div>
-                        <div class="col">
-                            <div class="font-weight-medium text-red small uppercase font-sans">{% translate "Available Seats" %}</div>
-                            <div class="text-red h1 mb-0 font-weight-bold">{% translate "0 (Fully Allocated)" %}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        {% endif %}
-    </div>
+    {% include "generic/includes/stat_card.html" with color="blue" icon="mdi mdi-key-outline" label=l_total value=object.seats %}
+    {% if object.available_seats > 0 %}
+        {% include "generic/includes/stat_card.html" with color="green" icon="mdi mdi-check-circle-outline" label=l_avail value=object.available_seats %}
+    {% else %}
+        {% translate "0 (Fully Allocated)" as v_full %}
+        {% include "generic/includes/stat_card.html" with color="red" icon="mdi mdi-alert-circle-outline" label=l_avail value=v_full %}
+    {% endif %}
 </div>

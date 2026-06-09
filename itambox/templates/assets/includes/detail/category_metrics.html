@@ -1,37 +1,7 @@
 {% load i18n %}
+{% translate "Asset Types" as l_types %}
+{% translate "Accessories" as l_acc %}
 <div class="row g-3 mb-4">
-    <div class="col-sm-6">
-        <div class="card card-sm bg-blue-lt border-0 shadow-none">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-blue text-white avatar rounded shadow-sm">
-                            <i class="mdi mdi-cog-outline"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-blue small uppercase font-sans">{% translate "Asset Types" %}</div>
-                        <div class="text-blue h1 mb-0 font-weight-bold">{{ asset_types_table.rows|length }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6">
-        <div class="card card-sm bg-purple-lt border-0 shadow-none">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-purple text-white avatar rounded shadow-sm">
-                            <i class="mdi mdi-puzzle-outline"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-purple small uppercase font-sans">{% translate "Accessories" %}</div>
-                        <div class="text-purple h1 mb-0 font-weight-bold">{{ accessories_table.rows|length }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% include "generic/includes/stat_card.html" with color="blue" icon="mdi mdi-cog-outline" label=l_types value=asset_types_table.rows|length %}
+    {% include "generic/includes/stat_card.html" with color="purple" icon="mdi mdi-puzzle-outline" label=l_acc value=accessories_table.rows|length %}
 </div>

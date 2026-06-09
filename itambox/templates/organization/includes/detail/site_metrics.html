@@ -1,38 +1,8 @@
 {% load i18n %}
 {# Panel: Site metrics (locations + assets count) #}
+{% translate "Locations" as l_loc %}
+{% translate "Total Physical Assets" as l_assets %}
 <div class="row g-3 mb-4">
-    <div class="col-sm-6">
-        <div class="card card-sm bg-purple-lt border-0 shadow-none">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-purple text-white avatar rounded shadow-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M3 21v-2a4 4 0 0 1 4 -4h10a4 4 0 0 1 4 4v2" /></svg>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-purple small uppercase font-sans">{% translate "Locations" %}</div>
-                        <div class="text-purple h1 mb-0 font-weight-bold">{{ locations_table.rows|length }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6">
-        <div class="card card-sm bg-green-lt border-0 shadow-none">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-green text-white avatar rounded shadow-sm">
-                            <i class="mdi mdi-laptop"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-green small uppercase font-sans">{% translate "Total Physical Assets" %}</div>
-                        <div class="text-green h1 mb-0 font-weight-bold">{{ assets_table.rows|length }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% include "generic/includes/stat_card.html" with color="purple" icon="mdi mdi-map-marker-outline" label=l_loc value=locations_table.rows|length %}
+    {% include "generic/includes/stat_card.html" with color="green" icon="mdi mdi-laptop" label=l_assets value=assets_table.rows|length %}
 </div>

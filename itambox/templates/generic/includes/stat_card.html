@@ -1,0 +1,37 @@
+{% load i18n %}
+{# ---------------------------------------------------------------------------
+   Reusable metric / stat card (Tabler).
+
+   Renders ONE card column. Wrap one or more in a `<div class="row g-3">`.
+
+   Params (all optional except label/value):
+     col     grid column class                 default "col-sm-6"
+     color   Tabler colour token               default "blue"
+             (blue|green|purple|red|azure|teal|cyan|indigo|orange|pink|
+              success|warning|danger|secondary …)
+     icon    full MDI icon class               default "mdi mdi-chart-box-outline"
+     label   caption (translate at call site)
+     value   figure / text to display
+     size    heading size for the value        default "h1"
+     compact tighter padding + small avatar     default False
+
+   Translate labels/values at the call site with {% translate "…" as foo %}
+   so they remain extractable, then pass label=foo / value=foo.
+--------------------------------------------------------------------------- #}
+<div class="{{ col|default:'col-sm-6' }}">
+    <div class="card card-sm bg-{{ color|default:'blue' }}-lt border-0 shadow-none">
+        <div class="card-body{% if compact %} p-2{% endif %}">
+            <div class="row align-items-center">
+                <div class="col-auto">
+                    <span class="bg-{{ color|default:'blue' }} text-white avatar{% if compact %}-sm{% endif %} rounded shadow-sm">
+                        <i class="{{ icon|default:'mdi mdi-chart-box-outline' }}"></i>
+                    </span>
+                </div>
+                <div class="col">
+                    <div class="font-weight-medium text-{{ color|default:'blue' }} small uppercase font-sans">{{ label }}</div>
+                    <div class="text-{{ color|default:'blue' }} {{ size|default:'h1' }} mb-0 font-weight-bold">{{ value }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

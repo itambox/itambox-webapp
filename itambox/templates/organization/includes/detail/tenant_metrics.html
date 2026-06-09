@@ -1,160 +1,25 @@
 {% load i18n %}
+{% translate "Sites" as l_sites %}
+{% translate "Locations" as l_loc %}
+{% translate "Asset Holders" as l_holders %}
+{% translate "Assets" as l_assets %}
+{% translate "Accessories" as l_acc %}
+{% translate "Consumables" as l_cons %}
+{% translate "Licenses" as l_lic %}
+{% translate "Kits" as l_kits %}
+{% translate "Subscriptions" as l_subs %}
 <div class="row g-3 mb-4">
-    <div class="col-sm-4">
-        <div class="card card-sm bg-purple-lt border-0 shadow-none">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-purple text-white avatar rounded shadow-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l18 0" /><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16" /></svg>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-purple small uppercase font-sans">{% translate "Sites" %}</div>
-                        <div class="text-purple h1 mb-0 font-weight-bold">{{ sites_table.rows|length }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-4">
-        <div class="card card-sm bg-azure-lt border-0 shadow-none">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-azure text-white avatar rounded shadow-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M3 21v-2a4 4 0 0 1 4 -4h10a4 4 0 0 1 4 4v2" /></svg>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-azure small uppercase font-sans">{% translate "Locations" %}</div>
-                        <div class="text-azure h1 mb-0 font-weight-bold">{{ locations_table.rows|length }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-4">
-        <div class="card card-sm bg-indigo-lt border-0 shadow-none">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-indigo text-white avatar rounded shadow-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /></svg>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-indigo small uppercase font-sans">{% translate "Asset Holders" %}</div>
-                        <div class="text-indigo h1 mb-0 font-weight-bold">{{ assetholders_table.rows|length }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% include "generic/includes/stat_card.html" with col="col-sm-4" color="purple" icon="mdi mdi-office-building-outline" label=l_sites value=sites_table.rows|length %}
+    {% include "generic/includes/stat_card.html" with col="col-sm-4" color="azure" icon="mdi mdi-map-marker-outline" label=l_loc value=locations_table.rows|length %}
+    {% include "generic/includes/stat_card.html" with col="col-sm-4" color="indigo" icon="mdi mdi-account-group-outline" label=l_holders value=assetholders_table.rows|length %}
 </div>
 <div class="row g-3 mb-4">
-    <div class="col-sm-3">
-        <div class="card card-sm bg-green-lt border-0 shadow-none">
-            <div class="card-body p-2">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-green text-white avatar-sm rounded shadow-sm">
-                            <i class="mdi mdi-laptop"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-green small uppercase font-sans">{% translate "Assets" %}</div>
-                        <div class="text-green h3 mb-0 font-weight-bold">{{ tenant_asset_count }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-3">
-        <div class="card card-sm bg-teal-lt border-0 shadow-none">
-            <div class="card-body p-2">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-teal text-white avatar-sm rounded shadow-sm">
-                            <i class="mdi mdi-keyboard-outline"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-teal small uppercase font-sans">{% translate "Accessories" %}</div>
-                        <div class="text-teal h3 mb-0 font-weight-bold">{{ tenant_accessory_count }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-3">
-        <div class="card card-sm bg-cyan-lt border-0 shadow-none">
-            <div class="card-body p-2">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-cyan text-white avatar-sm rounded shadow-sm">
-                            <i class="mdi mdi-water-outline"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-cyan small uppercase font-sans">{% translate "Consumables" %}</div>
-                        <div class="text-cyan h3 mb-0 font-weight-bold">{{ tenant_consumable_count }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-3">
-        <div class="card card-sm bg-blue-lt border-0 shadow-none">
-            <div class="card-body p-2">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-blue text-white avatar-sm rounded shadow-sm">
-                            <i class="mdi mdi-key-outline"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-blue small uppercase font-sans">{% translate "Licenses" %}</div>
-                        <div class="text-blue h3 mb-0 font-weight-bold">{{ tenant_license_count }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% include "generic/includes/stat_card.html" with col="col-sm-3" color="green" icon="mdi mdi-laptop" label=l_assets value=tenant_asset_count size="h3" compact="1" %}
+    {% include "generic/includes/stat_card.html" with col="col-sm-3" color="teal" icon="mdi mdi-keyboard-outline" label=l_acc value=tenant_accessory_count size="h3" compact="1" %}
+    {% include "generic/includes/stat_card.html" with col="col-sm-3" color="cyan" icon="mdi mdi-water-outline" label=l_cons value=tenant_consumable_count size="h3" compact="1" %}
+    {% include "generic/includes/stat_card.html" with col="col-sm-3" color="blue" icon="mdi mdi-key-outline" label=l_lic value=tenant_license_count size="h3" compact="1" %}
 </div>
 <div class="row g-3">
-    <div class="col-sm-6">
-        <div class="card card-sm bg-orange-lt border-0 shadow-none">
-            <div class="card-body p-2">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-orange text-white avatar-sm rounded shadow-sm">
-                            <i class="mdi mdi-package-variant"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-orange small uppercase font-sans">{% translate "Kits" %}</div>
-                        <div class="text-orange h3 mb-0 font-weight-bold">{{ tenant_kit_count }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6">
-        <div class="card card-sm bg-pink-lt border-0 shadow-none">
-            <div class="card-body p-2">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-pink text-white avatar-sm rounded shadow-sm">
-                            <i class="mdi mdi-file-document-outline"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-pink small uppercase font-sans">{% translate "Subscriptions" %}</div>
-                        <div class="text-pink h3 mb-0 font-weight-bold">{{ tenant_subscription_count }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% include "generic/includes/stat_card.html" with col="col-sm-6" color="orange" icon="mdi mdi-package-variant" label=l_kits value=tenant_kit_count size="h3" compact="1" %}
+    {% include "generic/includes/stat_card.html" with col="col-sm-6" color="pink" icon="mdi mdi-file-document-outline" label=l_subs value=tenant_subscription_count size="h3" compact="1" %}
 </div>

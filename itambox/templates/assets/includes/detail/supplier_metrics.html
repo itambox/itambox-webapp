@@ -1,20 +1,5 @@
 {% load i18n %}
+{% translate "Assets Supplied" as l_assets %}
 <div class="row g-3 mb-4">
-    <div class="col-sm-12">
-        <div class="card card-sm bg-green-lt border-0 shadow-none">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-green text-white avatar rounded shadow-sm">
-                            <i class="mdi mdi-storefront-outline"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-green small uppercase font-sans">{% translate "Assets Supplied" %}</div>
-                        <div class="text-green h1 mb-0 font-weight-bold">{{ assets_table.rows|length }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% include "generic/includes/stat_card.html" with col="col-sm-12" color="green" icon="mdi mdi-storefront-outline" label=l_assets value=assets_table.rows|length %}
 </div>

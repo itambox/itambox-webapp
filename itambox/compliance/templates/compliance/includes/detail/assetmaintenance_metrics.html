@@ -1,58 +1,18 @@
 {% load i18n %}
+{% translate "Maintenance Cost" as l_cost %}
+{% translate "Downtime Duration" as l_down %}
+{% blocktranslate with c=object.cost|default:0|floatformat:2 asvar cost_value %}${{ c }}{% endblocktranslate %}
 <div class="row g-3 mb-4">
-    <div class="col-sm-6">
-        <div class="card card-sm bg-blue-lt border-0 shadow-none">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-blue text-white avatar rounded shadow-sm">
-                            <i class="mdi mdi-currency-usd"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium text-blue small uppercase font-sans">{% translate "Maintenance Cost" %}</div>
-                        <div class="text-blue h1 mb-0 font-weight-bold">
-                            {% if object.cost %}
-                                ${{ object.cost|floatformat:2 }}
-                            {% else %}
-                                $0.00
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-sm-6">
-        <div class="card card-sm {% if object.completion_date %}bg-success-lt{% else %}bg-warning-lt{% endif %} border-0 shadow-none">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="{% if object.completion_date %}bg-success{% else %}bg-warning{% endif %} text-white avatar rounded shadow-sm">
-                            {% if object.completion_date %}
-                                <i class="mdi mdi-check-circle-outline"></i>
-                            {% else %}
-                                <i class="mdi mdi-clock-outline"></i>
-                            {% endif %}
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium {% if object.completion_date %}text-success{% else %}text-warning{% endif %} small uppercase font-sans">{% translate "Downtime Duration" %}</div>
-                        <div class="{% if object.completion_date %}text-success{% else %}text-warning{% endif %} h1 mb-0 font-weight-bold">
-                            {% if object.completion_date %}
-                                {% if object.downtime_days == 0 %}
-                                    {% translate "Same Day Service" %}
-                                {% else %}
-                                    {{ object.downtime_days }} {% translate "Day" %}{{ object.downtime_days|pluralize }}
-                                {% endif %}
-                            {% else %}
-                                {% translate "In Progress (Out of Service)" %}
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% include "generic/includes/stat_card.html" with color="blue" icon="mdi mdi-currency-usd" label=l_cost value=cost_value %}
+    {% if object.completion_date %}
+        {% if object.downtime_days == 0 %}
+            {% translate "Same Day Service" as v_down %}
+        {% else %}
+            {% blocktranslate count d=object.downtime_days asvar v_down %}{{ d }} Day{% plural %}{{ d }} Days{% endblocktranslate %}
+        {% endif %}
+        {% include "generic/includes/stat_card.html" with color="success" icon="mdi mdi-check-circle-outline" label=l_down value=v_down %}
+    {% else %}
+        {% translate "In Progress (Out of Service)" as v_down %}
+        {% include "generic/includes/stat_card.html" with color="warning" icon="mdi mdi-clock-outline" label=l_down value=v_down %}
+    {% endif %}
 </div>
