@@ -96,12 +96,11 @@ class CheckableInventoryTableMixin(tables.Table):
             except NoReverseMatch:
                 return mark_safe('<span class="text-muted small">—</span>')
 
-        # Return the premium, HTMX-driven checkout modal launcher
+        # HTMX-driven checkout launcher. Filled green + w-100 to match the asset
+        # Check-out button; no href="javascript:void(0)" (stays within the CSP).
         return format_html(
-            '<div class="d-inline-block">'
-            '  <a class="btn btn-sm btn-primary" hx-get="{}" hx-target="#modal-placeholder" hx-swap="innerHTML" href="javascript:void(0)">'
-            '    <i class="mdi mdi-keyboard-tab-reverse"></i> Check-out'
-            '  </a>'
-            '</div>',
+            '<a class="btn btn-sm btn-success w-100" role="button" style="cursor: pointer" '
+            'hx-get="{}" hx-target="#modal-placeholder" hx-swap="innerHTML">'
+            '<i class="mdi mdi-keyboard-tab-reverse"></i> Check-out</a>',
             url
         )

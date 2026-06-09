@@ -88,17 +88,23 @@ class AssetTable(BaseTable): # Inherit from BaseTable
         if not request or not self.has_perm(request.user, 'assets.change_asset', record):
             return mark_safe('<span class="text-muted small">—</span>')
         
+        # Check-out (filled green) vs Check-in (outline green): same width via
+        # w-100 so the column is uniform, distinguished by fill rather than hue.
+        # No href="javascript:void(0)" — HTMX drives the click, which keeps us
+        # within the CSP (no inline javascript: navigation).
         if record.active_assignment:
             url = reverse('assets:asset_checkin', kwargs={'pk': record.pk})
             return format_html(
-                '<div class="d-inline-block"><a class="btn btn-sm btn-success" hx-get="{}" hx-target="#modal-placeholder" hx-swap="innerHTML" href="javascript:void(0)">'
-                '<i class="mdi mdi-keyboard-return"></i> Check-in</a></div>', url
+                '<a class="btn btn-sm btn-outline-success w-100" role="button" style="cursor: pointer" '
+                'hx-get="{}" hx-target="#modal-placeholder" hx-swap="innerHTML">'
+                '<i class="mdi mdi-keyboard-return"></i> Check-in</a>', url
             )
         else:
             url = reverse('assets:asset_checkout_modal', kwargs={'pk': record.pk})
             return format_html(
-                '<div class="d-inline-block"><a class="btn btn-sm btn-primary" hx-get="{}" hx-target="#modal-placeholder" hx-swap="innerHTML" href="javascript:void(0)">'
-                '<i class="mdi mdi-keyboard-tab-reverse"></i> Check-out</a></div>', url
+                '<a class="btn btn-sm btn-success w-100" role="button" style="cursor: pointer" '
+                'hx-get="{}" hx-target="#modal-placeholder" hx-swap="innerHTML">'
+                '<i class="mdi mdi-keyboard-tab-reverse"></i> Check-out</a>', url
             )
 
     def render_actions(self, record):
