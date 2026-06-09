@@ -205,7 +205,13 @@ class ActionsColumn(tables.Column):
             )
             break
 
-        return mark_safe(clone_html + html)
+        return mark_safe(self.get_leading_buttons(record, table) + clone_html + html)
+
+    def get_leading_buttons(self, record, table):
+        """Hook for subclasses to prepend extra per-row buttons (e.g. a
+        check-out button) ahead of the clone/edit/delete actions. Returns an
+        HTML-safe string."""
+        return ''
 
 
 class AssigneeColumn(tables.Column):

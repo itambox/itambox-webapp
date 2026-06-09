@@ -24,12 +24,11 @@ class AccessoryTable(CheckableInventoryTableMixin, BaseTable):
     available = tables.Column(accessor='available', verbose_name='Available')
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name='Tenant')
     tags = TagColumn(url_name='inventory:accessory_list')
-    actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = Accessory
-        fields = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'part_number', 'total_stock', 'checked_out_qty', 'available', 'tags', 'checkout_checkin', 'actions')
-        default_columns = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'total_stock', 'checked_out_qty', 'available', 'tags', 'checkout_checkin', 'actions')
+        fields = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'part_number', 'total_stock', 'checked_out_qty', 'available', 'tags', 'actions')
+        default_columns = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'total_stock', 'checked_out_qty', 'available', 'tags', 'actions')
 
     def render_available(self, value, record):
         if value <= 0:
@@ -158,12 +157,11 @@ class ConsumableTable(CheckableInventoryTableMixin, BaseTable):
     available = tables.Column(accessor='available', verbose_name='Available')
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name='Tenant')
     tags = TagColumn(url_name='inventory:consumable_list')
-    actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = Consumable
-        fields = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'part_number', 'total_stock', 'consumed_qty', 'available', 'tags', 'checkout_checkin', 'actions')
-        default_columns = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'total_stock', 'consumed_qty', 'available', 'tags', 'checkout_checkin', 'actions')
+        fields = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'part_number', 'total_stock', 'consumed_qty', 'available', 'tags', 'actions')
+        default_columns = ('pk', 'name', 'manufacturer', 'tenant', 'category', 'total_stock', 'consumed_qty', 'available', 'tags', 'actions')
 
     def render_available(self, value, record):
         if value <= 0:
@@ -279,12 +277,11 @@ class ComponentTable(CheckableInventoryTableMixin, BaseTable):
     min_qty = tables.Column(verbose_name='Safety Threshold')
     tenant = tables.Column(linkify=True)
     tags = TagColumn(url_name='inventory:component_list')
-    actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = Component
-        fields = ('pk', 'name', 'manufacturer', 'category', 'part_number', 'total_stock', 'available_stock', 'min_qty', 'tenant', 'tags', 'checkout_checkin', 'actions')
-        default_columns = ('pk', 'name', 'manufacturer', 'category', 'part_number', 'total_stock', 'available_stock', 'min_qty', 'tenant', 'tags', 'checkout_checkin', 'actions')
+        fields = ('pk', 'name', 'manufacturer', 'category', 'part_number', 'total_stock', 'available_stock', 'min_qty', 'tenant', 'tags', 'actions')
+        default_columns = ('pk', 'name', 'manufacturer', 'category', 'part_number', 'total_stock', 'available_stock', 'min_qty', 'tenant', 'tags', 'actions')
 
 
 class ComponentStockTable(BaseTable):

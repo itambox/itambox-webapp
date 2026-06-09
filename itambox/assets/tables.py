@@ -24,22 +24,14 @@ class AssetTable(BaseTable): # Inherit from BaseTable
 
     tags = TagColumn(url_name='assets:asset_list')
     requestable = tables.BooleanColumn(verbose_name='Requestable', yesno='Yes,No')
-    checkout_checkin = tables.Column(
-        verbose_name='',
-        orderable=False,
-        empty_values=(),
-        attrs={
-            'th': {'class': 'col-checkout text-nowrap'},
-            'td': {'class': 'text-center text-nowrap noprint p-1 col-checkout'}
-        },
-    )
     actions = tables.Column(
         verbose_name='',
         orderable=False,
         empty_values=(),
         attrs={
-            'th': {'class': 'col-actions text-nowrap'},
-            'td': {'class': 'text-end text-nowrap noprint p-1 col-actions'}
+            # Wider variant: the actions cell now also holds the check-out/in button.
+            'th': {'class': 'col-actions-wide text-nowrap'},
+            'td': {'class': 'text-end text-nowrap noprint p-1 col-actions-wide'}
         },
     )
 
@@ -47,11 +39,11 @@ class AssetTable(BaseTable): # Inherit from BaseTable
         model = Asset
         fields = (
             'pk', 'name', 'asset_tag', 'serial_number', 'asset_type', 'asset_role', 
-            'status', 'assignee', 'tenant', 'location', 'purchase_date', 'purchase_cost', 'salvage_value', 'order_number', 'supplier', 'tags', 'requestable', 'checkout_checkin', 'actions',
+            'status', 'assignee', 'tenant', 'location', 'purchase_date', 'purchase_cost', 'salvage_value', 'order_number', 'supplier', 'tags', 'requestable', 'actions',
         )
         default_columns = (
-            'pk', 'name', 'asset_tag', 'serial_number', 'asset_type', 'asset_role', 
-            'status', 'assignee', 'tenant', 'location', 'purchase_date', 'purchase_cost', 'supplier', 'requestable', 'tags', 'checkout_checkin', 'actions',
+            'pk', 'name', 'asset_tag', 'serial_number', 'asset_type', 'asset_role',
+            'status', 'assignee', 'tenant', 'location', 'purchase_date', 'purchase_cost', 'supplier', 'requestable', 'tags', 'actions',
         )
         order_by = ('name',)
 
@@ -80,32 +72,6 @@ class AssetTable(BaseTable): # Inherit from BaseTable
     def value_purchase_date(self, value):
         # Format date if it exists
         return value.strftime("%Y-%m-%d") if value else "—"
-
-    def render_checkout_checkin(self, record):
-        if getattr(record, 'deleted_at', None) is not None:
-            return mark_safe('<span class="text-muted small">—</span>')
-        request = getattr(self, 'request', None)
-        if not request or not self.has_perm(request.user, 'assets.change_asset', record):
-            return mark_safe('<span class="text-muted small">—</span>')
-        
-        # Check-out (filled green) vs Check-in (outline green): same width via
-        # w-100 so the column is uniform, distinguished by fill rather than hue.
-        # No href="javascript:void(0)" — HTMX drives the click, which keeps us
-        # within the CSP (no inline javascript: navigation).
-        if record.active_assignment:
-            url = reverse('assets:asset_checkin', kwargs={'pk': record.pk})
-            return format_html(
-                '<a class="btn btn-sm btn-outline-success w-100" role="button" style="cursor: pointer" '
-                'hx-get="{}" hx-target="#modal-placeholder" hx-swap="innerHTML">'
-                '<i class="mdi mdi-keyboard-return"></i> Check-in</a>', url
-            )
-        else:
-            url = reverse('assets:asset_checkout_modal', kwargs={'pk': record.pk})
-            return format_html(
-                '<a class="btn btn-sm btn-success w-100" role="button" style="cursor: pointer" '
-                'hx-get="{}" hx-target="#modal-placeholder" hx-swap="innerHTML">'
-                '<i class="mdi mdi-keyboard-tab-reverse"></i> Check-out</a>', url
-            )
 
     def render_actions(self, record):
         if getattr(record, 'deleted_at', None) is not None:
@@ -151,7 +117,25 @@ class AssetTable(BaseTable): # Inherit from BaseTable
             return ""
 
         html = '<div class="d-flex align-items-center gap-1 justify-content-end">'
-        
+
+        if can_edit:
+            # Check-out (filled green) / Check-in (outline green), merged into the
+            # actions group. Labeled for clarity; HTMX drives the click (CSP-safe).
+            if record.active_assignment:
+                checkin_url = reverse('assets:asset_checkin', kwargs={'pk': record.pk})
+                html += (
+                    '<a class="btn btn-sm btn-outline-success check-action" role="button" style="cursor: pointer" '
+                    f'hx-get="{checkin_url}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
+                    'title="Check-in" aria-label="Check-in"><i class="mdi mdi-login me-1"></i>Check-in</a>'
+                )
+            else:
+                checkout_url = reverse('assets:asset_checkout_modal', kwargs={'pk': record.pk})
+                html += (
+                    '<a class="btn btn-sm btn-success check-action" role="button" style="cursor: pointer" '
+                    f'hx-get="{checkout_url}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
+                    'title="Check-out" aria-label="Check-out"><i class="mdi mdi-logout me-1"></i>Check-out</a>'
+                )
+
         if can_clone:
             clone_url = reverse('assets:asset_clone', kwargs={'pk': record.pk})
             html += f'<a class="btn btn-sm btn-warning" href="{clone_url}" title="Copy/Clone"><i class="mdi mdi-content-copy"></i></a>'

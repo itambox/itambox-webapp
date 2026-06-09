@@ -5,6 +5,8 @@ from django.utils.safestring import mark_safe
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
+from core.tables import ActionsColumn
+
 # ============================================================
 #  Model Mixin: CheckableInventoryModelMixin
 # ============================================================
@@ -58,49 +60,48 @@ class CheckableInventoryModelMixin(models.Model):
 #  Table Mixin: CheckableInventoryTableMixin
 # ============================================================
 
-class CheckableInventoryTableMixin(tables.Table):
-    """
-    Mixin for django_tables2 tables (ComponentTable, AccessoryTable, ConsumableTable)
-    to render a permission-aware "Check-out" button/column inline for catalog lists.
-    """
-    checkout_checkin = tables.Column(
-        verbose_name='',
-        orderable=False,
-        empty_values=(),
-        attrs={
-            'th': {'class': 'col-checkout text-nowrap'},
-            'td': {'class': 'text-center text-nowrap noprint p-1 col-checkout'}
-        },
-    )
+class CheckoutActionsColumn(ActionsColumn):
+    """Actions column for checkable inventory tables: prepends a per-row
+    Check-out button to the standard clone/edit/delete actions, so no separate
+    checkout column is needed. Uses the wider sticky variant to fit the button."""
 
-    def render_checkout_checkin(self, record) -> str:
+    attrs = {
+        'th': {'class': 'col-actions-wide text-nowrap'},
+        'td': {'class': 'text-end text-nowrap noprint p-1 col-actions-wide'},
+    }
+
+    def get_leading_buttons(self, record, table):
         if getattr(record, 'deleted_at', None) is not None:
-            return mark_safe('<span class="text-muted small">—</span>')
-        request = getattr(self, 'request', None)
+            return ''
+        request = getattr(table, 'request', None)
         if not request:
-            return ""
+            return ''
 
         app_label = record._meta.app_label
         model_name = record._meta.model_name
+        if not table.has_perm(request.user, f"{app_label}.change_{model_name}", record):
+            return ''
 
-        # Check if user has permission to checkout/change the inventory item
-        permission_codename = f"{app_label}.change_{model_name}"
-        if not self.has_perm(request.user, permission_codename, record):
-            return mark_safe('<span class="text-muted small">—</span>')
-
-        # Retrieve the dynamic checkout URL
         url = getattr(record, 'checkout_url', '')
         if not url:
             try:
                 url = reverse(f"{app_label}:{model_name}_checkout", kwargs={'pk': record.pk})
             except NoReverseMatch:
-                return mark_safe('<span class="text-muted small">—</span>')
+                return ''
 
-        # HTMX-driven checkout launcher. Filled green + w-100 to match the asset
-        # Check-out button; no href="javascript:void(0)" (stays within the CSP).
+        title = _('Check-out')
         return format_html(
-            '<a class="btn btn-sm btn-success w-100" role="button" style="cursor: pointer" '
-            'hx-get="{}" hx-target="#modal-placeholder" hx-swap="innerHTML">'
-            '<i class="mdi mdi-keyboard-tab-reverse"></i> Check-out</a>',
-            url
+            '<a class="btn btn-sm btn-success check-action me-1" role="button" style="cursor: pointer" '
+            'hx-get="{url}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
+            'title="{title}" aria-label="{title}"><i class="mdi mdi-logout me-1"></i>{title}</a>',
+            url=url, title=title,
         )
+
+
+class CheckableInventoryTableMixin(tables.Table):
+    """
+    Mixin for django_tables2 tables (ComponentTable, AccessoryTable, ConsumableTable):
+    exposes a permission-aware "Check-out" button inside the actions column (no
+    separate checkout column).
+    """
+    actions = CheckoutActionsColumn()

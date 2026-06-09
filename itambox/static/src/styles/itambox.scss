@@ -748,9 +748,9 @@ body.offcanvas-open {
         z-index: 2 !important;
         background-color: var(--tblr-bg-surface) !important;
         white-space: nowrap;
-        min-width: 112px !important;
-        width: 112px !important;
-        max-width: 112px !important;
+        min-width: 96px !important;
+        width: 96px !important;
+        max-width: 96px !important;
         text-align: center;
     }
 
@@ -773,9 +773,9 @@ body.offcanvas-open {
 
     th.col-actions-wide,
     td.col-actions-wide {
-        min-width: 180px !important;
-        width: 180px !important;
-        max-width: 180px !important;
+        min-width: 200px !important;
+        width: 200px !important;
+        max-width: 200px !important;
         position: sticky !important;
         right: 0 !important;
         z-index: 2 !important;
@@ -1297,6 +1297,12 @@ textarea {
 // wasted left/right gutters, shrink chrome a touch, and convert the
 // wide data tables into stacked "cards" so no horizontal scrolling
 // (and no squashed action columns) is needed on small screens.
+// Check-in / Check-out button merged into the actions column: one shared width
+// on desktop so Check-in and Check-out line up (column isn't ragged).
+.btn.check-action {
+    min-width: 6rem;
+}
+
 @media (max-width: 575.98px) {
 
     // ---- Reclaim horizontal space: near edge-to-edge content ----
@@ -1397,6 +1403,7 @@ textarea {
         // Override the desktop sticky-column rules (these carry !important and
         // higher specificity, so they must be neutralized at matching specificity)
         td.col-actions,
+        td.col-actions-wide,
         td.col-checkout {
             position: static !important;
             right: auto !important;
@@ -1406,6 +1413,15 @@ textarea {
             max-width: none !important;
             text-align: right !important;
             justify-content: flex-end;
+        }
+
+        // Merged actions cell: drop the empty label, let the actions span the
+        // row, and grow the check button to fill the available space.
+        td.col-actions-wide::before { display: none; }
+        td.col-actions-wide > .d-flex { width: 100%; }
+        .btn.check-action {
+            flex: 1 1 auto;
+            min-width: 0;
         }
 
         // Remove all desktop sticky edge-shadow pseudo-elements
