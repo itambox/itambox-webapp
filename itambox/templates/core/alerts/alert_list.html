@@ -4,7 +4,7 @@
 {% block extra_controls %}
     <a href="{% url 'alertrule_list' %}" class="btn btn-outline-secondary">
         <i class="mdi mdi-tune me-1"></i>
-        {% trans "Manage Alert Rules" %}
+        {% translate "Manage Alert Rules" %}
     </a>
 {% endblock %}
 
@@ -22,10 +22,10 @@
                     </div>
                     <div class="col">
                         <div class="font-weight-medium">
-                            {{ active_alerts_count }} {% trans "Active Alerts" %}
+                            {{ active_alerts_count }} {% translate "Active Alerts" %}
                         </div>
                         <div class="text-secondary">
-                            {% trans "Require immediate validation" %}
+                            {% translate "Require immediate validation" %}
                         </div>
                     </div>
                 </div>
@@ -45,10 +45,10 @@
                     </div>
                     <div class="col">
                         <div class="font-weight-medium">
-                            {{ acknowledged_alerts_count }} {% trans "Acknowledged" %}
+                            {{ acknowledged_alerts_count }} {% translate "Acknowledged" %}
                         </div>
                         <div class="text-secondary">
-                            {% trans "Under review by administrators" %}
+                            {% translate "Under review by administrators" %}
                         </div>
                     </div>
                 </div>
@@ -69,11 +69,11 @@
                     <div class="col">
                         <div class="font-weight-medium">
                             <a href="{% url 'alertrule_list' %}" class="text-primary fw-bold">
-                                {% trans "Configure Threshold Rules" %}
+                                {% translate "Configure Threshold Rules" %}
                             </a>
                         </div>
                         <div class="text-secondary">
-                            {% trans "Manage triggers & notification channels" %}
+                            {% translate "Manage triggers & notification channels" %}
                         </div>
                     </div>
                 </div>

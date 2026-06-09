@@ -1,11 +1,11 @@
 {% extends base_template|default:"layout.html" %}
 {% load i18n %}
 
-{% block title %}{% trans "Alert Rule" %}: {{ object.name }} {% translate "- ITAMbox" %}{% endblock %}
+{% block title %}{% translate "Alert Rule" %}: {{ object.name }} {% translate "- ITAMbox" %}{% endblock %}
 
 {% block page_header %}
-    <div class="page-pretitle">{% trans "Operations" %}</div>
-    <h2 class="page-title">{% trans "Alert Rule" %}: {{ object.name }}</h2>
+    <div class="page-pretitle">{% translate "Operations" %}</div>
+    <h2 class="page-title">{% translate "Alert Rule" %}: {{ object.name }}</h2>
 {% endblock %}
 
 {% block page_actions %}
@@ -15,16 +15,16 @@
             <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
             <button type="submit" class="btn btn-outline-primary" title="{% translate 'Evaluate this rule now' %}">
                 <i class="mdi mdi-play-circle-outline"></i>
-                {% trans "Run now" %}
+                {% translate "Run now" %}
             </button>
         </form>
         <a href="{% url 'alertrule_edit' object.pk %}" class="btn btn-primary d-none d-sm-inline-block">
             <i class="mdi mdi-pencil-outline"></i>
-            {% trans "Edit Rule" %}
+            {% translate "Edit Rule" %}
         </a>
         <a href="{% url 'alertrule_delete' object.pk %}" class="btn btn-outline-danger d-none d-sm-inline-block">
             <i class="mdi mdi-trash-can-outline"></i>
-            {% trans "Delete" %}
+            {% translate "Delete" %}
         </a>
     </div>
 {% endblock %}
@@ -36,21 +36,21 @@
         <!-- Rule Configuration Card -->
         <div class="card mb-3">
             <div class="card-header">
-                <h3 class="card-title">{% trans "Rule Configuration" %}</h3>
+                <h3 class="card-title">{% translate "Rule Configuration" %}</h3>
             </div>
             <div class="card-body p-0">
                 <table class="table table-transparent table-vcenter card-table">
                     <tbody>
                         <tr>
-                            <td class="text-secondary fw-bold">{% trans "Name" %}</td>
+                            <td class="text-secondary fw-bold">{% translate "Name" %}</td>
                             <td>{{ object.name }}</td>
                         </tr>
                         <tr>
-                            <td class="text-secondary fw-bold">{% trans "Description" %}</td>
+                            <td class="text-secondary fw-bold">{% translate "Description" %}</td>
                             <td>{{ object.description|default:"&mdash;" }}</td>
                         </tr>
                         <tr>
-                            <td class="text-secondary fw-bold">{% trans "Alert Type" %}</td>
+                            <td class="text-secondary fw-bold">{% translate "Alert Type" %}</td>
                             <td>
                                 <span class="badge bg-purple-lt">
                                     {{ object.get_alert_type_display }}
@@ -58,28 +58,28 @@
                             </td>
                         </tr>
                         <tr>
-                            <td class="text-secondary fw-bold">{% trans "Threshold Value" %}</td>
+                            <td class="text-secondary fw-bold">{% translate "Threshold Value" %}</td>
                             <td>
                                 <strong>{{ object.threshold_value }}</strong>
                                 {% if object.alert_type == 'low_stock' %}
-                                    {% trans "units limit" %}
+                                    {% translate "units limit" %}
                                 {% else %}
-                                    {% trans "days planning horizon" %}
+                                    {% translate "days planning horizon" %}
                                 {% endif %}
                             </td>
                         </tr>
                         <tr>
-                            <td class="text-secondary fw-bold">{% trans "Re-notify" %}</td>
+                            <td class="text-secondary fw-bold">{% translate "Re-notify" %}</td>
                             <td>
                                 {% if object.renotify_interval_days %}
-                                    {% blocktrans with days=object.renotify_interval_days %}Every {{ days }} day(s) while unresolved{% endblocktrans %}
+                                    {% blocktranslate with days=object.renotify_interval_days %}Every {{ days }} day(s) while unresolved{% endblocktranslate %}
                                 {% else %}
-                                    {% trans "Once only" %}
+                                    {% translate "Once only" %}
                                 {% endif %}
                             </td>
                         </tr>
                         <tr>
-                            <td class="text-secondary fw-bold">{% trans "Severity" %}</td>
+                            <td class="text-secondary fw-bold">{% translate "Severity" %}</td>
                             <td>
                                 {% if object.severity == 'info' %}
                                     <span class="badge bg-info">{% translate "Info" %}</span>
@@ -91,27 +91,27 @@
                             </td>
                         </tr>
                         <tr>
-                            <td class="text-secondary fw-bold">{% trans "Status" %}</td>
+                            <td class="text-secondary fw-bold">{% translate "Status" %}</td>
                             <td>
                                 {% if object.is_active %}
-                                    <span class="badge bg-success">{% trans "Active" %}</span>
+                                    <span class="badge bg-success">{% translate "Active" %}</span>
                                 {% else %}
-                                    <span class="badge bg-secondary">{% trans "Inactive" %}</span>
+                                    <span class="badge bg-secondary">{% translate "Inactive" %}</span>
                                 {% endif %}
                                 {% if object.is_muted %}
                                     <span class="badge bg-warning" title="{% translate 'Tracked in Alert Center, but channel notifications suppressed.' %}">
-                                        <i class="mdi mdi-bell-off-outline"></i> {% trans "Muted" %}
+                                        <i class="mdi mdi-bell-off-outline"></i> {% translate "Muted" %}
                                     </span>
                                 {% endif %}
                             </td>
                         </tr>
                         <tr>
-                            <td class="text-secondary fw-bold">{% trans "Last Evaluated" %}</td>
+                            <td class="text-secondary fw-bold">{% translate "Last Evaluated" %}</td>
                             <td>
                                 {% if object.last_fired_at %}
                                     {{ object.last_fired_at|date:"Y-m-d H:i" }}
                                 {% else %}
-                                    <span class="text-muted">{% trans "Never" %}</span>
+                                    <span class="text-muted">{% translate "Never" %}</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -123,15 +123,15 @@
         <!-- Notification Channels Card -->
         <div class="card">
             <div class="card-header">
-                <h3 class="card-title">{% trans "Notification Channels" %}</h3>
+                <h3 class="card-title">{% translate "Notification Channels" %}</h3>
             </div>
             <div class="card-body p-0">
                 <table class="table table-transparent table-vcenter card-table">
                     <thead>
                         <tr>
-                            <th>{% trans "Channel Name" %}</th>
-                            <th>{% trans "Type" %}</th>
-                            <th>{% trans "Status" %}</th>
+                            <th>{% translate "Channel Name" %}</th>
+                            <th>{% translate "Type" %}</th>
+                            <th>{% translate "Status" %}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -150,7 +150,7 @@
                         {% empty %}
                         <tr>
                             <td colspan="3" class="text-muted text-center py-3">
-                                {% trans "No custom channels configured (broadcast fallback)." %}
+                                {% translate "No custom channels configured (broadcast fallback)." %}
                             </td>
                         </tr>
                         {% endfor %}
@@ -168,7 +168,7 @@
                 <div class="card">
                     <div class="card-body text-center">
                         <div class="h1 m-0 text-danger">{{ active_logs_count }}</div>
-                        <div class="text-secondary">{% trans "Active Triggered Alerts" %}</div>
+                        <div class="text-secondary">{% translate "Active Triggered Alerts" %}</div>
                     </div>
                 </div>
             </div>
@@ -176,7 +176,7 @@
                 <div class="card">
                     <div class="card-body text-center">
                         <div class="h1 m-0 text-secondary">{{ logs_count }}</div>
-                        <div class="text-secondary">{% trans "Total Historical Alerts" %}</div>
+                        <div class="text-secondary">{% translate "Total Historical Alerts" %}</div>
                     </div>
                 </div>
             </div>
@@ -185,17 +185,17 @@
         <!-- Alert History -->
         <div class="card">
             <div class="card-header">
-                <h3 class="card-title">{% trans "Triggered Alerts History" %}</h3>
+                <h3 class="card-title">{% translate "Triggered Alerts History" %}</h3>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-vcenter card-table">
                         <thead>
                             <tr>
-                                <th>{% trans "Date" %}</th>
-                                <th>{% trans "Subject" %}</th>
-                                <th>{% trans "Status" %}</th>
-                                <th class="text-end">{% trans "Action" %}</th>
+                                <th>{% translate "Date" %}</th>
+                                <th>{% translate "Subject" %}</th>
+                                <th>{% translate "Status" %}</th>
+                                <th class="text-end">{% translate "Action" %}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -237,7 +237,7 @@
                             {% empty %}
                             <tr>
                                 <td colspan="4" class="text-muted text-center py-4">
-                                    {% trans "No alerts have been triggered by this rule yet." %}
+                                    {% translate "No alerts have been triggered by this rule yet." %}
                                 </td>
                             </tr>
                             {% endfor %}

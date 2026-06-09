@@ -4,15 +4,15 @@
 {% block content_tab %}
     <div class="d-flex align-items-center justify-content-between mb-4">
         <div>
-            <h3 class="card-title mb-0">{% trans "Notification Inbox" %}</h3>
-            <p class="text-muted small mb-0">{% trans "System operational logs, license expirations, and stock warnings." %}</p>
+            <h3 class="card-title mb-0">{% translate "Notification Inbox" %}</h3>
+            <p class="text-muted small mb-0">{% translate "System operational logs, license expirations, and stock warnings." %}</p>
         </div>
         {% if unread_notifications_count > 0 %}
             <form method="post" action="{% url 'users:mark_all_notifications_read' %}" class="d-inline">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-outline-secondary btn-sm d-flex align-items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l5 5l10 -10" /></svg>
-                    {% trans "Mark All as Read" %}
+                    {% translate "Mark All as Read" %}
                 </button>
             </form>
         {% endif %}
@@ -50,9 +50,9 @@
                             <div class="col-auto ms-auto">
                                 <form method="post" action="{% url 'users:mark_notification_read' pk=notif.pk %}" class="d-inline">
                                     {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-ghost-success border-0 px-2 py-1" title="{% trans 'Mark as Read' %}">
+                                    <button type="submit" class="btn btn-sm btn-ghost-success border-0 px-2 py-1" title="{% translate 'Mark as Read' %}">
                                         <i class="mdi mdi-check"></i>
-                                        <span class="d-none d-sm-inline ms-1">{% trans "Mark Read" %}</span>
+                                        <span class="d-none d-sm-inline ms-1">{% translate "Mark Read" %}</span>
                                     </button>
                                 </form>
                             </div>
@@ -60,7 +60,7 @@
                             <div class="col-auto ms-auto text-muted">
                                 <span class="small text-muted font-weight-medium">
                                     <i class="mdi mdi-eye-outline me-1"></i>
-                                    {% trans "Read" %}
+                                    {% translate "Read" %}
                                 </span>
                             </div>
                         {% endif %}
@@ -72,7 +72,7 @@
         <div class="py-5 text-muted text-center card border-0 bg-transparent shadow-none">
             <div class="card-body">
                 <i class="mdi mdi-bell-off-outline text-muted mb-2"></i>
-                <p class="mb-0 small font-weight-medium">{% trans "You have no system notifications." %}</p>
+                <p class="mb-0 small font-weight-medium">{% translate "You have no system notifications." %}</p>
             </div>
         </div>
     {% endif %}

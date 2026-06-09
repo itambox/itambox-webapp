@@ -18,21 +18,21 @@
             <div class="col">
                 <!-- Breadcrumbs -->
                 <ol class="breadcrumb" aria-label="{% translate 'breadcrumbs' %}">
-                    <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">{% trans "Dashboard" %}</a></li>
-                    <li class="breadcrumb-item"><a href="{% url 'job_list' %}">{% trans "Tasks & Jobs" %}</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">{% translate "Dashboard" %}</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'job_list' %}">{% translate "Tasks & Jobs" %}</a></li>
                     <li class="breadcrumb-item active" aria-current="page"><a href="#">{{ object.name }}</a></li>
                 </ol>
                 <h2 class="page-title mt-2">
                     {{ object.name }}
                     {% if object.status == 'pending' %}
-                        <span class="badge bg-info ms-2">{% trans "Pending" %}</span>
+                        <span class="badge bg-info ms-2">{% translate "Pending" %}</span>
                     {% elif object.status == 'running' %}
-                        <span class="badge bg-warning ms-2">{% trans "Running" %}</span>
+                        <span class="badge bg-warning ms-2">{% translate "Running" %}</span>
                         <span class="spinner-border spinner-border-sm text-warning ms-1" role="status"></span>
                     {% elif object.status == 'completed' %}
-                        <span class="badge bg-success ms-2">{% trans "Completed" %}</span>
+                        <span class="badge bg-success ms-2">{% translate "Completed" %}</span>
                     {% elif object.status == 'failed' %}
-                        <span class="badge bg-danger ms-2">{% trans "Failed" %}</span>
+                        <span class="badge bg-danger ms-2">{% translate "Failed" %}</span>
                     {% endif %}
                 </h2>
             </div>
@@ -45,7 +45,7 @@
                         {% csrf_token %}
                         <button type="submit" class="btn btn-outline-danger btn-sm">
                             <i class="mdi mdi-close-box-outline"></i>
-                            {% trans "Cancel Task" %}
+                            {% translate "Cancel Task" %}
                         </button>
                     </form>
                 </div>
@@ -60,26 +60,26 @@
         <div class="col-md-4">
             <div class="card mb-3">
                 <div class="card-header">
-                    <h3 class="card-title">{% trans "Job Information" %}</h3>
+                    <h3 class="card-title">{% translate "Job Information" %}</h3>
                 </div>
                 <table class="table table-transparent table-vcenter card-table font-monospace fs-5">
                     <tbody>
                         <tr>
-                            <td><strong>{% trans "Created" %}:</strong></td>
+                            <td><strong>{% translate "Created" %}:</strong></td>
                             <td class="text-muted text-end">{{ object.created|date:"Y-m-d H:i:s" }}</td>
                         </tr>
                         <tr>
-                            <td><strong>{% trans "Started" %}:</strong></td>
+                            <td><strong>{% translate "Started" %}:</strong></td>
                             <td class="text-muted text-end">{% if object.started %}{{ object.started|date:"Y-m-d H:i:s" }}{% else %}&mdash;{% endif %}</td>
                         </tr>
                         <tr>
-                            <td><strong>{% trans "Completed" %}:</strong></td>
+                            <td><strong>{% translate "Completed" %}:</strong></td>
                             <td class="text-muted text-end">{% if object.completed %}{{ object.completed|date:"Y-m-d H:i:s" }}{% else %}&mdash;{% endif %}</td>
                         </tr>
                         {% if object.result %}
                         <tr>
                             <td colspan="2" class="border-top pt-2">
-                                <strong>{% trans "Task Result Summary" %}:</strong>
+                                <strong>{% translate "Task Result Summary" %}:</strong>
                                 <pre class="bg-surface-secondary text-primary border rounded p-2 mt-2 mb-0 fs-6" style="white-space: pre-wrap; word-break: break-all;">{{ object.result|pretty_json }}</pre>
                             </td>
                         </tr>
@@ -94,9 +94,9 @@
                 <div class="card-body">
                     <h3 class="card-title text-success">
                         <i class="mdi mdi-download me-1"></i>
-                        {% trans "Generated Attachments" %}
+                        {% translate "Generated Attachments" %}
                     </h3>
-                    <p class="text-muted fs-5">{% trans "The background operation generated files for checkout or label template batch downloading." %}</p>
+                    <p class="text-muted fs-5">{% translate "The background operation generated files for checkout or label template batch downloading." %}</p>
                     {% for file in attachments %}
                     <a href="{{ file.file.url }}" class="btn btn-success btn-sm w-100 mt-1" download hx-boost="false">
                         <i class="mdi mdi-folder-zip-outline"></i>
@@ -114,14 +114,14 @@
                 <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
                     <h3 class="card-title text-white">
                         <i class="mdi mdi-console me-1"></i>
-                        {% trans "Execution & Activity Logs" %}
+                        {% translate "Execution & Activity Logs" %}
                     </h3>
                     {% if object.status == 'running' %}
                     <span class="badge bg-warning text-warning-fg spinner-border spinner-border-sm" role="status"></span>
                     {% endif %}
                 </div>
                 <div class="card-body bg-dark text-light p-0">
-                    <pre class="bg-dark text-light border-0 rounded-0 p-3 mb-0 fs-5 font-monospace" style="min-height: 250px; max-height: 500px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;">{% if object.logs %}{{ object.logs }}{% else %}[{% trans "Waiting for task initialization..." %}]{% endif %}</pre>
+                    <pre class="bg-dark text-light border-0 rounded-0 p-3 mb-0 fs-5 font-monospace" style="min-height: 250px; max-height: 500px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;">{% if object.logs %}{{ object.logs }}{% else %}[{% translate "Waiting for task initialization..." %}]{% endif %}</pre>
                 </div>
             </div>
         </div>

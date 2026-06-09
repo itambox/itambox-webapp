@@ -1,7 +1,7 @@
 {% extends base_template|default:"layout.html" %}
 {% load i18n %}
 
-{% block title %}{% block title_tab %}{% trans "User Account" %}{% endblock %} {% translate "- ITAMbox" %}{% endblock %}
+{% block title %}{% block title_tab %}{% translate "User Account" %}{% endblock %} {% translate "- ITAMbox" %}{% endblock %}
 
 {% block page_header %}
     <div class="page-pretitle">
@@ -18,27 +18,27 @@
     <div class="card-header">
         <ul class="nav nav-tabs card-header-tabs" role="tablist">
             <li class="nav-item" role="presentation">
-                <a href="{% url 'users:user_profile' %}" class="nav-link{% if active_tab == 'profile' %} active{% endif %}">{% trans "Profile" %}</a>
+                <a href="{% url 'users:user_profile' %}" class="nav-link{% if active_tab == 'profile' %} active{% endif %}">{% translate "Profile" %}</a>
             </li>
             <li class="nav-item" role="presentation">
                 <a href="{% url 'users:user_notifications' %}" class="nav-link{% if active_tab == 'notifications' %} active{% endif %}">
-                    {% trans "Notifications" %}
+                    {% translate "Notifications" %}
                     {% if unread_notifications_count > 0 %}
                         <span class="badge bg-red-lt ms-1">{{ unread_notifications_count }}</span>
                     {% endif %}
                 </a>
             </li>
             <li class="nav-item" role="presentation">
-                <a href="{% url 'users:user_subscriptions' %}" class="nav-link{% if active_tab == 'subscriptions' %} active{% endif %}">{% trans "Subscriptions" %}</a>
+                <a href="{% url 'users:user_subscriptions' %}" class="nav-link{% if active_tab == 'subscriptions' %} active{% endif %}">{% translate "Subscriptions" %}</a>
             </li>
             <li class="nav-item" role="presentation">
-                <a href="{% url 'users:user_preferences' %}" class="nav-link{% if active_tab == 'preferences' %} active{% endif %}">{% trans "Preferences" %}</a>
+                <a href="{% url 'users:user_preferences' %}" class="nav-link{% if active_tab == 'preferences' %} active{% endif %}">{% translate "Preferences" %}</a>
             </li>
             <li class="nav-item" role="presentation">
-                <a href="{% url 'users:user_password' %}" class="nav-link{% if active_tab == 'password' %} active{% endif %}">{% trans "Change Password" %}</a>
+                <a href="{% url 'users:user_password' %}" class="nav-link{% if active_tab == 'password' %} active{% endif %}">{% translate "Change Password" %}</a>
             </li>
             <li class="nav-item" role="presentation">
-                <a href="{% url 'users:user_api_tokens' %}" class="nav-link{% if active_tab == 'api_tokens' %} active{% endif %}">{% trans "API Tokens" %}</a>
+                <a href="{% url 'users:user_api_tokens' %}" class="nav-link{% if active_tab == 'api_tokens' %} active{% endif %}">{% translate "API Tokens" %}</a>
             </li>
         </ul>
     </div>

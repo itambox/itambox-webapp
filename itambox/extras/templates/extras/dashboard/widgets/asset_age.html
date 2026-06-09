@@ -4,7 +4,7 @@
 {% with total=age_buckets.lt1y|add:age_buckets.1_3y|add:age_buckets.3_5y|add:age_buckets.5_7y|add:age_buckets.gt7y %}
 <div class="d-flex align-items-baseline mb-2">
     <span class="h3 mb-0 text-primary fw-bold">{{ avg_asset_age_years }}y</span>
-    <span class="text-muted small ms-2">{% trans "average asset age" %}</span>
+    <span class="text-muted small ms-2">{% translate "average asset age" %}</span>
 </div>
 
 {% if chart_format == 'list' %}
@@ -24,5 +24,5 @@
 
 {% endwith %}
 {% else %}
-<div class="text-muted text-center py-4">{% trans "No asset purchase dates recorded." %}</div>
+<div class="text-muted text-center py-4">{% translate "No asset purchase dates recorded." %}</div>
 {% endif %}

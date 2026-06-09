@@ -1,12 +1,12 @@
 {% extends 'users/base.html' %}
 {% load i18n %}
 
-{% block title_tab %}{% trans "Subscriptions" %}{% endblock %}
+{% block title_tab %}{% translate "Subscriptions" %}{% endblock %}
 
 {% block content_tab %}
 <div class="mb-4">
-    <h3 class="card-title mb-0">{% trans "Subscribed Objects & Change Updates" %}</h3>
-    <p class="text-muted small mb-0">{% trans "Overview of physical and logical inventory objects you have subscribed to for real-time change notifications." %}</p>
+    <h3 class="card-title mb-0">{% translate "Subscribed Objects & Change Updates" %}</h3>
+    <p class="text-muted small mb-0">{% translate "Overview of physical and logical inventory objects you have subscribed to for real-time change notifications." %}</p>
 </div>
 
 {# Subscribed Objects Section #}
@@ -18,7 +18,7 @@
                     <div>
                         <span class="badge bg-purple-lt me-2">{{ item.type_name }}</span>
                         <a href="{{ item.url }}" class="font-weight-medium text-reset">{{ item.name }}</a>
-                        <div class="text-muted small mt-1">{% trans "Subscribed on" %} {{ item.created|date:"Y-m-d H:i" }}</div>
+                        <div class="text-muted small mt-1">{% translate "Subscribed on" %} {{ item.created|date:"Y-m-d H:i" }}</div>
                     </div>
                     <div>
                         <button type="button" class="btn btn-sm btn-outline-danger"
@@ -26,8 +26,8 @@
                                 hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                                 hx-target="closest .list-group-item"
                                 hx-swap="outerHTML"
-                                title="{% trans 'Unsubscribe' %}">
-                            {% trans "Unsubscribe" %}
+                                title="{% translate 'Unsubscribe' %}">
+                            {% translate "Unsubscribe" %}
                         </button>
                     </div>
                 </div>
@@ -37,8 +37,8 @@
         <div class="py-5 text-muted text-center border-0 bg-transparent shadow-none">
             <div class="card-body">
                 <i class="mdi mdi-star-off-outline text-muted mb-2"></i>
-                <p class="mb-0 small font-weight-medium">{% trans "You have not subscribed to any specific objects for updates yet." %}</p>
-                <p class="text-muted small mt-1">{% trans "Use the star icon on any hardware asset, license, or location details page to subscribe." %}</p>
+                <p class="mb-0 small font-weight-medium">{% translate "You have not subscribed to any specific objects for updates yet." %}</p>
+                <p class="text-muted small mt-1">{% translate "Use the star icon on any hardware asset, license, or location details page to subscribe." %}</p>
             </div>
         </div>
     {% endif %}

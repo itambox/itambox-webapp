@@ -4,11 +4,11 @@
     <table class="table table-vcenter card-table table-striped table-hover mb-0" style="font-size: 0.78rem;">
         <thead>
             <tr class="text-uppercase text-muted fw-bold" style="font-size: 0.65rem; letter-spacing: 0.05em;">
-                <th>{% trans "Time" %}</th>
-                <th>{% trans "Action" %}</th>
-                <th>{% trans "Category" %}</th>
-                <th>{% trans "User" %}</th>
-                <th>{% trans "Modified Object" %}</th>
+                <th>{% translate "Time" %}</th>
+                <th>{% translate "Action" %}</th>
+                <th>{% translate "Category" %}</th>
+                <th>{% translate "User" %}</th>
+                <th>{% translate "Modified Object" %}</th>
             </tr>
         </thead>
         <tbody>
@@ -27,17 +27,17 @@
                     {% if change.action == 'create' %}
                     <span class="badge badge-outline text-success d-inline-flex align-items-center gap-1 border-success-subtle bg-success-lt px-2 py-1">
                         <i class="mdi mdi-plus-circle-outline"></i>
-                        <span>{% trans "Created" %}</span>
+                        <span>{% translate "Created" %}</span>
                     </span>
                     {% elif change.action == 'update' %}
                     <span class="badge badge-outline text-info d-inline-flex align-items-center gap-1 border-info-subtle bg-info-lt px-2 py-1">
                         <i class="mdi mdi-pencil-outline"></i>
-                        <span>{% trans "Updated" %}</span>
+                        <span>{% translate "Updated" %}</span>
                     </span>
                     {% else %}
                     <span class="badge badge-outline text-danger d-inline-flex align-items-center gap-1 border-danger-subtle bg-danger-lt px-2 py-1">
                         <i class="mdi mdi-delete-outline"></i>
-                        <span>{% trans "Deleted" %}</span>
+                        <span>{% translate "Deleted" %}</span>
                     </span>
                     {% endif %}
                 </td>
@@ -78,6 +78,6 @@
 {% else %}
 <div class="text-muted text-center py-5 d-flex flex-column align-items-center gap-2">
     <i class="mdi mdi-text-box-search-outline fs-1 text-muted opacity-50"></i>
-    <span>{% trans "No recent changes recorded matching search parameters." %}</span>
+    <span>{% translate "No recent changes recorded matching search parameters." %}</span>
 </div>
 {% endif %}

@@ -1,6 +1,6 @@
 {% load i18n %}{% load l10n %}
 {% if tenant_spend %}
-<div class="text-muted small mb-2">{% trans "Purchase cost by tenant" %}</div>
+<div class="text-muted small mb-2">{% translate "Purchase cost by tenant" %}</div>
 
 {% if chart_type == 'list' %}
 <!-- Simple List View -->
@@ -21,5 +21,5 @@
 {% endif %}
 
 {% else %}
-<div class="text-muted text-center py-4">{% trans "No tenant data available." %}</div>
+<div class="text-muted text-center py-4">{% translate "No tenant data available." %}</div>
 {% endif %}

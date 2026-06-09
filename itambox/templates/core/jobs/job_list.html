@@ -10,9 +10,9 @@
             <div class="col">
                 <h2 class="page-title">
                     <i class="mdi mdi-cpu-64-bit me-2 text-primary"></i>
-                    {% trans "Background Tasks & Jobs" %}
+                    {% translate "Background Tasks & Jobs" %}
                 </h2>
-                <div class="text-muted mt-1">{% trans "Monitor the status and execution logs of asynchronous operations." %}</div>
+                <div class="text-muted mt-1">{% translate "Monitor the status and execution logs of asynchronous operations." %}</div>
             </div>
         </div>
     </div>
@@ -30,10 +30,10 @@
                         </div>
                         <div class="col">
                             <div class="font-weight-medium">
-                                {{ table.data|length }} {% trans "Total Tasks" %}
+                                {{ table.data|length }} {% translate "Total Tasks" %}
                             </div>
                             <div class="text-muted">
-                                {% trans "Historical runs queue" %}
+                                {% translate "Historical runs queue" %}
                             </div>
                         </div>
                     </div>
@@ -51,10 +51,10 @@
                         </div>
                         <div class="col">
                             <div class="font-weight-medium">
-                                <span class="text-warning">{% trans "Active Workers" %}</span>
+                                <span class="text-warning">{% translate "Active Workers" %}</span>
                             </div>
                             <div class="text-muted">
-                                {% trans "Zero N+1 query storm" %}
+                                {% translate "Zero N+1 query storm" %}
                             </div>
                         </div>
                     </div>
@@ -72,10 +72,10 @@
                         </div>
                         <div class="col">
                             <div class="font-weight-medium">
-                                <span class="text-success">{% trans "Fast Async Actions" %}</span>
+                                <span class="text-success">{% translate "Fast Async Actions" %}</span>
                             </div>
                             <div class="text-muted">
-                                {% trans "Django-Q2 ORM Broker" %}
+                                {% translate "Django-Q2 ORM Broker" %}
                             </div>
                         </div>
                     </div>
@@ -93,10 +93,10 @@
                         </div>
                         <div class="col">
                             <div class="font-weight-medium">
-                                <span class="text-danger">{% trans "Audit Safety" %}</span>
+                                <span class="text-danger">{% translate "Audit Safety" %}</span>
                             </div>
                             <div class="text-muted">
-                                {% trans "Centralized logs registry" %}
+                                {% translate "Centralized logs registry" %}
                             </div>
                         </div>
                     </div>
@@ -117,11 +117,11 @@
              hx-swap="outerHTML"
              {% endif %}>
             <div class="card-header">
-                <h3 class="card-title">{% trans "Tasks Queue" %}</h3>
+                <h3 class="card-title">{% translate "Tasks Queue" %}</h3>
                 <!-- Simple status indicator -->
                 {% if "running" in table.data.queryset.values_list|stringformat:"s" %}
                 <span class="spinner-border spinner-border-sm text-warning ms-2" role="status"></span>
-                <span class="text-muted font-monospace fs-5 ms-1">{% trans "processing..." %}</span>
+                <span class="text-muted font-monospace fs-5 ms-1">{% translate "processing..." %}</span>
                 {% endif %}
             </div>
             <div class="table-responsive">
@@ -135,9 +135,9 @@
                     <div class="empty-icon">
                         <i class="mdi mdi-emoticon-neutral-outline text-muted"></i>
                     </div>
-                    <p class="empty-title">{% trans "No jobs found" %}</p>
+                    <p class="empty-title">{% translate "No jobs found" %}</p>
                     <p class="empty-subtitle text-muted">
-                        {% trans "Asynchronous import and checkout tasks will appear in this registry." %}
+                        {% translate "Asynchronous import and checkout tasks will appear in this registry." %}
                     </p>
                 </div>
             </div>

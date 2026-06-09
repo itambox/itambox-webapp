@@ -2,25 +2,25 @@
 <form method="post" action="{% url 'extras:dashboard_widget_add' dashboard_id=dashboard_id %}" hx-post="{% url 'extras:dashboard_widget_add' dashboard_id=dashboard_id %}" hx-target="#dashboard-modal-content">
     {% csrf_token %}
     <div class="modal-header">
-        <h5 class="modal-title">{% trans "Add Widget" %}</h5>
+        <h5 class="modal-title">{% translate "Add Widget" %}</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
     </div>
     <div class="modal-body">
         <div class="mb-3">
-            <label class="form-label" for="{{ form.widget.id_for_label }}">{% trans "Widget" %}</label>
+            <label class="form-label" for="{{ form.widget.id_for_label }}">{% translate "Widget" %}</label>
             {{ form.widget }}
         </div>
         <div class="mb-3">
-            <label class="form-label" for="{{ form.title.id_for_label }}">{% trans "Title" %}</label>
+            <label class="form-label" for="{{ form.title.id_for_label }}">{% translate "Title" %}</label>
             {{ form.title }}
-            <div class="form-text">{% trans "Leave blank to use the default title." %}</div>
+            <div class="form-text">{% translate "Leave blank to use the default title." %}</div>
         </div>
     </div>
     <div class="modal-footer">
-        <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+        <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
         <button type="submit" class="btn btn-primary ms-auto">
             <i class="mdi mdi-plus"></i>
-            {% trans "Add Widget" %}
+            {% translate "Add Widget" %}
         </button>
     </div>
 </form>

@@ -2,7 +2,7 @@
 {% load i18n %}
 {% load crispy_forms_tags %}
 
-{% block title_tab %}{% trans "Preferences" %}{% endblock %}
+{% block title_tab %}{% translate "Preferences" %}{% endblock %}
 
 {% block content_tab %}
 {# This content is included inside the card body defined in users/inc/tabs.html #}
@@ -10,18 +10,18 @@
     {% csrf_token %}
     <div class="card-body">
         {# General Preferences Section #}
-        <h3 class="card-title mb-4">{% trans "User Preferences" %}</h3>
+        <h3 class="card-title mb-4">{% translate "User Preferences" %}</h3>
         {{ form|crispy }}
         
         {# Table Configurations Section #}
         {% if table_configs %}
         <div class="field-group my-5">
             <div class="row mb-3">
-                <h3 class="col-9 offset-sm-3">{% trans "Table Configurations" %}</h3>
+                <h3 class="col-9 offset-sm-3">{% translate "Table Configurations" %}</h3>
             </div>
             <div class="row mb-3">
                 <label class="col-sm-3 col-form-label text-sm-end">
-                    {% trans "Clear table preferences" %}
+                    {% translate "Clear table preferences" %}
                 </label>
                 <div class="col-sm-9">
                     <div class="card">
@@ -32,9 +32,9 @@
                                         <th class="w-1 text-center">
                                             {# <input type="checkbox" class="toggle form-check-input" title="Toggle All"> #} {# Toggle All JS needed #}
                                         </th>
-                                        <th>{% trans "Table" %}</th>
-                                        <th>{% trans "Ordering" %}</th>
-                                        <th>{% trans "Columns" %}</th>
+                                        <th>{% translate "Table" %}</th>
+                                        <th>{% translate "Ordering" %}</th>
+                                        <th>{% translate "Columns" %}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -52,7 +52,7 @@
                             </table>
                         </div>
                     </div>
-                    <small class="form-hint">{% trans "Select one or more table configurations to clear." %}</small>
+                    <small class="form-hint">{% translate "Select one or more table configurations to clear." %}</small>
                 </div>
             </div>
         </div>
@@ -60,7 +60,7 @@
     </div> {# End card-body #}
     
     <div class="card-footer text-end">
-        <button type="submit" class="btn btn-primary">{% trans "Save Changes" %}</button>
+        <button type="submit" class="btn btn-primary">{% translate "Save Changes" %}</button>
     </div>
 </form>
 {% endblock %} 

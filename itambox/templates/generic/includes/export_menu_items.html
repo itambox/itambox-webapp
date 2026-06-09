@@ -1,30 +1,30 @@
 {% load i18n %}
 {# Reusable export dropdown items — shared by the desktop Export dropdown and the mobile [...] menu. #}
 {# Expects context: app_label, model_name, export_templates, request #}
-<div class="dropdown-header">{% trans "Current View" %}</div>
+<div class="dropdown-header">{% translate "Current View" %}</div>
 <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=0 %}?format=csv&export_scope=filtered&{{ request.GET.urlencode }}" hx-boost="false">
     <i class="mdi mdi-file-delimited-outline me-2 text-muted"></i>
-    {% trans "CSV Format" %}
+    {% translate "CSV Format" %}
 </a>
 <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=0 %}?format=yaml&export_scope=filtered&{{ request.GET.urlencode }}" hx-boost="false">
     <i class="mdi mdi-file-code-outline me-2 text-muted"></i>
-    {% trans "YAML Format" %}
+    {% translate "YAML Format" %}
 </a>
 
 <div class="dropdown-divider"></div>
-<div class="dropdown-header">{% trans "All Data" %}</div>
+<div class="dropdown-header">{% translate "All Data" %}</div>
 <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=0 %}?format=csv&export_scope=all" hx-boost="false">
     <i class="mdi mdi-file-delimited-outline me-2 text-muted"></i>
-    {% trans "CSV Format" %}
+    {% translate "CSV Format" %}
 </a>
 <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=0 %}?format=yaml&export_scope=all" hx-boost="false">
     <i class="mdi mdi-file-code-outline me-2 text-muted"></i>
-    {% trans "YAML Format" %}
+    {% translate "YAML Format" %}
 </a>
 
 {% if export_templates %}
     <div class="dropdown-divider"></div>
-    <div class="dropdown-header">{% trans "Export Templates" %}</div>
+    <div class="dropdown-header">{% translate "Export Templates" %}</div>
     {% for template in export_templates %}
     <a class="dropdown-item" href="{% url 'object_export' app_label=app_label model_name=model_name template_id=template.pk %}" hx-boost="false">
         <i class="mdi mdi-file-code-outline me-2 text-muted"></i>

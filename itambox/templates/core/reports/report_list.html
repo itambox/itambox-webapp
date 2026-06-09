@@ -4,7 +4,7 @@
 {% block extra_controls %}
     <a href="{% url 'reporttemplate_list' %}" class="btn btn-outline-secondary">
         <i class="mdi mdi-file-document-outline me-1"></i>
-        {% trans "Manage Templates" %}
+        {% translate "Manage Templates" %}
     </a>
 {% endblock %}
 
@@ -22,10 +22,10 @@
                     </div>
                     <div class="col">
                         <div class="font-weight-medium">
-                            {% trans "Automated Report Schedules" %}
+                            {% translate "Automated Report Schedules" %}
                         </div>
                         <div class="text-secondary">
-                            {% trans "Hourly, nightly, or weekly runs cataloged" %}
+                            {% translate "Hourly, nightly, or weekly runs cataloged" %}
                         </div>
                     </div>
                 </div>
@@ -46,11 +46,11 @@
                     <div class="col">
                         <div class="font-weight-medium">
                             <a href="{% url 'reporttemplate_list' %}" class="text-purple fw-bold">
-                                {{ templates.count|default:"3" }} {% trans "Report Templates Available" %}
+                                {{ templates.count|default:"3" }} {% translate "Report Templates Available" %}
                             </a>
                         </div>
                         <div class="text-secondary">
-                            {% trans "Asset summary, license allocation & renewals" %}
+                            {% translate "Asset summary, license allocation & renewals" %}
                         </div>
                     </div>
                 </div>

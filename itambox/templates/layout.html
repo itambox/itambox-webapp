@@ -129,7 +129,7 @@
                             <span class="d-flex align-items-center gap-2 text-truncate">
                                 <i class="mdi mdi-briefcase-outline fs-3"></i>
                                 <span class="text-truncate">
-                                    {% if request.active_tenant %}{{ request.active_tenant.name }}{% elif request.active_tenant_group %}{{ request.active_tenant_group.name }} {% trans "(Group)" %}{% else %}{% trans "All Tenants" %}{% endif %}
+                                    {% if request.active_tenant %}{{ request.active_tenant.name }}{% elif request.active_tenant_group %}{{ request.active_tenant_group.name }} {% translate "(Group)" %}{% else %}{% translate "All Tenants" %}{% endif %}
                                 </span>
                             </span>
                             <i class="mdi mdi-unfold-more-horizontal text-muted"></i>
@@ -179,10 +179,10 @@
                             {% block page_header %}
                             <div id="page-header-block">
                                 <div class="page-pretitle">
-                                    {% trans "Overview" %}
+                                    {% translate "Overview" %}
                                 </div>
                                 <h2 class="page-title">
-                                    {% trans "Dashboard" %}
+                                    {% translate "Dashboard" %}
                                 </h2>
                             </div>
                             {% endblock %}
@@ -215,22 +215,22 @@
             <div class="container-fluid d-flex justify-content-between align-items-center">
                 <ul class="list-inline mb-0 fs-2">
                     <li class="list-inline-item">
-                      <a href="{% static 'docs/index.html' %}" target="_blank" class="link-secondary" rel="noopener" aria-label="{% trans "Docs" %}" title="{% trans "Docs" %}" data-bs-placement="top" data-bs-toggle="tooltip">
+                      <a href="{% static 'docs/index.html' %}" target="_blank" class="link-secondary" rel="noopener" aria-label="{% translate "Docs" %}" title="{% translate "Docs" %}" data-bs-placement="top" data-bs-toggle="tooltip">
                         <i class="mdi mdi-book-outline"></i>
                       </a>
                     </li>
                     <li class="list-inline-item">
-                      <a href="{% url 'api:api-root' %}" target="_blank" class="link-secondary" rel="noopener" aria-label="{% trans "REST API" %}" title="{% trans "REST API" %}" data-bs-placement="top" data-bs-toggle="tooltip">
+                      <a href="{% url 'api:api-root' %}" target="_blank" class="link-secondary" rel="noopener" aria-label="{% translate "REST API" %}" title="{% translate "REST API" %}" data-bs-placement="top" data-bs-toggle="tooltip">
                         <i class="mdi mdi-cloud-tags"></i>
                       </a>
                     </li>
                      <li class="list-inline-item">
-                        <a href="{% url 'api:swagger-ui' %}" target="_blank" class="link-secondary" rel="noopener" aria-label="{% trans "API documentation" %}" title="{% trans "API documentation" %}" data-bs-placement="top" data-bs-toggle="tooltip">
+                        <a href="{% url 'api:swagger-ui' %}" target="_blank" class="link-secondary" rel="noopener" aria-label="{% translate "API documentation" %}" title="{% translate "API documentation" %}" data-bs-placement="top" data-bs-toggle="tooltip">
                             <i class="mdi mdi-file-code-outline"></i>
                         </a>
                     </li>
                     <li class="list-inline-item">
-                      <a href="https://github.com/your-repo" target="_blank" class="link-secondary" rel="noopener" aria-label="{% trans "Source Code" %}" title="{% trans "Source Code" %}" data-bs-placement="top" data-bs-toggle="tooltip">
+                      <a href="https://github.com/your-repo" target="_blank" class="link-secondary" rel="noopener" aria-label="{% translate "Source Code" %}" title="{% translate "Source Code" %}" data-bs-placement="top" data-bs-toggle="tooltip">
                         <i class="mdi mdi-github"></i>
                       </a>
                     </li>

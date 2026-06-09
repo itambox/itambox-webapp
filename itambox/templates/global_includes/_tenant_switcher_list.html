@@ -6,18 +6,18 @@
     <a href="?switch_tenant=" class="list-group-item list-group-item-action py-2 {% if not request.active_tenant and not request.active_tenant_group %}active{% endif %}">
         <div class="d-flex align-items-center">
             <span class="status-dot bg-blue me-2"></span>
-            <strong>{% trans "All Tenants (Global)" %}</strong>
+            <strong>{% translate "All Tenants (Global)" %}</strong>
         </div>
     </a>
     {% for item in grouped_tenants_switcher %}
         {% if item.group %}
             <a href="?switch_tenant_group={{ item.group.id }}" class="list-group-header list-group-item-action py-1 px-3 text-muted fs-6 font-weight-bold text-uppercase d-flex justify-content-between align-items-center {% if request.active_tenant_group.id == item.group.id %}active bg-secondary-lt{% endif %}" style="letter-spacing: 0.05em; font-size: 0.7rem !important; cursor: pointer; text-decoration: none;">
                 <span>{{ item.group.name }}</span>
-                <span class="badge bg-secondary-lt">{% trans "Show All" %}</span>
+                <span class="badge bg-secondary-lt">{% translate "Show All" %}</span>
             </a>
         {% else %}
             <div class="list-group-header py-1 px-3 text-muted fs-6 font-weight-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.7rem !important;">
-                {% trans "Ungrouped Tenants" %}
+                {% translate "Ungrouped Tenants" %}
             </div>
         {% endif %}
         {% for tenant in item.tenants %}
@@ -30,7 +30,7 @@
         {% endfor %}
     {% empty %}
         <div class="list-group-item text-muted text-center py-3">
-            {% trans "No tenants available" %}
+            {% translate "No tenants available" %}
         </div>
     {% endfor %}
 {% else %}
@@ -38,11 +38,11 @@
         {% if item.group %}
             <a href="?switch_tenant_group={{ item.group.id }}" class="list-group-header list-group-item-action py-1 px-3 text-muted fs-6 font-weight-bold text-uppercase d-flex justify-content-between align-items-center {% if request.active_tenant_group.id == item.group.id %}active bg-secondary-lt{% endif %}" style="letter-spacing: 0.05em; font-size: 0.7rem !important; cursor: pointer; text-decoration: none;">
                 <span>{{ item.group.name }}</span>
-                <span class="badge bg-secondary-lt">{% trans "Show All" %}</span>
+                <span class="badge bg-secondary-lt">{% translate "Show All" %}</span>
             </a>
         {% else %}
             <div class="list-group-header py-1 px-3 text-muted fs-6 font-weight-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.7rem !important;">
-                {% trans "Ungrouped" %}
+                {% translate "Ungrouped" %}
             </div>
         {% endif %}
         {% for membership in item.memberships %}
@@ -56,7 +56,7 @@
         {% endfor %}
     {% empty %}
         <div class="list-group-item text-muted text-center py-3">
-            {% trans "No workspace memberships" %}
+            {% translate "No workspace memberships" %}
         </div>
     {% endfor %}
 {% endif %}

@@ -3,7 +3,7 @@
 {% if status_stats %}
 <div class="d-flex align-items-baseline mb-2">
     <span class="h2 mb-0">{{ total_assets }}</span>
-    <span class="text-muted small ms-2">{% trans "Total Managed Assets" %}</span>
+    <span class="text-muted small ms-2">{% translate "Total Managed Assets" %}</span>
 </div>
 
 {% if chart_type == 'list' %}
@@ -26,5 +26,5 @@
 
 
 {% else %}
-<div class="text-muted text-center py-4">{% trans "No status labels configured." %}</div>
+<div class="text-muted text-center py-4">{% translate "No status labels configured." %}</div>
 {% endif %}

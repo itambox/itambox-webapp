@@ -1,5 +1,5 @@
 {% load i18n %}
-<div class="text-muted small mb-2">{% blocktrans %}Hardware Expiring within {{ days_horizon }} days{% endblocktrans %}</div>
+<div class="text-muted small mb-2">{% blocktranslate %}Hardware Expiring within {{ days_horizon }} days{% endblocktranslate %}</div>
 {% if eol_alerts %}
 <div class="list-group list-group-flush" style="font-size: 0.80rem;">
     {% for alert in eol_alerts|slice:":5" %}

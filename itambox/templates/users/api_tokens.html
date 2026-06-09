@@ -2,12 +2,12 @@
 {% load i18n %}
 {% load crispy_forms_tags %}
 
-{% block title_tab %}{% trans "API Tokens" %}{% endblock %}
+{% block title_tab %}{% translate "API Tokens" %}{% endblock %}
 
 {% block content_tab %}
 <div class="mb-4">
-    <h3 class="card-title mb-0">{% trans "API Tokens" %}</h3>
-    <p class="text-muted small mb-0">{% trans "Manage personal access tokens to authenticate external integrations, API scripts, and CLI utilities." %}</p>
+    <h3 class="card-title mb-0">{% translate "API Tokens" %}</h3>
+    <p class="text-muted small mb-0">{% translate "Manage personal access tokens to authenticate external integrations, API scripts, and CLI utilities." %}</p>
 </div>
 
 {# Generated Key copy-once alert block #}
@@ -21,14 +21,14 @@
                 </svg>
             </div>
             <div class="w-100">
-                <h4 class="alert-title">{% trans "New API Access Token Generated Successfully!" %}</h4>
+                <h4 class="alert-title">{% translate "New API Access Token Generated Successfully!" %}</h4>
                 <div class="mb-3">
-                    {% trans "Please copy this token key now. For your security, it will not be displayed on this page again." %}
+                    {% translate "Please copy this token key now. For your security, it will not be displayed on this page again." %}
                 </div>
                 <div class="input-group">
                     <input type="text" class="form-control font-monospace fw-bold select-all" value="{{ new_token_key }}" readonly id="token-key-display">
                     <button class="btn btn-success" type="button" onclick="navigator.clipboard.writeText('{{ new_token_key }}'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy', 2000)">
-                        {% trans "Copy" %}
+                        {% translate "Copy" %}
                     </button>
                 </div>
             </div>
@@ -41,65 +41,65 @@
     <div class="col-md-8">
         <div class="card">
             <div class="card-header">
-                <h3 class="card-title">{% trans "Active Tokens" %}</h3>
+                <h3 class="card-title">{% translate "Active Tokens" %}</h3>
             </div>
             {% if tokens %}
                 <div class="table-responsive">
                     <table class="table card-table table-vcenter text-nowrap datatable">
                         <thead>
                             <tr>
-                                <th>{% trans "Token" %}</th>
-                                <th>{% trans "Description" %}</th>
-                                <th>{% trans "Permissions" %}</th>
-                                <th>{% trans "Created" %}</th>
-                                <th>{% trans "Expires" %}</th>
-                                <th>{% trans "Last Used" %}</th>
+                                <th>{% translate "Token" %}</th>
+                                <th>{% translate "Description" %}</th>
+                                <th>{% translate "Permissions" %}</th>
+                                <th>{% translate "Created" %}</th>
+                                <th>{% translate "Expires" %}</th>
+                                <th>{% translate "Last Used" %}</th>
                                 <th class="text-end"></th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for token in tokens %}
                                 <tr>
-                                    <td data-label="{% trans 'Token' %}">
+                                    <td data-label="{% translate 'Token' %}">
                                         <code class="font-monospace text-body fw-medium" title="{{ token.key }}">{{ token.key|slice:":6" }}...</code>
                                     </td>
-                                    <td data-label="{% trans 'Description' %}">
+                                    <td data-label="{% translate 'Description' %}">
                                         <span class="text-secondary small font-weight-medium d-block">{{ token.description|default:"—" }}</span>
                                     </td>
-                                    <td data-label="{% trans 'Permissions' %}">
+                                    <td data-label="{% translate 'Permissions' %}">
                                         {% if token.write_enabled %}
-                                            <span class="badge bg-success-lt text-uppercase font-weight-bold px-2" style="font-size: 0.65rem;">{% trans "Read / Write" %}</span>
+                                            <span class="badge bg-success-lt text-uppercase font-weight-bold px-2" style="font-size: 0.65rem;">{% translate "Read / Write" %}</span>
                                         {% else %}
-                                            <span class="badge bg-info-lt text-uppercase font-weight-bold px-2" style="font-size: 0.65rem;">{% trans "Read-Only" %}</span>
+                                            <span class="badge bg-info-lt text-uppercase font-weight-bold px-2" style="font-size: 0.65rem;">{% translate "Read-Only" %}</span>
                                         {% endif %}
                                     </td>
-                                    <td data-label="{% trans 'Created' %}">
+                                    <td data-label="{% translate 'Created' %}">
                                         <span class="small text-muted">{{ token.created|date:"Y-m-d" }}</span>
                                     </td>
-                                    <td data-label="{% trans 'Expires' %}">
+                                    <td data-label="{% translate 'Expires' %}">
                                         {% if token.expires %}
                                             {% if token.is_expired %}
-                                                <span class="badge bg-danger-lt font-weight-medium">{% trans "Expired" %} ({{ token.expires|date:"Y-m-d" }})</span>
+                                                <span class="badge bg-danger-lt font-weight-medium">{% translate "Expired" %} ({{ token.expires|date:"Y-m-d" }})</span>
                                             {% else %}
                                                 <span class="small text-muted">{{ token.expires|date:"Y-m-d" }}</span>
                                             {% endif %}
                                         {% else %}
-                                            <span class="small text-muted">{% trans "Never" %}</span>
+                                            <span class="small text-muted">{% translate "Never" %}</span>
                                         {% endif %}
                                     </td>
-                                    <td data-label="{% trans 'Last Used' %}">
+                                    <td data-label="{% translate 'Last Used' %}">
                                         {% if token.last_used %}
                                             <span class="small text-muted font-monospace">{{ token.last_used|date:"Y-m-d H:i" }}</span>
                                         {% else %}
-                                            <span class="small text-muted">{% trans "Never" %}</span>
+                                            <span class="small text-muted">{% translate "Never" %}</span>
                                         {% endif %}
                                     </td>
                                     <td class="text-end" data-label="">
-                                        <form method="post" action="{% url 'users:delete_api_token' pk=token.pk %}" class="d-inline" onsubmit="return confirm('{% trans "Are you sure you want to revoke this API token? External scripts using this key will immediately lose access." %}');">
+                                        <form method="post" action="{% url 'users:delete_api_token' pk=token.pk %}" class="d-inline" onsubmit="return confirm('{% translate "Are you sure you want to revoke this API token? External scripts using this key will immediately lose access." %}');">
                                             {% csrf_token %}
-                                            <button type="submit" class="btn btn-sm btn-ghost-danger border-0 px-2 py-1" title="{% trans "Revoke Token" %}">
+                                            <button type="submit" class="btn btn-sm btn-ghost-danger border-0 px-2 py-1" title="{% translate "Revoke Token" %}">
                                                 <i class="mdi mdi-delete-forever-outline"></i>
-                                                <span class="d-none d-sm-inline ms-1">{% trans "Revoke" %}</span>
+                                                <span class="d-none d-sm-inline ms-1">{% translate "Revoke" %}</span>
                                             </button>
                                         </form>
                                     </td>
@@ -112,7 +112,7 @@
                 <div class="py-5 text-muted text-center card border-0 bg-transparent shadow-none">
                     <div class="card-body">
                         <i class="mdi mdi-key-outline text-muted mb-2"></i>
-                        <p class="mb-0 small font-weight-medium">{% trans "You have not generated any API access tokens." %}</p>
+                        <p class="mb-0 small font-weight-medium">{% translate "You have not generated any API access tokens." %}</p>
                     </div>
                 </div>
             {% endif %}
@@ -123,7 +123,7 @@
     <div class="col-md-4">
         <div class="card">
             <div class="card-header">
-                <h3 class="card-title">{% trans "Generate Token" %}</h3>
+                <h3 class="card-title">{% translate "Generate Token" %}</h3>
             </div>
             <div class="card-body">
                 <form method="post">
@@ -136,7 +136,7 @@
                                 <path d="M12 5v14" />
                                 <path d="M5 12h14" />
                             </svg>
-                            {% trans "Generate Token" %}
+                            {% translate "Generate Token" %}
                         </button>
                     </div>
                 </form>

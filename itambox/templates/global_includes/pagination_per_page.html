@@ -4,10 +4,10 @@
 
 {% if paginator.get_page_lengths %}
 {% with paginator.get_page_lengths as page_lengths %}
-<nav aria-label="{% trans "Pagination options" %}">
+<nav aria-label="{% translate "Pagination options" %}">
     <div class="dropdown dropdown-menu-end">
         <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-            {% trans "Per Page" %}
+            {% translate "Per Page" %}
         </button>
         <ul class="dropdown-menu">
             {% for n in page_lengths %}
@@ -24,10 +24,10 @@
 {% endwith %}
 {% else %}
 {% get_pagination_choices as choices %}
-<nav aria-label="{% trans "Pagination options" %}">
+<nav aria-label="{% translate "Pagination options" %}">
     <div class="dropdown dropdown-menu-end">
         <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-            {% trans "Per Page" %}
+            {% translate "Per Page" %}
         </button>
         <ul class="dropdown-menu">
             {% for count, label in choices %}

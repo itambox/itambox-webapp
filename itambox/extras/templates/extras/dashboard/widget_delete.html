@@ -4,16 +4,16 @@
     <div class="modal-status bg-danger"></div>
     <div class="modal-body text-center py-4">
         <i class="mdi mdi-alert-outline mb-2 text-danger"></i>
-        <h5>{% trans "Remove Widget" %}</h5>
+        <h5>{% translate "Remove Widget" %}</h5>
         <div class="text-muted">
-            {% trans "Remove" %} <strong>{{ config.title }}</strong>?
+            {% translate "Remove" %} <strong>{{ config.title }}</strong>?
         </div>
     </div>
     <div class="modal-footer">
-        <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+        <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
         <button type="submit" class="btn btn-danger ms-auto">
             <i class="mdi mdi-trash-can-outline"></i>
-            {% trans "Remove" %}
+            {% translate "Remove" %}
         </button>
     </div>
 </form>

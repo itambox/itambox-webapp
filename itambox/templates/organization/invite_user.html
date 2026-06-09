@@ -2,15 +2,15 @@
 {% load crispy_forms_tags %}
 {% load i18n %}
 
-{% block title %}{% trans "Invite Workspace Member" %} {% translate "- ITAMbox" %}{% endblock %}
+{% block title %}{% translate "Invite Workspace Member" %} {% translate "- ITAMbox" %}{% endblock %}
 
 {% block page_header %}
     <div id="page-header-block">
         <div class="page-pretitle">
-            {% trans "Workspace Onboarding" %}
+            {% translate "Workspace Onboarding" %}
         </div>
         <h2 class="page-title">
-            {% trans "Invite Workspace Member" %}
+            {% translate "Invite Workspace Member" %}
         </h2>
     </div>
 {% endblock %}
@@ -21,7 +21,7 @@
         <div class="card">
             <div class="card-body">
                 <p class="text-muted mb-4">
-                    {% trans "Invite a new staff member to join your active tenant workspace. They will receive a secure token which links their account to this workspace." %}
+                    {% translate "Invite a new staff member to join your active tenant workspace. They will receive a secure token which links their account to this workspace." %}
                 </p>
                 {% crispy form %}
             </div>

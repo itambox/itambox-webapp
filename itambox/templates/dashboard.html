@@ -29,7 +29,7 @@
             {% endif %}
         </button>
         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dashboard-switcher">
-            <li class="dropdown-header">{% trans "Switch Dashboard" %}</li>
+            <li class="dropdown-header">{% translate "Switch Dashboard" %}</li>
             {% for db in dashboards_list %}
                 <li>
                     <a class="dropdown-item d-flex align-items-center justify-content-between {% if db.id == active_dashboard.id %}active{% endif %}"
@@ -40,7 +40,7 @@
                         <span>
                             {{ db.name }}
                             {% if db.is_default %}
-                                <small class="text-muted ms-1">({% trans "Default" %})</small>
+                                <small class="text-muted ms-1">({% translate "Default" %})</small>
                             {% endif %}
                         </span>
                         {% if db.tenant %}
@@ -58,7 +58,7 @@
                    data-bs-target="#dashboard-modal"
                    href="#">
                     <i class="mdi mdi-cog-outline me-1"></i>
-                    {% trans "Manage Dashboards" %}
+                    {% translate "Manage Dashboards" %}
                 </a>
             </li>
         </ul>
@@ -67,35 +67,35 @@
     {# On phones these controls collapse to icon-only to save space; labels return at ≥sm. #}
     <span id="dashboard-locked-controls">
         <button id="unlock-dashboard" class="btn btn-outline-secondary d-flex align-items-center"
-            title="{% trans 'Unlock dashboard to resize and reorder widgets' %}">
+            title="{% translate 'Unlock dashboard to resize and reorder widgets' %}">
             <i class="mdi mdi-lock-open-outline"></i>
-            <span class="d-none d-sm-inline ms-1">{% trans 'Unlock' %}</span>
+            <span class="d-none d-sm-inline ms-1">{% translate 'Unlock' %}</span>
         </button>
     </span>
     <span id="dashboard-unlocked-controls" style="display:none">
         <button id="save-dashboard" class="btn btn-primary d-flex align-items-center"
-            title="{% trans 'Save layout' %}">
+            title="{% translate 'Save layout' %}">
             <i class="mdi mdi-floppy"></i>
-            <span class="d-none d-sm-inline ms-1">{% trans 'Save Layout' %}</span>
+            <span class="d-none d-sm-inline ms-1">{% translate 'Save Layout' %}</span>
         </button>
         <button class="btn btn-outline-secondary d-flex align-items-center"
             hx-get="{% url 'extras:dashboard_widget_add' dashboard_id=active_dashboard.id %}" hx-target="#dashboard-modal-content"
-            data-bs-toggle="modal" data-bs-target="#dashboard-modal" title="{% trans 'Add Widget' %}">
+            data-bs-toggle="modal" data-bs-target="#dashboard-modal" title="{% translate 'Add Widget' %}">
             <i class="mdi mdi-plus"></i>
-            <span class="d-none d-sm-inline ms-1">{% trans 'Add Widget' %}</span>
+            <span class="d-none d-sm-inline ms-1">{% translate 'Add Widget' %}</span>
         </button>
         <button id="lock-dashboard" class="btn btn-outline-secondary d-flex align-items-center"
-            title="{% trans 'Lock dashboard' %}">
+            title="{% translate 'Lock dashboard' %}">
             <i class="mdi mdi-lock"></i>
-            <span class="d-none d-sm-inline ms-1">{% trans 'Lock' %}</span>
+            <span class="d-none d-sm-inline ms-1">{% translate 'Lock' %}</span>
         </button>
     </span>
     <form method="post" action="{% url 'extras:dashboard_reset' dashboard_id=active_dashboard.id %}" class="d-inline"
         onsubmit="return confirm('Reset dashboard to default layout? This cannot be undone.')">
         {% csrf_token %}
-        <button type="submit" class="btn btn-outline-danger" title="{% trans 'Reset' %}">
+        <button type="submit" class="btn btn-outline-danger" title="{% translate 'Reset' %}">
             <i class="mdi mdi-refresh"></i>
-            <span class="d-none d-sm-inline ms-1">{% trans 'Reset' %}</span>
+            <span class="d-none d-sm-inline ms-1">{% translate 'Reset' %}</span>
         </button>
     </form>
 </div>
@@ -124,13 +124,13 @@
                     <button class="btn btn-icon btn-sm btn-ghost-secondary"
                         hx-get="{% url 'extras:dashboard_widget_config' dashboard_id=active_dashboard.id index=entry.index %}"
                         hx-target="#dashboard-modal-content"
-                        data-bs-toggle="modal" data-bs-target="#dashboard-modal" title="{% trans 'Configure' %}">
+                        data-bs-toggle="modal" data-bs-target="#dashboard-modal" title="{% translate 'Configure' %}">
                         <i class="mdi mdi-cog-outline"></i>
                     </button>
                     <button class="btn btn-icon btn-sm btn-ghost-danger dashboard-manage-btn d-none"
                         hx-get="{% url 'extras:dashboard_widget_delete' dashboard_id=active_dashboard.id index=entry.index %}"
                         hx-target="#dashboard-modal-content"
-                        data-bs-toggle="modal" data-bs-target="#dashboard-modal" title="{% trans 'Remove' %}">
+                        data-bs-toggle="modal" data-bs-target="#dashboard-modal" title="{% translate 'Remove' %}">
                         <i class="mdi mdi-close"></i>
                     </button>
                 </div>
@@ -155,13 +155,13 @@
         <div class="card">
             <div class="card-body text-center py-5">
                 <i class="mdi mdi-view-dashboard mb-3 text-muted"></i>
-                <h4>{% trans 'Your dashboard is empty' %}</h4>
-                <p class="text-muted mb-3">{% trans 'No widgets are currently configured.' %}</p>
+                <h4>{% translate 'Your dashboard is empty' %}</h4>
+                <p class="text-muted mb-3">{% translate 'No widgets are currently configured.' %}</p>
                 <button class="btn btn-primary" hx-get="{% url 'extras:dashboard_widget_add' %}"
                     hx-target="#dashboard-modal-content"
                     data-bs-toggle="modal" data-bs-target="#dashboard-modal">
                     <i class="mdi mdi-plus me-1"></i>
-                    {% trans 'Add your first widget' %}
+                    {% translate 'Add your first widget' %}
                 </button>
             </div>
         </div>

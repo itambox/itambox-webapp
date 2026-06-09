@@ -6,16 +6,16 @@
 {% load render_table from django_tables2 %}
 {% load i18n %}
 
-{% block title %}{% if query %}{% trans "Search Results" %}{% else %}{% trans "Search" %}{% endif %}{% endblock %}
+{% block title %}{% if query %}{% translate "Search Results" %}{% else %}{% translate "Search" %}{% endif %}{% endblock %}
 
 {% block page_header %}
     <h1 class="page-title">
         {% if query %}
-            {% blocktrans trimmed with q=query %}
+            {% blocktranslate trimmed with q=query %}
                 Search Results for "{{ q }}"
-            {% endblocktrans %}
+            {% endblocktranslate %}
         {% else %}
-            {% trans "Search" %}
+            {% translate "Search" %}
         {% endif %}
     </h1>
 {% endblock %}
@@ -48,7 +48,7 @@
                 {% endfor %}
             {% elif query %}
                 <div class="card card-body">
-                    <p class="text-muted">{% trans "No results found." %}</p>
+                    <p class="text-muted">{% translate "No results found." %}</p>
                 </div>
             {% endif %}
         {% endblock results %}
@@ -56,7 +56,7 @@
     <div class="col-md-3">
         {# Search Form Card #}
         <div class="card mb-3">
-            <div class="card-header"><h3 class="card-title">{% trans "Search Options" %}</h3></div>
+            <div class="card-header"><h3 class="card-title">{% translate "Search Options" %}</h3></div>
             <div class="card-body">
                 <form action="{% url 'search' %}" method="get" class="options-form">
                     <div class="mb-3">
@@ -72,7 +72,7 @@
                         {{ form.lookup }}
                     </div>
                     <div class="mt-4">
-                        <button type="submit" class="btn btn-primary w-100">{% trans "Search" %}</button>
+                        <button type="submit" class="btn btn-primary w-100">{% translate "Search" %}</button>
                     </div>
                 </form>
             </div>

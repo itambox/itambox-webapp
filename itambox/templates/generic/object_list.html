@@ -20,17 +20,17 @@
               <ul class="nav nav-tabs card-header-tabs">
                 <li class="nav-item">
                   <a class="nav-link {% if model_name == 'component' %}active fw-bold{% endif %}" href="{% url 'inventory:component_list' %}">
-                    <i class="mdi mdi-book-open-outline me-2"></i>{% trans "Catalog" %}
+                    <i class="mdi mdi-book-open-outline me-2"></i>{% translate "Catalog" %}
                   </a>
                 </li>
                 <li class="nav-item">
                   <a class="nav-link {% if model_name == 'componentstock' %}active fw-bold{% endif %}" href="{% url 'inventory:componentstock_list' %}">
-                    <i class="mdi mdi-warehouse me-2"></i>{% trans "Stocks" %}
+                    <i class="mdi mdi-warehouse me-2"></i>{% translate "Stocks" %}
                   </a>
                 </li>
                 <li class="nav-item">
                   <a class="nav-link {% if model_name == 'componentallocation' %}active fw-bold{% endif %}" href="{% url 'inventory:componentallocation_list' %}">
-                    <i class="mdi mdi-account-arrow-right me-2"></i>{% trans "Allocations" %}
+                    <i class="mdi mdi-account-arrow-right me-2"></i>{% translate "Allocations" %}
                   </a>
                 </li>
               </ul>
@@ -40,17 +40,17 @@
               <ul class="nav nav-tabs card-header-tabs">
                 <li class="nav-item">
                   <a class="nav-link {% if model_name == 'accessory' %}active fw-bold{% endif %}" href="{% url 'inventory:accessory_list' %}">
-                    <i class="mdi mdi-book-open-outline me-2"></i>{% trans "Catalog" %}
+                    <i class="mdi mdi-book-open-outline me-2"></i>{% translate "Catalog" %}
                   </a>
                 </li>
                 <li class="nav-item">
                   <a class="nav-link {% if model_name == 'accessorystock' %}active fw-bold{% endif %}" href="{% url 'inventory:accessorystock_list' %}">
-                    <i class="mdi mdi-warehouse me-2"></i>{% trans "Stocks" %}
+                    <i class="mdi mdi-warehouse me-2"></i>{% translate "Stocks" %}
                   </a>
                 </li>
                 <li class="nav-item">
                   <a class="nav-link {% if model_name == 'accessoryassignment' %}active fw-bold{% endif %}" href="{% url 'inventory:accessoryassignment_list' %}">
-                    <i class="mdi mdi-account-arrow-right me-2"></i>{% trans "Assignments" %}
+                    <i class="mdi mdi-account-arrow-right me-2"></i>{% translate "Assignments" %}
                   </a>
                 </li>
               </ul>
@@ -60,17 +60,17 @@
               <ul class="nav nav-tabs card-header-tabs">
                 <li class="nav-item">
                   <a class="nav-link {% if model_name == 'consumable' %}active fw-bold{% endif %}" href="{% url 'inventory:consumable_list' %}">
-                    <i class="mdi mdi-book-open-outline me-2"></i>{% trans "Catalog" %}
+                    <i class="mdi mdi-book-open-outline me-2"></i>{% translate "Catalog" %}
                   </a>
                 </li>
                 <li class="nav-item">
                   <a class="nav-link {% if model_name == 'consumablestock' %}active fw-bold{% endif %}" href="{% url 'inventory:consumablestock_list' %}">
-                    <i class="mdi mdi-warehouse me-2"></i>{% trans "Stocks" %}
+                    <i class="mdi mdi-warehouse me-2"></i>{% translate "Stocks" %}
                   </a>
                 </li>
                 <li class="nav-item">
                   <a class="nav-link {% if model_name == 'consumableassignment' %}active fw-bold{% endif %}" href="{% url 'inventory:consumableassignment_list' %}">
-                    <i class="mdi mdi-account-arrow-right me-2"></i>{% trans "Consumptions" %}
+                    <i class="mdi mdi-account-arrow-right me-2"></i>{% translate "Consumptions" %}
                   </a>
                 </li>
               </ul>
@@ -101,11 +101,11 @@
                                  hx-swap="innerHTML"
                                  hx-push-url="true">
                                  <div class="input-group input-group-flat input-group-sm">
-                                     <input type="search" name="q" class="form-control form-control-sm" placeholder="{% trans "Search..." %}"
+                                     <input type="search" name="q" class="form-control form-control-sm" placeholder="{% translate "Search..." %}"
                                             value="{{ request.GET.q|default:"" }}"
                                             hx-trigger="keyup changed delay:500ms, search">
                                      <span class="input-group-text {% if not request.GET.q %}d-none{% endif %}">
-                                         <a href="#" class="link-secondary clear-search-btn" title="{% trans "Clear search" %}" data-bs-toggle="tooltip">
+                                         <a href="#" class="link-secondary clear-search-btn" title="{% translate "Clear search" %}" data-bs-toggle="tooltip">
                                              <i class="mdi mdi-close"></i>
                                          </a>
                                      </span>
@@ -127,16 +127,16 @@
                          {% if table_config_key %}
                              <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center"
                                      hx-get="{% url 'table_config' model_name=table_config_key %}"
-                                     hx-target="#modal-placeholder" title="{% trans "Configure Table" %}">
+                                     hx-target="#modal-placeholder" title="{% translate "Configure Table" %}">
                                  <i class="mdi mdi-cog-outline"></i>
-                                 <span class="d-none d-md-inline ms-1">{% trans "Configure Table" %}</span>
+                                 <span class="d-none d-md-inline ms-1">{% translate "Configure Table" %}</span>
                              </button>
                          {% endif %}
 
                          {% if filter_form %}
-                             <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center" id="toggle-filters-btn" title="{% trans "Toggle Filters" %}">
+                             <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center" id="toggle-filters-btn" title="{% translate "Toggle Filters" %}">
                                  <i class="mdi mdi-filter-outline"></i>
-                                 <span class="d-none d-md-inline ms-1">{% trans "Filters" %}</span>
+                                 <span class="d-none d-md-inline ms-1">{% translate "Filters" %}</span>
                                  <span id="filters-applied-count" class="badge bg-primary ms-2 {% if not filter_form.applied_filters %}d-none{% endif %}">
                                      {{ filter_form.applied_filters|length|default:"0" }}
                                  </span>
@@ -313,7 +313,7 @@
                 {% if import_url %}
                 <a href="{{ import_url }}" class="btn btn-secondary d-none d-sm-inline-block">
                     <i class="mdi mdi-upload me-1"></i>
-                    {% trans "Import" %}
+                    {% translate "Import" %}
                 </a>
                 {% endif %}
             {% endif %}
@@ -322,7 +322,7 @@
             <div class="dropdown d-none d-sm-inline-block">
                 <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                     <i class="mdi mdi-download me-1"></i>
-                    {% trans "Export" %}
+                    {% translate "Export" %}
                 </button>
                 <div class="dropdown-menu dropdown-menu-end">
                     {% include 'generic/includes/export_menu_items.html' %}
@@ -340,14 +340,14 @@
 
             {# Mobile overflow — folds Import / Export / Recycle Bin into a single [...] menu #}
             <div class="dropdown d-sm-none">
-                <button type="button" class="btn btn-outline-secondary btn-icon" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="{% trans 'More actions' %}">
+                <button type="button" class="btn btn-outline-secondary btn-icon" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="{% translate 'More actions' %}">
                     <i class="mdi mdi-dots-vertical"></i>
                 </button>
                 <div class="dropdown-menu dropdown-menu-end">
                     {% if can_add and import_url %}
                     <a class="dropdown-item" href="{{ import_url }}">
                         <i class="mdi mdi-upload me-2 text-muted"></i>
-                        {% trans "Import" %}
+                        {% translate "Import" %}
                     </a>
                     <div class="dropdown-divider"></div>
                     {% endif %}

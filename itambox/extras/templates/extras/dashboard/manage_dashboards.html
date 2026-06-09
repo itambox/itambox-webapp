@@ -1,11 +1,11 @@
 {% load i18n %}
 <div class="modal-header">
-    <h5 class="modal-title">{% trans "Manage Dashboards" %}</h5>
+    <h5 class="modal-title">{% translate "Manage Dashboards" %}</h5>
     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
 </div>
 <div class="modal-body">
     <!-- Part 1: Existing Dashboards List -->
-    <h6 class="mb-3">{% trans "Your Dashboards" %}</h6>
+    <h6 class="mb-3">{% translate "Your Dashboards" %}</h6>
     <div class="list-group mb-4 shadow-sm border-0 rounded-3 overflow-hidden">
         {% for db in dashboards %}
         <div class="list-group-item list-group-item-action d-flex align-items-center justify-content-between p-3" style="background-color: var(--tblr-bg-surface-secondary, #f8f9fa); border-color: var(--tblr-border-color, #e6e8eb);">
@@ -13,18 +13,18 @@
                 <!-- Editable Name Inline Form -->
                 <form hx-post="{% url 'extras:dashboard_rename_dashboard' pk=db.pk %}" hx-target="#dashboard-modal-content" class="d-flex align-items-center gap-2 w-70">
                     {% csrf_token %}
-                    <input type="text" name="name" value="{{ db.name }}" class="form-control form-control-sm border-0 bg-transparent fw-semibold p-0 fs-3 text-body" style="box-shadow: none;" title="{% trans 'Click to rename' %}">
-                    <button type="submit" class="btn btn-icon btn-sm btn-ghost-secondary border-0 p-0 d-none rename-save-btn" title="{% trans 'Save Name' %}" style="width: 24px; height: 24px;">
+                    <input type="text" name="name" value="{{ db.name }}" class="form-control form-control-sm border-0 bg-transparent fw-semibold p-0 fs-3 text-body" style="box-shadow: none;" title="{% translate 'Click to rename' %}">
+                    <button type="submit" class="btn btn-icon btn-sm btn-ghost-secondary border-0 p-0 d-none rename-save-btn" title="{% translate 'Save Name' %}" style="width: 24px; height: 24px;">
                         <i class="mdi mdi-check text-success"></i>
                     </button>
                 </form>
 
                 {% if db.tenant %}
-                    <span class="badge bg-blue-lt px-2" title="{% trans 'Scoped to Tenant' %}">{{ db.tenant.name }}</span>
+                    <span class="badge bg-blue-lt px-2" title="{% translate 'Scoped to Tenant' %}">{{ db.tenant.name }}</span>
                 {% endif %}
 
                 {% if db.is_default %}
-                    <span class="badge bg-success-lt px-2" title="{% trans 'Initial landing dashboard' %}">{% trans "Default" %}</span>
+                    <span class="badge bg-success-lt px-2" title="{% translate 'Initial landing dashboard' %}">{% translate "Default" %}</span>
                 {% endif %}
             </div>
 
@@ -34,17 +34,17 @@
                 <!-- Set Default Button -->
                 <form hx-post="{% url 'extras:dashboard_set_default_dashboard' pk=db.pk %}" hx-target="#dashboard-modal-content" class="d-inline">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-sm btn-outline-success px-2 py-1 fs-5" title="{% trans 'Set as Default Landing Dashboard' %}">
-                        {% trans "Set Default" %}
+                    <button type="submit" class="btn btn-sm btn-outline-success px-2 py-1 fs-5" title="{% translate 'Set as Default Landing Dashboard' %}">
+                        {% translate "Set Default" %}
                     </button>
                 </form>
                 {% endif %}
 
                 <!-- Delete Button -->
                 {% if dashboards|length > 1 %}
-                <form hx-post="{% url 'extras:dashboard_delete_dashboard' pk=db.pk %}" hx-target="#dashboard-modal-content" class="d-inline" onsubmit="return confirm('{% trans 'Delete this dashboard? All widget custom sizing and placements will be lost.' %}')">
+                <form hx-post="{% url 'extras:dashboard_delete_dashboard' pk=db.pk %}" hx-target="#dashboard-modal-content" class="d-inline" onsubmit="return confirm('{% translate 'Delete this dashboard? All widget custom sizing and placements will be lost.' %}')">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-icon btn-sm btn-ghost-danger border-0" title="{% trans 'Delete Dashboard' %}">
+                    <button type="submit" class="btn btn-icon btn-sm btn-ghost-danger border-0" title="{% translate 'Delete Dashboard' %}">
                         <i class="mdi mdi-trash-can-outline"></i>
                     </button>
                 </form>
@@ -56,17 +56,17 @@
 
     <!-- Part 2: Create Dashboard Form -->
     <hr class="my-3">
-    <h6 class="mb-3">{% trans "Create New Dashboard" %}</h6>
+    <h6 class="mb-3">{% translate "Create New Dashboard" %}</h6>
     <form hx-post="{% url 'extras:dashboard_create' %}" class="row g-3 align-items-end">
         {% csrf_token %}
         <div class="col-md-5">
-            <label class="form-label fs-4 fw-medium text-secondary">{% trans "Dashboard Name" %}</label>
-            <input type="text" name="name" class="form-control" placeholder="{% trans 'e.g. Finance Board, Tenant A overview' %}" required>
+            <label class="form-label fs-4 fw-medium text-secondary">{% translate "Dashboard Name" %}</label>
+            <input type="text" name="name" class="form-control" placeholder="{% translate 'e.g. Finance Board, Tenant A overview' %}" required>
         </div>
         <div class="col-md-4">
-            <label class="form-label fs-4 fw-medium text-secondary">{% trans "Target Tenant Context" %}</label>
+            <label class="form-label fs-4 fw-medium text-secondary">{% translate "Target Tenant Context" %}</label>
             <select name="tenant" class="form-select" required>
-                <option value="">-- {% trans "Select Tenant" %} --</option>
+                <option value="">-- {% translate "Select Tenant" %} --</option>
                 {% for tenant in tenants %}
                     <option value="{{ tenant.id }}">{{ tenant.name }}</option>
                 {% endfor %}
@@ -75,12 +75,12 @@
         <div class="col-md-3">
             <button type="submit" class="btn btn-primary w-100 d-flex align-items-center justify-content-center">
                 <i class="mdi mdi-plus me-1"></i>
-                {% trans "Create Board" %}
+                {% translate "Create Board" %}
             </button>
         </div>
     </form>
 </div>
 <div class="modal-footer">
-    <button type="button" class="btn btn-outline-secondary ms-auto" data-bs-dismiss="modal">{% trans "Close" %}</button>
+    <button type="button" class="btn btn-outline-secondary ms-auto" data-bs-dismiss="modal">{% translate "Close" %}</button>
 </div>
 

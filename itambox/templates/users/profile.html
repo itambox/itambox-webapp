@@ -3,7 +3,7 @@
 {% load crispy_forms_tags %}
 {% load render_table from django_tables2 %}
 
-{% block title_tab %}{% trans "Profile" %}{% endblock %}
+{% block title_tab %}{% translate "Profile" %}{% endblock %}
 
 {% block content_tab %}
 {# This content is included inside the card body defined in users/inc/tabs.html #}
@@ -12,14 +12,14 @@
     <div class="col-md-6">
         <div class="card">
             <div class="card-header">
-                <h3 class="card-title">{% trans "Profile" %}</h3>
+                <h3 class="card-title">{% translate "Profile" %}</h3>
             </div>
             <div class="card-body">
                 <form method="post">
                     {% csrf_token %}
                     {{ form|crispy }}
                     <div class="text-end mt-4">
-                        <button type="submit" class="btn btn-primary">{% trans "Save Changes" %}</button>
+                        <button type="submit" class="btn btn-primary">{% translate "Save Changes" %}</button>
                     </div>
                 </form>
             </div>
@@ -30,7 +30,7 @@
     <div class="col-md-6">
         <div class="card">
             <div class="card-header">
-                <h3 class="card-title">{% trans "Tenant Memberships" %}</h3>
+                <h3 class="card-title">{% translate "Tenant Memberships" %}</h3>
             </div>
             <div class="card-body">
                 {% if user_memberships %}
@@ -40,7 +40,7 @@
                         {% endfor %}
                     </ul>
                 {% else %}
-                    <p class="text-muted">{% trans "User has no active tenant memberships." %}</p>
+                    <p class="text-muted">{% translate "User has no active tenant memberships." %}</p>
                 {% endif %}
             </div>
         </div>
@@ -50,7 +50,7 @@
 {# Separate Card for Recent Activity (Below) #}
 <div class="card mt-4">
     <div class="card-header">
-        <h3 class="card-title">{% trans "Recent Activity" %}</h3>
+        <h3 class="card-title">{% translate "Recent Activity" %}</h3>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -58,7 +58,7 @@
             {% if activity_table %}
                 {% render_table activity_table %}
             {% else %}
-                <div class="text-center p-4 text-muted">{% trans "No activity data available." %}</div>
+                <div class="text-center p-4 text-muted">{% translate "No activity data available." %}</div>
             {% endif %}
         </div>
     </div>

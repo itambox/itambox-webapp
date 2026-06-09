@@ -5,7 +5,7 @@
 {% block title %}{{ object }}{% endblock %}
 
 {% block breadcrumbs %}
-  <li class="breadcrumb-item"><a href="{% url 'objectchange_list' %}">{% trans "Change Log" %}</a></li>
+  <li class="breadcrumb-item"><a href="{% url 'objectchange_list' %}">{% translate "Change Log" %}</a></li>
   {# Simplified breadcrumb logic #}
 {% endblock %}
 
@@ -13,14 +13,14 @@
 <div class="row">
     <div class="col col-md-5">
         <div class="card">
-            <h2 class="card-header">{% trans "Change Details" %}</h2>
+            <h2 class="card-header">{% translate "Change Details" %}</h2>
             <table class="table table-hover attr-table">
                 <tr>
-                    <th scope="row">{% trans "Time" %}</th>
+                    <th scope="row">{% translate "Time" %}</th>
                     <td>{{ object.time|annotated_time }}</td> {# Use annotated_time helper #}
                 </tr>
                 <tr>
-                    <th scope="row">{% trans "User" %}</th>
+                    <th scope="row">{% translate "User" %}</th>
                     <td>
                         {% if object.user %}
                           {{ object.user|linkify }}
@@ -30,19 +30,19 @@
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row">{% trans "Action" %}</th>
+                    <th scope="row">{% translate "Action" %}</th>
                     <td>
                         <span class="badge bg-{{ object.get_action_color }}">{{ object.get_action_display }}</span> {# Use action color helper #}
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row">{% trans "Object Type" %}</th>
+                    <th scope="row">{% translate "Object Type" %}</th>
                     <td>
                         {{ object.object_type_repr|default:object.changed_object_type }}
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row">{% trans "Object" %}</th>
+                    <th scope="row">{% translate "Object" %}</th>
                     <td>
                         {% if object.changed_object and object.get_changed_object_url %}
                             <a href="{{ object.get_changed_object_url }}">{{ object.object_repr }}</a>
@@ -52,7 +52,7 @@
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row">{% trans "Request ID" %}</th>
+                    <th scope="row">{% translate "Request ID" %}</th>
                     <td>
                         <a href="{% url 'objectchange_list' %}?request_id={{ object.request_id }}">{{ object.request_id }}</a>
                     </td>
@@ -62,7 +62,7 @@
     </div>
     <div class="col col-md-7">
         <div class="card">
-            <h2 class="card-header">{% trans "Difference" %}</h2>
+            <h2 class="card-header">{% translate "Difference" %}</h2>
             <div class="card-body">
                 {% if not diff_removed_json == '{}' or not diff_added_json == '{}' %}
                     {% if not diff_removed_json == '{}' %}
@@ -81,9 +81,9 @@
                     {% endif %}
                 {% else %}
                      <span class="text-muted">
-                         {% if object.action == 'create' %} {% trans "Object Created" %}
-                         {% elif object.action == 'delete' %} {% trans "Object Deleted" %}
-                         {% else %} {% trans "No Changes Logged" %}
+                         {% if object.action == 'create' %} {% translate "Object Created" %}
+                         {% elif object.action == 'delete' %} {% translate "Object Deleted" %}
+                         {% else %} {% translate "No Changes Logged" %}
                          {% endif %}
                      </span>
                 {% endif %}
@@ -94,24 +94,24 @@
 <div class="row">
     <div class="col col-md-6">
         <div class="card">
-            <h2 class="card-header">{% trans "Pre-Change Data" %}</h2>
+            <h2 class="card-header">{% translate "Pre-Change Data" %}</h2>
             <div class="card-body p-0"> {# Remove padding for pre #}
                 {% if object.prechange_data %}
                     <pre class="change-data">{% for line in diff_lines %}{% with prefix=line|slice:":2" %}{% if prefix == '- ' or prefix == '  ' %}<span class="diff-line {% if prefix == '- ' %}removed{% elif prefix == '  ' %}context{% endif %}">{{ line|slice:"2:"|escape }}</span>{% endif %}{% endwith %}{% endfor %}</pre>
                 {% else %}
-                    <div class="p-3"><span class="text-muted">{% trans "None" %}</span></div> {# Add padding back if empty #}
+                    <div class="p-3"><span class="text-muted">{% translate "None" %}</span></div> {# Add padding back if empty #}
                 {% endif %}
             </div>
         </div>
     </div>
     <div class="col col-md-6">
         <div class="card">
-            <h2 class="card-header">{% trans "Post-Change Data" %}</h2>
+            <h2 class="card-header">{% translate "Post-Change Data" %}</h2>
             <div class="card-body p-0"> {# Remove padding for pre #}
                 {% if object.postchange_data %}
                     <pre class="change-data">{% for line in diff_lines %}{% with prefix=line|slice:":2" %}{% if prefix == '+ ' or prefix == '  ' %}<span class="diff-line {% if prefix == '+ ' %}added{% elif prefix == '  ' %}context{% endif %}">{{ line|slice:"2:"|escape }}</span>{% endif %}{% endwith %}{% endfor %}</pre>
                 {% else %}
-                  <div class="p-3"><span class="text-muted">{% trans "None" %}</span></div> {# Add padding back if empty #}
+                  <div class="p-3"><span class="text-muted">{% translate "None" %}</span></div> {# Add padding back if empty #}
                 {% endif %}
             </div>
         </div>

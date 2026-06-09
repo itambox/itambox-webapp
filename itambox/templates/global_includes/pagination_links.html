@@ -10,12 +10,12 @@
      {% endif %}>
 
     {% if page_obj.paginator.num_pages > 1 %}
-    <nav aria-label="{% trans "Page selection" %}" class="pagination-nav-scroll">
+    <nav aria-label="{% translate "Page selection" %}" class="pagination-nav-scroll">
         <ul class="pagination flex-wrap mb-0">
             {% if page_obj.has_previous %}
             <li class="page-item">
                 <a {% if hx_target %}href="#" hx-get="{{ request.path }}{% update_querystring request page=page_obj.previous_page_number tab=tab %}"{% else %}href="{{ request.path }}{% update_querystring request page=page_obj.previous_page_number tab=tab %}"{% endif %}
-                   class="page-link" aria-label="{% trans "Previous page" %}">
+                   class="page-link" aria-label="{% translate "Previous page" %}">
                     <i class="mdi mdi-chevron-left"></i>
                 </a>
             </li>
@@ -25,7 +25,7 @@
             <li class="page-item{% if page_obj.number == p %} active{% endif %}"{% if page_obj.number == p %} aria-current="page"{% endif %}>
                 {% if p %}
                 <a {% if hx_target %}href="#" hx-get="{{ request.path }}{% update_querystring request page=p tab=tab %}"{% else %}href="{{ request.path }}{% update_querystring request page=p tab=tab %}"{% endif %}
-                   class="page-link" aria-label="{% blocktrans with num=p %}Page {{ num }}{% endblocktrans %}">
+                   class="page-link" aria-label="{% blocktranslate with num=p %}Page {{ num }}{% endblocktranslate %}">
                     {{ p }}
                 </a>
                 {% else %}
@@ -37,7 +37,7 @@
             {% if page_obj.has_next %}
             <li class="page-item">
                 <a {% if hx_target %}href="#" hx-get="{{ request.path }}{% update_querystring request page=page_obj.next_page_number tab=tab %}"{% else %}href="{{ request.path }}{% update_querystring request page=page_obj.next_page_number tab=tab %}"{% endif %}
-                   class="page-link" aria-label="{% trans "Next page" %}">
+                   class="page-link" aria-label="{% translate "Next page" %}">
                     <i class="mdi mdi-chevron-right"></i>
                 </a>
             </li>
@@ -47,9 +47,9 @@
     {% endif %}
 
     <small class="text-muted">
-        {% blocktrans trimmed with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
+        {% blocktranslate trimmed with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
             Showing {{ start }}-{{ end }} of {{ total }}
-        {% endblocktrans %}
+        {% endblocktranslate %}
     </small>
 
     {% include 'global_includes/pagination_per_page.html' with paginator=page_obj.paginator hx_target=hx_target hx_push_url=hx_push_url tab=tab %}

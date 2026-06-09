@@ -1,34 +1,34 @@
 {% extends base_template|default:"layout.html" %}
 {% load i18n %}
 
-{% block title %}{% trans "Report Template" %}: {{ object.name }} {% translate "- ITAMbox" %}{% endblock %}
+{% block title %}{% translate "Report Template" %}: {{ object.name }} {% translate "- ITAMbox" %}{% endblock %}
 
 {% block page_header %}
-    <div class="page-pretitle">{% trans "Operations" %}</div>
-    <h2 class="page-title">{% trans "Report Template" %}: {{ object.name }}</h2>
+    <div class="page-pretitle">{% translate "Operations" %}</div>
+    <h2 class="page-title">{% translate "Report Template" %}: {{ object.name }}</h2>
 {% endblock %}
 
 {% block page_actions %}
     <div class="btn-list">
         <a href="{% url 'reporttemplate_download' object.pk %}?print=true" target="_blank" class="btn btn-outline-secondary d-none d-sm-inline-block">
             <i class="mdi mdi-printer"></i>
-            {% trans "Print Report" %}
+            {% translate "Print Report" %}
         </a>
         <a href="{% url 'reporttemplate_download' object.pk %}?format=html" class="btn btn-outline-info d-none d-sm-inline-block" hx-boost="false">
             <i class="mdi mdi-download me-1"></i>
-            {% trans "Export HTML" %}
+            {% translate "Export HTML" %}
         </a>
         <a href="{% url 'reporttemplate_download' object.pk %}?format=csv" class="btn btn-outline-success d-none d-sm-inline-block" hx-boost="false">
             <i class="mdi mdi-download me-1"></i>
-            {% trans "Export CSV" %}
+            {% translate "Export CSV" %}
         </a>
         <a href="{% url 'reporttemplate_edit' object.pk %}" class="btn btn-primary d-none d-sm-inline-block">
             <i class="mdi mdi-pencil-outline"></i>
-            {% trans "Edit Template" %}
+            {% translate "Edit Template" %}
         </a>
         <a href="{% url 'reporttemplate_delete' object.pk %}" class="btn btn-outline-danger d-none d-sm-inline-block">
             <i class="mdi mdi-trash-can-outline"></i>
-            {% trans "Delete" %}
+            {% translate "Delete" %}
         </a>
     </div>
 {% endblock %}
@@ -39,21 +39,21 @@
     <div class="col-md-5">
         <div class="card mb-3">
             <div class="card-header">
-                <h3 class="card-title">{% trans "Template Information" %}</h3>
+                <h3 class="card-title">{% translate "Template Information" %}</h3>
             </div>
             <div class="card-body p-0">
                 <table class="table table-transparent table-vcenter card-table" style="table-layout: fixed; width: 100%;">
                     <tbody>
                         <tr>
-                            <td class="text-secondary fw-bold" style="width: 30%;">{% trans "Name" %}</td>
+                            <td class="text-secondary fw-bold" style="width: 30%;">{% translate "Name" %}</td>
                             <td class="text-wrap text-break">{{ object.name }}</td>
                         </tr>
                         <tr>
-                            <td class="text-secondary fw-bold" style="width: 30%;">{% trans "Description" %}</td>
+                            <td class="text-secondary fw-bold" style="width: 30%;">{% translate "Description" %}</td>
                             <td class="text-wrap text-break">{{ object.description|default:"&mdash;" }}</td>
                         </tr>
                         <tr>
-                            <td class="text-secondary fw-bold" style="width: 30%;">{% trans "Report Type" %}</td>
+                            <td class="text-secondary fw-bold" style="width: 30%;">{% translate "Report Type" %}</td>
                             <td class="text-wrap text-break">
                                 <span class="badge bg-blue-lt">
                                     {{ object.get_report_type_display }}
@@ -68,15 +68,15 @@
         <!-- Linked Schedules Card -->
         <div class="card">
             <div class="card-header">
-                <h3 class="card-title">{% trans "Active Schedules" %}</h3>
+                <h3 class="card-title">{% translate "Active Schedules" %}</h3>
             </div>
             <div class="card-body p-0">
                 <table class="table table-transparent table-vcenter card-table" style="table-layout: fixed; width: 100%;">
                     <thead>
                         <tr>
-                            <th style="width: 55%;">{% trans "Schedule" %}</th>
-                            <th style="width: 25%;">{% trans "Format" %}</th>
-                            <th style="width: 20%;">{% trans "Active" %}</th>
+                            <th style="width: 55%;">{% translate "Schedule" %}</th>
+                            <th style="width: 25%;">{% translate "Format" %}</th>
+                            <th style="width: 20%;">{% translate "Active" %}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -97,7 +97,7 @@
                         {% empty %}
                         <tr>
                             <td colspan="3" class="text-muted text-center py-3">
-                                {% trans "No schedules configured for this template yet." %}
+                                {% translate "No schedules configured for this template yet." %}
                             </td>
                         </tr>
                         {% endfor %}
@@ -112,8 +112,8 @@
         {% if object.advanced_mode %}
         <div class="card mb-3">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h3 class="card-title">{% trans "Jinja2 HTML Override Code" %}</h3>
-                <span class="badge bg-warning text-warning-fg">{% trans "Advanced Code Active" %}</span>
+                <h3 class="card-title">{% translate "Jinja2 HTML Override Code" %}</h3>
+                <span class="badge bg-warning text-warning-fg">{% translate "Advanced Code Active" %}</span>
             </div>
             <div class="card-body p-0">
                 {% if object.template_content %}
@@ -121,7 +121,7 @@
                 {% else %}
                     <div class="p-4 text-center text-muted">
                         <i class="mdi mdi-information-outline mb-2"></i>
-                        <p class="mb-0">{% trans "Advanced mode enabled, but template content is empty. Falling back to default layout." %}</p>
+                        <p class="mb-0">{% translate "Advanced mode enabled, but template content is empty. Falling back to default layout." %}</p>
                     </div>
                 {% endif %}
             </div>
@@ -129,13 +129,13 @@
         {% else %}
         <div class="card mb-3">
             <div class="card-header d-flex justify-content-between align-items-center bg-transparent">
-                <h3 class="card-title">{% trans "Visual Designer Parameters" %}</h3>
-                <span class="badge bg-success text-success-fg">{% trans "No-Code Designer Active" %}</span>
+                <h3 class="card-title">{% translate "Visual Designer Parameters" %}</h3>
+                <span class="badge bg-success text-success-fg">{% translate "No-Code Designer Active" %}</span>
             </div>
             <div class="card-body">
                 <div class="row g-3">
                     <div class="col-sm-6">
-                        <div class="text-secondary small fw-bold mb-1">{% trans "LAYOUT PRESET" %}</div>
+                        <div class="text-secondary small fw-bold mb-1">{% translate "LAYOUT PRESET" %}</div>
                         <div class="d-flex align-items-center">
                             <span class="badge bg-primary-lt px-2 py-1 fs-4">
                                 <i class="mdi mdi-view-dashboard-outline me-1"></i>
@@ -145,7 +145,7 @@
                     </div>
                     
                     <div class="col-sm-6">
-                        <div class="text-secondary small fw-bold mb-1">{% trans "GROUP BY FIELD" %}</div>
+                        <div class="text-secondary small fw-bold mb-1">{% translate "GROUP BY FIELD" %}</div>
                         <div>
                             {% if object.group_by_field %}
                                 <span class="badge bg-purple-lt px-2 py-1">
@@ -153,7 +153,7 @@
                                     <code>{{ object.group_by_field }}</code>
                                 </span>
                             {% else %}
-                                <span class="text-muted small italic">{% trans "No row grouping configured" %}</span>
+                                <span class="text-muted small italic">{% translate "No row grouping configured" %}</span>
                             {% endif %}
                         </div>
                     </div>
@@ -161,7 +161,7 @@
                     <div class="col-12"><hr class="my-2"></div>
 
                     <div class="col-12">
-                        <div class="text-secondary small fw-bold mb-2">{% trans "VISUAL SECTIONS" %}</div>
+                        <div class="text-secondary small fw-bold mb-2">{% translate "VISUAL SECTIONS" %}</div>
                         <div class="row g-2">
                             <div class="col-sm-6">
                                 <div class="card card-sm border-0 bg-body-secondary p-2 d-flex flex-row align-items-center">
@@ -174,7 +174,7 @@
                                             <i class="mdi mdi-close-circle"></i>
                                         </span>
                                     {% endif %}
-                                    <div class="small fw-semibold">{% trans "Summary Cards Total Summary" %}</div>
+                                    <div class="small fw-semibold">{% translate "Summary Cards Total Summary" %}</div>
                                 </div>
                             </div>
                             <div class="col-sm-6">
@@ -188,7 +188,7 @@
                                             <i class="mdi mdi-close-circle"></i>
                                         </span>
                                     {% endif %}
-                                    <div class="small fw-semibold">{% trans "Spend Distribution Chart" %}</div>
+                                    <div class="small fw-semibold">{% translate "Spend Distribution Chart" %}</div>
                                 </div>
                             </div>
                         </div>
@@ -197,7 +197,7 @@
                     <div class="col-12"><hr class="my-2"></div>
 
                     <div class="col-12">
-                        <div class="text-secondary small fw-bold mb-2">{% trans "GRID COLUMNS COMPOSITION" %}</div>
+                        <div class="text-secondary small fw-bold mb-2">{% translate "GRID COLUMNS COMPOSITION" %}</div>
                         <div class="d-flex flex-wrap gap-2">
                             {% for col in object.included_columns %}
                                 <span class="badge bg-indigo-lt px-2 py-1 fs-5">
@@ -205,7 +205,7 @@
                                     {{ col|title }}
                                 </span>
                             {% empty %}
-                                <span class="badge bg-secondary-lt px-2 py-1">{% trans "All Standard Columns" %}</span>
+                                <span class="badge bg-secondary-lt px-2 py-1">{% translate "All Standard Columns" %}</span>
                             {% endfor %}
                         </div>
                     </div>
