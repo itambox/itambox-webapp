@@ -1,0 +1,41 @@
+{% load i18n %}
+{% load render_table from django_tables2 %}
+{% comment %}
+Related-object tab pane: a card holding a django-tables2 table, its
+pagination, and a centred empty-state. Used inside a detail view's
+extra_tab_panes block.
+
+Params:
+  tab        pane id / ?tab= value (required)         e.g. "assets"
+  table      django-tables2 table instance (required)
+  title      card header heading (required)
+  empty      empty-state text (required)
+  icon       optional full MDI class for the empty state, e.g. "mdi mdi-devices"
+  add_url    optional "+ Add" button href
+  add_label  optional "+ Add" button label            default "Add"
+{% endcomment %}
+<div class="tab-pane fade {% if request.GET.tab == tab %}show active{% endif %}" id="{{ tab }}" role="tabpanel">
+    <div class="card border-0 shadow-sm">
+        <div class="card-header border-0 bg-transparent{% if add_url %} d-flex justify-content-between align-items-center{% endif %}">
+            <h3 class="card-title">{{ title }}</h3>
+            {% if add_url %}
+                {% translate "Add" as default_add %}
+                <a href="{{ add_url }}" class="btn btn-sm btn-primary">
+                    <i class="mdi mdi-plus"></i>
+                    {{ add_label|default:default_add }}
+                </a>
+            {% endif %}
+        </div>
+        {% if table.rows %}
+            <div class="table-responsive">
+                {% render_table table %}
+            </div>
+            {% include 'generic/includes/table_pagination.html' with table=table tab=tab %}
+        {% else %}
+            <div class="card-body py-5 text-muted text-center">
+                {% if icon %}<i class="{{ icon }} text-muted mb-2"></i>{% endif %}
+                <p class="mb-0">{{ empty }}</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
