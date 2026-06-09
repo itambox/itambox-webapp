@@ -1,18 +1,31 @@
 """
-Management command to clear all data and seed the database with comprehensive sample data.
+Seed the database with a coherent, presentation-ready demo dataset.
+
+The narrative is a **Managed Service Provider (MSP)** — "Northwind Managed
+Services" — that runs its own internal IT and manages IT for a handful of
+customers across regulated industries (pharma, banking, asset management, plus
+a few smaller single-tenant clients). MSP staff hold cross-tenant memberships
+with scoped roles, which is what makes the multi-tenant story tangible.
+
+Every app is touched with realistic, headcount-driven daily data: organization
+hierarchy, access (users/roles/memberships), assets + assignments + custody,
+inventory stock, licensing, subscriptions, maintenance, procurement, and the
+operational layer (alerts, reports, event rules, config contexts, dashboards).
 
 Usage:
-    python manage.py seed_data                  # Seed with defaults (no --no-input needed for drop)
-    python manage.py seed_data --skip-drop      # Add data without clearing existing
-    python manage.py seed_data --production     # Only create minimal essential data (admin, status labels)
+    python manage.py seed_data                  # full demo dataset (clears first)
+    python manage.py seed_data --skip-drop      # add without clearing
+    python manage.py seed_data --production      # minimal essential data only
 """
 
 import datetime
 import hashlib
 import random
 
+from django.apps import apps
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.management.base import BaseCommand
 from django.db import transaction
@@ -20,32 +33,34 @@ from django.utils import timezone
 
 User = get_user_model()
 
+SEED_PASSWORD = 'itambox2026'
+TODAY = datetime.date.today()
+
+
+def days_ago(n):
+    return TODAY - datetime.timedelta(days=n)
+
+
+def days_ahead(n):
+    return TODAY + datetime.timedelta(days=n)
+
 
 class Command(BaseCommand):
-    help = "Clear all data and reseed the database with comprehensive sample data for testing."
+    help = "Seed the database with a presentation-ready MSP demo dataset."
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            '--skip-drop',
-            action='store_true',
-            default=False,
-            help='Add data without clearing existing records.',
-        )
-        parser.add_argument(
-            '--production',
-            action='store_true',
-            default=False,
-            help='Only create minimal essential data (admin user, default status labels).',
-        )
+        parser.add_argument('--skip-drop', action='store_true', default=False,
+                            help='Add data without clearing existing records.')
+        parser.add_argument('--production', action='store_true', default=False,
+                            help='Only create minimal essential data (admin user, status labels).')
 
     def handle(self, *args, **options):
-        skip_drop = options['skip_drop']
-        production = options['production']
+        random.seed(42)  # reproducible dataset
 
-        if not skip_drop:
+        if not options['skip_drop']:
             self._clear_all_data()
 
-        if production:
+        if options['production']:
             self._seed_minimal()
         else:
             self._seed_all()
@@ -57,78 +72,79 @@ class Command(BaseCommand):
     # ─────────────────────────────────────────────────────────────────
 
     def _clear_all_data(self):
-        """Delete all records in dependency order to avoid FK violations."""
         self.stdout.write('Clearing all existing data...')
 
-        # Delete in reverse-dependency order
+        # Truncate tables left behind by uninstalled plugins (e.g. itambox_esign,
+        # which was moved to a separate repo). Their rows still FK-reference assets
+        # but their models are no longer registered, so the ORM cannot clear them
+        # and asset deletion would fail. No-op on a fresh database.
+        from django.db import connection
+        orphan_tables = [t for t in connection.introspection.table_names()
+                         if t.startswith('itambox_esign')]
+        if orphan_tables:
+            with connection.cursor() as cur:
+                cur.execute('TRUNCATE TABLE %s CASCADE'
+                            % ', '.join('"%s"' % t for t in orphan_tables))
+            self.stdout.write(f'  Truncated orphaned plugin tables: {", ".join(orphan_tables)}')
+
         models_to_clear = [
-            # Leaf models first
-            ('assets', 'AssetRequest'),
-            ('assets', 'AssetAudit'),
-            ('assets', 'AuditSession'),
-            ('core', 'WebhookEndpoint'),
-            ('core', 'ReportTemplate'),
-            ('core', 'LabelTemplate'),
-            ('core', 'JournalEntry'),
-            ('organization', 'TenantMembership'),
-            ('organization', 'TenantInvitation'),
-            ('organization', 'TenantRole'),
-            ('inventory', 'ComponentAllocation'),
-            ('inventory', 'ComponentStock'),
-            ('compliance', 'CustodyReceipt'),
-            ('compliance', 'CustodyTemplate'),
-            ('core', 'ObjectChange'),
-            ('core', 'Notification'),
-            ('users', 'UserPreference'),
-            ('organization', 'ContactAssignment'),
+            ('core', 'AlertLog'), ('core', 'AlertRule'),
+            ('core', 'ScheduledReport'), ('core', 'ReportTemplate'),
+            ('core', 'NotificationChannel'), ('core', 'EventRule'),
+            ('core', 'WebhookEndpoint'), ('core', 'LabelTemplate'),
+            ('core', 'ExportTemplate'), ('core', 'JournalEntry'),
+            ('core', 'Notification'), ('core', 'ObjectChange'),
+            ('extras', 'ConfigContext'), ('extras', 'Dashboard'),
+            ('procurement', 'FulfillmentLink'), ('procurement', 'PurchaseOrderLine'),
+            ('procurement', 'PurchaseOrder'),
+            ('assets', 'AssetRequest'), ('assets', 'AssetAudit'), ('assets', 'AuditSession'),
+            ('compliance', 'CustodyReceipt'), ('compliance', 'CustodyTemplate'),
+            ('compliance', 'AssetMaintenance'),
             ('licenses', 'LicenseSeatAssignment'),
             ('subscriptions', 'SubscriptionAssignment'),
-            ('inventory', 'AccessoryAssignment'),
-            ('inventory', 'ConsumableAssignment'),
-            ('assets', 'InstalledSoftware'),
-            ('compliance', 'AssetMaintenance'),
-            ('inventory', 'KitItem'),
-            ('inventory', 'Kit'),
-            ('assets', 'Asset'),
-            ('assets', 'AssetType'),
-            ('inventory', 'Component'),
-            ('inventory', 'Accessory'),
-            ('inventory', 'Consumable'),
-            ('licenses', 'License'),
-            ('software', 'Software'),
-            ('subscriptions', 'Subscription'),
-            ('subscriptions', 'Provider'),
-            ('organization', 'Location'),
-            ('organization', 'Site'),
-            ('organization', 'AssetHolder'),
-            ('organization', 'Contact'),
+            ('inventory', 'AccessoryAssignment'), ('inventory', 'ConsumableAssignment'),
+            ('inventory', 'ComponentAllocation'), ('inventory', 'ComponentStock'),
+            ('inventory', 'AccessoryStock'), ('inventory', 'ConsumableStock'),
+            ('inventory', 'KitItem'), ('inventory', 'Kit'),
+            ('assets', 'InstalledSoftware'), ('assets', 'AssetAssignment'),
+            ('assets', 'Asset'), ('assets', 'AssetType'),
+            ('inventory', 'Component'), ('inventory', 'Accessory'), ('inventory', 'Consumable'),
+            ('licenses', 'License'), ('software', 'Software'),
+            ('subscriptions', 'Subscription'), ('subscriptions', 'Provider'),
+            ('organization', 'TenantMembership'), ('organization', 'TenantInvitation'),
+            ('organization', 'TenantRole'),
+            ('organization', 'ContactAssignment'), ('organization', 'Contact'),
             ('organization', 'ContactRole'),
-            ('organization', 'Tenant'),
-            ('organization', 'TenantGroup'),
-            ('organization', 'Region'),
-            ('organization', 'SiteGroup'),
-            ('assets', 'AssetRole'),
-            ('assets', 'StatusLabel'),
-            ('assets', 'Manufacturer'),
-            ('assets', 'Category'),
-            ('assets', 'CustomFieldset'),
-            ('assets', 'CustomField'),
-            ('assets', 'Depreciation'),
+            ('organization', 'Location'), ('organization', 'Site'),
+            ('organization', 'AssetHolder'),
+            ('organization', 'Tenant'), ('organization', 'TenantGroup'),
+            ('organization', 'Region'), ('organization', 'SiteGroup'),
+            ('assets', 'AssetRole'), ('assets', 'StatusLabel'),
+            ('assets', 'Manufacturer'), ('assets', 'Supplier'), ('assets', 'Category'),
+            ('assets', 'CustomFieldset'), ('assets', 'CustomField'), ('assets', 'Depreciation'),
             ('extras', 'Tag'),
         ]
-        for app_label, model_name in models_to_clear:
-            try:
-                from django.apps import apps
-                model = apps.get_model(app_label, model_name)
-                count, _ = model.objects.all().delete()
-                if count:
-                    self.stdout.write(f'  Deleted {count} {model_name}(s)')
-            except Exception as e:
-                self.stdout.write(self.style.WARNING(f'  Could not clear {model_name}: {e}'))
+        # Delete via _base_manager (bypasses tenant scoping + soft-delete filters so
+        # EVERY row is removed) and retry across passes so PROTECT ordering between
+        # the existing dataset and this one resolves regardless of FK direction.
+        pending = list(models_to_clear)
+        for _attempt in range(5):
+            failed = []
+            for app_label, model_name in pending:
+                try:
+                    model = apps.get_model(app_label, model_name)
+                    count, _ = model._base_manager.all().delete()
+                    if count:
+                        self.stdout.write(f'  Deleted {count} {model_name}(s)')
+                except Exception:
+                    failed.append((app_label, model_name))
+            if not failed:
+                break
+            pending = failed
+        for app_label, model_name in pending:
+            self.stdout.write(self.style.WARNING(f'  Could not fully clear {model_name}'))
 
-        # Keep superuser accounts, delete regular users
         User.objects.filter(is_superuser=False).delete()
-        # Clear ContentType cache after bulk deletions
         ContentType.objects.clear_cache()
         self.stdout.write('  Kept superuser accounts, deleted regular users.')
 
@@ -137,113 +153,39 @@ class Command(BaseCommand):
     # ─────────────────────────────────────────────────────────────────
 
     def _seed_minimal(self):
-        """Only essential records: admin user and default status labels."""
         from assets.models import StatusLabel
-
-        # Ensure admin user exists
         if not User.objects.filter(is_superuser=True).exists():
-            User.objects.create_superuser(
-                username='admin',
-                email='admin@itambox.local',
-                password='admin123'
-            )
+            User.objects.create_superuser(username='admin', email='admin@itambox.local', password='admin123')
             self.stdout.write('  Created admin user (admin / admin123)')
-
-        # Default status labels
-        defaults = [
-            ('Available', 'available', 'deployable', '28a745'),
-            ('In Use', 'in-use', 'deployed', '007bff'),
-            ('Pending Repair', 'pending-repair', 'pending', 'ffc107'),
-            ('Retired', 'retired', 'archived', 'dc3545'),
-            ('In Transit', 'in-transit', 'pending', '6f42c1'),
-            ('Decommissioned', 'decommissioned', 'undeployable', '6c757d'),
-        ]
-        for name, slug, stype, color in defaults:
-            StatusLabel.objects.get_or_create(
-                slug=slug,
-                defaults={'name': name, 'type': stype, 'color': color}
-            )
-        self.stdout.write(f'  Seeded {len(defaults)} StatusLabels.')
+        for name, slug, stype, color in self._status_label_defs():
+            StatusLabel.objects.get_or_create(slug=slug, defaults={'name': name, 'type': stype, 'color': color})
+        self.stdout.write('  Seeded default StatusLabels.')
 
     # ─────────────────────────────────────────────────────────────────
     # Full Seed
     # ─────────────────────────────────────────────────────────────────
 
     def _seed_all(self):
-        self.stdout.write('\nSeeding comprehensive sample data...\n')
-
+        self.stdout.write('\nSeeding MSP demo dataset...\n')
         with transaction.atomic():
-            # Phase 0: Foundation
-            self._seed_phase0()
+            self._seed_catalog()
+            self._seed_organizations()
+            self._seed_access()
+            self._seed_assets()
+            self._seed_inventory_stock()
+            self._seed_licensing()
+            self._seed_subscriptions()
+            self._seed_maintenance()
+            self._seed_procurement()
+            self._seed_operations()
 
-            # Phase 1: Organization Hierarchy
-            self._seed_phase1()
+    # ─────────────────────────────────────────────────────────────────
+    # Catalog (tenant-agnostic reference data)
+    # ─────────────────────────────────────────────────────────────────
 
-            # Phase 2: Asset Infrastructure
-            self._seed_phase2()
-
-            # Phase 3: Hardware Assets
-            self._seed_phase3()
-
-            # Phase 4: Software & Licenses
-            self._seed_phase4()
-
-            # Phase 5: Subscriptions
-            self._seed_phase5()
-
-            # Phase 6: Kits, Maintenance, Activity
-            self._seed_phase6()
-
-            # Phase 7: Missing Demo Features
-            self._seed_phase7()
-
-    # ─────────────────────────────────────────
-    # Phase 0: Users, Tags, StatusLabels
-    # ─────────────────────────────────────────
-
-    def _seed_phase0(self):
-        from assets.models import StatusLabel, AssetRole, Manufacturer, Depreciation, Supplier
-        from extras.models import Tag, CustomField, CustomFieldset
-        from users.models import UserPreference
-
-        self.stdout.write('--- Phase 0: Foundation ---')
-
-        # Users
-        users_data = [
-            ('alex.admin', 'alex.admin@acme.corp', True),
-            ('sarah.chen', 'sarah.chen@acme.corp', False),
-            ('marcus.johnson', 'marcus.johnson@acme.corp', False),
-            ('elena.rodriguez', 'elena.rodriguez@acme.corp', False),
-            ('thomas.weber', 'thomas.weber@acme.corp', False),
-            ('oliver.smith', 'oliver.smith@acme.corp', False),
-            ('sophia.martinez', 'sophia.martinez@acme.corp', False),
-            ('lucas.muller', 'lucas.muller@acme.corp', False),
-            ('emma.dupont', 'emma.dupont@acme.corp', False),
-            ('liam.o-connor', 'liam.oconnor@acme.corp', False),
-            ('chloe.lefevre', 'chloe.lefevre@acme.corp', False),
-            ('noah.schmidt', 'noah.schmidt@acme.corp', False),
-            ('mia.petrov', 'mia.petrov@acme.corp', False),
-            ('alexander.gruber', 'alexander.gruber@acme.corp', False),
-            ('yasmine.al-sayed', 'yasmine.alsayed@acme.corp', False),
-            ('david.kim', 'david.kim@acme.corp', False),
-            ('wei.zhang', 'wei.zhang@acme.corp', False),
-        ]
-        self._users = []
-        for username, email, is_superuser in users_data:
-            user, created = User.objects.get_or_create(username=username, defaults={
-                'email': email, 'is_superuser': is_superuser, 'is_staff': is_superuser
-            })
-            if created:
-                user.set_password('itambox2026')
-                user.save()
-                UserPreference.objects.create(user=user, data={
-                    'color_theme': random.choice(['light', 'dark']),
-                    'pagination': {'per_page': random.choice([25, 50, 100])}
-                })
-            self._users.append(user)
-
-        # Default status labels (idempotent)
-        defaults = [
+    @staticmethod
+    def _status_label_defs():
+        return [
             ('Available', 'available', 'deployable', '28a745'),
             ('In Use', 'in-use', 'deployed', '007bff'),
             ('Pending Repair', 'pending-repair', 'pending', 'ffc107'),
@@ -252,1626 +194,1302 @@ class Command(BaseCommand):
             ('Decommissioned', 'decommissioned', 'undeployable', '6c757d'),
             ('Quarantined', 'quarantined', 'pending', 'fd7e14'),
         ]
+
+    def _seed_catalog(self):
+        from assets.models import StatusLabel, AssetRole, Manufacturer, Depreciation, Supplier, AssetType, Category
+        from extras.models import Tag, CustomField, CustomFieldset
+        from inventory.models import Component, Accessory, Consumable
+        from software.models import Software
+        from subscriptions.models import Provider
+
+        self.stdout.write('--- Catalog: reference data ---')
+
+        # Status labels
         self._status_labels = {}
-        for name, slug, stype, color in defaults:
-            obj, _ = StatusLabel.objects.get_or_create(
-                slug=slug, defaults={'name': name, 'type': stype, 'color': color}
-            )
+        for name, slug, stype, color in self._status_label_defs():
+            obj, _ = StatusLabel.objects.get_or_create(slug=slug, defaults={'name': name, 'type': stype, 'color': color})
             self._status_labels[slug] = obj
 
         # Tags
-        tag_data = [
-            ('Production', 'production', '28a745'),
-            ('Development', 'development', '007bff'),
-            ('Staging', 'staging', 'ffc107'),
-            ('VIP', 'vip', 'dc3545'),
-            ('Windows', 'windows', '17a2b8'),
-            ('macOS', 'macos', '6f42c1'),
-            ('Linux', 'linux', 'fd7e14'),
-            ('Cloud', 'cloud', '20c997'),
-            ('On-Prem', 'on-prem', 'adb5bd'),
-            ('Finance', 'finance', '198754'),
-            ('Engineering', 'engineering', '0d6efd'),
-            ('HR', 'hr', 'd63384'),
-            ('Marketing', 'marketing', 'ff6b6b'),
-            ('Sales', 'sales', 'ffd43b'),
-            ('Executive', 'executive', 'e83e8c'),
-            ('Security', 'security', '0b5ed7'),
-            ('Audited', 'audited', '20c997'),
-            ('Under Review', 'under-review', 'ffc107'),
-            ('Critical', 'critical', 'dc3545'),
-            ('Legacy', 'legacy', '6c757d'),
-        ]
         self._tags = {}
-        for name, slug, color in tag_data:
+        for name, slug, color in [
+            ('Production', 'production', '28a745'), ('Development', 'development', '007bff'),
+            ('VIP', 'vip', 'dc3545'), ('GxP Validated', 'gxp-validated', '198754'),
+            ('PCI Scope', 'pci-scope', '0b5ed7'), ('Finance', 'finance', '198754'),
+            ('Field', 'field', 'fd7e14'), ('Loaner', 'loaner', 'adb5bd'),
+            ('Critical', 'critical', 'dc3545'), ('Legacy', 'legacy', '6c757d'),
+            ('Encrypted', 'encrypted', '20c997'), ('MDM Enrolled', 'mdm-enrolled', '6f42c1'),
+        ]:
             obj, _ = Tag.objects.get_or_create(slug=slug, defaults={'name': name, 'color': color})
             self._tags[slug] = obj
 
-        # AssetRoles
-        role_data = [
-            # Laptops/Workstations roles
-            ('Standard Workstation', 'standard-workstation', '007bff', 'Standard laptop or workstation for general office staff'),
-            ('Developer Workstation', 'developer-workstation', '6f42c1', 'High-performance workstation for developers and engineers'),
-            ('Executive Workstation', 'executive-workstation', 'e83e8c', 'Premium computing device for executives and management'),
-            ('CAD/Design Workstation', 'cad-design-workstation', 'fd7e14', 'GPU-optimized workstation for CAD, design, and 3D modeling'),
-            ('Kiosk / Reception Terminal', 'kiosk-reception-terminal', 'adb5bd', 'Restricted access terminal for reception, guest check-in, or lab environments'),
-            ('Field Representative Tablet', 'field-tablet', '20c997', 'Ruggedized tablet for field operations or warehouse logistics'),
-            ('Mobile Testing Device', 'mobile-test-device', 'ff6b6b', 'Smartphone used exclusively for software testing and QA'),
-            ('Corporate Smartphone', 'corporate-smartphone', 'fd7e14', 'Company-issued mobile smartphone for voice, chat, and MFA'),
-            
-            # Servers / Datacenter roles
-            ('Virtualization Host', 'virtualization-host-server', 'dc3545', 'Bare-metal hypervisor server running ESXi, Proxmox, or Hyper-V'),
-            ('Database Server', 'database-server', '17a2b8', 'Server hosting production database instances (PostgreSQL, MSSQL, Oracle)'),
-            ('Application Server', 'application-server', '20c997', 'Server hosting line-of-business applications'),
-            ('Backup Storage Server', 'backup-server', 'fd7e14', 'High-capacity storage server or NAS for backup retention'),
-            ('Build & CI/CD Agent', 'build-ci-agent', '28a745', 'Dedicated build node for CI/CD pipeline automation'),
-
-            # Network roles
-            ('Core Router / Firewall', 'core-router-firewall', 'dc3545', 'Central security gateway, router, or edge firewall'),
-            ('Access / Distribution Switch', 'access-switch', '0d6efd', 'Network switch providing physical Ethernet connectivity'),
-            ('Wireless Access Point', 'wireless-ap', '20c997', 'Enterprise WiFi access point'),
-
-            # Peripherals / Shared roles
-            ('Conference Room AV System', 'conference-av', 'e83e8c', 'Smart display, camera, and audio hub for hybrid meetings'),
-            ('Network Printer', 'network-printer', 'adb5bd', 'Multi-function network printer, scanner, and copier'),
-            ('Desktop Monitor', 'desktop-monitor', '6f42c1', 'External desktop display monitor'),
-        ]
+        # Asset roles
         self._asset_roles = {}
-        for name, slug, color, desc in role_data:
-            obj, _ = AssetRole.objects.get_or_create(
-                slug=slug, defaults={'name': name, 'color': color, 'description': desc}
-            )
+        for name, slug, color, desc in [
+            ('Standard Workstation', 'standard-workstation', '007bff', 'Laptop/desktop for general office staff'),
+            ('Developer Workstation', 'developer-workstation', '6f42c1', 'High-performance workstation for engineers'),
+            ('Executive Workstation', 'executive-workstation', 'e83e8c', 'Premium device for executives'),
+            ('CAD/Design Workstation', 'cad-design-workstation', 'fd7e14', 'GPU workstation for CAD/3D'),
+            ('Lab / Cleanroom Terminal', 'lab-terminal', 'adb5bd', 'Restricted terminal for lab or production-floor use'),
+            ('Field Tablet', 'field-tablet', '20c997', 'Ruggedized tablet for field/warehouse work'),
+            ('Corporate Smartphone', 'corporate-smartphone', 'fd7e14', 'Company smartphone for voice/chat/MFA'),
+            ('Virtualization Host', 'virtualization-host-server', 'dc3545', 'Hypervisor host (ESXi/Proxmox/Hyper-V)'),
+            ('Database Server', 'database-server', '17a2b8', 'Production database host'),
+            ('Application Server', 'application-server', '20c997', 'Line-of-business application host'),
+            ('Backup / Storage', 'backup-server', 'fd7e14', 'Backup target or NAS'),
+            ('Core Router / Firewall', 'core-router-firewall', 'dc3545', 'Edge security gateway'),
+            ('Access / Distribution Switch', 'access-switch', '0d6efd', 'Network switch'),
+            ('Wireless Access Point', 'wireless-ap', '20c997', 'Enterprise WiFi access point'),
+            ('Conference Room AV', 'conference-av', 'e83e8c', 'Meeting-room camera/audio hub'),
+            ('Desktop Monitor', 'desktop-monitor', '6f42c1', 'External display'),
+        ]:
+            obj, _ = AssetRole.objects.get_or_create(slug=slug, defaults={'name': name, 'color': color, 'description': desc})
             self._asset_roles[slug] = obj
 
         # Manufacturers
-        mfr_data = [
-            ('Dell Technologies', 'dell-technologies', 'American multinational computer technology company'),
-            ('Apple Inc.', 'apple-inc', 'Consumer electronics and software company'),
-            ('HP Inc.', 'hp-inc', 'Information technology company'),
-            ('Lenovo Group', 'lenovo-group', 'Chinese multinational technology company'),
-            ('Cisco Systems', 'cisco-systems', 'Networking hardware and telecommunications'),
-            ('Samsung Electronics', 'samsung-electronics', 'South Korean multinational electronics corporation'),
-            ('Microsoft Corporation', 'microsoft-corporation', 'Software, consumer electronics, and personal computers'),
-            ('Logitech International', 'logitech-international', 'Computer peripherals and software'),
-            ('Brother Industries', 'brother-industries', 'Printers and multifunction devices'),
-            ('Synology Inc.', 'synology-inc', 'Network-attached storage appliances'),
-            ('Ubiquiti Inc.', 'ubiquiti-inc', 'Networking technology company'),
-        ]
         self._manufacturers = {}
-        for name, slug, desc in mfr_data:
-            obj, _ = Manufacturer.objects.get_or_create(
-                slug=slug, defaults={'name': name, 'description': desc}
-            )
+        for name, slug in [
+            ('Dell Technologies', 'dell-technologies'), ('Apple Inc.', 'apple-inc'),
+            ('HP Inc.', 'hp-inc'), ('Lenovo Group', 'lenovo-group'),
+            ('Cisco Systems', 'cisco-systems'), ('Samsung Electronics', 'samsung-electronics'),
+            ('Microsoft Corporation', 'microsoft-corporation'), ('Logitech International', 'logitech-international'),
+            ('Brother Industries', 'brother-industries'), ('Synology Inc.', 'synology-inc'),
+            ('Ubiquiti Inc.', 'ubiquiti-inc'),
+        ]:
+            obj, _ = Manufacturer.objects.get_or_create(slug=slug, defaults={'name': name})
             self._manufacturers[slug] = obj
 
-        # CustomFields: (name, label, field_type, required, choices, model_level)
+        # Suppliers
+        self._suppliers = {}
+        for name, slug, email, phone, website in [
+            ('Northwind Procurement', 'northwind-procurement', 'buy@northwind-it.com', '+49-30-555-0100', 'https://northwind-it.com'),
+            ('Dell Direct', 'dell-direct', 'enterprise@dell.com', '+1-800-555-0199', 'https://dell.com'),
+            ('Apple Business', 'apple-business', 'business@apple.com', '+1-800-555-0200', 'https://apple.com/business'),
+            ('CDW Deutschland', 'cdw-deutschland', 'de.sales@cdw.com', '+49-211-555-0500', 'https://cdw.de'),
+            ('Bechtle AG', 'bechtle-ag', 'b2b@bechtle.com', '+49-7132-555-0700', 'https://bechtle.com'),
+            ('Insight Enterprises', 'insight-enterprises', 'eu@insight.com', '+44-20-555-0800', 'https://insight.com'),
+        ]:
+            obj, _ = Supplier.objects.get_or_create(slug=slug, defaults={
+                'name': name, 'contact_email': email, 'contact_phone': phone, 'website': website})
+            self._suppliers[slug] = obj
+
+        # Depreciation schedules
+        self._depreciations = {}
+        for name, months in [('3-Year Straight-Line', 36), ('4-Year Straight-Line', 48),
+                             ('5-Year Straight-Line', 60), ('7-Year Straight-Line', 84)]:
+            obj, _ = Depreciation.objects.get_or_create(name=name, defaults={'months': months})
+            self._depreciations[name] = obj
+
+        # Custom fields + fieldsets
         cf_data = [
+            ('hostname', 'Hostname', 'text', False, None, False),
+            ('os_version', 'OS Version', 'text', False, None, False),
+            ('department', 'Department', 'select', False, 'Engineering\nFinance\nHR\nMarketing\nSales\nOperations\nResearch\nLegal', False),
+            ('encrypted', 'Disk Encrypted', 'boolean', False, None, False),
             ('sim_number', 'SIM Number', 'text', False, None, False),
             ('imei', 'IMEI', 'text', False, None, False),
-            ('screen_size', 'Screen Size (inches)', 'number', False, None, True),
-            ('vehicle_vin', 'VIN Number', 'text', False, None, False),
-            ('hostname', 'Hostname', 'text', True, None, False),
-            ('os_version', 'OS Version', 'text', False, None, False),
-            ('department', 'Department', 'select', False, 'Engineering\nFinance\nHR\nMarketing\nSales\nOperations', False),
-            ('floor', 'Floor', 'number', False, None, False),
-            ('asset_lifecycle', 'Lifecycle Stage', 'select', False, 'Procurement\nDeployment\nActive\nMaintenance\nRetirement', False),
-            ('encrypted', 'Disk Encrypted', 'boolean', False, None, False),
-            ('cpu_architecture', 'CPU Architecture', 'select', False, 'x86_64\nARM64', True),
-            ('ram_slot_count', 'RAM Slots Count', 'number', False, None, True),
             ('ip_address', 'IP Address', 'text', False, None, False),
+            ('firmware_version', 'Firmware Version', 'text', False, None, False),
             ('port_count', 'Port Count', 'number', False, None, True),
             ('poe_budget_w', 'PoE Budget (Watts)', 'number', False, None, True),
-            ('firmware_version', 'Firmware Version', 'text', False, None, False),
-            ('sim_carrier', 'SIM Carrier', 'select', False, 'Deutsche Telekom\nVodafone\nO2\nSwisscom\nOrange', False),
-            ('apn_profile', 'APN Profile', 'text', False, None, False),
-            ('puk_code', 'PUK Code', 'text', False, None, False),
-            ('screen_resolution', 'Screen Resolution', 'text', False, None, True),
-            ('input_ports', 'Input Ports', 'text', False, None, True),
+            ('screen_size', 'Screen Size (inches)', 'number', False, None, True),
             ('mounted_state', 'Mounted State', 'select', False, 'Wall-Mounted\nCeiling-Mounted\nTable-Top\nMobile-Stand', False),
-            # New model-level specs
             ('cpu', 'CPU Model', 'text', False, None, True),
             ('ram_gb', 'RAM (GB)', 'number', False, None, True),
             ('storage_gb', 'Storage (GB)', 'number', False, None, True),
             ('storage_type', 'Storage Type', 'select', False, 'NVMe\nSSD\nHDD\nSSD RAID\nSATA SSD', True),
             ('gpu', 'GPU Model', 'text', False, None, True),
+            ('cpu_architecture', 'CPU Architecture', 'select', False, 'x86_64\nARM64', True),
         ]
         self._custom_fields = {}
         for name, label, ftype, required, choices, model_level in cf_data:
-            obj, _ = CustomField.objects.get_or_create(
-                name=name,
-                defaults={'label': label, 'field_type': ftype, 'required': required, 'choices': choices, 'model_level': model_level}
-            )
-            # Sync model_level if existing field had a different value
-            if obj.model_level != model_level:
-                obj.model_level = model_level
-                obj.save(update_fields=['model_level'])
+            obj, _ = CustomField.objects.get_or_create(name=name, defaults={
+                'label': label, 'field_type': ftype, 'required': required,
+                'choices': choices, 'model_level': model_level})
             self._custom_fields[name] = obj
 
-        # CustomFieldsets
-        self._laptop_fieldset = CustomFieldset.objects.create(name='Laptop Specs')
-        self._laptop_fieldset.fields.add(
-            self._custom_fields['cpu'],
-            self._custom_fields['ram_gb'],
-            self._custom_fields['storage_gb'],
-            self._custom_fields['storage_type'],
-            self._custom_fields['gpu'],
-            self._custom_fields['cpu_architecture'],
-            self._custom_fields['ram_slot_count'],
-            self._custom_fields['hostname'],
-            self._custom_fields['os_version'],
-            self._custom_fields['encrypted'],
-            self._custom_fields['department'],
-        )
+        def fieldset(name, *field_names):
+            fs = CustomFieldset.objects.create(name=name)
+            fs.fields.add(*[self._custom_fields[f] for f in field_names])
+            return fs
 
-        self._mobile_fieldset = CustomFieldset.objects.create(name='Mobile Device Specs')
-        self._mobile_fieldset.fields.add(
-            self._custom_fields['cpu'],
-            self._custom_fields['ram_gb'],
-            self._custom_fields['storage_gb'],
-            self._custom_fields['screen_size'],
-            self._custom_fields['os_version'],
-            self._custom_fields['sim_number'],
-            self._custom_fields['imei'],
-        )
+        self._fs_laptop = fieldset('Laptop / Workstation Specs', 'cpu', 'ram_gb', 'storage_gb', 'storage_type',
+                                   'gpu', 'cpu_architecture', 'hostname', 'os_version', 'encrypted', 'department')
+        self._fs_mobile = fieldset('Mobile Device Specs', 'cpu', 'ram_gb', 'storage_gb', 'screen_size',
+                                   'os_version', 'sim_number', 'imei')
+        self._fs_server = fieldset('Server Specs', 'cpu', 'ram_gb', 'storage_gb', 'storage_type',
+                                   'hostname', 'os_version')
+        self._fs_switch = fieldset('Network Device Specs', 'port_count', 'poe_budget_w', 'hostname',
+                                   'ip_address', 'firmware_version')
+        self._fs_av = fieldset('AV & Conference Specs', 'screen_size', 'mounted_state')
 
-        self._server_fieldset = CustomFieldset.objects.create(name='Server Specs')
-        self._server_fieldset.fields.add(
-            self._custom_fields['cpu'],
-            self._custom_fields['ram_gb'],
-            self._custom_fields['storage_gb'],
-            self._custom_fields['storage_type'],
-            self._custom_fields['hostname'],
-            self._custom_fields['os_version'],
-            self._custom_fields['department'],
-            self._custom_fields['floor'],
-        )
-
-        self._switch_fieldset = CustomFieldset.objects.create(name='Network Switch Specs')
-        self._switch_fieldset.fields.add(
-            self._custom_fields['port_count'],
-            self._custom_fields['poe_budget_w'],
-            self._custom_fields['hostname'],
-            self._custom_fields['ip_address'],
-            self._custom_fields['firmware_version'],
-        )
-
-        self._sim_fieldset = CustomFieldset.objects.create(name='Mobile SIM Specs')
-        self._sim_fieldset.fields.add(
-            self._custom_fields['sim_number'],
-            self._custom_fields['sim_carrier'],
-            self._custom_fields['apn_profile'],
-            self._custom_fields['puk_code'],
-        )
-
-        self._av_fieldset = CustomFieldset.objects.create(name='AV & Conference Specs')
-        self._av_fieldset.fields.add(
-            self._custom_fields['screen_resolution'],
-            self._custom_fields['input_ports'],
-            self._custom_fields['mounted_state'],
-        )
-
-        # Depreciation schedules
-        dep_data = [
-            ('3-Year Straight-Line', 36),
-            ('4-Year Straight-Line', 48),
-            ('5-Year Straight-Line', 60),
-            ('7-Year Straight-Line', 84),
-            ('10-Year Straight-Line', 120),
-        ]
-        self._depreciations = {}
-        for name, months in dep_data:
-            obj, _ = Depreciation.objects.get_or_create(name=name, defaults={'months': months})
-            self._depreciations[name] = obj
-
-        # Suppliers
-        supplier_data = [
-            ('ITZ Solutions GmbH', 'itz-solutions', 'info@itz-solutions.de', '+49-30-555-0100', 'https://itz-solutions.de'),
-            ('Dell Direct', 'dell-direct', 'enterprise@dell.com', '+1-800-555-0199', 'https://dell.com'),
-            ('Apple Business', 'apple-business', 'business@apple.com', '+1-800-555-0200', 'https://apple.com/business'),
-            ('HP Enterprise Store', 'hp-enterprise-store', 'hpe-sales@hp.com', '+1-800-555-0300', 'https://hpe.com'),
-            ('Lenovo Pro', 'lenovo-pro', 'pro-sales@lenovo.com', '+1-800-555-0400', 'https://lenovo.com/pro'),
-            ('CDW Deutschland', 'cdw-deutschland', 'de.sales@cdw.com', '+49-211-555-0500', 'https://cdw.de'),
-            ('Amazon Business', 'amazon-business', 'business@amazon.de', '+49-800-555-0600', 'https://business.amazon.de'),
-            ('Notebooksbilliger AG', 'notebooksbilliger-ag', 'b2b@notebooksbilliger.de', '+49-5921-555-0700', 'https://notebooksbilliger.de/b2b'),
-        ]
-        self._suppliers = {}
-        for name, slug, email, phone, website in supplier_data:
-            obj, _ = Supplier.objects.get_or_create(
-                slug=slug,
-                defaults={'name': name, 'contact_email': email, 'contact_phone': phone, 'website': website}
-            )
-            self._suppliers[slug] = obj
-
-        self.stdout.write(f'  {len(self._users)} users, {len(self._tags)} tags, '
-                          f'{len(self._asset_roles)} asset roles, {len(self._manufacturers)} manufacturers, '
-                          f'{len(self._custom_fields)} custom fields, {len(self._depreciations)} depreciation schedules.')
-
-    # ─────────────────────────────────────────
-    # Phase 1: Organization Hierarchy
-    # ─────────────────────────────────────────
-
-    def _seed_phase1(self):
-        from organization.models import (
-            Region, SiteGroup, TenantGroup, Tenant, Site, Location,
-            AssetHolder, ContactRole, Contact, ContactAssignment,
-        )
-
-        self.stdout.write('--- Phase 1: Organization ---')
-
-        # Regions
-        regions = {}
-        for name, slug in [('North America', 'north-america'), ('Europe', 'europe'), ('Asia-Pacific', 'asia-pacific')]:
-            obj, _ = Region.objects.get_or_create(slug=slug, defaults={'name': name})
-            regions[slug] = obj
-
-        # Sub-regions
-        sub_regions = {}
-        for name, slug, parent_slug in [
-            ('US East', 'us-east', 'north-america'),
-            ('US West', 'us-west', 'north-america'),
-            ('Canada', 'canada', 'north-america'),
-            ('Western Europe', 'western-europe', 'europe'),
-            ('Northern Europe', 'northern-europe', 'europe'),
-            ('Southeast Asia', 'southeast-asia', 'asia-pacific'),
-            ('Australia', 'australia', 'asia-pacific'),
-        ]:
-            obj, _ = Region.objects.get_or_create(
-                slug=slug,
-                defaults={'name': name, 'parent': regions[parent_slug]}
-            )
-            sub_regions[slug] = obj
-
-        # SiteGroups
-        site_groups = {}
-        for name, slug in [
-            ('Corporate Offices', 'corporate-offices'),
-            ('Datacenters', 'datacenters'),
-            ('Remote Sites', 'remote-sites'),
-        ]:
-            obj, _ = SiteGroup.objects.get_or_create(slug=slug, defaults={'name': name})
-            site_groups[slug] = obj
-
-        # TenantGroups
-        tg_acme, _ = TenantGroup.objects.get_or_create(slug='acme-corp', defaults={'name': 'Acme Corporation'})
-        tg_globex, _ = TenantGroup.objects.get_or_create(slug='globex-inc', defaults={'name': 'Globex Inc'})
-        tg_stark, _ = TenantGroup.objects.get_or_create(slug='stark-industries', defaults={'name': 'Stark Industries'})
-        tg_soylent, _ = TenantGroup.objects.get_or_create(slug='soylent-corp', defaults={'name': 'Soylent Corp'})
-        tg_initech, _ = TenantGroup.objects.get_or_create(slug='initech-llc', defaults={'name': 'Initech LLC'})
-
-        tenants = {}
-        tenant_data = [
-            # Acme Corporation (Internal/Host Demo)
-            ('Acme North America', 'acme-north-america', tg_acme),
-            ('Acme Europe', 'acme-europe', tg_acme),
-            ('Acme Labs', 'acme-labs', tg_acme),
-            
-            # Globex Inc
-            ('Globex Retail', 'globex-retail', tg_globex),
-            ('Globex Manufacturing', 'globex-manufacturing', tg_globex),
-            
-            # Stark Industries
-            ('Stark Defense', 'stark-defense', tg_stark),
-            ('Stark Energy', 'stark-energy', tg_stark),
-            
-            # Soylent Corp
-            ('Soylent Operations', 'soylent-operations', tg_soylent),
-            ('Soylent Research', 'soylent-research', tg_soylent),
-            
-            # Initech LLC
-            ('Initech Software', 'initech-software', tg_initech),
-            ('Initech Consulting', 'initech-consulting', tg_initech),
-            
-            # Additional generic tenant
-            ('Umbrella Corp', 'umbrella-corp', tg_acme), # Assigning to Acme for variety, or leave it. Let's make it its own or under Initech
-        ]
-        for name, slug, tgroup in tenant_data:
-            obj, _ = Tenant.objects.get_or_create(slug=slug, defaults={'name': name, 'group': tgroup})
-            tenants[slug] = obj
-        self._tenants = tenants
-
-        # Sites
-        sites = {}
-        site_data = [
-            ('Berlin HQ', 'berlin-hq', site_groups['corporate-offices'], tenants['acme-north-america'],
-             sub_regions['western-europe'], 'Central Office', '52.5200', '13.4050',
-             'Mauerstrasse 42\n10117 Berlin\nGermany'),
-            ('Munich Office', 'munich-office', site_groups['corporate-offices'], tenants['acme-europe'],
-             sub_regions['western-europe'], 'Satellite Office', '48.1351', '11.5820',
-             'Leopoldstrasse 88\n80802 Munich\nGermany'),
-            ('Amsterdam DC', 'amsterdam-dc', site_groups['datacenters'], tenants['acme-north-america'],
-             sub_regions['western-europe'], 'Primary Datacenter', '52.3105', '4.7683',
-             'Science Park 400\n1098 XH Amsterdam\nNetherlands'),
-            ('New York Office', 'new-york-office', site_groups['corporate-offices'], tenants['acme-labs'],
-             sub_regions['us-east'], 'US Headquarters', '40.7128', '-74.0060',
-             '350 Fifth Avenue\nNew York, NY 10118\nUSA'),
-            ('San Francisco Office', 'san-francisco-office', site_groups['corporate-offices'], tenants['acme-labs'],
-             sub_regions['us-west'], 'West Coast Office', '37.7749', '-122.4194',
-             '1 Market Street\nSan Francisco, CA 94105\nUSA'),
-            ('Singapore Office', 'singapore-office', site_groups['remote-sites'], tenants['acme-north-america'],
-             sub_regions['southeast-asia'], 'APAC Hub', '1.3521', '103.8198',
-             '8 Marina Boulevard\nSingapore 018981'),
-            # Customer Sites
-            ('Globex Frankfurt HQ', 'globex-frankfurt-hq', site_groups['corporate-offices'], tenants['globex-retail'],
-             sub_regions['western-europe'], 'Customer HQ', '50.1109', '8.6821',
-             'Taunusanlage 12\n60325 Frankfurt\nGermany'),
-            ('Globex Frankfurt Office 2', 'frankfurt-hub', site_groups['corporate-offices'], tenants['globex-manufacturing'],
-             sub_regions['western-europe'], 'Asset Management Center', '50.1120', '8.6800',
-             'Kaiserstrasse 15\n60311 Frankfurt\nGermany'),
-            ('MediCare Munich Office', 'medicare-munich-office', site_groups['corporate-offices'], tenants['stark-defense'],
-             sub_regions['western-europe'], 'Customer Office', '48.1374', '11.5755',
-             'Rosenheimer Strasse 145\n81671 Munich\nGermany'),
-            ('Stark Energy Munich', 'munich-lab', site_groups['datacenters'], tenants['stark-energy'],
-             sub_regions['western-europe'], 'Research Laboratory', '48.1400', '11.5800',
-             'Rosenheimer Strasse 150\n81671 Munich\nGermany'),
-            ('TechStartup Berlin Hub', 'techstartup-berlin-hub', site_groups['remote-sites'], tenants['soylent-operations'],
-             sub_regions['western-europe'], 'Co-Working Hub', '52.5067', '13.3911',
-             'Axel-Springer-Strasse 54\n10117 Berlin\nGermany'),
-            ('GreenEnergy Hamburg', 'greenenergy-hamburg', site_groups['corporate-offices'], tenants['soylent-research'],
-             sub_regions['northern-europe'], 'Customer HQ', '53.5511', '9.9937',
-             'Am Kaiserkai 1\n20457 Hamburg\nGermany'),
-            ('Apex Frankfurt Depot', 'apex-frankfurt-depot', site_groups['remote-sites'], tenants['initech-consulting'],
-             sub_regions['western-europe'], 'Warehouse Depot', '50.0494', '8.5707',
-             'CargoCity Sued\n60549 Frankfurt Airport\nGermany'),
-            ('Boston Robotics Center', 'boston-robotics-center', site_groups['corporate-offices'], tenants['umbrella-corp'],
-             sub_regions['us-east'], 'R&D Center', '42.3601', '-71.0589',
-             '250 Summer Street\nBoston, MA 02210\nUSA'),
-        ]
-        for name, slug, group, tenant, region, facility, lat, lon, addr in site_data:
-            obj, _ = Site.objects.get_or_create(
-                slug=slug,
-                defaults={
-                    'name': name, 'group': group, 'tenant': tenant, 'region': region,
-                    'facility': facility, 'latitude': lat, 'longitude': lon,
-                    'physical_address': addr, 'time_zone': 'UTC',
-                }
-            )
-            sites[slug] = obj
-
-        # Locations (rooms/floors within sites)
-        locations = {}
-        location_data = [
-            ('Floor 1 - Engineering', 'berlin-floor-1-eng', sites['berlin-hq'], tenants['acme-north-america']),
-            ('Floor 2 - Finance & HR', 'berlin-floor-2-admin', sites['berlin-hq'], tenants['acme-north-america']),
-            ('Floor 3 - Executive', 'berlin-floor-3-exec', sites['berlin-hq'], tenants['acme-north-america']),
-            ('Server Room A', 'berlin-server-room-a', sites['berlin-hq'], tenants['acme-north-america']),
-            ('Berlin Staging Row 1', 'berlin-staging-row-1', sites['berlin-hq'], tenants['acme-north-america']),
-            ('Rack Row 1 - Compute', 'ams-rack-row-1', sites['amsterdam-dc'], tenants['acme-north-america']),
-            ('Rack Row 2 - Storage', 'ams-rack-row-2', sites['amsterdam-dc'], tenants['acme-north-america']),
-            ('Rack Row 3 - Network', 'ams-rack-row-3', sites['amsterdam-dc'], tenants['acme-north-america']),
-            ('Floor 5 - Engineering', 'ny-floor-5-eng', sites['new-york-office'], tenants['acme-labs']),
-            ('Floor 6 - Sales', 'ny-floor-6-sales', sites['new-york-office'], tenants['acme-labs']),
-            ('Office 12A', 'munich-office-12a', sites['munich-office'], tenants['acme-europe']),
-            ('Munich Staging Area', 'munich-staging-area', sites['munich-office'], tenants['acme-europe']),
-            # Customer Locations
-            ('Floor 2 - Trading Desk', 'globex-floor-2-trading', sites['globex-frankfurt-hq'], tenants['globex-retail']),
-            ('Floor 3 - Risk Management', 'globex-floor-3-risk', sites['globex-frankfurt-hq'], tenants['globex-retail']),
-            ('Frankfurt Hub Floor 1', 'frankfurt-hub-floor-1', sites['frankfurt-hub'], tenants['globex-manufacturing']),
-            ('Ward Administration', 'medicare-ward-admin', sites['medicare-munich-office'], tenants['stark-defense']),
-            ('Lab Research Suite', 'medicare-lab-research', sites['medicare-munich-office'], tenants['stark-defense']),
-            ('Lab A Testing Bench', 'lab-a-testing-bench', sites['munich-lab'], tenants['stark-energy']),
-            ('Open Space Area', 'techstartup-open-space', sites['techstartup-berlin-hub'], tenants['soylent-operations']),
-            ('Engineering Lab', 'techstartup-eng-lab', sites['techstartup-berlin-hub'], tenants['soylent-operations']),
-            ('Wind Analytics Office', 'greenenergy-wind-analytics', sites['greenenergy-hamburg'], tenants['soylent-research']),
-            ('Solar Operations Center', 'greenenergy-solar-ops', sites['greenenergy-hamburg'], tenants['soylent-research']),
-            ('Frankfurt Depot Shelf B', 'frankfurt-depot-shelf-b', sites['apex-frankfurt-depot'], tenants['initech-consulting']),
-            ('Boston Assembly Floor', 'boston-assembly-floor', sites['boston-robotics-center'], tenants['umbrella-corp']),
-        ]
-        for name, slug, site, tenant in location_data:
-            obj, _ = Location.objects.get_or_create(
-                slug=slug,
-                defaults={'name': name, 'site': site, 'tenant': tenant}
-            )
-            locations[slug] = obj
-        self._locations = locations
-
-        # AssetHolders (employees)
-        holder_data = [
-            ('Alex', 'Miller', 'alex.admin', 'alex.admin@acme.corp', tenants['acme-north-america']),
-            ('Sarah', 'Chen', 'sarah.chen', 'sarah.chen@acme.corp', tenants['acme-north-america']),
-            ('Marcus', 'Johnson', 'marcus.johnson', 'marcus.johnson@acme.corp', tenants['acme-labs']),
-            ('Elena', 'Rodriguez', 'elena.rodriguez', 'elena.rodriguez@acme.corp', tenants['acme-europe']),
-            ('Thomas', 'Weber', 'thomas.weber', 'thomas.weber@acme.corp', tenants['acme-north-america']),
-            ('Anna', 'Schmidt', 'anna.schmidt', 'anna.schmidt@acme.corp', tenants['acme-north-america']),
-            ('James', 'Wilson', 'james.wilson', 'james.wilson@acme.corp', tenants['acme-labs']),
-            ('Yuki', 'Tanaka', 'yuki.tanaka', 'yuki.tanaka@acme.corp', tenants['acme-north-america']),
-            ('Omar', 'Hassan', 'omar.hassan', 'omar.hassan@acme.corp', tenants['acme-europe']),
-            ('Lisa', 'Andersson', 'lisa.andersson', 'lisa.andersson@acme.corp', tenants['acme-north-america']),
-            ('Carlos', 'Mendez', 'carlos.mendez', 'carlos.mendez@acme.corp', tenants['acme-labs']),
-            ('Priya', 'Patel', 'priya.patel', 'priya.patel@acme.corp', tenants['acme-north-america']),
-            ('Oliver', 'Smith', 'oliver.smith', 'oliver.smith@acme.corp', tenants['initech-software']),
-            ('Sophia', 'Martinez', 'sophia.martinez', 'sophia.martinez@acme.corp', tenants['initech-software']),
-            # Customer holders
-            ('Klaus', 'Fischer', 'klaus.fischer', 'klaus.fischer@globex-capital.de', tenants['globex-retail']),
-            ('Nina', 'Bergmann', 'nina.bergmann', 'nina.bergmann@globex-capital.de', tenants['globex-retail']),
-            ('Lucas', 'Müller', 'lucas.muller', 'lucas.muller@globex-asset.de', tenants['globex-manufacturing']),
-            ('Emma', 'Dupont', 'emma.dupont', 'emma.dupont@globex-asset.de', tenants['globex-manufacturing']),
-            ('Dr. Markus', 'Wagner', 'markus.wagner', 'dr.wagner@medicare-health.de', tenants['stark-defense']),
-            ('Sophie', 'Klein', 'sophie.klein', 'sophie.klein@medicare-health.de', tenants['stark-defense']),
-            ('Liam', 'O\'Connor', 'liam.o-connor', 'liam.oconnor@medicare-lab.de', tenants['stark-energy']),
-            ('Chloe', 'Lefevre', 'chloe.lefevre', 'chloe.lefevre@medicare-lab.de', tenants['stark-energy']),
-            ('Felix', 'Bauer', 'felix.bauer', 'felix@techstartup.io', tenants['soylent-operations']),
-            ('Lena', 'Schulz', 'lena.schulz', 'lena@techstartup.io', tenants['soylent-operations']),
-            ('Jonas', 'Hoffmann', 'jonas.hoffmann', 'jonas.hoffmann@greenenergy-se.de', tenants['soylent-research']),
-            ('Katja', 'Vogel', 'katja.vogel', 'katja.vogel@greenenergy-se.de', tenants['soylent-research']),
-            ('Noah', 'Schmidt', 'noah.schmidt', 'noah.schmidt@apex-logistics.de', tenants['initech-consulting']),
-            ('Mia', 'Petrov', 'mia.petrov', 'mia.petrov@apex-logistics.de', tenants['initech-consulting']),
-            ('Alexander', 'Gruber', 'alexander.gruber', 'alex.gruber@quantum-robotics.com', tenants['umbrella-corp']),
-            ('Yasmine', 'Al-Sayed', 'yasmine.al-sayed', 'yasmine.alsayed@quantum-robotics.com', tenants['umbrella-corp']),
-            ('David', 'Kim', 'david.kim', 'david.kim@quantum-robotics.com', tenants['umbrella-corp']),
-            ('Wei', 'Zhang', 'wei.zhang', 'wei.zhang@quantum-robotics.com', tenants['umbrella-corp']),
-        ]
-        self._holders = {}
-        for first, last, upn, email, tenant in holder_data:
-            obj, _ = AssetHolder.objects.get_or_create(
-                upn=upn,
-                defaults={
-                    'first_name': first, 'last_name': last, 'email': email, 'tenant': tenant
-                }
-            )
-            self._holders[upn] = obj
-
-        # ContactRoles
-        role_data = [
-            ('Account Manager', 'account-manager'),
-            ('Support Contact', 'support-contact'),
-            ('Technical Lead', 'technical-lead'),
-            ('Billing Contact', 'billing-contact'),
-            ('Escalation Point', 'escalation-point'),
-        ]
-        self._contact_roles = {}
-        for name, slug in role_data:
-            obj, _ = ContactRole.objects.get_or_create(slug=slug, defaults={'name': name})
-            self._contact_roles[slug] = obj
-
-        # Contacts (vendor/manufacturer contacts)
-        contact_data = [
-            ('John Vendor', 'Dell Account Manager', '+1-512-555-0100', 'john.vendor@dell.com', 'https://dell.com'),
-            ('Lisa Support', 'Apple Enterprise Support', '+1-408-555-0200', 'lisa.support@apple.com', 'https://apple.com'),
-            ('Mike Tech', 'Cisco TAC Lead', '+1-408-555-0300', 'mike.tech@cisco.com', 'https://cisco.com'),
-            ('Sandra Sales', 'HP Alexwals', '+1-650-555-0400', 'sandra.sales@hp.com', 'https://hp.com'),
-            ('Alex Distributor', 'Lenovo Channel Manager', '+49-30-555-0500', 'alex.dist@lenovo.com', 'https://lenovo.com'),
-        ]
-        self._contacts = []
-        for name, title, phone, email, web in contact_data:
-            obj = Contact.objects.create(name=name, title=title, phone=phone, email=email, web_url=web)
-            self._contacts.append(obj)
-
-        # ContactAssignments for manufacturers
-        mfr_contact_map = [
-            ('dell-technologies', 0, 'account-manager'),
-            ('apple-inc', 1, 'support-contact'),
-            ('cisco-systems', 2, 'technical-lead'),
-            ('hp-inc', 3, 'account-manager'),
-            ('lenovo-group', 4, 'account-manager'),
-        ]
-        for mfr_slug, contact_idx, role_slug in mfr_contact_map:
-            ct = ContentType.objects.get_for_model(self._manufacturers[mfr_slug])
-            ContactAssignment.objects.get_or_create(
-                contact=self._contacts[contact_idx],
-                role=self._contact_roles[role_slug],
-                content_type=ct,
-                object_id=self._manufacturers[mfr_slug].pk,
-            )
-
-        self.stdout.write(f'  {len(regions)} regions, {len(site_groups)} site groups, '
-                          f'{len(tenants)} tenants, {len(sites)} sites, {len(locations)} locations, '
-                          f'{len(self._holders)} asset holders, {len(self._contact_roles)} contact roles, '
-                          f'{len(self._contacts)} contacts.')
-
-    # ─────────────────────────────────────────
-    # Phase 2: Asset Infrastructure (AssetTypes, Components, Accessories, Consumables)
-    # ─────────────────────────────────────────
-
-    def _seed_phase2(self):
-        from assets.models import AssetType, Category
-        from inventory.models import Component, Accessory, Consumable
-
-        self.stdout.write('--- Phase 2: Asset Infrastructure ---')
-
-        # --- Categories ---
-        cat_names = [
-            'charger', 'adaptor', 'mouse', 'keyboard', 'webcam', 'headset', 'cable',
-            'display', 'toner', 'ink', 'batteries', 'thermal-paste', 'other',
-            'ram-memory', 'ssd-nvme', 'hdd', 'nic', 'gpu', 'cpu', 'dock',
-            'laptops', 'desktops', 'servers', 'monitors', 'mobile-phones', 'tablets',
-            'printers', 'network-devices', 'storage-devices', 'conference-systems',
-        ]
+        # Categories
         self._categories = {}
-        for cat_slug in cat_names:
+        for slug in ['laptops', 'desktops', 'servers', 'monitors', 'mobile-phones', 'tablets',
+                     'network-devices', 'storage-devices', 'conference-systems',
+                     'charger', 'adaptor', 'mouse', 'keyboard', 'webcam', 'headset', 'cable',
+                     'display', 'dock', 'toner', 'ink', 'batteries', 'thermal-paste', 'other',
+                     'ram-memory', 'ssd-nvme', 'hdd', 'nic', 'gpu', 'cpu']:
             applies = {'asset': True, 'accessory': True, 'consumable': True, 'component': True}
-            obj, _ = Category.objects.get_or_create(
-                slug=cat_slug,
-                defaults={'name': cat_slug.replace('-', ' ').title(), 'applies_to': applies}
-            )
-            self._categories[cat_slug] = obj
+            obj, _ = Category.objects.get_or_create(slug=slug, defaults={
+                'name': slug.replace('-', ' ').title(), 'applies_to': applies})
+            self._categories[slug] = obj
 
-        # --- Asset Types ---
+        # Asset types: (model, slug, mfr, part_number, eol_months, fieldset, depreciation, category, role, specs)
         at_data = [
-            # (model, slug, manufacturer_slug, part_number, cpu, ram_gb, storage_gb, storage_type, gpu, eol_months, custom_fieldset, depreciation, category_slug, role_slug)
-            ('Latitude 5550', 'dell-latitude-5550', 'dell-technologies', 'LAT5550-2025',
-             'Intel Core i7-1365U', 16, 512, 'NVMe', 'Intel Iris Xe', 36, self._laptop_fieldset, self._depreciations['3-Year Straight-Line'], 'laptops', 'standard-workstation'),
-            ('Precision 5680', 'dell-precision-5680', 'dell-technologies', 'PREC5680-WS',
-             'Intel Core i9-13900H', 32, 1024, 'NVMe', 'NVIDIA RTX 2000 Ada', 36, self._laptop_fieldset, self._depreciations['4-Year Straight-Line'], 'laptops', 'developer-workstation'),
-            ('OptiPlex 7010', 'dell-optiplex-7010', 'dell-technologies', 'OPT7010-SFF',
-             'Intel Core i5-13500', 16, 256, 'NVMe', 'Intel UHD 770', 48, None, self._depreciations['4-Year Straight-Line'], 'desktops', 'standard-workstation'),
-            ('MacBook Pro 16"', 'macbook-pro-16-2024', 'apple-inc', 'MBP16-M4',
-             'Apple M4 Pro', 36, 512, 'NVMe', 'Integrated 20-core GPU', 36, self._laptop_fieldset, self._depreciations['3-Year Straight-Line'], 'laptops', 'developer-workstation'),
-            ('MacBook Air 15"', 'macbook-air-15-2024', 'apple-inc', 'MBA15-M3',
-             'Apple M3', 16, 256, 'NVMe', 'Integrated 10-core GPU', 36, self._laptop_fieldset, self._depreciations['3-Year Straight-Line'], 'laptops', 'standard-workstation'),
-            ('Mac Studio', 'mac-studio-2024', 'apple-inc', 'MSTUDIO-M2U',
-             'Apple M2 Ultra', 64, 1024, 'NVMe', 'Integrated 76-core GPU', 48, None, self._depreciations['5-Year Straight-Line'], 'desktops', 'developer-workstation'),
-            ('EliteBook 860 G11', 'hp-elitebook-860-g11', 'hp-inc', '866S7EA',
-             'Intel Core i7-1370P', 32, 1024, 'NVMe', 'Intel Iris Xe', 36, self._laptop_fieldset, self._depreciations['3-Year Straight-Line'], 'laptops', 'standard-workstation'),
-            ('ThinkPad X1 Carbon Gen 12', 'thinkpad-x1-carbon-g12', 'lenovo-group', '21KC004PGE',
-             'Intel Core i7-1365U', 16, 512, 'NVMe', 'Intel Iris Xe', 36, self._laptop_fieldset, self._depreciations['3-Year Straight-Line'], 'laptops', 'developer-workstation'),
-            ('ThinkCentre M90q Gen 5', 'thinkcentre-m90q-gen5', 'lenovo-group', '12JNS00E00',
-             'Intel Core i5-13500T', 16, 256, 'NVMe', 'Intel UHD 770', 48, None, self._depreciations['4-Year Straight-Line'], 'desktops', 'standard-workstation'),
-            ('PowerEdge R760', 'dell-poweredge-r760', 'dell-technologies', 'R760-XEON',
-             '2x Intel Xeon Gold 6430', 256, 8000, 'SSD RAID', None, 60, self._server_fieldset, self._depreciations['5-Year Straight-Line'], 'servers', 'virtualization-host-server'),
-            ('ProLiant DL380 Gen11', 'hpe-proliant-dl380-g11', 'hp-inc', 'P52534-B21',
-             '2x Intel Xeon Silver 4416+', 128, 4000, 'SSD RAID', None, 60, self._server_fieldset, self._depreciations['5-Year Straight-Line'], 'servers', 'application-server'),
-            ('iPhone 15 Pro', 'iphone-15-pro', 'apple-inc', 'A2847',
-             'Apple A17 Pro', 8, 256, 'NVMe', None, 24, self._mobile_fieldset, self._depreciations['3-Year Straight-Line'], 'mobile-phones', 'corporate-smartphone'),
-            ('Galaxy S24 Ultra', 'galaxy-s24-ultra', 'samsung-electronics', 'SM-S928B',
-             'Snapdragon 8 Gen 3', 12, 256, 'UFS 4.0', None, 24, self._mobile_fieldset, self._depreciations['3-Year Straight-Line'], 'mobile-phones', 'corporate-smartphone'),
-            ('iPad Pro 12.9"', 'ipad-pro-129-2024', 'apple-inc', 'A2436',
-             'Apple M4', 8, 256, 'NVMe', None, 36, None, self._depreciations['3-Year Straight-Line'], 'tablets', 'field-tablet'),
-            ('Surface Pro 10', 'surface-pro-10', 'microsoft-corporation', 'SURFPRO10-I7',
-             'Intel Core i7-1365U', 16, 512, 'NVMe', 'Intel Iris Xe', 36, self._laptop_fieldset, self._depreciations['3-Year Straight-Line'], 'tablets', 'field-tablet'),
-            ('Catalyst 9300', 'cisco-catalyst-9300', 'cisco-systems', 'C9300-48P',
-             None, None, None, None, None, 60, self._switch_fieldset, self._depreciations['7-Year Straight-Line'], 'network-devices', 'access-switch'),
-            ('Meraki MR46', 'meraki-mr46', 'cisco-systems', 'MR46-HW',
-             None, None, None, None, None, 60, None, self._depreciations['5-Year Straight-Line'], 'network-devices', 'wireless-ap'),
-            ('UniFi Dream Machine Pro', 'unifi-dream-machine-pro', 'ubiquiti-inc', 'UDM-Pro',
-             None, None, None, None, None, 48, self._switch_fieldset, self._depreciations['5-Year Straight-Line'], 'network-devices', 'core-router-firewall'),
-            ('UniFi Switch Pro 48 PoE', 'unifi-switch-pro-48', 'ubiquiti-inc', 'USW-PRO-48-POE',
-             None, None, None, None, None, 48, self._switch_fieldset, self._depreciations['5-Year Straight-Line'], 'network-devices', 'access-switch'),
-            ('DiskStation DS1823xs+', 'synology-ds1823xs', 'synology-inc', 'DS1823XS+',
-             'AMD Ryzen V1780B', 32, 8000, 'HDD', None, 60, None, self._depreciations['5-Year Straight-Line'], 'storage-devices', 'backup-server'),
-            ('Dell P2723DE 27" Monitor', 'dell-p2723de-monitor', 'dell-technologies', 'P2723DE',
-             '', None, None, '', '', 60, None, self._depreciations['5-Year Straight-Line'], 'monitors', 'desktop-monitor'),
-            ('Dell P2422HE 24" Monitor', 'dell-p2422he-monitor', 'dell-technologies', 'P2422HE',
-             '', None, None, '', '', 60, None, self._depreciations['5-Year Straight-Line'], 'monitors', 'desktop-monitor'),
-            ('Logitech MeetUp AV System', 'logitech-meetup', 'logitech-international', '960-001101',
-             None, None, None, None, None, 36, self._av_fieldset, self._depreciations['5-Year Straight-Line'], 'conference-systems', 'conference-av'),
-            ('Precision 7960 Tower', 'dell-precision-7960-tower', 'dell-technologies', 'PREC7960-TWR',
-             None, None, None, None, None, 48, self._laptop_fieldset, self._depreciations['4-Year Straight-Line'], 'desktops', 'cad-design-workstation'),
+            ('Latitude 5550', 'dell-latitude-5550', 'dell-technologies', 'LAT5550-2025', 36, self._fs_laptop,
+             '3-Year Straight-Line', 'laptops', 'standard-workstation',
+             {'cpu': 'Intel Core i7-1365U', 'ram_gb': 16, 'storage_gb': 512, 'storage_type': 'NVMe', 'cpu_architecture': 'x86_64'}),
+            ('EliteBook 860 G11', 'hp-elitebook-860-g11', 'hp-inc', '866S7EA', 36, self._fs_laptop,
+             '3-Year Straight-Line', 'laptops', 'standard-workstation',
+             {'cpu': 'Intel Core i7-1370P', 'ram_gb': 32, 'storage_gb': 1024, 'storage_type': 'NVMe', 'cpu_architecture': 'x86_64'}),
+            ('ThinkPad X1 Carbon Gen 12', 'thinkpad-x1-carbon-g12', 'lenovo-group', '21KC004PGE', 36, self._fs_laptop,
+             '3-Year Straight-Line', 'laptops', 'developer-workstation',
+             {'cpu': 'Intel Core i7-1365U', 'ram_gb': 32, 'storage_gb': 1024, 'storage_type': 'NVMe', 'cpu_architecture': 'x86_64'}),
+            ('MacBook Pro 16"', 'macbook-pro-16-2024', 'apple-inc', 'MBP16-M4', 36, self._fs_laptop,
+             '3-Year Straight-Line', 'laptops', 'developer-workstation',
+             {'cpu': 'Apple M4 Pro', 'ram_gb': 36, 'storage_gb': 1024, 'storage_type': 'NVMe', 'cpu_architecture': 'ARM64'}),
+            ('MacBook Air 15"', 'macbook-air-15-2024', 'apple-inc', 'MBA15-M3', 36, self._fs_laptop,
+             '3-Year Straight-Line', 'laptops', 'standard-workstation',
+             {'cpu': 'Apple M3', 'ram_gb': 16, 'storage_gb': 512, 'storage_type': 'NVMe', 'cpu_architecture': 'ARM64'}),
+            ('Precision 5680', 'dell-precision-5680', 'dell-technologies', 'PREC5680-WS', 48, self._fs_laptop,
+             '4-Year Straight-Line', 'laptops', 'developer-workstation',
+             {'cpu': 'Intel Core i9-13900H', 'ram_gb': 64, 'storage_gb': 2048, 'storage_type': 'NVMe', 'gpu': 'NVIDIA RTX 3000 Ada', 'cpu_architecture': 'x86_64'}),
+            ('OptiPlex 7010 SFF', 'dell-optiplex-7010', 'dell-technologies', 'OPT7010-SFF', 48, self._fs_laptop,
+             '4-Year Straight-Line', 'desktops', 'standard-workstation',
+             {'cpu': 'Intel Core i5-13500', 'ram_gb': 16, 'storage_gb': 512, 'storage_type': 'NVMe', 'cpu_architecture': 'x86_64'}),
+            ('Mac Studio', 'mac-studio-2024', 'apple-inc', 'MSTUDIO-M2U', 60, self._fs_laptop,
+             '5-Year Straight-Line', 'desktops', 'cad-design-workstation',
+             {'cpu': 'Apple M2 Ultra', 'ram_gb': 64, 'storage_gb': 1024, 'storage_type': 'NVMe', 'cpu_architecture': 'ARM64'}),
+            ('Precision 7960 Tower', 'dell-precision-7960-tower', 'dell-technologies', 'PREC7960-TWR', 60, self._fs_laptop,
+             '5-Year Straight-Line', 'desktops', 'cad-design-workstation',
+             {'cpu': 'Intel Xeon w7-3465X', 'ram_gb': 128, 'storage_gb': 4096, 'storage_type': 'SSD RAID', 'gpu': 'NVIDIA RTX 6000 Ada', 'cpu_architecture': 'x86_64'}),
+            ('PowerEdge R760', 'dell-poweredge-r760', 'dell-technologies', 'R760-XEON', 60, self._fs_server,
+             '5-Year Straight-Line', 'servers', 'virtualization-host-server',
+             {'cpu': '2x Intel Xeon Gold 6430', 'ram_gb': 256, 'storage_gb': 8000, 'storage_type': 'SSD RAID'}),
+            ('ProLiant DL380 Gen11', 'hpe-proliant-dl380-g11', 'hp-inc', 'P52534-B21', 60, self._fs_server,
+             '5-Year Straight-Line', 'servers', 'application-server',
+             {'cpu': '2x Intel Xeon Silver 4416+', 'ram_gb': 128, 'storage_gb': 4000, 'storage_type': 'SSD RAID'}),
+            ('DiskStation DS1823xs+', 'synology-ds1823xs', 'synology-inc', 'DS1823XS+', 60, self._fs_server,
+             '5-Year Straight-Line', 'storage-devices', 'backup-server',
+             {'cpu': 'AMD Ryzen V1780B', 'ram_gb': 32, 'storage_gb': 64000, 'storage_type': 'HDD'}),
+            ('iPhone 15 Pro', 'iphone-15-pro', 'apple-inc', 'A2847', 24, self._fs_mobile,
+             '3-Year Straight-Line', 'mobile-phones', 'corporate-smartphone',
+             {'cpu': 'Apple A17 Pro', 'ram_gb': 8, 'storage_gb': 256, 'screen_size': 6.1}),
+            ('Galaxy S24 Ultra', 'galaxy-s24-ultra', 'samsung-electronics', 'SM-S928B', 24, self._fs_mobile,
+             '3-Year Straight-Line', 'mobile-phones', 'corporate-smartphone',
+             {'cpu': 'Snapdragon 8 Gen 3', 'ram_gb': 12, 'storage_gb': 256, 'screen_size': 6.8}),
+            ('iPad Pro 12.9"', 'ipad-pro-129-2024', 'apple-inc', 'A2436', 36, self._fs_mobile,
+             '3-Year Straight-Line', 'tablets', 'field-tablet',
+             {'cpu': 'Apple M4', 'ram_gb': 8, 'storage_gb': 256, 'screen_size': 12.9}),
+            ('Surface Pro 10', 'surface-pro-10', 'microsoft-corporation', 'SURFPRO10-I7', 36, self._fs_mobile,
+             '3-Year Straight-Line', 'tablets', 'field-tablet',
+             {'cpu': 'Intel Core i7-1365U', 'ram_gb': 16, 'storage_gb': 512, 'screen_size': 13.0}),
+            ('Catalyst 9300', 'cisco-catalyst-9300', 'cisco-systems', 'C9300-48P', 84, self._fs_switch,
+             '7-Year Straight-Line', 'network-devices', 'access-switch', {'port_count': 48, 'poe_budget_w': 740}),
+            ('UniFi Switch Pro 48 PoE', 'unifi-switch-pro-48', 'ubiquiti-inc', 'USW-PRO-48-POE', 60, self._fs_switch,
+             '5-Year Straight-Line', 'network-devices', 'access-switch', {'port_count': 48, 'poe_budget_w': 600}),
+            ('Meraki MR46', 'meraki-mr46', 'cisco-systems', 'MR46-HW', 60, None,
+             '5-Year Straight-Line', 'network-devices', 'wireless-ap', {}),
+            ('UniFi Dream Machine Pro', 'unifi-dream-machine-pro', 'ubiquiti-inc', 'UDM-Pro', 60, self._fs_switch,
+             '5-Year Straight-Line', 'network-devices', 'core-router-firewall', {'port_count': 8, 'poe_budget_w': 0}),
+            ('Dell P2723DE 27" Monitor', 'dell-p2723de-monitor', 'dell-technologies', 'P2723DE', 60, None,
+             '5-Year Straight-Line', 'monitors', 'desktop-monitor', {}),
+            ('Dell P2422HE 24" Monitor', 'dell-p2422he-monitor', 'dell-technologies', 'P2422HE', 60, None,
+             '5-Year Straight-Line', 'monitors', 'desktop-monitor', {}),
+            ('Logitech Rally Bar', 'logitech-rally-bar', 'logitech-international', '960-001308', 60, self._fs_av,
+             '5-Year Straight-Line', 'conference-systems', 'conference-av', {'screen_size': 0}),
         ]
         self._asset_types = {}
-        for data in at_data:
-            model_name, slug, mfr_slug = data[0], data[1], data[2]
-            category_slug = data[12]
-            role_slug = data[13]
-            category_obj = self._categories.get(category_slug)
-            role_obj = self._asset_roles.get(role_slug)
-            
-            # Resolve model-level custom specifications based on fieldset and slug
-            c_values = {}
-            if data[10]: # if custom_fieldset is set
-                fieldset_name = data[10].name
-                # Save standard CPU/RAM/Storage specs if defined in the row
-                if len(data) > 4 and data[4]: c_values['cpu'] = data[4]
-                if len(data) > 5 and data[5]: c_values['ram_gb'] = data[5]
-                if len(data) > 6 and data[6]: c_values['storage_gb'] = data[6]
-                if len(data) > 7 and data[7]: c_values['storage_type'] = data[7]
-                if len(data) > 8 and data[8]: c_values['gpu'] = data[8]
-
-                # Specific specs based on model slug
-                if fieldset_name == 'Laptop Specs':
-                    if 'macbook' in slug:
-                        c_values['cpu_architecture'] = 'ARM64'
-                        c_values['ram_slot_count'] = 0
-                    else:
-                        c_values['cpu_architecture'] = 'x86_64'
-                        if '7960' in slug:
-                            c_values['ram_slot_count'] = 8
-                        else:
-                            c_values['ram_slot_count'] = 2
-                elif fieldset_name == 'Mobile Device Specs':
-                    if 'iphone' in slug:
-                        c_values['screen_size'] = 6.1
-                    elif 'galaxy' in slug:
-                        c_values['screen_size'] = 6.8
-                    elif 'ipad' in slug:
-                        c_values['screen_size'] = 12.9
-                    elif 'surface' in slug:
-                        c_values['screen_size'] = 13.0
-                elif fieldset_name == 'Network Switch Specs':
-                    if 'catalyst' in slug:
-                        c_values['port_count'] = 48
-                        c_values['poe_budget_w'] = 740
-                    elif 'switch-pro-48' in slug:
-                        c_values['port_count'] = 48
-                        c_values['poe_budget_w'] = 600
-                    elif 'dream-machine' in slug:
-                        c_values['port_count'] = 8
-                        c_values['poe_budget_w'] = 0
-                elif fieldset_name == 'AV & Conference Specs':
-                    if 'meetup' in slug:
-                        c_values['screen_resolution'] = '3840x2160 (4K)'
-                        c_values['input_ports'] = 'HDMI, USB-C, DisplayPort'
-
-            obj, _ = AssetType.objects.get_or_create(
-                slug=slug,
-                defaults={
-                    'model': model_name, 'manufacturer': self._manufacturers[mfr_slug],
-                    'part_number': data[3] or '', 'eol_months': data[9],
-                    'custom_fieldset': data[10], 'depreciation': data[11],
-                    'category': category_obj, 'asset_role': role_obj,
-                    'custom_values': c_values,
-                }
-            )
-            # Sync custom_values if existing object had different values
-            if obj.custom_values != c_values:
-                obj.custom_values = c_values
-                obj.save(update_fields=['custom_values'])
+        for model_name, slug, mfr, part, eol, fs, dep, cat, role, specs in at_data:
+            obj, _ = AssetType.objects.get_or_create(slug=slug, defaults={
+                'model': model_name, 'manufacturer': self._manufacturers[mfr], 'part_number': part,
+                'eol_months': eol, 'custom_fieldset': fs, 'depreciation': self._depreciations[dep],
+                'category': self._categories[cat], 'asset_role': self._asset_roles[role],
+                'custom_values': specs})
             self._asset_types[slug] = obj
 
-        # --- Components ---
-        comp_data = [
-            ('Samsung 32GB DDR5-4800', 'samsung-32gb-ddr5', 'samsung-electronics', 'ram-memory', 'M324R4GA3BB0', {'capacity_gb': 32, 'type': 'DDR5', 'speed_mhz': 4800}),
-            ('Crucial 16GB DDR4-3200', 'crucial-16gb-ddr4', 'dell-technologies', 'ram-memory', 'CT16G4SFD832A', {'capacity_gb': 16, 'type': 'DDR4', 'speed_mhz': 3200}),
-            ('Corsair Vengeance 64GB DDR5-5600', 'corsair-64gb-ddr5', 'logitech-international', 'ram-memory', 'CMK64GX5M2B5600C40', {'capacity_gb': 64, 'type': 'DDR5', 'speed_mhz': 5600}),
-            ('Kingston ValueRAM 8GB DDR4-2666', 'kingston-8gb-ddr4', 'samsung-electronics', 'ram-memory', 'KVR26N19S8/8', {'capacity_gb': 8, 'type': 'DDR4', 'speed_mhz': 2666}),
-            ('Samsung 1TB 990 Pro NVMe', 'samsung-1tb-nvme', 'samsung-electronics', 'ssd-nvme', 'MZ-V9P1T0B', {'capacity_gb': 1000, 'type': 'NVMe', 'interface': 'PCIe 4.0'}),
-            ('Samsung 2TB 990 Pro NVMe', 'samsung-2tb-nvme', 'samsung-electronics', 'ssd-nvme', 'MZ-V9P2T0B', {'capacity_gb': 2000, 'type': 'NVMe', 'interface': 'PCIe 4.0'}),
-            ('Kingston NV2 500GB NVMe', 'kingston-500gb-nvme', 'samsung-electronics', 'ssd-nvme', 'SNV2S/500G', {'capacity_gb': 500, 'type': 'NVMe', 'interface': 'PCIe 4.0'}),
-            ('Crucial MX500 4TB SATA SSD', 'crucial-4tb-sata', 'dell-technologies', 'ssd-nvme', 'CT4000MX500SSD1', {'capacity_gb': 4000, 'type': 'SATA', 'interface': 'SATA III'}),
-            ('WD Red Pro 8TB HDD', 'wd-red-8tb', 'dell-technologies', 'hdd', 'WD8003FFBX', {'capacity_gb': 8000, 'type': 'HDD', 'interface': 'SATA'}),
-            ('Seagate IronWolf Pro 12TB HDD', 'seagate-ironwolf-12tb', 'dell-technologies', 'hdd', 'ST12000NE0008', {'capacity_gb': 12000, 'type': 'HDD', 'interface': 'SATA'}),
-            ('Intel X710 10GbE NIC', 'intel-x710-nic', 'dell-technologies', 'nic', 'X710DA2', {'type': 'SFP+', 'speed': '10GbE'}),
-            ('Mellanox ConnectX-6 100GbE NIC', 'mellanox-connectx6', 'cisco-systems', 'nic', 'MCX623106AN-CDAT', {'type': 'QSFP56', 'speed': '100GbE'}),
-            ('NVIDIA A100 80GB', 'nvidia-a100', 'dell-technologies', 'gpu', 'A100-80GB', {'type': 'A100', 'vram_gb': 80}),
-            ('NVIDIA GeForce RTX 4090 24GB', 'nvidia-rtx-4090', 'samsung-electronics', 'gpu', 'RTX4090-24G', {'type': 'RTX 4090', 'vram_gb': 24}),
-            ('NVIDIA RTX 6000 Ada 48GB', 'nvidia-rtx-6000', 'dell-technologies', 'gpu', 'RTX6000-ADA', {'type': 'RTX 6000 Ada', 'vram_gb': 48}),
-            ('Intel Xeon Gold 6430', 'xeon-gold-6430', 'dell-technologies', 'cpu', 'SRMZS', {'type': 'Xeon Gold', 'cores': 32}),
-            ('AMD EPYC 9654 Processor', 'amd-epyc-9654', 'dell-technologies', 'cpu', '100-000000789', {'type': 'EPYC 96-Core', 'cores': 96}),
-            ('Noctua NH-D15 CPU Cooler', 'noctua-nh-d15', 'logitech-international', 'other', 'NH-D15-CH-BK', {'type': 'Air Cooler', 'fan_size': '140mm'}),
-            ('Corsair RM1000x 1000W PSU', 'corsair-rm1000x', 'logitech-international', 'other', 'CP-9020201-EU', {'type': 'Modular PSU', 'wattage': 1000}),
-            ('Dell PERC H755 RAID Controller', 'dell-perc-h755', 'dell-technologies', 'other', 'PERC-H755-FRONT', {'type': 'RAID Controller', 'interface': 'SAS 12Gb/s'}),
-        ]
+        # Components
         self._components = {}
-        for name, slug, mfr_slug, cat_slug, part_number, specs in comp_data:
-            category = self._categories.get(cat_slug)
-            obj, _ = Component.objects.get_or_create(
-                slug=slug,
-                defaults={
-                    'name': name, 'manufacturer': self._manufacturers[mfr_slug],
-                    'category': category, 'part_number': part_number, 'specs': specs,
-                }
-            )
+        for name, slug, mfr, cat, part, specs in [
+            ('Samsung 32GB DDR5-4800', 'samsung-32gb-ddr5', 'samsung-electronics', 'ram-memory', 'M324R4GA3BB0', {'capacity_gb': 32, 'type': 'DDR5'}),
+            ('Crucial 16GB DDR5-5600', 'crucial-16gb-ddr5', 'samsung-electronics', 'ram-memory', 'CT16G56C46S5', {'capacity_gb': 16, 'type': 'DDR5'}),
+            ('Samsung 1TB 990 Pro NVMe', 'samsung-1tb-nvme', 'samsung-electronics', 'ssd-nvme', 'MZ-V9P1T0B', {'capacity_gb': 1000, 'type': 'NVMe'}),
+            ('Samsung 2TB 990 Pro NVMe', 'samsung-2tb-nvme', 'samsung-electronics', 'ssd-nvme', 'MZ-V9P2T0B', {'capacity_gb': 2000, 'type': 'NVMe'}),
+            ('WD Red Pro 8TB HDD', 'wd-red-8tb', 'dell-technologies', 'hdd', 'WD8003FFBX', {'capacity_gb': 8000, 'type': 'HDD'}),
+            ('Seagate IronWolf Pro 12TB', 'seagate-ironwolf-12tb', 'dell-technologies', 'hdd', 'ST12000NE0008', {'capacity_gb': 12000, 'type': 'HDD'}),
+            ('Intel X710 10GbE NIC', 'intel-x710-nic', 'dell-technologies', 'nic', 'X710DA2', {'speed': '10GbE'}),
+            ('NVIDIA RTX 6000 Ada 48GB', 'nvidia-rtx-6000', 'dell-technologies', 'gpu', 'RTX6000-ADA', {'vram_gb': 48}),
+            ('Intel Xeon Gold 6430', 'xeon-gold-6430', 'dell-technologies', 'cpu', 'SRMZS', {'cores': 32}),
+            ('Dell PERC H755 RAID Controller', 'dell-perc-h755', 'dell-technologies', 'other', 'PERC-H755', {'interface': 'SAS 12Gb/s'}),
+        ]:
+            obj, _ = Component.objects.get_or_create(slug=slug, defaults={
+                'name': name, 'manufacturer': self._manufacturers[mfr],
+                'category': self._categories[cat], 'part_number': part, 'specs': specs})
             self._components[slug] = obj
 
-        # --- Accessories ---
-        acc_data = [
-            ('USB-C Charger 65W', 'usb-c-charger-65w', 'dell-technologies', 'charger', '450-AFGM', 5),
-            ('USB-C to HDMI Adapter', 'usb-c-hdmi-adapter', 'dell-technologies', 'adaptor', '470-AEGM', 3),
-            ('Wireless Mouse MX Master 3S', 'mx-master-3s', 'logitech-international', 'mouse', '910-006556', 5),
-            ('Wireless Keyboard MX Keys', 'mx-keys', 'logitech-international', 'keyboard', '920-009413', 3),
-            ('Webcam C920s Pro', 'webcam-c920s', 'logitech-international', 'webcam', '960-001257', 2),
-            ('Headset Zone Wireless 2', 'zone-wireless-2', 'logitech-international', 'headset', '981-000886', 3),
-            ('Thunderbolt 4 Cable 2m', 'thunderbolt-4-cable', 'apple-inc', 'cable', 'MWP02ZM/A', 5),
-            ('Magic Mouse', 'magic-mouse', 'apple-inc', 'mouse', 'MK2E3ZM/A', 2),
-            ('Dell 27" Monitor P2723DE', 'dell-p2723de', 'dell-technologies', 'display', 'DELL-P2723DE', 2),
-            ('Dell 24" Monitor P2422HE', 'dell-p2422he', 'dell-technologies', 'display', 'DELL-P2422HE', 2),
-            ('Ergonomic Laptop Stand', 'ergo-laptop-stand', 'logitech-international', 'other', '939-001790', 5),
+        # Accessories (tenant set later per stock; catalog rows are global definitions)
+        self._accessory_defs = [
+            ('USB-C Charger 65W', 'usb-c-charger-65w', 'dell-technologies', 'charger', '450-AFGM', 10),
+            ('USB-C to HDMI Adapter', 'usb-c-hdmi-adapter', 'dell-technologies', 'adaptor', '470-AEGM', 10),
+            ('Wireless Mouse MX Master 3S', 'mx-master-3s', 'logitech-international', 'mouse', '910-006556', 10),
+            ('Wireless Keyboard MX Keys', 'mx-keys', 'logitech-international', 'keyboard', '920-009413', 10),
+            ('Webcam Brio 500', 'webcam-brio-500', 'logitech-international', 'webcam', '960-001422', 8),
+            ('Headset Zone Wireless 2', 'zone-wireless-2', 'logitech-international', 'headset', '981-000886', 8),
+            ('Thunderbolt 4 Dock', 'tb4-dock', 'dell-technologies', 'dock', 'WD22TB4', 6),
+            ('Dell 27" Monitor P2723DE', 'dell-p2723de', 'dell-technologies', 'display', 'DELL-P2723DE', 6),
         ]
+        self._consumable_defs = [
+            ('HP 26X Laser Toner - Black', 'hp-26x-toner-black', 'hp-inc', 'toner', 'CF226X', 5),
+            ('Brother DR-241CL Drum Unit', 'brother-dr-241cl', 'brother-industries', 'toner', 'DR-241CL', 3),
+            ('Arctic MX-6 Thermal Paste', 'arctic-mx-6', 'dell-technologies', 'thermal-paste', 'MX6-4G', 8),
+            ('AA Batteries Pack 24', 'aa-batteries-24', 'logitech-international', 'batteries', 'AA-24PK', 15),
+        ]
+        # Accessory/Consumable catalogue objects are created per primary tenant
+        # (they are tenant-scoped); store the definitions for the stock phase.
         self._accessories = {}
-        for name, slug, mfr_slug, cat_slug, part_number, min_qty in acc_data:
-            obj, _ = Accessory.objects.get_or_create(
-                slug=slug,
-                defaults={
-                    'name': name, 'manufacturer': self._manufacturers[mfr_slug],
-                    'category': self._categories.get(cat_slug), 'part_number': part_number,
-                    'min_qty': min_qty,
-                    'tenant': self._tenants.get('acme-north-america'),
-                }
-            )
-            self._accessories[slug] = obj
-
-        # --- Consumables ---
-        cons_data = [
-            ('HP 26X Laser Toner - Black', 'hp-26x-toner-black', 'hp-inc', 'toner', 'CF226X', 3),
-            ('HP 26A Laser Toner - Cyan', 'hp-26a-toner-cyan', 'hp-inc', 'toner', 'CF221A', 2),
-            ('Canon Ink Cartridge PGI-280XL', 'canon-pgi-280xl', 'brother-industries', 'ink', 'PGI-280XL', 3),
-            ('Brother DR-241CL Drum Unit', 'brother-dr-241cl', 'brother-industries', 'toner', 'DR-241CL', 2),
-            ('Arctic Silver 5 Thermal Paste', 'arctic-silver-5', 'dell-technologies', 'thermal-paste', 'AS5-3.5G', 5),
-            ('AA Batteries Pack 24', 'aa-batteries-24', 'logitech-international', 'batteries', 'AA-24PK', 10),
-            ('Whiteboard Markers Box 12', 'whiteboard-markers-12', 'logitech-international', 'other', 'WB-MRK-12', 5),
-        ]
         self._consumables = {}
-        for name, slug, mfr_slug, cat_slug, part_number, min_qty in cons_data:
-            obj, _ = Consumable.objects.get_or_create(
-                slug=slug,
-                defaults={
-                    'name': name, 'manufacturer': self._manufacturers[mfr_slug],
-                    'category': self._categories.get(cat_slug), 'part_number': part_number,
-                    'min_qty': min_qty,
-                    'tenant': self._tenants.get('acme-north-america'),
-                }
-            )
-            self._consumables[slug] = obj
 
-        self.stdout.write(f'  {len(self._categories)} categories, {len(self._asset_types)} asset types, '
-                          f'{len(self._components)} components, '                                    
-                          f'{len(self._accessories)} accessories, {len(self._consumables)} consumables.')
-
-    # ─────────────────────────────────────────
-    # Phase 3: Hardware Assets & Components
-    # ─────────────────────────────────────────
-
-    def _seed_phase3(self):
-        from assets.models import (
-            Asset, InstalledSoftware,
-        )
-        from inventory.models import AccessoryAssignment, ConsumableAssignment, AccessoryStock, ConsumableStock, ComponentStock, ComponentAllocation
-        from compliance.models import CustodyReceipt, CustodyTemplate
-
-        self.stdout.write('--- Phase 3: Hardware Assets ---')
-
-        # --- Custody Templates ---
-        self.stdout.write('  Seeding Custody Templates...')
-        self._custody_templates = {}
-        
-        templates_data = [
-            ('Standard Laptop Agreement', 'standard-laptop-agreement', None, None, 
-             'laptops',
-             'By signing this document, you acknowledge receipt of the IT equipment (laptop) and agree to abide by the company\'s acceptable use policy. You agree to return the equipment in good condition upon termination of your employment.',
-             'This equipment remains the property of the company and must be returned on demand.',
-             'QMS-IT-EULA-V1'),
-             
-            ('Mobile Device Agreement', 'mobile-device-agreement', None, None, 
-             'mobile-phones',
-             'By signing this document, you acknowledge receipt of the mobile device and SIM card. You agree to keep the device secured with a passcode/biometrics, and not disable any mobile device management (MDM) profiles.',
-             'This device is intended for business use. Personal use must be kept to a minimum.',
-             'QMS-IT-MOB-V1'),
-
-            ('Workstation & Desktop Agreement', 'workstation-desktop-agreement', None, None, 
-             'desktops',
-             'By signing this document, you acknowledge custody of the specified desktop workstation. You agree to ensure that it is connected only to authorized networks and not to modify its hardware configuration without IT approval.',
-             'Workstation remains the property of the company and is subject to security auditing.',
-             'QMS-IT-DSK-V1'),
-
-            ('Acme NA Specific Laptop EULA', 'acme-na-laptop-agreement', 'acme-north-america', None, 
-             'laptops',
-             'By signing this document, you acknowledge receipt of the IT equipment (laptop) and agree to the Acme North America local security guidelines, including disk encryption requirements.',
-             'This equipment remains the property of Acme North America and must be returned on demand.',
-             'QMS-NA-IT-EULA-V1'),
-        ]
-        
-        for name, slug, tenant_slug, tg_slug, cat_slug, eula, disclaimer, qms_ref in templates_data:
-            tenant_obj = self._tenants.get(tenant_slug) if tenant_slug else None
-            cat_obj = self._categories.get(cat_slug) if cat_slug else None
-            
-            obj, _ = CustodyTemplate.objects.get_or_create(
-                name=name,
-                defaults={
-                    'tenant': tenant_obj,
-                    'category': cat_obj,
-                    'eula_text': eula,
-                    'disclaimer': disclaimer,
-                    'qms_reference': qms_ref,
-                    'is_active': True,
-                    'require_acceptance': True,
-                    'email_signature_request': True,
-                    'signature_provider': 'local',
-                }
-            )
-            self._custody_templates[slug] = obj
-
-        # Create 60+ assets across all types
-        asset_data = [
-            # (name, asset_tag, asset_type_slug, asset_role_slug, status_slug, holder_upn, location_slug, serial, purchase_cost, salvage_value, purchase_date)
-            ('MBP16 Alex Admin', 'ABX-001', 'macbook-pro-16-2024', 'executive-workstation', 'in-use', 'alex.admin', 'berlin-floor-1-eng', 'C02ZV1R9MD6T', 3599.00, 500.00, datetime.date(2024, 3, 15)),
-            ('MBP16 Sarah Chen', 'ABX-002', 'macbook-pro-16-2024', 'developer-workstation', 'in-use', 'sarah.chen', 'berlin-floor-1-eng', 'C02ZV2T8MD7U', 3599.00, 500.00, datetime.date(2024, 4, 10)),
-            ('Latitude 5550 Marcus', 'ABX-003', 'dell-latitude-5550', 'standard-workstation', 'in-use', 'marcus.johnson', 'ny-floor-5-eng', 'DL5550-001', 1899.00, 300.00, datetime.date(2024, 6, 1)),
-            ('Latitude 5550 Elena', 'ABX-004', 'dell-latitude-5550', 'standard-workstation', 'in-use', 'elena.rodriguez', 'munich-office-12a', 'DL5550-002', 1899.00, 300.00, datetime.date(2024, 7, 20)),
-            ('ThinkPad X1 Thomas', 'ABX-005', 'thinkpad-x1-carbon-g12', 'developer-workstation', 'in-use', 'thomas.weber', 'berlin-floor-1-eng', 'TPX1-001', 2199.00, 350.00, datetime.date(2024, 5, 12)),
-            ('ThinkPad X1 Anna', 'ABX-006', 'thinkpad-x1-carbon-g12', 'standard-workstation', 'in-use', 'anna.schmidt', 'berlin-floor-2-admin', 'TPX1-002', 2199.00, 350.00, datetime.date(2024, 5, 12)),
-            ('MBA15 James Wilson', 'ABX-007', 'macbook-air-15-2024', 'standard-workstation', 'in-use', 'james.wilson', 'ny-floor-5-eng', 'C02XK3P9N6QW', 1499.00, 200.00, datetime.date(2024, 8, 5)),
-            ('EliteBook Yuki', 'ABX-008', 'hp-elitebook-860-g11', 'standard-workstation', 'in-use', 'yuki.tanaka', 'berlin-floor-2-admin', 'HPEB-001', 2099.00, 300.00, datetime.date(2024, 4, 22)),
-            ('MBP16 Omar Hassan', 'ABX-009', 'macbook-pro-16-2024', 'developer-workstation', 'in-use', 'omar.hassan', 'munich-office-12a', 'C02ZV5R0PD8VX', 3599.00, 500.00, datetime.date(2024, 9, 1)),
-            ('M2 Ultra Dev Server', 'ABX-010', 'mac-studio-2024', 'build-ci-agent', 'in-use', None, 'berlin-server-room-a', 'C07XM8S2DT6P', 6999.00, 1000.00, datetime.date(2024, 2, 10)),
-            ('EliteBook Lisa', 'ABX-011', 'hp-elitebook-860-g11', 'standard-workstation', 'in-use', 'lisa.andersson', 'berlin-floor-1-eng', 'HPEB-002', 2099.00, 300.00, datetime.date(2024, 11, 8)),
-            ('Latitude 5550 Carlos', 'ABX-012', 'dell-latitude-5550', 'standard-workstation', 'in-use', 'carlos.mendez', 'ny-floor-6-sales', 'DL5550-003', 1899.00, 300.00, datetime.date(2024, 10, 15)),
-            ('ThinkPad X1 Priya', 'ABX-013', 'thinkpad-x1-carbon-g12', 'developer-workstation', 'in-use', 'priya.patel', 'berlin-floor-1-eng', 'TPX1-003', 2199.00, 350.00, datetime.date(2024, 6, 18)),
-            ('Precision 5680 WS-1', 'ABX-014', 'dell-precision-5680', 'cad-design-workstation', 'in-use', None, 'berlin-floor-1-eng', 'PREC-001', 4299.00, 600.00, datetime.date(2024, 1, 25)),
-            ('Precision 5680 WS-2', 'ABX-015', 'dell-precision-5680', 'cad-design-workstation', 'available', None, 'berlin-floor-1-eng', 'PREC-002', 4299.00, 600.00, datetime.date(2024, 1, 25)),
-            ('Mac Studio Design', 'ABX-016', 'mac-studio-2024', 'cad-design-workstation', 'in-use', None, 'berlin-floor-1-eng', 'C07XM9G4DT8Q', 6999.00, 1000.00, datetime.date(2024, 3, 1)),
-            ('OptiPlex 7010 Finance-1', 'ABX-017', 'dell-optiplex-7010', 'standard-workstation', 'in-use', None, 'berlin-floor-2-admin', 'OPT-001', 1299.00, 200.00, datetime.date(2024, 4, 5)),
-            ('OptiPlex 7010 Finance-2', 'ABX-018', 'dell-optiplex-7010', 'standard-workstation', 'in-use', None, 'berlin-floor-2-admin', 'OPT-002', 1299.00, 200.00, datetime.date(2024, 4, 5)),
-            ('OptiPlex 7010 HR-1', 'ABX-019', 'dell-optiplex-7010', 'standard-workstation', 'in-use', None, 'berlin-floor-2-admin', 'OPT-003', 1299.00, 200.00, datetime.date(2024, 4, 12)),
-            ('OptiPlex 7010 Exec-1', 'ABX-020', 'dell-optiplex-7010', 'standard-workstation', 'in-use', None, 'berlin-floor-3-exec', 'OPT-004', 1299.00, 200.00, datetime.date(2024, 2, 28)),
-            ('ThinkCentre M90q Backup', 'ABX-021', 'thinkcentre-m90q-gen5', 'standard-workstation', 'available', None, 'berlin-server-room-a', 'TCM-001', 899.00, 100.00, datetime.date(2024, 8, 15)),
-            ('PowerEdge R760 Prod-1', 'ABX-022', 'dell-poweredge-r760', 'virtualization-host-server', 'in-use', None, 'ams-rack-row-1', 'SRV-PROD-01', 18500.00, 2000.00, datetime.date(2024, 1, 10)),
-            ('PowerEdge R760 Prod-2', 'ABX-023', 'dell-poweredge-r760', 'database-server', 'in-use', None, 'ams-rack-row-1', 'SRV-PROD-02', 18500.00, 2000.00, datetime.date(2024, 1, 10)),
-            ('ProLiant DL380 Dev-1', 'ABX-024', 'hpe-proliant-dl380-g11', 'application-server', 'in-use', None, 'ams-rack-row-2', 'SRV-DEV-01', 12500.00, 1500.00, datetime.date(2024, 3, 20)),
-            ('PowerEdge R760 Backup', 'ABX-025', 'dell-poweredge-r760', 'backup-server', 'available', None, 'ams-rack-row-2', 'SRV-BACKUP-01', 18500.00, 2000.00, datetime.date(2024, 6, 1)),
-            ('iPhone 15 Pro Alex', 'ABX-026', 'iphone-15-pro', 'corporate-smartphone', 'in-use', 'alex.admin', 'berlin-floor-1-eng', 'IP15P-001', 1299.00, 150.00, datetime.date(2024, 9, 22)),
-            ('iPhone 15 Pro Sarah', 'ABX-027', 'iphone-15-pro', 'corporate-smartphone', 'in-use', 'sarah.chen', 'berlin-floor-1-eng', 'IP15P-002', 1299.00, 150.00, datetime.date(2024, 9, 22)),
-            ('iPhone 15 Pro Marcus', 'ABX-028', 'iphone-15-pro', 'corporate-smartphone', 'in-use', 'marcus.johnson', 'ny-floor-5-eng', 'IP15P-003', 1299.00, 150.00, datetime.date(2024, 9, 25)),
-            ('Galaxy S24 Elena', 'ABX-029', 'galaxy-s24-ultra', 'corporate-smartphone', 'in-use', 'elena.rodriguez', 'munich-office-12a', 'S24U-001', 1249.00, 150.00, datetime.date(2024, 10, 5)),
-            ('iPad Pro James', 'ABX-030', 'ipad-pro-129-2024', 'field-tablet', 'in-use', 'james.wilson', 'ny-floor-5-eng', 'IPP-001', 1099.00, 100.00, datetime.date(2024, 7, 15)),
-            ('Surface Pro Thomas', 'ABX-031', 'surface-pro-10', 'field-tablet', 'in-use', 'thomas.weber', 'berlin-floor-3-exec', 'SP10-001', 1799.00, 200.00, datetime.date(2024, 8, 20)),
-            ('Catalyst 9300 Core-1', 'ABX-032', 'cisco-catalyst-9300', 'access-switch', 'in-use', None, 'ams-rack-row-3', 'C9300-CORE-01', 8500.00, 500.00, datetime.date(2024, 2, 1)),
-            ('Catalyst 9300 Core-2', 'ABX-033', 'cisco-catalyst-9300', 'access-switch', 'available', None, 'berlin-server-room-a', 'C9300-CORE-02', 8500.00, 500.00, datetime.date(2024, 2, 1)),
-            ('Meraki MR46 AP-1', 'ABX-034', 'meraki-mr46', 'wireless-ap', 'in-use', None, 'berlin-floor-1-eng', 'MR46-AP-01', 1200.00, 100.00, datetime.date(2024, 3, 5)),
-            ('Meraki MR46 AP-2', 'ABX-035', 'meraki-mr46', 'wireless-ap', 'in-use', None, 'berlin-floor-2-admin', 'MR46-AP-02', 1200.00, 100.00, datetime.date(2024, 3, 5)),
-            ('UDM Pro Gateway', 'ABX-036', 'unifi-dream-machine-pro', 'core-router-firewall', 'in-use', None, 'berlin-server-room-a', 'UDM-PRO-01', 379.00, 50.00, datetime.date(2024, 1, 15)),
-            ('Synology NAS Primary', 'ABX-037', 'synology-ds1823xs', 'backup-server', 'in-use', None, 'ams-rack-row-2', 'NAS-PRIMARY-01', 4200.00, 400.00, datetime.date(2024, 5, 10)),
-            ('Dell P2723DE Monitor-1', 'ABX-038', 'dell-p2723de-monitor', 'desktop-monitor', 'in-use', 'alex.admin', 'berlin-floor-1-eng', 'MON-DELL-01', 499.00, 50.00, datetime.date(2024, 3, 15)),
-            ('Dell P2723DE Monitor-2', 'ABX-039', 'dell-p2723de-monitor', 'desktop-monitor', 'in-use', 'sarah.chen', 'berlin-floor-1-eng', 'MON-DELL-02', 499.00, 50.00, datetime.date(2024, 4, 10)),
-            ('Latitude 5550 Spare-1', 'ABX-040', 'dell-latitude-5550', 'standard-workstation', 'available', None, 'berlin-floor-1-eng', 'DL5550-SP01', 1899.00, 300.00, datetime.date(2024, 10, 1)),
-            ('Latitude 5550 Spare-2', 'ABX-041', 'dell-latitude-5550', 'standard-workstation', 'available', None, 'ny-floor-5-eng', 'DL5550-SP02', 1899.00, 300.00, datetime.date(2024, 10, 1)),
-            ('MBP16 Repair-1', 'ABX-042', 'macbook-pro-16-2024', 'developer-workstation', 'pending-repair', None, 'berlin-floor-1-eng', 'C02ZV0R5LD1UY', 3599.00, 500.00, datetime.date(2024, 2, 20)),
-            ('ThinkPad X1 Retired-1', 'ABX-043', 'thinkpad-x1-carbon-g12', 'developer-workstation', 'retired', None, 'berlin-server-room-a', 'TPX1-RET-01', 1899.00, 100.00, datetime.date(2021, 3, 15)),
-            ('iPhone 15 Pro Spare', 'ABX-044', 'iphone-15-pro', 'corporate-smartphone', 'available', None, 'berlin-floor-3-exec', 'IP15P-SP01', 1299.00, 150.00, datetime.date(2024, 11, 1)),
-            ('iPad Pro Spare', 'ABX-045', 'ipad-pro-129-2024', 'field-tablet', 'available', None, 'ny-floor-6-sales', 'IPP-SP01', 1099.00, 100.00, datetime.date(2024, 11, 1)),
-            ('OptiPlex 7010 Reception', 'ABX-046', 'dell-optiplex-7010', 'kiosk-reception-terminal', 'in-use', None, 'berlin-floor-3-exec', 'OPT-REC-01', 1299.00, 200.00, datetime.date(2024, 5, 20)),
-            # New internal networking, AV & high-end desktop workstation assets
-            ('UniFi Switch 48 Berlin HQ', 'ABX-050', 'unifi-switch-pro-48', 'access-switch', 'in-use', None, 'berlin-server-room-a', 'USW-PRO-48-001', 1099.00, 100.00, datetime.date(2024, 4, 1)),
-            ('UniFi Switch 48 AMS DC', 'ABX-051', 'unifi-switch-pro-48', 'access-switch', 'in-use', None, 'ams-rack-row-3', 'USW-PRO-48-002', 1099.00, 100.00, datetime.date(2024, 4, 5)),
-            ('Berlin Room 12 AV', 'ABX-052', 'logitech-meetup', 'conference-av', 'in-use', None, 'berlin-floor-1-eng', 'LOG-AV-001', 899.00, 50.00, datetime.date(2024, 6, 12)),
-            ('Munich Room A AV', 'ABX-053', 'logitech-meetup', 'conference-av', 'in-use', None, 'munich-office-12a', 'LOG-AV-002', 899.00, 50.00, datetime.date(2024, 6, 15)),
-            ('Precision 7960 Oliver', 'ABX-054', 'dell-precision-7960-tower', 'developer-workstation', 'in-use', 'oliver.smith', 'berlin-floor-1-eng', 'PREC7960-001', 5499.00, 800.00, datetime.date(2024, 5, 1)),
-            ('Precision 7960 Sophia', 'ABX-055', 'dell-precision-7960-tower', 'developer-workstation', 'in-use', 'sophia.martinez', 'berlin-floor-1-eng', 'PREC7960-002', 5499.00, 800.00, datetime.date(2024, 5, 1)),
-            # Customer Tenant Assets
-            ('Latitude 5550 Klaus', 'FIN-001', 'dell-latitude-5550', 'standard-workstation', 'in-use', 'klaus.fischer', 'globex-floor-2-trading', 'DL5550-FIN01', 1899.00, 300.00, datetime.date(2024, 3, 1)),
-            ('Latitude 5550 Nina', 'FIN-002', 'dell-latitude-5550', 'standard-workstation', 'in-use', 'nina.bergmann', 'globex-floor-3-risk', 'DL5550-FIN02', 1899.00, 300.00, datetime.date(2024, 3, 15)),
-            ('EliteBook 860 Dr. Wagner', 'MED-001', 'hp-elitebook-860-g11', 'standard-workstation', 'in-use', 'markus.wagner', 'medicare-ward-admin', 'HPEB-MED01', 2099.00, 300.00, datetime.date(2024, 4, 1)),
-            ('EliteBook 860 Sophie', 'MED-002', 'hp-elitebook-860-g11', 'standard-workstation', 'in-use', 'sophie.klein', 'medicare-lab-research', 'HPEB-MED02', 2099.00, 300.00, datetime.date(2024, 4, 15)),
-            ('MB Air 15 Felix', 'TSI-001', 'macbook-air-15-2024', 'developer-workstation', 'in-use', 'felix.bauer', 'techstartup-open-space', 'MBA-TSI01', 1499.00, 200.00, datetime.date(2024, 5, 1)),
-            ('MB Air 15 Lena', 'TSI-002', 'macbook-air-15-2024', 'developer-workstation', 'in-use', 'lena.schulz', 'techstartup-eng-lab', 'MBA-TSI02', 1499.00, 200.00, datetime.date(2024, 5, 10)),
-            ('ThinkPad X1 Jonas', 'GRE-001', 'thinkpad-x1-carbon-g12', 'developer-workstation', 'in-use', 'jonas.hoffmann', 'greenenergy-wind-analytics', 'TPX1-GRE01', 2199.00, 350.00, datetime.date(2024, 6, 1)),
-            ('ThinkPad X1 Katja', 'GRE-002', 'thinkpad-x1-carbon-g12', 'developer-workstation', 'in-use', 'katja.vogel', 'greenenergy-solar-ops', 'TPX1-GRE02', 2199.00, 350.00, datetime.date(2024, 6, 1)),
-            ('OptiPlex 7010 Globex-1', 'FIN-003', 'dell-optiplex-7010', 'standard-workstation', 'in-use', None, 'globex-floor-2-trading', 'OPT-FIN01', 1299.00, 200.00, datetime.date(2024, 2, 15)),
-            ('OptiPlex 7010 Globex-2', 'FIN-004', 'dell-optiplex-7010', 'standard-workstation', 'in-use', None, 'globex-floor-3-risk', 'OPT-FIN02', 1299.00, 200.00, datetime.date(2024, 2, 15)),
-            ('Mac Studio TechStartup', 'TSI-003', 'mac-studio-2024', 'developer-workstation', 'in-use', None, 'techstartup-eng-lab', 'MST-TSI01', 6999.00, 1000.00, datetime.date(2024, 6, 15)),
-            ('iPhone 15 Pro Klaus', 'FIN-005', 'iphone-15-pro', 'corporate-smartphone', 'in-use', 'klaus.fischer', 'globex-floor-2-trading', 'IP15P-FIN01', 1299.00, 150.00, datetime.date(2024, 10, 1)),
-            ('iPad Pro Medicare', 'MED-003', 'ipad-pro-129-2024', 'field-tablet', 'in-use', 'markus.wagner', 'medicare-ward-admin', 'IPP-MED01', 1099.00, 100.00, datetime.date(2024, 8, 1)),
-            ('Surface Pro GreenEnergy', 'GRE-003', 'surface-pro-10', 'field-tablet', 'in-use', 'jonas.hoffmann', 'greenenergy-wind-analytics', 'SP10-GRE01', 1799.00, 200.00, datetime.date(2024, 7, 15)),
-            ('Dell P2422HE Globex 1', 'FIN-006', 'dell-p2422he-monitor', 'desktop-monitor', 'in-use', 'klaus.fischer', 'globex-floor-2-trading', 'MON-FIN01', 379.00, 30.00, datetime.date(2024, 3, 1)),
-            ('Dell P2422HE Globex 2', 'FIN-007', 'dell-p2422he-monitor', 'desktop-monitor', 'in-use', 'nina.bergmann', 'globex-floor-3-risk', 'MON-FIN02', 379.00, 30.00, datetime.date(2024, 3, 15)),
-            ('Latitude 5550 GreenEnergy Spare', 'GRE-004', 'dell-latitude-5550', 'standard-workstation', 'available', None, 'greenenergy-wind-analytics', 'DL5550-GRE01', 1899.00, 300.00, datetime.date(2024, 8, 1)),
-            ('EliteBook 860 Globex Spare', 'FIN-008', 'hp-elitebook-860-g11', 'standard-workstation', 'available', None, 'globex-floor-2-trading', 'HPEB-FIN01', 2099.00, 300.00, datetime.date(2024, 7, 1)),
-            # New Customer Tenant Assets (Apex Logistics and Quantum Robotics)
-            ('Latitude 5550 Noah', 'APX-001', 'dell-latitude-5550', 'standard-workstation', 'in-use', 'noah.schmidt', 'frankfurt-depot-shelf-b', 'DL5550-APX01', 1899.00, 300.00, datetime.date(2024, 5, 1)),
-            ('Latitude 5550 Mia', 'APX-002', 'dell-latitude-5550', 'standard-workstation', 'in-use', 'mia.petrov', 'frankfurt-depot-shelf-b', 'DL5550-APX02', 1899.00, 300.00, datetime.date(2024, 5, 10)),
-            ('ThinkPad X1 David', 'QNT-001', 'thinkpad-x1-carbon-g12', 'developer-workstation', 'in-use', 'david.kim', 'boston-assembly-floor', 'TPX1-QNT01', 2199.00, 350.00, datetime.date(2024, 6, 1)),
-            ('ThinkPad X1 Wei', 'QNT-002', 'thinkpad-x1-carbon-g12', 'developer-workstation', 'in-use', 'wei.zhang', 'boston-assembly-floor', 'TPX1-QNT02', 2199.00, 350.00, datetime.date(2024, 6, 1)),
-            ('Precision 7960 Alex', 'QNT-003', 'dell-precision-7960-tower', 'cad-design-workstation', 'in-use', 'alexander.gruber', 'boston-assembly-floor', 'PREC7960-QNT01', 5499.00, 800.00, datetime.date(2024, 6, 10)),
-        ]
-
-        # Dynamically generate 800 additional assets spread across companies
-        at_slugs = list(self._asset_types.keys())
-        loc_slugs = list(self._locations.keys())
-        
-        for i in range(1, 801):
-            tag = f'GEN-{i:04d}'
-            at_slug = random.choice(at_slugs)
-            at_obj = self._asset_types[at_slug]
-            role_slug = at_obj.asset_role.slug if at_obj.asset_role else 'standard-workstation'
-            status_slug = random.choice(['in-use', 'in-use', 'in-use', 'available', 'available', 'pending-repair', 'retired'])
-            
-            location_slug = random.choice(loc_slugs)
-            loc_obj = self._locations[location_slug]
-            tenant_obj = loc_obj.tenant
-            
-            tenant_holders = [upn for upn, h in self._holders.items() if h.tenant == tenant_obj]
-            
-            holder_upn = None
-            if status_slug == 'in-use' and tenant_holders and random.choice([True, False]):
-                holder_upn = random.choice(tenant_holders)
-            
-            purchase_cost = round(random.uniform(300.0, 5000.0), 2)
-            salvage_value = round(purchase_cost * 0.1, 2)
-            p_date = datetime.date(random.choice([2021, 2022, 2023, 2024]), random.randint(1, 12), random.randint(1, 28))
-            
-            name = f'{self._asset_types[at_slug].model} {tag}'
-            serial = f'SN-{random.randint(10000000, 99999999)}'
-            
-            asset_data.append((name, tag, at_slug, role_slug, status_slug, holder_upn, location_slug, serial, purchase_cost, salvage_value, p_date))
-
-        self._assets = {}
-        for data in asset_data:
-            name, tag, at_slug, role_slug, status_slug = data[0], data[1], data[2], data[3], data[4]
-            holder = self._holders.get(data[5] or '') if data[5] else None
-            location = self._locations.get(data[6] or '') if data[6] else None
-
-            # If checked out to a holder, physical location is None in Asset table
-            base_location = None if (holder and status_slug == 'in-use') else location
-
-            # Construct dynamic custom values based on custom fieldsets (only instance-level details)
-            c_values = {}
-            asset_type = self._asset_types.get(at_slug)
-            if asset_type and asset_type.custom_fieldset:
-                fs_name = asset_type.custom_fieldset.name
-                if fs_name == 'Laptop Specs':
-                    c_values = {
-                        'hostname': f"{role_slug}-{tag.lower()}",
-                        'os_version': random.choice(['Windows 11 23H2', 'macOS Sequoia 15.1', 'Ubuntu 24.04 LTS']),
-                        'encrypted': True,
-                        'department': random.choice(['Engineering', 'Finance', 'HR', 'Marketing', 'Sales', 'Operations']),
-                    }
-                elif fs_name == 'Mobile Device Specs':
-                    c_values = {
-                        'sim_number': f"+49-170-{random.randint(1000000, 9999999)}",
-                        'imei': f"35{random.randint(100000000000, 999999999999)}",
-                        'os_version': random.choice(['iOS 17.5', 'Android 14']),
-                    }
-                elif fs_name == 'Server Specs':
-                    c_values = {
-                        'hostname': f"srv-{tag.lower()}.local",
-                        'os_version': random.choice(['RHEL 9.3', 'Ubuntu Server 22.04', 'Windows Server 2025']),
-                        'department': 'Operations',
-                        'floor': random.randint(1, 3),
-                    }
-                elif fs_name == 'Network Switch Specs':
-                    c_values = {
-                        'hostname': f"sw-{tag.lower()}.local",
-                        'ip_address': f"10.100.{random.randint(1, 254)}.{random.randint(1, 254)}",
-                        'firmware_version': 'v16.12.8',
-                    }
-                elif fs_name == 'AV & Conference Specs':
-                    c_values = {
-                        'mounted_state': random.choice(['Wall-Mounted', 'Ceiling-Mounted', 'Table-Top']),
-                    }
-
-            obj, created = Asset.objects.get_or_create(
-                asset_tag=tag,
-                defaults={
-                    'name': name, 'asset_type': asset_type,
-                    'asset_role': self._asset_roles.get(role_slug),
-                    'status': self._status_labels.get(status_slug),
-                    'location': base_location,
-                    'tenant': location.tenant if location and location.tenant else None,
-                    'serial_number': data[7], 'purchase_cost': data[8],
-                    'salvage_value': data[9], 'purchase_date': data[10],
-                    'supplier': self._suppliers.get('itz-solutions'),
-                    'order_number': f'PO-2024-{random.randint(1000, 9999)}',
-                    'custom_values': c_values,
-                }
-            )
-            # Sync custom_values if existing object had different values
-            if not created and obj.custom_values != c_values:
-                obj.custom_values = c_values
-                obj.save(update_fields=['custom_values'])
-            self._assets[tag] = obj
-
-            # Create proper checkout log entries for new or unassigned assets
-            if created or not obj.assignments.exists():
-                from assets.models import AssetAssignment
-                from organization.models import AssetHolder, Location
-                
-                # Case A: Checked out to a Holder
-                if holder and status_slug == 'in-use':
-                    AssetAssignment.objects.get_or_create(
-                        asset=obj,
-                        assigned_user=holder,
-                        defaults={
-                            'checked_out_by': self._users[0],
-                            'is_active': True,
-                            'notes': 'Initial seed checkout to holder',
-                        }
-                    )
-
-                
-                # Case B: Checked out to a Location
-                elif not holder and status_slug == 'in-use' and location:
-                    AssetAssignment.objects.get_or_create(
-                        asset=obj,
-                        assigned_location=location,
-                        defaults={
-                            'checked_out_by': self._users[0],
-                            'is_active': True,
-                            'notes': 'Initial seed checkout to location',
-                        }
-                    )
-
-        # --- ComponentStock (NEW) ---
-        stock_data = [
-            ('samsung-32gb-ddr5', 'berlin-server-room-a', 50),
-            ('samsung-32gb-ddr5', 'ams-rack-row-1', 40),
-            ('crucial-16gb-ddr4', 'berlin-floor-1-eng', 30),
-            ('crucial-16gb-ddr4', 'ny-floor-5-eng', 25),
-            ('corsair-64gb-ddr5', 'berlin-floor-1-eng', 15),
-            ('kingston-8gb-ddr4', 'munich-staging-area', 30),
-            ('samsung-1tb-nvme', 'berlin-server-room-a', 40),
-            ('samsung-2tb-nvme', 'ams-rack-row-2', 30),
-            ('kingston-500gb-nvme', 'berlin-floor-2-admin', 20),
-            ('crucial-4tb-sata', 'ams-rack-row-2', 15),
-            ('wd-red-8tb', 'ams-rack-row-2', 50),
-            ('seagate-ironwolf-12tb', 'berlin-server-room-a', 30),
-            ('intel-x710-nic', 'berlin-server-room-a', 15),
-            ('intel-x710-nic', 'ams-rack-row-3', 20),
-            ('mellanox-connectx6', 'ams-rack-row-3', 10),
-            ('nvidia-a100', 'ams-rack-row-1', 5),
-            ('nvidia-rtx-4090', 'berlin-floor-1-eng', 8),
-            ('nvidia-rtx-6000', 'berlin-floor-1-eng', 4),
-            ('xeon-gold-6430', 'berlin-server-room-a', 10),
-            ('amd-epyc-9654', 'ams-rack-row-1', 6),
-            ('noctua-nh-d15', 'berlin-floor-1-eng', 25),
-            ('corsair-rm1000x', 'berlin-floor-1-eng', 20),
-            ('dell-perc-h755', 'berlin-server-room-a', 10),
-            # Customer stock locations
-            ('samsung-32gb-ddr5', 'frankfurt-depot-shelf-b', 15),
-            ('samsung-1tb-nvme', 'frankfurt-depot-shelf-b', 20),
-            ('crucial-16gb-ddr4', 'frankfurt-hub-floor-1', 10),
-            ('nvidia-rtx-4090', 'boston-assembly-floor', 5),
-            ('amd-epyc-9654', 'lab-a-testing-bench', 4),
-        ]
-        self._stocks = []
-        for comp_slug, loc_slug, qty in stock_data:
-            comp_obj = self._components.get(comp_slug)
-            loc_obj = self._locations.get(loc_slug)
-            if comp_obj and loc_obj:
-                stock_obj, _ = ComponentStock.objects.get_or_create(
-                    component=comp_obj,
-                    location=loc_obj,
-                    defaults={'qty': qty}
-                )
-                self._stocks.append(stock_obj)
-
-        # --- AccessoryStock (NEW) ---
-        acc_stock_data = [
-            ('mx-master-3s', 'berlin-floor-1-eng', 20),
-            ('mx-master-3s', 'ny-floor-5-eng', 15),
-            ('mx-keys', 'berlin-floor-1-eng', 15),
-            ('mx-keys', 'ny-floor-5-eng', 10),
-            ('usb-c-hdmi-adapter', 'berlin-floor-1-eng', 30),
-            ('usb-c-charger-65w', 'berlin-floor-1-eng', 25),
-            ('zone-wireless-2', 'berlin-floor-1-eng', 10),
-            ('dell-p2723de', 'berlin-floor-1-eng', 12),
-            ('dell-p2422he', 'berlin-floor-2-admin', 8),
-            # Customer stocks
-            ('mx-master-3s', 'frankfurt-depot-shelf-b', 10),
-            ('usb-c-hdmi-adapter', 'frankfurt-depot-shelf-b', 15),
-        ]
-        self._acc_stocks = []
-        for acc_slug, loc_slug, qty in acc_stock_data:
-            acc_obj = self._accessories.get(acc_slug)
-            loc_obj = self._locations.get(loc_slug)
-            if acc_obj and loc_obj:
-                stock_obj, _ = AccessoryStock.objects.get_or_create(
-                    accessory=acc_obj,
-                    location=loc_obj,
-                    defaults={'qty': qty}
-                )
-                self._acc_stocks.append(stock_obj)
-
-        # --- ConsumableStock (NEW) ---
-        cons_stock_data = [
-            ('hp-26x-toner-black', 'berlin-floor-2-admin', 15),
-            ('hp-26a-toner-cyan', 'berlin-floor-2-admin', 10),
-            ('canon-pgi-280xl', 'berlin-floor-2-admin', 20),
-            ('brother-dr-241cl', 'berlin-floor-2-admin', 5),
-            ('arctic-silver-5', 'berlin-floor-1-eng', 30),
-            ('aa-batteries-24', 'berlin-floor-1-eng', 50),
-            ('whiteboard-markers-12', 'berlin-floor-2-admin', 15),
-            # Customer stocks
-            ('hp-26x-toner-black', 'frankfurt-depot-shelf-b', 5),
-            ('arctic-silver-5', 'frankfurt-depot-shelf-b', 10),
-        ]
-        self._cons_stocks = []
-        for cons_slug, loc_slug, qty in cons_stock_data:
-            cons_obj = self._consumables.get(cons_slug)
-            loc_obj = self._locations.get(loc_slug)
-            if cons_obj and loc_obj:
-                stock_obj, _ = ConsumableStock.objects.get_or_create(
-                    consumable=cons_obj,
-                    location=loc_obj,
-                    defaults={'qty': qty}
-                )
-                self._cons_stocks.append(stock_obj)
-
-        # --- ComponentAllocations ---
-        alloc_data = [
-            ('samsung-32gb-ddr5', 'ABX-022', 2),
-            ('samsung-32gb-ddr5', 'ABX-023', 2),
-            ('samsung-1tb-nvme', 'ABX-022', 1),
-            ('samsung-2tb-nvme', 'ABX-023', 2),
-            ('wd-red-8tb', 'ABX-022', 2),
-            ('wd-red-8tb', 'ABX-023', 2),
-            ('wd-red-8tb', 'ABX-025', 4),
-            ('intel-x710-nic', 'ABX-022', 1),
-            ('intel-x710-nic', 'ABX-023', 1),
-            ('nvidia-a100', 'ABX-024', 1),
-            ('xeon-gold-6430', 'ABX-024', 1),
-            ('crucial-16gb-ddr4', 'ABX-003', 1),
-            ('crucial-16gb-ddr4', 'ABX-004', 1),
-            ('samsung-1tb-nvme', 'ABX-001', 1),
-            ('samsung-1tb-nvme', 'ABX-002', 1),
-            # New allocations
-            ('corsair-64gb-ddr5', 'ABX-014', 1),
-            ('corsair-64gb-ddr5', 'ABX-015', 1),
-            ('nvidia-rtx-4090', 'ABX-014', 1),
-            ('nvidia-rtx-4090', 'ABX-015', 1),
-            ('noctua-nh-d15', 'ABX-014', 1),
-            ('corsair-rm1000x', 'ABX-014', 1),
-            ('seagate-ironwolf-12tb', 'ABX-037', 4), # Primary NAS loaded with HDDs!
-            ('dell-perc-h755', 'ABX-022', 1),
-            ('dell-perc-h755', 'ABX-023', 1),
-            ('intel-x710-nic', 'ABX-032', 1),
-            ('mellanox-connectx6', 'ABX-033', 1),
-            # New Workstations allocations
-            ('corsair-64gb-ddr5', 'ABX-054', 1),
-            ('corsair-64gb-ddr5', 'ABX-055', 1),
-            ('corsair-64gb-ddr5', 'QNT-003', 1),
-            ('nvidia-rtx-6000', 'ABX-054', 1),
-            ('nvidia-rtx-6000', 'ABX-055', 1),
-            ('nvidia-rtx-6000', 'QNT-003', 1),
-            # Customer allocations
-            ('samsung-32gb-ddr5', 'FIN-001', 1),
-            ('samsung-1tb-nvme', 'FIN-001', 1),
-            ('samsung-32gb-ddr5', 'FIN-002', 1),
-            ('samsung-1tb-nvme', 'FIN-002', 1),
-            ('crucial-16gb-ddr4', 'MED-001', 1),
-            ('crucial-16gb-ddr4', 'MED-002', 1),
-            ('samsung-1tb-nvme', 'TSI-001', 1),
-            ('samsung-1tb-nvme', 'TSI-002', 1),
-            ('corsair-64gb-ddr5', 'TSI-003', 1),
-            ('nvidia-rtx-4090', 'TSI-003', 1),
-        ]
-        for comp_slug, asset_tag, qty in alloc_data:
-            ComponentAllocation.objects.get_or_create(
-                component=self._components[comp_slug],
-                assigned_asset=self._assets[asset_tag],
-                defaults={'qty': qty},
-            )
-
-        # --- AccessoryAssignments ---
-        for acc_slug, holder_upn, qty in [
-            ('usb-c-charger-65w', 'alex.admin', 1),
-            ('usb-c-charger-65w', 'sarah.chen', 1),
-            ('mx-master-3s', 'marcus.johnson', 1),
-            ('mx-keys', 'elena.rodriguez', 1),
-            ('webcam-c920s', 'thomas.weber', 1),
-            ('usb-c-hdmi-adapter', 'anna.schmidt', 1),
-            ('zone-wireless-2', 'james.wilson', 1),
-            ('magic-mouse', 'yuki.tanaka', 1),
-            ('usb-c-charger-65w', 'lisa.andersson', 1),
-            ('mx-master-3s', 'carlos.mendez', 1),
-            ('mx-master-3s', 'priya.patel', 1),
-            # Customer accessory assignments
-            ('mx-master-3s', 'klaus.fischer', 1),
-            ('mx-keys', 'nina.bergmann', 1),
-            ('zone-wireless-2', 'markus.wagner', 1),
-            ('webcam-c920s', 'sophie.klein', 1),
-            ('magic-mouse', 'felix.bauer', 1),
-            ('usb-c-charger-65w', 'lena.schulz', 1),
-            ('usb-c-hdmi-adapter', 'jonas.hoffmann', 1),
-            ('mx-master-3s', 'katja.vogel', 1),
+        # Software
+        self._software = {}
+        for name, mfr in [
+            ('Windows 11 Enterprise', 'microsoft-corporation'), ('macOS Sequoia', 'apple-inc'),
+            ('Microsoft 365 E5', 'microsoft-corporation'), ('Microsoft Office LTSC 2024', 'microsoft-corporation'),
+            ('Adobe Creative Cloud', 'microsoft-corporation'), ('JetBrains All Products Pack', 'microsoft-corporation'),
+            ('VMware vSphere 8 Enterprise Plus', 'dell-technologies'), ('CrowdStrike Falcon', 'microsoft-corporation'),
+            ('1Password Business', 'microsoft-corporation'), ('Zoom Workplace Enterprise', 'microsoft-corporation'),
+            ('Veeam Backup & Replication', 'dell-technologies'), ('Autodesk AutoCAD', 'microsoft-corporation'),
+            ('SAS Analytics Pro', 'dell-technologies'), ('Bloomberg Terminal', 'microsoft-corporation'),
+            ('Ubuntu Pro 24.04', 'dell-technologies'),
         ]:
-            AccessoryAssignment.objects.create(
-                accessory=self._accessories[acc_slug],
-                assigned_holder=self._holders[holder_upn],
-                qty=qty,
-            )
+            obj, _ = Software.objects.get_or_create(name=name, defaults={'manufacturer': self._manufacturers[mfr]})
+            self._software[name] = obj
 
-        # --- ConsumableAssignments ---
-        for cons_slug, holder_upn, qty in [
-            ('hp-26x-toner-black', 'anna.schmidt', 2),
-            ('arctic-silver-5', 'thomas.weber', 1),
-            ('aa-batteries-24', 'lisa.andersson', 1),
-            ('whiteboard-markers-12', 'elena.rodriguez', 1),
-        ]:
-            ConsumableAssignment.objects.create(
-                consumable=self._consumables[cons_slug],
-                assigned_holder=self._holders[holder_upn],
-                qty=qty,
-            )
-
-        # --- CustodyReceipt ---
-        for tag, holder_upn in [('ABX-001', 'alex.admin'), ('ABX-002', 'sarah.chen'), ('ABX-003', 'marcus.johnson'),
-                                 ('FIN-001', 'klaus.fischer'), ('MED-001', 'markus.wagner'), ('GRE-001', 'jonas.hoffmann')]:
-            h = self._holders[holder_upn]
-            hash_val = hashlib.sha256(f"{tag}-{h.pk}-{timezone.now()}".encode()).hexdigest()[:64]
-            
-            # Find a matching CustodyTemplate based on the asset's type category
-            asset_obj = self._assets[tag]
-            template_obj = None
-            if asset_obj.asset_type and asset_obj.asset_type.category:
-                cat_slug = asset_obj.asset_type.category.slug
-                if cat_slug == 'laptops':
-                    if asset_obj.tenant and asset_obj.tenant.slug == 'acme-north-america':
-                        template_obj = self._custody_templates.get('acme-na-laptop-agreement')
-                    else:
-                        template_obj = self._custody_templates.get('standard-laptop-agreement')
-                elif cat_slug == 'mobile-phones':
-                    template_obj = self._custody_templates.get('mobile-device-agreement')
-                elif cat_slug == 'desktops':
-                    template_obj = self._custody_templates.get('workstation-desktop-agreement')
-            
-            CustodyReceipt.objects.get_or_create(
-                verification_hash=hash_val,
-                defaults={
-                    'asset': asset_obj,
-                    'holder': h,
-                    'custody_template': template_obj,
-                    'signature_canvas': f'data:image/png;base64,MOCK_SIGNATURE_{tag}',
-                    'eula_version': '1.0',
-                    'accepted': True,
-                    'acceptance_status': 'accepted',
-                    'signed_at': timezone.now() - datetime.timedelta(days=random.randint(10, 100)),
-                }
-            )
-        self.stdout.write(f'  {len(self._assets)} assets, components, accessories, consumables, custody receipts.')
-
-    # ─────────────────────────────────────────
-    # Phase 4: Software & Licenses
-    # ─────────────────────────────────────────
-
-    def _seed_phase4(self):
-        from software.models import Software
-        from licenses.models import License, LicenseSeatAssignment
-
-        self.stdout.write('--- Phase 4: Software & Licenses ---')
-
-        # Software Products
-        sw_data = [
-            ('Windows 11 Enterprise', 'dell-technologies'),
-            ('macOS Sonoma', 'apple-inc'),
-            ('Microsoft 365 E5', 'microsoft-corporation'),
-            ('Microsoft Office 2024 LTSC', 'microsoft-corporation'),
-            ('Adobe Creative Cloud', 'microsoft-corporation'),
-            ('JetBrains IntelliJ IDEA Ultimate', 'microsoft-corporation'),
-            ('Docker Desktop Enterprise', 'microsoft-corporation'),
-            ('VMware vSphere 8 Enterprise Plus', 'dell-technologies'),
-            ('Slack Enterprise Grid', 'microsoft-corporation'),
-            ('Zoom Enterprise', 'microsoft-corporation'),
-            ('1Password Business', 'microsoft-corporation'),
-            ('SentinelOne Singularity', 'microsoft-corporation'),
-            ('CrowdStrike Falcon', 'microsoft-corporation'),
-            ('Cisco AnyConnect VPN', 'cisco-systems'),
-            ('Ubuntu Pro 22.04', 'dell-technologies'),
-        ]
-        self._software_products = {}
-        for name, mfr_slug in sw_data:
-            obj, _ = Software.objects.get_or_create(
-                name=name,
-                defaults={'manufacturer': self._manufacturers[mfr_slug]}
-            )
-            self._software_products[name] = obj
-
-        # Licenses
-        license_data = [
-            ('Win11-Ent-Vol-001', 'Windows 11 Enterprise', 'perpetual_seat', 'W11ENT-XXXX-YYYY-ZZZZ-AAAA', 150, None, datetime.date(2024, 1, 1), 'acme-north-america'),
-            ('M365-E5-Vol', 'Microsoft 365 E5', 'subscription_seat', None, 150, 22500.00, datetime.date(2024, 1, 1), 'acme-north-america'),
-            ('Office2024-Vol', 'Microsoft Office 2024 LTSC', 'perpetual_seat', 'OFF2024-XXXX-YYYY-ZZZZ-BBBB', 100, None, datetime.date(2024, 3, 1), 'acme-north-america'),
-            ('Adobe-CC-Team', 'Adobe Creative Cloud', 'subscription_seat', None, 25, 15000.00, datetime.date(2024, 2, 1), 'acme-labs'),
-            ('IntelliJ-Ultimate-50', 'JetBrains IntelliJ IDEA Ultimate', 'subscription_seat', None, 50, 8500.00, datetime.date(2024, 4, 1), 'acme-labs'),
-            ('Docker-Enterprise', 'Docker Desktop Enterprise', 'subscription_seat', None, 30, 4500.00, datetime.date(2024, 5, 1), 'acme-labs'),
-            ('vSphere-Ent-8', 'VMware vSphere 8 Enterprise Plus', 'subscription_seat', None, 10, 35000.00, datetime.date(2024, 2, 15), 'acme-labs'),
-            ('Slack-Ent', 'Slack Enterprise Grid', 'subscription_seat', None, 150, 18000.00, datetime.date(2024, 1, 1), 'acme-labs'),
-            ('Zoom-Ent', 'Zoom Enterprise', 'subscription_seat', None, 150, 12000.00, datetime.date(2024, 1, 1), 'acme-north-america'),
-            ('1Password-Biz', '1Password Business', 'subscription_seat', None, 150, 12000.00, datetime.date(2024, 1, 1), 'acme-north-america'),
-            ('S1-Complete-1000', 'SentinelOne Singularity', 'subscription_seat', None, 1000, 45000.00, datetime.date(2024, 1, 1), 'acme-europe'),
-            ('CS-Falcon-1000', 'CrowdStrike Falcon', 'subscription_seat', None, 1000, 55000.00, datetime.date(2024, 1, 1), 'acme-europe'),
-            ('Cisco-AnyConnect', 'Cisco AnyConnect VPN', 'subscription_seat', None, 200, 8000.00, datetime.date(2024, 1, 1), 'acme-north-america'),
-            # Customer Licenses
-            ('Globex-M365-E3', 'Microsoft 365 E5', 'subscription_seat', None, 75, 11250.00, datetime.date(2024, 5, 1), 'globex-retail'),
-            ('MediCare-Office-50', 'Microsoft Office 2024 LTSC', 'perpetual_seat', 'MED-OFF2024-XXXX-YYYY', 50, None, datetime.date(2024, 6, 1), 'stark-defense'),
-            ('TechStartup-JetBrains', 'JetBrains IntelliJ IDEA Ultimate', 'subscription_seat', None, 10, 1700.00, datetime.date(2024, 8, 1), 'soylent-operations'),
-            ('GreenEnergy-Win11', 'Windows 11 Enterprise', 'perpetual_seat', 'GRE-W11ENT-XXXX-YYYY', 30, None, datetime.date(2024, 9, 1), 'soylent-research'),
-        ]
-        self._licenses = []
-        for name, sw_name, ltype, key, seats, cost, purchase_date, tenant_slug in license_data:
-            obj = License.objects.create(
-                name=name,
-                software=self._software_products[sw_name],
-                license_type=ltype,
-                product_key=key or '',
-                seats=seats,
-                purchase_cost=cost,
-                purchase_date=purchase_date,
-                order_number=f'PO-SW-{random.randint(1000, 9999)}',
-                tenant=self._tenants.get(tenant_slug),
-            )
-            self._licenses.append(obj)
-
-        # LicenseSeatAssignments
-        holder_ups = list(self._holders.keys())
-        for lic in self._licenses[:6]:
-            num_assign = min(lic.seats, random.randint(3, 8))
-            assigned_holders = random.sample(holder_ups, num_assign)
-            for upn in assigned_holders:
-                try:
-                    LicenseSeatAssignment.objects.create(
-                        license=lic,
-                        assigned_holder=self._holders[upn],
-                    )
-                except Exception:
-                    pass  # CheckConstraint may fail if asset also assigned
-
-        self.stdout.write(f'  {len(self._software_products)} software products, {len(self._licenses)} licenses.')
-
-        # --- Installed Software (creates links between assets and software) ---
-        from assets.models import InstalledSoftware
-        sw_installs = [
-            ('ABX-001', 'Windows 11 Enterprise', '23H2', 'Intune', datetime.date(2024, 3, 15)),
-            ('ABX-002', 'Windows 11 Enterprise', '23H2', 'Intune', datetime.date(2024, 4, 10)),
-            ('ABX-003', 'Windows 11 Enterprise', '23H2', 'Intune', datetime.date(2024, 6, 1)),
-            ('ABX-004', 'Windows 11 Enterprise', '23H2', 'Intune', datetime.date(2024, 7, 20)),
-            ('ABX-005', 'Windows 11 Enterprise', '23H2', 'Intune', datetime.date(2024, 5, 12)),
-            ('ABX-006', 'Windows 11 Enterprise', '23H2', 'Intune', datetime.date(2024, 5, 12)),
-            ('ABX-007', 'macOS Sonoma', '14.5', 'Intune', datetime.date(2024, 8, 5)),
-            ('ABX-008', 'Windows 11 Enterprise', '23H2', 'Intune', datetime.date(2024, 4, 22)),
-            ('ABX-009', 'macOS Sonoma', '14.5', 'Intune', datetime.date(2024, 9, 1)),
-            ('ABX-010', 'macOS Sonoma', '14.5', 'Intune', datetime.date(2024, 2, 10)),
-            ('ABX-022', 'Ubuntu Pro 22.04', '22.04.4', 'Lansweeper', datetime.date(2024, 1, 10)),
-            ('ABX-023', 'Ubuntu Pro 22.04', '22.04.4', 'Lansweeper', datetime.date(2024, 1, 10)),
-            ('ABX-024', 'VMware vSphere 8 Enterprise Plus', '8.0.2', 'Lansweeper', datetime.date(2024, 3, 20)),
-            ('ABX-001', 'Microsoft 365 E5', '', 'Intune', datetime.date(2024, 3, 15)),
-            ('ABX-002', 'Microsoft 365 E5', '', 'Intune', datetime.date(2024, 4, 10)),
-            ('ABX-003', 'CrowdStrike Falcon', '', 'Intune', datetime.date(2024, 6, 1)),
-            ('ABX-004', 'SentinelOne Singularity', '', 'Intune', datetime.date(2024, 7, 20)),
-            ('ABX-022', 'Docker Desktop Enterprise', '4.30.0', 'Lansweeper', datetime.date(2024, 1, 10)),
-            ('ABX-023', 'Docker Desktop Enterprise', '4.30.0', 'Lansweeper', datetime.date(2024, 1, 10)),
-            ('ABX-014', 'JetBrains IntelliJ IDEA Ultimate', '2024.2', 'Intune', datetime.date(2024, 1, 25)),
-        ]
-        installed_count = 0
-        for tag, sw_name, version, agent, install_date in sw_installs:
-            sw_product = self._software_products.get(sw_name)
-            if sw_product and tag in self._assets:
-                _, created = InstalledSoftware.objects.get_or_create(
-                    asset=self._assets[tag],
-                    software=sw_product,
-                    version_detected=version,
-                    defaults={
-                        'discovered_by_agent': agent,
-                        'install_date': install_date,
-                        'last_seen_date': timezone.now() - datetime.timedelta(days=random.randint(0, 30)),
-                    }
-                )
-                if created:
-                    installed_count += 1
-        self.stdout.write(f'  {installed_count} installed software records created.')
-
-    # ─────────────────────────────────────────
-    # Phase 5: Subscriptions
-    # ─────────────────────────────────────────
-
-    def _seed_phase5(self):
-        from subscriptions.models import Provider, Subscription, SubscriptionAssignment
-        from assets.models import Asset
-
-        self.stdout.write('--- Phase 5: Subscriptions ---')
-
-        # Providers
-        provider_data = [
-            ('Amazon Web Services', 'aws-acme', 'https://aws.amazon.com/console'),
-            ('Microsoft Azure', 'az-acme', 'https://portal.azure.com'),
-            ('Google Cloud Platform', 'gcp-acme', 'https://console.cloud.google.com'),
-            ('GitHub Enterprise', 'gh-acme', 'https://github.com/enterprises/acme'),
-            ('Cloudflare', 'cf-acme', 'https://dash.cloudflare.com'),
-        ]
+        # Cloud / SaaS providers
         self._providers = {}
-        for name, acct_id, url in provider_data:
-            obj, _ = Provider.objects.get_or_create(
-                name=name,
-                defaults={'account_id': acct_id, 'portal_url': url}
-            )
+        for name, acct, url in [
+            ('Amazon Web Services', 'aws-org', 'https://console.aws.amazon.com'),
+            ('Microsoft Azure', 'azure-ea', 'https://portal.azure.com'),
+            ('Google Cloud Platform', 'gcp-org', 'https://console.cloud.google.com'),
+            ('GitHub Enterprise', 'github-ent', 'https://github.com/enterprises'),
+            ('Cloudflare', 'cloudflare', 'https://dash.cloudflare.com'),
+            ('Datadog', 'datadog', 'https://app.datadoghq.eu'),
+        ]:
+            obj, _ = Provider.objects.get_or_create(name=name, defaults={'account_id': acct, 'portal_url': url})
             self._providers[name] = obj
 
-        # Subscriptions
-        sub_data = [
-            ('AWS Production Account', 'Amazon Web Services', 'saas', datetime.date(2024, 1, 1), datetime.date(2025, 1, 1), 120000.00, 12, 'acme-north-america'),
-            ('Azure Enterprise Agreement', 'Microsoft Azure', 'saas', datetime.date(2024, 3, 1), datetime.date(2027, 3, 1), 250000.00, 36, 'acme-north-america'),
-            ('GCP Starter', 'Google Cloud Platform', 'saas', datetime.date(2024, 6, 1), datetime.date(2025, 6, 1), 36000.00, 12, 'acme-north-america'),
-            ('GitHub Enterprise Cloud', 'GitHub Enterprise', 'saas', datetime.date(2024, 1, 1), datetime.date(2025, 1, 1), 42000.00, 12, 'acme-labs'),
-            ('Cloudflare Enterprise', 'Cloudflare', 'support', datetime.date(2024, 2, 1), datetime.date(2025, 2, 1), 24000.00, 12, 'acme-europe'),
-            ('AWS Dev/Test Sandbox', 'Amazon Web Services', 'saas', datetime.date(2024, 4, 1), datetime.date(2025, 4, 1), 18000.00, 12, 'acme-labs'),
-            # Customer Subscriptions
-            ('Globex AWS Workloads', 'Amazon Web Services', 'saas', datetime.date(2024, 5, 1), datetime.date(2025, 5, 1), 85000.00, 12, 'globex-retail'),
-            ('Globex Azure Backup', 'Microsoft Azure', 'saas', datetime.date(2024, 6, 1), datetime.date(2026, 6, 1), 48000.00, 24, 'globex-retail'),
-            ('MediCare GCP Analytics', 'Google Cloud Platform', 'saas', datetime.date(2024, 7, 1), datetime.date(2025, 7, 1), 32000.00, 12, 'stark-defense'),
-            ('TechStartup GitHub Team', 'GitHub Enterprise', 'saas', datetime.date(2024, 8, 1), datetime.date(2025, 8, 1), 4800.00, 12, 'soylent-operations'),
-            ('GreenEnergy Cloudflare Pro', 'Cloudflare', 'support', datetime.date(2024, 9, 1), datetime.date(2025, 9, 1), 12000.00, 12, 'soylent-research'),
+        self.stdout.write(f'  {len(self._asset_types)} asset types, {len(self._components)} components, '
+                          f'{len(self._software)} software products, {len(self._providers)} providers.')
+
+    # ─────────────────────────────────────────────────────────────────
+    # Organizations: groups, tenants, sites, locations, holders, contacts
+    # ─────────────────────────────────────────────────────────────────
+
+    # Industry profile -> how assets are distributed for a tenant.
+    #   laptops: candidate workstation asset-type slugs (one picked per employee)
+    #   mobile:  fraction of employees issued a corporate phone
+    #   monitors: avg external monitors per deskbound employee
+    #   depts:   department choices for custom fields
+    #   shared:  list of (asset_type_slug, count) for shared / infrastructure assets
+    PROFILES = {
+        'msp_internal': dict(laptops=['macbook-pro-16-2024', 'thinkpad-x1-carbon-g12', 'dell-precision-5680'],
+                             mobile=0.8, monitors=1.5, depts=['Engineering', 'Operations'],
+                             shared=[('dell-poweredge-r760', 4), ('hpe-proliant-dl380-g11', 2),
+                                     ('synology-ds1823xs', 2), ('cisco-catalyst-9300', 2),
+                                     ('unifi-switch-pro-48', 3), ('meraki-mr46', 6),
+                                     ('unifi-dream-machine-pro', 2), ('mac-studio-2024', 2),
+                                     ('logitech-rally-bar', 2)]),
+        'msp_corp': dict(laptops=['dell-latitude-5550', 'macbook-air-15-2024'], mobile=0.5, monitors=1.0,
+                         depts=['Finance', 'HR', 'Sales', 'Marketing'],
+                         shared=[('dell-optiplex-7010', 4), ('logitech-rally-bar', 2), ('meraki-mr46', 2)]),
+        'pharma_rnd': dict(laptops=['thinkpad-x1-carbon-g12', 'dell-precision-5680', 'macbook-pro-16-2024'],
+                           mobile=0.6, monitors=1.3, depts=['Research', 'Engineering', 'Operations'],
+                           shared=[('dell-poweredge-r760', 2), ('hpe-proliant-dl380-g11', 1),
+                                   ('synology-ds1823xs', 1), ('cisco-catalyst-9300', 2),
+                                   ('meraki-mr46', 4), ('unifi-dream-machine-pro', 1),
+                                   ('ipad-pro-129-2024', 4), ('dell-optiplex-7010', 4),
+                                   ('logitech-rally-bar', 2)]),
+        'pharma_mfg': dict(laptops=['dell-latitude-5550', 'hp-elitebook-860-g11'], mobile=0.4, monitors=0.5,
+                           depts=['Operations', 'Engineering'],
+                           shared=[('surface-pro-10', 6), ('dell-optiplex-7010', 6), ('cisco-catalyst-9300', 2),
+                                   ('meraki-mr46', 6), ('unifi-dream-machine-pro', 1)]),
+        'pharma_commercial': dict(laptops=['dell-latitude-5550', 'macbook-air-15-2024'], mobile=0.7, monitors=1.0,
+                                  depts=['Sales', 'Marketing', 'Finance'],
+                                  shared=[('dell-optiplex-7010', 3), ('meraki-mr46', 3), ('logitech-rally-bar', 2)]),
+        'bank_retail': dict(laptops=['dell-latitude-5550', 'hp-elitebook-860-g11'], mobile=0.5, monitors=1.5,
+                            depts=['Sales', 'Operations', 'Finance'],
+                            shared=[('dell-poweredge-r760', 2), ('cisco-catalyst-9300', 2), ('meraki-mr46', 4),
+                                    ('unifi-dream-machine-pro', 1), ('dell-optiplex-7010', 6), ('logitech-rally-bar', 2)]),
+        'bank_invest': dict(laptops=['macbook-pro-16-2024', 'dell-precision-5680'], mobile=0.9, monitors=2.0,
+                            depts=['Sales', 'Finance', 'Operations'],
+                            shared=[('dell-poweredge-r760', 2), ('cisco-catalyst-9300', 2),
+                                    ('unifi-dream-machine-pro', 1), ('logitech-rally-bar', 2)]),
+        'bank_risk': dict(laptops=['dell-latitude-5550'], mobile=0.3, monitors=1.5, depts=['Finance', 'Operations'],
+                          shared=[('dell-optiplex-7010', 4), ('meraki-mr46', 2)]),
+        'fund_portfolio': dict(laptops=['macbook-pro-16-2024', 'dell-latitude-5550'], mobile=0.8, monitors=2.0,
+                               depts=['Finance', 'Operations'],
+                               shared=[('dell-poweredge-r760', 1), ('unifi-dream-machine-pro', 1), ('logitech-rally-bar', 1)]),
+        'fund_ops': dict(laptops=['dell-latitude-5550'], mobile=0.4, monitors=1.5, depts=['Operations', 'Finance'],
+                         shared=[('dell-optiplex-7010', 4), ('meraki-mr46', 2)]),
+        'legal': dict(laptops=['hp-elitebook-860-g11', 'dell-latitude-5550'], mobile=0.6, monitors=1.0,
+                      depts=['Legal', 'Operations'],
+                      shared=[('dell-optiplex-7010', 4), ('unifi-dream-machine-pro', 1), ('meraki-mr46', 2),
+                              ('logitech-rally-bar', 1)]),
+        'architecture': dict(laptops=['macbook-pro-16-2024', 'dell-precision-5680'], mobile=0.4, monitors=2.0,
+                             depts=['Engineering', 'Operations'],
+                             shared=[('mac-studio-2024', 2), ('dell-precision-7960-tower', 2),
+                                     ('dell-poweredge-r760', 1), ('unifi-dream-machine-pro', 1),
+                                     ('logitech-rally-bar', 1)]),
+        'logistics': dict(laptops=['dell-latitude-5550'], mobile=0.6, monitors=0.4, depts=['Operations'],
+                          shared=[('surface-pro-10', 8), ('ipad-pro-129-2024', 4), ('dell-optiplex-7010', 4),
+                                  ('cisco-catalyst-9300', 2), ('meraki-mr46', 6), ('unifi-dream-machine-pro', 1)]),
+    }
+
+    FIRST_NAMES = ['Anna', 'Lukas', 'Sophie', 'Felix', 'Marie', 'Jonas', 'Lena', 'Paul', 'Emma', 'Leon',
+                   'Hannah', 'Noah', 'Mia', 'Elias', 'Clara', 'Finn', 'Laura', 'Ben', 'Julia', 'Tim',
+                   'Sara', 'David', 'Nina', 'Jan', 'Lea', 'Tom', 'Eva', 'Max', 'Pia', 'Niklas',
+                   'Yusuf', 'Aisha', 'Marco', 'Chloe', 'Omar', 'Elena', 'Raj', 'Wei', 'Ingrid', 'Pierre',
+                   'Sofia', 'Karl', 'Maya', 'Henrik', 'Lucia', 'Andre', 'Petra', 'Samir', 'Greta', 'Viktor']
+    LAST_NAMES = ['Muller', 'Schmidt', 'Schneider', 'Fischer', 'Weber', 'Meyer', 'Wagner', 'Becker', 'Hoffmann',
+                  'Schafer', 'Koch', 'Bauer', 'Richter', 'Klein', 'Wolf', 'Neumann', 'Schwarz', 'Zimmermann',
+                  'Braun', 'Krueger', 'Hartmann', 'Lange', 'Werner', 'Krause', 'Lehmann', 'Koehler', 'Maier',
+                  'Walter', 'Huber', 'Kaiser', 'Fuchs', 'Peters', 'Lang', 'Scholz', 'Jung', 'Hahn', 'Vogel',
+                  'Friedrich', 'Keller', 'Gunther', 'Frank', 'Berger', 'Winkler', 'Roth', 'Beck', 'Lorenz',
+                  'Baumann', 'Franke', 'Albrecht', 'Ludwig']
+
+    def _org_spec(self):
+        """Compact specification of the MSP and its customers."""
+        return [
+            # kind, group(name,slug), domain, [tenants...]
+            dict(kind='msp', group=('Northwind Managed Services', 'northwind-msp'), domain='northwind-it.com',
+                 tenants=[
+                     dict(name='Northwind — Internal IT', slug='northwind-internal-it', code='NW-IT',
+                          profile='msp_internal', headcount=12,
+                          site=('Northwind Berlin HQ', 'nw-berlin-hq', 'Berlin', 'Friedrichstrasse 88\n10117 Berlin\nGermany',
+                                'dach', 'corporate-offices', '52.5200', '13.4050'),
+                          extra_sites=[('Northwind Frankfurt DC', 'nw-frankfurt-dc', 'Frankfurt',
+                                        'Hanauer Landstrasse 200\n60314 Frankfurt\nGermany', 'dach', 'datacenters', '50.1109', '8.6821')],
+                          locations=[('Engineering Floor', 'nw-eng-floor'), ('Service Desk', 'nw-service-desk'),
+                                     ('DC Rack Row 1', 'nw-dc-rack-1'), ('DC Rack Row 2', 'nw-dc-rack-2')]),
+                     dict(name='Northwind — Corporate', slug='northwind-corporate', code='NW-CORP',
+                          profile='msp_corp', headcount=16,
+                          site=('Northwind Berlin HQ', 'nw-berlin-hq', 'Berlin', '', 'dach', 'corporate-offices', None, None),
+                          locations=[('Finance & HR', 'nw-finance-hr'), ('Sales Floor', 'nw-sales-floor')]),
+                 ]),
+            dict(kind='customer', industry='Pharmaceuticals', group=('Helix Biopharma', 'helix-biopharma'),
+                 domain='helixbio.com',
+                 tenants=[
+                     dict(name='Helix Biopharma — R&D', slug='helix-rnd', code='HLX-RD', profile='pharma_rnd', headcount=22,
+                          site=('Helix Basel Research Campus', 'helix-basel', 'Basel',
+                                'Hochbergerstrasse 60\n4057 Basel\nSwitzerland', 'western-europe', 'labs-plants', '47.5596', '7.5886'),
+                          locations=[('Lab Block A', 'helix-lab-a'), ('Lab Block B', 'helix-lab-b'),
+                                     ('R&D Offices', 'helix-rnd-offices'), ('Server Room', 'helix-basel-srv')]),
+                     dict(name='Helix Biopharma — Manufacturing', slug='helix-mfg', code='HLX-MF', profile='pharma_mfg', headcount=16,
+                          site=('Helix Visp Plant', 'helix-visp', 'Visp',
+                                'Schachenstrasse 12\n3930 Visp\nSwitzerland', 'western-europe', 'labs-plants', '46.2940', '7.8810'),
+                          locations=[('Production Line 1', 'helix-line-1'), ('Production Line 2', 'helix-line-2'),
+                                     ('QA Lab', 'helix-qa-lab'), ('Plant IT Room', 'helix-visp-srv')]),
+                     dict(name='Helix Biopharma — Commercial', slug='helix-commercial', code='HLX-CO', profile='pharma_commercial', headcount=14,
+                          site=('Helix Zurich Office', 'helix-zurich', 'Zurich',
+                                'Bahnhofstrasse 45\n8001 Zurich\nSwitzerland', 'western-europe', 'corporate-offices', '47.3769', '8.5417'),
+                          locations=[('Commercial Floor', 'helix-commercial-floor'), ('Meeting Suites', 'helix-meeting-suites')]),
+                 ]),
+            dict(kind='customer', industry='Banking', group=('Meridian Capital Bank', 'meridian-bank'),
+                 domain='meridianbank.com',
+                 tenants=[
+                     dict(name='Meridian — Retail Banking', slug='meridian-retail', code='MER-RT', profile='bank_retail', headcount=26,
+                          site=('Meridian Frankfurt Tower', 'meridian-frankfurt', 'Frankfurt',
+                                'Taunusanlage 12\n60325 Frankfurt\nGermany', 'dach', 'corporate-offices', '50.1109', '8.6700'),
+                          locations=[('Retail Floor 2', 'mer-retail-f2'), ('Retail Floor 3', 'mer-retail-f3'),
+                                     ('Branch Ops', 'mer-branch-ops'), ('Data Center', 'mer-frankfurt-dc')]),
+                     dict(name='Meridian — Investment', slug='meridian-investment', code='MER-IB', profile='bank_invest', headcount=16,
+                          site=('Meridian London Office', 'meridian-london', 'London',
+                                '30 St Mary Axe\nLondon EC3A 8BF\nUnited Kingdom', 'western-europe', 'corporate-offices', '51.5145', '-0.0803'),
+                          locations=[('Trading Floor', 'mer-trading-floor'), ('Deal Rooms', 'mer-deal-rooms')]),
+                     dict(name='Meridian — Risk & Compliance', slug='meridian-risk', code='MER-RC', profile='bank_risk', headcount=10,
+                          site=('Meridian Frankfurt Tower', 'meridian-frankfurt', 'Frankfurt', '', 'dach', 'corporate-offices', None, None),
+                          locations=[('Risk Analytics', 'mer-risk-analytics')]),
+                 ]),
+            dict(kind='customer', industry='Asset Management', group=('Sterling Asset Management', 'sterling-am'),
+                 domain='sterling-am.com',
+                 tenants=[
+                     dict(name='Sterling — Portfolio Management', slug='sterling-portfolio', code='STG-PM', profile='fund_portfolio', headcount=14,
+                          site=('Sterling Munich Office', 'sterling-munich', 'Munich',
+                                'Maximilianstrasse 35\n80539 Munich\nGermany', 'dach', 'corporate-offices', '48.1391', '11.5802'),
+                          locations=[('Portfolio Desk', 'stg-portfolio-desk'), ('Partner Suites', 'stg-partner-suites'),
+                                     ('Server Closet', 'stg-server-closet')]),
+                     dict(name='Sterling — Operations', slug='sterling-ops', code='STG-OP', profile='fund_ops', headcount=8,
+                          site=('Sterling Munich Office', 'sterling-munich', 'Munich', '', 'dach', 'corporate-offices', None, None),
+                          locations=[('Fund Operations', 'stg-fund-ops')]),
+                 ]),
+            dict(kind='customer', industry='Legal Services', group=None, domain='brightwell-legal.com',
+                 tenants=[
+                     dict(name='Brightwell Legal', slug='brightwell-legal', code='BWL', profile='legal', headcount=16,
+                          site=('Brightwell Berlin Chambers', 'brightwell-berlin', 'Berlin',
+                                'Kurfurstendamm 21\n10719 Berlin\nGermany', 'dach', 'corporate-offices', '52.5030', '13.3270'),
+                          locations=[('Partner Offices', 'bwl-partner-offices'), ('Associate Bullpen', 'bwl-associates'),
+                                     ('Records Room', 'bwl-records')]),
+                 ]),
+            dict(kind='customer', industry='Architecture & Design', group=None, domain='aurora-arch.com',
+                 tenants=[
+                     dict(name='Aurora Architects', slug='aurora-architects', code='AUR', profile='architecture', headcount=11,
+                          site=('Aurora Hamburg Studio', 'aurora-hamburg', 'Hamburg',
+                                'Am Kaiserkai 10\n20457 Hamburg\nGermany', 'dach', 'corporate-offices', '53.5413', '9.9920'),
+                          locations=[('Design Studio', 'aur-design-studio'), ('Render Farm', 'aur-render-farm')]),
+                 ]),
+            dict(kind='customer', industry='Logistics', group=None, domain='vantage-logistics.com',
+                 tenants=[
+                     dict(name='Vantage Logistics', slug='vantage-logistics', code='VAN', profile='logistics', headcount=18,
+                          site=('Vantage Frankfurt Airport Depot', 'vantage-fra', 'Frankfurt',
+                                'CargoCity Sued, Gebaude 535\n60549 Frankfurt\nGermany', 'dach', 'field-depots', '50.0490', '8.5870'),
+                          locations=[('Warehouse Floor', 'van-warehouse'), ('Dispatch Office', 'van-dispatch'),
+                                     ('Network Cabinet', 'van-network')]),
+                 ]),
         ]
-        self._subscriptions = []
-        for name, prov_name, stype, start, renewal, cost, term, tenant_slug in sub_data:
-            obj = Subscription.objects.create(
-                name=name, provider=self._providers[prov_name],
-                type=stype,
-                start_date=start, renewal_date=renewal,
-                renewal_cost=cost, term_months=term,
-                description=f'{prov_name} subscription - {stype.upper()}',
-                tenant=self._tenants.get(tenant_slug),
-            )
-            self._subscriptions.append(obj)
 
-        # SubscriptionAssignments (link to Locations and Assets)
-        ct_asset = ContentType.objects.get_for_model(Asset)
-        servers = [a for a in self._assets.values() if a.asset_role and a.asset_role.slug in ['virtualization-host-server', 'database-server', 'application-server', 'backup-server']]
-        for server in servers[:4]:
-            SubscriptionAssignment.objects.get_or_create(
-                subscription=self._subscriptions[0],
-                content_type=ct_asset,
-                object_id=server.pk,
-                defaults={'notes': 'Provisioned workload node'}
-            )
+    def _seed_organizations(self):
+        from organization.models import (Region, SiteGroup, TenantGroup, Tenant, Site, Location,
+                                          AssetHolder, ContactRole, Contact, ContactAssignment)
+        self.stdout.write('--- Organizations ---')
 
-        self.stdout.write(f'  {len(self._providers)} providers, {len(self._subscriptions)} subscriptions.')
+        # Regions
+        self._regions = {}
+        eu, _ = Region.objects.get_or_create(slug='europe', defaults={'name': 'Europe'})
+        self._regions['europe'] = eu
+        for name, slug in [('DACH', 'dach'), ('Western Europe', 'western-europe'), ('Nordics', 'nordics')]:
+            obj, _ = Region.objects.get_or_create(slug=slug, defaults={'name': name, 'parent': eu})
+            self._regions[slug] = obj
 
-    # ─────────────────────────────────────────
-    # Phase 6: Kits, Maintenance, ActivityLogs
-    # ─────────────────────────────────────────
+        # Site groups
+        self._sitegroups = {}
+        for name, slug in [('Corporate Offices', 'corporate-offices'), ('Datacenters', 'datacenters'),
+                           ('Labs & Plants', 'labs-plants'), ('Field & Depots', 'field-depots')]:
+            obj, _ = SiteGroup.objects.get_or_create(slug=slug, defaults={'name': name})
+            self._sitegroups[slug] = obj
 
-    def _seed_phase6(self):
-        from assets.models import Asset
-        from inventory.models import Kit, KitItem
-        from compliance.models import AssetMaintenance
-        from licenses.models import License
+        self._tgroups = {}
+        self._tenants = {}
+        self._tenant_meta = {}          # slug -> dict(profile, domain, code, group_slug, industry, kind)
+        self._sites = {}
+        self._locations = {}            # slug -> Location
+        self._tenant_locations = {}     # tenant slug -> [Location]
+        self._tenant_holders = {}       # tenant slug -> [AssetHolder]
+        self._orgs = self._org_spec()
 
-        self.stdout.write('--- Phase 6: Kits, Maintenance, Activities ---')
+        for org in self._orgs:
+            group_obj = None
+            if org['group']:
+                gname, gslug = org['group']
+                group_obj, _ = TenantGroup.objects.get_or_create(slug=gslug, defaults={'name': gname})
+                self._tgroups[gslug] = group_obj
+
+            for t in org['tenants']:
+                tenant, _ = Tenant.objects.get_or_create(slug=t['slug'], defaults={
+                    'name': t['name'], 'group': group_obj,
+                    'description': f"{org.get('industry', 'Managed Service Provider')} — managed by Northwind Managed Services."})
+                self._tenants[t['slug']] = tenant
+                self._tenant_meta[t['slug']] = dict(profile=t['profile'], domain=org['domain'], code=t['code'],
+                                                    group_slug=org['group'][1] if org['group'] else None,
+                                                    industry=org.get('industry'), kind=org['kind'])
+                self._tenant_locations[t['slug']] = []
+
+                # Primary site (may be shared across tenants of the same org)
+                for site_spec in [t['site']] + t.get('extra_sites', []):
+                    sname, sslug, city, addr, region_slug, sg_slug, lat, lon = site_spec
+                    if sslug not in self._sites:
+                        self._sites[sslug] = Site.objects.get_or_create(slug=sslug, defaults={
+                            'name': sname, 'tenant': tenant, 'group': self._sitegroups[sg_slug],
+                            'region': self._regions[region_slug], 'physical_address': addr,
+                            'latitude': lat, 'longitude': lon, 'time_zone': 'Europe/Berlin'})[0]
+                primary_site = self._sites[t['site'][1]]
+
+                # Locations
+                for lname, lslug in t['locations']:
+                    loc, _ = Location.objects.get_or_create(slug=lslug, defaults={
+                        'name': lname, 'site': primary_site, 'tenant': tenant})
+                    self._locations[lslug] = loc
+                    self._tenant_locations[t['slug']].append(loc)
+
+                # Holders (employees)
+                holders = self._make_holders(tenant, org['domain'], t['headcount'])
+                self._tenant_holders[t['slug']] = holders
+
+        # Contacts: a primary customer contact per customer group/tenant + vendor reps
+        self._contact_roles = {}
+        for name, slug in [('Account Manager', 'account-manager'), ('Customer Primary Contact', 'customer-primary'),
+                           ('Vendor Support', 'vendor-support')]:
+            self._contact_roles[slug] = ContactRole.objects.get_or_create(slug=slug, defaults={'name': name})[0]
+
+        self._contacts = []
+        for org in self._orgs:
+            if org['kind'] != 'customer':
+                continue
+            label = (org['group'][0] if org['group'] else org['tenants'][0]['name'])
+            c = Contact.objects.create(
+                name=f"{random.choice(self.FIRST_NAMES)} {random.choice(self.LAST_NAMES)}",
+                title=f"IT Manager, {label}", phone='+49-69-555-0%03d' % random.randint(100, 999),
+                email=f"it.manager@{org['domain']}", web_url=f"https://{org['domain']}")
+            self._contacts.append(c)
+            # Assign as primary contact on each tenant of the customer
+            for t in org['tenants']:
+                tenant = self._tenants[t['slug']]
+                ContactAssignment.objects.get_or_create(
+                    contact=c, role=self._contact_roles['customer-primary'],
+                    content_type=ContentType.objects.get_for_model(tenant), object_id=tenant.pk,
+                    defaults={'priority': 'primary'})
+
+        total_holders = sum(len(v) for v in self._tenant_holders.values())
+        self.stdout.write(f'  {len(self._tgroups)} tenant groups, {len(self._tenants)} tenants, '
+                          f'{len(self._sites)} sites, {len(self._locations)} locations, {total_holders} asset holders.')
+
+    def _make_holders(self, tenant, domain, n):
+        from organization.models import AssetHolder
+        holders = []
+        used = set()
+        for _ in range(n):
+            for _attempt in range(20):
+                first = random.choice(self.FIRST_NAMES)
+                last = random.choice(self.LAST_NAMES)
+                upn = f"{first}.{last}@{domain}".lower()
+                if upn not in used:
+                    break
+            if upn in used:
+                upn = f"{first}.{last}{random.randint(1, 99)}@{domain}".lower()
+            used.add(upn)
+            holder = AssetHolder.objects.create(
+                first_name=first, last_name=last, upn=upn, email=upn, tenant=tenant)
+            holders.append(holder)
+        return holders
+
+    # ─────────────────────────────────────────────────────────────────
+    # Access: users, per-tenant roles, cross-tenant memberships
+    # ─────────────────────────────────────────────────────────────────
+
+    def _seed_access(self):
+        from organization.models import TenantRole, TenantMembership
+        self.stdout.write('--- Access: users, roles, memberships ---')
+
+        # Build permission catalogs from Django's permission table.
+        all_perms = list(Permission.objects.select_related('content_type').all())
+
+        def perm_str(p):
+            return f"{p.content_type.app_label}.{p.codename}"
+
+        op_apps = {'assets', 'inventory', 'organization', 'compliance', 'licenses',
+                   'subscriptions', 'software', 'procurement', 'extras', 'core'}
+        ADMIN = [perm_str(p) for p in all_perms]
+        TECH = [perm_str(p) for p in all_perms
+                if p.content_type.app_label in op_apps and not p.codename.startswith('delete_')]
+        ASSETMGR = [perm_str(p) for p in all_perms
+                    if p.content_type.app_label in {'assets', 'inventory', 'compliance', 'organization', 'procurement'}
+                    and p.codename.split('_')[0] in {'view', 'add', 'change'}]
+        READONLY = [perm_str(p) for p in all_perms if p.codename.startswith('view_')]
+        ROLE_PERMS = {'Administrator': ADMIN, 'Technician': TECH, 'Asset Manager': ASSETMGR, 'Read-Only': READONLY}
+
+        # Per-tenant roles
+        self._roles = {}  # (tenant_slug, role_name) -> TenantRole
+        for slug, tenant in self._tenants.items():
+            for role_name, perms in ROLE_PERMS.items():
+                role, _ = TenantRole.objects.get_or_create(
+                    tenant=tenant, name=role_name,
+                    defaults={'permissions': perms, 'description': f'{role_name} role for {tenant.name}'})
+                self._roles[(slug, role_name)] = role
+
+        # MSP staff (login users). (username, full_name, kind, assigned_group_slugs or None=all)
+        self._users = {}
+        self._engineer_users = []
+        msp_domain = 'northwind-it.com'
+        staff = [
+            ('lars.eklund', 'Lars Eklund', 'engineer', None),     # Lead infra engineer
+            ('deepa.rao', 'Deepa Rao', 'engineer', None),         # Senior engineer
+            ('tom.berger', 'Tom Berger', 'engineer', None),       # Field engineer
+            ('sara.lind', 'Sara Lind', 'engineer', None),         # Field engineer
+            ('ravi.anand', 'Ravi Anand', 'helpdesk', None),       # Service desk L1
+            ('mia.koch', 'Mia Koch', 'helpdesk', None),           # Service desk L1
+            ('nadia.haas', 'Nadia Haas', 'account', ['helix-biopharma', 'sterling-am']),
+            ('peter.voss', 'Peter Voss', 'account', ['meridian-bank']),
+        ]
+        role_for_kind = {'engineer': 'Administrator', 'helpdesk': 'Technician', 'account': 'Read-Only'}
+        for username, full_name, kind, group_scope in staff:
+            first, last = full_name.split(' ', 1)
+            user, created = User.objects.get_or_create(username=username, defaults={
+                'email': f'{username}@{msp_domain}', 'first_name': first, 'last_name': last,
+                'is_staff': False, 'is_superuser': False})
+            if created:
+                user.set_password(SEED_PASSWORD)
+                user.save()
+            self._users[username] = user
+            if kind == 'engineer':
+                self._engineer_users.append(user)
+            role_name = role_for_kind[kind]
+            for slug, tenant in self._tenants.items():
+                meta = self._tenant_meta[slug]
+                # Account managers are scoped to their assigned customer groups; others span all tenants.
+                if group_scope is not None and meta['group_slug'] not in group_scope:
+                    continue
+                TenantMembership.objects.get_or_create(
+                    user=user, tenant=tenant, defaults={'role': self._roles[(slug, role_name)]})
+
+        if not self._engineer_users:
+            self._engineer_users = list(self._users.values())
+        self._provisioner = self._engineer_users[0]
+
+        # One customer-admin login per customer org, scoped to their own tenants.
+        customer_admins = 0
+        for org in self._orgs:
+            if org['kind'] != 'customer':
+                continue
+            domain = org['domain']
+            label = org['group'][0] if org['group'] else org['tenants'][0]['name']
+            username = f"admin@{domain}"
+            user, created = User.objects.get_or_create(username=username, defaults={
+                'email': username, 'first_name': 'IT', 'last_name': f'Admin ({label})',
+                'is_staff': False, 'is_superuser': False})
+            if created:
+                user.set_password(SEED_PASSWORD)
+                user.save()
+            self._users[username] = user
+            customer_admins += 1
+            for t in org['tenants']:
+                slug = t['slug']
+                TenantMembership.objects.get_or_create(
+                    user=user, tenant=self._tenants[slug], defaults={'role': self._roles[(slug, 'Administrator')]})
+                # Link this login to a holder profile in their first tenant.
+                holders = self._tenant_holders.get(slug, [])
+                if holders and holders[0].user_id is None:
+                    holders[0].user = user
+                    holders[0].save(update_fields=['user'])
+
+        total_memberships = TenantMembership.objects.count()
+        self.stdout.write(f'  {len(self._roles)} tenant roles, {len(self._users)} login users '
+                          f'({customer_admins} customer admins), {total_memberships} memberships.')
+
+    # ─────────────────────────────────────────────────────────────────
+    # Assets: per-tenant devices, assignments, custody, installs
+    # ─────────────────────────────────────────────────────────────────
+
+    PRICES = {
+        'dell-latitude-5550': 1899, 'hp-elitebook-860-g11': 2099, 'thinkpad-x1-carbon-g12': 2199,
+        'macbook-pro-16-2024': 3599, 'macbook-air-15-2024': 1499, 'dell-precision-5680': 4299,
+        'dell-optiplex-7010': 1299, 'mac-studio-2024': 6999, 'dell-precision-7960-tower': 7499,
+        'dell-poweredge-r760': 18500, 'hpe-proliant-dl380-g11': 12500, 'synology-ds1823xs': 4200,
+        'iphone-15-pro': 1299, 'galaxy-s24-ultra': 1249, 'ipad-pro-129-2024': 1099, 'surface-pro-10': 1799,
+        'cisco-catalyst-9300': 8500, 'unifi-switch-pro-48': 1099, 'meraki-mr46': 1200,
+        'unifi-dream-machine-pro': 379, 'dell-p2723de-monitor': 499, 'dell-p2422he-monitor': 379,
+        'logitech-rally-bar': 2799,
+    }
+    HW_SUPPLIERS = ['dell-direct', 'apple-business', 'cdw-deutschland', 'bechtle-ag', 'insight-enterprises']
+
+    def _os_for(self, atype_slug):
+        if 'macbook' in atype_slug or 'mac-studio' in atype_slug:
+            return random.choice(['macOS Sequoia 15.1', 'macOS Sonoma 14.6'])
+        if 'iphone' in atype_slug or 'ipad' in atype_slug:
+            return random.choice(['iOS 17.6', 'iPadOS 17.6'])
+        if 'galaxy' in atype_slug:
+            return 'Android 14'
+        if atype_slug in ('dell-poweredge-r760', 'hpe-proliant-dl380-g11'):
+            return random.choice(['VMware ESXi 8.0u2', 'Ubuntu Server 24.04 LTS', 'Windows Server 2022'])
+        if 'thinkpad' in atype_slug or 'precision' in atype_slug:
+            return random.choice(['Windows 11 23H2', 'Ubuntu 24.04 LTS'])
+        return 'Windows 11 23H2'
+
+    def _seed_assets(self):
+        from assets.models import Asset, AssetAssignment, InstalledSoftware
+        from inventory.models import ComponentAllocation
+        from compliance.models import CustodyTemplate, CustodyReceipt
+        self.stdout.write('--- Assets ---')
+
+        # Global custody templates (category-matched).
+        self._custody_templates = {}
+        for name, slug, cat_slug, eula in [
+            ('Standard Workstation & Laptop Agreement', 'laptop-agreement', 'laptops',
+             'I acknowledge receipt of the issued laptop/workstation and agree to the acceptable-use and '
+             'disk-encryption policy. The equipment remains company property and must be returned on demand.'),
+            ('Mobile Device Agreement', 'mobile-agreement', 'mobile-phones',
+             'I acknowledge receipt of the mobile device and SIM. I will keep it secured with a passcode/biometrics '
+             'and will not remove the mobile device management (MDM) profile.'),
+            ('Desktop Workstation Agreement', 'desktop-agreement', 'desktops',
+             'I acknowledge custody of the desktop workstation and agree not to modify its hardware or connect it to '
+             'unauthorized networks without IT approval.'),
+        ]:
+            self._custody_templates[cat_slug] = CustodyTemplate.objects.get_or_create(name=name, defaults={
+                'category': self._categories[cat_slug], 'eula_text': eula,
+                'disclaimer': 'This equipment remains the property of the organization.',
+                'qms_reference': f'NMS-IT-{slug.upper()}', 'is_active': True, 'require_acceptance': True,
+                'email_signature_request': True, 'signature_provider': 'local'})[0]
+
+        self._asset_seq = {}
+        self._assets = []
+        self._assets_by_tenant = {}
+        self._laptops_by_tenant = {}
+        self._servers = []
+
+        def next_tag(code):
+            self._asset_seq[code] = self._asset_seq.get(code, 0) + 1
+            return f"{code}-{self._asset_seq[code]:04d}"
+
+        def shared_location(tenant_slug):
+            locs = self._tenant_locations[tenant_slug]
+            for kw in ('srv', 'rack', 'dc', 'server', 'network', 'closet', 'cabinet', 'farm'):
+                for loc in locs:
+                    if kw in loc.slug:
+                        return loc
+            return locs[0] if locs else None
+
+        def make_asset(tenant, code, atype_slug, status_slug, holder, location, dept, tags=None):
+            atype = self._asset_types[atype_slug]
+            role = atype.asset_role
+            tag = next_tag(code)
+            base_cost = self.PRICES.get(atype_slug, 1000)
+            cost = round(base_cost * random.uniform(0.95, 1.05), 2)
+            years_old = random.choice([0, 1, 1, 2, 2, 3])
+            p_date = days_ago(years_old * 365 + random.randint(0, 300))
+            warranty = p_date + datetime.timedelta(days=(atype.eol_months or 36) * 30)
+            fs_name = atype.custom_fieldset.name if atype.custom_fieldset else ''
+            cv = {}
+            host = f"{code.lower()}-{tag.split('-')[-1]}"
+            if fs_name == 'Laptop / Workstation Specs':
+                cv = {'hostname': host, 'os_version': self._os_for(atype_slug), 'encrypted': True,
+                      'department': dept}
+            elif fs_name == 'Mobile Device Specs':
+                cv = {'os_version': self._os_for(atype_slug),
+                      'sim_number': f"+49-170-{random.randint(1000000, 9999999)}",
+                      'imei': f"35{random.randint(100000000000, 999999999999)}"}
+            elif fs_name == 'Server Specs':
+                cv = {'hostname': f"{host}.svc.local", 'os_version': self._os_for(atype_slug)}
+            elif fs_name == 'Network Device Specs':
+                cv = {'hostname': f"{host}.net.local",
+                      'ip_address': f"10.{random.randint(10, 250)}.{random.randint(0, 254)}.{random.randint(1, 254)}",
+                      'firmware_version': f"v{random.randint(7, 17)}.{random.randint(0, 12)}.{random.randint(0, 9)}"}
+            elif fs_name == 'AV & Conference Specs':
+                cv = {'mounted_state': random.choice(['Wall-Mounted', 'Table-Top'])}
+
+            base_location = None if (holder and status_slug == 'in-use') else location
+            asset = Asset.objects.create(
+                name=f"{atype.model} ({tag})", asset_tag=tag, asset_type=atype, asset_role=role,
+                status=self._status_labels[status_slug], location=base_location, tenant=tenant,
+                serial_number=f"{code}{random.randint(100000, 999999)}", purchase_cost=cost,
+                salvage_value=round(cost * 0.1, 2), purchase_date=p_date, warranty_expiration=warranty,
+                supplier=self._suppliers[random.choice(self.HW_SUPPLIERS)],
+                order_number=f"PO-{p_date.year}-{random.randint(1000, 9999)}", custom_values=cv)
+            if tags:
+                asset.tags.add(*[self._tags[t] for t in tags if t in self._tags])
+            if status_slug == 'in-use' and holder:
+                AssetAssignment.objects.create(asset=asset, assigned_user=holder,
+                                               checked_out_by=self._provisioner, is_active=True,
+                                               notes='Provisioned by Northwind service desk.')
+            elif status_slug == 'in-use' and location:
+                AssetAssignment.objects.create(asset=asset, assigned_location=location,
+                                               checked_out_by=self._provisioner, is_active=True,
+                                               notes='Deployed to site infrastructure.')
+            self._assets.append(asset)
+            return asset
+
+        for slug, tenant in self._tenants.items():
+            meta = self._tenant_meta[slug]
+            profile = self.PROFILES[meta['profile']]
+            code = meta['code']
+            holders = self._tenant_holders[slug]
+            locs = self._tenant_locations[slug]
+            self._assets_by_tenant[slug] = []
+            self._laptops_by_tenant[slug] = []
+            regulated = meta['industry'] in ('Pharmaceuticals', 'Banking', 'Asset Management')
+
+            # Per-employee primary device + optional mobile + monitors
+            for holder in holders:
+                dept = random.choice(profile['depts'])
+                laptop_slug = random.choice(profile['laptops'])
+                lt = make_asset(tenant, code, laptop_slug, 'in-use', holder, None, dept,
+                                tags=['encrypted'] + (['gxp-validated'] if regulated and 'pharma' in meta['profile'] else []))
+                self._laptops_by_tenant[slug].append(lt)
+                self._assets_by_tenant[slug].append(lt)
+                if random.random() < profile['mobile']:
+                    self._assets_by_tenant[slug].append(
+                        make_asset(tenant, code, random.choice(['iphone-15-pro', 'galaxy-s24-ultra']),
+                                   'in-use', holder, None, dept, tags=['mdm-enrolled']))
+                n_mon = int(profile['monitors']) + (1 if random.random() < (profile['monitors'] % 1) else 0)
+                for _ in range(n_mon):
+                    self._assets_by_tenant[slug].append(
+                        make_asset(tenant, code, random.choice(['dell-p2723de-monitor', 'dell-p2422he-monitor']),
+                                   'in-use', holder, None, dept))
+
+            # A few loaner/spare and repair units
+            for _ in range(max(1, len(holders) // 12)):
+                self._assets_by_tenant[slug].append(
+                    make_asset(tenant, code, random.choice(profile['laptops']), 'available', None,
+                               locs[0] if locs else None, random.choice(profile['depts']), tags=['loaner']))
+            if len(holders) > 8:
+                self._assets_by_tenant[slug].append(
+                    make_asset(tenant, code, random.choice(profile['laptops']), 'pending-repair', None,
+                               locs[0] if locs else None, random.choice(profile['depts'])))
+
+            # Shared / infrastructure assets
+            infra_loc = shared_location(slug)
+            for atype_slug, count in profile['shared']:
+                for _ in range(count):
+                    a = make_asset(tenant, code, atype_slug, 'in-use', None, infra_loc,
+                                   'Operations', tags=['production'] if 'poweredge' in atype_slug else None)
+                    self._assets_by_tenant[slug].append(a)
+                    if a.asset_role and a.asset_role.slug in (
+                            'virtualization-host-server', 'database-server', 'application-server', 'backup-server'):
+                        self._servers.append(a)
+
+        # Installed software on a sample of laptops + all servers
+        sw_count = 0
+        for slug in self._tenants:
+            meta = self._tenant_meta[slug]
+            for lt in self._laptops_by_tenant[slug]:
+                installs = [(lt.custom_values.get('os_version', 'Windows 11 23H2'), 'Intune'),
+                            ('Microsoft 365 E5', 'Intune'), ('CrowdStrike Falcon', 'Intune'),
+                            ('1Password Business', 'Intune')]
+                if meta['industry'] == 'Architecture & Design':
+                    installs.append(('Autodesk AutoCAD', 'Intune'))
+                if meta['industry'] == 'Asset Management':
+                    installs.append(('Bloomberg Terminal', 'Lansweeper'))
+                for sw_name, agent in random.sample(installs, k=min(len(installs), random.randint(2, 4))):
+                    sw = self._software.get(sw_name if sw_name in self._software else 'Windows 11 Enterprise')
+                    if not sw:
+                        continue
+                    _, created = InstalledSoftware.objects.get_or_create(
+                        asset=lt, software=sw, version_detected='',
+                        defaults={'discovered_by_agent': agent, 'install_date': lt.purchase_date,
+                                  'last_seen_date': timezone.now() - datetime.timedelta(days=random.randint(0, 14))})
+                    sw_count += created
+        for srv in self._servers:
+            for sw_name in random.sample(['VMware vSphere 8 Enterprise Plus', 'Ubuntu Pro 24.04',
+                                          'Veeam Backup & Replication'], 2):
+                _, created = InstalledSoftware.objects.get_or_create(
+                    asset=srv, software=self._software[sw_name], version_detected='',
+                    defaults={'discovered_by_agent': 'Lansweeper', 'install_date': srv.purchase_date,
+                              'last_seen_date': timezone.now() - datetime.timedelta(days=random.randint(0, 7))})
+                sw_count += created
+
+        # Component allocations into servers and CAD towers
+        alloc = 0
+        cad = [a for a in self._assets if a.asset_type and a.asset_type.slug in
+               ('dell-precision-7960-tower', 'mac-studio-2024', 'dell-precision-5680')]
+        for srv in self._servers:
+            for comp_slug, qty in [('samsung-32gb-ddr5', 4), ('samsung-2tb-nvme', 2), ('wd-red-8tb', 4),
+                                   ('intel-x710-nic', 1), ('dell-perc-h755', 1)]:
+                if random.random() < 0.7:
+                    ComponentAllocation.objects.get_or_create(
+                        component=self._components[comp_slug], assigned_asset=srv, defaults={'qty': qty})
+                    alloc += 1
+        for ws in cad[:30]:
+            for comp_slug, qty in [('crucial-16gb-ddr5', 2), ('nvidia-rtx-6000', 1), ('samsung-2tb-nvme', 1)]:
+                if random.random() < 0.6:
+                    ComponentAllocation.objects.get_or_create(
+                        component=self._components[comp_slug], assigned_asset=ws, defaults={'qty': qty})
+                    alloc += 1
+
+        # Custody receipts for regulated-industry laptops/mobiles (signed)
+        receipts = 0
+        for slug, tenant in self._tenants.items():
+            if self._tenant_meta[slug]['industry'] not in ('Pharmaceuticals', 'Banking'):
+                continue
+            for asset in self._assets_by_tenant[slug]:
+                cat = asset.asset_type.category.slug if asset.asset_type and asset.asset_type.category else None
+                tmpl = self._custody_templates.get(cat)
+                active = asset.assignments.filter(is_active=True, assigned_user__isnull=False).first()
+                if not (tmpl and active and random.random() < 0.5):
+                    continue
+                holder = active.assigned_user
+                h = hashlib.sha256(f"{asset.asset_tag}-{holder.pk}-{timezone.now()}".encode()).hexdigest()[:64]
+                CustodyReceipt.objects.create(
+                    asset=asset, holder=holder, custody_template=tmpl, verification_hash=h,
+                    signature_canvas=f'data:image/png;base64,SIGNED_{asset.asset_tag}', eula_version='1.0',
+                    accepted=True, acceptance_status='accepted',
+                    signed_at=timezone.now() - datetime.timedelta(days=random.randint(5, 200)))
+                receipts += 1
+
+        self.stdout.write(f'  {len(self._assets)} assets, {sw_count} software installs, '
+                          f'{alloc} component allocations, {receipts} custody receipts.')
+
+    # ─────────────────────────────────────────────────────────────────
+    # Inventory: accessory/consumable catalog, stock, assignments, kits
+    # ─────────────────────────────────────────────────────────────────
+
+    def _seed_inventory_stock(self):
+        from inventory.models import (Accessory, Consumable, AccessoryStock, ConsumableStock,
+                                       AccessoryAssignment, ConsumableAssignment, Kit, KitItem)
+        self.stdout.write('--- Inventory: stock & kits ---')
+
+        catalog_tenant = self._tenants['northwind-internal-it']
+        self._accessories = {}
+        for name, slug, mfr, cat, part, min_qty in self._accessory_defs:
+            self._accessories[slug] = Accessory.objects.get_or_create(slug=slug, defaults={
+                'name': name, 'manufacturer': self._manufacturers[mfr], 'category': self._categories[cat],
+                'part_number': part, 'min_qty': min_qty, 'tenant': catalog_tenant})[0]
+        self._consumables = {}
+        for name, slug, mfr, cat, part, min_qty in self._consumable_defs:
+            self._consumables[slug] = Consumable.objects.get_or_create(slug=slug, defaults={
+                'name': name, 'manufacturer': self._manufacturers[mfr], 'category': self._categories[cat],
+                'part_number': part, 'min_qty': min_qty, 'tenant': catalog_tenant})[0]
+
+        # Stock at the MSP and at each tenant's first location.
+        stock_count = 0
+        for slug in self._tenants:
+            locs = self._tenant_locations[slug]
+            if not locs:
+                continue
+            loc = locs[0]
+            for acc_slug in random.sample(list(self._accessories), k=4):
+                # Deliberately leave a couple below min_qty to trigger low-stock alerts.
+                qty = random.choice([0, 2, 3, 8, 12, 20])
+                AccessoryStock.objects.get_or_create(accessory=self._accessories[acc_slug], location=loc,
+                                                      defaults={'qty': qty})
+                stock_count += 1
+            for con_slug in random.sample(list(self._consumables), k=2):
+                ConsumableStock.objects.get_or_create(consumable=self._consumables[con_slug], location=loc,
+                                                       defaults={'qty': random.choice([1, 4, 10, 25])})
+                stock_count += 1
+
+        # Accessory assignments to a sample of holders
+        assign_count = 0
+        all_holders = [h for hs in self._tenant_holders.values() for h in hs]
+        for holder in random.sample(all_holders, k=min(60, len(all_holders))):
+            for acc_slug in random.sample(list(self._accessories), k=random.randint(1, 3)):
+                AccessoryAssignment.objects.create(accessory=self._accessories[acc_slug],
+                                                   assigned_holder=holder, qty=1)
+                assign_count += 1
+        for holder in random.sample(all_holders, k=min(10, len(all_holders))):
+            ConsumableAssignment.objects.create(consumable=self._consumables['aa-batteries-24'],
+                                                assigned_holder=holder, qty=1)
 
         # Kits
-        kit1 = Kit.objects.create(name='Developer Onboarding Kit', description='All essentials for a new developer.', tenant=self._tenants.get('acme-north-america'))
-        KitItem.objects.create(kit=kit1, asset_type=self._asset_types['dell-latitude-5550'], qty=1)
-        KitItem.objects.create(kit=kit1, accessory=self._accessories['mx-master-3s'], qty=1)
-        KitItem.objects.create(kit=kit1, accessory=self._accessories['mx-keys'], qty=1)
-        KitItem.objects.create(kit=kit1, accessory=self._accessories['usb-c-hdmi-adapter'], qty=1)
-        KitItem.objects.create(kit=kit1, license=self._licenses[0], qty=1)
-
-        kit2 = Kit.objects.create(name='Executive Onboarding Kit', description='Premium onboarding package for executives.', tenant=self._tenants.get('acme-north-america'))
-        KitItem.objects.create(kit=kit2, asset_type=self._asset_types['macbook-pro-16-2024'], qty=1)
-        KitItem.objects.create(kit=kit2, asset_type=self._asset_types['iphone-15-pro'], qty=1)
-        KitItem.objects.create(kit=kit2, accessory=self._accessories['usb-c-charger-65w'], qty=2)
-        KitItem.objects.create(kit=kit2, accessory=self._accessories['magic-mouse'], qty=1)
-        KitItem.objects.create(kit=kit2, license=self._licenses[1], qty=1)
-
-        kit3 = Kit.objects.create(name='Sales Representative Kit', description='Standard kit for sales team members.', tenant=self._tenants.get('acme-labs'))
-        KitItem.objects.create(kit=kit3, asset_type=self._asset_types['thinkpad-x1-carbon-g12'], qty=1)
-        KitItem.objects.create(kit=kit3, accessory=self._accessories['zone-wireless-2'], qty=1)
-        KitItem.objects.create(kit=kit3, accessory=self._accessories['webcam-c920s'], qty=1)
-        KitItem.objects.create(kit=kit3, license=self._licenses[7], qty=1)  # Zoom
-
-        kit4 = Kit.objects.create(name='Server Provisioning Bundle', description='Rack-ready server hardware bundle.', tenant=self._tenants.get('acme-north-america'))
-        KitItem.objects.create(kit=kit4, asset_type=self._asset_types['dell-poweredge-r760'], qty=1)
-        KitItem.objects.create(kit=kit4, accessory=self._accessories['thunderbolt-4-cable'], qty=2)
-
-        # Customer Kit
-        kit5 = Kit.objects.create(name='Globex Trader Setup', description='Standard trading desk setup for Globex Capital.', tenant=self._tenants.get('globex-retail'))
-        KitItem.objects.create(kit=kit5, asset_type=self._asset_types['dell-latitude-5550'], qty=1)
-        KitItem.objects.create(kit=kit5, accessory=self._accessories['mx-master-3s'], qty=1)
-        KitItem.objects.create(kit=kit5, accessory=self._accessories['dell-p2723de'], qty=2)
-        KitItem.objects.create(kit=kit5, accessory=self._accessories['usb-c-hdmi-adapter'], qty=1)
-
-        # Asset Maintenance records (supplier must be FK now)
-        maintenance_data = [
-            ('ABX-001', 'repair', 'dell-direct', 0.00, datetime.date(2024, 6, 10), datetime.date(2024, 6, 11), 'Keyboard replacement under warranty'),
-            ('ABX-022', 'upgrade', 'dell-direct', 2500.00, datetime.date(2024, 5, 1), datetime.date(2024, 5, 2), 'Added 2x 32GB RAM modules'),
-            ('ABX-023', 'upgrade', 'dell-direct', 2500.00, datetime.date(2024, 5, 3), datetime.date(2024, 5, 4), 'Added 2x 32GB RAM modules'),
-            ('ABX-032', 'repair', 'cdw-deutschland', 850.00, datetime.date(2024, 8, 15), None, 'Port failure on blade 3 - RMA in progress'),
-            ('ABX-037', 'software_support', 'itz-solutions', 0.00, datetime.date(2024, 9, 1), datetime.date(2024, 9, 1), 'DSM 7.2 upgrade'),
-            ('ABX-003', 'repair', 'dell-direct', 0.00, datetime.date(2024, 10, 5), datetime.date(2024, 10, 6), 'Display hinge repair under warranty'),
-            ('ABX-042', 'repair', 'apple-business', 899.00, datetime.date(2024, 11, 1), None, 'Logic board failure - awaiting parts'),
-            ('ABX-024', 'calibration', 'hp-enterprise-store', 450.00, datetime.date(2024, 7, 20), datetime.date(2024, 7, 20), 'Annual RAID battery replacement'),
-            ('ABX-016', 'software_support', 'apple-business', 0.00, datetime.date(2024, 10, 10), datetime.date(2024, 10, 10), 'macOS 15.2 enterprise deployment'),
-            ('ABX-025', 'hardware_support', 'dell-direct', 1200.00, datetime.date(2024, 6, 15), datetime.date(2024, 6, 16), 'PSU replacement - redundant unit failed'),
-            # Customer maintenance records
-            ('FIN-001', 'repair', 'notebooksbilliger-ag', 250.00, datetime.date(2024, 9, 10), datetime.date(2024, 9, 12), 'SSD upgrade from 256GB to 512GB'),
-            ('MED-001', 'repair', 'hp-enterprise-store', 650.00, datetime.date(2024, 11, 5), datetime.date(2024, 11, 7), 'Display replacement after damage'),
-            ('GRE-001', 'software_support', 'lenovo-pro', 0.00, datetime.date(2024, 10, 20), datetime.date(2024, 10, 20), 'BIOS update and driver refresh'),
-            ('TSI-002', 'repair', 'apple-business', 350.00, datetime.date(2024, 8, 25), datetime.date(2024, 8, 26), 'Battery replacement'),
+        kits = [
+            ('Developer Onboarding Kit', 'northwind-internal-it',
+             [('thinkpad-x1-carbon-g12', 1)], [('mx-master-3s', 1), ('mx-keys', 1), ('tb4-dock', 1)]),
+            ('Executive Onboarding Kit', 'northwind-corporate',
+             [('macbook-pro-16-2024', 1), ('iphone-15-pro', 1)], [('usb-c-charger-65w', 2), ('zone-wireless-2', 1)]),
+            ('Trading Desk Setup', 'meridian-investment',
+             [('macbook-pro-16-2024', 1)], [('dell-p2723de', 2), ('mx-master-3s', 1), ('tb4-dock', 1)]),
+            ('Field Technician Kit', 'vantage-logistics',
+             [('surface-pro-10', 1)], [('usb-c-charger-65w', 1), ('usb-c-hdmi-adapter', 1)]),
         ]
-        for tag, mtype, supplier_slug, cost, start, completion, notes in maintenance_data:
-            supplier = self._suppliers.get(supplier_slug)
+        for name, tenant_slug, at_items, acc_items in kits:
+            kit = Kit.objects.create(name=name, description=f'Standard provisioning bundle: {name}.',
+                                     tenant=self._tenants[tenant_slug])
+            for at_slug, qty in at_items:
+                KitItem.objects.create(kit=kit, asset_type=self._asset_types[at_slug], qty=qty)
+            for acc_slug, qty in acc_items:
+                KitItem.objects.create(kit=kit, accessory=self._accessories[acc_slug], qty=qty)
+
+        self.stdout.write(f'  {len(self._accessories)} accessories, {len(self._consumables)} consumables, '
+                          f'{stock_count} stock rows, {assign_count} accessory assignments, {len(kits)} kits.')
+
+    # ─────────────────────────────────────────────────────────────────
+    # Licensing
+    # ─────────────────────────────────────────────────────────────────
+
+    def _seed_licensing(self):
+        from licenses.models import License, LicenseSeatAssignment
+        self.stdout.write('--- Licensing ---')
+        self._licenses = []
+        seat_assigns = 0
+        for slug, tenant in self._tenants.items():
+            meta = self._tenant_meta[slug]
+            holders = self._tenant_holders[slug]
+            hc = max(len(holders), 5)
+            code = meta['code']
+            plan = [
+                ('Microsoft 365 E5', 'subscription_seat', round(hc * 1.2) + 5, 57 * (round(hc * 1.2) + 5), True),
+                ('CrowdStrike Falcon', 'subscription_seat', round(hc * 1.2) + 5, 60 * (round(hc * 1.2) + 5), True),
+                ('1Password Business', 'subscription_seat', round(hc * 1.1) + 5, 8 * (round(hc * 1.1) + 5), True),
+                ('Windows 11 Enterprise', 'perpetual_seat', hc + 10, None, False),
+            ]
+            if meta['industry'] == 'Pharmaceuticals':
+                plan.append(('SAS Analytics Pro', 'subscription_seat', 15, 45000, True))
+            if meta['industry'] == 'Architecture & Design':
+                plan.append(('Autodesk AutoCAD', 'subscription_seat', 12, 24000, True))
+            if meta['industry'] in ('Banking', 'Asset Management'):
+                plan.append(('Bloomberg Terminal', 'subscription_seat', 8, 192000, True))
+            for sw_name, ltype, seats, cost, has_expiry in plan:
+                expiry = days_ahead(random.choice([18, 25, 40, 90, 180, 365])) if has_expiry else None
+                lic = License.objects.create(
+                    name=f"{code} {sw_name}", software=self._software[sw_name], license_type=ltype,
+                    product_key=('' if ltype != 'perpetual_seat' else f"{code}-XXXXX-YYYYY-ZZZZZ"),
+                    seats=seats, purchase_cost=cost, purchase_date=days_ago(random.randint(60, 600)),
+                    order_number=f"PO-SW-{random.randint(1000, 9999)}", tenant=tenant, expiration_date=expiry)
+                self._licenses.append(lic)
+                # Assign seats to a sample of holders for the seat-based subscriptions
+                if ltype == 'subscription_seat' and holders and sw_name in ('Microsoft 365 E5', 'CrowdStrike Falcon'):
+                    for h in random.sample(holders, k=min(len(holders), max(3, len(holders) // 2))):
+                        try:
+                            LicenseSeatAssignment.objects.create(license=lic, assigned_holder=h)
+                            seat_assigns += 1
+                        except Exception:
+                            pass
+        self.stdout.write(f'  {len(self._licenses)} licenses, {seat_assigns} seat assignments.')
+
+    # ─────────────────────────────────────────────────────────────────
+    # Subscriptions
+    # ─────────────────────────────────────────────────────────────────
+
+    def _seed_subscriptions(self):
+        from subscriptions.models import Subscription, SubscriptionAssignment
+        from assets.models import Asset
+        self.stdout.write('--- Subscriptions ---')
+        self._subscriptions = []
+        ct_asset = ContentType.objects.get_for_model(Asset)
+        # One cloud footprint per organization, owned by its primary tenant.
+        for org in self._orgs:
+            primary_slug = org['tenants'][0]['slug']
+            tenant = self._tenants[primary_slug]
+            label = org['group'][0] if org['group'] else org['tenants'][0]['name']
+            plan = [('Amazon Web Services', random.randint(30000, 150000)),
+                    ('Microsoft Azure', random.randint(40000, 200000))]
+            if org['kind'] == 'msp' or random.random() < 0.5:
+                plan.append(('GitHub Enterprise', random.randint(4000, 40000)))
+            if random.random() < 0.5:
+                plan.append(('Datadog', random.randint(8000, 36000)))
+            for prov_name, cost in plan:
+                start = days_ago(random.randint(60, 700))
+                renewal = days_ahead(random.choice([20, 35, 60, 120, 300]))
+                sub = Subscription.objects.create(
+                    name=f"{label} — {prov_name}", provider=self._providers[prov_name], type='saas',
+                    start_date=start, renewal_date=renewal, renewal_cost=cost,
+                    term_months=12, description=f"{prov_name} cloud subscription for {label}.", tenant=tenant)
+                self._subscriptions.append(sub)
+            # Link AWS workloads to a couple of the tenant's servers
+            servers = [a for a in self._assets_by_tenant.get(primary_slug, [])
+                       if a.asset_role and 'server' in a.asset_role.slug]
+            if servers and self._subscriptions:
+                for srv in servers[:3]:
+                    SubscriptionAssignment.objects.get_or_create(
+                        subscription=self._subscriptions[-len(plan)], content_type=ct_asset,
+                        object_id=srv.pk, defaults={'notes': 'Hybrid workload node'})
+        self.stdout.write(f'  {len(self._subscriptions)} subscriptions across {len(self._orgs)} organizations.')
+
+    # ─────────────────────────────────────────────────────────────────
+    # Maintenance
+    # ─────────────────────────────────────────────────────────────────
+
+    def _seed_maintenance(self):
+        from compliance.models import AssetMaintenance
+        self.stdout.write('--- Maintenance ---')
+        sample = random.sample(self._assets, k=min(40, len(self._assets)))
+        kinds = [('repair', 'Keyboard replacement under warranty', 0),
+                 ('repair', 'Display hinge repair', 220),
+                 ('upgrade', 'RAM upgrade to 64GB', 480),
+                 ('hardware_support', 'Redundant PSU replacement', 1200),
+                 ('software_support', 'Firmware / BIOS update', 0),
+                 ('calibration', 'Annual RAID battery replacement', 450)]
+        count = 0
+        for asset in sample:
+            mtype, note, cost = random.choice(kinds)
+            start = asset.purchase_date + datetime.timedelta(days=random.randint(60, 500))
+            if start > TODAY:
+                start = days_ago(random.randint(10, 120))
+            done = start + datetime.timedelta(days=random.randint(1, 5)) if random.random() < 0.7 else None
             AssetMaintenance.objects.create(
-                asset=self._assets[tag],
-                title=f'{mtype.replace("_", " ").title()} - {self._assets[tag].name}',
-                maintenance_type=mtype,
-                supplier=supplier,
-                cost=cost,
-                start_date=start,
-                completion_date=completion,
-                notes=notes,
-            )
+                asset=asset, title=f"{mtype.replace('_', ' ').title()} — {asset.name}",
+                maintenance_type=mtype, supplier=self._suppliers[random.choice(self.HW_SUPPLIERS)],
+                cost=cost, start_date=start, completion_date=done, notes=note)
+            count += 1
+        self.stdout.write(f'  {count} maintenance records.')
 
-        self.stdout.write('  5 kits, 14 maintenance records.')
+    # ─────────────────────────────────────────────────────────────────
+    # Procurement
+    # ─────────────────────────────────────────────────────────────────
 
-    def _seed_phase7(self):
-        from core.models import WebhookEndpoint, ReportTemplate, LabelTemplate, JournalEntry
-        from assets.models import AssetRequest, AuditSession, AssetAudit, Asset, AssetType
-        from django.contrib.contenttypes.models import ContentType
-        from django.contrib.auth import get_user_model
-        
-        User = get_user_model()
-        
-        self.stdout.write('--- Phase 7: Demo Features (Requests, Webhooks, Templates, Audits) ---')
-        
-        # 2. Webhook Endpoints
-        WebhookEndpoint.objects.get_or_create(
-            name='Slack Hardware Alerts',
-            url='https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX',
-            secret='demo_secret_12345',
-            enabled=True
-        )
-        
-        # 3. Templates
-        ReportTemplate.objects.get_or_create(
-            name='Monthly Asset Depreciation',
-            description='Standard report showing all assets and their current written down value.',
-            template_content='<h1>Monthly Asset Depreciation Report</h1><p>Date: {{ date }}</p>'
-        )
-        LabelTemplate.objects.get_or_create(
-            name='Standard QR Label',
-            defaults={
-                'description': '2x1 inch label with QR code',
-                'barcode_format': 'qr',
-                # Rendered as HTML (Jinja2) by the label engine. Available vars:
-                # asset/obj, barcode_img, barcode_data_uri, barcode_format.
-                'template_code': (
-                    '<table style="width:100%; border-collapse:collapse;">'
-                    '<tr>'
-                    '<td style="width:55%; vertical-align:middle; font-family:Helvetica,Arial,sans-serif;">'
-                    '<div style="font-size:9.5pt; font-weight:bold;">{{ asset.name }}</div>'
-                    '<div style="font-size:8pt; font-family:monospace; background:#000; color:#fff;'
-                    ' padding:1px 3px; display:inline-block; border-radius:2px;">{{ asset.asset_tag }}</div>'
-                    '</td>'
-                    '<td style="width:45%; text-align:right;">{{ barcode_img }}</td>'
-                    '</tr>'
-                    '</table>'
-                )
-            }
-        )
+    def _seed_procurement(self):
+        from procurement.models import PurchaseOrder, PurchaseOrderLine
+        self.stdout.write('--- Procurement ---')
+        po_count = 0
+        line_count = 0
+        statuses = ['ordered', 'partial', 'received', 'draft', 'approved']
+        target_slugs = ['northwind-internal-it', 'helix-rnd', 'meridian-retail', 'meridian-investment',
+                        'sterling-portfolio', 'brightwell-legal', 'aurora-architects', 'vantage-logistics']
+        for i, slug in enumerate(target_slugs):
+            tenant = self._tenants.get(slug)
+            locs = self._tenant_locations.get(slug)
+            if not (tenant and locs):
+                continue
+            meta = self._tenant_meta[slug]
+            status = statuses[i % len(statuses)]
+            order_date = days_ago(random.randint(5, 90))
+            po = PurchaseOrder.objects.create(
+                tenant=tenant, order_number=f"{meta['code']}-PO-{order_date.year}-{1000 + i}",
+                supplier=self._suppliers[random.choice(self.HW_SUPPLIERS)], status=status,
+                order_date=order_date, expected_delivery_date=order_date + datetime.timedelta(days=21),
+                destination_location=locs[0], created_by=self._provisioner,
+                notes='Quarterly hardware refresh order.')
+            po_count += 1
+            laptop = random.choice(self.PROFILES[meta['profile']]['laptops'])
+            lines = [('asset_type', laptop, random.randint(3, 10)),
+                     ('accessory', 'tb4-dock', random.randint(3, 10)),
+                     ('asset_type', random.choice(['dell-p2723de-monitor', 'dell-p2422he-monitor']), random.randint(4, 12))]
+            for kind, key, qty in lines:
+                received = qty if status == 'received' else (qty // 2 if status == 'partial' else 0)
+                kwargs = dict(purchase_order=po, tenant=tenant, qty_ordered=qty, qty_received=received,
+                              unit_price=round(self.PRICES.get(key, 100) if kind == 'asset_type' else 250, 2))
+                if kind == 'asset_type':
+                    kwargs['asset_type'] = self._asset_types[key]
+                else:
+                    kwargs['accessory'] = self._accessories[key]
+                PurchaseOrderLine.objects.create(**kwargs)
+                line_count += 1
+        self.stdout.write(f'  {po_count} purchase orders, {line_count} order lines.')
 
-        # 4. Asset Requests
-        user1 = User.objects.filter(is_superuser=False).first()
-        if not user1:
-            user1 = User.objects.first()
-            
-        atype1 = AssetType.objects.first()
-        if atype1:
-            atype1.requestable = True
-            atype1.save()
+    # ─────────────────────────────────────────────────────────────────
+    # Operations: alerts, reports, event rules, config, dashboards, audit
+    # ─────────────────────────────────────────────────────────────────
 
-        AssetRequest.objects.get_or_create(
-            requester=user1,
-            asset_type=atype1,
-            notes='My current laptop battery is failing.',
-            status='pending',
-        )
-        AssetRequest.objects.get_or_create(
-            requester=user1,
-            asset_type=atype1,
-            notes='Need a secondary monitor for home office.',
-            status='approved',
-        )
+    def _seed_operations(self):
+        from core.models import (NotificationChannel, AlertRule, AlertLog, ReportTemplate, ScheduledReport,
+                                 EventRule, WebhookEndpoint, LabelTemplate, JournalEntry)
+        from extras.models import ConfigContext, Dashboard
+        from assets.models import Asset, AssetType, AssetRequest, AuditSession, AssetAudit
+        from licenses.models import License
+        self.stdout.write('--- Operations: alerts, reports, automation ---')
 
-        from assets.models import AssetRequest, AuditSession, AssetAudit, Asset, AssetType, StatusLabel
-        
-        # ... (other imports)
-        # 5. Audits
-        audit_session, _ = AuditSession.objects.get_or_create(
-            name='Q2 Annual Hardware Audit',
-            status='in_progress',
-            created_by=user1
-        )
-        assets = Asset.objects.exclude(location__isnull=True)[:3]
-        if not assets:
-            assets = Asset.objects.all()[:3]
-        status1 = StatusLabel.objects.first()
-        from organization.models import Location
-        loc1 = Location.objects.first()
-        for a in assets:
-            AssetAudit.objects.get_or_create(
-                session=audit_session,
-                asset=a,
-                status=status1,
-                auditor=user1,
-                location=a.location or loc1
-            )
+        # Notification channels
+        email_ch = NotificationChannel.objects.create(
+            name='Northwind Service Desk', channel_type='email', enabled=True,
+            config={'recipients': 'servicedesk@northwind-it.com'})
+        slack_ch = NotificationChannel.objects.create(
+            name='Northwind Slack #alerts', channel_type='slack', enabled=True,
+            config={'webhook_url': 'https://hooks.slack.com/services/T000/B000/XXXX'})
 
-        # 6. Journal Entries
-        if assets:
-            JournalEntry.objects.create(
-                content_object=assets[0],
-                user=user1,
-                comment='Device inspected. Small scratch on the top lid, otherwise fine.'
-            )
-            JournalEntry.objects.create(
-                content_object=assets[0],
-                user=user1,
-                comment='User reported the fan is getting loud under heavy load.'
-            )
+        # Alert rules (system-wide)
+        rules = {}
+        for name, atype, thr, sev in [
+            ('Low Inventory Stock', 'low_stock', 5, 'warning'),
+            ('License Expiring Soon', 'license_expiry', 30, 'warning'),
+            ('Subscription Renewal Due', 'renewal_due', 45, 'info'),
+            ('Hardware Warranty Expiring', 'warranty_expiry', 60, 'warning'),
+            ('Asset End-of-Life Planning', 'upcoming_eol', 90, 'info'),
+            ('Audit Overdue', 'audit_overdue', 365, 'critical'),
+        ]:
+            r = AlertRule.objects.create(name=name, alert_type=atype, threshold_value=thr, severity=sev,
+                                         is_active=True, description=f'{name} monitoring across managed tenants.')
+            r.channels.add(email_ch, slack_ch)
+            rules[atype] = r
+
+        # Alert logs referencing real objects (active / acknowledged)
+        ct_asset = ContentType.objects.get_for_model(Asset)
+        ct_lic = ContentType.objects.get_for_model(License)
+        log_count = 0
+        expiring_licenses = [lic for lic in self._licenses if lic.expiration_date and lic.expiration_date <= days_ahead(30)]
+        for lic in expiring_licenses[:12]:
+            AlertLog.objects.create(
+                rule=rules['license_expiry'], content_type=ct_lic, object_id=lic.pk,
+                subject=f"License '{lic.name}' expires {lic.expiration_date:%Y-%m-%d}",
+                message=f"{lic.name} ({lic.seats} seats) is due to expire on {lic.expiration_date:%Y-%m-%d}.",
+                severity='warning', status=random.choice(['active', 'active', 'acknowledged']))
+            log_count += 1
+        warranty_assets = [a for a in self._assets if a.warranty_expiration and a.warranty_expiration <= days_ahead(60)]
+        for a in random.sample(warranty_assets, k=min(15, len(warranty_assets))):
+            AlertLog.objects.create(
+                rule=rules['warranty_expiry'], content_type=ct_asset, object_id=a.pk,
+                subject=f"Warranty for {a.asset_tag} expires {a.warranty_expiration:%Y-%m-%d}",
+                message=f"{a.name} ({a.asset_tag}) warranty ends {a.warranty_expiration:%Y-%m-%d}.",
+                severity='warning', status=random.choice(['active', 'acknowledged', 'resolved']))
+            log_count += 1
+
+        # Report templates + schedules
+        rt_summary = ReportTemplate.objects.create(
+            name='Fleet Inventory Summary', report_type='asset_summary',
+            description='All managed assets by status, role and tenant.', include_summary_cards=True,
+            include_distribution_chart=True, group_by_field='status')
+        rt_lic = ReportTemplate.objects.create(
+            name='License Utilization', report_type='license_utilization',
+            description='Seat utilization and renewal exposure across customers.', include_summary_cards=True)
+        rt_renew = ReportTemplate.objects.create(
+            name='Upcoming Subscription Renewals', report_type='subscription_renewals',
+            description='Cloud and SaaS renewals due in the next quarter.', include_summary_cards=True)
+        rt_dep = ReportTemplate.objects.create(
+            name='Asset Depreciation Summary', report_type='asset_depreciation',
+            description='Written-down value of the managed fleet.', include_summary_cards=True,
+            style_preset='financial')
+
+        sr1 = ScheduledReport.objects.create(name='Weekly Fleet Summary', report=rt_summary, frequency='weekly',
+                                             format='html', recipients='ops@northwind-it.com', is_active=True,
+                                             start_time=datetime.time(7, 0))
+        sr1.channels.add(email_ch)
+        sr2 = ScheduledReport.objects.create(name='Monthly License Review', report=rt_lic, frequency='monthly',
+                                             format='csv', recipients='licensing@northwind-it.com', is_active=True)
+        sr2.channels.add(email_ch)
+
+        # Event rules + webhook
+        webhook = WebhookEndpoint.objects.get_or_create(
+            name='Northwind Slack Hardware Events',
+            defaults={'url': 'https://hooks.slack.com/services/T000/B001/HARDWARE',
+                      'secret': 'demo_shared_secret', 'enabled': True})[0]
+        EventRule.objects.create(
+            name='Notify on new asset', model=ct_asset, events=['create'], action_type='notification',
+            action_config={'message': 'A new asset was added to the managed fleet.'}, enabled=True)
+        EventRule.objects.create(
+            name='Push asset status changes to Slack', model=ct_asset, events=['update'], action_type='webhook',
+            action_config={'endpoint': webhook.name}, enabled=True)
+
+        # Config contexts
+        ctx_sec = ConfigContext.objects.create(
+            name='Baseline Endpoint Security', weight=100,
+            description='Security baseline applied to all managed endpoints.',
+            data={'disk_encryption': 'required', 'edr_agent': 'CrowdStrike Falcon',
+                  'password_manager': '1Password', 'mdm': 'Microsoft Intune', 'screen_lock_minutes': 10})
+        ctx_sec.tenants.add(*self._tenants.values())
+        pharma_tenants = [t for s, t in self._tenants.items()
+                          if self._tenant_meta[s]['industry'] == 'Pharmaceuticals']
+        if pharma_tenants:
+            ctx_gxp = ConfigContext.objects.create(
+                name='GxP Lab Controls', weight=50,
+                description='Additional controls for GxP-validated lab and production systems.',
+                data={'audit_logging': 'enabled', 'usb_storage': 'blocked',
+                      'software_whitelisting': True, 'change_control': 'QMS-required'})
+            ctx_gxp.tenants.add(*pharma_tenants)
+
+        # Dashboards for the MSP operators
+        for user in [self._provisioner] + list(User.objects.filter(is_superuser=True)[:1]):
+            Dashboard.objects.get_or_create(user=user, name='Operations Overview',
+                                            defaults={'is_default': True, 'layout': []})
+
+        # Quarterly audit
+        audit = AuditSession.objects.create(name='Q2 Managed Fleet Audit', status='in_progress',
+                                            created_by=self._provisioner)
+        audit_assets = random.sample(self._assets, k=min(25, len(self._assets)))
+        audited = 0
+        for a in audit_assets:
+            loc = a.location or (self._tenant_locations.get(a.tenant.slug)[0]
+                                 if a.tenant and self._tenant_locations.get(a.tenant.slug) else None)
+            AssetAudit.objects.get_or_create(session=audit, asset=a, defaults={
+                'status': a.status, 'auditor': self._provisioner, 'location': loc})
+            audited += 1
+
+        # Asset requests from customer admins
+        req_type = self._asset_types['dell-latitude-5550']
+        req_type.requestable = True
+        req_type.save(update_fields=['requestable'])
+        self._asset_types['iphone-15-pro'].requestable = True
+        self._asset_types['iphone-15-pro'].save(update_fields=['requestable'])
+        customer_admin_users = [u for name, u in self._users.items() if name.startswith('admin@')]
+        req_count = 0
+        for user in customer_admin_users[:5]:
+            AssetRequest.objects.create(requester=user, asset_type=req_type,
+                                        notes='New starter joining next month — needs a standard laptop.',
+                                        status=random.choice(['pending', 'approved']))
+            req_count += 1
+
+        # Journal entries on a few assets
+        if self._assets:
+            for a in random.sample(self._assets, k=min(6, len(self._assets))):
+                JournalEntry.objects.create(content_object=a, user=self._provisioner,
+                                            comment=random.choice([
+                                                'Device inspected during site visit — minor cosmetic wear.',
+                                                'User reported fan noise under load; monitoring.',
+                                                'Re-imaged and re-enrolled in MDM after role change.',
+                                                'Confirmed asset present and tagged during audit.']))
+
+        # Label template
+        LabelTemplate.objects.get_or_create(name='Standard QR Asset Label', defaults={
+            'description': '2x1 inch QR label', 'barcode_format': 'qr',
+            'template_code': ('<table style="width:100%"><tr>'
+                              '<td style="width:55%"><div style="font-weight:bold">{{ asset.name }}</div>'
+                              '<div style="font-family:monospace">{{ asset.asset_tag }}</div></td>'
+                              '<td style="width:45%;text-align:right">{{ barcode_img }}</td></tr></table>')})
+
+        self.stdout.write(f'  {len(rules)} alert rules, {log_count} alert logs, 4 report templates, '
+                          f'2 schedules, 2 event rules, config contexts, {audited} audited assets, '
+                          f'{req_count} asset requests.')
