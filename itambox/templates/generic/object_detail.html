@@ -82,7 +82,7 @@
 <ul class="nav nav-tabs page-header-tabs" data-bs-toggle="tabs" role="tablist">
     <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Details' %}">
         <a href="?tab=details" data-bs-target="#details" class="nav-link {% if not request.GET.tab or request.GET.tab == 'details' %}active{% endif %}" data-bs-toggle="tab" role="tab">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M6.168 18.849a4 4 0 0 1 3.832 -2.849h4a4 4 0 0 1 3.834 2.855" /></svg>
+            <i class="mdi mdi-information-outline me-1"></i>
             <span class="d-none d-xl-inline ms-1">{% translate "Details" %}</span>
         </a>
     </li>
@@ -90,7 +90,7 @@
     {% if changelog_table %}
     <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Changelog' %}">
         <a href="?tab=changelog" data-bs-target="#changelog" class="nav-link {% if request.GET.tab == 'changelog' %}active{% endif %}" data-bs-toggle="tab" role="tab">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 8l0 4l2 2" /><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5" /></svg>
+            <i class="mdi mdi-history me-1"></i>
             <span class="d-none d-xl-inline ms-1">{% translate "Changelog" %}</span>
         </a>
     </li>
@@ -98,7 +98,7 @@
     {% if has_journaling %}
     <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Journal' %}">
         <a href="?tab=journal" data-bs-target="#journal" class="nav-link {% if request.GET.tab == 'journal' %}active{% endif %}" data-bs-toggle="tab" role="tab">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M16 7a4 4 0 1 1 -8 0a4 4 0 0 1 8 0z" /><path d="M12 14v7" /><path d="M9 18h6" /></svg>
+            <i class="mdi mdi-notebook-outline me-1"></i>
             <span class="d-none d-xl-inline ms-1">{% translate "Journal" %}</span>
             <span class="badge bg-secondary ms-1">{{ journal_entries_count }}</span>
         </a>
@@ -107,13 +107,7 @@
     {% if has_subscriptions %}
     <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Subscriptions' %}">
         <a href="?tab=subscriptions" data-bs-target="#subscriptions" class="nav-link {% if request.GET.tab == 'subscriptions' %}active{% endif %}" data-bs-toggle="tab" role="tab">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1 text-info" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                <path d="M15 21h-9a3 3 0 0 1 -3 -3v-1h10v2a2 2 0 0 0 4 0v-14a2 2 0 1 1 2 2h-2m2 -4h-11a3 3 0 0 0 -3 3v11" />
-                <path d="M9 7l4 0" />
-                <path d="M9 11l4 0" />
-                <path d="M9 15l4 0" />
-            </svg>
+            <i class="mdi mdi-receipt-text-outline me-1 text-info"></i>
             <span class="d-none d-xl-inline ms-1">{% translate "Subscriptions" %}</span>
             <span class="badge bg-info-lt ms-1">{{ subscription_assignments_count }}</span>
         </a>
@@ -122,7 +116,7 @@
     {% if has_image_attachments or has_file_attachments %}
     <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Attachments' %}">
         <a href="?tab=attachments" data-bs-target="#attachments" class="nav-link {% if request.GET.tab == 'attachments' %}active{% endif %}" data-bs-toggle="tab" role="tab">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 7l-6.5 6.5a1.5 1.5 0 0 0 3 3l6.5 -6.5a3 3 0 0 0 -6 -6l-6.5 6.5a4.5 4.5 0 0 0 9 9l6.5 -6.5"/></svg>
+            <i class="mdi mdi-paperclip me-1"></i>
             <span class="d-none d-xl-inline ms-1">{% translate "Attachments" %}</span>
         </a>
     </li>
@@ -317,7 +311,7 @@
                     <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
                     {{ journal_form.comment }}
                     <button type="submit" class="btn btn-primary mt-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+                        <i class="mdi mdi-plus me-1"></i>
                         {% translate "Add Entry" %}
                     </button>
                 </form>
