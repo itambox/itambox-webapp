@@ -305,133 +305,35 @@
         </div>
     </div>
 
-    <div class="tab-pane fade {% if request.GET.tab == 'software' %}show active{% endif %}" id="software" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">{% translate "Installed Software Inventory" %}</h3>
-            </div>
-            {% if software_table.rows %}
-                <div class="table-responsive">
-                    {% render_table software_table %}
-                </div>
-                {% include 'generic/includes/table_pagination.html' with table=software_table tab="software" %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <p class="mb-0">{% translate "No catalog software items registered on this asset." %}</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
+    {% translate "Installed Software Inventory" as t_software %}
+    {% translate "No catalog software items registered on this asset." as e_software %}
+    {% include 'generic/includes/related_table_tab.html' with tab="software" table=software_table title=t_software empty=e_software %}
 
     {% if object.accessory_assignments.exists %}
-    <div class="tab-pane fade {% if request.GET.tab == 'accessories' %}show active{% endif %}" id="accessories" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">{% translate "Assigned Accessories" %}</h3>
-            </div>
-            {% if accessory_table.rows %}
-                <div class="table-responsive">
-                    {% render_table accessory_table %}
-                </div>
-                {% include 'generic/includes/table_pagination.html' with table=accessory_table tab="accessories" %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <p class="mb-0">{% translate "No accessories assigned to this asset." %}</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
+    {% translate "Assigned Accessories" as t_acc %}
+    {% translate "No accessories assigned to this asset." as e_acc %}
+    {% include 'generic/includes/related_table_tab.html' with tab="accessories" table=accessory_table title=t_acc empty=e_acc %}
     {% endif %}
 
     {% if object.consumable_consumptions.exists %}
-    <div class="tab-pane fade {% if request.GET.tab == 'consumables' %}show active{% endif %}" id="consumables" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">{% translate "Assigned Consumables" %}</h3>
-            </div>
-            {% if consumable_table.rows %}
-                <div class="table-responsive">
-                    {% render_table consumable_table %}
-                </div>
-                {% include 'generic/includes/table_pagination.html' with table=consumable_table tab="consumables" %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <p class="mb-0">{% translate "No consumables assigned to this asset." %}</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
+    {% translate "Assigned Consumables" as t_cons %}
+    {% translate "No consumables assigned to this asset." as e_cons %}
+    {% include 'generic/includes/related_table_tab.html' with tab="consumables" table=consumable_table title=t_cons empty=e_cons %}
     {% endif %}
 
-    <div class="tab-pane fade {% if request.GET.tab == 'requests' %}show active{% endif %}" id="requests" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">{% translate "Asset Requests History" %}</h3>
-            </div>
-            {% if requests_table.rows %}
-                <div class="table-responsive">
-                    {% render_table requests_table %}
-                </div>
-                {% include 'generic/includes/table_pagination.html' with table=requests_table tab="requests" %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <p class="mb-0">{% translate "No requests logged for this asset." %}</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
+    {% translate "Asset Requests History" as t_requests %}
+    {% translate "No requests logged for this asset." as e_requests %}
+    {% include 'generic/includes/related_table_tab.html' with tab="requests" table=requests_table title=t_requests empty=e_requests %}
 
-    <div class="tab-pane fade {% if request.GET.tab == 'audits' %}show active{% endif %}" id="audits" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">{% translate "Asset Verification & Audits" %}</h3>
-            </div>
-            {% if audits_table.rows %}
-                <div class="table-responsive">
-                    {% render_table audits_table %}
-                </div>
-                {% include 'generic/includes/table_pagination.html' with table=audits_table tab="audits" %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <p class="mb-0">{% translate "No verification audits logged for this asset." %}</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
+    {% translate "Asset Verification & Audits" as t_audits %}
+    {% translate "No verification audits logged for this asset." as e_audits %}
+    {% include 'generic/includes/related_table_tab.html' with tab="audits" table=audits_table title=t_audits empty=e_audits %}
 
-    <div class="tab-pane fade {% if request.GET.tab == 'custody-receipts' %}show active{% endif %}" id="custody-receipts" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">{% translate "Signed Custody Receipts" %}</h3>
-            </div>
-            {% if receipts_table.rows %}
-                <div class="table-responsive">
-                    {% render_table receipts_table %}
-                </div>
-                {% include 'generic/includes/table_pagination.html' with table=receipts_table tab="custody-receipts" %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <p class="mb-0">{% translate "No custody receipts generated for this asset." %}</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
+    {% translate "Signed Custody Receipts" as t_receipts %}
+    {% translate "No custody receipts generated for this asset." as e_receipts %}
+    {% include 'generic/includes/related_table_tab.html' with tab="custody-receipts" table=receipts_table title=t_receipts empty=e_receipts %}
 
-    <div class="tab-pane fade {% if request.GET.tab == 'license-seats' %}show active{% endif %}" id="license-seats" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">{% translate "Allocated Software Licenses" %}</h3>
-            </div>
-            {% if license_seats_table.rows %}
-                <div class="table-responsive">
-                    {% render_table license_seats_table %}
-                </div>
-                {% include 'generic/includes/table_pagination.html' with table=license_seats_table tab="license-seats" %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <p class="mb-0">{% translate "No software license seats allocated to this asset." %}</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
+    {% translate "Allocated Software Licenses" as t_seats %}
+    {% translate "No software license seats allocated to this asset." as e_seats %}
+    {% include 'generic/includes/related_table_tab.html' with tab="license-seats" table=license_seats_table title=t_seats empty=e_seats %}
 {% endblock extra_tab_panes %}

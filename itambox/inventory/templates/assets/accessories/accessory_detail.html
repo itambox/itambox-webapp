@@ -79,42 +79,13 @@
     </div>
 
     {# Active Assignments Tab Pane #}
-    <div class="tab-pane fade {% if request.GET.tab == 'assignments' %}show active{% endif %}" id="assignments" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">{% translate "Checked Out Assignments" %}</h3>
-            </div>
-            {% if assignments_table.rows %}
-                <div class="table-responsive">
-                    {% render_table assignments_table %}
-                </div>
-                {% include 'generic/includes/table_pagination.html' with table=assignments_table %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <i class="mdi mdi-keyboard-outline text-muted mb-2"></i>
-                    <p class="mb-0">{% translate "No active checkout assignments logged for this peripheral." %}</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
+    {% translate "Checked Out Assignments" as t_assignments %}
+    {% translate "No active checkout assignments logged for this peripheral." as e_assignments %}
+    {% include 'generic/includes/related_table_tab.html' with tab="assignments" table=assignments_table title=t_assignments empty=e_assignments icon="mdi mdi-keyboard-outline" %}
 
     {# Kits Tab Pane #}
-    <div class="tab-pane fade {% if request.GET.tab == 'kits' %}show active{% endif %}" id="kits" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">{% translate "Kits Allocating this Accessory" %}</h3>
-            </div>
-            {% if kits_table.rows %}
-                <div class="table-responsive">
-                    {% render_table kits_table %}
-                </div>
-                {% include 'generic/includes/table_pagination.html' with table=kits_table %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <p class="mb-0">{% translate "No kits allocate this accessory." %}</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
+    {% translate "Kits Allocating this Accessory" as t_kits %}
+    {% translate "No kits allocate this accessory." as e_kits %}
+    {% include 'generic/includes/related_table_tab.html' with tab="kits" table=kits_table title=t_kits empty=e_kits %}
 {% endblock extra_tab_panes %}
 

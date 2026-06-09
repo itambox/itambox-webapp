@@ -59,21 +59,8 @@
 {% endblock extra_tabs %}
 
 {% block extra_tab_panes %}
-    <div class="tab-pane fade {% if request.GET.tab == 'custody-policies' %}show active{% endif %}" id="custody-policies" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">{% translate "Tenant-Scoped Custody Policies & EULAs" %}</h3>
-            </div>
-            {% if custody_templates_table.rows %}
-                <div class="table-responsive">
-                    {% render_table custody_templates_table %}
-                </div>
-                {% include 'generic/includes/table_pagination.html' with table=custody_templates_table tab="custody-policies" %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <p class="mb-0">{% translate "No custody policies or templates are currently registered for this tenant group." %}</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>{% endblock extra_tab_panes %}
+    {% translate "Tenant-Scoped Custody Policies & EULAs" as t_custody %}
+    {% translate "No custody policies or templates are currently registered for this tenant group." as e_custody %}
+    {% include 'generic/includes/related_table_tab.html' with tab="custody-policies" table=custody_templates_table title=t_custody empty=e_custody %}
+{% endblock extra_tab_panes %}
  

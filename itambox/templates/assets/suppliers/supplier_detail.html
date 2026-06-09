@@ -45,80 +45,23 @@
 {# --- Extra Tab Panes --- #}
 {% block extra_tab_panes %}
     {# Supplied Assets Tab Pane #}
-    <div class="tab-pane fade {% if request.GET.tab == 'assets' %}show active{% endif %}" id="assets" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">{% translate "Assets Sourced from" %} {{ object.name }}</h3>
-            </div>
-            {% if assets_table.rows %}
-                <div class="table-responsive">
-                    {% render_table assets_table %}
-                </div>
-                {% include 'generic/includes/table_pagination.html' with table=assets_table tab="assets" %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <i class="mdi mdi-devices text-muted mb-2"></i>
-                    <p class="mb-0">{% translate "No physical assets sourced from this supplier yet." %}</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
+    {% blocktranslate with name=object.name asvar t_assets %}Assets Sourced from {{ name }}{% endblocktranslate %}
+    {% translate "No physical assets sourced from this supplier yet." as e_assets %}
+    {% include 'generic/includes/related_table_tab.html' with tab="assets" table=assets_table title=t_assets empty=e_assets icon="mdi mdi-devices" %}
 
     {# Accessories Supplied Tab Pane #}
-    <div class="tab-pane fade {% if request.GET.tab == 'accessories' %}show active{% endif %}" id="accessories" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">{% translate "Accessories Supplied by" %} {{ object.name }}</h3>
-            </div>
-            {% if accessories_table.rows %}
-                <div class="table-responsive">
-                    {% render_table accessories_table %}
-                </div>
-                {% include 'generic/includes/table_pagination.html' with table=accessories_table tab="accessories" %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <p class="mb-0">{% translate "No accessories supplied by this supplier yet." %}</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
+    {% blocktranslate with name=object.name asvar t_accessories %}Accessories Supplied by {{ name }}{% endblocktranslate %}
+    {% translate "No accessories supplied by this supplier yet." as e_accessories %}
+    {% include 'generic/includes/related_table_tab.html' with tab="accessories" table=accessories_table title=t_accessories empty=e_accessories %}
 
     {# Maintenances Tab Pane #}
-    <div class="tab-pane fade {% if request.GET.tab == 'maintenances' %}show active{% endif %}" id="maintenances" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">{% translate "Maintenance Expenditures with" %} {{ object.name }}</h3>
-            </div>
-            {% if maintenances_table.rows %}
-                <div class="table-responsive">
-                    {% render_table maintenances_table %}
-                </div>
-                {% include 'generic/includes/table_pagination.html' with table=maintenances_table tab="maintenances" %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <p class="mb-0">{% translate "No maintenance logs recorded for this supplier yet." %}</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
+    {% blocktranslate with name=object.name asvar t_maint %}Maintenance Expenditures with {{ name }}{% endblocktranslate %}
+    {% translate "No maintenance logs recorded for this supplier yet." as e_maint %}
+    {% include 'generic/includes/related_table_tab.html' with tab="maintenances" table=maintenances_table title=t_maint empty=e_maint %}
 
     {# Licenses Purchased Tab Pane #}
-    <div class="tab-pane fade {% if request.GET.tab == 'licenses' %}show active{% endif %}" id="licenses" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">{% translate "Licenses Purchased from" %} {{ object.name }}</h3>
-            </div>
-            {% if licenses_table.rows %}
-                <div class="table-responsive">
-                    {% render_table licenses_table %}
-                </div>
-                {% include 'generic/includes/table_pagination.html' with table=licenses_table tab="licenses" %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <p class="mb-0">{% translate "No licenses purchased from this supplier yet." %}</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
+    {% blocktranslate with name=object.name asvar t_lic %}Licenses Purchased from {{ name }}{% endblocktranslate %}
+    {% translate "No licenses purchased from this supplier yet." as e_lic %}
+    {% include 'generic/includes/related_table_tab.html' with tab="licenses" table=licenses_table title=t_lic empty=e_lic %}
 {% endblock extra_tab_panes %}
 

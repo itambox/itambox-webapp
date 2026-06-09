@@ -28,22 +28,7 @@
 {# --- Extra Tab Panes --- #}
 {% block extra_tab_panes %}
     {# Assignments Tab Pane #}
-    <div class="tab-pane fade {% if request.GET.tab == 'assignments' %}show active{% endif %}" id="assignments" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">{% translate "Associated Assignments" %}</h3>
-            </div>
-            {% if assignments_table.rows %}
-                <div class="table-responsive">
-                    {% render_table assignments_table %}
-                </div>
-                {% include 'generic/includes/table_pagination.html' with table=assignments_table tab="assignments" %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <i class="mdi mdi-account-group-outline text-muted mb-2"></i>
-                    <p class="mb-0">{% translate "This contact has no active assignments." %}</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
+    {% translate "Associated Assignments" as t_assign %}
+    {% translate "This contact has no active assignments." as e_assign %}
+    {% include 'generic/includes/related_table_tab.html' with tab="assignments" table=assignments_table title=t_assign empty=e_assign icon="mdi mdi-account-group-outline" %}
 {% endblock extra_tab_panes %}

@@ -78,119 +78,34 @@
 {# --- Extra Tab Panes --- #}
 {% block extra_tab_panes %}
     {# Assets Tab Pane #}
-    <div class="tab-pane fade {% if request.GET.tab == 'assets' %}show active{% endif %}" id="assets" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">{% translate "Assets Located in this Specific Location" %}</h3>
-            </div>
-            {% if assets_table.rows %}
-                <div class="table-responsive">
-                    {% render_table assets_table %}
-                </div>
-                {% include 'generic/includes/table_pagination.html' with table=assets_table tab="assets" %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <i class="mdi mdi-devices text-muted mb-2"></i>
-                    <p class="mb-0">{% translate "No assets assigned to this specific location." %}</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
+    {% translate "Assets Located in this Specific Location" as t_assets %}
+    {% translate "No assets assigned to this specific location." as e_assets %}
+    {% include 'generic/includes/related_table_tab.html' with tab="assets" table=assets_table title=t_assets empty=e_assets icon="mdi mdi-devices" %}
 
     {# Accessory Stocks Tab Pane #}
-    <div class="tab-pane fade {% if request.GET.tab == 'accessory-stocks' %}show active{% endif %}" id="accessory-stocks" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">{% translate "Accessory Stocks" %}</h3>
-            </div>
-            {% if accessory_stocks_table.rows %}
-                <div class="table-responsive">
-                    {% render_table accessory_stocks_table %}
-                </div>
-                {% include 'generic/includes/table_pagination.html' with table=accessory_stocks_table tab="accessory-stocks" %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <p class="mb-0">{% translate "No accessories stored in this location." %}</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
+    {% translate "Accessory Stocks" as t_acc %}
+    {% translate "No accessories stored in this location." as e_acc %}
+    {% include 'generic/includes/related_table_tab.html' with tab="accessory-stocks" table=accessory_stocks_table title=t_acc empty=e_acc %}
 
     {# Consumable Stocks Tab Pane #}
-    <div class="tab-pane fade {% if request.GET.tab == 'consumable-stocks' %}show active{% endif %}" id="consumable-stocks" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">{% translate "Consumable Stocks" %}</h3>
-            </div>
-            {% if consumable_stocks_table.rows %}
-                <div class="table-responsive">
-                    {% render_table consumable_stocks_table %}
-                </div>
-                {% include 'generic/includes/table_pagination.html' with table=consumable_stocks_table tab="consumable-stocks" %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <p class="mb-0">{% translate "No consumables stored in this location." %}</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
+    {% translate "Consumable Stocks" as t_cons %}
+    {% translate "No consumables stored in this location." as e_cons %}
+    {% include 'generic/includes/related_table_tab.html' with tab="consumable-stocks" table=consumable_stocks_table title=t_cons empty=e_cons %}
 
     {# Component Stocks Tab Pane #}
-    <div class="tab-pane fade {% if request.GET.tab == 'component-stocks' %}show active{% endif %}" id="component-stocks" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">{% translate "Component Stocks" %}</h3>
-            </div>
-            {% if component_stocks_table.rows %}
-                <div class="table-responsive">
-                    {% render_table component_stocks_table %}
-                </div>
-                {% include 'generic/includes/table_pagination.html' with table=component_stocks_table tab="component-stocks" %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <p class="mb-0">{% translate "No components stored in this location." %}</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
+    {% translate "Component Stocks" as t_comp %}
+    {% translate "No components stored in this location." as e_comp %}
+    {% include 'generic/includes/related_table_tab.html' with tab="component-stocks" table=component_stocks_table title=t_comp empty=e_comp %}
 
     {# Checkout Log Tab Pane #}
-    <div class="tab-pane fade {% if request.GET.tab == 'checkout-log' %}show active{% endif %}" id="checkout-log" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">{% translate "Historical Checkout Log" %}</h3>
-            </div>
-            {% if asset_assignments_table.rows %}
-                <div class="table-responsive">
-                    {% render_table asset_assignments_table %}
-                </div>
-                {% include 'generic/includes/table_pagination.html' with table=asset_assignments_table tab="checkout-log" %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <p class="mb-0">{% translate "No checkout logs for this location." %}</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
+    {% translate "Historical Checkout Log" as t_log %}
+    {% translate "No checkout logs for this location." as e_log %}
+    {% include 'generic/includes/related_table_tab.html' with tab="checkout-log" table=asset_assignments_table title=t_log empty=e_log %}
 
     {# Audit Campaigns Tab Pane #}
-    <div class="tab-pane fade {% if request.GET.tab == 'audits' %}show active{% endif %}" id="audits" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">{% translate "Audit Campaigns run in this Location" %}</h3>
-            </div>
-            {% if audits_table.rows %}
-                <div class="table-responsive">
-                    {% render_table audits_table %}
-                </div>
-                {% include 'generic/includes/table_pagination.html' with table=audits_table tab="audits" %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <p class="mb-0">{% translate "No audit campaigns logged for this location." %}</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
+    {% translate "Audit Campaigns run in this Location" as t_audits %}
+    {% translate "No audit campaigns logged for this location." as e_audits %}
+    {% include 'generic/includes/related_table_tab.html' with tab="audits" table=audits_table title=t_audits empty=e_audits %}
 
     {# Child Locations Tab Pane #}
     <div class="tab-pane fade {% if request.GET.tab == 'child-locations' %}show active{% endif %}" id="child-locations" role="tabpanel">
