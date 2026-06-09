@@ -156,23 +156,8 @@
             <!-- Page header -->
             <div class="page-header d-print-none">
                 <div class="container-fluid">
-                    <div id="breadcrumbs-block" class="d-flex justify-content-between align-items-center" {% if breadcrumbs or help_url %}style="min-height: 2.25rem;"{% endif %}>
-                    {% if breadcrumbs %}
-                        <ol class="breadcrumb breadcrumb-arrows mb-0" aria-label="{% translate 'breadcrumbs' %}">
-                            {% for url, label in breadcrumbs %}
-                                {% if url %}
-                                    <li class="breadcrumb-item"><a href="{{ url }}">{% translate label %}</a></li>
-                                {% else %}
-                                    <li class="breadcrumb-item active" aria-current="page">{% translate label %}</li>
-                                {% endif %}
-                            {% endfor %}
-                        </ol>
-                    {% endif %}
-                    {% if help_url %}
-                        <a href="{{ help_url }}" target="_blank" class="btn btn-icon btn-ghost-info ms-auto" title="{% translate 'View Help Documentation' %}" id="help-docs-btn">
-                            <i class="mdi mdi-help-circle" style="font-size: 1.25rem;"></i>
-                        </a>
-                    {% endif %}
+                    <div id="breadcrumbs-block">
+                        {% include 'global_includes/_breadcrumbs.html' %}
                     </div>
                     <div class="row g-2 align-items-center mt-2">
                         <div class="col">
