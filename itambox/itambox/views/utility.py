@@ -66,5 +66,28 @@ class SearchView(LoginRequiredMixin, BaseHTMXView, TemplateResponseMixin, View):
 
 
 def health(request):
-    """Health check endpoint returning 200 OK."""
-    return JsonResponse({'status': 'ok'})
+    """Readiness/health check.
+
+    Verifies database connectivity so orchestrators (k8s, compose, load
+    balancers) don't route traffic to an instance that can't serve requests.
+    Returns 200 when healthy, 503 otherwise.
+    """
+    from django.db import connection
+
+    checks = {}
+    healthy = True
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT 1')
+            cursor.fetchone()
+        checks['database'] = 'ok'
+    except Exception:
+        logger.exception('Health check: database connectivity failed')
+        checks['database'] = 'error'
+        healthy = False
+
+    return JsonResponse(
+        {'status': 'ok' if healthy else 'error', 'checks': checks},
+        status=200 if healthy else 503,
+    )

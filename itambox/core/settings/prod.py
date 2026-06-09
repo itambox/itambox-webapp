@@ -8,13 +8,22 @@ from .base import *
 
 DEBUG = os.environ.get('ITAMBOX_DEBUG', 'False').lower() in ('true', '1', 't')
 
-if not DEBUG and SECRET_KEY == 'django-insecure-dev-only-change-me-in-production':
+if SECRET_KEY == 'django-insecure-dev-only-change-me-in-production':
     raise RuntimeError(
-        'SECRET_KEY environment variable must be set to a secure random value '
-        'when DEBUG=False (production mode).'
+        'ITAMBOX_SECRET_KEY environment variable must be set to a secure random '
+        'value in production. Refusing to start with the insecure fallback key.'
     )
 
 ALLOWED_HOSTS = os.environ.get('ITAMBOX_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+
+# Origins trusted for unsafe (POST/PUT/...) cross-origin requests. Behind an
+# HTTPS proxy on a custom domain Django needs the scheme-qualified host here,
+# e.g. ITAMBOX_CSRF_TRUSTED_ORIGINS=https://itam.example.com
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get('ITAMBOX_CSRF_TRUSTED_ORIGINS', '').split(',')
+    if origin.strip()
+]
 
 SECURE_SSL_REDIRECT = os.environ.get('ITAMBOX_SECURE_SSL_REDIRECT', 'True').lower() in ('true', '1', 't')
 SECURE_HSTS_SECONDS = int(os.environ.get('ITAMBOX_HSTS_SECONDS', '31536000'))
@@ -25,6 +34,42 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# ------------------------------------------------------------------------------
+# Static files: served by WhiteNoise straight from gunicorn (compressed +
+# content-hashed). Add the middleware immediately after SecurityMiddleware.
+# ------------------------------------------------------------------------------
+if 'whitenoise.middleware.WhiteNoiseMiddleware' not in MIDDLEWARE:
+    _security_idx = MIDDLEWARE.index('django.middleware.security.SecurityMiddleware')
+    MIDDLEWARE.insert(_security_idx + 1, 'whitenoise.middleware.WhiteNoiseMiddleware')
+
+# Compression-only WhiteNoise storage (no manifest hashing). Manifest storage
+# post-processes every CSS/JS file and hard-fails collectstatic when a vendored
+# stylesheet references an asset that isn't shipped (e.g. a .css.map source map).
+# Compression keeps assets small and WhiteNoise still serves them with ETag-based
+# caching, without the brittle reference resolution.
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage',
+    },
+}
+
+# ------------------------------------------------------------------------------
+# Email — env driven. Without this, Django falls back to SMTP on localhost:25
+# and password resets / invitations / alert + report notifications fail.
+# ------------------------------------------------------------------------------
+EMAIL_BACKEND = os.environ.get('ITAMBOX_EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = os.environ.get('ITAMBOX_EMAIL_HOST', 'localhost')
+EMAIL_PORT = int(os.environ.get('ITAMBOX_EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.environ.get('ITAMBOX_EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('ITAMBOX_EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.environ.get('ITAMBOX_EMAIL_USE_TLS', 'True').lower() in ('true', '1', 't')
+EMAIL_USE_SSL = os.environ.get('ITAMBOX_EMAIL_USE_SSL', 'False').lower() in ('true', '1', 't')
+DEFAULT_FROM_EMAIL = os.environ.get('ITAMBOX_DEFAULT_FROM_EMAIL', 'ITAMbox <no-reply@localhost>')
+SERVER_EMAIL = os.environ.get('ITAMBOX_SERVER_EMAIL', DEFAULT_FROM_EMAIL)
 
 # Drop BasicAuthentication in production — token + session auth is sufficient.
 # BasicAuthentication transmits credentials on every request and is only needed

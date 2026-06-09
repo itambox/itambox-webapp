@@ -1,48 +1,96 @@
-version: '3.8'
+# ==============================================================================
+# ITAMbox — production stack.
+# ==============================================================================
+# Secrets and host configuration come from a .env file you provide next to this
+# file (see .env.example). At minimum set, for production:
+#   ITAMBOX_SECRET_KEY            (long random value)
+#   ITAMBOX_ALLOWED_HOSTS         (your domain(s); keep 127.0.0.1 for the probe)
+#   ITAMBOX_DB_PASSWORD
+#   ITAMBOX_CSRF_TRUSTED_ORIGINS  (https://your-domain)
+#   ITAMBOX_EMAIL_*               (real SMTP for password resets / alerts)
+#
+# TLS is expected to be terminated by a reverse proxy / ingress in front of this
+# stack; the app trusts X-Forwarded-Proto via SECURE_PROXY_SSL_HEADER.
+#
+# First run (database is not migrated automatically on container start):
+#   docker compose build
+#   docker compose run --rm app python manage.py migrate
+#   docker compose run --rm app python manage.py createsuperuser
+#   docker compose up -d
+#
+# Local development uses the bare-metal flow in CLAUDE.md (runserver), or run
+# with ITAMBOX_ENV=dev.
+# ==============================================================================
+
+x-app-env: &app-env
+  ITAMBOX_ENV: prod
+  ITAMBOX_DEBUG: "False"
+  ITAMBOX_DB_HOST: db
+  ITAMBOX_DB_PORT: "5432"
+  ITAMBOX_CACHE_BACKEND: redis
+  ITAMBOX_REDIS_URL: redis://redis:6379/1
+  RATELIMIT_CACHE: default
 
 services:
   app:
     build: .
+    restart: unless-stopped
+    env_file: .env
+    environment: *app-env
+    volumes:
+      - media:/app/media
     ports:
       - "8000:8000"
-    environment:
-      - ITAMBOX_SECRET_KEY=change-me-in-production
-      - ITAMBOX_DEBUG=True
-      - ITAMBOX_DB_ENGINE=django.db.backends.postgresql
-      - ITAMBOX_DB_NAME=itambox
-      - ITAMBOX_DB_USER=itambox
-      - ITAMBOX_DB_PASSWORD=itambox
-      - ITAMBOX_DB_HOST=db
-      - ITAMBOX_DB_PORT=5432
-    volumes:
-      - ./itambox:/app
     depends_on:
       db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request as u,sys; req=u.Request('http://127.0.0.1:8000/health/', headers={'Host':'127.0.0.1','X-Forwarded-Proto':'https'}); sys.exit(0 if u.urlopen(req, timeout=5).status==200 else 1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  worker:
+    build: .
+    restart: unless-stopped
+    command: python manage.py qcluster
+    env_file: .env
+    environment: *app-env
+    volumes:
+      - media:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   db:
     image: postgres:16
-    ports:
-      - "5433:5432"
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: itambox
-      POSTGRES_PASSWORD: itambox
-      POSTGRES_DB: itambox
+      POSTGRES_USER: ${ITAMBOX_DB_USER:-itambox}
+      POSTGRES_PASSWORD: ${ITAMBOX_DB_PASSWORD:-itambox}
+      POSTGRES_DB: ${ITAMBOX_DB_NAME:-itambox}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U itambox -d itambox"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U ${ITAMBOX_DB_USER:-itambox} -d ${ITAMBOX_DB_NAME:-itambox}"]
+      interval: 10s
       timeout: 5s
       retries: 5
 
-  mailpit:
-    image: axllent/mailpit:latest
-    ports:
-      - "1025:1025"
-      - "8025:8025"
+  redis:
+    image: redis:7-alpine
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   pgdata:
-
+  media:

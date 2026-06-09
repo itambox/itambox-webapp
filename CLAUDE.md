@@ -32,7 +32,8 @@ All commands run from `itambox/`.
 
 ### Django
 ```bash
-# Env selection: ITAMBOX_ENV=dev|prod (defaults to dev when ITAMBOX_DEBUG=true)
+# Env selection: ITAMBOX_ENV=dev|prod. Fails closed to prod when neither
+# ITAMBOX_ENV nor ITAMBOX_DEBUG is set (test runs default to dev).
 DJANGO_SETTINGS_MODULE=core.settings.dev python manage.py runserver
 
 python manage.py makemigrations
@@ -133,7 +134,7 @@ Tasks live in `core/tasks/`. Each task function should be wrapped in `TaskContex
 
 | Env var | Purpose | Default |
 |---|---|---|
-| `ITAMBOX_ENV` | `dev` or `prod` | auto-detected from `ITAMBOX_DEBUG` |
+| `ITAMBOX_ENV` | `dev` or `prod` | fail-closed to `prod` when unset (dev under tests) |
 | `ITAMBOX_SECRET_KEY` | Django secret key | insecure default (dev only) |
 | `ITAMBOX_DB_*` | DB connection | `itambox`/`localhost`/`5432` |
 | `ITAMBOX_CACHE_BACKEND` | `locmem` or `redis` | `locmem` |

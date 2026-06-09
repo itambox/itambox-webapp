@@ -181,12 +181,15 @@ LOCALE_PATHS = [
 ]
 
 STATIC_URL = '/static/'
+# STATIC_ROOT is the collectstatic target. Required for `manage.py collectstatic`
+# (and therefore for the production image build) — Django raises without it.
+STATIC_ROOT = os.environ.get('ITAMBOX_STATIC_ROOT', str(BASE_DIR / 'staticfiles'))
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
 
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = os.environ.get('ITAMBOX_MEDIA_ROOT', str(BASE_DIR / 'media'))
 
 # Local static end-user documentation root
 DOCS_ROOT = os.environ.get('ITAMBOX_DOCS_ROOT', BASE_DIR / 'docs')
@@ -338,8 +341,16 @@ REQUIRE_CUSTODY_SIGNIN = os.environ.get('ITAMBOX_REQUIRE_CUSTODY_SIGNIN', 'True'
 # ==============================================================================
 # Plugins Configuration
 # ==============================================================================
+# Plugins are optional Django apps loaded at settings time (see
+# itambox/plugins/utils.py). They are configured via a comma-separated env var
+# so the core image boots without bundling any plugin. A missing/uninstalled
+# plugin listed here raises ImproperlyConfigured at startup, so do not hardcode
+# plugins that are not guaranteed to be installed.
+#   Example: ITAMBOX_PLUGINS=itambox_esign
 PLUGINS = [
-    'itambox_esign',
+    p.strip()
+    for p in os.environ.get('ITAMBOX_PLUGINS', '').split(',')
+    if p.strip()
 ]
 
 IS_TESTING = 'test' in sys.argv or any('test' in arg or 'pytest' in arg for arg in sys.argv)
@@ -363,6 +374,58 @@ GRAPHENE = {
     'SCHEMA': 'core.schema.schema',
     'MIDDLEWARE': [],
 }
+
+# ==============================================================================
+# Logging
+# ==============================================================================
+# Console logging is the right default for containers (the orchestrator
+# captures stdout/stderr). Level is env-tunable; Django request 5xx errors and
+# our app loggers are surfaced explicitly.
+LOG_LEVEL = os.environ.get('ITAMBOX_LOG_LEVEL', 'INFO').upper()
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{asctime} {levelname} {name} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': LOG_LEVEL,
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        'django.security': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'itambox': {
+            'handlers': ['console'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+    },
+}
+
 
 # ==============================================================================
 # CORS Configuration

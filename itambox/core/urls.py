@@ -258,7 +258,10 @@ if plugin_ui_patterns:
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
-if settings.DEBUG:
+# Only mount the toolbar when it is actually installed (dev settings). Guarding
+# on DEBUG alone is unsafe: DEBUG can be True under base/prod settings, where
+# debug_toolbar is not in INSTALLED_APPS, which would crash at import time.
+if settings.DEBUG and 'debug_toolbar' in settings.INSTALLED_APPS:
     import debug_toolbar
     urlpatterns += [
         path('__debug__/', include(debug_toolbar.urls)),
