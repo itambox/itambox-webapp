@@ -150,6 +150,18 @@ class MultiTenantLDAPBackend(LDAPBackend):
 
         return TenantLDAPSettings(tenant_config)
 
+    def _is_configured(self):
+        """True only when a usable LDAP config is resolvable for the current
+        context. Without USER_SEARCH or USER_DN_TEMPLATE, django-auth-ldap raises
+        ImproperlyConfigured during authentication — which, for a backend in the
+        chain, would abort an ordinary password login. We treat "no config" as
+        "not my job" and let the next backend handle it."""
+        try:
+            s = self.settings
+            return bool(getattr(s, 'USER_SEARCH', None) or getattr(s, 'USER_DN_TEMPLATE', None))
+        except Exception:
+            return False
+
     def authenticate(self, request, username=None, password=None, **kwargs):
         # Resolve active tenant from UPN/email suffix if not already set
         if not get_current_tenant() and username and '@' in username:
@@ -168,7 +180,17 @@ class MultiTenantLDAPBackend(LDAPBackend):
                 except Tenant.DoesNotExist:
                     pass
 
-        user = super().authenticate(request, username, password, **kwargs)
+        # No LDAP configured for this tenant or globally — skip rather than raise,
+        # so password (and SSO) backends further down the chain can authenticate.
+        if not self._is_configured():
+            return None
+
+        from django.core.exceptions import ImproperlyConfigured
+        try:
+            user = super().authenticate(request, username, password, **kwargs)
+        except ImproperlyConfigured as e:
+            logger.debug("LDAP backend skipped — not configured: %s", e)
+            return None
         if user:
             self.sync_ldap_user_profile_and_memberships(user)
         return user
