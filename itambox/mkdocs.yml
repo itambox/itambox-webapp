@@ -108,3 +108,9 @@ nav:
       - Getting Started: 'plugins/getting_started.md'
       - API Reference: 'plugins/api_reference.md'
       - Extension Hooks: 'plugins/hooks.md'
+  - Operations:
+      - Installation: 'operations/installation.md'
+      - Upgrades: 'operations/upgrades.md'
+      - Backup & Restore: 'operations/backup-restore.md'
+  - Development:
+      - Release Checklist: 'development/release-checklist.md'
