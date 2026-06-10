@@ -8,15 +8,17 @@ from itambox.registry import registry
 
 class BookmarkableMixin:
     """
-    Mixin for models that users can bookmark in the UI.
-    Models using this mixin will have a reverse GenericRelation
-    to the Bookmark model for easy lookup.
+    Mixin for models that users can bookmark (star) and watch (bell) in the UI.
+    Registering here sets both 'bookmarkable' (personal quick-access pin, no
+    notifications) and 'watchable' (notify-on-change via ObjectWatch) features on
+    the model. Every bookmarkable model is also watchable; do NOT add a second mixin.
     """
 
     @classmethod
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         registry.register_feature(cls, 'bookmarkable')
+        registry.register_feature(cls, 'watchable')
 
 
 class CloneableMixin:

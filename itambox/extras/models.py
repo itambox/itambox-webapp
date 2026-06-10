@@ -348,6 +348,36 @@ class Bookmark(ChangeLoggingMixin, BaseModel):
         return f"Bookmark by {self.user} on {self.content_object}"
 
 
+class ObjectWatch(ChangeLoggingMixin, BaseModel):
+    """Notify the user on every change to the watched object (bell / Watch feature)."""
+    user = models.ForeignKey(
+        to=settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='watches'
+    )
+    model = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveBigIntegerField()
+    content_object = GenericForeignKey('model', 'object_id')
+    created = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created']
+        verbose_name = "Object Watch"
+        verbose_name_plural = "Object Watches"
+        indexes = [
+            models.Index(fields=['user', 'model', 'object_id'], name='extras_watch_user_id_idx'),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'model', 'object_id'],
+                name='extras_objectwatch_unique_user_model_object'
+            )
+        ]
+
+    def __str__(self):
+        return f"Watch by {self.user} on {self.content_object}"
+
+
 class ImageAttachment(ChangeLoggingMixin, BaseModel):
     model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='image_attachments')
     object_id = models.PositiveBigIntegerField(db_index=True)
