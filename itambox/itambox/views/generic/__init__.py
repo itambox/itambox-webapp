@@ -378,22 +378,14 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
             try:
                 context['edit_url'] = reverse(get_model_viewname(obj, 'update'), kwargs={'pk': obj.pk})
             except NoReverseMatch:
-                if hasattr(obj, 'slug') and obj.slug:
-                    try:
-                        context['edit_url'] = reverse(get_model_viewname(obj, 'update'), kwargs={'slug': obj.slug})
-                    except NoReverseMatch:
-                        logger.debug("Edit URL not resolvable for %s obj=%s slug=%s", model_name, obj.pk, obj.slug)
-        
+                logger.debug("Edit URL not resolvable for %s obj=%s", model_name, obj.pk)
+
         context['delete_url'] = None
         if can_delete:
             try:
                 context['delete_url'] = reverse(get_model_viewname(obj, 'delete'), kwargs={'pk': obj.pk})
             except NoReverseMatch:
-                if hasattr(obj, 'slug') and obj.slug:
-                    try:
-                        context['delete_url'] = reverse(get_model_viewname(obj, 'delete'), kwargs={'slug': obj.slug})
-                    except NoReverseMatch:
-                        logger.debug("Delete URL not resolvable for %s obj=%s slug=%s", model_name, obj.pk, obj.slug)
+                logger.debug("Delete URL not resolvable for %s obj=%s", model_name, obj.pk)
 
         # Clone is offered generically for any model flagged cloneable (via
         # CloneableMixin) that has a clone view wired and that the user may add.
@@ -403,11 +395,7 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
             try:
                 context['clone_url'] = reverse(get_model_viewname(obj, 'clone'), kwargs={'pk': obj.pk})
             except NoReverseMatch:
-                if hasattr(obj, 'slug') and obj.slug:
-                    try:
-                        context['clone_url'] = reverse(get_model_viewname(obj, 'clone'), kwargs={'slug': obj.slug})
-                    except NoReverseMatch:
-                        logger.debug("Clone URL not resolvable for %s obj=%s slug=%s", model_name, obj.pk, obj.slug)
+                logger.debug("Clone URL not resolvable for %s obj=%s", model_name, obj.pk)
 
         context['title'] = str(obj)
         base_breadcrumbs = [
@@ -706,13 +694,8 @@ class ObjectEditView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
                 pass
         elif self.request.POST.get('_continue') and _model:
             try:
-                edit_view_name = get_model_viewname(_model, 'edit') 
-                try:
-                    return redirect(reverse(edit_view_name, kwargs={'pk': self.object.pk}))
-                except NoReverseMatch:
-                    if hasattr(self.object, 'slug') and self.object.slug:
-                        return redirect(reverse(edit_view_name, kwargs={'slug': self.object.slug}))
-                    raise
+                edit_view_name = get_model_viewname(_model, 'edit')
+                return redirect(reverse(edit_view_name, kwargs={'pk': self.object.pk}))
             except NoReverseMatch:
                 pass
             
