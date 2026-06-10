@@ -12,7 +12,7 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 from django_q.tasks import async_task
 
-from core.models import ReportTemplate, ScheduledReport
+from extras.models import ReportTemplate, ScheduledReport
 from core.tables import ReportTemplateTable, ScheduledReportTable
 from core.forms import ReportTemplateForm, ScheduledReportForm
 from itambox.views.generic import (

@@ -3,9 +3,13 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.urls import reverse
+from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from core.models import BaseModel, ChangeLoggingMixin
-from core.managers import TenantScopingManager, SoftDeleteManager, AllObjectsManager
+from core.managers import (
+    TenantScopingManager, SoftDeleteManager, AllObjectsManager,
+    TenantScopingSoftDeleteManager, TenantScopingAllObjectsManager,
+)
 from core.mixins import SoftDeleteMixin
 from core.validators import validate_image_attachment, validate_file_attachment
 
@@ -475,4 +479,217 @@ class ConfigContext(ChangeLoggingMixin, BaseModel):
 
     def get_absolute_url(self):
         return reverse('extras:configcontext_edit', kwargs={'pk': self.pk})
+
+
+class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
+    allow_global_tenant = True
+
+    REPORT_TYPE_ASSET_SUMMARY = 'asset_summary'
+    REPORT_TYPE_LICENSE_UTILIZATION = 'license_utilization'
+    REPORT_TYPE_SUBSCRIPTION_RENEWALS = 'subscription_renewals'
+    REPORT_TYPE_ASSET_MAINTENANCE = 'asset_maintenance'
+    REPORT_TYPE_ASSET_DEPRECIATION = 'asset_depreciation'
+    REPORT_TYPE_SOFTWARE_INVENTORY = 'software_inventory'
+
+    REPORT_TYPE_CHOICES = [
+        (REPORT_TYPE_ASSET_SUMMARY, 'Asset Inventory Summary'),
+        (REPORT_TYPE_LICENSE_UTILIZATION, 'License Utilization'),
+        (REPORT_TYPE_SUBSCRIPTION_RENEWALS, 'Subscription Renewals'),
+        (REPORT_TYPE_ASSET_MAINTENANCE, 'Asset Maintenance & Repairs'),
+        (REPORT_TYPE_ASSET_DEPRECIATION, 'Asset Depreciation Summary'),
+        (REPORT_TYPE_SOFTWARE_INVENTORY, 'Software Catalog & Installations'),
+    ]
+
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    tenant = models.ForeignKey(
+        'organization.Tenant',
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name='report_templates',
+        db_index=True,
+        help_text="The tenant owning this report template. Null represents system-wide templates."
+    )
+    filter_tenants = models.ManyToManyField(
+        'organization.Tenant',
+        blank=True,
+        related_name='filtered_templates',
+        help_text="Filter compiled data to only include these selected tenants. If none are selected, aggregates data globally."
+    )
+    report_type = models.CharField(max_length=50, choices=REPORT_TYPE_CHOICES)
+    included_columns = models.JSONField(default=list, blank=True, help_text="Checked columns to render in the report data grid.")
+    include_summary_cards = models.BooleanField(default=True, help_text="Toggle displaying top card widgets (totals, counts, financial sums).")
+    include_distribution_chart = models.BooleanField(default=False, help_text="Toggle embedding spend or status distribution charts in the HTML report.")
+    group_by_field = models.CharField(max_length=100, blank=True, null=True, help_text="Optional column key to group grid records under (e.g. location, status).")
+    style_preset = models.CharField(max_length=50, default='default', choices=[
+        ('default', 'Professional Layout'),
+        ('compact', 'Compact Audit Sheet'),
+        ('financial', 'Financial Spend Summary')
+    ])
+    advanced_mode = models.BooleanField(default=False, help_text="Enable custom Jinja2/HTML template code override.")
+    template_content = models.TextField(
+        blank=True,
+        help_text="Optional Jinja2 custom HTML override template"
+    )
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = "Report Template"
+        verbose_name_plural = "Report Templates"
+        constraints = [
+            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_reporttemplate_name_active'),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.get_report_type_display()})"
+
+    def get_absolute_url(self):
+        return reverse('report_template_detail', kwargs={'pk': self.pk})
+
+    def clean(self):
+        super().clean()
+        if self.template_content and self.template_content.strip():
+            try:
+                from jinja2 import Environment
+                Environment().parse(self.template_content)
+            except Exception as e:
+                raise ValidationError({'template_content': f"Jinja2 template compilation failed: {str(e)}"})
+
+
+class ScheduledReport(ChangeLoggingMixin, BaseModel):
+    objects = TenantScopingManager()
+    allow_global_tenant = True
+
+    FORMAT_HTML = 'html'
+    FORMAT_CSV = 'csv'
+    FORMAT_CHOICES = [
+        (FORMAT_HTML, 'HTML Email'),
+        (FORMAT_CSV, 'CSV Attachment'),
+    ]
+
+    FREQUENCY_ONCE = 'once'
+    FREQUENCY_HOURLY = 'hourly'
+    FREQUENCY_DAILY = 'daily'
+    FREQUENCY_WEEKLY = 'weekly'
+    FREQUENCY_BIWEEKLY = 'biweekly'
+    FREQUENCY_MONTHLY = 'monthly'
+    FREQUENCY_QUARTERLY = 'quarterly'
+    FREQUENCY_YEARLY = 'yearly'
+    FREQUENCY_CRON = 'cron'
+
+    FREQUENCY_CHOICES = [
+        (FREQUENCY_ONCE, 'Once'),
+        (FREQUENCY_HOURLY, 'Hourly'),
+        (FREQUENCY_DAILY, 'Daily'),
+        (FREQUENCY_WEEKLY, 'Weekly'),
+        (FREQUENCY_BIWEEKLY, 'Biweekly'),
+        (FREQUENCY_MONTHLY, 'Monthly'),
+        (FREQUENCY_QUARTERLY, 'Quarterly'),
+        (FREQUENCY_YEARLY, 'Yearly'),
+        (FREQUENCY_CRON, 'Custom Cron Expression'),
+    ]
+
+    name = models.CharField(max_length=255)
+    tenant = models.ForeignKey(
+        'organization.Tenant',
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name='scheduled_reports',
+        db_index=True,
+        help_text="The tenant owning this scheduled report. Null represents system-wide schedules."
+    )
+    filter_tenants = models.ManyToManyField(
+        'organization.Tenant',
+        blank=True,
+        related_name='filtered_schedules',
+        help_text="Filter compiled data to only include these selected tenants. If none are selected, aggregates data globally."
+    )
+    report = models.ForeignKey(ReportTemplate, on_delete=models.CASCADE, related_name='schedules')
+    schedule = models.ForeignKey(
+        'django_q.Schedule',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='scheduled_reports',
+        help_text="Linked Django-Q Schedule"
+    )
+    recipients = models.TextField(blank=True, default='', help_text="Comma-separated email addresses")
+    frequency = models.CharField(max_length=50, default='weekly', choices=FREQUENCY_CHOICES)
+    format = models.CharField(max_length=20, choices=FORMAT_CHOICES, default=FORMAT_HTML)
+    cron_expression = models.CharField(max_length=100, blank=True, null=True, help_text="Custom Cron Expression (e.g. '0 8 * * 1-5')")
+    start_time = models.TimeField(null=True, blank=True, help_text="Time of day to run the schedule (e.g. 08:00:00)")
+    channels = models.ManyToManyField('core.NotificationChannel', blank=True, related_name='scheduled_reports')
+    save_to_archive = models.BooleanField(default=True, help_text="Store a copy of generated reports in the local file archive")
+    is_active = models.BooleanField(default=True)
+    last_run = models.DateTimeField(null=True, blank=True)
+    last_status = models.CharField(max_length=50, null=True, blank=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = "Scheduled Report"
+        verbose_name_plural = "Scheduled Reports"
+
+    def __str__(self):
+        return f"{self.name} -> {self.report.name}"
+
+    def delete(self, *args, **kwargs):
+        if self.schedule:
+            try:
+                self.schedule.delete()
+            except Exception:
+                pass
+        super().delete(*args, **kwargs)
+
+    def clean(self):
+        super().clean()
+        if self.frequency == 'cron':
+            if not self.cron_expression:
+                raise ValidationError({'cron_expression': "Cron expression is required when frequency is set to Custom Cron."})
+            try:
+                from croniter import croniter
+                from django.utils import timezone
+                croniter(self.cron_expression, timezone.now())
+            except Exception as e:
+                raise ValidationError({'cron_expression': f"Invalid Cron expression: {str(e)}"})
+        if self.recipients:
+            from django.core.validators import validate_email
+            emails = [e.strip() for e in self.recipients.split(',') if e.strip()]
+            if not emails:
+                raise ValidationError({'recipients': "No recipient email addresses entered."})
+            for email in emails:
+                try:
+                    validate_email(email)
+                except ValidationError:
+                    raise ValidationError({'recipients': f"'{email}' is not a valid email address."})
+
+
+class ReportGenerationArchive(ChangeLoggingMixin, BaseModel):
+    objects = TenantScopingManager()
+
+    scheduled_report = models.ForeignKey(ScheduledReport, on_delete=models.CASCADE, related_name='archives')
+    generated_at = models.DateTimeField(auto_now_add=True)
+    format = models.CharField(max_length=20)
+    status = models.CharField(max_length=50)
+    error_message = models.TextField(blank=True, null=True)
+    file = models.ForeignKey('extras.FileAttachment', on_delete=models.SET_NULL, null=True, blank=True, related_name='report_archives')
+    tenant = models.ForeignKey(
+        'organization.Tenant',
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name='report_archives',
+        db_index=True
+    )
+
+    class Meta:
+        ordering = ['-generated_at']
+        verbose_name = "Report Generation Archive"
+        verbose_name_plural = "Report Generation Archives"
+
+    def __str__(self):
+        return f"{self.scheduled_report.name} - {self.generated_at:%Y-%m-%d %H:%M:%S}"
 

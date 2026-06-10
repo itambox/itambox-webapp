@@ -11,7 +11,7 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
     applies tenant scoping and filter constellations, compiles summary card metrics,
     orders selected data columns, and renders self-contained SVG distribution charts.
     """
-    from core.models import ReportTemplate
+    from extras.models import ReportTemplate
     
     # Resolve active columns sequence
     active_cols = template.included_columns or []

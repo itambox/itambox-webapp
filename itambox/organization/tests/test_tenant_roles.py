@@ -367,7 +367,7 @@ class TenantRoleSecurityTests(TestCase):
         self.assertEqual(alert.status, AlertLog.STATUS_ACTIVE) # Unchanged
 
     def test_report_views_permissions_enforced(self):
-        from core.models import ReportTemplate, ScheduledReport
+        from extras.models import ReportTemplate, ScheduledReport
         from model_bakery import baker
         from django.urls import reverse
         

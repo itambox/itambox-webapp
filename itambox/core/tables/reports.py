@@ -1,6 +1,6 @@
 import django_tables2 as tables
 from django.utils.html import format_html
-from core.models import ReportTemplate, ScheduledReport
+from extras.models import ReportTemplate, ScheduledReport
 from .base import BaseTable
 from .columns import BooleanColumn
 
