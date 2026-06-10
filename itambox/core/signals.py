@@ -95,7 +95,7 @@ def _notify_bookmark_subscribers(sender, instance, action):
     subject = f"Bookmarked Item {action.title()}: {instance}"
     message = f"The item '{instance}' you bookmarked has been {action}."
     
-    target_url = None
+    target_url = ''
     if action != 'deleted' and hasattr(instance, 'get_absolute_url'):
         try:
             target_url = instance.get_absolute_url()

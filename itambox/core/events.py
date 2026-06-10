@@ -189,7 +189,7 @@ def _send_notification(rule, event):
     except (KeyError, ValueError):
         pass
 
-    target_url = None
+    target_url = ''
     try:
         model_class = event.model.model_class()
         if model_class and hasattr(model_class, 'get_absolute_url'):

@@ -133,7 +133,7 @@ class CustomField(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
     name = models.SlugField(max_length=50, verbose_name="Field Name", help_text="Slug-like name (e.g. sim_card_number)")
     label = models.CharField(max_length=100, db_index=True, verbose_name="Display Label")
     field_type = models.CharField(max_length=50, choices=FIELD_TYPE_CHOICES, default=FIELD_TYPE_TEXT, db_index=True, verbose_name="Field Type")
-    choices = models.TextField(blank=True, null=True, help_text="New-line separated list of choices (only for 'select' type)")
+    choices = models.TextField(blank=True, help_text="New-line separated list of choices (only for 'select' type)")
     required = models.BooleanField(default=False, db_index=True, verbose_name="Required")
     object_types = models.ManyToManyField(
         'contenttypes.ContentType',
@@ -523,7 +523,7 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     included_columns = models.JSONField(default=list, blank=True, help_text="Checked columns to render in the report data grid.")
     include_summary_cards = models.BooleanField(default=True, help_text="Toggle displaying top card widgets (totals, counts, financial sums).")
     include_distribution_chart = models.BooleanField(default=False, help_text="Toggle embedding spend or status distribution charts in the HTML report.")
-    group_by_field = models.CharField(max_length=100, blank=True, null=True, help_text="Optional column key to group grid records under (e.g. location, status).")
+    group_by_field = models.CharField(max_length=100, blank=True, help_text="Optional column key to group grid records under (e.g. location, status).")
     style_preset = models.CharField(max_length=50, default='default', choices=[
         ('default', 'Professional Layout'),
         ('compact', 'Compact Audit Sheet'),
@@ -620,13 +620,13 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
     recipients = models.TextField(blank=True, default='', help_text="Comma-separated email addresses")
     frequency = models.CharField(max_length=50, default='weekly', choices=FREQUENCY_CHOICES)
     format = models.CharField(max_length=20, choices=FORMAT_CHOICES, default=FORMAT_HTML)
-    cron_expression = models.CharField(max_length=100, blank=True, null=True, help_text="Custom Cron Expression (e.g. '0 8 * * 1-5')")
+    cron_expression = models.CharField(max_length=100, blank=True, help_text="Custom Cron Expression (e.g. '0 8 * * 1-5')")
     start_time = models.TimeField(null=True, blank=True, help_text="Time of day to run the schedule (e.g. 08:00:00)")
     channels = models.ManyToManyField('extras.NotificationChannel', blank=True, related_name='scheduled_reports')
     save_to_archive = models.BooleanField(default=True, help_text="Store a copy of generated reports in the local file archive")
     is_active = models.BooleanField(default=True)
     last_run = models.DateTimeField(null=True, blank=True)
-    last_status = models.CharField(max_length=50, null=True, blank=True)
+    last_status = models.CharField(max_length=50, blank=True)
 
     class Meta:
         ordering = ['name']
@@ -674,7 +674,7 @@ class ReportGenerationArchive(ChangeLoggingMixin, BaseModel):
     generated_at = models.DateTimeField(auto_now_add=True)
     format = models.CharField(max_length=20)
     status = models.CharField(max_length=50)
-    error_message = models.TextField(blank=True, null=True)
+    error_message = models.TextField(blank=True)
     file = models.ForeignKey('extras.FileAttachment', on_delete=models.SET_NULL, null=True, blank=True, related_name='report_archives')
     tenant = models.ForeignKey(
         'organization.Tenant',

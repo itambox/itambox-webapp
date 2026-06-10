@@ -262,7 +262,7 @@ class AssetHolder(CustomFieldDataMixin, SubscribableMixin, StandardModel, SoftDe
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     upn = models.CharField(max_length=255, verbose_name='User Principal Name')
-    email = models.EmailField(blank=True, null=True)
+    email = models.EmailField(blank=True)
     tenant = models.ForeignKey(
         Tenant,
         on_delete=models.PROTECT,

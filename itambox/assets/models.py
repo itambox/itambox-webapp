@@ -108,7 +108,7 @@ class Manufacturer(StandardModel, SoftDeleteMixin):
     all_objects = AllObjectsManager()
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255)
-    description = models.TextField(blank=True, null=True)
+    description = models.TextField(blank=True)
 
     contacts = GenericRelation('organization.ContactAssignment')
     tags = models.ManyToManyField('extras.Tag', related_name='manufacturers', blank=True)
@@ -255,7 +255,7 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
 
     name = models.CharField(max_length=255)
     asset_tag = models.CharField(max_length=50, blank=True)
-    serial_number = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    serial_number = models.CharField(max_length=100, blank=True, db_index=True)
     asset_type = models.ForeignKey(AssetType, on_delete=models.PROTECT, related_name='assets', null=True, blank=True, db_index=True)
     asset_role = models.ForeignKey(AssetRole, on_delete=models.SET_NULL, blank=True, null=True, related_name='assets', db_index=True)
     purchase_date = models.DateField(blank=True, null=True, db_index=True)
@@ -302,7 +302,7 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
     location = models.ForeignKey('organization.Location', on_delete=models.SET_NULL, blank=True, null=True, related_name='assets', db_index=True)
     tenant = models.ForeignKey('organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='assets', db_index=True)
     purchase_order_line = models.ForeignKey('procurement.PurchaseOrderLine', on_delete=models.SET_NULL, blank=True, null=True, related_name='assets', db_index=True)
-    notes = models.TextField(blank=True, null=True)
+    notes = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', related_name="assets", blank=True)
     last_audited = models.DateTimeField(null=True, blank=True, verbose_name="Last Audited", db_index=True)
     last_audited_by = models.ForeignKey(
@@ -485,12 +485,12 @@ class Supplier(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMix
     all_objects = AllObjectsManager()
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255)
-    website = models.URLField(max_length=500, blank=True, null=True)
-    contact_email = models.EmailField(max_length=255, blank=True, null=True)
-    contact_phone = models.CharField(max_length=50, blank=True, null=True)
-    address = models.TextField(blank=True, null=True)
-    contact_name = models.CharField(max_length=255, blank=True, null=True)
-    notes = models.TextField(blank=True, null=True)
+    website = models.URLField(max_length=500, blank=True)
+    contact_email = models.EmailField(max_length=255, blank=True)
+    contact_phone = models.CharField(max_length=50, blank=True)
+    address = models.TextField(blank=True)
+    contact_name = models.CharField(max_length=255, blank=True)
+    notes = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', related_name='suppliers', blank=True)
 
     class Meta:
@@ -516,8 +516,8 @@ class Category(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     all_objects = AllObjectsManager()
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255)
-    color = models.CharField(max_length=6, blank=True, null=True, help_text="RGB color in hexadecimal (e.g. 00ff00)")
-    description = models.TextField(blank=True, null=True)
+    color = models.CharField(max_length=6, blank=True, help_text="RGB color in hexadecimal (e.g. 00ff00)")
+    description = models.TextField(blank=True)
     applies_to = models.JSONField(default=dict, blank=True, help_text="Applies to: {'asset': True, 'accessory': True, 'component': True}")
     tags = models.ManyToManyField('extras.Tag', related_name='categories', blank=True)
 
@@ -612,8 +612,8 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
     )
     is_group = models.BooleanField(default=False, db_index=True)
 
-    notes = models.TextField(blank=True, null=True)
-    response_notes = models.TextField(blank=True, null=True)
+    notes = models.TextField(blank=True)
+    response_notes = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', related_name='asset_requests_tagged', blank=True)
 
     @property

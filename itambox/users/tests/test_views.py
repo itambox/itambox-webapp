@@ -315,4 +315,4 @@ class BookmarkAndNotificationTests(TestCase):
         notif_del = notifications.first()
         self.assertIn("Deleted", notif_del.subject)
         self.assertIn("Test Tenant", notif_del.message)
-        self.assertIsNone(notif_del.target_url)
+        self.assertEqual(notif_del.target_url, '')

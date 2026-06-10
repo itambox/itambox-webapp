@@ -290,7 +290,7 @@ class Notification(models.Model):
     message = models.TextField()
     level = models.CharField(max_length=20, choices=LEVEL_CHOICES, default=LEVEL_INFO)
     is_read = models.BooleanField(default=False)
-    target_url = models.CharField(max_length=500, blank=True, null=True, help_text="Optional destination URL when clicked.")
+    target_url = models.CharField(max_length=500, blank=True, help_text="Optional destination URL when clicked.")
     created_at = models.DateTimeField(auto_now_add=True)
 
 
@@ -371,12 +371,12 @@ class EmailSettings(ChangeLoggingMixin, BaseModel):
     smtp_host = models.CharField(max_length=255, default='localhost')
     smtp_port = models.PositiveIntegerField(default=25)
     smtp_use_tls = models.BooleanField(default=True)
-    smtp_username = models.CharField(max_length=255, blank=True, null=True)
-    smtp_password = models.CharField(max_length=1000, blank=True, null=True)
+    smtp_username = models.CharField(max_length=255, blank=True)
+    smtp_password = models.CharField(max_length=1000, blank=True)
     from_address = models.EmailField(max_length=255, default='itambox@localhost')
     from_name = models.CharField(max_length=255, default='ITAMbox Notifications')
     enabled = models.BooleanField(default=False)
-    test_recipient = models.EmailField(max_length=255, blank=True, null=True, help_text="Email address for test notifications")
+    test_recipient = models.EmailField(max_length=255, blank=True, help_text="Email address for test notifications")
 
     class Meta:
         verbose_name = "Email Settings"
