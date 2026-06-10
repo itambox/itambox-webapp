@@ -384,7 +384,8 @@ class KitCheckoutView(GenericTransactionView):
     model_form = forms.KitCheckoutForm
     service_callable = checkout_kit
     context_object_name = 'kit'
-    template_name = 'assets/includes/kit_checkout_modal.html'
+    template_name = 'inventory/includes/kit_checkout_modal.html'
+    error_partial = 'inventory/includes/kit_checkout_modal.html#checkout-modal-form'
     success_message = "Kit checked out successfully."
     hx_trigger = "kitListUpdated"
     form_field_map = {
@@ -404,7 +405,8 @@ class AccessoryCheckoutView(GenericTransactionView):
     model_form = forms.AccessoryCheckoutForm
     service_callable = checkout_accessory
     context_object_name = 'accessory'
-    template_name = 'assets/includes/accessory_checkout_modal.html'
+    template_name = 'inventory/includes/accessory_checkout_modal.html'
+    error_partial = 'inventory/includes/accessory_checkout_modal.html#checkout-modal-form'
     success_message = "Accessory checked out successfully."
     form_field_map = {
         'assigned_holder': 'holder',
@@ -439,7 +441,8 @@ class ConsumableCheckoutView(GenericTransactionView):
     model_form = forms.ConsumableCheckoutForm
     service_callable = checkout_consumable
     context_object_name = 'consumable'
-    template_name = 'assets/includes/consumable_checkout_modal.html'
+    template_name = 'inventory/includes/consumable_checkout_modal.html'
+    error_partial = 'inventory/includes/consumable_checkout_modal.html#checkout-modal-form'
     success_message = "Consumable consumed successfully."
     form_field_map = {
         'assigned_holder': 'holder',
@@ -961,7 +964,8 @@ class ComponentCheckoutView(GenericTransactionView):
     model_form = forms.ComponentCheckoutForm
     service_callable = checkout_component
     context_object_name = 'component'
-    template_name = 'assets/includes/component_checkout_modal.html'
+    template_name = 'inventory/includes/component_checkout_modal.html'
+    error_partial = 'inventory/includes/component_checkout_modal.html#checkout-modal-form'
     success_message = "Component checked out successfully."
     form_field_map = {
         'assigned_holder': 'holder',

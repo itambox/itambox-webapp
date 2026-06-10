@@ -1,0 +1,23 @@
+{% load i18n %}
+{# Generic custom-fields card: rendered on any detail page whose model has the
+   custom_field_data feature and at least one stored value. #}
+{% if custom_fields_display %}
+<div class="card mb-3">
+    <div class="card-body">
+        <h3 class="card-title text-secondary">
+            <i class="mdi mdi-form-textbox me-1"></i>{% translate "Custom Fields" %}
+        </h3>
+        <dl class="row mb-0">
+            {% for label, value in custom_fields_display %}
+            <dt class="col-5 text-secondary">{{ label }}</dt>
+            <dd class="col-7">
+                {% if value is True %}<span class="badge bg-green">{% translate "Yes" %}</span>
+                {% elif value is False %}<span class="badge bg-secondary">{% translate "No" %}</span>
+                {% elif value is None or value == "" %}<span class="text-muted">&mdash;</span>
+                {% else %}{{ value }}{% endif %}
+            </dd>
+            {% endfor %}
+        </dl>
+    </div>
+</div>
+{% endif %}

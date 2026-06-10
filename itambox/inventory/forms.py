@@ -11,7 +11,9 @@ from assets.models import Manufacturer, Category, Asset
 from .models import Accessory, Consumable, Kit, KitItem, AccessoryStock, ConsumableStock, Component, ComponentStock, ComponentAllocation
 
 
-class AccessoryForm(SlugModelForm):
+from extras.customfields import CustomFieldModelFormMixin
+
+class AccessoryForm(CustomFieldModelFormMixin, SlugModelForm):
     manufacturer = forms.ModelChoiceField(
         queryset=Manufacturer.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'})
@@ -79,9 +81,10 @@ class AccessoryForm(SlugModelForm):
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
             HTML('</div>')
         )
+        self.append_custom_fields_to_layout()
 
 
-class ConsumableForm(SlugModelForm):
+class ConsumableForm(CustomFieldModelFormMixin, SlugModelForm):
     manufacturer = forms.ModelChoiceField(
         queryset=Manufacturer.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'})
@@ -149,6 +152,7 @@ class ConsumableForm(SlugModelForm):
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
             HTML('</div>')
         )
+        self.append_custom_fields_to_layout()
 
 
 class KitForm(forms.ModelForm):
@@ -494,7 +498,7 @@ class ConsumableStockModalForm(forms.ModelForm):
         self.helper.form_tag = False
 
 
-class ComponentForm(SlugModelForm):
+class ComponentForm(CustomFieldModelFormMixin, SlugModelForm):
     manufacturer = forms.ModelChoiceField(
         queryset=Manufacturer.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'})
@@ -561,6 +565,7 @@ class ComponentForm(SlugModelForm):
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
             HTML('</div>')
         )
+        self.append_custom_fields_to_layout()
 
 
 class ComponentStockForm(forms.ModelForm):

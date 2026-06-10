@@ -33,6 +33,8 @@ from users.forms import TableConfigForm
 from users.models import UserPreference
 
 from itambox.views.htmx import BaseHTMXView
+from itambox.views.generic.mixins import CachedObjectMixin
+from itambox.views.generic.utils import safe_return_url
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +106,13 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
             queryset = manager.all()
             if hasattr(queryset, 'filter_by_tenant'):
                 queryset = queryset.filter_by_tenant()
+            elif any(f.name == 'tenant' for f in model._meta.fields):
+                # Fail loud: a tenant-bearing model whose all_objects manager cannot
+                # scope by tenant would expose other tenants' deleted objects here.
+                raise ImproperlyConfigured(
+                    f"{model.__name__}.all_objects is not tenant-scoped but the model "
+                    f"has a tenant field. Use TenantScopingAllObjectsManager."
+                )
             queryset = queryset.filter(deleted_at__isnull=False)
         else:
             queryset = super().get_queryset()
@@ -114,7 +123,13 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
                 logger.warning('Invalid filter params for %s: %s', self.__class__.__name__, self.filter.errors)
                 self.filter = None
             else:
-                return self.filter.qs
+                queryset = self.filter.qs
+
+        # cf_<name>=<value> params filter on custom field data (NetBox-style).
+        if model and registry.model_has_feature(model, 'custom_field_data'):
+            from extras.customfields import apply_custom_field_filters
+            queryset = apply_custom_field_filters(queryset, model, self.request.GET)
+
         return queryset
 
     def get_paginate_by(self, queryset):
@@ -161,17 +176,24 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
 
         context.setdefault('title', _model._meta.verbose_name_plural)
 
-        from core.models import ExportTemplate, LabelTemplate
-        try:
-            content_type = ContentType.objects.get_for_model(_model)
-            context['export_templates'] = list(ExportTemplate.objects.filter(content_type=content_type))
-        except Exception:
+        # Export/label template catalogs feed dropdowns that only exist on the
+        # full page — partial (table refresh/filter/pagination) renders never
+        # use them, so don't pay for the queries there.
+        if self.is_htmx_partial() and self.content_partial_name:
             context['export_templates'] = []
-
-        try:
-            context['label_templates'] = list(LabelTemplate.objects.all())
-        except Exception:
             context['label_templates'] = []
+        else:
+            from core.models import ExportTemplate, LabelTemplate
+            try:
+                content_type = ContentType.objects.get_for_model(_model)
+                context['export_templates'] = list(ExportTemplate.objects.filter(content_type=content_type))
+            except Exception:
+                context['export_templates'] = []
+
+            try:
+                context['label_templates'] = list(LabelTemplate.objects.all())
+            except Exception:
+                context['label_templates'] = []
 
         try:
             create_url_name = get_model_viewname(_model, 'create')
@@ -253,7 +275,7 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         context['help_url'] = get_help_url(self, _model._meta.app_label, _model._meta.model_name)
         return context
 
-class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, DetailView):
+class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, CachedObjectMixin, DetailView):
     template_name = 'generic/object_detail.html'
     layout = None
 
@@ -279,11 +301,15 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
 
     def has_permission(self):
         perms = self.get_permission_required()
-        obj = None
         try:
             obj = self.get_object()
-        except Exception:
-            pass
+        except Http404:
+            # 404 (not 403) for objects outside the tenant scope: don't reveal
+            # whether the pk exists in another tenant. Anonymous users fall
+            # through to the permission check (and the login redirect).
+            if self.request.user.is_authenticated:
+                raise
+            obj = None
         return self.request.user.has_perms(perms, obj=obj)
 
     def get(self, request, *args, **kwargs):
@@ -434,6 +460,10 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
         context['attachment_app_label'] = app_label
         context['attachment_model_name'] = model_name
 
+        if registry.model_has_feature(obj.__class__, 'custom_field_data'):
+            from extras.customfields import get_custom_fields_display
+            context['custom_fields_display'] = get_custom_fields_display(obj)
+
         if registry.model_has_feature(obj.__class__, 'image_attachments'):
             obj_type = ContentType.objects.get_for_model(obj)
             context['image_attachments'] = ImageAttachment.objects.filter(
@@ -528,17 +558,21 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
         context['help_url'] = get_help_url(self, app_label, model_name)
         return context
 
-class ObjectEditView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, UpdateView):
+class ObjectEditView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, CachedObjectMixin, UpdateView):
     model_form = None
     template_name = 'generic/object_edit.html'
 
     def has_permission(self):
         perms = self.get_permission_required()
-        obj = None
         try:
             obj = self.get_object()
-        except Exception:
-            pass
+        except Http404:
+            # 404 (not 403) for objects outside the tenant scope: don't reveal
+            # whether the pk exists in another tenant. Anonymous users fall
+            # through to the permission check (and the login redirect).
+            if self.request.user.is_authenticated:
+                raise
+            obj = None
         return self.request.user.has_perms(perms, obj=obj)
 
     def get_permission_required(self):
@@ -546,7 +580,11 @@ class ObjectEditView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         if model:
             app_label = model._meta.app_label
             model_name = model._meta.model_name
-            if self.get_object():
+            try:
+                obj = self.get_object()
+            except Http404:
+                obj = None
+            if obj:
                 return (f'{app_label}.change_{model_name}',)
             return (f'{app_label}.add_{model_name}',)
         return ('',)
@@ -617,20 +655,22 @@ class ObjectEditView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         return form
 
     def get_success_url(self):
-        if self.request.POST.get('return_url'):
-            return self.request.POST.get('return_url')
+        fallback = None
         if hasattr(self, 'default_return_url') and self.default_return_url:
-            return reverse(self.default_return_url)
-        if self.object and hasattr(self.object, 'get_absolute_url'):
-            return self.object.get_absolute_url()
-        _model = self._get_model()
-        if _model:
-            try:
-                list_view_name = get_model_viewname(_model, 'list')
-                return reverse(list_view_name)
-            except NoReverseMatch:
-                logger.debug("List view URL fallback failed for model %s", _model)
-        return reverse('dashboard')
+            fallback = reverse(self.default_return_url)
+        elif self.object and hasattr(self.object, 'get_absolute_url'):
+            fallback = self.object.get_absolute_url()
+        if fallback is None:
+            _model = self._get_model()
+            if _model:
+                try:
+                    list_view_name = get_model_viewname(_model, 'list')
+                    fallback = reverse(list_view_name)
+                except NoReverseMatch:
+                    logger.debug("List view URL fallback failed for model %s", _model)
+        if fallback is None:
+            fallback = reverse('dashboard')
+        return safe_return_url(self.request, self.request.POST.get('return_url'), fallback)
 
     def form_valid(self, form):
         # Unsaved instances (new objects and clones) are creations.
@@ -757,17 +797,21 @@ class ObjectCloneView(ObjectEditView):
     def pre_save_clone(self, original, cloned):
         pass
 
-class ObjectDeleteView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, DeleteView):
+class ObjectDeleteView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, CachedObjectMixin, DeleteView):
     template_name = 'generic/object_confirm_delete.html'
     form_class = ConfirmationForm
 
     def has_permission(self):
         perms = self.get_permission_required()
-        obj = None
         try:
             obj = self.get_object()
-        except Exception:
-            pass
+        except Http404:
+            # 404 (not 403) for objects outside the tenant scope: don't reveal
+            # whether the pk exists in another tenant. Anonymous users fall
+            # through to the permission check (and the login redirect).
+            if self.request.user.is_authenticated:
+                raise
+            obj = None
         return self.request.user.has_perms(perms, obj=obj)
 
     def get_permission_required(self):
@@ -783,17 +827,17 @@ class ObjectDeleteView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
         return ('',)
 
     def get_success_url(self):
-        if self.request.POST.get('return_url'):
-            return self.request.POST.get('return_url')
         if hasattr(self, 'default_return_url') and self.default_return_url:
-            return reverse(self.default_return_url)
-        if hasattr(self, 'success_url') and self.success_url:
-            return str(self.success_url)
-        try:
-            list_view_name = get_model_viewname(self.object.__class__, 'list')
-            return reverse(list_view_name)
-        except NoReverseMatch:
-            return reverse('dashboard')
+            fallback = reverse(self.default_return_url)
+        elif hasattr(self, 'success_url') and self.success_url:
+            fallback = str(self.success_url)
+        else:
+            try:
+                list_view_name = get_model_viewname(self.object.__class__, 'list')
+                fallback = reverse(list_view_name)
+            except NoReverseMatch:
+                fallback = reverse('dashboard')
+        return safe_return_url(self.request, self.request.POST.get('return_url'), fallback)
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -830,7 +874,7 @@ class ObjectDeleteView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
                 context['cancel_url'] = reverse(list_view_name)
             except NoReverseMatch:
                 context['cancel_url'] = reverse('dashboard')
-        context['return_url'] = self.request.GET.get('return_url', context['cancel_url'])
+        context['return_url'] = safe_return_url(self.request, self.request.GET.get('return_url'), context['cancel_url'])
         
         base_breadcrumbs = [
             (reverse('dashboard'), _('Dashboard')),
@@ -1169,7 +1213,11 @@ class ObjectBulkEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXVi
 
         pks = request.POST.getlist('pk')
         model = self._get_model()
-        return_url = request.POST.get('return_url') or request.META.get('HTTP_REFERER', reverse('dashboard'))
+        return_url = safe_return_url(
+            request,
+            request.POST.get('return_url') or request.META.get('HTTP_REFERER'),
+            reverse('dashboard'),
+        )
         raw_selected_fields = request.POST.getlist('_selected_fields')
         selected_fields = [f for f in raw_selected_fields if f not in ('add_tags', 'remove_tags')]
 
@@ -1310,7 +1358,11 @@ class ObjectBulkDeleteView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMX
 
         pks = request.POST.getlist('pk')
         model = self._get_model()
-        return_url = request.POST.get('return_url') or request.META.get('HTTP_REFERER', reverse('dashboard'))
+        return_url = safe_return_url(
+            request,
+            request.POST.get('return_url') or request.META.get('HTTP_REFERER'),
+            reverse('dashboard'),
+        )
 
         if not pks:
             messages.warning(request, f"No {model._meta.verbose_name_plural} were selected.")
@@ -1439,8 +1491,9 @@ class ObjectRestoreView(PermissionRequiredMixin, LoginRequiredMixin, View):
             list_url = reverse(get_model_viewname(self.model, 'list')) + "?deleted=true"
         except Exception:
             list_url = '/'
-        referrer = request.META.get('HTTP_REFERER') or list_url
-        return HttpResponseRedirect(referrer)
+        return HttpResponseRedirect(
+            safe_return_url(request, request.META.get('HTTP_REFERER'), list_url)
+        )
 
 
 class ObjectPurgeView(PermissionRequiredMixin, LoginRequiredMixin, View):
@@ -1485,8 +1538,9 @@ class ObjectPurgeView(PermissionRequiredMixin, LoginRequiredMixin, View):
             list_url = reverse(get_model_viewname(self.model, 'list')) + "?deleted=true"
         except Exception:
             list_url = '/'
-        referrer = request.META.get('HTTP_REFERER') or list_url
-        return HttpResponseRedirect(referrer)
+        return HttpResponseRedirect(
+            safe_return_url(request, request.META.get('HTTP_REFERER'), list_url)
+        )
 
 
 class ObjectBulkRestoreView(PermissionRequiredMixin, LoginRequiredMixin, View):
@@ -1540,8 +1594,9 @@ class ObjectBulkRestoreView(PermissionRequiredMixin, LoginRequiredMixin, View):
             list_url = reverse(get_model_viewname(self.model, 'list')) + "?deleted=true"
         except Exception:
             list_url = '/'
-        referrer = request.META.get('HTTP_REFERER') or list_url
-        return HttpResponseRedirect(referrer)
+        return HttpResponseRedirect(
+            safe_return_url(request, request.META.get('HTTP_REFERER'), list_url)
+        )
 
 
 class ObjectBulkPurgeView(PermissionRequiredMixin, LoginRequiredMixin, View):
@@ -1595,5 +1650,6 @@ class ObjectBulkPurgeView(PermissionRequiredMixin, LoginRequiredMixin, View):
             list_url = reverse(get_model_viewname(self.model, 'list')) + "?deleted=true"
         except Exception:
             list_url = '/'
-        referrer = request.META.get('HTTP_REFERER') or list_url
-        return HttpResponseRedirect(referrer)
+        return HttpResponseRedirect(
+            safe_return_url(request, request.META.get('HTTP_REFERER'), list_url)
+        )

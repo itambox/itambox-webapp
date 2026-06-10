@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import TemplateView, RedirectView
 from assets import views as asset_views # Import the assets views
+from extras.dashboard import views as dashboard_views
 from itambox.views.generic import (
     ObjectBulkDeleteView, ObjectBulkEditView, table_config,
     GenericObjectImportView, ObjectRestoreView, ObjectPurgeView,
@@ -69,7 +70,7 @@ urlpatterns = [
 
     path('admin/', admin.site.urls),
     path('accounts/', include('django.contrib.auth.urls')),
-    path('', asset_views.DashboardView.as_view(), name='dashboard'), # Root path for dashboard
+    path('', dashboard_views.DashboardView.as_view(), name='dashboard'),  # Root dashboard (extras owns dashboards)
 
     # Search Path
     path('search/', SearchView.as_view(), name='search'),

@@ -16,6 +16,7 @@ from django.urls import reverse
 from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from .choices import StatusTypeChoices
 from .models import Asset, StatusLabel, AssetAssignment
 from compliance.models import CustodyReceipt
 from inventory.models import AccessoryAssignment, ConsumableAssignment
@@ -49,7 +50,7 @@ def checkout_asset(
 
         resolved_status = status
         if not resolved_status:
-            resolved_status = StatusLabel.objects.filter(type='deployed').first()
+            resolved_status = StatusLabel.objects.filter(type=StatusTypeChoices.DEPLOYED).first()
         if resolved_status:
             asset.status = resolved_status
 
@@ -192,7 +193,7 @@ def checkin_asset(
             if not revert_status:
                 revert_status = active.pre_checkout_status
             if not revert_status:
-                revert_status = StatusLabel.objects.filter(type='deployable').first()
+                revert_status = StatusLabel.objects.filter(type=StatusTypeChoices.DEPLOYABLE).first()
             
             if revert_status:
                 asset.status = revert_status
@@ -207,7 +208,7 @@ def checkin_asset(
             checked_in_from = asset.location
             revert_status = status
             if not revert_status:
-                revert_status = StatusLabel.objects.filter(type='deployable').first()
+                revert_status = StatusLabel.objects.filter(type=StatusTypeChoices.DEPLOYABLE).first()
             if revert_status:
                 asset.status = revert_status
             asset.location = location
@@ -223,7 +224,7 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_lo
     if not holder and not location:
         raise ValidationError("Either holder or location must be specified.")
 
-    in_use_status = StatusLabel.objects.filter(type='deployed').first()
+    in_use_status = StatusLabel.objects.filter(type=StatusTypeChoices.DEPLOYED).first()
     if not in_use_status:
         raise ValidationError("No Status Label with type 'Deployed' exists. Please configure one.")
 
@@ -237,7 +238,7 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_lo
                 # Lock a deployable asset immediately
                 asset = Asset.objects.filter(
                     asset_type=item.asset_type,
-                    status__type='deployable'
+                    status__type=StatusTypeChoices.DEPLOYABLE
                 ).select_for_update().first()
                 if not asset:
                     raise ValidationError(f"No available assets of type '{item.asset_type}' in stock.")

@@ -3,13 +3,13 @@ from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel
-from core.mixins import TaggableMixin, AutoSlugMixin, SoftDeleteMixin, JournalingMixin, SubscribableMixin
+from core.mixins import TaggableMixin, AutoSlugMixin, SoftDeleteMixin, JournalingMixin, SubscribableMixin, CustomFieldDataMixin
 
 
 from .mixins import CheckableInventoryModelMixin
 
 
-class AbstractInventoryItem(CheckableInventoryModelMixin, AutoSlugMixin, SubscribableMixin, DeletableVaultModel):
+class AbstractInventoryItem(CustomFieldDataMixin, CheckableInventoryModelMixin, AutoSlugMixin, SubscribableMixin, DeletableVaultModel):
     allow_global_tenant = True
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255)

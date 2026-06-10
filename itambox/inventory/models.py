@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError, FieldError
 
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel, StandardModel
 from core.mixins import TaggableMixin, AutoSlugMixin, SoftDeleteMixin, JournalingMixin, ImageAttachmentMixin, CloneableMixin, ExportableMixin, SubscribableMixin
-from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager, SoftDeleteQuerySet, TenantScopingQuerySet
+from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager, TenantScopingAllObjectsManager, SoftDeleteQuerySet, TenantScopingQuerySet
 from .abstract_models import AbstractInventoryItem, AbstractStock, AbstractAssignment
 
 
@@ -107,7 +107,7 @@ class Component(AbstractInventoryItem):
 
 class Accessory(AbstractInventoryItem):
     objects = TenantScopingSoftDeleteManager()
-    all_objects = AllObjectsManager()
+    all_objects = TenantScopingAllObjectsManager()
 
     manufacturer = models.ForeignKey(
         'assets.Manufacturer',
@@ -179,7 +179,7 @@ class Accessory(AbstractInventoryItem):
 
 class Consumable(AbstractInventoryItem):
     objects = TenantScopingSoftDeleteManager()
-    all_objects = AllObjectsManager()
+    all_objects = TenantScopingAllObjectsManager()
 
     class Meta(AbstractInventoryItem.Meta):
         verbose_name = _("Consumable")
@@ -450,7 +450,7 @@ class ConsumableAssignment(AbstractAssignment):
 
 class Kit(JournalingMixin, TaggableMixin, CloneableMixin, ExportableMixin, SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
     objects = TenantScopingSoftDeleteManager()
-    all_objects = AllObjectsManager()
+    all_objects = TenantScopingAllObjectsManager()
     allow_global_tenant = True
 
     name = models.CharField(max_length=100, verbose_name="Kit Name")

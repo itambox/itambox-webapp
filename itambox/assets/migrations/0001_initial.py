@@ -300,6 +300,9 @@ class Migration(migrations.Migration):
             options={
                 'abstract': False,
             },
-            bases=(core.mixins.CustomFieldDataMixin, core.mixins.BookmarkableMixin, core.mixins.TaggableMixin, core.mixins.ExportableMixin, core.mixins.CloneableMixin, core.models.ChangeLoggingMixin, models.Model),
+            # NOTE: CustomFieldDataMixin removed from historical bases when it became a
+            # field-bearing abstract model (it was a plain object mixin here); keeping
+            # it would retroactively inject custom_field_data into this CreateModel.
+            bases=(core.mixins.BookmarkableMixin, core.mixins.TaggableMixin, core.mixins.ExportableMixin, core.mixins.CloneableMixin, core.models.ChangeLoggingMixin, models.Model),
         ),
     ]

@@ -235,14 +235,20 @@ class AssetForm(forms.ModelForm):
                 except AssetType.DoesNotExist:
                     pass
 
-        custom_fields = []
+        # Per-device custom fields: globally-applicable Asset fields (not bound
+        # to any fieldset) plus the selected asset type's fieldset fields that
+        # target Asset.
+        from django.contrib.contenttypes.models import ContentType
+        asset_ct = ContentType.objects.get_for_model(Asset)
+        custom_fields = CustomField.objects.filter(object_types=asset_ct, fieldsets__isnull=True)
         if asset_type_id:
             try:
                 asset_type_obj = AssetType.objects.get(pk=asset_type_id)
                 if asset_type_obj.custom_fieldset:
-                    custom_fields = asset_type_obj.custom_fieldset.fields.filter(model_level=False)
+                    custom_fields = custom_fields | asset_type_obj.custom_fieldset.fields.filter(object_types=asset_ct)
             except AssetType.DoesNotExist:
                 pass
+        custom_fields = custom_fields.distinct()
 
         self.custom_field_keys = []
         for field in custom_fields:
@@ -250,8 +256,8 @@ class AssetForm(forms.ModelForm):
             self.custom_field_keys.append(field_key)
 
             initial_value = None
-            if self.instance and self.instance.pk and self.instance.custom_values:
-                initial_value = self.instance.custom_values.get(field.name)
+            if self.instance and self.instance.pk and self.instance.custom_field_data:
+                initial_value = self.instance.custom_field_data.get(field.name)
 
             form_field = None
             if field.field_type == CustomField.FIELD_TYPE_TEXT:
@@ -363,21 +369,21 @@ class AssetForm(forms.ModelForm):
     def save(self, commit=True):
         instance = super().save(commit=False)
 
-        custom_values = {}
+        custom_field_data = {}
         for key, value in self.cleaned_data.items():
             if key.startswith('cf_'):
                 field_name = key[3:]
                 if value is not None:
                     if isinstance(value, (int, float, bool)):
-                        custom_values[field_name] = value
+                        custom_field_data[field_name] = value
                     elif hasattr(value, 'isoformat'):
-                        custom_values[field_name] = value.isoformat()
+                        custom_field_data[field_name] = value.isoformat()
                     else:
-                        custom_values[field_name] = str(value)
+                        custom_field_data[field_name] = str(value)
                 else:
-                    custom_values[field_name] = None
+                    custom_field_data[field_name] = None
 
-        instance.custom_values = custom_values
+        instance.custom_field_data = custom_field_data
 
         if commit:
             instance.save()

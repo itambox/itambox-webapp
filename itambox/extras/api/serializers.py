@@ -18,11 +18,15 @@ class TagSerializer(BaseModelSerializer):
 class CustomFieldSerializer(BaseModelSerializer):
     field_type_display = serializers.CharField(source='get_field_type_display', read_only=True)
 
+    object_types = serializers.SlugRelatedField(
+        many=True, read_only=True, slug_field='model'
+    )
+
     class Meta:
         model = CustomField
         fields = [
             'id', 'name', 'label', 'field_type', 'field_type_display',
-            'choices', 'required', 'created_at', 'updated_at'
+            'choices', 'required', 'object_types', 'created_at', 'updated_at'
         ]
         brief_fields = ['id', 'name', 'label', 'field_type']
 

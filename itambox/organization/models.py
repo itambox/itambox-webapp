@@ -7,11 +7,11 @@ from django.contrib.contenttypes.models import ContentType
 from django.conf import settings # Import settings
 from core.models import BaseModel, ChangeLoggingMixin, StandardModel, VaultModel, DeletableVaultModel
 from core.managers import TenantScopingManager, SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager, TenantScopingAllObjectsManager
-from core.mixins import ExportableMixin, TaggableMixin, JournalingMixin, AutoSlugMixin, CloneableMixin, ImageAttachmentMixin, FileAttachmentMixin, BookmarkableMixin, SubscribableMixin, SoftDeleteMixin
+from core.mixins import ExportableMixin, TaggableMixin, JournalingMixin, AutoSlugMixin, CloneableMixin, ImageAttachmentMixin, FileAttachmentMixin, BookmarkableMixin, SubscribableMixin, SoftDeleteMixin, CustomFieldDataMixin
 
 # Create your models here.
 
-class Location(SubscribableMixin, StandardModel, SoftDeleteMixin):
+class Location(CustomFieldDataMixin, SubscribableMixin, StandardModel, SoftDeleteMixin):
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()
     STATUS_PLANNED = 'planned'
@@ -249,7 +249,7 @@ class Site(DeletableVaultModel, BookmarkableMixin):
         return reverse('organization:site_detail', kwargs={'pk': self.pk})
 
 # +++ AssetHolder Model +++
-class AssetHolder(SubscribableMixin, StandardModel, SoftDeleteMixin):
+class AssetHolder(CustomFieldDataMixin, SubscribableMixin, StandardModel, SoftDeleteMixin):
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()
     user = models.ForeignKey(
@@ -328,7 +328,7 @@ class ContactRole(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         return reverse('organization:contactrole_detail', kwargs={'pk': self.pk})
 
 
-class Contact(StandardModel, SoftDeleteMixin):
+class Contact(CustomFieldDataMixin, StandardModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     name = models.CharField(max_length=100)

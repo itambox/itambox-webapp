@@ -228,18 +228,18 @@ class CustomFieldViewTests(TestCase):
         )
 
     def test_list_view(self):
-        url = reverse('assets:customfield_list')
+        url = reverse('extras:customfield_list')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_detail_view(self):
-        url = reverse('assets:customfield_detail', kwargs={'pk': self.cf.pk})
+        url = reverse('extras:customfield_detail', kwargs={'pk': self.cf.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Department Code')
 
     def test_create_view_post(self):
-        url = reverse('assets:customfield_create')
+        url = reverse('extras:customfield_create')
         response = self.client.post(url, {
             'name': 'building_floor',
             'label': 'Building Floor',
@@ -253,7 +253,7 @@ class CustomFieldViewTests(TestCase):
         self.assertTrue(CustomField.objects.filter(name='building_floor').exists())
 
     def test_delete_view_post(self):
-        url = reverse('assets:customfield_delete', kwargs={'pk': self.cf.pk})
+        url = reverse('extras:customfield_delete', kwargs={'pk': self.cf.pk})
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
         self.assertFalse(CustomField.objects.filter(pk=self.cf.pk).exists())
@@ -268,18 +268,18 @@ class CustomFieldsetViewTests(TestCase):
         self.cfs = CustomFieldset.objects.create(name='Network Config')
 
     def test_list_view(self):
-        url = reverse('assets:customfieldset_list')
+        url = reverse('extras:customfieldset_list')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_detail_view(self):
-        url = reverse('assets:customfieldset_detail', kwargs={'pk': self.cfs.pk})
+        url = reverse('extras:customfieldset_detail', kwargs={'pk': self.cfs.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Network Config')
 
     def test_create_view_post(self):
-        url = reverse('assets:customfieldset_create')
+        url = reverse('extras:customfieldset_create')
         response = self.client.post(url, {
             'name': 'Server Specs',
         })
@@ -290,7 +290,7 @@ class CustomFieldsetViewTests(TestCase):
         self.assertTrue(CustomFieldset.objects.filter(name='Server Specs').exists())
 
     def test_delete_view_post(self):
-        url = reverse('assets:customfieldset_delete', kwargs={'pk': self.cfs.pk})
+        url = reverse('extras:customfieldset_delete', kwargs={'pk': self.cfs.pk})
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
         self.assertFalse(CustomFieldset.objects.filter(pk=self.cfs.pk).exists())

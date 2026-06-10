@@ -3,7 +3,9 @@ from core.forms import SlugModelForm
 from ..models import Supplier
 
 
-class SupplierForm(SlugModelForm):
+from extras.customfields import CustomFieldModelFormMixin
+
+class SupplierForm(CustomFieldModelFormMixin, SlugModelForm):
     class Meta:
         model = Supplier
         fields = ['name', 'slug', 'website', 'contact_email', 'contact_phone', 'contact_name', 'address', 'notes', 'tags']

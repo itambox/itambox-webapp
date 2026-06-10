@@ -16,6 +16,7 @@ django-taggit>=6.1,<6.2
 django-q2>=1.7,<2.0
 sqlparse>=0.5.4,<0.6.0
 croniter>=6.0,<7.0
+python-dateutil>=2.9,<3.0  # used directly (assets EOL math); previously only a croniter transitive dep
 
 # GraphQL
 graphene-django>=3.2,<3.3

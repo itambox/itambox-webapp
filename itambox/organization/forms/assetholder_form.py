@@ -13,7 +13,9 @@ from ..filters import AssetHolderFilterSet
 
 
 
-class AssetHolderForm(forms.ModelForm):
+from extras.customfields import CustomFieldModelFormMixin
+
+class AssetHolderForm(CustomFieldModelFormMixin, forms.ModelForm):
     tenant = forms.ModelChoiceField(
         queryset=Tenant.objects.all(),
         required=False,
@@ -95,6 +97,7 @@ class AssetHolderForm(forms.ModelForm):
             Submit('submit', button_text, css_class='btn btn-primary'),
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
         )
+        self.append_custom_fields_to_layout()
 
 
 class AssetHolderFilterForm(FilterForm):

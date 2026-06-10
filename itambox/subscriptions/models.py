@@ -2,7 +2,7 @@ from django.db import models
 from django.conf import settings
 from django.urls import reverse, NoReverseMatch
 from core.models import BaseModel, ChangeLoggingMixin, StandardModel, DeletableVaultModel
-from core.mixins import TaggableMixin, JournalingMixin, ExportableMixin, AutoSlugMixin, ImageAttachmentMixin, FileAttachmentMixin, CloneableMixin, SoftDeleteMixin, BookmarkableMixin
+from core.mixins import TaggableMixin, JournalingMixin, ExportableMixin, AutoSlugMixin, ImageAttachmentMixin, FileAttachmentMixin, CloneableMixin, SoftDeleteMixin, BookmarkableMixin, CustomFieldDataMixin
 from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager, TenantScopingManager, TenantScopingAllObjectsManager
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
@@ -158,9 +158,9 @@ class BillingCycleChoices(models.TextChoices):
     ONETIME = 'onetime', _('One-Time')
 
 
-class Subscription(AutoSlugMixin, BookmarkableMixin, DeletableVaultModel):
+class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, DeletableVaultModel):
     objects = TenantScopingSoftDeleteManager()
-    all_objects = AllObjectsManager()
+    all_objects = TenantScopingAllObjectsManager()
 
     """Represents a recurring service agreement (SaaS, Support, etc.)."""
     name = models.CharField(

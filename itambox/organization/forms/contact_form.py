@@ -9,7 +9,9 @@ from ..models import Contact
 from ..filters import ContactFilterSet
 
 
-class ContactForm(forms.ModelForm):
+from extras.customfields import CustomFieldModelFormMixin
+
+class ContactForm(CustomFieldModelFormMixin, forms.ModelForm):
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
         required=False,
@@ -50,6 +52,7 @@ class ContactForm(forms.ModelForm):
             'comments',
             'tags'
         )
+        self.append_custom_fields_to_layout()
         from .helpers import add_standard_buttons
         add_standard_buttons(self.helper, self.instance, 'organization:contact_list')
 

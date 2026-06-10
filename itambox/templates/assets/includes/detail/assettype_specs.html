@@ -10,8 +10,8 @@
         </h4>
         <div class="row g-3">
             {% for field in object.custom_fieldset.fields.all %}
-                {% if field.model_level %}
-                    {% with val=object.custom_values|lookup:field.name %}
+                {% if field.is_asset_type_spec %}
+                    {% with val=object.custom_field_data|lookup:field.name %}
                     {% if val is not None and val != "" %}
                     <div class="col-md-6">
                         <div class="d-flex align-items-center mb-1">

@@ -1,6 +1,5 @@
 from django.db import models
 from django.contrib.contenttypes.fields import GenericRelation
-from django.db.models.signals import class_prepared
 
 from itambox.registry import registry
 
@@ -41,47 +40,26 @@ class CloneableMixin:
         registry.register_feature(cls, 'cloneable')
 
 
-class CustomFieldDataMixin:
+class CustomFieldDataMixin(models.Model):
     """
-    Mixin for models that support per-type custom fields
-    via a JSON column. Models using this mixin must define
-    a `custom_field_data` JSONField or inherit it from this mixin.
+    Abstract model providing custom field value storage. Which fields apply to
+    a model is declared on extras.CustomField.object_types; this mixin only
+    supplies the JSON storage and registers the feature flag.
     """
+
+    custom_field_data = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Custom Field Data",
+    )
+
+    class Meta:
+        abstract = True
 
     @classmethod
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        # Register the feature eagerly; field validation is deferred
-        # to the class_prepared signal handler below.
         registry.register_feature(cls, 'custom_field_data')
-
-
-def _validate_custom_field_data(sender, **kwargs):
-    """
-    Deferred validation for CustomFieldDataMixin.
-    Called by Django's class_prepared signal after the model class is fully
-    built and the app registry is ready. This avoids the AppRegistryNotReady
-    error that occurs when accessing cls._meta inside __init_subclass__.
-
-    Uses _meta.local_fields instead of get_fields() because get_fields()
-    triggers _relation_tree population, which requires ALL models to be loaded.
-    """
-    if issubclass(sender, CustomFieldDataMixin) and not getattr(sender._meta, 'abstract', False):
-        # Check local_fields (safe during class_prepared — no relation tree lookup)
-        local_field_names = {f.name for f in sender._meta.local_fields}
-        # Also check MRO for fields defined on parent abstract models
-        for klass in sender.__mro__:
-            if hasattr(klass, '_meta') and hasattr(klass._meta, 'local_fields'):
-                local_field_names.update(f.name for f in klass._meta.local_fields)
-
-        if 'custom_field_data' not in local_field_names and 'custom_values' not in local_field_names:
-            raise TypeError(
-                f"{sender.__name__} using CustomFieldDataMixin must define a "
-                f"'custom_field_data' or 'custom_values' JSONField."
-            )
-
-
-class_prepared.connect(_validate_custom_field_data)
 
 
 class ExportableMixin:

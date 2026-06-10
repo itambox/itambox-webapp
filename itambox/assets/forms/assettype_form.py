@@ -88,10 +88,14 @@ class AssetTypeForm(SlugModelForm):
 
         custom_fields = []
         if custom_fieldset_id:
+            from django.contrib.contenttypes.models import ContentType
             from extras.models import CustomFieldset, CustomField
+            from ..models import AssetType as AssetTypeModel
             try:
                 fieldset_obj = CustomFieldset.objects.get(pk=custom_fieldset_id)
-                custom_fields = fieldset_obj.fields.filter(model_level=True)
+                # Fields targeting AssetType act as hardware specifications.
+                assettype_ct = ContentType.objects.get_for_model(AssetTypeModel)
+                custom_fields = fieldset_obj.fields.filter(object_types=assettype_ct)
             except CustomFieldset.DoesNotExist:
                 pass
 
@@ -101,8 +105,8 @@ class AssetTypeForm(SlugModelForm):
             self.custom_field_keys.append(field_key)
 
             initial_value = None
-            if self.instance and self.instance.pk and self.instance.custom_values:
-                initial_value = self.instance.custom_values.get(field.name)
+            if self.instance and self.instance.pk and self.instance.custom_field_data:
+                initial_value = self.instance.custom_field_data.get(field.name)
 
             form_field = None
             if field.field_type == CustomField.FIELD_TYPE_TEXT:
@@ -222,21 +226,21 @@ class AssetTypeForm(SlugModelForm):
     def save(self, commit=True):
         instance = super().save(commit=False)
 
-        custom_values = {}
+        custom_field_data = {}
         for key, value in self.cleaned_data.items():
             if key.startswith('cf_'):
                 field_name = key[3:]
                 if value is not None:
                     if isinstance(value, (int, float, bool)):
-                        custom_values[field_name] = value
+                        custom_field_data[field_name] = value
                     elif hasattr(value, 'isoformat'):
-                        custom_values[field_name] = value.isoformat()
+                        custom_field_data[field_name] = value.isoformat()
                     else:
-                        custom_values[field_name] = str(value)
+                        custom_field_data[field_name] = str(value)
                 else:
-                    custom_values[field_name] = None
+                    custom_field_data[field_name] = None
 
-        instance.custom_values = custom_values
+        instance.custom_field_data = custom_field_data
 
         if commit:
             instance.save()

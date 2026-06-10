@@ -128,19 +128,20 @@ class CustomField(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
     field_type = models.CharField(max_length=50, choices=FIELD_TYPE_CHOICES, default=FIELD_TYPE_TEXT, db_index=True, verbose_name="Field Type")
     choices = models.TextField(blank=True, null=True, help_text="New-line separated list of choices (only for 'select' type)")
     required = models.BooleanField(default=False, db_index=True, verbose_name="Required")
-    model_level = models.BooleanField(
-        default=False,
-        db_index=True,
-        verbose_name="Model Level / Specification",
-        help_text="If True, this field defines a hardware specification on the Asset Type (e.g. CPU, RAM) rather than a device-specific instance detail (e.g. Hostname, OS version)."
+    object_types = models.ManyToManyField(
+        'contenttypes.ContentType',
+        related_name='custom_fields',
+        blank=True,
+        verbose_name="Object Types",
+        help_text="The model(s) this field applies to. A field applying to Asset Type "
+                  "describes a hardware specification; one applying to Asset describes "
+                  "a per-device detail.",
     )
 
     class Meta:
         ordering = ['label']
         verbose_name = _("Custom Field")
         verbose_name_plural = _("Custom Fields")
-        db_table = 'assets_customfield'
-        app_label = 'assets'
         constraints = [
             models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_customfield_name_active'),
         ]
@@ -149,7 +150,13 @@ class CustomField(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         return f"{self.label} ({self.get_field_type_display()})"
 
     def get_absolute_url(self):
-        return reverse('assets:customfield_detail', kwargs={'pk': self.pk})
+        return reverse('extras:customfield_detail', kwargs={'pk': self.pk})
+
+    @property
+    def is_asset_type_spec(self):
+        """True when this field applies to AssetType (a hardware specification).
+        Template-friendly replacement for the retired model_level flag."""
+        return self.object_types.filter(app_label='assets', model='assettype').exists()
 
 
 class CustomFieldset(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
@@ -162,8 +169,6 @@ class CustomFieldset(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         ordering = ['name']
         verbose_name = _("Custom Fieldset")
         verbose_name_plural = _("Custom Fieldsets")
-        db_table = 'assets_customfieldset'
-        app_label = 'assets'
         constraints = [
             models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_customfieldset_name_active'),
         ]
@@ -172,7 +177,7 @@ class CustomFieldset(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         return self.name
 
     def get_absolute_url(self):
-        return reverse('assets:customfieldset_detail', kwargs={'pk': self.pk})
+        return reverse('extras:customfieldset_detail', kwargs={'pk': self.pk})
 
 
 class ConfigContext(ChangeLoggingMixin, BaseModel):

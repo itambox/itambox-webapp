@@ -3,7 +3,7 @@ import logging
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, get_object_or_404
 from django.views.generic import FormView, View
 
@@ -21,6 +21,13 @@ class GenericTransactionView(PermissionRequiredMixin, LoginRequiredMixin, BaseHT
     hx_trigger = "tableRefreshRequired"
     form_field_map = {}
     form_exclude_fields = ()
+    #: When True, successful HTMX submissions answer with HX-Redirect to the
+    #: object's detail page instead of 204 + closeModal/refresh triggers.
+    hx_redirect_on_success = False
+    #: django-template-partials reference ("template.html#partial-name") rendered
+    #: on validation errors for HTMX requests. Returns only the form fragment with
+    #: a 422 status, so the modal body is re-swapped without nesting the full modal.
+    error_partial = None
 
     def get_permission_required(self):
         if self.permission_required is None:
@@ -33,11 +40,15 @@ class GenericTransactionView(PermissionRequiredMixin, LoginRequiredMixin, BaseHT
         perms = self.get_permission_required()
         if not perms:
             return True
-        obj = None
         try:
             obj = self.get_object()
-        except Exception:
-            pass
+        except Http404:
+            # 404 (not 403) for objects outside the tenant scope: don't reveal
+            # whether the pk exists in another tenant. Anonymous users fall
+            # through to the permission check (and the login redirect).
+            if self.request.user.is_authenticated:
+                raise
+            obj = None
         return self.request.user.has_perms(perms, obj=obj)
 
     def get_form_class(self):
@@ -58,8 +69,11 @@ class GenericTransactionView(PermissionRequiredMixin, LoginRequiredMixin, BaseHT
         return queryset
 
     def get_object(self):
-        pk = self.kwargs.get('pk')
-        return get_object_or_404(self.get_queryset(), pk=pk)
+        # Cached: this is called from has_permission, get_form_kwargs,
+        # form_valid and get_context_data within a single request.
+        if getattr(self, '_cached_object', None) is None:
+            self._cached_object = get_object_or_404(self.get_queryset(), pk=self.kwargs.get('pk'))
+        return self._cached_object
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -80,7 +94,12 @@ class GenericTransactionView(PermissionRequiredMixin, LoginRequiredMixin, BaseHT
             service_kwargs[mapped_key] = value
         return service_kwargs
 
+    def post_service(self, obj, form, result):
+        """Hook for subclasses: runs inside the same transaction, after
+        ``service_callable`` succeeded."""
+
     def form_valid(self, form):
+        from django.contrib import messages
         obj = self.get_object()
         try:
             with transaction.atomic():
@@ -88,9 +107,18 @@ class GenericTransactionView(PermissionRequiredMixin, LoginRequiredMixin, BaseHT
                     obj, user=self.request.user, request=self.request,
                     **self.get_service_kwargs(form)
                 )
+                self.post_service(obj, form, result)
 
             if getattr(self.request, 'htmx', False):
+                if self.hx_redirect_on_success:
+                    # Full navigation follows, so queue a Django message for the
+                    # next render instead of a toast trigger.
+                    messages.success(self.request, self.get_success_message(result))
+                    response = HttpResponse(status=204)
+                    response['HX-Redirect'] = obj.get_absolute_url()
+                    return response
                 return self._htmx_success_response(obj, result)
+            messages.success(self.request, self.get_success_message(result))
             return redirect(obj.get_absolute_url())
 
         except ValidationError as e:
@@ -101,6 +129,18 @@ class GenericTransactionView(PermissionRequiredMixin, LoginRequiredMixin, BaseHT
             logger.exception("Unexpected error in %s.form_valid", self.__class__.__name__)
             form.add_error(None, "An unexpected error occurred. Please try again or contact support.")
             return self.form_invalid(form)
+
+    def form_invalid(self, form):
+        if getattr(self.request, 'htmx', False) and self.error_partial:
+            from django.shortcuts import render
+            response = render(
+                self.request, self.error_partial, self.get_context_data(form=form)
+            )
+            # 422 signals a validation failure; the client opts this status into
+            # swapping (htmx:beforeSwap handler in static/src/state.ts).
+            response.status_code = 422
+            return response
+        return super().form_invalid(form)
 
     def _htmx_success_response(self, obj, result=None):
         response = HttpResponse(status=204)
@@ -134,11 +174,12 @@ class SimplePostView(PermissionRequiredMixin, LoginRequiredMixin, View):
         perms = self.get_permission_required()
         if not perms:
             return True
-        obj = None
         try:
             obj = self.get_object()
-        except Exception:
-            pass
+        except Http404:
+            if self.request.user.is_authenticated:
+                raise
+            obj = None
         return self.request.user.has_perms(perms, obj=obj)
 
     def post(self, request, *args, **kwargs):
@@ -178,9 +219,12 @@ class SimplePostView(PermissionRequiredMixin, LoginRequiredMixin, View):
         return queryset
 
     def get_object(self):
+        if getattr(self, '_cached_object', None) is not None:
+            return self._cached_object
         pk = self.kwargs.get('pk')
         if pk is not None:
-            return get_object_or_404(self.get_queryset(), pk=pk)
+            self._cached_object = get_object_or_404(self.get_queryset(), pk=pk)
+            return self._cached_object
         raise NotImplementedError(
             f"{self.__class__.__name__} must define 'queryset' or override get_object()"
         )

@@ -66,3 +66,13 @@ document.addEventListener('htmx:configRequest', (event: any) => {
   }
 });
 
+// Global HTMX validation-error handling: the server answers failed form
+// submissions with 422 + the re-rendered form fragment. HTMX refuses to swap
+// non-2xx responses by default, so opt 422 in (and don't log it as an error).
+document.addEventListener('htmx:beforeSwap', (event: any) => {
+  if (event.detail?.xhr?.status === 422) {
+    event.detail.shouldSwap = true;
+    event.detail.isError = false;
+  }
+});
+

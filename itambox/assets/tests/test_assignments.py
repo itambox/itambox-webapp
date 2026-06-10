@@ -151,7 +151,8 @@ class AssetAssignmentTestCase(TestCase):
             print("CHECKOUT FORM ERRORS:", response.context['form'].errors)
         
         # Assert response is successful and has HX-Redirect header
-        self.assertEqual(response.status_code, 200)
+        # (204 No Content: the client acts on the header, no body is swapped)
+        self.assertEqual(response.status_code, 204)
         self.assertIn('HX-Redirect', response.headers)
         self.assertEqual(response.headers['HX-Redirect'], self.peripheral_monitor.get_absolute_url())
 
@@ -183,7 +184,8 @@ class AssetAssignmentTestCase(TestCase):
             print("CHECKIN FORM ERRORS:", response.context['form'].errors)
         
         # Assert response is successful and has HX-Redirect header
-        self.assertEqual(response.status_code, 200)
+        # (204 No Content: the client acts on the header, no body is swapped)
+        self.assertEqual(response.status_code, 204)
         self.assertIn('HX-Redirect', response.headers)
         self.assertEqual(response.headers['HX-Redirect'], self.peripheral_monitor.get_absolute_url())
 

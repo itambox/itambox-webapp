@@ -87,14 +87,14 @@ class CustomFieldEditView(ObjectEditView):
     model = CustomField
     model_form = CustomFieldForm
     template_name = 'generic/object_edit.html'
-    default_return_url = 'assets:customfield_list'
+    default_return_url = 'extras:customfield_list'
 
 
 class CustomFieldDeleteView(ObjectDeleteView):
     queryset = CustomField.objects.all()
     model = CustomField
     template_name = 'generic/object_confirm_delete.html'
-    success_url = reverse_lazy('assets:customfield_list')
+    success_url = reverse_lazy('extras:customfield_list')
 
 
 # Custom Fieldsets
@@ -119,14 +119,14 @@ class CustomFieldsetEditView(ObjectEditView):
     model = CustomFieldset
     model_form = CustomFieldsetForm
     template_name = 'generic/object_edit.html'
-    default_return_url = 'assets:customfieldset_list'
+    default_return_url = 'extras:customfieldset_list'
 
 
 class CustomFieldsetDeleteView(ObjectDeleteView):
     queryset = CustomFieldset.objects.all()
     model = CustomFieldset
     template_name = 'generic/object_confirm_delete.html'
-    success_url = reverse_lazy('assets:customfieldset_list')
+    success_url = reverse_lazy('extras:customfieldset_list')
 
 
 # =============================================================================

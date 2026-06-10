@@ -867,6 +867,11 @@ class EnterpriseITAMTestCase(TestCase):
             required=False
         )
 
+        # object_types must be set so CF applies to Asset
+        asset_ct = ContentType.objects.get_for_model(Asset)
+        sim_field.object_types.add(asset_ct)
+        screen_field.object_types.add(asset_ct)
+
         # 2. Create fieldset and link fields
         fieldset = CustomFieldset.objects.create(name="Phone Specs")
         fieldset.fields.add(sim_field, screen_field)

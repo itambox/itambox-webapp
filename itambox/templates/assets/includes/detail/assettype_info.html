@@ -32,7 +32,7 @@
     <dt class="col-sm-3">{% translate "Custom Fieldset:" %}</dt>
     <dd class="col-sm-9">
         {% if object.custom_fieldset %}
-            <a href="{% url 'assets:customfieldset_detail' pk=object.custom_fieldset.pk %}">{{ object.custom_fieldset.name }}</a>
+            <a href="{% url 'extras:customfieldset_detail' pk=object.custom_fieldset.pk %}">{{ object.custom_fieldset.name }}</a>
         {% else %}
             <span class="text-muted"><i>{% translate "None" %}</i></span>
         {% endif %}

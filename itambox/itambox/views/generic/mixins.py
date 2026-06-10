@@ -4,6 +4,21 @@ from django.shortcuts import get_object_or_404
 from django.views.generic import View
 
 
+class CachedObjectMixin:
+    """Cache ``get_object()`` for the lifetime of the request.
+
+    CBVs call ``get_object()`` from ``has_permission``, ``get()``,
+    ``get_template_names`` and ``get_context_data``; without caching, every call
+    re-runs the detail query — including its full select_related/prefetch_related
+    graph — and the prefetches on one copy are invisible to the others.
+    """
+
+    def get_object(self, *args, **kwargs):
+        if getattr(self, '_cached_object', None) is None:
+            self._cached_object = super().get_object(*args, **kwargs)
+        return self._cached_object
+
+
 class ObjectPermissionRequiredMixin(AccessMixin):
     additional_permissions = list()
 

@@ -60,7 +60,7 @@ class BaseFilterSet(django_filters.FilterSet):
                         ).distinct()
                     elif model.__name__ == 'AssetRole':
                         filtered_qs = queryset.filter(
-                            asset__tenant=current_tenant
+                            assets__tenant=current_tenant
                         ).distinct()
                     else:
                         continue

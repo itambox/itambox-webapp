@@ -87,21 +87,26 @@ class TagTable(BaseTable):
 
 class CustomFieldTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('assets:customfield_detail', args=[A('pk')], verbose_name='Name')
+    name = tables.LinkColumn('extras:customfield_detail', args=[A('pk')], verbose_name='Name')
     label = tables.Column(verbose_name='Label')
     field_type = tables.Column(verbose_name='Field Type')
     required = tables.BooleanColumn(verbose_name='Required')
+    object_types = tables.ManyToManyColumn(
+        verbose_name='Applies To',
+        transform=lambda ct: ct.model_class()._meta.verbose_name.title() if ct.model_class() else ct.model,
+        orderable=False,
+    )
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = CustomField
-        fields = ('pk', 'name', 'label', 'field_type', 'required', 'actions')
-        default_columns = ('pk', 'name', 'label', 'field_type', 'required', 'actions')
+        fields = ('pk', 'name', 'label', 'field_type', 'required', 'object_types', 'actions')
+        default_columns = ('pk', 'name', 'label', 'field_type', 'required', 'object_types', 'actions')
 
 
 class CustomFieldsetTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('assets:customfieldset_detail', args=[A('pk')], verbose_name='Name')
+    name = tables.LinkColumn('extras:customfieldset_detail', args=[A('pk')], verbose_name='Name')
     fields_count = tables.Column(verbose_name='Fields Count', orderable=False)
     actions = ActionsColumn()
 

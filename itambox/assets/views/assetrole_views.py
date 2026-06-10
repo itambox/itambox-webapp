@@ -16,7 +16,7 @@ from itambox.quick_add import QuickAddMixin
 
 
 class AssetRoleListView(ObjectListView):
-    queryset = AssetRole.objects.prefetch_related('tags').annotate(asset_count=Count('asset'))
+    queryset = AssetRole.objects.prefetch_related('tags').annotate(asset_count=Count('assets'))
     filterset = filters.AssetRoleFilterSet
     filterset_form = forms.AssetRoleFilterForm
     table = tables.AssetRoleTable
@@ -24,7 +24,7 @@ class AssetRoleListView(ObjectListView):
 
 
 class AssetRoleDetailView(ObjectDetailView):
-    queryset = AssetRole.objects.prefetch_related('tags', 'asset_set')
+    queryset = AssetRole.objects.prefetch_related('tags', 'assets')
 
     layout = (
         ((Panel('info', 'Asset Role Details'),),),
@@ -34,11 +34,11 @@ class AssetRoleDetailView(ObjectDetailView):
         context = super().get_context_data(**kwargs)
         assetrole = self.get_object()
 
-        assets_table = tables.AssetTable(assetrole.asset_set.all(), request=self.request)
+        assets_table = tables.AssetTable(assetrole.assets.all(), request=self.request)
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assets_table)
 
         related_objects_list = []
-        asset_count = assetrole.asset_set.count()
+        asset_count = assetrole.assets.count()
         if asset_count:
             related_objects_list.append({
                 'label': 'Assets',
@@ -74,7 +74,7 @@ class AssetRoleDeleteView(ObjectDeleteView):
 
     def post(self, request, *args, **kwargs):
         assetrole = self.get_object()
-        asset_count = assetrole.asset_set.count()
+        asset_count = assetrole.assets.count()
 
         if asset_count > 0:
             messages.error(

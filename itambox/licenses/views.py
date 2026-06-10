@@ -126,6 +126,7 @@ class LicenseCheckoutView(GenericTransactionView):
     service_callable = checkout_license
     context_object_name = 'license'
     template_name = 'licenses/includes/license_checkout_modal.html'
+    error_partial = 'licenses/includes/license_checkout_modal.html#checkout-modal-form'
     success_message = "License checked out successfully."
     hx_trigger = "licenseUpdated"
     form_field_map = {}

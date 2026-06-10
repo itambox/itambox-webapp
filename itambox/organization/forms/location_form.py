@@ -9,7 +9,9 @@ from ..models import Location, Site, Tenant
 from ..filters import LocationFilterSet
 
 
-class LocationForm(forms.ModelForm):
+from extras.customfields import CustomFieldModelFormMixin
+
+class LocationForm(CustomFieldModelFormMixin, forms.ModelForm):
     site = forms.ModelChoiceField(
         queryset=Site.objects.all(),
         required=True,
@@ -58,6 +60,7 @@ class LocationForm(forms.ModelForm):
             'site', 'name', 'slug', 'status', 'parent', 'tenant',
             'facility', 'description', 'tags'
         )
+        self.append_custom_fields_to_layout()
         from .helpers import add_standard_buttons
         add_standard_buttons(self.helper, self.instance, 'organization:location_list')
 

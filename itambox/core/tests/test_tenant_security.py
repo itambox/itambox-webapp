@@ -155,3 +155,62 @@ class CoreTenantSecurityTestCase(TestCase):
         # Cleanup context
         set_current_tenant(None)
         set_current_membership(None)
+
+
+class RecycleBinTenantScopingTestCase(TestCase):
+    """Regression tests: ``all_objects`` on tenant-scoped models must itself be
+    tenant-scoped, otherwise the Recycle Bin (which queries all_objects) leaks
+    soft-deleted objects across tenants."""
+
+    def setUp(self):
+        self.tenant_a = Tenant.objects.create(name='Tenant A', slug='rb-tenant-a')
+        self.tenant_b = Tenant.objects.create(name='Tenant B', slug='rb-tenant-b')
+        self.status = StatusLabel.objects.create(name='RB Active', slug='rb-active', type='deployable')
+        self.asset_a = Asset.objects.create(
+            name='Asset A', asset_tag='RB-A-001', status=self.status, tenant=self.tenant_a
+        )
+        self.asset_b = Asset.objects.create(
+            name='Asset B', asset_tag='RB-B-001', status=self.status, tenant=self.tenant_b
+        )
+        self.asset_a.delete()  # soft delete
+        self.asset_b.delete()  # soft delete
+
+    def test_all_objects_is_tenant_scoped(self):
+        from core.managers import set_current_tenant
+        set_current_tenant(self.tenant_a)
+        try:
+            visible = set(Asset.all_objects.values_list('pk', flat=True))
+            self.assertIn(self.asset_a.pk, visible)
+            self.assertNotIn(
+                self.asset_b.pk, visible,
+                "Asset.all_objects leaked another tenant's (soft-deleted) asset",
+            )
+        finally:
+            set_current_tenant(None)
+
+    def test_all_objects_includes_soft_deleted_rows(self):
+        from core.managers import set_current_tenant
+        set_current_tenant(self.tenant_a)
+        try:
+            self.assertFalse(Asset.objects.filter(pk=self.asset_a.pk).exists())
+            self.assertTrue(Asset.all_objects.filter(pk=self.asset_a.pk).exists())
+        finally:
+            set_current_tenant(None)
+
+    def test_tenant_scoped_models_have_tenant_scoped_all_objects(self):
+        """Every model with a tenant FK and an all_objects manager must expose
+        filter_by_tenant on its queryset (the contract the Recycle Bin relies on)."""
+        from django.apps import apps
+        offenders = []
+        for model in apps.get_models():
+            if not any(f.name == 'tenant' for f in model._meta.fields):
+                continue
+            manager = getattr(model, 'all_objects', None)
+            if manager is None:
+                continue
+            if not hasattr(manager.get_queryset(), 'filter_by_tenant'):
+                offenders.append(model._meta.label)
+        self.assertEqual(
+            offenders, [],
+            f"Models with unscoped all_objects managers: {offenders}",
+        )

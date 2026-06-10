@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel
-from core.mixins import BookmarkableMixin, SoftDeleteMixin
+from core.mixins import BookmarkableMixin, SoftDeleteMixin, CustomFieldDataMixin
 from extras.models import Tag
 from software.models import Software
 from assets.models import Asset
@@ -35,7 +35,7 @@ class AllObjectsLicenseManager(AllObjectsManager.from_queryset(LicenseQuerySet))
     pass
 
 
-class License(BookmarkableMixin, DeletableVaultModel):
+class License(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
     """Represents the specific entitlement/purchase record for software."""
 
     name = models.CharField(

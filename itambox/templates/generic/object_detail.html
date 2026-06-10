@@ -217,6 +217,9 @@
                 </div>
                 {% endif %}
 
+                {# --- Generic Custom Fields Card --- #}
+                {% include 'extras/includes/custom_fields_panel.html' %}
+
                 {# --- Tags Card --- #}
                 {% if object.tags.all %}
                 <div class="card mb-3 shadow-sm">

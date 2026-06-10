@@ -1,13 +1,13 @@
 {% load i18n %}
 {# Panel: Custom field values #}
 {% load utility_tags %}
-{% if object.custom_values %}
+{% if object.custom_field_data %}
 <h4 class="card-title text-secondary mb-3 d-flex align-items-center">
     <i class="mdi mdi-package-variant me-2 text-primary"></i>
     {% translate "Custom Specifications" %}
 </h4>
 <div class="row g-3">
-    {% for key, val in object.custom_values.items %}
+    {% for key, val in object.custom_field_data.items %}
         {% if val is not None and val != "" %}
         <div class="col-md-6">
             <div class="d-flex align-items-center mb-1">

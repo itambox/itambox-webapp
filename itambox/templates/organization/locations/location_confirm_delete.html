@@ -18,9 +18,9 @@
             <p>{% translate "Are you sure you want to delete the location:" %} <strong>{{ location.name }} ({{ location.slug }})</strong> {% translate "at site" %} <strong>{{ location.site.name }}</strong>?</p>
 
             {# Add warning about related objects #}
-            {% if location.asset_set.count > 0 or location.children.count > 0 %}
+            {% if location.assets.count > 0 or location.children.count > 0 %}
                 <p class="text-warning">
-                    {% translate "Warning: This location has" %} {{ location.asset_set.count }} {% translate "assigned asset" %}{{ location.asset_set.count|pluralize }}
+                    {% translate "Warning: This location has" %} {{ location.assets.count }} {% translate "assigned asset" %}{{ location.assets.count|pluralize }}
                     {% translate "and" %} {{ location.children.count }} {% translate "child location" %}{{ location.children.count|pluralize }}.
                     Deleting it may affect related objects depending on your setup.
                 </p>

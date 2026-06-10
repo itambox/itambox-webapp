@@ -10,6 +10,8 @@ from .models import Provider, Subscription, SubscriptionAssignment
 from .filters import SubscriptionFilterSet, ProviderFilterSet
 
 
+from extras.customfields import CustomFieldModelFormMixin
+
 class ProviderForm(forms.ModelForm):
     tenant = forms.ModelChoiceField(
         queryset=Tenant.objects.all(),
@@ -70,7 +72,7 @@ class ProviderForm(forms.ModelForm):
         )
 
 
-class SubscriptionForm(forms.ModelForm):
+class SubscriptionForm(CustomFieldModelFormMixin, forms.ModelForm):
     tenant = forms.ModelChoiceField(
         queryset=Tenant.objects.all(),
         required=False,
@@ -158,6 +160,7 @@ class SubscriptionForm(forms.ModelForm):
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary">Cancel</a>'),
             HTML('</div>')
         )
+        self.append_custom_fields_to_layout()
 
 
 class ProviderFilterForm(FilterForm):

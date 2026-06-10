@@ -9,6 +9,8 @@ from django.urls import reverse
 from django.views import View
 from django.views.generic import TemplateView
 
+from itambox.views.htmx import BaseHTMXView
+
 from extras.dashboard.forms import DashboardWidgetAddForm, DashboardWidgetConfigForm
 from extras.dashboard.utils import get_dashboard, get_default_dashboard
 from extras.dashboard.widgets import get_widget, get_registered_widgets
@@ -307,3 +309,40 @@ class DashboardSetDefaultView(LoginRequiredMixin, View):
             response['HX-Redirect'] = reverse('dashboard')
             return response
         return redirect('dashboard')
+
+
+class DashboardView(LoginRequiredMixin, BaseHTMXView, TemplateView):
+    template_name = 'dashboard.html'
+    document_path = 'dashboard'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Dashboard'
+        context['breadcrumbs'] = [(None, 'Dashboard')]
+
+        from itambox.utils import get_help_url
+        context['help_url'] = get_help_url(self)
+
+        # Resolve active dashboard ID from query params or session cache
+        dashboard_id = self.request.GET.get('dashboard')
+        if not dashboard_id:
+            dashboard_id = self.request.session.get('active_dashboard_id')
+
+        from extras.dashboard.utils import get_dashboard
+        dashboard = get_dashboard(self.request.user, dashboard_id=dashboard_id)
+
+        # Persist active dashboard ID in the session
+        self.request.session['active_dashboard_id'] = dashboard.id
+
+        widget_list = []
+        for idx, config in enumerate(dashboard.layout):
+            if not config.get('visible', True):
+                continue
+            widget_list.append({'index': idx, 'config': config})
+
+        # Inject multi-dashboard properties into context
+        context['active_dashboard'] = dashboard
+        context['dashboard_widgets'] = widget_list
+        context['dashboards_list'] = self.request.user.dashboards.all()
+        context['disable_history_cache'] = True
+        return context

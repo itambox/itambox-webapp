@@ -13,7 +13,9 @@ from django.urls import reverse
 # Software
 # =============================================================================
 
-class SoftwareForm(forms.ModelForm):
+from extras.customfields import CustomFieldModelFormMixin
+
+class SoftwareForm(CustomFieldModelFormMixin, forms.ModelForm):
     """Form for creating and updating Software instances."""
     manufacturer = forms.ModelChoiceField(
         queryset=Manufacturer.objects.all(),
@@ -59,6 +61,7 @@ class SoftwareForm(forms.ModelForm):
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary">{_("Cancel")}</a>'),
             HTML('</div>')
         )
+        self.append_custom_fields_to_layout()
 
 
 # --- Software Filter Form --- 

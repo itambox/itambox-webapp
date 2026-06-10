@@ -76,14 +76,14 @@ class TagFilterForm(FilterForm):
 class CustomFieldForm(forms.ModelForm):
     class Meta:
         model = CustomField
-        fields = ['name', 'label', 'field_type', 'choices', 'required', 'model_level']
+        fields = ['name', 'label', 'field_type', 'choices', 'required', 'object_types']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'label': forms.TextInput(attrs={'class': 'form-control'}),
             'field_type': forms.Select(attrs={'class': 'form-select'}),
             'choices': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Value 1\nValue 2'}),
             'required': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'model_level': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'object_types': forms.SelectMultiple(attrs={'class': 'form-select', 'size': 8}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -92,17 +92,33 @@ class CustomFieldForm(forms.ModelForm):
         self.helper.form_method = 'post'
         self.helper.form_tag = True
         self.fields['name'].widget.attrs['slugify'] = 'label'
-        
+
+        # Only models that actually store custom field data are selectable.
+        from django.contrib.contenttypes.models import ContentType
+        from itambox.registry import registry
+        supported = [
+            ContentType.objects.get_for_model(model).pk
+            for model, features in registry.model_features.items()
+            if 'custom_field_data' in features and not model._meta.abstract
+        ]
+        self.fields['object_types'].queryset = (
+            ContentType.objects.filter(pk__in=supported).order_by('app_label', 'model')
+        )
+        self.fields['object_types'].help_text = (
+            "Models this field applies to. Fields applying to Asset Type act as "
+            "hardware specifications; fields applying to Asset are per-device details."
+        )
+
         button_text = 'Update' if self.instance.pk else 'Create'
-        cancel_url = reverse('assets:customfield_list')
-        
+        cancel_url = reverse('extras:customfield_list')
+
         self.helper.layout = Layout(
             'label',
             'name',
             'field_type',
             'choices',
             Div('required', css_class='mb-3 form-check'),
-            Div('model_level', css_class='mb-3 form-check'),
+            'object_types',
             HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
@@ -125,7 +141,7 @@ class CustomFieldsetForm(forms.ModelForm):
         self.helper.form_tag = True
         
         button_text = 'Update' if self.instance.pk else 'Create'
-        cancel_url = reverse('assets:customfieldset_list')
+        cancel_url = reverse('extras:customfieldset_list')
         
         self.helper.layout = Layout(
             'name',
@@ -244,4 +260,4 @@ class ConfigContextTable(BaseTable):
         model = ConfigContext
         fields = ('pk', 'name', 'weight', 'description', 'actions')
         default_columns = ('pk', 'name', 'weight', 'description', 'actions')
-
+

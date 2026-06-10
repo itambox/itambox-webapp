@@ -205,11 +205,12 @@ class ChangeLoggingMixin:
             if self._prechange_snapshot is not None:
                 prechange_data = self._prechange_snapshot
             else:
-                try:
-                    original_instance = self.__class__.objects.get(pk=self.pk)
+                # Use the unfiltered base manager: the changelog must capture the
+                # pre-change state even when the active tenant context or soft-delete
+                # filters would hide the row from the default manager.
+                original_instance = self.__class__._base_manager.filter(pk=self.pk).first()
+                if original_instance is not None:
                     prechange_data = serialize_object(original_instance, exclude_fields=self._change_logging_excluded_fields)
-                except self.__class__.DoesNotExist:
-                    pass
 
         super().save(*args, **kwargs)
 
@@ -224,15 +225,17 @@ class ChangeLoggingMixin:
         self._log_change(action=action, prechange_data=prechange_data, postchange_data=postchange_data, message=self._changelog_message)
 
     def delete(self, *args, **kwargs):
+        # Peek at force_hard_delete without consuming it — SoftDeleteMixin owns
+        # and consumes the flag wherever it sits in the MRO. (Never treat a
+        # positional arg as the flag: positionally, delete()'s first arg is
+        # Django's `using`.)
+        from core.mixins import SoftDeleteMixin
+        force_hard = bool(kwargs.get('force_hard_delete', False))
+
         if not get_current_request_id():
             super().delete(*args, **kwargs)
             return
 
-        from core.mixins import SoftDeleteMixin
-        force_hard = kwargs.get('force_hard_delete', False)
-        if args and isinstance(args[0], bool):
-            force_hard = args[0]
-            
         is_soft_delete = isinstance(self, SoftDeleteMixin) and not force_hard
         if is_soft_delete:
             super().delete(*args, **kwargs)

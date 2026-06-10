@@ -15,18 +15,27 @@ class BaseHTMXView:
             )
         return [self.template_name]
 
+    def _is_boosted_main_swap(self):
+        request = self.request
+        if not getattr(request, 'htmx', False):
+            return False
+        target = getattr(request.htmx, 'target', '') or ''
+        return getattr(request.htmx, 'boosted', False) or \
+               getattr(request.htmx, 'history_restore_request', False) or \
+               target in ('page-content-wrapper', '#page-content-wrapper', 'page-body-main', '#page-body-main')
+
+    def is_htmx_partial(self):
+        """True when this request will be answered with the content partial
+        (not the full page and not a boosted main swap)."""
+        return bool(getattr(self.request, 'htmx', False)) and not self._is_boosted_main_swap()
+
     def render_to_response(self, context, **response_kwargs):
         request = self.request
 
         if getattr(request, 'htmx', False):
             context['request'] = request
 
-            target = getattr(request.htmx, 'target', '') or ''
-            is_boosted_main_swap = getattr(request.htmx, 'boosted', False) or \
-                                   getattr(request.htmx, 'history_restore_request', False) or \
-                                   target in ('page-content-wrapper', '#page-content-wrapper', 'page-body-main', '#page-body-main')
-
-            if is_boosted_main_swap:
+            if self._is_boosted_main_swap():
                 context['base_template'] = 'base_htmx.html'
                 context.setdefault('title', 'ITAMbox')
                 context.setdefault('breadcrumbs', [(reverse('dashboard'), 'Dashboard'), (None, context['title'])])

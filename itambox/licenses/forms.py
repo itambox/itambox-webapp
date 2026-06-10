@@ -11,7 +11,9 @@ from django.urls import reverse
 from assets.models import Asset
 from organization.models import AssetHolder
 
-class LicenseForm(forms.ModelForm):
+from extras.customfields import CustomFieldModelFormMixin
+
+class LicenseForm(CustomFieldModelFormMixin, forms.ModelForm):
     """Form for creating and updating License entitlements."""
     software = forms.ModelChoiceField(
         queryset=Software.objects.all(),
@@ -74,6 +76,7 @@ class LicenseForm(forms.ModelForm):
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary">{_("Cancel")}</a>'),
             HTML('</div>')
         )
+        self.append_custom_fields_to_layout()
 
 class LicenseFilterForm(FilterForm):
     filterset_class = LicenseFilterSet
