@@ -63,5 +63,11 @@ cpSync('node_modules/apexcharts/dist/apexcharts.min.js', dist('apexcharts.min.js
 // HTML5 QR Code Scanner fallback
 cpSync('node_modules/html5-qrcode/html5-qrcode.min.js', dist('html5-qrcode.min.js'));
 
+// --- Brand assets ---
+mkdirSync(__dirname + '/static/dist/brand', { recursive: true });
+cpSync(__dirname + '/static/src/brand/itambox-mark.svg', __dirname + '/static/dist/brand/itambox-mark.svg');
+cpSync(__dirname + '/static/src/brand/itambox-logo.svg', __dirname + '/static/dist/brand/itambox-logo.svg');
+cpSync(__dirname + '/static/src/brand/favicon.svg', __dirname + '/static/dist/brand/favicon.svg');
+
 console.log('[itambox] Vendor assets copied to static/dist/vendor/');
 

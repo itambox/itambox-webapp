@@ -17,7 +17,9 @@
     
     {# PWA Meta and Capabilities #}
     <link rel="manifest" href="{% url 'manifest.json' %}">
-    <meta name="theme-color" content="#2fb344">
+    <meta name="theme-color" content="#1c1917" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: dark)">
+    <link rel="icon" type="image/svg+xml" href="{% static 'dist/brand/favicon.svg' %}">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
