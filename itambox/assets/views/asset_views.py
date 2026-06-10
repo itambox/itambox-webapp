@@ -334,7 +334,7 @@ class AssetCheckinView(GenericTransactionView):
 
 class AssetAuditView(SimplePostView):
     queryset = Asset.objects.all()
-    permission_required = 'assets.change_asset'
+    permission_required = 'compliance.add_assetaudit'
 
     def post(self, request, *args, **kwargs):
         asset = self.get_object()

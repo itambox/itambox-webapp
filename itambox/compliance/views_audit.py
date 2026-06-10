@@ -1,11 +1,13 @@
 import django_tables2 as tables
 from django_tables2.utils import A
+import json
 from django.shortcuts import get_object_or_404, render
 from django.http import HttpResponse
 from django.urls import reverse_lazy
 from django.views.generic import View
 from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django import forms
 
 from core.tables import BaseTable, ToggleColumn, ActionsColumn
@@ -104,8 +106,19 @@ class AuditSessionDetailView(ObjectDetailView):
         return ctx
 
 
-class AssetAuditScanView(View):
+class AssetAuditScanView(LoginRequiredMixin, PermissionRequiredMixin, View):
     """HTMX AJAX endpoint called on barcode scans within an active campaign."""
+    permission_required = 'compliance.add_assetaudit'
+
+    def handle_no_permission(self):
+        if self.request.user.is_authenticated and getattr(self.request, 'htmx', False):
+            response = HttpResponse(status=204)
+            response['HX-Trigger'] = json.dumps({
+                "showMessage": {"message": "You do not have permission to record audit scans.", "level": "danger"}
+            })
+            return response
+        return super().handle_no_permission()
+
     def post(self, request, pk, *args, **kwargs):
         session = get_object_or_404(AuditSession, pk=pk, status='active')
         form = AuditBarcodeScanForm(request.POST)
@@ -139,7 +152,6 @@ class AssetAuditScanView(View):
                 response['HX-Trigger'] = 'playAuditFailSound'
                 return response
 
-            import json
             response = render(request, 'assets/audits/includes/audit_scan_success.html', {'asset': asset})
             response['HX-Trigger'] = json.dumps({
                 'updateReconciliation': None,
