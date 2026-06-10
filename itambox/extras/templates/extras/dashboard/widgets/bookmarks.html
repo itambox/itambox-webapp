@@ -1,0 +1,19 @@
+{% load i18n %}
+{% if bookmarked_items %}
+<div class="list-group list-group-flush">
+    {% for item in bookmarked_items %}
+    <a href="{{ item.url }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2">
+        <i class="mdi mdi-star text-yellow flex-shrink-0"></i>
+        <div class="flex-grow-1 text-truncate">
+            <span class="text-reset">{{ item.name }}</span>
+            <span class="text-muted small ms-2">{{ item.type_name }}</span>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-muted text-center py-4">
+    <i class="mdi mdi-star-off-outline d-block mb-1" style="font-size:1.5rem;"></i>
+    {% translate "Star any object to pin it here." %}
+</div>
+{% endif %}

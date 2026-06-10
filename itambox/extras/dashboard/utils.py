@@ -40,6 +40,9 @@ def get_default_dashboard():
         
         # Row 5: Audit Log Trails (Full-Width changelog with absolute fidelity)
         {'widget': 'recent-activity', 'title': 'Change Log', 'visible': True, 'w': 12, 'h': 4, 'style': 'default', 'config': {'limit': 8}},
+
+        # Row 6: Personal Quick-Access
+        {'widget': 'my-bookmarks', 'title': 'My Bookmarks', 'visible': True, 'w': 4, 'h': 3, 'style': 'warning', 'config': {}},
     ]
 
 

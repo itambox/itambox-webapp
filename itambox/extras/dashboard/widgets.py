@@ -877,6 +877,24 @@ class LowStockWidget(DashboardWidget):
 
 
 @register_widget
+class BookmarksWidget(DashboardWidget):
+    widget_id = 'my-bookmarks'
+    title = 'My Bookmarks'
+    description = 'Quick-access list of objects you have starred (personal, per-user)'
+    template_name = 'extras/dashboard/widgets/bookmarks.html'
+
+    def get_context(self, request):
+        from extras.models import Bookmark
+        from extras.utils import resolve_generic_items
+        rows = list(Bookmark.objects.filter(user=request.user).select_related('model')[:50])
+        return {'bookmarked_items': resolve_generic_items(rows)}
+
+    def get_footer_links(self, request):
+        from django.urls import reverse
+        return [{'url': reverse('users:user_bookmarks'), 'label': _('All Bookmarks')}]
+
+
+@register_widget
 class AssetAgeWidget(DashboardWidget):
     widget_id = 'asset-age'
     title = 'Asset Age Distribution'
