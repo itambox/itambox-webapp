@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.utils import timezone
 from software.models import Software
 from core.models import BaseModel, ChangeLoggingMixin, StandardModel, DeletableVaultModel
-from core.mixins import CustomFieldDataMixin, JournalingMixin, TaggableMixin, AutoSlugMixin, BookmarkableMixin, SubscribableMixin, SoftDeleteMixin
+from core.mixins import CustomFieldDataMixin, JournalingMixin, TaggableMixin, AutoSlugMixin, BookmarkableMixin, SubscribableMixin, SoftDeleteMixin, CloneableMixin, ExportableMixin, ImageAttachmentMixin, FileAttachmentMixin
 from extras.models import CustomFieldset
 from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -1042,5 +1042,79 @@ class AssetAssignment(SoftDeleteMixin, JournalingMixin, TaggableMixin, ChangeLog
 
     def get_absolute_url(self):
         return self.asset.get_absolute_url()
+
+
+class MaintenanceStatusChoices(models.TextChoices):
+    SCHEDULED = 'scheduled', 'Scheduled'
+    IN_PROGRESS = 'in_progress', 'In Progress'
+    COMPLETED = 'completed', 'Completed'
+    CANCELLED = 'cancelled', 'Cancelled'
+
+
+class AssetMaintenance(TaggableMixin, CloneableMixin, ExportableMixin,
+                        JournalingMixin, ImageAttachmentMixin, FileAttachmentMixin,
+                        SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
+
+    MAINTENANCE_TYPE_UPGRADE = 'upgrade'
+    MAINTENANCE_TYPE_REPAIR = 'repair'
+    MAINTENANCE_TYPE_CALIBRATION = 'calibration'
+    MAINTENANCE_TYPE_SOFTWARE_SUPPORT = 'software_support'
+    MAINTENANCE_TYPE_HARDWARE_SUPPORT = 'hardware_support'
+    MAINTENANCE_TYPE_CHOICES = [
+        (MAINTENANCE_TYPE_UPGRADE, 'Upgrade'),
+        (MAINTENANCE_TYPE_REPAIR, 'Repair'),
+        (MAINTENANCE_TYPE_CALIBRATION, 'Calibration'),
+        (MAINTENANCE_TYPE_SOFTWARE_SUPPORT, 'Software Support'),
+        (MAINTENANCE_TYPE_HARDWARE_SUPPORT, 'Hardware Support'),
+    ]
+
+    asset = models.ForeignKey('Asset', on_delete=models.PROTECT, related_name='maintenances', db_index=True)
+    title = models.CharField(max_length=200, default='Maintenance')
+    description = models.TextField(blank=True)
+    supplier = models.ForeignKey('Supplier', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Supplier/Vendor")
+    performed_by = models.CharField(max_length=200, blank=True)
+    maintenance_type = models.CharField(
+        max_length=50,
+        choices=MAINTENANCE_TYPE_CHOICES,
+        default=MAINTENANCE_TYPE_REPAIR,
+        verbose_name="Maintenance Type",
+        db_index=True
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=MaintenanceStatusChoices.choices,
+        default=MaintenanceStatusChoices.SCHEDULED,
+        db_index=True
+    )
+    cost = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Maintenance Cost"
+    )
+    start_date = models.DateField(verbose_name="Start Date", db_index=True)
+    completion_date = models.DateField(null=True, blank=True, verbose_name="Completion Date", db_index=True)
+    notes = models.TextField(blank=True)
+    tags = models.ManyToManyField('extras.Tag', related_name='asset_maintenances', blank=True)
+
+    class Meta:
+        ordering = ['-start_date']
+        verbose_name = _("Asset Maintenance")
+        verbose_name_plural = _("Asset Maintenances")
+
+    def __str__(self):
+        return f"{self.get_maintenance_type_display()} on {self.asset.name}"
+
+    def get_absolute_url(self):
+        return reverse('assets:assetmaintenance_detail', kwargs={'pk': self.pk})
+
+    @property
+    def downtime_days(self):
+        if self.start_date and self.completion_date:
+            return (self.completion_date - self.start_date).days
+        return None
 
 

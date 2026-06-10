@@ -144,7 +144,7 @@
             {% endif %}
 
             {# 4. Custom Specifications Card (Conditional Check) #}
-            {% if object.custom_values %}
+            {% if object.custom_field_data %}
             <div class="card mb-3 shadow-sm">
                 <div class="card-body">
                     {% include 'assets/includes/detail/asset_custom_fields.html' %}
@@ -264,7 +264,7 @@
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
                 <h3 class="card-title">{% translate "Installed Physical Modules / Components" %}</h3>
-                <a href="{% url 'assets:componentallocation_create' %}?asset={{ object.pk }}" class="btn btn-sm btn-primary">
+                <a href="{% url 'inventory:componentallocation_create' %}?asset={{ object.pk }}" class="btn btn-sm btn-primary">
                     <i class="mdi mdi-plus"></i>
                     {% translate "Add Component" %}
                 </a>
@@ -287,7 +287,7 @@
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
                 <h3 class="card-title">{% translate "Asset Repair & Upgrade History" %}</h3>
-                <a href="{% url 'compliance:assetmaintenance_create' %}?asset={{ object.pk }}" class="btn btn-sm btn-primary">
+                <a href="{% url 'assets:assetmaintenance_create' %}?asset={{ object.pk }}" class="btn btn-sm btn-primary">
                     <i class="mdi mdi-plus"></i>
                     {% translate "Record Maintenance" %}
                 </a>

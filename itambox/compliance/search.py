@@ -1,5 +1,5 @@
 from core.search import SearchIndex, register_search
-from .models import AssetMaintenance
+from assets.models import AssetMaintenance
 
 
 @register_search()

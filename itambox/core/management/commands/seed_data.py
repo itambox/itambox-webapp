@@ -99,7 +99,7 @@ class Command(BaseCommand):
             ('procurement', 'PurchaseOrder'),
             ('assets', 'AssetRequest'), ('compliance', 'AssetAudit'), ('compliance', 'AuditSession'),
             ('compliance', 'CustodyReceipt'), ('compliance', 'CustodyTemplate'),
-            ('compliance', 'AssetMaintenance'),
+            ('assets', 'AssetMaintenance'),
             ('licenses', 'LicenseSeatAssignment'),
             ('subscriptions', 'SubscriptionAssignment'),
             ('inventory', 'AccessoryAssignment'), ('inventory', 'ConsumableAssignment'),

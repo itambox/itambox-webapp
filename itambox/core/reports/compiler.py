@@ -343,8 +343,8 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
             chart_svg = generate_bar_chart(chart_data, title=_("Monthly Spend by Provider"))
 
     elif template.report_type == ReportTemplate.REPORT_TYPE_ASSET_MAINTENANCE:
-        from compliance.models import AssetMaintenance
-        
+        from assets.models import AssetMaintenance
+
         maint_qs = AssetMaintenance.objects.filter(deleted_at__isnull=True).select_related('asset', 'supplier')
         if filter_tenants:
             maint_qs = maint_qs.filter(asset__tenant__in=filter_tenants)

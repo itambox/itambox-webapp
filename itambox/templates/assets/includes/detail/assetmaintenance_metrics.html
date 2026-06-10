@@ -1,0 +1,18 @@
+{% load i18n %}
+{% translate "Maintenance Cost" as l_cost %}
+{% translate "Downtime Duration" as l_down %}
+{% blocktranslate with c=object.cost|default:0|floatformat:2 asvar cost_value %}${{ c }}{% endblocktranslate %}
+<div class="row g-3 mb-4">
+    {% include "generic/includes/stat_card.html" with color="blue" icon="mdi mdi-currency-usd" label=l_cost value=cost_value %}
+    {% if object.completion_date %}
+        {% if object.downtime_days == 0 %}
+            {% translate "Same Day Service" as v_down %}
+        {% else %}
+            {% blocktranslate count d=object.downtime_days asvar v_down %}{{ d }} Day{% plural %}{{ d }} Days{% endblocktranslate %}
+        {% endif %}
+        {% include "generic/includes/stat_card.html" with color="success" icon="mdi mdi-check-circle-outline" label=l_down value=v_down %}
+    {% else %}
+        {% translate "In Progress (Out of Service)" as v_down %}
+        {% include "generic/includes/stat_card.html" with color="warning" icon="mdi mdi-clock-outline" label=l_down value=v_down %}
+    {% endif %}
+</div>

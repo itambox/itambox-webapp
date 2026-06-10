@@ -121,3 +121,12 @@ urlpatterns = [
 
 from .urls_audits import urlpatterns as audit_urls
 urlpatterns += audit_urls
+
+urlpatterns += [
+    path('maintenances/', views.AssetMaintenanceListView.as_view(), name='assetmaintenance_list'),
+    path('maintenances/add/', views.AssetMaintenanceEditView.as_view(), name='assetmaintenance_create'),
+    path('maintenances/<int:pk>/', views.AssetMaintenanceDetailView.as_view(), name='assetmaintenance_detail'),
+    path('maintenances/<int:pk>/edit/', views.AssetMaintenanceEditView.as_view(), name='assetmaintenance_update'),
+    path('maintenances/<int:pk>/clone/', views.AssetMaintenanceCloneView.as_view(), name='assetmaintenance_clone'),
+    path('maintenances/<int:pk>/delete/', views.AssetMaintenanceDeleteView.as_view(), name='assetmaintenance_delete'),
+]

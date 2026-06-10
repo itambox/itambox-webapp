@@ -1,4 +1,3 @@
-from .dashboard import DashboardView
 from .asset_views import (
     AssetListView, AssetDetailView, AssetEditView, AssetDeleteView,
     AssetCloneView, AssetImportView, AssetBulkEditView, AssetBulkDeleteView,
@@ -43,5 +42,9 @@ from .audit_views import (
     AuditSessionListView, AuditSessionDetailView, AuditSessionCreateView,
     AssetAuditScanView, AuditSessionCloseView, AuditSessionRehomeView,
     AuditSessionDeleteView,
+)
+from .maintenance_views import (
+    AssetMaintenanceListView, AssetMaintenanceDetailView, AssetMaintenanceEditView,
+    AssetMaintenanceCloneView, AssetMaintenanceDeleteView,
 )
 

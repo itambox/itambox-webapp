@@ -3,8 +3,7 @@ from django.urls import reverse
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Row, Column
 from core.forms import FilterForm
-from assets.models import Asset, Supplier, Category
-from .models import AssetMaintenance
+from assets.models import Asset, Supplier, Category, AssetMaintenance
 
 class AssetMaintenanceFilterForm(FilterForm):
     from .filters import AssetMaintenanceFilterSet
@@ -64,7 +63,7 @@ class AssetMaintenanceForm(forms.ModelForm):
         self.helper.form_tag = True
 
         button_text = 'Update' if self.instance and self.instance.pk else 'Create'
-        cancel_url = reverse('compliance:assetmaintenance_list')
+        cancel_url = reverse('assets:assetmaintenance_list')
 
         self.helper.layout = Layout(
             Row(

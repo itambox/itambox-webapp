@@ -47,8 +47,8 @@ class SupplierDetailView(ObjectDetailView):
         context['accessories_table'] = accessories_table
 
         # Maintenance Expenditures
-        from compliance.models import AssetMaintenance
-        from compliance.tables import AssetMaintenanceTable
+        from assets.models import AssetMaintenance
+        from assets.tables import AssetMaintenanceTable
         maintenance_qs = AssetMaintenance.objects.filter(supplier=supplier).select_related('asset', 'supplier')
         maintenances_table = AssetMaintenanceTable(maintenance_qs, request=self.request)
         RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(maintenances_table)
@@ -82,7 +82,7 @@ class SupplierDetailView(ObjectDetailView):
             related_objects_list.append({
                 'label': 'Maintenances',
                 'count': maintenance_count,
-                'url': f"{reverse('compliance:assetmaintenance_list')}?supplier={supplier.slug}"
+                'url': f"{reverse('assets:assetmaintenance_list')}?supplier={supplier.slug}"
             })
         license_count = license_qs.count()
         if license_count:

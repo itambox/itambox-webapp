@@ -281,9 +281,9 @@ MATRIX_MODELS = {
     },
     'assetmaintenance': {
         'label': 'Asset Maintenances',
-        'app': 'compliance',
+        'app': 'assets',
         'model_name': 'assetmaintenance',
-        'group': 'Compliance & Custody',
+        'group': 'Inventory & Hardware',
     },
 
     'user': {

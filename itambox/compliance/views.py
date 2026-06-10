@@ -8,54 +8,13 @@ from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectCloneView
 )
 
-from .models import AssetMaintenance, CustodyReceipt, CustodyTemplate
-from .filters import AssetMaintenanceFilterSet
-from .forms import AssetMaintenanceForm, AssetMaintenanceFilterForm, CustodyTemplateForm
-from .tables import AssetMaintenanceTable, CustodyTemplateTable
-
-class AssetMaintenanceListView(ObjectListView):
-    queryset = AssetMaintenance.objects.select_related('asset')
-    filterset = AssetMaintenanceFilterSet
-    filterset_form = AssetMaintenanceFilterForm
-    table = AssetMaintenanceTable
-    action_buttons = ('add',)
-
-
-class AssetMaintenanceDetailView(ObjectDetailView):
-    queryset = AssetMaintenance.objects.select_related('asset')
-    template_name = 'compliance/assetmaintenances/assetmaintenance_detail.html'
-
-    layout = (
-        ((Panel('metrics', 'Maintenance Overview'),),),
-        ((Panel('info', 'Maintenance Details'),),),
-    )
-
-
-class AssetMaintenanceEditView(ObjectEditView):
-    queryset = AssetMaintenance.objects.all()
-    model = AssetMaintenance
-    model_form = AssetMaintenanceForm
-    template_name = 'generic/object_edit.html'
-    default_return_url = 'compliance:assetmaintenance_list'
-
-    def get_initial(self):
-        initial = super().get_initial()
-        # Prepopulate asset if passed in GET params
-        asset_id = self.request.GET.get('asset')
-        if asset_id:
-            initial['asset'] = asset_id
-        return initial
-
-
-class AssetMaintenanceCloneView(AssetMaintenanceEditView, ObjectCloneView):
-    model = AssetMaintenance
-
-
-class AssetMaintenanceDeleteView(ObjectDeleteView):
-    queryset = AssetMaintenance.objects.all()
-    model = AssetMaintenance
-    template_name = 'generic/object_confirm_delete.html'
-    success_url = reverse_lazy('compliance:assetmaintenance_list')
+from .models import CustodyReceipt, CustodyTemplate
+from .forms import CustodyTemplateForm
+from .tables import CustodyTemplateTable
+from assets.views.maintenance_views import (  # noqa: F401
+    AssetMaintenanceListView, AssetMaintenanceDetailView, AssetMaintenanceEditView,
+    AssetMaintenanceCloneView, AssetMaintenanceDeleteView,
+)
 
 
 def custody_eula_sign(request, token):

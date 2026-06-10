@@ -4,7 +4,8 @@ from django import forms
 from django.db.models import Q
 from assets.models import Asset, StatusLabel
 from organization.models import AssetHolder, Location
-from .models import AssetMaintenance, CustodyReceipt, AuditSession, AssetAudit
+from .models import CustodyReceipt, AuditSession, AssetAudit
+from assets.models import AssetMaintenance
 
 class CustodyReceiptFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(

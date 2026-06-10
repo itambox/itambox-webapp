@@ -3,7 +3,8 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from assets.models import Manufacturer, Asset, AssetType, AssetRole, StatusLabel, Depreciation, Supplier, Category, AssetRequest
 from inventory.models import Accessory, AccessoryAssignment, Consumable, ConsumableAssignment, Kit, KitItem, Component, ComponentAllocation
-from compliance.models import CustodyReceipt, AssetMaintenance
+from compliance.models import CustodyReceipt
+from assets.models import AssetMaintenance
 from extras.models import CustomField, CustomFieldset
 from core.models import Notification
 from django.contrib.contenttypes.models import ContentType
@@ -352,10 +353,23 @@ class ComponentTrackingTestCase(TransactionTestCase):
             self.assertTrue(notif.is_read)
 
     def test_asset_audit_view(self):
+        # An audit records the *observed* location — when neither the asset nor
+        # an active campaign has one, the view refuses instead of guessing.
+        self.asset.location = None
+        self.asset.save()
+        response = self.client.post(reverse('assets:asset_audit', kwargs={'pk': self.asset.pk}))
+        self.assertEqual(response.status_code, 204)
+        self.assertIn('Cannot audit', response.headers.get('HX-Trigger', ''))
+        self.asset.refresh_from_db()
+        self.assertIsNone(self.asset.last_audited)
+
+        # With a known location the audit succeeds.
+        self.asset.location = self.location
+        self.asset.save()
         response = self.client.post(reverse('assets:asset_audit', kwargs={'pk': self.asset.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Audited")
-        
+
         self.asset.refresh_from_db()
         self.assertIsNotNone(self.asset.last_audited)
         self.assertEqual(self.asset.last_audited_by, self.user)
@@ -472,7 +486,7 @@ class AssetProcurementTestCase(TestCase):
             'asset_tag': 'LAP-002',
             'asset_type': self.asset_type.pk,
             'asset_role': self.role.pk,
-            'status': Asset.STATUS_AVAILABLE,
+            'status': 'available',  # legacy free-text value, exercises the form's tolerance
             'purchase_cost': '999.50',
             'order_number': 'PO-112233',
             'supplier': supplier.pk,
@@ -495,7 +509,7 @@ class AssetProcurementTestCase(TestCase):
             'asset_tag': 'LAP-003',
             'asset_type': self.asset_type.pk,
             'asset_role': self.role.pk,
-            'status': Asset.STATUS_AVAILABLE,
+            'status': 'available',  # legacy free-text value, exercises the form's tolerance
             'purchase_cost': '',
             'order_number': '',
             'supplier': '',
@@ -689,7 +703,7 @@ class AssetMaintenanceAndLifecycleTestCase(TestCase):
 
     def test_asset_maintenance_crud_views(self):
         import datetime
-        from compliance.models import AssetMaintenance
+        from assets.models import AssetMaintenance
         
         asset = Asset.objects.create(
             name="Developer ThinkPad",
@@ -717,7 +731,7 @@ class AssetMaintenanceAndLifecycleTestCase(TestCase):
             'notes': 'Fixed motherboard logic board issue'
         }
         
-        response = self.client.post(reverse('compliance:assetmaintenance_create'), data=post_data)
+        response = self.client.post(reverse('assets:assetmaintenance_create'), data=post_data)
         self.assertEqual(response.status_code, 302)
         
         # Verify created
@@ -726,14 +740,14 @@ class AssetMaintenanceAndLifecycleTestCase(TestCase):
         self.assertEqual(maint.downtime_days, 5)
         
         # 2. List View
-        response = self.client.get(reverse('compliance:assetmaintenance_list'))
+        response = self.client.get(reverse('assets:assetmaintenance_list'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Local Repair Shop")
         self.assertContains(response, "Repair")
         self.assertContains(response, "$250.00")
         
         # 3. Detail View
-        response = self.client.get(reverse('compliance:assetmaintenance_detail', kwargs={'pk': maint.pk}))
+        response = self.client.get(reverse('assets:assetmaintenance_detail', kwargs={'pk': maint.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Local Repair Shop")
         self.assertContains(response, "Fixed motherboard logic board issue")
@@ -751,7 +765,7 @@ class AssetMaintenanceAndLifecycleTestCase(TestCase):
             'completion_date': '2025-05-16',
             'notes': 'Fixed motherboard logic board issue and cleaned thermal paste'
         }
-        response = self.client.post(reverse('compliance:assetmaintenance_update', kwargs={'pk': maint.pk}), data=update_data)
+        response = self.client.post(reverse('assets:assetmaintenance_update', kwargs={'pk': maint.pk}), data=update_data)
         self.assertEqual(response.status_code, 302)
         maint.refresh_from_db()
         self.assertEqual(maint.supplier, supplier_premium)
@@ -759,7 +773,7 @@ class AssetMaintenanceAndLifecycleTestCase(TestCase):
         self.assertEqual(maint.downtime_days, 6)
 
         # 5. Delete View
-        response = self.client.post(reverse('compliance:assetmaintenance_delete', kwargs={'pk': maint.pk}))
+        response = self.client.post(reverse('assets:assetmaintenance_delete', kwargs={'pk': maint.pk}))
         self.assertEqual(response.status_code, 302)
         self.assertFalse(AssetMaintenance.objects.filter(pk=maint.pk).exists())
 
@@ -884,8 +898,8 @@ class EnterpriseITAMTestCase(TestCase):
 
         # Verify custom values JSON saved correctly in DB
         asset = Asset.objects.get(asset_tag='PHN-001')
-        self.assertEqual(asset.custom_values.get('sim_number'), '8904903200001234567')
-        self.assertEqual(asset.custom_values.get('screen_size'), '6.1')
+        self.assertEqual(asset.custom_field_data.get('sim_number'), '8904903200001234567')
+        self.assertEqual(asset.custom_field_data.get('screen_size'), '6.1')
 
         # Verify values display on the detail page
         detail_url = reverse('assets:asset_detail', kwargs={'pk': asset.pk})
@@ -1002,8 +1016,10 @@ class EnterpriseITAMTestCase(TestCase):
         }
         
         response = self.client.post(reverse('inventory:kit_checkout_modal', kwargs={'pk': kit.pk}), data=checkout_data, HTTP_HX_REQUEST='true')
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "No available assets of type")
+        # Validation failures on HTMX form posts answer 422 with the re-rendered
+        # form fragment (swapped back into the modal body by the client).
+        self.assertEqual(response.status_code, 422)
+        self.assertContains(response, "No available assets of type", status_code=422)
 
         self.assertEqual(AccessoryAssignment.objects.filter(accessory=charger).count(), 0)
         self.assertEqual(license_obj.assignments.count(), 0)

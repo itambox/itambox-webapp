@@ -5,7 +5,7 @@ from django.core.exceptions import PermissionDenied
 
 from organization.models import Tenant, AssetHolder, Location, Site
 from assets.models import Asset, StatusLabel, AssetType, Manufacturer
-from compliance.models import AssetMaintenance
+from assets.models import AssetMaintenance
 from licenses.models import License
 from subscriptions.models import Subscription, Provider
 from core.models import ObjectChange

@@ -3,7 +3,8 @@ from django.test import TestCase
 from model_bakery import baker
 from assets.models import Asset, Supplier
 from organization.models import AssetHolder
-from ..models import AssetMaintenance, CustodyReceipt
+from assets.models import AssetMaintenance
+from ..models import CustodyReceipt
 
 class AssetMaintenanceModelTests(TestCase):
     def setUp(self):

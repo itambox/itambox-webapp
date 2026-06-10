@@ -241,7 +241,7 @@ OPERATIONS_MENU = Menu(
                         ),
                     ),
                 ),
-                get_model_item('compliance', 'assetmaintenance', _('Maintenances')),
+                get_model_item('assets', 'assetmaintenance', _('Maintenances')),
                 get_model_item('compliance', 'custodytemplate', _('Custody Templates')),
             ),
         ),

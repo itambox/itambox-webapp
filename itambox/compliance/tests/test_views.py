@@ -5,7 +5,8 @@ from django.urls import reverse
 from model_bakery import baker
 from assets.models import Asset, Supplier
 from organization.models import AssetHolder
-from ..models import AssetMaintenance, CustodyReceipt
+from assets.models import AssetMaintenance
+from ..models import CustodyReceipt
 
 User = get_user_model()
 
@@ -31,26 +32,26 @@ class AssetMaintenanceViewTests(TestCase):
         )
 
     def test_list_view(self):
-        url = reverse('compliance:assetmaintenance_list')
+        url = reverse('assets:assetmaintenance_list')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'SRV-01')
 
     def test_detail_view(self):
-        url = reverse('compliance:assetmaintenance_detail', kwargs={'pk': self.maintenance.pk})
+        url = reverse('assets:assetmaintenance_detail', kwargs={'pk': self.maintenance.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'SRV-01')
         self.assertContains(response, '250.00')
 
     def test_create_view_get(self):
-        url = reverse('compliance:assetmaintenance_create')
+        url = reverse('assets:assetmaintenance_create')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_create_view_post(self):
         hp_supplier = baker.make(Supplier, name='HP Support', slug='hp-support')
-        url = reverse('compliance:assetmaintenance_create')
+        url = reverse('assets:assetmaintenance_create')
         response = self.client.post(url, {
             'asset': self.asset.pk,
             'title': 'RAM upgrade to 64GB',
@@ -66,13 +67,13 @@ class AssetMaintenanceViewTests(TestCase):
         self.assertTrue(AssetMaintenance.objects.filter(supplier=hp_supplier).exists())
 
     def test_edit_view_get(self):
-        url = reverse('compliance:assetmaintenance_update', kwargs={'pk': self.maintenance.pk})
+        url = reverse('assets:assetmaintenance_update', kwargs={'pk': self.maintenance.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_edit_view_post(self):
         dell_premium = baker.make(Supplier, name='Dell Premium', slug='dell-premium')
-        url = reverse('compliance:assetmaintenance_update', kwargs={'pk': self.maintenance.pk})
+        url = reverse('assets:assetmaintenance_update', kwargs={'pk': self.maintenance.pk})
         response = self.client.post(url, {
             'asset': self.asset.pk,
             'title': 'Replaced motherboard + CPU',
@@ -90,12 +91,12 @@ class AssetMaintenanceViewTests(TestCase):
         self.assertEqual(self.maintenance.cost, 300.00)
 
     def test_delete_view_get(self):
-        url = reverse('compliance:assetmaintenance_delete', kwargs={'pk': self.maintenance.pk})
+        url = reverse('assets:assetmaintenance_delete', kwargs={'pk': self.maintenance.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
     def test_delete_view_post(self):
-        url = reverse('compliance:assetmaintenance_delete', kwargs={'pk': self.maintenance.pk})
+        url = reverse('assets:assetmaintenance_delete', kwargs={'pk': self.maintenance.pk})
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
         self.assertFalse(AssetMaintenance.objects.filter(pk=self.maintenance.pk).exists())

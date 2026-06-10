@@ -1,0 +1,59 @@
+{% load i18n %}
+<dl class="row mb-0">
+    <dt class="col-sm-3">{% translate "Asset:" %}</dt>
+    <dd class="col-sm-9">
+        {% if object.asset %}
+            <a href="{{ object.asset.get_absolute_url }}" class="font-weight-bold text-decoration-none">
+                {{ object.asset.name }} ({{ object.asset.asset_tag }})
+            </a>
+        {% else %}
+             <span class="text-muted"><i>{% translate "None" %}</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">{% translate "Maintenance Type:" %}</dt>
+    <dd class="col-sm-9">
+        <span class="badge bg-purple-lt px-2.5 py-1 text-uppercase">
+            {{ object.get_maintenance_type_display }}
+        </span>
+    </dd>
+
+    <dt class="col-sm-3">{% translate "Supplier/Vendor:" %}</dt>
+    <dd class="col-sm-9">
+        {% if object.supplier %}
+            <strong>{{ object.supplier }}</strong>
+        {% else %}
+            <span class="text-muted"><i>{% translate "Not Specified" %}</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">{% translate "Start Date:" %}</dt>
+    <dd class="col-sm-9 text-secondary">{{ object.start_date|date:"Y-m-d" }}</dd>
+
+    <dt class="col-sm-3">{% translate "Completion Date:" %}</dt>
+    <dd class="col-sm-9 text-secondary">
+        {% if object.completion_date %}
+            {{ object.completion_date|date:"Y-m-d" }}
+        {% else %}
+            <span class="badge bg-warning-lt text-warning text-uppercase">{% translate "Open / Active" %}</span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">{% translate "Cost:" %}</dt>
+    <dd class="col-sm-9 text-secondary">
+        {% if object.cost %}
+            ${{ object.cost|floatformat:2 }}
+        {% else %}
+            <span class="text-muted"><i>{% translate "No Cost Recorded" %}</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">{% translate "Notes/Description:" %}</dt>
+    <dd class="col-sm-9 text-secondary">
+        {% if object.notes %}
+            {{ object.notes|linebreaksbr }}
+        {% else %}
+            <span class="text-muted"><i>{% translate "No notes provided." %}</i></span>
+        {% endif %}
+    </dd>
+</dl>

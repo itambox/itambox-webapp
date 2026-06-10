@@ -9,7 +9,8 @@ from model_bakery import baker
 
 from organization.models import Tenant, TenantMembership, TenantRole, AssetHolder, Location
 from assets.models import Asset, AssetType, StatusLabel, AssetAssignment, AssetRequest
-from compliance.models import CustodyReceipt, AssetMaintenance
+from compliance.models import CustodyReceipt
+from assets.models import AssetMaintenance
 from licenses.models import License, LicenseSeatAssignment
 from core.validators import validate_file_attachment, validate_image_attachment
 from core.auth.ldap import MultiTenantLDAPBackend
