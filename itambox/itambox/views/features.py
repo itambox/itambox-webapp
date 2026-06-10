@@ -3,7 +3,7 @@ import json
 import difflib
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.apps import apps
 from django.urls import reverse, NoReverseMatch
 from django.utils.decorators import method_decorator
@@ -183,7 +183,10 @@ def get_filterset_for_model(model):
 class ObjectExportView(LoginRequiredMixin, View):
     def get(self, request, app_label, model_name, template_id):
         model = apps.get_model(app_label, model_name)
-        
+
+        if not request.user.has_perm(f'{app_label}.view_{model_name}'):
+            raise Http404
+
         export_format = request.GET.get('format', 'csv').lower()
         export_scope = request.GET.get('export_scope', 'all').lower()
 
@@ -351,9 +354,25 @@ class FileAttachmentUploadView(LoginRequiredMixin, View):
         return redirect(request.POST.get('return_url', obj.get_absolute_url()))
 
 
+def _check_attachment_parent_access(request, content_type, object_id):
+    """Return the parent object if the user can change it, else raise Http404."""
+    model_class = content_type.model_class()
+    if model_class is None:
+        raise Http404
+    parent = model_class.objects.filter(pk=object_id).first()
+    if parent is None:
+        raise Http404
+    app_label = model_class._meta.app_label
+    model_name = model_class._meta.model_name
+    if not request.user.has_perm(f'{app_label}.change_{model_name}', obj=parent):
+        raise Http404
+    return parent
+
+
 class ImageAttachmentDeleteView(LoginRequiredMixin, View):
     def post(self, request, pk):
         attachment = get_object_or_404(ImageAttachment, pk=pk)
+        _check_attachment_parent_access(request, attachment.model, attachment.object_id)
         obj_url = request.POST.get('return_url', '/')
         attachment.delete()
         messages.success(request, f"Image '{attachment.name}' deleted.")
@@ -363,6 +382,7 @@ class ImageAttachmentDeleteView(LoginRequiredMixin, View):
 class FileAttachmentDeleteView(LoginRequiredMixin, View):
     def post(self, request, pk):
         attachment = get_object_or_404(FileAttachment, pk=pk)
+        _check_attachment_parent_access(request, attachment.model, attachment.object_id)
         obj_url = request.POST.get('return_url', '/')
         attachment.delete()
         messages.success(request, f"File '{attachment.name}' deleted.")
