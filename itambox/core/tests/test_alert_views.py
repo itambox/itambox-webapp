@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
 
-from core.models import AlertRule, AlertLog
+from extras.models import AlertRule, AlertLog
 
 User = get_user_model()
 

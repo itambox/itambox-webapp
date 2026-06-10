@@ -298,7 +298,7 @@ class TenantRoleSecurityTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_alert_action_permissions_enforced(self):
-        from core.models import AlertRule, AlertLog
+        from extras.models import AlertRule, AlertLog
         from model_bakery import baker
         from django.contrib.contenttypes.models import ContentType
         from django.urls import reverse

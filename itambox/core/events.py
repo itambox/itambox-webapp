@@ -6,8 +6,8 @@ import logging
 import requests
 from django.contrib.contenttypes.models import ContentType
 
-from core.models import ChangeLoggingMixin, Job, NotificationChannel
-from extras.models import Event, EventRule
+from core.models import ChangeLoggingMixin, Job
+from extras.models import Event, EventRule, NotificationChannel
 
 logger = logging.getLogger(__name__)
 

@@ -5,7 +5,7 @@ from django.contrib.contenttypes.models import ContentType
 from assets.models import Manufacturer, Category
 from organization.models import Site, Location
 from inventory.models import Accessory, Consumable, AccessoryStock, ConsumableStock
-from core.models import AlertRule, AlertLog, NotificationChannel
+from extras.models import AlertRule, AlertLog, NotificationChannel
 
 User = get_user_model()
 

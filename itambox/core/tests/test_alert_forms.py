@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 
 from core.forms import NotificationChannelForm
-from core.models import NotificationChannel
+from extras.models import NotificationChannel
 from itambox.middleware import _current_user
 
 User = get_user_model()

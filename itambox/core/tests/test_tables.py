@@ -4,7 +4,8 @@ from django.contrib.auth import get_user_model
 from assets.models import AssetAssignment, Asset, AssetRole
 from organization.models import Site, Location
 from core.tables import BaseTable, AssigneeColumn, ObjectChangeTable
-from core.models import ObjectChange, NotificationChannel
+from core.models import ObjectChange
+from extras.models import NotificationChannel
 from itambox.middleware import _request_id
 from assets.tables import AssetTable
 

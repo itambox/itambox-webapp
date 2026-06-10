@@ -1,7 +1,7 @@
 import logging
 from django.utils import timezone
 
-from core.models import AlertRule, AlertLog, NotificationChannel
+from extras.models import AlertRule, AlertLog, NotificationChannel
 from core.events import send_notification_to_channel
 from core.tasks.context import TaskContext
 

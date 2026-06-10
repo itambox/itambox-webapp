@@ -1,7 +1,7 @@
 import django_tables2 as tables
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
-from core.models import AlertLog, AlertRule, NotificationChannel
+from extras.models import AlertLog, AlertRule, NotificationChannel
 from .base import BaseTable
 from .columns import BooleanColumn, ToggleColumn
 

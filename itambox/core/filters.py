@@ -4,7 +4,8 @@ from django.db.models import Q
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import get_user_model
 
-from core.models import AlertLog, AlertRule, ObjectChange
+from core.models import ObjectChange
+from extras.models import AlertLog, AlertRule
 from core.choices import ObjectChangeActionChoices
 
 User = get_user_model()

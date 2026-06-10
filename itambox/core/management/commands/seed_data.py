@@ -88,9 +88,9 @@ class Command(BaseCommand):
             self.stdout.write(f'  Truncated orphaned plugin tables: {", ".join(orphan_tables)}')
 
         models_to_clear = [
-            ('core', 'AlertLog'), ('core', 'AlertRule'),
+            ('extras', 'AlertLog'), ('extras', 'AlertRule'),
             ('extras', 'ScheduledReport'), ('extras', 'ReportTemplate'),
-            ('core', 'NotificationChannel'), ('extras', 'EventRule'),
+            ('extras', 'NotificationChannel'), ('extras', 'EventRule'),
             ('extras', 'WebhookEndpoint'), ('extras', 'LabelTemplate'),
             ('extras', 'ExportTemplate'), ('extras', 'JournalEntry'),
             ('core', 'Notification'), ('core', 'ObjectChange'),
@@ -1346,7 +1346,7 @@ class Command(BaseCommand):
     # ─────────────────────────────────────────────────────────────────
 
     def _seed_operations(self):
-        from core.models import (NotificationChannel, AlertRule, AlertLog)
+        from extras.models import NotificationChannel, AlertRule, AlertLog
         from extras.models import EventRule, WebhookEndpoint, LabelTemplate, JournalEntry, ReportTemplate, ScheduledReport
         from extras.models import ConfigContext, Dashboard
         from assets.models import Asset, AssetType, AssetRequest

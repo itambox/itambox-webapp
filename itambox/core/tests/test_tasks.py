@@ -6,7 +6,8 @@ from django.utils import timezone
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 
-from core.models import Job, Notification, AlertRule, AlertLog, NotificationChannel
+from core.models import Job, Notification
+from extras.models import AlertRule, AlertLog, NotificationChannel
 from core.tasks import import_csv_task, evaluate_alert_rules_task, run_alert_rule_now
 from assets.models import Asset, StatusLabel, AssetRole, Manufacturer, AssetType
 from subscriptions.models import Subscription

@@ -11,8 +11,7 @@ from core.search import SEARCH_INDEXES
 from core.utils import get_model_viewname
 import django_filters
 from itambox.middleware import get_current_user
-from core.models import AlertRule, NotificationChannel
-from extras.models import WebhookEndpoint, EventRule, LabelTemplate, ReportTemplate, ScheduledReport
+from extras.models import WebhookEndpoint, EventRule, LabelTemplate, ReportTemplate, ScheduledReport, AlertRule, NotificationChannel
 
 OBJ_TYPE_CHOICES = [
     (
@@ -672,7 +671,7 @@ class ScheduledReportForm(forms.ModelForm):
             profile = user.asset_holder_profiles.filter(tenant=get_current_tenant()).first() if get_current_tenant() else user.asset_holder_profiles.first()
             if profile and profile.tenant:
                 from extras.models import ReportTemplate
-                from core.models import NotificationChannel
+                from extras.models import NotificationChannel
                 from django.db.models import Q
                 self.fields['report'].queryset = ReportTemplate.objects.filter(
                     Q(tenant=profile.tenant) | Q(tenant__isnull=True)

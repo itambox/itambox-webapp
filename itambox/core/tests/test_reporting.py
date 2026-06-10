@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from unittest.mock import patch, MagicMock
-from core.models import NotificationChannel
+from extras.models import NotificationChannel
 from extras.models import ReportTemplate, ScheduledReport, ReportGenerationArchive
 from django_q.models import Schedule
 

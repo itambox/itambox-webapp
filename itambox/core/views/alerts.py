@@ -10,7 +10,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMix
 from django.utils.decorators import method_decorator
 from django.views.generic import View
 
-from core.models import AlertRule, AlertLog, NotificationChannel
+from extras.models import AlertRule, AlertLog, NotificationChannel
 from core.tables import AlertRuleTable, AlertLogTable, NotificationChannelTable
 from core.forms import AlertRuleForm, NotificationChannelForm
 from core.filters import AlertLogFilterSet
