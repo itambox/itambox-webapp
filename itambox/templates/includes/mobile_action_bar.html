@@ -1,0 +1,65 @@
+{% load i18n %}
+{% load static %}
+{# Fixed bottom action bar — visible only on screens narrower than the lg breakpoint (< 992px) #}
+<div class="mobile-action-bar d-lg-none" role="navigation" aria-label="{% translate 'Quick actions' %}">
+    <div class="mobile-action-bar__inner">
+
+        <a href="{% url 'assets:asset_add' %}" class="mobile-action-bar__btn" title="{% translate 'Add Asset' %}">
+            <i class="mdi mdi-plus-circle-outline" aria-hidden="true"></i>
+            <span>{% translate "Add" %}</span>
+        </a>
+
+        <a href="{% url 'search' %}" class="mobile-action-bar__btn" title="{% translate 'Search' %}">
+            <i class="mdi mdi-magnify" aria-hidden="true"></i>
+            <span>{% translate "Search" %}</span>
+        </a>
+
+        {# Centre FAB — elevated scanner button #}
+        <button type="button" class="mobile-action-bar__btn mobile-action-bar__btn--scanner"
+                id="global-open-scanner-btn"
+                title="{% translate 'Scan barcode or QR code' %}"
+                aria-label="{% translate 'Open scanner' %}">
+            <span class="mobile-action-bar__scanner-fab" aria-hidden="true">
+                <i class="mdi mdi-line-scan"></i>
+            </span>
+            <span>{% translate "Scan" %}</span>
+        </button>
+
+        <a href="{% url 'dashboard' %}" class="mobile-action-bar__btn" title="{% translate 'Dashboard' %}">
+            <i class="mdi mdi-view-dashboard-outline" aria-hidden="true"></i>
+            <span>{% translate "Home" %}</span>
+        </a>
+
+        <a href="{% url 'compliance:auditsession_list' %}" class="mobile-action-bar__btn" title="{% translate 'Audits' %}">
+            <i class="mdi mdi-clipboard-check-outline" aria-hidden="true"></i>
+            <span>{% translate "Audits" %}</span>
+        </a>
+
+    </div>
+</div>
+
+{# Global scanner modal — rendered on all pages; distinct IDs from the audit-page scanner #}
+<div id="global-scanner-modal" class="scanner-overlay" style="display:none;">
+    <div class="text-center mb-3">
+        <h3 class="text-white mb-1">{% translate "Scan to Find Asset" %}</h3>
+        <p class="text-secondary small mb-0">{% translate "Point camera at a barcode or QR code" %}</p>
+    </div>
+
+    <div class="scanner-viewfinder" id="global-scanner-reader">
+        <div class="scanner-laser"></div>
+    </div>
+
+    <div id="global-scanner-error" class="alert alert-warning mt-3" style="display:none;">
+        <i class="mdi mdi-alert-outline me-2"></i>
+        <span data-scanner-error-msg>{% translate "Camera unavailable. On iPhone/iPad this requires HTTPS and camera permission — check Settings › Safari › Camera, or use a hardware scanner." %}</span>
+    </div>
+
+    <div class="mt-4 d-flex gap-2">
+        <button type="button" id="global-toggle-torch-btn" class="btn btn-outline-light" style="display:none;">
+            <i class="mdi mdi-flashlight"></i> {% translate "Toggle Flash" %}
+        </button>
+        <button type="button" id="global-close-scanner-btn" class="btn btn-danger">
+            {% translate "Cancel" %}
+        </button>
+    </div>
+</div>

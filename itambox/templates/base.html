@@ -64,6 +64,9 @@
     <div id="modal-placeholder"></div>
     {% endblock modals %}
 
+    {# Mobile bottom action bar (hidden on desktop via d-lg-none; includes global scanner modal) #}
+    {% include "includes/mobile_action_bar.html" %}
+
     {# Toast Messages Container #}
     <div id="django-messages" class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100">
       {% if messages %}
