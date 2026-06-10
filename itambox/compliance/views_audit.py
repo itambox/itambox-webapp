@@ -83,18 +83,34 @@ class AuditSessionDetailView(ObjectDetailView):
         ctx = super().get_context_data(**kwargs)
         session = self.get_object()
 
-        from compliance.reconciliation import classify_session_audits
-        classified = classify_session_audits(session)
+        if session.status == 'completed' and session.reconciliation_report:
+            # Render from the frozen stored report; do not recompute.
+            report = session.reconciliation_report
+            rows = report.get('rows', [])
+            ctx['total_expected'] = report.get('total_expected', 0)
+            ctx['total_scanned'] = report.get('total_scanned', 0)
+            ctx['matching'] = [r for r in rows if r['category'] == 'matching']
+            ctx['mismatches'] = [r for r in rows if r['category'] == 'mismatched']
+            ctx['surprise_finds'] = [r for r in rows if r['category'] == 'surprise']
+            ctx['missing_assets'] = [r for r in rows if r['category'] == 'missing']
+            ctx['report_is_stored'] = True
+        else:
+            from compliance.reconciliation import classify_session_audits, _audit_to_dict, _missing_asset_to_dict
+            classified = classify_session_audits(session)
+            expected_loc_name = session.location.name if session.location else 'Global'
+            ctx['total_expected'] = (
+                len(classified['matching']) + len(classified['mismatched']) + classified['missing'].count()
+            )
+            ctx['total_scanned'] = (
+                len(classified['matching']) + len(classified['mismatched']) + len(classified['surprise'])
+            )
+            ctx['matching'] = [_audit_to_dict(a, 'matching') for a in classified['matching']]
+            ctx['mismatches'] = [_audit_to_dict(a, 'mismatched', expected_loc_name) for a in classified['mismatched']]
+            ctx['surprise_finds'] = [_audit_to_dict(a, 'surprise') for a in classified['surprise']]
+            ctx['missing_assets'] = [_missing_asset_to_dict(a, session.location) for a in classified['missing']]
+            ctx['report_is_stored'] = False
 
         ctx['scan_form'] = AuditBarcodeScanForm()
-        ctx['total_expected'] = session.expected_assets_queryset.count()
-        ctx['total_scanned'] = (
-            len(classified['matching']) + len(classified['mismatched']) + len(classified['surprise'])
-        )
-        ctx['matching'] = classified['matching']
-        ctx['mismatches'] = classified['mismatched']
-        ctx['surprise_finds'] = classified['surprise']
-        ctx['missing_assets'] = classified['missing']
         return ctx
 
 
@@ -179,6 +195,39 @@ class AuditSessionRehomeView(SimplePostView):
     def perform_action(self, session, request) -> dict:
         rehome_audit_session_mismatches(session, request.user)
         return {'message': f"All mismatched assets in campaign '{session.name}' have been bulk re-homed to '{session.location.name if session.location else 'Global'}'."}
+
+
+class AuditSessionReportCsvView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    """Stream the stored reconciliation report as a CSV download."""
+    permission_required = 'compliance.view_auditsession'
+
+    def get(self, request, pk, *args, **kwargs):
+        import csv
+        session = get_object_or_404(AuditSession, pk=pk, status='completed')
+        report = session.reconciliation_report or {}
+        rows = report.get('rows', [])
+
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = (
+            f'attachment; filename="audit-report-{session.pk}.csv"'
+        )
+        writer = csv.writer(response)
+        writer.writerow([
+            'Category', 'Asset Tag', 'Asset Name',
+            'Observed Location', 'Expected Location',
+            'Auditor', 'Timestamp',
+        ])
+        for row in rows:
+            writer.writerow([
+                row.get('category', ''),
+                row.get('asset_tag', ''),
+                row.get('name', ''),
+                row.get('observed_location', ''),
+                row.get('expected_location', ''),
+                row.get('auditor', ''),
+                row.get('timestamp_display', '') or (row.get('timestamp', '') or '')[:16],
+            ])
+        return response
 
 
 class AuditSessionDeleteView(ObjectDeleteView):

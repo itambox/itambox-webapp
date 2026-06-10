@@ -13,6 +13,7 @@ urlpatterns = [
     path('audit-sessions/<int:pk>/scan/', views_audit.AssetAuditScanView.as_view(), name='auditsession_scan'),
     path('audit-sessions/<int:pk>/close/', views_audit.AuditSessionCloseView.as_view(), name='auditsession_close'),
     path('audit-sessions/<int:pk>/rehome/', views_audit.AuditSessionRehomeView.as_view(), name='auditsession_rehome'),
+    path('audit-sessions/<int:pk>/report.csv', views_audit.AuditSessionReportCsvView.as_view(), name='auditsession_report_csv'),
     path('audit-sessions/<int:pk>/delete/', views_audit.AuditSessionDeleteView.as_view(), name='auditsession_delete'),
 
     # Asset Maintenances moved to the assets app (assets:assetmaintenance_*).

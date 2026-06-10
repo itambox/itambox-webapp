@@ -171,6 +171,10 @@ class AuditSession(StandardModel, SoftDeleteMixin):
     started_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='audit_sessions')
+    reconciliation_report = models.JSONField(
+        null=True, blank=True, editable=False,
+        help_text="Frozen reconciliation report written at close time. Denormalized for long-term readability."
+    )
 
     class Meta:
         ordering = ['-started_at']

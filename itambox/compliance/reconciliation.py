@@ -87,6 +87,53 @@ def audit_asset(asset: Asset, user=None, session=None, location=None, status=Non
     return audit_record
 
 
+def _audit_to_dict(audit, category: str, expected_location_name: str = None) -> dict:
+    """Serialize one AssetAudit to a JSON-safe dict for the stored report."""
+    from django.urls import reverse
+    try:
+        asset_url = audit.asset.get_absolute_url()
+    except Exception:
+        asset_url = None
+    return {
+        'category': category,
+        'asset_id': audit.asset_id,
+        'asset_tag': audit.asset.asset_tag,
+        'name': audit.asset.name,
+        'asset_url': asset_url,
+        'observed_location_id': audit.location_id,
+        'observed_location': audit.location.name if audit.location else None,
+        'expected_location': expected_location_name,
+        'auditor': audit.auditor.username if audit.auditor else None,
+        'timestamp': audit.timestamp.isoformat(),
+        'timestamp_display': audit.timestamp.strftime("%Y-%m-%d %H:%M"),
+        'verification_method_display': audit.get_verification_method_display(),
+    }
+
+
+def _missing_asset_to_dict(asset, session_location) -> dict:
+    from django.urls import reverse
+    try:
+        asset_url = asset.get_absolute_url()
+    except Exception:
+        asset_url = None
+    return {
+        'category': 'missing',
+        'asset_id': asset.pk,
+        'asset_tag': asset.asset_tag,
+        'name': asset.name,
+        'asset_url': asset_url,
+        'observed_location_id': None,
+        'observed_location': None,
+        'expected_location': session_location.name if session_location else 'Global',
+        'serial_number': asset.serial_number if hasattr(asset, 'serial_number') else None,
+        'status_name': asset.status.name if asset.status else None,
+        'status_color': asset.status.color if asset.status else None,
+        'auditor': None,
+        'timestamp': None,
+        'verification_method_display': None,
+    }
+
+
 @transaction.atomic
 def close_audit_session(session: AuditSession, user=None, request=None, notes='', **kwargs) -> dict:
     if session.status == 'completed':
@@ -98,9 +145,32 @@ def close_audit_session(session: AuditSession, user=None, request=None, notes=''
 
     result = classify_session_audits(session)
 
+    # Build the frozen report — denormalized so it stays readable after asset deletions.
+    expected_location_name = session.location.name if session.location else 'Global'
+    rows = []
+    for audit in result['matching']:
+        rows.append(_audit_to_dict(audit, 'matching'))
+    for audit in result['mismatched']:
+        rows.append(_audit_to_dict(audit, 'mismatched', expected_location_name))
+    for audit in result['surprise']:
+        rows.append(_audit_to_dict(audit, 'surprise'))
+    for asset in result['missing']:
+        rows.append(_missing_asset_to_dict(asset, session.location))
+
+    total_scanned = len(result['matching']) + len(result['mismatched']) + len(result['surprise'])
+    total_expected = len(result['matching']) + len(result['mismatched']) + len(list(result['missing']))
+
+    report = {
+        'total_expected': total_expected,
+        'total_scanned': total_scanned,
+        'rows': rows,
+    }
+    session.reconciliation_report = report
+    session.save(update_fields=['reconciliation_report'])
+
     return {
-        'total_expected': len(set(session.expected_assets_queryset.values_list('id', flat=True))),
-        'total_scanned': len(result['matching']) + len(result['mismatched']) + len(result['surprise']),
+        'total_expected': total_expected,
+        'total_scanned': total_scanned,
         'matching_count': len(result['matching']),
         'mismatch_list': [a.asset for a in result['mismatched']],
         'surprise_list': [a.asset for a in result['surprise']],
@@ -110,13 +180,27 @@ def close_audit_session(session: AuditSession, user=None, request=None, notes=''
 
 @transaction.atomic
 def rehome_audit_session_mismatches(session: AuditSession, user=None, request=None, **kwargs):
-    """Move mismatched assets to the campaign location using frozen audit evidence."""
+    """Move mismatched assets to the campaign location using frozen audit evidence.
+
+    Drives from the stored reconciliation_report when available so the set of
+    assets moved matches exactly what was recorded at close time — not a
+    re-evaluation of current asset state.
+    """
     if session.status != 'completed':
         raise ValidationError("Audit sessions must be closed before bulk re-homing reconciliation.")
 
-    result = classify_session_audits(session)
-    for audit in result['mismatched']:
-        asset = audit.asset
+    if session.reconciliation_report:
+        mismatch_ids = [
+            row['asset_id']
+            for row in session.reconciliation_report.get('rows', [])
+            if row.get('category') == 'mismatched'
+        ]
+        assets = Asset.objects.filter(pk__in=mismatch_ids)
+    else:
+        result = classify_session_audits(session)
+        assets = [audit.asset for audit in result['mismatched']]
+
+    for asset in assets:
         asset.snapshot()
         asset.location = session.location
         asset.save(update_fields=['location'])

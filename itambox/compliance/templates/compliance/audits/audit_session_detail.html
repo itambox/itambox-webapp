@@ -17,14 +17,20 @@
                     <i class="mdi mdi-check-circle-outline"></i>
                     {% translate "Close Campaign & Reconcile" %}
                 </a>
-            {% elif object.status == 'completed' and mismatches %}
-                <form method="post" action="{% url 'compliance:auditsession_rehome' pk=object.pk %}" class="d-inline">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-success">
-                        <i class="mdi mdi-link-variant"></i>
-                        {% translate "Move Mismatched Assets to Campaign Location" %}
-                    </button>
-                </form>
+            {% elif object.status == 'completed' %}
+                <a href="{% url 'compliance:auditsession_report_csv' pk=object.pk %}" class="btn btn-outline-secondary">
+                    <i class="mdi mdi-file-delimited-outline"></i>
+                    {% translate "Export CSV" %}
+                </a>
+                {% if mismatches %}
+                    <form method="post" action="{% url 'compliance:auditsession_rehome' pk=object.pk %}" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-success">
+                            <i class="mdi mdi-link-variant"></i>
+                            {% translate "Move Mismatched Assets to Campaign Location" %}
+                        </button>
+                    </form>
+                {% endif %}
             {% endif %}
             <a href="{% url 'compliance:auditsession_list' %}" class="btn btn-outline-secondary">
                 {% translate "Back to Campaigns" %}
@@ -288,17 +294,15 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {% for audit in mismatches %}
+                                            {% for row in mismatches %}
                                                 <tr>
                                                     <td>
-                                                        <a href="{{ audit.asset.get_absolute_url }}">{{ audit.asset.name }}</a>
+                                                        {% if row.asset_url %}<a href="{{ row.asset_url }}">{% endif %}{{ row.name }}{% if row.asset_url %}</a>{% endif %}
                                                     </td>
-                                                    <td><code>{{ audit.asset.asset_tag }}</code></td>
-                                                    <td class="text-warning font-weight-bold">
-                                                        {{ audit.location.name|default:"—" }}
-                                                    </td>
-                                                    <td>{{ audit.auditor.username }}</td>
-                                                    <td class="text-secondary">{{ audit.timestamp|date:"Y-m-d H:i" }}</td>
+                                                    <td><code>{{ row.asset_tag }}</code></td>
+                                                    <td class="text-warning font-weight-bold">{{ row.observed_location|default:"—" }}</td>
+                                                    <td>{{ row.auditor|default:"—" }}</td>
+                                                    <td class="text-secondary">{{ row.timestamp_display|default:"—" }}</td>
                                                 </tr>
                                             {% endfor %}
                                         </tbody>
@@ -332,17 +336,21 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {% for asset in missing_assets %}
+                                            {% for row in missing_assets %}
                                                 <tr>
                                                     <td>
-                                                        <a href="{{ asset.get_absolute_url }}">{{ asset.name }}</a>
+                                                        {% if row.asset_url %}<a href="{{ row.asset_url }}">{% endif %}{{ row.name }}{% if row.asset_url %}</a>{% endif %}
                                                     </td>
-                                                    <td><code>{{ asset.asset_tag }}</code></td>
-                                                    <td>{{ asset.serial_number|default:"—" }}</td>
+                                                    <td><code>{{ row.asset_tag }}</code></td>
+                                                    <td>{{ row.serial_number|default:"—" }}</td>
                                                     <td>
-                                                        <span class="badge" style="background-color: #{{ asset.status.color }}1a; color: #{{ asset.status.color }}; border: 1px solid #{{ asset.status.color }}33;">
-                                                            {{ asset.status.name }}
-                                                        </span>
+                                                        {% if row.status_color %}
+                                                            <span class="badge" style="background-color: #{{ row.status_color }}1a; color: #{{ row.status_color }}; border: 1px solid #{{ row.status_color }}33;">
+                                                                {{ row.status_name }}
+                                                            </span>
+                                                        {% else %}
+                                                            {{ row.status_name|default:"—" }}
+                                                        {% endif %}
                                                     </td>
                                                 </tr>
                                             {% endfor %}
@@ -378,17 +386,15 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {% for audit in surprise_finds %}
+                                            {% for row in surprise_finds %}
                                                 <tr>
                                                     <td>
-                                                        <a href="{{ audit.asset.get_absolute_url }}">{{ audit.asset.name }}</a>
+                                                        {% if row.asset_url %}<a href="{{ row.asset_url }}">{% endif %}{{ row.name }}{% if row.asset_url %}</a>{% endif %}
                                                     </td>
-                                                    <td><code>{{ audit.asset.asset_tag }}</code></td>
-                                                    <td class="text-orange font-weight-bold">
-                                                        {{ audit.location.name|default:"—" }}
-                                                    </td>
-                                                    <td>{{ audit.auditor.username }}</td>
-                                                    <td class="text-secondary">{{ audit.timestamp|date:"Y-m-d H:i" }}</td>
+                                                    <td><code>{{ row.asset_tag }}</code></td>
+                                                    <td class="text-orange font-weight-bold">{{ row.observed_location|default:"—" }}</td>
+                                                    <td>{{ row.auditor|default:"—" }}</td>
+                                                    <td class="text-secondary">{{ row.timestamp_display|default:"—" }}</td>
                                                 </tr>
                                             {% endfor %}
                                         </tbody>
@@ -423,16 +429,16 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {% for audit in matching %}
+                                            {% for row in matching %}
                                                 <tr>
                                                     <td>
-                                                        <a href="{{ audit.asset.get_absolute_url }}">{{ audit.asset.name }}</a>
+                                                        {% if row.asset_url %}<a href="{{ row.asset_url }}">{% endif %}{{ row.name }}{% if row.asset_url %}</a>{% endif %}
                                                     </td>
-                                                    <td><code>{{ audit.asset.asset_tag }}</code></td>
-                                                    <td>{{ audit.auditor.username }}</td>
-                                                    <td class="text-secondary">{{ audit.timestamp|date:"Y-m-d H:i" }}</td>
+                                                    <td><code>{{ row.asset_tag }}</code></td>
+                                                    <td>{{ row.auditor|default:"—" }}</td>
+                                                    <td class="text-secondary">{{ row.timestamp_display|default:"—" }}</td>
                                                     <td>
-                                                        <span class="badge bg-secondary-lt">{{ audit.get_verification_method_display }}</span>
+                                                        <span class="badge bg-secondary-lt">{{ row.verification_method_display|default:"—" }}</span>
                                                     </td>
                                                 </tr>
                                             {% endfor %}
