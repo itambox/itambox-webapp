@@ -6,6 +6,49 @@ from assets.models import Asset, StatusLabel
 from compliance.models import AuditSession, AssetAudit
 
 
+def classify_session_audits(session: AuditSession) -> dict:
+    """Classify all audit records for a session into four categories.
+
+    Uses the AUDIT records' observed data (immutable evidence), never the
+    assets' current/live fields.
+
+    Returns a dict with keys:
+      matching    — list of AssetAudit (expected + observed location matches session)
+      mismatched  — list of AssetAudit (expected + observed location differs from session)
+      surprise    — list of AssetAudit (scanned but not in expected_ids)
+      missing     — Asset queryset (expected but not scanned)
+    """
+    expected_ids = set(session.expected_assets_queryset.values_list('id', flat=True))
+    audits = list(
+        session.audits.select_related('asset', 'location', 'status', 'auditor')
+    )
+    scanned_ids = {a.asset_id for a in audits}
+
+    matching = []
+    mismatched = []
+    surprise = []
+
+    for audit in audits:
+        if audit.asset_id not in expected_ids:
+            surprise.append(audit)
+        elif session.location_id is None:
+            # Global stocktake: no location expectation, all scanned assets match.
+            matching.append(audit)
+        elif audit.location_id == session.location_id:
+            matching.append(audit)
+        else:
+            mismatched.append(audit)
+
+    missing = Asset.objects.filter(id__in=(expected_ids - scanned_ids)).select_related('location', 'status')
+
+    return {
+        'matching': matching,
+        'mismatched': mismatched,
+        'surprise': surprise,
+        'missing': missing,
+    }
+
+
 @transaction.atomic
 def audit_asset(asset: Asset, user=None, session=None, location=None, status=None, notes='', verification_method='manual', request=None, **kwargs) -> AssetAudit:
     location = location or asset.location
@@ -53,38 +96,27 @@ def close_audit_session(session: AuditSession, user=None, request=None, notes=''
     session.completed_at = timezone.now()
     session.save()
 
-    expected_ids = set(session.expected_assets_queryset.values_list('id', flat=True))
-    audited_relations = session.audits.select_related('asset', 'location')
-    scanned_ids = set(audited_relations.values_list('asset_id', flat=True))
-
-    mismatches = []
-    matching = []
-
-    for audit in audited_relations:
-        if audit.asset.location != session.location:
-            mismatches.append(audit.asset)
-        else:
-            matching.append(audit.asset)
-
-    missing = Asset.objects.filter(id__in=(expected_ids - scanned_ids))
+    result = classify_session_audits(session)
 
     return {
-        'total_expected': len(expected_ids),
-        'total_scanned': len(scanned_ids),
-        'matching_count': len(matching),
-        'mismatch_list': mismatches,
-        'missing_list': list(missing)
+        'total_expected': len(set(session.expected_assets_queryset.values_list('id', flat=True))),
+        'total_scanned': len(result['matching']) + len(result['mismatched']) + len(result['surprise']),
+        'matching_count': len(result['matching']),
+        'mismatch_list': [a.asset for a in result['mismatched']],
+        'surprise_list': [a.asset for a in result['surprise']],
+        'missing_list': list(result['missing']),
     }
 
 
 @transaction.atomic
 def rehome_audit_session_mismatches(session: AuditSession, user=None, request=None, **kwargs):
-    """Bulk reconciles location discrepancies by re-homing assets to their observed location."""
+    """Move mismatched assets to the campaign location using frozen audit evidence."""
     if session.status != 'completed':
         raise ValidationError("Audit sessions must be closed before bulk re-homing reconciliation.")
 
-    mismatched_audits = session.audits.select_related('asset').exclude(asset__location=session.location)
-    for audit in mismatched_audits:
+    result = classify_session_audits(session)
+    for audit in result['mismatched']:
         asset = audit.asset
+        asset.snapshot()
         asset.location = session.location
         asset.save(update_fields=['location'])

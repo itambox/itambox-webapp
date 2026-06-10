@@ -77,32 +77,24 @@ class AuditSessionCreateView(ObjectEditView):
 
 class AuditSessionDetailView(ObjectDetailView):
     queryset = AuditSession.objects.select_related('location', 'created_by').prefetch_related('audits__asset', 'audits__auditor')
-    template_name = 'assets/audits/audit_session_detail.html'
+    template_name = 'compliance/audits/audit_session_detail.html'
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         session = self.get_object()
 
-        expected_ids = set(session.expected_assets_queryset.values_list('id', flat=True))
-        audited_relations = session.audits.select_related('asset', 'location', 'status')
-        scanned_ids = set(audited_relations.values_list('asset_id', flat=True))
+        from compliance.reconciliation import classify_session_audits
+        classified = classify_session_audits(session)
 
         ctx['scan_form'] = AuditBarcodeScanForm()
-        ctx['total_expected'] = len(expected_ids)
-        ctx['total_scanned'] = len(scanned_ids)
-
-        mismatches = []
-        matching = []
-        for a in audited_relations:
-            if a.asset.location != session.location:
-                mismatches.append(a)
-            else:
-                matching.append(a)
-
-        ctx['mismatches'] = mismatches
-        ctx['matching'] = matching
-        from assets.models import Asset
-        ctx['missing_assets'] = Asset.objects.filter(id__in=(expected_ids - scanned_ids)).select_related('location', 'status')
+        ctx['total_expected'] = session.expected_assets_queryset.count()
+        ctx['total_scanned'] = (
+            len(classified['matching']) + len(classified['mismatched']) + len(classified['surprise'])
+        )
+        ctx['matching'] = classified['matching']
+        ctx['mismatches'] = classified['mismatched']
+        ctx['surprise_finds'] = classified['surprise']
+        ctx['missing_assets'] = classified['missing']
         return ctx
 
 
@@ -152,7 +144,7 @@ class AssetAuditScanView(LoginRequiredMixin, PermissionRequiredMixin, View):
                 response['HX-Trigger'] = 'playAuditFailSound'
                 return response
 
-            response = render(request, 'assets/audits/includes/audit_scan_success.html', {'asset': asset})
+            response = render(request, 'compliance/audits/includes/audit_scan_success.html', {'asset': asset})
             response['HX-Trigger'] = json.dumps({
                 'updateReconciliation': None,
                 'playAuditSound': None
@@ -173,7 +165,7 @@ class AuditSessionCloseForm(forms.Form):
 class AuditSessionCloseView(GenericTransactionView):
     queryset = AuditSession.objects.filter(status='active')
     model_form = AuditSessionCloseForm
-    template_name = 'assets/audits/audit_session_close.html'
+    template_name = 'compliance/audits/audit_session_close.html'
     service_callable = close_audit_session
     success_message = "Audit session closed. Reconciliation report generated."
 
