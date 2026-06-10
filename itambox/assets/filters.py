@@ -86,6 +86,11 @@ class AssetFilterSet(BaseFilterSet):
         label='Requestable',
         widget=forms.Select(choices=[('', 'Any'), ('true', 'Yes'), ('false', 'No')], attrs={'class': 'form-select'})
     )
+    audit_due = django_filters.BooleanFilter(
+        method='filter_audit_due',
+        label='Audit Due',
+        widget=forms.Select(choices=[('', 'Any'), ('true', 'Overdue'), ('false', 'Up to date')], attrs={'class': 'form-select'})
+    )
 
     class Meta:
         model = Asset
@@ -120,6 +125,26 @@ class AssetFilterSet(BaseFilterSet):
         if not value:
             return queryset
         return queryset.filter(assignments__assigned_user=value, assignments__is_active=True)
+
+    def filter_audit_due(self, queryset, name, value):
+        if value is None:
+            return queryset
+        from django.utils import timezone
+        from datetime import timedelta
+        today = timezone.now()
+        # Build a Q filter per category: assets overdue per their category cadence.
+        overdue_q = Q(pk__in=[])  # start empty
+        for cat in Category.objects.filter(audit_interval_months__isnull=False):
+            cutoff = today - timedelta(days=cat.audit_interval_months * 30)
+            overdue_q |= Q(asset_type__category=cat) & (
+                Q(last_audited__isnull=True) | Q(last_audited__lt=cutoff)
+            )
+        if value:
+            return queryset.filter(overdue_q)
+        else:
+            # "Up to date" = has a category cadence AND is within it, OR has no cadence
+            has_cadence_q = Q(asset_type__category__audit_interval_months__isnull=False)
+            return queryset.exclude(overdue_q & has_cadence_q)
 
 # --- AssetRole Filter --- 
 class AssetRoleFilterSet(BaseFilterSet):

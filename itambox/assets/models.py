@@ -330,6 +330,27 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
     def model(self):
         return self.asset_type.model if self.asset_type else None
 
+    @property
+    def audit_due_date(self):
+        """Date by which the next physical audit is due, or None if no cadence is set.
+
+        Never-audited assets with a cadence are overdue immediately (returns created_at).
+        """
+        category = self.category
+        if not category or not category.audit_interval_months:
+            return None
+        from datetime import timedelta
+        interval_days = category.audit_interval_months * 30
+        base = self.last_audited or self.created_at
+        return base + timedelta(days=interval_days)
+
+    @property
+    def audit_overdue(self) -> bool:
+        """True when a cadence is set and the due date has passed."""
+        from django.utils import timezone
+        due = self.audit_due_date
+        return due is not None and timezone.now() > due
+
     def get_status_display(self):
         return self.status.name if self.status else "—"
 
@@ -519,6 +540,10 @@ class Category(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     color = models.CharField(max_length=6, blank=True, help_text="RGB color in hexadecimal (e.g. 00ff00)")
     description = models.TextField(blank=True)
     applies_to = models.JSONField(default=dict, blank=True, help_text="Applies to: {'asset': True, 'accessory': True, 'component': True}")
+    audit_interval_months = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="How often assets in this category must be physically audited, in months. Leave blank for no required cadence."
+    )
     tags = models.ManyToManyField('extras.Tag', related_name='categories', blank=True)
 
     class Meta:

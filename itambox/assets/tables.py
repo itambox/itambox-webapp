@@ -25,6 +25,11 @@ class AssetTable(BaseTable): # Inherit from BaseTable
 
     tags = TagColumn(url_name='assets:asset_list')
     requestable = tables.BooleanColumn(verbose_name='Requestable', yesno='Yes,No')
+    audit_due_date = tables.Column(
+        verbose_name='Audit Due',
+        orderable=False,
+        empty_values=(),
+    )
     actions = tables.Column(
         verbose_name='',
         orderable=False,
@@ -39,8 +44,8 @@ class AssetTable(BaseTable): # Inherit from BaseTable
     class Meta(BaseTable.Meta): # Inherit Meta from BaseTable
         model = Asset
         fields = (
-            'pk', 'name', 'asset_tag', 'serial_number', 'asset_type', 'asset_role', 
-            'status', 'assignee', 'tenant', 'location', 'purchase_date', 'purchase_cost', 'salvage_value', 'order_number', 'supplier', 'tags', 'requestable', 'actions',
+            'pk', 'name', 'asset_tag', 'serial_number', 'asset_type', 'asset_role',
+            'status', 'assignee', 'tenant', 'location', 'purchase_date', 'purchase_cost', 'salvage_value', 'order_number', 'supplier', 'tags', 'requestable', 'audit_due_date', 'actions',
         )
         default_columns = (
             'pk', 'name', 'asset_tag', 'serial_number', 'asset_type', 'asset_role',
@@ -64,6 +69,15 @@ class AssetTable(BaseTable): # Inherit from BaseTable
                 value.color or '6c757d', value.color or '6c757d', value.color or '6c757d', value.name
             )
         return "—"
+
+    def render_audit_due_date(self, record):
+        due = record.audit_due_date
+        if due is None:
+            return "—"
+        date_str = due.strftime("%Y-%m-%d")
+        if record.audit_overdue:
+            return format_html('<span class="text-danger fw-semibold" title="Overdue">{}</span>', date_str)
+        return date_str
 
     def render_salvage_value(self, value):
         if value is not None:

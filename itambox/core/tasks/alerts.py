@@ -441,27 +441,52 @@ def _match_warranty_expiry(rule, today):
 
 
 def _match_audit_overdue(rule, today):
-    """Assets whose last audit is older than threshold_value days, or never audited.
+    """Assets overdue for a physical audit.
 
-    threshold_value = number of days since the last audit before it counts as overdue.
-    An asset that has never been audited (last_audited IS NULL) is always included.
+    Per-category cadence (Category.audit_interval_months) takes priority when
+    set on an asset's category; otherwise falls back to rule.threshold_value days.
+    Assets that have never been audited and have a cadence are always included.
     """
-    from assets.models import Asset
+    from assets.models import Asset, Category
     from django.db.models import Q
 
     cutoff = today - timezone.timedelta(days=rule.threshold_value)
+
+    # Also pull in assets overdue per a category-level cadence that's shorter
+    # than the global rule threshold (they wouldn't match last_audited__lt=cutoff).
+    category_overdue_q = Q(pk__in=[])
+    for cat in Category.objects.filter(audit_interval_months__isnull=False):
+        cat_cutoff = today - timezone.timedelta(days=cat.audit_interval_months * 30)
+        category_overdue_q |= Q(asset_type__category=cat) & (
+            Q(last_audited__isnull=True) | Q(last_audited__lt=cat_cutoff)
+        )
+
     qs = Asset.objects.filter(
         deleted_at__isnull=True,
+    ).select_related(
+        'asset_type__category',
     ).filter(
-        Q(last_audited__isnull=True) | Q(last_audited__lt=cutoff)
+        Q(last_audited__isnull=True) | Q(last_audited__lt=cutoff) | category_overdue_q
     )
     if rule.tenant:
         qs = qs.filter(tenant=rule.tenant)
 
     matches = []
     for asset in qs:
+        # Prefer category-level cadence over the global rule threshold.
+        category = asset.asset_type.category if asset.asset_type else None
+        if category and category.audit_interval_months:
+            interval_days = category.audit_interval_months * 30
+            base = asset.last_audited or asset.created_at
+            due_date = (base + timezone.timedelta(days=interval_days)).date()
+            if due_date > today:
+                continue  # category cadence says not yet overdue
+            threshold_desc = f"every {category.audit_interval_months} month(s) per category"
+        else:
+            threshold_desc = f"every {rule.threshold_value} day(s)"
+
         if asset.last_audited:
-            days_overdue = (today - asset.last_audited).days
+            days_overdue = (today - asset.last_audited.date()).days
             detail = f"last audited {days_overdue} day(s) ago ({asset.last_audited:%Y-%m-%d})"
         else:
             detail = "never audited"
@@ -470,7 +495,7 @@ def _match_audit_overdue(rule, today):
             'subject': f"Audit Overdue: {asset.asset_tag}",
             'message': (
                 f"Asset {asset.asset_tag} ({asset.name}) is overdue for an audit "
-                f"({detail}; threshold: every {rule.threshold_value} day(s))."
+                f"({detail}; threshold: {threshold_desc})."
             ),
         })
     return matches

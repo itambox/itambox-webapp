@@ -3865,3 +3865,21 @@ msgstr "Beobachtetes Objekt"
 
 msgid "Object Watches"
 msgstr "Beobachtete Objekte"
+
+msgid "Audit Due"
+msgstr "Prüfung fällig"
+
+msgid "Overdue"
+msgstr "Überfällig"
+
+msgid "Up to date"
+msgstr "Aktuell"
+
+msgid "Audit interval months"
+msgstr "Prüfungsintervall (Monate)"
+
+msgid "How often assets in this category must be physically audited, in months. Leave blank for no required cadence."
+msgstr "Wie oft Objekte dieser Kategorie physisch inventarisiert werden müssen, in Monaten. Leer lassen für kein vorgeschriebenes Intervall."
+
+msgid "Audit Overdue: %(asset_tag)s"
+msgstr "Prüfung überfällig: %(asset_tag)s"

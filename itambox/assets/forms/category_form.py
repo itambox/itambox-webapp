@@ -31,11 +31,12 @@ class CategoryForm(ColorFieldFormMixin, SlugModelForm):
 
     class Meta:
         model = Category
-        fields = ['name', 'slug', 'color', 'description', 'applies_to_flags', 'tags']
+        fields = ['name', 'slug', 'color', 'description', 'applies_to_flags', 'audit_interval_months', 'tags']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'slug': forms.TextInput(attrs={'class': 'form-control', 'slugify': 'name'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'audit_interval_months': forms.NumberInput(attrs={'class': 'form-control', 'min': '1', 'placeholder': 'e.g. 12'}),
             'tags': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
         }
 
@@ -68,6 +69,7 @@ class CategoryForm(ColorFieldFormMixin, SlugModelForm):
             ),
             'description',
             'applies_to_flags',
+            'audit_interval_months',
             HTML('<div class="mt-4"></div>'),
             Submit('submit', button_text, css_class='btn btn-primary'),
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>')
