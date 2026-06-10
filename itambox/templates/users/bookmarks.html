@@ -1,0 +1,45 @@
+{% extends 'users/base.html' %}
+{% load i18n %}
+
+{% block title_tab %}{% translate "Bookmarks" %}{% endblock %}
+
+{% block content_tab %}
+<div class="mb-4">
+    <h3 class="card-title mb-0">{% translate "My Bookmarks" %}</h3>
+    <p class="text-muted small mb-0">{% translate "Objects you have starred for quick access. Bookmarks are personal pins — no notifications are sent." %}</p>
+</div>
+
+<div class="card border-0 shadow-sm">
+    {% if bookmarked_count > 0 %}
+        <div class="list-group list-group-flush">
+            {% for item in bookmarked_items %}
+                <div class="list-group-item d-flex justify-content-between align-items-center py-3">
+                    <div>
+                        <span class="badge bg-yellow-lt me-2">{{ item.type_name }}</span>
+                        <a href="{{ item.url }}" class="font-weight-medium text-reset">{{ item.name }}</a>
+                        <div class="text-muted small mt-1">{% translate "Bookmarked on" %} {{ item.created|date:"Y-m-d H:i" }}</div>
+                    </div>
+                    <div>
+                        <button type="button" class="btn btn-sm btn-outline-danger"
+                                hx-post="{% url 'users:bookmark_toggle' content_type_id=item.content_type_id object_id=item.object_id %}"
+                                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                                hx-target="closest .list-group-item"
+                                hx-swap="outerHTML"
+                                title="{% translate 'Remove Bookmark' %}">
+                            {% translate "Remove" %}
+                        </button>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="py-5 text-muted text-center border-0 bg-transparent shadow-none">
+            <div class="card-body">
+                <i class="mdi mdi-star-off-outline text-muted mb-2" style="font-size:2rem;"></i>
+                <p class="mb-0 small font-weight-medium">{% translate "No bookmarks yet." %}</p>
+                <p class="text-muted small mt-1">{% translate "Use the star icon on any object details page to pin it here." %}</p>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

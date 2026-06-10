@@ -23,8 +23,18 @@
                 hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                 hx-target="this"
                 hx-swap="outerHTML"
-                title="{% if is_bookmarked %}Remove Bookmark{% else %}Bookmark Item{% endif %}">
-            <i class="mdi mdi-star-outline"></i>
+                title="{% if is_bookmarked %}{% translate 'Remove Bookmark' %}{% else %}{% translate 'Bookmark' %}{% endif %}">
+            <i class="mdi {% if is_bookmarked %}mdi-star{% else %}mdi-star-outline{% endif %}"></i>
+        </button>
+        {% endif %}
+        {% if is_watchable %}
+        <button type="button" class="btn btn-icon {% if is_watched %}btn-info{% else %}btn-outline-secondary{% endif %}"
+                hx-post="{% url 'users:watch_toggle' content_type_id=watch_content_type_id object_id=object.pk %}"
+                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                hx-target="this"
+                hx-swap="outerHTML"
+                title="{% if is_watched %}{% translate 'Stop Watching' %}{% else %}{% translate 'Watch (notify me on changes)' %}{% endif %}">
+            <i class="mdi {% if is_watched %}mdi-bell{% else %}mdi-bell-outline{% endif %}"></i>
         </button>
         {% endif %}
         {# --- Standard Edit/Delete using action_urls from context --- #}

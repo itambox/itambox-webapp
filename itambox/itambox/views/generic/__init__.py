@@ -491,7 +491,7 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
             context['is_bookmarkable'] = True
             context['bookmark_content_type_id'] = obj_type.pk
             if self.request.user.is_authenticated:
-                from extras.models import Bookmark
+                from extras.models import Bookmark, ObjectWatch
                 context['is_bookmarked'] = Bookmark.objects.filter(
                     user=self.request.user,
                     model=obj_type,
@@ -499,6 +499,20 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
                 ).exists()
             else:
                 context['is_bookmarked'] = False
+
+        if registry.model_has_feature(obj.__class__, 'watchable'):
+            obj_type = ContentType.objects.get_for_model(obj)
+            context['is_watchable'] = True
+            context['watch_content_type_id'] = obj_type.pk
+            if self.request.user.is_authenticated:
+                from extras.models import ObjectWatch
+                context['is_watched'] = ObjectWatch.objects.filter(
+                    user=self.request.user,
+                    model=obj_type,
+                    object_id=obj.pk
+                ).exists()
+            else:
+                context['is_watched'] = False
 
 
         if 'related_objects_list' not in context:

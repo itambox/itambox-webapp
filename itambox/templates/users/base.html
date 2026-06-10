@@ -29,7 +29,14 @@
                 </a>
             </li>
             <li class="nav-item" role="presentation">
-                <a href="{% url 'users:user_subscriptions' %}" class="nav-link{% if active_tab == 'subscriptions' %} active{% endif %}">{% translate "Subscriptions" %}</a>
+                <a href="{% url 'users:user_bookmarks' %}" class="nav-link{% if active_tab == 'bookmarks' %} active{% endif %}">
+                    <i class="mdi mdi-star-outline me-1"></i>{% translate "Bookmarks" %}
+                </a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a href="{% url 'users:user_subscriptions' %}" class="nav-link{% if active_tab == 'watching' %} active{% endif %}">
+                    <i class="mdi mdi-bell-outline me-1"></i>{% translate "Watching" %}
+                </a>
             </li>
             <li class="nav-item" role="presentation">
                 <a href="{% url 'users:user_preferences' %}" class="nav-link{% if active_tab == 'preferences' %} active{% endif %}">{% translate "Preferences" %}</a>

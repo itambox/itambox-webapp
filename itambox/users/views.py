@@ -278,55 +278,33 @@ def notification_poll(request):
     return render(request, 'htmx/notification_dropdown.html', context)
 
 
-class UserSubscriptionsView(UserGenericTabView):
-    active_tab = 'subscriptions'
-    tab_title = 'Subscriptions'
-    template_name = 'users/subscriptions.html'
+class UserBookmarksView(UserGenericTabView):
+    active_tab = 'bookmarks'
+    tab_title = 'Bookmarks'
+    template_name = 'users/bookmarks.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        
-        # --- Query bookmarked/subscribed objects ---
         from extras.models import Bookmark
+        from extras.utils import resolve_generic_items
         user_bookmarks = list(Bookmark.objects.filter(user=self.request.user).select_related('model'))
-        
-        # Group by ContentType to batch resolve GFKs
-        bookmarks_by_ct = {}
-        for b in user_bookmarks:
-            bookmarks_by_ct.setdefault(b.model, []).append(b)
-            
-        resolved_objects = {}
-        for ct, bookmarks in bookmarks_by_ct.items():
-            model_class = ct.model_class()
-            if model_class:
-                object_ids = [b.object_id for b in bookmarks]
-                objs = model_class.objects.filter(pk__in=object_ids)
-                for obj in objs:
-                    resolved_objects[(ct.id, obj.pk)] = obj
-                    
-        bookmarked_items = []
-        for b in user_bookmarks:
-            obj = resolved_objects.get((b.model.id, b.object_id))
-            if obj:
-                url = '#'
-                if hasattr(obj, 'get_absolute_url'):
-                    try:
-                        url = obj.get_absolute_url()
-                    except Exception:
-                        pass
-                bookmarked_items.append({
-                    'id': b.pk,
-                    'type_name': obj._meta.verbose_name.title(),
-                    'name': str(obj),
-                    'url': url,
-                    'created': b.created,
-                    'content_type_id': b.model.pk,
-                    'object_id': b.object_id
-                })
-        
-        context['bookmarked_items'] = bookmarked_items
-        context['bookmarked_count'] = len(bookmarked_items)
-        
+        context['bookmarked_items'] = resolve_generic_items(user_bookmarks)
+        context['bookmarked_count'] = len(context['bookmarked_items'])
+        return context
+
+
+class UserSubscriptionsView(UserGenericTabView):
+    active_tab = 'watching'
+    tab_title = 'Watching'
+    template_name = 'users/watching.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from extras.models import ObjectWatch
+        from extras.utils import resolve_generic_items
+        user_watches = list(ObjectWatch.objects.filter(user=self.request.user).select_related('model'))
+        context['watched_items'] = resolve_generic_items(user_watches, toggle_url_name='users:watch_toggle')
+        context['watched_count'] = len(context['watched_items'])
         return context
 
 
@@ -376,25 +354,94 @@ class BookmarkToggleView(LoginRequiredMixin, View):
             # Detail page toggle response
             from django.middleware.csrf import get_token
             csrf_token = get_token(request)
+            btn_class = 'btn-warning' if is_bookmarked else 'btn-outline-secondary'
+            star_icon = 'mdi-star' if is_bookmarked else 'mdi-star-outline'
+            title = 'Remove Bookmark' if is_bookmarked else 'Bookmark'
             button_html = f"""
-            <button type="button" class="btn btn-icon {'btn-warning' if is_bookmarked else 'btn-outline-secondary'}"
+            <button type="button" class="btn btn-icon {btn_class}"
                     hx-post="{reverse('users:bookmark_toggle', kwargs={'content_type_id': content_type_id, 'object_id': object_id})}"
                     hx-headers='{{"X-CSRFToken": "{csrf_token}"}}'
                     hx-target="this"
                     hx-swap="outerHTML"
-                    title="{'Remove Bookmark' if is_bookmarked else 'Bookmark Item'}">
-                <i class="mdi mdi-star-outline"></i>
+                    title="{title}">
+                <i class="mdi {star_icon}"></i>
             </button>
             """
             response = HttpResponse(button_html)
             response['HX-Trigger'] = json.dumps({
                 "showMessage": {
-                    "message": _("Subscribed to {name}.").format(name=str(target_obj)) if is_bookmarked else _("Unsubscribed from {name}.").format(name=str(target_obj)),
+                    "message": _("Bookmarked {name}.").format(name=str(target_obj)) if is_bookmarked else _("Bookmark removed from {name}.").format(name=str(target_obj)),
                     "level": "success"
                 }
             })
             return response
             
+        return redirect(target_obj.get_absolute_url())
+
+
+class WatchToggleView(LoginRequiredMixin, View):
+    """Toggle an ObjectWatch for a generic object (used via HTMX)."""
+    def post(self, request, content_type_id, object_id):
+        import json
+        from extras.models import ObjectWatch
+        from django.contrib.contenttypes.models import ContentType
+
+        content_type = get_object_or_404(ContentType, id=content_type_id)
+        target_obj = get_object_or_404(content_type.model_class(), id=object_id)
+
+        watch_qs = ObjectWatch.objects.filter(
+            user=request.user,
+            model=content_type,
+            object_id=object_id
+        )
+
+        if watch_qs.exists():
+            watch_qs.delete()
+            is_watched = False
+        else:
+            ObjectWatch.objects.create(
+                user=request.user,
+                model=content_type,
+                object_id=object_id
+            )
+            is_watched = True
+
+        if getattr(request, 'htmx', False):
+            referer = request.META.get('HTTP_REFERER', '')
+            if 'subscriptions' in referer or 'watching' in referer:
+                response = HttpResponse("")
+                response['HX-Trigger'] = json.dumps({
+                    "showMessage": {
+                        "message": _("Unwatched {name}.").format(name=str(target_obj)),
+                        "level": "success"
+                    }
+                })
+                return response
+
+            from django.middleware.csrf import get_token
+            csrf_token = get_token(request)
+            btn_class = 'btn-info' if is_watched else 'btn-outline-secondary'
+            bell_icon = 'mdi-bell' if is_watched else 'mdi-bell-outline'
+            title = 'Stop Watching' if is_watched else 'Watch (notify me on changes)'
+            button_html = f"""
+            <button type="button" class="btn btn-icon {btn_class}"
+                    hx-post="{reverse('users:watch_toggle', kwargs={'content_type_id': content_type_id, 'object_id': object_id})}"
+                    hx-headers='{{"X-CSRFToken": "{csrf_token}"}}'
+                    hx-target="this"
+                    hx-swap="outerHTML"
+                    title="{title}">
+                <i class="mdi {bell_icon}"></i>
+            </button>
+            """
+            response = HttpResponse(button_html)
+            response['HX-Trigger'] = json.dumps({
+                "showMessage": {
+                    "message": _("Now watching {name}.").format(name=str(target_obj)) if is_watched else _("Unwatched {name}.").format(name=str(target_obj)),
+                    "level": "success"
+                }
+            })
+            return response
+
         return redirect(target_obj.get_absolute_url())
 
 

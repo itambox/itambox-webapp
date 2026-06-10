@@ -14,8 +14,10 @@ urlpatterns = [
     path('notifications/<int:pk>/read/', views.MarkNotificationReadView.as_view(), name='mark_notification_read'),
     path('notifications/<int:pk>/view/', views.ViewNotificationView.as_view(), name='view_notification'),
     path('notifications/read-all/', views.MarkAllNotificationsReadView.as_view(), name='mark_all_notifications_read'),
+    path('bookmarks/', views.UserBookmarksView.as_view(), name='user_bookmarks'),
     path('subscriptions/', views.UserSubscriptionsView.as_view(), name='user_subscriptions'),
     path('bookmarks/toggle/<int:content_type_id>/<int:object_id>/', views.BookmarkToggleView.as_view(), name='bookmark_toggle'),
+    path('watches/toggle/<int:content_type_id>/<int:object_id>/', views.WatchToggleView.as_view(), name='watch_toggle'),
 
     # User Management Views (Frontend Admin)
     path('users/', views.UserListView.as_view(), name='user_list'),
