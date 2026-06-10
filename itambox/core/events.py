@@ -315,7 +315,7 @@ def send_notification_to_channel(channel, subject, body):
                 host=email_config.smtp_host,
                 port=email_config.smtp_port,
                 username=email_config.smtp_username or '',
-                password=email_config.smtp_password or '',
+                password=email_config.smtp_password_decrypted or '',
                 use_tls=email_config.smtp_use_tls,
                 fail_silently=False,
             )

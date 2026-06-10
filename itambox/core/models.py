@@ -372,7 +372,7 @@ class EmailSettings(ChangeLoggingMixin, BaseModel):
     smtp_port = models.PositiveIntegerField(default=25)
     smtp_use_tls = models.BooleanField(default=True)
     smtp_username = models.CharField(max_length=255, blank=True, null=True)
-    smtp_password = models.CharField(max_length=255, blank=True, null=True)
+    smtp_password = models.CharField(max_length=1000, blank=True, null=True)
     from_address = models.EmailField(max_length=255, default='itambox@localhost')
     from_name = models.CharField(max_length=255, default='ITAMbox Notifications')
     enabled = models.BooleanField(default=False)
@@ -389,7 +389,19 @@ class EmailSettings(ChangeLoggingMixin, BaseModel):
         # System-wide singleton: one outbound SMTP config for the whole install.
         # Per-tenant *destinations* are configured on NotificationChannel.config['recipients'].
         self.pk = 1
+        if self.smtp_password and not self.smtp_password.startswith("enc$"):
+            from core.crypto import encrypt_string
+            self.smtp_password = encrypt_string(self.smtp_password)
         super().save(*args, **kwargs)
+
+    @property
+    def smtp_password_decrypted(self) -> str:
+        if not self.smtp_password:
+            return ""
+        if self.smtp_password.startswith("enc$"):
+            from core.crypto import decrypt_string
+            return decrypt_string(self.smtp_password)
+        return self.smtp_password
 
     @classmethod
     def load(cls):
