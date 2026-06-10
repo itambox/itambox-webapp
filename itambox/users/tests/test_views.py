@@ -118,7 +118,7 @@ class UserViewTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_user_subscriptions_view(self):
-        from core.models import Bookmark
+        from extras.models import Bookmark
         from organization.models import Tenant
         from django.contrib.contenttypes.models import ContentType
         
@@ -229,7 +229,7 @@ class BookmarkAndNotificationTests(TestCase):
         self.tenant = Tenant.objects.create(name='Test Tenant', slug='test-tenant')
         
     def test_bookmark_toggle_view_add_and_remove(self):
-        from core.models import Bookmark
+        from extras.models import Bookmark
         from django.contrib.contenttypes.models import ContentType
         
         self.client.force_login(self.user)
@@ -245,7 +245,7 @@ class BookmarkAndNotificationTests(TestCase):
         self.assertFalse(Bookmark.objects.filter(user=self.user, model=ct, object_id=self.tenant.pk).exists())
 
     def test_bookmark_toggle_view_htmx_add_and_remove(self):
-        from core.models import Bookmark
+        from extras.models import Bookmark
         from django.contrib.contenttypes.models import ContentType
         
         self.client.force_login(self.user)
@@ -268,7 +268,7 @@ class BookmarkAndNotificationTests(TestCase):
         self.assertFalse(Bookmark.objects.filter(user=self.user, model=ct, object_id=self.tenant.pk).exists())
 
     def test_bookmark_toggle_view_htmx_delete_from_subscriptions_list(self):
-        from core.models import Bookmark
+        from extras.models import Bookmark
         from django.contrib.contenttypes.models import ContentType
         
         ct = ContentType.objects.get_for_model(self.tenant)
@@ -287,7 +287,8 @@ class BookmarkAndNotificationTests(TestCase):
         self.assertFalse(Bookmark.objects.filter(user=self.user, model=ct, object_id=self.tenant.pk).exists())
 
     def test_bookmark_change_notification_triggers(self):
-        from core.models import Bookmark, Notification
+        from extras.models import Bookmark
+        from core.models import Notification
         from django.contrib.contenttypes.models import ContentType
         
         ct = ContentType.objects.get_for_model(self.tenant)

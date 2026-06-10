@@ -92,7 +92,7 @@ class JournalingMixin(models.Model):
     to JournalEntry for easy lookup.
     """
     journal_entries = GenericRelation(
-        'core.JournalEntry',
+        'extras.JournalEntry',
         content_type_field='model',
         object_id_field='object_id'
     )
@@ -111,7 +111,7 @@ class ImageAttachmentMixin(models.Model):
     Mixin for models that can have uploaded images.
     """
     image_attachments = GenericRelation(
-        'core.ImageAttachment',
+        'extras.ImageAttachment',
         content_type_field='model',
         object_id_field='object_id'
     )
@@ -130,7 +130,7 @@ class FileAttachmentMixin(models.Model):
     Mixin for models that can have uploaded files.
     """
     file_attachments = GenericRelation(
-        'core.FileAttachment',
+        'extras.FileAttachment',
         content_type_field='model',
         object_id_field='object_id'
     )

@@ -3,7 +3,8 @@ import io
 import csv
 from django.utils import timezone
 
-from core.models import ScheduledReport, ReportTemplate, EmailSettings, ReportGenerationArchive, FileAttachment
+from core.models import ScheduledReport, ReportTemplate, EmailSettings, ReportGenerationArchive
+from extras.models import FileAttachment
 from core.reports import compile_report_context, get_polished_system_html_template
 
 logger = logging.getLogger(__name__)
@@ -136,7 +137,8 @@ def generate_scheduled_report_task(scheduled_report_id):
         archive_entry = None
         file_attach = None
         if getattr(sched, 'save_to_archive', True):
-            from core.models import ReportGenerationArchive, FileAttachment
+            from core.models import ReportGenerationArchive
+            from extras.models import FileAttachment
             archive_entry = ReportGenerationArchive.objects.create(
                 scheduled_report=sched,
                 format=sched.format,

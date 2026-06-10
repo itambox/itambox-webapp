@@ -287,7 +287,7 @@ class UserSubscriptionsView(UserGenericTabView):
         context = super().get_context_data(**kwargs)
         
         # --- Query bookmarked/subscribed objects ---
-        from core.models import Bookmark
+        from extras.models import Bookmark
         user_bookmarks = list(Bookmark.objects.filter(user=self.request.user).select_related('model'))
         
         # Group by ContentType to batch resolve GFKs
@@ -337,7 +337,7 @@ class BookmarkToggleView(LoginRequiredMixin, View):
     """
     def post(self, request, content_type_id, object_id):
         import json
-        from core.models import Bookmark
+        from extras.models import Bookmark
         from django.contrib.contenttypes.models import ContentType
         
         content_type = get_object_or_404(ContentType, id=content_type_id)

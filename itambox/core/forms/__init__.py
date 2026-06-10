@@ -11,7 +11,8 @@ from core.search import SEARCH_INDEXES
 from core.utils import get_model_viewname
 import django_filters
 from itambox.middleware import get_current_user
-from core.models import WebhookEndpoint, EventRule, LabelTemplate, ReportTemplate, ScheduledReport, AlertRule, NotificationChannel
+from core.models import ReportTemplate, ScheduledReport, AlertRule, NotificationChannel
+from extras.models import WebhookEndpoint, EventRule, LabelTemplate
 
 OBJ_TYPE_CHOICES = [
     (

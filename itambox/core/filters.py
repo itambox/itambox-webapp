@@ -75,7 +75,7 @@ class ObjectChangeFilterSet(BaseFilterSet):
     NOISE_CONTENT_TYPES = (
         ('core', 'job'),
         ('core', 'bookmark'),
-        ('core', 'event'),
+        ('extras', 'event'),
         ('core', 'reportgenerationarchive'),
     )
 

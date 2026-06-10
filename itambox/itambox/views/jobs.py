@@ -40,7 +40,7 @@ class JobDetailView(ObjectDetailView):
         context = super().get_context_data(**kwargs)
         # Check if the Job has attached label ZIPs
         ct = ContentType.objects.get_for_model(Job)
-        from core.models import FileAttachment
+        from extras.models import FileAttachment
         attachments = FileAttachment.objects.filter(model=ct, object_id=self.object.pk)
         context['attachments'] = attachments
         context['title'] = f"Job Details: {self.object.name}"

@@ -26,7 +26,8 @@ from django.template import TemplateDoesNotExist
 
 from itambox.registry import registry
 from itambox.utils import get_model_viewname, get_table_for_model, get_help_url
-from core.models import ObjectChange, JournalEntry, ImageAttachment, FileAttachment
+from core.models import ObjectChange
+from extras.models import JournalEntry, ImageAttachment, FileAttachment
 from core.tables import ObjectChangeTable, BaseTable
 from core.forms import ConfirmationForm, JournalEntryForm, BulkEditForm
 from users.forms import TableConfigForm
@@ -183,7 +184,7 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
             context['export_templates'] = []
             context['label_templates'] = []
         else:
-            from core.models import ExportTemplate, LabelTemplate
+            from extras.models import ExportTemplate, LabelTemplate
             try:
                 content_type = ContentType.objects.get_for_model(_model)
                 context['export_templates'] = list(ExportTemplate.objects.filter(content_type=content_type))
@@ -502,7 +503,7 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
             context['is_bookmarkable'] = True
             context['bookmark_content_type_id'] = obj_type.pk
             if self.request.user.is_authenticated:
-                from core.models import Bookmark
+                from extras.models import Bookmark
                 context['is_bookmarked'] = Bookmark.objects.filter(
                     user=self.request.user,
                     model=obj_type,

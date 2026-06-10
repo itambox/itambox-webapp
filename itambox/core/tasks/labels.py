@@ -4,7 +4,8 @@ import zipfile
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.base import ContentFile
 
-from core.models import Job, Notification, FileAttachment
+from core.models import Job, Notification
+from extras.models import FileAttachment
 from .context import TaskContext
 from .utils import reverse_job_detail
 
@@ -346,7 +347,7 @@ def generate_label_pdf_batch_task(job_id, asset_pks, template_id, layout_mode, u
     and layout mode, and attaches it directly to the Job.
     """
     from assets.models import Asset
-    from core.models import LabelTemplate
+    from extras.models import LabelTemplate
 
     with TaskContext(tenant_id=tenant_id, user_id=user_id) as ctx:
         try:

@@ -16,10 +16,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.utils.http import urlencode
 from django_tables2 import RequestConfig
 
-from core.models import (
-    ObjectChange, ExportTemplate, JournalEntry, 
-    WebhookEndpoint, EventRule, LabelTemplate, ImageAttachment, FileAttachment
-)
+from core.models import ObjectChange
+from extras.models import WebhookEndpoint, EventRule, ExportTemplate, LabelTemplate, JournalEntry, ImageAttachment, FileAttachment
 from core.tables import (
     ObjectChangeTable, ExportTemplateTable, WebhookEndpointTable, 
     EventRuleTable, LabelTemplateTable

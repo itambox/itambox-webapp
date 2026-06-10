@@ -7,7 +7,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.core import mail
 from django.db import transaction
 
-from core.models import Event, EventRule, Job, Notification, NotificationChannel
+from core.models import Job, Notification, NotificationChannel
+from extras.models import Event, EventRule
 from core.events import dispatch_event, send_notification_to_channel
 from assets.models import Manufacturer
 

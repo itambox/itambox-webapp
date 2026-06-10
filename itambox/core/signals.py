@@ -4,7 +4,8 @@ from django.db import transaction, DatabaseError
 from django.db.models.signals import post_save, post_delete, pre_save
 from django.dispatch import receiver
 
-from core.models import ChangeLoggingMixin, Event as EventModel
+from core.models import ChangeLoggingMixin
+from extras.models import Event as EventModel
 from core.events import dispatch_event
 
 logger = logging.getLogger(__name__)
@@ -67,7 +68,7 @@ def event_on_delete(sender, instance, **kwargs):
 
 def _safe_dispatch(sender, instance, action, created=None):
     from django.db import connection
-    if 'core_event' not in connection.introspection.table_names():
+    if 'extras_event' not in connection.introspection.table_names():
         return
     try:
         dispatch_event(sender, instance, action=action, created=created)
@@ -79,9 +80,10 @@ def _safe_dispatch(sender, instance, action, created=None):
 
 def _notify_bookmark_subscribers(sender, instance, action):
     from django.db import connection
-    if 'core_bookmark' not in connection.introspection.table_names():
+    if 'extras_bookmark' not in connection.introspection.table_names():
         return
-    from core.models import Bookmark, Notification
+    from extras.models import Bookmark
+    from core.models import Notification
     from django.contrib.contenttypes.models import ContentType
     
     ct = ContentType.objects.get_for_model(sender)

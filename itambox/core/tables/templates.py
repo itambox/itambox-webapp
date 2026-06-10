@@ -1,6 +1,6 @@
 import django_tables2 as tables
 from django.contrib.contenttypes.models import ContentType
-from core.models import ExportTemplate, WebhookEndpoint, EventRule, LabelTemplate
+from extras.models import WebhookEndpoint, EventRule, ExportTemplate, LabelTemplate
 from .base import BaseTable
 from .columns import BooleanColumn
 
@@ -74,8 +74,7 @@ class EventRuleTable(BaseTable):
         return f"{value.app_label}.{value.model}"
 
     def render_action_type(self, value):
-        from core.models import EventRule as ER
-        action_map = dict(ER.ACTION_TYPE_CHOICES)
+        action_map = dict(EventRule.ACTION_TYPE_CHOICES)
         return action_map.get(value, value)
 
 
@@ -92,6 +91,5 @@ class LabelTemplateTable(BaseTable):
         sequence = ('name', 'description', 'page_width', 'page_height', 'barcode_format')
 
     def render_barcode_format(self, value):
-        from core.models import LabelTemplate as LT
-        fmt_map = dict(LT._meta.get_field('barcode_format').choices)
+        fmt_map = dict(LabelTemplate._meta.get_field('barcode_format').choices)
         return fmt_map.get(value, value)

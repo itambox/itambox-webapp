@@ -5,7 +5,8 @@ from unittest.mock import patch
 
 from assets.models import Manufacturer, Asset, AssetType, AssetRole, StatusLabel
 from organization.models import AssetHolder, Tenant
-from core.models import Job, LabelTemplate
+from core.models import Job
+from extras.models import LabelTemplate
 
 User = get_user_model()
 

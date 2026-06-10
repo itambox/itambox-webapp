@@ -416,7 +416,7 @@ def asset_label_print(request, pk, template_id=None):
     asset = get_object_or_404(Asset, pk=pk)
 
     if template_id:
-        from core.models import LabelTemplate
+        from extras.models import LabelTemplate
         from core.tasks.labels import render_labels_pdf
         label_template = get_object_or_404(LabelTemplate, pk=template_id)
         # Use the same engine as the bulk print job — synchronously, no background Job.

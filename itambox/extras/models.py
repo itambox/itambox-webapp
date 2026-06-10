@@ -1,10 +1,13 @@
 from django.conf import settings
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from core.models import BaseModel, ChangeLoggingMixin
 from core.managers import TenantScopingManager, SoftDeleteManager, AllObjectsManager
 from core.mixins import SoftDeleteMixin
+from core.validators import validate_image_attachment, validate_file_attachment
 
 
 class Tag(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
@@ -178,6 +181,275 @@ class CustomFieldset(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
 
     def get_absolute_url(self):
         return reverse('extras:customfieldset_detail', kwargs={'pk': self.pk})
+
+
+class Event(ChangeLoggingMixin, BaseModel):
+    ACTION_CREATE = 'create'
+    ACTION_UPDATE = 'update'
+    ACTION_DELETE = 'delete'
+
+    ACTION_CHOICES = [
+        (ACTION_CREATE, 'Create'),
+        (ACTION_UPDATE, 'Update'),
+        (ACTION_DELETE, 'Delete'),
+    ]
+
+    model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='events')
+    object_id = models.PositiveBigIntegerField(db_index=True)
+    content_object = GenericForeignKey('model', 'object_id')
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES, db_index=True)
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    data = models.JSONField(default=dict, blank=True)
+    processed = models.BooleanField(default=False, db_index=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+        verbose_name = "Event"
+        verbose_name_plural = "Events"
+        indexes = [
+            models.Index(fields=['model', 'object_id'], name='core_event_model_i_6d722d_idx'),
+            models.Index(fields=['processed', 'timestamp'], name='core_event_process_17ef77_idx'),
+        ]
+
+    def __str__(self):
+        return f"Event {self.get_action_display()} on {self.content_object}"
+
+
+class EventRule(ChangeLoggingMixin, BaseModel):
+    ACTION_WEBHOOK = 'webhook'
+    ACTION_NOTIFICATION = 'notification'
+    ACTION_SCRIPT = 'script'
+
+    ACTION_TYPE_CHOICES = [
+        (ACTION_WEBHOOK, 'Webhook'),
+        (ACTION_NOTIFICATION, 'Notification'),
+        (ACTION_SCRIPT, 'Script'),
+    ]
+
+    name = models.CharField(max_length=255)
+    model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='event_rules')
+    events = models.JSONField(
+        default=list,
+        help_text="List of event action types, e.g. ['create', 'update']"
+    )
+    conditions = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Optional conditions for rule matching"
+    )
+    action_type = models.CharField(max_length=20, choices=ACTION_TYPE_CHOICES)
+    action_config = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Configuration for the action (webhook URL, template, etc.)"
+    )
+    enabled = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = "Event Rule"
+        verbose_name_plural = "Event Rules"
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse('eventrule_detail', kwargs={'pk': self.pk})
+
+
+class WebhookEndpoint(ChangeLoggingMixin, BaseModel):
+    HTTP_GET = 'GET'
+    HTTP_POST = 'POST'
+    HTTP_PUT = 'PUT'
+    HTTP_PATCH = 'PATCH'
+    METHOD_CHOICES = [
+        (HTTP_GET, 'GET'),
+        (HTTP_POST, 'POST'),
+        (HTTP_PUT, 'PUT'),
+        (HTTP_PATCH, 'PATCH'),
+    ]
+
+    name = models.CharField(max_length=255, unique=True)
+    url = models.URLField(max_length=2000)
+    http_method = models.CharField(max_length=10, choices=METHOD_CHOICES, default=HTTP_POST)
+    headers = models.JSONField(default=dict, blank=True)
+    secret = models.CharField(max_length=255, blank=True, help_text="Shared secret for HMAC payload signing")
+    enabled = models.BooleanField(default=True)
+    retry_count = models.PositiveSmallIntegerField(default=3, help_text="Max retry attempts on failure")
+    retry_backoff = models.PositiveSmallIntegerField(default=60, help_text="Backoff in seconds between retries")
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = "Webhook Endpoint"
+        verbose_name_plural = "Webhook Endpoints"
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse('webhookendpoint_detail', kwargs={'pk': self.pk})
+
+
+class JournalEntry(ChangeLoggingMixin, BaseModel):
+    model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='journal_entries')
+    object_id = models.PositiveBigIntegerField(db_index=True)
+    content_object = GenericForeignKey('model', 'object_id')
+    user = models.ForeignKey(
+        to=settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='journal_entries'
+    )
+    created = models.DateTimeField(auto_now_add=True, db_index=True)
+    comment = models.TextField()
+
+    class Meta:
+        ordering = ['-created']
+        verbose_name = "Journal Entry"
+        verbose_name_plural = "Journal Entries"
+        indexes = [
+            models.Index(fields=['model', 'object_id'], name='core_journa_model_i_3f2f97_idx'),
+        ]
+
+    def __str__(self):
+        return f"Journal entry on {self.content_object} by {self.user}"
+
+
+class Bookmark(ChangeLoggingMixin, BaseModel):
+    user = models.ForeignKey(
+        to=settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='bookmarks'
+    )
+    model = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveBigIntegerField()
+    content_object = GenericForeignKey('model', 'object_id')
+    created = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created']
+        verbose_name = "Bookmark"
+        verbose_name_plural = "Bookmarks"
+        indexes = [
+            models.Index(fields=['user', 'model', 'object_id'], name='core_bookma_user_id_69a2d6_idx'),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'model', 'object_id'],
+                name='core_bookmark_unique_user_model_object'
+            )
+        ]
+
+    def __str__(self):
+        return f"Bookmark by {self.user} on {self.content_object}"
+
+
+class ImageAttachment(ChangeLoggingMixin, BaseModel):
+    model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='image_attachments')
+    object_id = models.PositiveBigIntegerField(db_index=True)
+    content_object = GenericForeignKey('model', 'object_id')
+    image = models.ImageField(upload_to='attachments/images/', validators=[validate_image_attachment])
+    name = models.CharField(max_length=255, blank=True)
+    created = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created']
+        verbose_name = "Image Attachment"
+        verbose_name_plural = "Image Attachments"
+        indexes = [
+            models.Index(fields=['model', 'object_id'], name='core_imagea_model_i_684849_idx'),
+        ]
+
+    def __str__(self):
+        return self.name or f"Image {self.pk}"
+
+
+class FileAttachment(ChangeLoggingMixin, BaseModel):
+    model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='file_attachments')
+    object_id = models.PositiveBigIntegerField(db_index=True)
+    content_object = GenericForeignKey('model', 'object_id')
+    file = models.FileField(upload_to='attachments/files/', validators=[validate_file_attachment])
+    name = models.CharField(max_length=255, blank=True)
+    mime_type = models.CharField(max_length=100, blank=True)
+    created = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created']
+        verbose_name = "File Attachment"
+        verbose_name_plural = "File Attachments"
+        indexes = [
+            models.Index(fields=['model', 'object_id'], name='core_fileat_model_i_c8edb4_idx'),
+        ]
+
+    def __str__(self):
+        return self.name or f"File {self.pk}"
+
+
+class ExportTemplate(BaseModel):
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='export_templates')
+    template_code = models.TextField(help_text="Jinja2 or Django template code for export")
+    mime_type = models.CharField(max_length=50, default='text/csv', help_text="MIME type for the exported file")
+    file_extension = models.CharField(max_length=10, default='csv')
+
+    class Meta:
+        ordering = ['content_type', 'name']
+        verbose_name = "Export Template"
+        verbose_name_plural = "Export Templates"
+        constraints = [
+            models.UniqueConstraint(
+                fields=['content_type', 'name'],
+                name='core_exporttemplate_unique_content_type_name'
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.content_type.model} - {self.name}"
+
+    def get_absolute_url(self):
+        return reverse('export_template_detail', kwargs={'pk': self.pk})
+
+    def render(self, obj):
+        from jinja2.sandbox import SandboxedEnvironment
+        env = SandboxedEnvironment()
+        template = env.from_string(self.template_code)
+        return template.render(obj=obj)
+
+    def render_queryset(self, queryset):
+        from jinja2.sandbox import SandboxedEnvironment
+        env = SandboxedEnvironment()
+        template = env.from_string(self.template_code)
+        results = []
+        for obj in queryset:
+            results.append(template.render(obj=obj))
+        return '\n'.join(results)
+
+
+class LabelTemplate(ChangeLoggingMixin, BaseModel):
+    name = models.CharField(max_length=255, unique=True)
+    description = models.TextField(blank=True)
+    page_width = models.FloatField(default=2.25, help_text="Label width in inches")
+    page_height = models.FloatField(default=1.25, help_text="Label height in inches")
+    barcode_format = models.CharField(max_length=20, default='code128', choices=[
+        ('code128', 'Code 128'),
+        ('code39', 'Code 39'),
+        ('qr', 'QR Code'),
+        ('datamatrix', 'Data Matrix'),
+    ])
+    template_code = models.TextField(blank=True, help_text="Jinja2/HTML template for label layout")
+    printer_settings = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = "Label Template"
+        verbose_name_plural = "Label Templates"
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse('labeltemplate_detail', kwargs={'pk': self.pk})
 
 
 class ConfigContext(ChangeLoggingMixin, BaseModel):
