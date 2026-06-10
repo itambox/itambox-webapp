@@ -7,9 +7,9 @@ from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema
 from core.api.permissions import TokenPermissions, StrictTenantPermission
 
-from core.api.viewsets import ITAMBoxModelViewSet, ITAMBoxReadOnlyModelViewSet
+from core.api.viewsets import ITAMBoxModelViewSet
 from assets.models import (
-    Asset, AssetRole, Manufacturer, AssetType, InstalledSoftware,
+    Asset, AssetRole, Manufacturer, AssetType,
     StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence,
     AssetAssignment, AuditSession, AssetAudit
 )
@@ -21,7 +21,7 @@ from assets.filters import (
 )
 from .serializers import (
     AssetSerializer, AssetRoleSerializer, ManufacturerSerializer, AssetTypeSerializer,
-    InstalledSoftwareSerializer, StatusLabelSerializer, DepreciationSerializer,
+    StatusLabelSerializer, DepreciationSerializer,
     SupplierSerializer, CategorySerializer, AssetRequestSerializer,
     AssetTagSequenceSerializer, AssetAssignmentSerializer,
     AuditSessionSerializer, AssetAuditSerializer, AssetCheckOutAPISerializer,
@@ -97,7 +97,7 @@ class AssetViewSet(ITAMBoxModelViewSet):
 
 class AssetRoleViewSet(ITAMBoxModelViewSet):
     queryset = AssetRole.objects.annotate(
-        asset_count=models.Count('asset')
+        asset_count=models.Count('assets')
     )
     serializer_class = AssetRoleSerializer
     filter_backends = (DjangoFilterBackend,)
@@ -111,15 +111,6 @@ class ManufacturerViewSet(ITAMBoxModelViewSet):
     serializer_class = ManufacturerSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = ManufacturerFilterSet
-
-
-class InstalledSoftwareViewSet(ITAMBoxReadOnlyModelViewSet):
-    queryset = InstalledSoftware.objects.select_related(
-        'asset', 'software', 'software__manufacturer'
-    ).all()
-    serializer_class = InstalledSoftwareSerializer
-    filterset_fields = ['asset_id', 'software_id', 'software__manufacturer_id', 'version_detected']
-    search_fields = ['asset__name', 'software__name', 'version_detected']
 
 
 class AssetTypeViewSet(ITAMBoxModelViewSet):

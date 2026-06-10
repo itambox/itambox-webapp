@@ -66,7 +66,7 @@ class CoreModelsTestCase(TestCase):
 
     def test_cascade_soft_delete_and_hard_delete(self):
         """Test that cascading soft-delete soft-deletes soft-deletable objects and hard-deletes non-soft-deletable ones."""
-        from assets.models import InstalledSoftware
+        from software.models import InstalledSoftware
         role = AssetRole.objects.create(name='Desktop', slug='desktop')
         asset = Asset.objects.create(name='Test Desktop', asset_tag='TAG-CSD', asset_role=role)
         

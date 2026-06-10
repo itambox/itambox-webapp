@@ -11,7 +11,8 @@ from itambox.views.generic import (
     # BulkDeleteView # Add later if needed
 )
 from itambox.panels import Panel
-from .models import Software
+from .models import Software, InstalledSoftware
+from .tables import InstalledSoftwareTable
 from . import forms
 from . import tables
 from . import filters
@@ -40,8 +41,6 @@ class SoftwareDetailView(ObjectDetailView):
         context = super().get_context_data(**kwargs)
         software = self.get_object()
 
-        from assets.models import InstalledSoftware
-        from .tables import InstalledSoftwareTable
         from django_tables2 import RequestConfig
         from itambox.utils import get_paginate_count
 

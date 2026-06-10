@@ -106,7 +106,7 @@ class Command(BaseCommand):
             ('inventory', 'ComponentAllocation'), ('inventory', 'ComponentStock'),
             ('inventory', 'AccessoryStock'), ('inventory', 'ConsumableStock'),
             ('inventory', 'KitItem'), ('inventory', 'Kit'),
-            ('assets', 'InstalledSoftware'), ('assets', 'AssetAssignment'),
+            ('software', 'InstalledSoftware'), ('assets', 'AssetAssignment'),
             ('assets', 'Asset'), ('assets', 'AssetType'),
             ('inventory', 'Component'), ('inventory', 'Accessory'), ('inventory', 'Consumable'),
             ('licenses', 'License'), ('software', 'Software'),
@@ -301,11 +301,19 @@ class Command(BaseCommand):
             ('gpu', 'GPU Model', 'text', False, None, True),
             ('cpu_architecture', 'CPU Architecture', 'select', False, 'x86_64\nARM64', True),
         ]
+        from django.contrib.contenttypes.models import ContentType
+        from assets.models import Asset as AssetModel, AssetType as AssetTypeModel
+        asset_ct = ContentType.objects.get_for_model(AssetModel)
+        assettype_ct = ContentType.objects.get_for_model(AssetTypeModel)
+
         self._custom_fields = {}
         for name, label, ftype, required, choices, model_level in cf_data:
             obj, _ = CustomField.objects.get_or_create(name=name, defaults={
                 'label': label, 'field_type': ftype, 'required': required,
-                'choices': choices, 'model_level': model_level})
+                'choices': choices})
+            # model_level=True described the hardware type (a spec); otherwise
+            # the field is a per-device detail on the asset.
+            obj.object_types.add(assettype_ct if model_level else asset_ct)
             self._custom_fields[name] = obj
 
         def fieldset(name, *field_names):
@@ -406,7 +414,7 @@ class Command(BaseCommand):
                 'model': model_name, 'manufacturer': self._manufacturers[mfr], 'part_number': part,
                 'eol_months': eol, 'custom_fieldset': fs, 'depreciation': self._depreciations[dep],
                 'category': self._categories[cat], 'asset_role': self._asset_roles[role],
-                'custom_values': specs})
+                'custom_field_data': specs})
             self._asset_types[slug] = obj
 
         # Components
@@ -894,7 +902,8 @@ class Command(BaseCommand):
         return 'Windows 11 23H2'
 
     def _seed_assets(self):
-        from assets.models import Asset, AssetAssignment, InstalledSoftware
+        from assets.models import Asset, AssetAssignment
+        from software.models import InstalledSoftware
         from inventory.models import ComponentAllocation
         from compliance.models import CustodyTemplate, CustodyReceipt
         self.stdout.write('--- Assets ---')
@@ -971,7 +980,7 @@ class Command(BaseCommand):
                 serial_number=f"{code}{random.randint(100000, 999999)}", purchase_cost=cost,
                 salvage_value=round(cost * 0.1, 2), purchase_date=p_date, warranty_expiration=warranty,
                 supplier=self._suppliers[random.choice(self.HW_SUPPLIERS)],
-                order_number=f"PO-{p_date.year}-{random.randint(1000, 9999)}", custom_values=cv)
+                order_number=f"PO-{p_date.year}-{random.randint(1000, 9999)}", custom_field_data=cv)
             if tags:
                 asset.tags.add(*[self._tags[t] for t in tags if t in self._tags])
             if status_slug == 'in-use' and holder:
@@ -1039,7 +1048,7 @@ class Command(BaseCommand):
         for slug in self._tenants:
             meta = self._tenant_meta[slug]
             for lt in self._laptops_by_tenant[slug]:
-                installs = [(lt.custom_values.get('os_version', 'Windows 11 23H2'), 'Intune'),
+                installs = [(lt.custom_field_data.get('os_version', 'Windows 11 23H2'), 'Intune'),
                             ('Microsoft 365 E5', 'Intune'), ('CrowdStrike Falcon', 'Intune'),
                             ('1Password Business', 'Intune')]
                 if meta['industry'] == 'Architecture & Design':

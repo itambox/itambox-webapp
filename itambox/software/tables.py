@@ -1,9 +1,9 @@
 import django_tables2 as tables
 from django.utils.translation import gettext_lazy as _
-from assets.models import Manufacturer, InstalledSoftware # Keep import for potential linking
+from assets.models import Manufacturer
 from core.tables import BaseTable, BooleanColumn, ToggleColumn, ActionsColumn
-from extras.tables import TagColumn # Import TagColumn from extras
-from .models import Software
+from extras.tables import TagColumn
+from .models import Software, InstalledSoftware
 
 class SoftwareTable(BaseTable):
     """Table for displaying Software instances."""

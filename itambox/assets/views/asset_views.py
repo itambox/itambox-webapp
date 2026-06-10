@@ -16,7 +16,8 @@ from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
-from ..models import Asset, InstalledSoftware, StatusLabel, AssetAssignment
+from ..models import Asset, StatusLabel, AssetAssignment
+from software.models import InstalledSoftware
 from .. import forms, tables, filters
 from ..services import checkout_asset, checkin_asset
 from software.tables import InstalledSoftwareTable
@@ -32,6 +33,7 @@ from itambox.views.generic import (
     ObjectBulkDeleteView, ObjectCloneView,
 )
 from itambox.views.generic.service_views import GenericTransactionView, SimplePostView
+from itambox.views.generic.utils import safe_return_url
 from itambox.quick_add import QuickAddMixin
 
 from organization.models import AssetHolder
@@ -62,7 +64,10 @@ class AssetListView(ObjectListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['asset_holders'] = AssetHolder.objects.all().order_by('last_name', 'first_name')
+        # The bulk-assign dropdown only renders on the full page; skip loading
+        # the entire holder directory for partial table refreshes.
+        if not (self.is_htmx_partial() and self.content_partial_name):
+            context['asset_holders'] = AssetHolder.objects.all().order_by('last_name', 'first_name')
         return context
 
     filterset = filters.AssetFilterSet
@@ -244,8 +249,10 @@ class AssetCheckoutView(GenericTransactionView):
     service_callable = checkout_asset
     context_object_name = 'asset'
     template_name = 'assets/includes/asset_checkout_modal.html'
+    error_partial = 'assets/includes/asset_checkout_modal.html#checkout-modal-form'
     success_message = "Asset checked out successfully."
     hx_trigger = "assetListUpdated"
+    hx_redirect_on_success = True
     form_field_map = {'asset_holder': 'holder'}
     form_exclude_fields = ('target_type',)
 
@@ -280,45 +287,27 @@ class AssetCheckoutView(GenericTransactionView):
     def get_success_message(self, result=None):
         return f"Asset '{self.get_object()}' checked out to {result}."
 
-    def form_valid(self, form):
-        obj = self.get_object()
-        try:
-            with transaction.atomic():
-                result = self.__class__.service_callable(
-                    obj, user=self.request.user, request=self.request,
-                    **self.get_service_kwargs(form)
-                )
-
-                request_id = self.request.GET.get('request_id')
-                if request_id:
-                    from ..models import AssetRequest
-                    try:
-                        asset_request = AssetRequest.objects.get(pk=request_id)
-                        if asset_request.status in (AssetRequest.STATUS_PENDING, AssetRequest.STATUS_APPROVED):
-                            asset_request.status = AssetRequest.STATUS_FULFILLED
-                            asset_request.response_date = timezone.now()
-                            asset_request.responded_by = self.request.user
-                            asset_request.asset = obj
-                            asset_request.save(update_fields=['status', 'response_date', 'responded_by', 'asset'])
-                    except AssetRequest.DoesNotExist:
-                        pass
-
-            messages.success(self.request, self.get_success_message(result))
-
-            if self.request.headers.get('HX-Request') or getattr(self.request, 'htmx', False):
-                response = HttpResponse()
-                response['HX-Redirect'] = obj.get_absolute_url()
-                return response
-            return redirect(obj.get_absolute_url())
-
-        except ValidationError as e:
-            for msg in e.messages:
-                form.add_error(None, msg)
-            return self.form_invalid(form)
-        except Exception as e:
-            logger.exception("Unexpected error during asset checkout for asset pk=%s", obj.pk)
-            form.add_error(None, "An unexpected error occurred. Please try again or contact support.")
-            return self.form_invalid(form)
+    def post_service(self, obj, form, result):
+        # Fulfill the originating request, but only when it actually references
+        # this asset (or this asset's type) — never an arbitrary request id.
+        request_id = self.request.GET.get('request_id')
+        if not request_id:
+            return
+        from django.db.models import Q
+        from ..models import AssetRequest
+        request_filter = Q(asset=obj)
+        if obj.asset_type_id:
+            request_filter |= Q(asset__isnull=True, asset_type_id=obj.asset_type_id)
+        asset_request = AssetRequest.objects.filter(
+            pk=request_id,
+            status__in=(AssetRequest.STATUS_PENDING, AssetRequest.STATUS_APPROVED),
+        ).filter(request_filter).first()
+        if asset_request:
+            asset_request.status = AssetRequest.STATUS_FULFILLED
+            asset_request.response_date = timezone.now()
+            asset_request.responded_by = self.request.user
+            asset_request.asset = obj
+            asset_request.save(update_fields=['status', 'response_date', 'responded_by', 'asset'])
 
 
 class AssetCheckinView(GenericTransactionView):
@@ -328,8 +317,10 @@ class AssetCheckinView(GenericTransactionView):
     service_callable = checkin_asset
     context_object_name = 'asset'
     template_name = 'assets/includes/asset_checkin_modal.html'
+    error_partial = 'assets/includes/asset_checkin_modal.html#checkin-modal-form'
     success_message = "Asset checked in successfully."
     hx_trigger = "assetListUpdated"
+    hx_redirect_on_success = True
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -339,27 +330,6 @@ class AssetCheckinView(GenericTransactionView):
 
     def get_success_message(self, result=None):
         return f"Asset '{self.get_object()}' checked in successfully."
-
-    def form_valid(self, form):
-        obj = self.get_object()
-        try:
-            with transaction.atomic():
-                result = self.__class__.service_callable(
-                    obj, user=self.request.user, request=self.request,
-                    **self.get_service_kwargs(form)
-                )
-
-            messages.success(self.request, self.get_success_message(result))
-
-            if self.request.headers.get('HX-Request') or getattr(self.request, 'htmx', False):
-                response = HttpResponse()
-                response['HX-Redirect'] = obj.get_absolute_url()
-                return response
-            return redirect(obj.get_absolute_url())
-
-        except Exception as e:
-            form.add_error(None, str(e))
-            return self.form_invalid(form)
 
 
 class AssetAuditView(SimplePostView):
@@ -388,11 +358,20 @@ class AssetAuditView(SimplePostView):
         location = asset.location
         if session and not location:
             location = session.location
-            
+
         if not location:
-            # Fallback to the first location in DB if no location is registered on the asset/session
-            from organization.models import Location
-            location = Location.objects.first()
+            # An audit records the *observed* physical location. Refusing is the only
+            # defensible behavior when neither the asset nor the campaign has one —
+            # never write a guessed location into a compliance record.
+            response = HttpResponse(status=204)
+            response['HX-Trigger'] = json.dumps({"showMessage": {
+                "message": (
+                    f"Cannot audit '{asset.name}': no location is set on the asset "
+                    f"or the active audit campaign. Set a location first."
+                ),
+                "level": "danger",
+            }})
+            return response
 
         # 3. Determine the observed status
         status = asset.status
@@ -469,7 +448,7 @@ def bulk_assign_assets(request):
 
     if not object_pks or not holder_id:
         messages.error(request, "No assets selected or no holder specified.")
-        return HttpResponseRedirect(request.META.get('HTTP_REFERER', reverse('assets:asset_list')))
+        return HttpResponseRedirect(safe_return_url(request, request.META.get('HTTP_REFERER'), reverse('assets:asset_list')))
 
     holder = get_object_or_404(AssetHolder, pk=holder_id)
 
@@ -561,13 +540,13 @@ def bulk_print_labels(request):
 
     if not object_pks:
         messages.error(request, "No assets selected for label printing.")
-        return HttpResponseRedirect(request.META.get('HTTP_REFERER', reverse('assets:asset_list')))
+        return HttpResponseRedirect(safe_return_url(request, request.META.get('HTTP_REFERER'), reverse('assets:asset_list')))
 
     try:
         template_id = int(template_id)
     except (TypeError, ValueError):
         messages.error(request, "No valid label template specified.")
-        return HttpResponseRedirect(request.META.get('HTTP_REFERER', reverse('assets:asset_list')))
+        return HttpResponseRedirect(safe_return_url(request, request.META.get('HTTP_REFERER'), reverse('assets:asset_list')))
 
     from django_q.tasks import async_task
     from django.contrib.contenttypes.models import ContentType

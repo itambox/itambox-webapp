@@ -1,7 +1,7 @@
 from itambox.api.routers import ITAMBoxRouter
 from .views import (
     AssetViewSet, AssetRoleViewSet, ManufacturerViewSet,
-    InstalledSoftwareViewSet, AssetTypeViewSet, StatusLabelViewSet,
+    AssetTypeViewSet, StatusLabelViewSet,
     DepreciationViewSet, SupplierViewSet, CategoryViewSet,
     AssetRequestViewSet, AssetTagSequenceViewSet,
     AssetAssignmentViewSet, AuditSessionViewSet, AssetAuditViewSet
@@ -13,7 +13,6 @@ router = ITAMBoxRouter()
 router.register(r'assets', AssetViewSet)
 router.register(r'asset-roles', AssetRoleViewSet)
 router.register(r'manufacturers', ManufacturerViewSet)
-router.register(r'installed-software', InstalledSoftwareViewSet)
 router.register(r'asset-types', AssetTypeViewSet)
 router.register(r'status-labels', StatusLabelViewSet)
 router.register(r'depreciations', DepreciationViewSet)

@@ -1,0 +1,15 @@
+{% load i18n %}
+{% translate "Total Purchased" as l_total %}
+{% translate "Consumed" as l_consumed %}
+{% translate "Remaining Stock" as l_avail %}
+<div class="row g-3 mb-4">
+    {% include "generic/includes/stat_card.html" with col="col-sm-4" color="blue" icon="mdi mdi-archive-outline" label=l_total value=object.total_stock %}
+    {% include "generic/includes/stat_card.html" with col="col-sm-4" color="purple" icon="mdi mdi-minus" label=l_consumed value=object.consumed_qty %}
+    {% if object.available <= 0 %}
+        {% include "generic/includes/stat_card.html" with col="col-sm-4" color="danger" icon="mdi mdi-check-circle-outline" label=l_avail value=object.available %}
+    {% elif object.available < object.min_qty %}
+        {% include "generic/includes/stat_card.html" with col="col-sm-4" color="warning" icon="mdi mdi-check-circle-outline" label=l_avail value=object.available %}
+    {% else %}
+        {% include "generic/includes/stat_card.html" with col="col-sm-4" color="success" icon="mdi mdi-check-circle-outline" label=l_avail value=object.available %}
+    {% endif %}
+</div>

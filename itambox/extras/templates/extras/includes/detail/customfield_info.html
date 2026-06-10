@@ -1,0 +1,46 @@
+{% load i18n %}
+<dl class="row mb-0">
+    <dt class="col-sm-3">{% translate "Field Name:" %}</dt>
+    <dd class="col-sm-9"><span class="badge bg-secondary-lt font-monospace">{{ object.name }}</span></dd>
+
+    <dt class="col-sm-3">{% translate "Display Label:" %}</dt>
+    <dd class="col-sm-9"><strong>{{ object.label }}</strong></dd>
+
+    <dt class="col-sm-3">{% translate "Field Type:" %}</dt>
+    <dd class="col-sm-9">
+        <span class="badge bg-blue-lt px-2.5 py-1 text-uppercase">
+            {{ object.get_field_type_display }}
+        </span>
+    </dd>
+
+    <dt class="col-sm-3">{% translate "Required:" %}</dt>
+    <dd class="col-sm-9">
+        {% if object.required %}
+            <span class="badge bg-danger">{% translate "Required" %}</span>
+        {% else %}
+            <span class="badge bg-secondary">{% translate "Optional" %}</span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">{% translate "Applies To:" %}</dt>
+    <dd class="col-sm-9">
+        {% for ct in object.object_types.all %}
+            <span class="badge bg-azure-lt me-1">{{ ct.name|title }}</span>
+        {% empty %}
+            <span class="text-muted">{% translate "No object types selected" %}</span>
+        {% endfor %}
+    </dd>
+
+    {% if object.field_type == 'select' %}
+    <dt class="col-sm-3">{% translate "Choices:" %}</dt>
+    <dd class="col-sm-9">
+        <ul class="list-inline mb-0 mt-1">
+            {% for choice in object.choices.splitlines %}
+                {% if choice.strip %}
+                    <li class="list-inline-item"><span class="badge bg-dark-lt font-monospace">{{ choice.strip }}</span></li>
+                {% endif %}
+            {% endfor %}
+        </ul>
+    </dd>
+    {% endif %}
+</dl>

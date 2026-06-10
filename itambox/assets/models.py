@@ -11,7 +11,10 @@ from extras.models import CustomFieldset
 from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import get_user_model
-from compliance.models import generate_token
+from assets.choices import (
+    StatusTypeChoices, RequestStatusChoices,
+    AuditSessionStatusChoices, AuditVerificationMethodChoices,
+)
 
 User = get_user_model()
 
@@ -41,22 +44,17 @@ class AssetStateMachine:
 class StatusLabel(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    TYPE_DEPLOYABLE = 'deployable'
-    TYPE_DEPLOYED = 'deployed'
-    TYPE_PENDING = 'pending'
-    TYPE_UNDEPLOYABLE = 'undeployable'
-    TYPE_ARCHIVED = 'archived'
-    TYPE_CHOICES = [
-        (TYPE_DEPLOYABLE, 'Deployable'),
-        (TYPE_DEPLOYED, 'Deployed'),
-        (TYPE_PENDING, 'Pending'),
-        (TYPE_UNDEPLOYABLE, 'Undeployable'),
-        (TYPE_ARCHIVED, 'Archived'),
-    ]
+    # Back-compat aliases — canonical definitions live in assets.choices.
+    TYPE_DEPLOYABLE = StatusTypeChoices.DEPLOYABLE
+    TYPE_DEPLOYED = StatusTypeChoices.DEPLOYED
+    TYPE_PENDING = StatusTypeChoices.PENDING
+    TYPE_UNDEPLOYABLE = StatusTypeChoices.UNDEPLOYABLE
+    TYPE_ARCHIVED = StatusTypeChoices.ARCHIVED
+    TYPE_CHOICES = StatusTypeChoices.choices
 
     name = models.CharField(max_length=100)
     slug = models.SlugField(max_length=100)
-    type = models.CharField(max_length=50, choices=TYPE_CHOICES, default=TYPE_DEPLOYABLE, db_index=True)
+    type = models.CharField(max_length=50, choices=StatusTypeChoices.choices, default=StatusTypeChoices.DEPLOYABLE, db_index=True)
     description = models.TextField(blank=True)
     color = models.CharField(max_length=6, blank=True, help_text="RGB color in hexadecimal (e.g. 00ff00)")
     tags = models.ManyToManyField('extras.Tag', related_name='status_labels_tagged', blank=True)
@@ -194,11 +192,7 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
         related_name='asset_types',
         verbose_name="Custom Fieldset"
     )
-    custom_values = models.JSONField(
-        default=dict,
-        blank=True,
-        verbose_name="Custom Values"
-    )
+    # custom_field_data JSONField comes from CustomFieldDataMixin
     depreciation = models.ForeignKey(
         Depreciation,
         on_delete=models.SET_NULL,
@@ -236,7 +230,11 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['manufacturer', 'model'], name='unique_manufacturer_model'),
+            models.UniqueConstraint(
+                fields=['manufacturer', 'model'],
+                condition=models.Q(deleted_at__isnull=True),
+                name='unique_manufacturer_model_active',
+            ),
             models.UniqueConstraint(fields=['slug'], condition=models.Q(deleted_at__isnull=True), name='unique_assettype_slug_active'),
         ]
         verbose_name = _("Asset Type")
@@ -253,26 +251,16 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
 
 class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, DeletableVaultModel):
     objects = TenantScopingSoftDeleteManager()
-    all_objects = AllObjectsManager()
-    
-    # --- Define choices as class attributes --- 
-    STATUS_IN_USE = 'in_use'
-    STATUS_AVAILABLE = 'available'
-    STATUS_PENDING_REPAIR = 'pending_repair'
-    STATUS_RETIRED = 'retired'
-    STATUS_CHOICES = [
-        (STATUS_IN_USE, 'In Use'),
-        (STATUS_AVAILABLE, 'Available'),
-        (STATUS_PENDING_REPAIR, 'Pending Repair'),
-        (STATUS_RETIRED, 'Retired'),
-    ]
-    # --- End Choices ---
+    all_objects = TenantScopingAllObjectsManager()
+
+    # NOTE: asset status is a FK to StatusLabel; the lifecycle vocabulary is
+    # StatusLabel.type (assets.choices.StatusTypeChoices), not a local choice set.
 
     name = models.CharField(max_length=255)
     asset_tag = models.CharField(max_length=50, blank=True)
     serial_number = models.CharField(max_length=100, blank=True, null=True, db_index=True)
     asset_type = models.ForeignKey(AssetType, on_delete=models.PROTECT, related_name='assets', null=True, blank=True, db_index=True)
-    asset_role = models.ForeignKey(AssetRole, on_delete=models.SET_NULL, blank=True, null=True, db_index=True)
+    asset_role = models.ForeignKey(AssetRole, on_delete=models.SET_NULL, blank=True, null=True, related_name='assets', db_index=True)
     purchase_date = models.DateField(blank=True, null=True, db_index=True)
     warranty_expiration = models.DateField(blank=True, null=True, db_index=True)
     
@@ -328,11 +316,7 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
         related_name='audited_assets',
         verbose_name="Last Audited By"
     )
-    custom_values = models.JSONField(
-        default=dict,
-        blank=True,
-        verbose_name="Custom Values"
-    )
+    # custom_field_data JSONField comes from CustomFieldDataMixin
     requestable = models.BooleanField(null=True, blank=True, default=None, db_index=True, help_text="Allow users to request this asset")
 
     @property
@@ -355,26 +339,9 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
     @property
     def eol_date(self):
         if self.purchase_date and self.asset_type and self.asset_type.eol_months:
-            import datetime
-            year = self.purchase_date.year
-            month = self.purchase_date.month
-            day = self.purchase_date.day
-            
-            # Add eol_months
-            total_months = month + self.asset_type.eol_months - 1
-            new_year = year + total_months // 12
-            new_month = total_months % 12 + 1
-            
-            # Handle month end day overflows (e.g. Feb 30th -> Feb 28th)
-            try:
-                return datetime.date(new_year, new_month, day)
-            except ValueError:
-                # Get the last day of that new month
-                if new_month == 12:
-                    next_month_first = datetime.date(new_year + 1, 1, 1)
-                else:
-                    next_month_first = datetime.date(new_year, new_month + 1, 1)
-                return next_month_first - datetime.timedelta(days=1)
+            from dateutil.relativedelta import relativedelta
+            # relativedelta clamps month-end overflow (Jan 31 + 1 month = Feb 28/29).
+            return self.purchase_date + relativedelta(months=self.asset_type.eol_months)
         return None
 
     @property
@@ -382,24 +349,17 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
         eol = self.eol_date
         if eol:
             import datetime
+            from dateutil.relativedelta import relativedelta
             today = datetime.date.today()
             if today >= eol:
                 return "Expired"
-            
-            # Calculate simple difference
-            years = eol.year - today.year
-            months = eol.month - today.month
-            if eol.day < today.day:
-                months -= 1
-            if months < 0:
-                years -= 1
-                months += 12
-                
+
+            delta = relativedelta(eol, today)
             parts = []
-            if years > 0:
-                parts.append(f"{years} year{'s' if years != 1 else ''}")
-            if months > 0:
-                parts.append(f"{months} month{'s' if months != 1 else ''}")
+            if delta.years > 0:
+                parts.append(f"{delta.years} year{'s' if delta.years != 1 else ''}")
+            if delta.months > 0:
+                parts.append(f"{delta.months} month{'s' if delta.months != 1 else ''}")
             return ", ".join(parts) or "Less than a month"
         return "—"
 
@@ -500,16 +460,16 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
     def clean(self):
         super().clean()
         if self.pk and self.status_id:
-            try:
-                old_asset = Asset.objects.get(pk=self.pk)
-                if old_asset.status_id and old_asset.status != self.status:
-                    AssetStateMachine.validate_transition(
-                        old_asset.status.type,
-                        self.status.type,
-                        self.assignments.filter(is_active=True).exists()
-                    )
-            except Asset.DoesNotExist:
-                pass
+            # Integrity checks must see the row as stored, not through the current
+            # request's tenant/soft-delete lens — otherwise a context mismatch
+            # (background task, cross-tenant admin) silently skips the state machine.
+            old_asset = Asset._base_manager.filter(pk=self.pk).first()
+            if old_asset and old_asset.status_id and old_asset.status != self.status:
+                AssetStateMachine.validate_transition(
+                    old_asset.status.type,
+                    self.status.type,
+                    self.assignments.filter(is_active=True).exists()
+                )
 
     def save(self, *args, **kwargs):
         if not self.asset_tag:
@@ -523,69 +483,7 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
 
 
 
-class InstalledSoftware(ChangeLoggingMixin, BaseModel):
-    """
-    Represents an instance of software discovered or inventoried on a specific asset.
-    Distinct from license assignment/tracking.
-    """
-    asset = models.ForeignKey(
-        to=Asset,
-        on_delete=models.CASCADE, # If Asset is deleted, remove its inventory
-        related_name='installed_software',
-        db_index=True
-    )
-    software = models.ForeignKey(
-        to=Software,
-        on_delete=models.PROTECT, # Don't delete Software catalog item if installed instance exists
-        related_name='installed_instances'
-    )
-    version_detected = models.CharField(
-        max_length=100,
-        blank=True,
-        help_text="Specific version discovered on the asset (e.g., 16.78.1)"
-    )
-    install_date = models.DateField(
-        blank=True,
-        null=True,
-        db_index=True,
-        help_text="Estimated or known installation date"
-    )
-    discovered_by_agent = models.CharField(
-        max_length=100,
-        blank=True,
-        verbose_name="Discovered By",
-        help_text="Identifier for the discovery source or agent (e.g., SCCM, Intune, Lansweeper)"
-    )
-    last_seen_date = models.DateTimeField(
-        blank=True,
-        null=True,
-        db_index=True,
-        help_text="Timestamp when this software was last detected on the asset"
-    )
-    notes = models.TextField(
-        blank=True,
-        help_text="Optional notes specific to this installation"
-    )
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=['asset', 'software', 'version_detected'], name='unique_asset_software_version')
-        ]
-        ordering = ['asset', 'software', '-last_seen_date']
-        verbose_name = _("Installed Software Instance")
-        verbose_name_plural = _("Installed Software Instances")
-
-
-    def __str__(self):
-        version_part = f" (v{self.version_detected})" if self.version_detected else ""
-        return f"{self.software.name}{version_part} on {self.asset.name}"
-
-    def get_absolute_url(self):
-        # Likely won't have its own detail view, link back to the asset
-        return self.asset.get_absolute_url()
-
-
-class Supplier(AutoSlugMixin, StandardModel, SoftDeleteMixin):
+class Supplier(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     name = models.CharField(max_length=255)
@@ -647,20 +545,14 @@ class Category(AutoSlugMixin, StandardModel, SoftDeleteMixin):
 class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()
-    STATUS_PENDING = 'pending'
-    STATUS_APPROVED = 'approved'
-    STATUS_PROCUREMENT = 'procurement'
-    STATUS_DENIED = 'denied'
-    STATUS_FULFILLED = 'fulfilled'
-    STATUS_CANCELLED = 'cancelled'
-    STATUS_CHOICES = [
-        (STATUS_PENDING, 'Pending'),
-        (STATUS_APPROVED, 'Approved'),
-        (STATUS_PROCUREMENT, 'Awaiting Procurement'),
-        (STATUS_DENIED, 'Denied'),
-        (STATUS_FULFILLED, 'Fulfilled'),
-        (STATUS_CANCELLED, 'Cancelled'),
-    ]
+    # Back-compat aliases — canonical definitions live in assets.choices.
+    STATUS_PENDING = RequestStatusChoices.PENDING
+    STATUS_APPROVED = RequestStatusChoices.APPROVED
+    STATUS_PROCUREMENT = RequestStatusChoices.PROCUREMENT
+    STATUS_DENIED = RequestStatusChoices.DENIED
+    STATUS_FULFILLED = RequestStatusChoices.FULFILLED
+    STATUS_CANCELLED = RequestStatusChoices.CANCELLED
+    STATUS_CHOICES = RequestStatusChoices.choices
 
     tenant = models.ForeignKey(
         'organization.Tenant',
@@ -748,7 +640,9 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
 
         if self.pk:
             try:
-                old_status = AssetRequest.objects.get(pk=self.pk).status
+                # _base_manager: state-machine checks must not depend on the active
+                # tenant context (see Asset.clean).
+                old_status = AssetRequest._base_manager.get(pk=self.pk).status
                 if old_status != self.status:
                     VALID_TRANSITIONS = {
                         AssetRequest.STATUS_PENDING: {AssetRequest.STATUS_APPROVED, AssetRequest.STATUS_DENIED, AssetRequest.STATUS_CANCELLED, AssetRequest.STATUS_FULFILLED},
@@ -968,9 +862,15 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         return reverse('assets:assettagsequence_detail', kwargs={'pk': self.pk})
 
     def next_tag(self):
+        from django.db import transaction
         from django.db.models import F
-        tag = f'{self.prefix}{self.next_value:0{self.zero_padding}d}'
-        type(self).all_objects.filter(pk=self.pk).update(next_value=F('next_value') + 1)
+        # Lock the sequence row before reading: formatting the tag from an unlocked
+        # read lets two concurrent saves claim the same value and collide on the
+        # asset_tag unique constraint.
+        with transaction.atomic():
+            locked = type(self)._base_manager.select_for_update().get(pk=self.pk)
+            tag = f'{locked.prefix}{locked.next_value:0{locked.zero_padding}d}'
+            type(self)._base_manager.filter(pk=self.pk).update(next_value=F('next_value') + 1)
         self.refresh_from_db(fields=['next_value'])
         return tag
 
@@ -1160,13 +1060,9 @@ class AuditSession(StandardModel, SoftDeleteMixin):
         help_text="Target location expected to be audited. If omitted, applies globally."
     )
     status = models.CharField(
-        max_length=20, 
-        choices=[
-            ('planned', 'Planned'),
-            ('active', 'Active'),
-            ('completed', 'Completed'),
-        ], 
-        default='planned'
+        max_length=20,
+        choices=AuditSessionStatusChoices.choices,
+        default=AuditSessionStatusChoices.PLANNED,
     )
     started_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
@@ -1220,13 +1116,8 @@ class AssetAudit(models.Model):
     notes = models.TextField(blank=True)
     verification_method = models.CharField(
         max_length=30,
-        choices=[
-            ('barcode', 'Barcode Scan'),
-            ('rfid', 'RFID Reader'),
-            ('manual', 'Manual Input'),
-            ('auto', 'Agent API Handshake')
-        ],
-        default='manual'
+        choices=AuditVerificationMethodChoices.choices,
+        default=AuditVerificationMethodChoices.MANUAL,
     )
 
     class Meta:

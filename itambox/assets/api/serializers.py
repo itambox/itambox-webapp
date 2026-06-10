@@ -9,7 +9,7 @@ from core.api.nested_serializers import (
     NestedAssetTypeSerializer
 )
 from assets.models import (
-    Asset, AssetRole, Manufacturer, AssetType, InstalledSoftware,
+    Asset, AssetRole, Manufacturer, AssetType,
     StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence,
     AssetAssignment, AuditSession, AssetAudit
 )
@@ -83,7 +83,7 @@ class AssetTypeSerializer(BaseModelSerializer):
         fields = [
             'id', 'model', 'slug', 'manufacturer', 'manufacturer_id',
             'part_number', 'eol_months', 'category', 'asset_role', 'assetrole_id',
-            'depreciation', 'depreciation_id', 'custom_fieldset', 'custom_values',
+            'depreciation', 'depreciation_id', 'custom_fieldset', 'custom_field_data',
             'image', 'requestable', 'description', 'comments',
             'tags', 'created_at', 'updated_at'
         ]
@@ -130,7 +130,7 @@ class AssetSerializer(BaseModelSerializer):
             'purchase_date', 'warranty_expiration',
             'purchase_cost', 'order_number', 'supplier', 'supplier_id',
             'salvage_value', 'last_audited', 'last_audited_by',
-            'custom_values', 'requestable',
+            'custom_field_data', 'requestable',
             'notes', 'tags', 'assigned_to', 'created_at', 'updated_at'
         ]
         brief_fields = ['id', 'name', 'asset_tag', 'serial_number', 'status']
@@ -154,31 +154,6 @@ class AssetSerializer(BaseModelSerializer):
             'checked_out_at': active.checked_out_at,
             'expected_checkin_date': active.expected_checkin_date,
         }
-
-
-class InstalledSoftwareSerializer(BaseModelSerializer):
-    asset = NestedAssetSerializer(read_only=True)
-    asset_id = serializers.PrimaryKeyRelatedField(
-        queryset=Asset.objects.all(), source='asset', write_only=True
-    )
-    software_id = serializers.PrimaryKeyRelatedField(
-        queryset=Software.objects.all(), source='software', write_only=True
-    )
-    software_name = serializers.CharField(source='software.name', read_only=True)
-    software_manufacturer = serializers.CharField(source='software.manufacturer.name', read_only=True)
-
-    class Meta:
-        model = InstalledSoftware
-        fields = (
-            'id', 'asset', 'asset_id', 'software', 'software_id', 'software_name', 'software_manufacturer',
-            'version_detected', 'install_date', 'discovered_by_agent',
-            'last_seen_date', 'notes',
-            'created_at', 'updated_at'
-        )
-        read_only_fields = ('created_at', 'updated_at')
-        brief_fields = ['id', 'software_name', 'version_detected']
-
-
 
 
 class SupplierSerializer(BaseModelSerializer):

@@ -1,8 +1,6 @@
 from django.contrib import admin
-# Import models from this app
-from .models import (
-    Asset, AssetRole, Manufacturer, AssetType, InstalledSoftware
-)
+from .models import Asset, AssetRole, Manufacturer, AssetType
+from software.models import InstalledSoftware
 
 # Register your models here.
 
@@ -12,7 +10,7 @@ class AssetRoleAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ("name",)}
 
     def asset_count(self, obj):
-        return obj.asset_set.count()
+        return obj.assets.count()
     asset_count.short_description = 'Assets'
 
 @admin.register(Manufacturer)
