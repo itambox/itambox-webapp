@@ -38,6 +38,7 @@ from itambox.views.features import (
     LabelSelectView, LabelPrintView,
 )
 from itambox.views.utility import SearchView, health # Import core views, aliased to avoid clash
+from assets.views_scan import ScanResolveView
 from itambox.views.jobs import JobListView, JobDetailView, JobCancelView
 from django.conf import settings # Import settings
 from django.conf.urls.static import static # Import static
@@ -74,6 +75,9 @@ urlpatterns = [
 
     # Search Path
     path('search/', SearchView.as_view(), name='search'),
+
+    # Global scan-to-find (resolves a barcode/QR code to an asset URL)
+    path('scan/resolve/', ScanResolveView.as_view(), name='scan_resolve'),
 
     # UI Paths
     path('assets/', include('assets.urls', namespace='assets')),
