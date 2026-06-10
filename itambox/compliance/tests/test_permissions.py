@@ -83,17 +83,17 @@ class AssetAuditViewPermissionTests(TenantTestMixin, TestCase):
 
     def setUp(self):
         self.setup_tenant_context(name='AssetAudit Perm Tenant', slug='asset-audit-perm-tenant')
-        loc = baker.make(Location, name='ServerRoom')
+        loc = baker.make(Location, name='ServerRoom', tenant=self.tenant)
         self.status = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
         self.asset = baker.make(Asset, asset_tag='ASSET-001', tenant=self.tenant, location=loc, status=self.status)
         self.url = reverse('assets:asset_audit', kwargs={'pk': self.asset.pk})
 
-    def _post(self, user=None):
+    def _post(self, user=None, data=None):
         if user:
             self.client.force_login(user)
         else:
             self.client.logout()
-        return self.client.post(self.url)
+        return self.client.post(self.url, data=data or {})
 
     def test_anonymous_redirects_to_login(self):
         response = self._post()
@@ -109,7 +109,10 @@ class AssetAuditViewPermissionTests(TenantTestMixin, TestCase):
         self.tenant_role.permissions = [AUDIT_PERM, 'assets.view_asset']
         self.tenant_role.save()
         self.client_login_to_tenant(self.tenant_user, self.tenant)
-        response = self.client.post(self.url)
-        # SimplePostView redirects on success (non-HTMX)
+        response = self._post(
+            user=self.tenant_user,
+            data={'location': self.asset.location.pk, 'status': self.status.pk},
+        )
+        # GenericTransactionView redirects to detail page on non-HTMX success
         self.assertIn(response.status_code, (200, 204, 302))
         self.assertEqual(AssetAudit.objects.filter(asset=self.asset).count(), 1)

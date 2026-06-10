@@ -22,6 +22,7 @@ from .. import forms, tables, filters
 from ..services import checkout_asset, checkin_asset
 from software.tables import InstalledSoftwareTable
 from compliance.models import CustodyReceipt
+from compliance.reconciliation import audit_asset_from_form
 from inventory.models import AccessoryAssignment, ConsumableAssignment
 from inventory.tables import AccessoryAssignmentTable, ConsumableAssignmentTable
 
@@ -332,83 +333,60 @@ class AssetCheckinView(GenericTransactionView):
         return f"Asset '{self.get_object()}' checked in successfully."
 
 
-class AssetAuditView(SimplePostView):
+class AssetAuditView(GenericTransactionView):
+    """Modal form for standalone asset verification from the detail page."""
     queryset = Asset.objects.all()
     permission_required = 'compliance.add_assetaudit'
+    context_object_name = 'asset'
+    template_name = 'assets/includes/asset_audit_modal.html'
+    error_partial = 'assets/includes/asset_audit_modal.html#audit-modal-form'
+    success_message = "Asset physically verified."
+    hx_trigger = "assetAuditRecorded"
 
-    def post(self, request, *args, **kwargs):
-        asset = self.get_object()
-        
-        from compliance.models import AuditSession
-        from compliance.reconciliation import audit_asset
-        from django.core.exceptions import ValidationError
+    model_form = forms.AssetAuditConfirmForm
 
-        # 1. Try to find an active AuditSession campaign
-        session = None
-        if asset.location:
-            session = AuditSession.objects.filter(status='active', location=asset.location).first()
-        
-        if not session:
-            session = AuditSession.objects.filter(status='active', location__isnull=True).first()
-            
-        if not session:
-            session = AuditSession.objects.filter(status='active').first()
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs.pop('instance', None)
+        kwargs['asset'] = self.get_object()
+        return kwargs
 
-        # 2. Determine the observed location
-        location = asset.location
-        if session and not location:
-            location = session.location
+    def get_service_kwargs(self, form):
+        return {
+            'location': form.cleaned_data['location'],
+            'status': form.cleaned_data['status'],
+            'notes': form.cleaned_data.get('notes', ''),
+        }
 
-        if not location:
-            # An audit records the *observed* physical location. Refusing is the only
-            # defensible behavior when neither the asset nor the campaign has one —
-            # never write a guessed location into a compliance record.
-            response = HttpResponse(status=204)
-            response['HX-Trigger'] = json.dumps({"showMessage": {
-                "message": (
-                    f"Cannot audit '{asset.name}': no location is set on the asset "
-                    f"or the active audit campaign. Set a location first."
-                ),
-                "level": "danger",
-            }})
-            return response
-
-        # 3. Determine the observed status
-        status = asset.status
-        if not status:
-            status = StatusLabel.objects.filter(type=StatusLabel.TYPE_DEPLOYABLE).first()
-
-        error_message = None
-        try:
-            audit_asset(
-                asset=asset,
-                user=request.user,
-                session=session,
-                location=location,
-                status=status,
-                verification_method='manual'
-            )
-            if session:
-                message = f"Asset '{asset.name}' physically audited successfully inside campaign '{session.name}'!"
-            else:
-                message = f"Asset '{asset.name}' physically audited successfully (standalone verification)!"
-        except ValidationError as e:
-            error_message = e.message if hasattr(e, 'message') else str(e)
-            message = f"Failed to perform audit: {error_message}"
-
-        # 5. Render the audit badge response
-        response = render(request, "assets/includes/asset_audit_badge.html", {'asset': asset})
-        
-        # Send HX-Trigger to display notification and play sound (if successful)
-        trigger_data = {}
-        if not error_message:
-            trigger_data["playAuditSound"] = None
-            trigger_data["showMessage"] = {"message": message, "level": "success"}
-        else:
-            trigger_data["showMessage"] = {"message": message, "level": "danger"}
-            
-        response['HX-Trigger'] = json.dumps(trigger_data)
+    def _htmx_success_response(self, obj, result=None):
+        """Return OOB-swapped badge + closeModal + playAuditSound triggers."""
+        badge_html = render(
+            self.request,
+            "assets/includes/asset_audit_badge.html",
+            {'asset': obj},
+        ).content.decode()
+        oob_fragment = (
+            f'<div id="asset-audit-badge-container" hx-swap-oob="outerHTML:#asset-audit-badge-container">'
+            f'{badge_html}</div>'
+        )
+        response = HttpResponse(oob_fragment, content_type='text/html')
+        response['HX-Trigger'] = json.dumps({
+            "closeModalEvent": None,
+            "playAuditSound": None,
+            "showMessage": {
+                "message": self.get_success_message(result),
+                "level": "success",
+            },
+        })
         return response
+
+    def get_success_message(self, result=None):
+        asset = self.get_object()
+        if result and result.get('session'):
+            return f"'{asset.name}' verified inside campaign '{result['session'].name}'."
+        return f"'{asset.name}' standalone verification recorded."
+
+    service_callable = audit_asset_from_form
 
 
 @login_required

@@ -15,10 +15,9 @@
 
 <div class="d-grid gap-2">
     <button class="btn btn-success font-weight-bold shadow-sm"
-            hx-post="{% url 'assets:asset_audit' pk=object.pk %}"
-            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-            hx-target="#asset-audit-badge-container"
-            hx-swap="outerHTML"
+            hx-get="{% url 'assets:asset_audit' pk=object.pk %}"
+            hx-target="#modal-placeholder"
+            hx-swap="innerHTML"
             id="audit-verify-btn">
         <i class="mdi mdi-check me-1"></i>
         {% translate "Verify Physical Presence" %}

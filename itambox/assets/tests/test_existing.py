@@ -353,22 +353,28 @@ class ComponentTrackingTestCase(TransactionTestCase):
             self.assertTrue(notif.is_read)
 
     def test_asset_audit_view(self):
-        # An audit records the *observed* location — when neither the asset nor
-        # an active campaign has one, the view refuses instead of guessing.
-        self.asset.location = None
-        self.asset.save()
-        response = self.client.post(reverse('assets:asset_audit', kwargs={'pk': self.asset.pk}))
-        self.assertEqual(response.status_code, 204)
-        self.assertIn('Cannot audit', response.headers.get('HX-Trigger', ''))
+        # GET renders the modal form.
+        response = self.client.get(reverse('assets:asset_audit', kwargs={'pk': self.asset.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'asset-audit-modal')
+
+        # POST without required fields returns form error (422).
+        response = self.client.post(
+            reverse('assets:asset_audit', kwargs={'pk': self.asset.pk}),
+            data={},
+            HTTP_HX_REQUEST='true',
+        )
+        self.assertEqual(response.status_code, 422)
         self.asset.refresh_from_db()
         self.assertIsNone(self.asset.last_audited)
 
-        # With a known location the audit succeeds.
-        self.asset.location = self.location
-        self.asset.save()
-        response = self.client.post(reverse('assets:asset_audit', kwargs={'pk': self.asset.pk}))
+        # POST with location + status succeeds and records the audit.
+        response = self.client.post(
+            reverse('assets:asset_audit', kwargs={'pk': self.asset.pk}),
+            data={'location': self.location.pk, 'status': self.asset.status.pk},
+            HTTP_HX_REQUEST='true',
+        )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Audited")
 
         self.asset.refresh_from_db()
         self.assertIsNotNone(self.asset.last_audited)

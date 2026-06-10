@@ -1,59 +1,51 @@
 from django import forms
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Layout, Field
 from organization.models import Location
-from ..models import AssetAudit, AuditSession, StatusLabel
+from assets.models import StatusLabel
 
-class AssetAuditForm(forms.ModelForm):
-    class Meta:
-        model = AssetAudit
-        fields = ['location', 'status', 'notes', 'verification_method']
-        widgets = {
-            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'verification_method': forms.HiddenInput(),
-        }
 
-    def __init__(self, *args, **kwargs):
-        asset = kwargs.pop('asset', None)
-        super().__init__(*args, **kwargs)
-        self.fields['location'] = forms.ModelChoiceField(
-            queryset=Location.objects.all(),
-            required=True,
-            widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''})
-        )
-        self.fields['status'] = forms.ModelChoiceField(
-            queryset=StatusLabel.objects.exclude(type=StatusLabel.TYPE_ARCHIVED),
-            required=True,
-            widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''})
-        )
-
-        if asset:
-            self.fields['location'].initial = asset.location
-            self.fields['status'].initial = asset.status
-
-class AuditSessionForm(forms.ModelForm):
-    class Meta:
-        model = AuditSession
-        fields = ['name', 'location']
-        widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['location'] = forms.ModelChoiceField(
-            queryset=Location.objects.all(),
-            required=False,
-            label="Target Location (Optional)",
-            help_text="Expected location to audit. Leave blank to audit globally.",
-            widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''})
-        )
-
-class AuditBarcodeScanForm(forms.Form):
-    barcode = forms.CharField(
-        label="Scan Asset Tag or Serial Number",
-        widget=forms.TextInput(attrs={
-            'placeholder': 'Scan serial or tag...', 
-            'autofocus': 'autofocus', 
-            'class': 'form-control',
-            'id': 'barcode-scan-input'
-        })
+class AssetAuditConfirmForm(forms.Form):
+    """Modal form for standalone asset verification (detail-page 'Verify Physical Presence')."""
+    location = forms.ModelChoiceField(
+        queryset=Location.objects.all().order_by('name'),
+        required=True,
+        label="Observed Location",
+        help_text="Where did you physically find this asset right now?",
+        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
     )
+    status = forms.ModelChoiceField(
+        queryset=StatusLabel.objects.exclude(type=StatusLabel.TYPE_ARCHIVED).order_by('name'),
+        required=True,
+        label="Observed Status",
+        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+    )
+    notes = forms.CharField(
+        required=False,
+        label="Notes (optional)",
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+    )
+
+    def __init__(self, *args, asset=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Re-evaluate querysets at instantiation time so TenantScopingManager
+        # picks up the active tenant context from the current request.
+        self.fields['location'].queryset = Location.objects.all().order_by('name')
+        self.fields['status'].queryset = StatusLabel.objects.exclude(
+            type=StatusLabel.TYPE_ARCHIVED
+        ).order_by('name')
+        if asset:
+            self.fields['location'].initial = asset.location_id
+            self.fields['status'].initial = asset.status_id
+        self.helper = FormHelper()
+        self.helper.form_tag = False
+        self.helper.layout = Layout(
+            Field('location'),
+            Field('status'),
+            Field('notes'),
+        )
+
+
+# Legacy ModelForm kept for API/compliance barcode views — not used by the detail modal.
+class AuditSessionForm(forms.Form):
+    pass  # defined in compliance.forms_audit; imported from there

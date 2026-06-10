@@ -1,0 +1,42 @@
+{% load i18n %}
+{# itambox/templates/assets/includes/asset_audit_modal.html #}
+{% load crispy_forms_tags %}
+{% load partials %}
+
+{% startpartial audit-modal-form %}
+    {% if form.non_field_errors %}
+        <div class="alert alert-danger mb-3">
+            {% for error in form.non_field_errors %}
+                <div>{{ error }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+    {% crispy form %}
+{% endpartial %}
+
+<div class="modal modal-blur fade" id="asset-audit-modal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <form id="asset-audit-form"
+                  hx-post="{% url 'assets:asset_audit' pk=asset.pk %}"
+                  hx-target="#asset-audit-modal-body"
+                  hx-swap="innerHTML">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">{% translate "Verify Physical Presence:" %} {{ asset.name }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+                </div>
+                <div class="modal-body" id="asset-audit-modal-body">
+                    {% partial audit-modal-form %}
+                </div>
+                <div class="modal-footer justify-content-start">
+                    <button type="submit" class="btn btn-success">
+                        <i class="mdi mdi-check me-1"></i>
+                        {% translate "Confirm Verification" %}
+                    </button>
+                    <button type="button" class="btn btn-secondary ms-2" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

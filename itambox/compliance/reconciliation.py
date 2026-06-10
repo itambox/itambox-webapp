@@ -87,6 +87,33 @@ def audit_asset(asset: Asset, user=None, session=None, location=None, status=Non
     return audit_record
 
 
+def audit_asset_from_form(asset: Asset, user, location, status, notes: str = '', **kwargs) -> dict:
+    """Service callable for the standalone detail-page verify modal.
+
+    Resolves the correct active session (observed-location match first, then
+    global, no 'any active session' fallback — F2 fix), then delegates to
+    audit_asset().
+    """
+    session = (
+        AuditSession.objects.filter(status='active', location=location).first()
+        or AuditSession.objects.filter(status='active', location__isnull=True).first()
+    )
+
+    audit_asset(
+        asset=asset,
+        user=user,
+        session=session,
+        location=location,
+        status=status,
+        notes=notes,
+        verification_method='manual',
+    )
+
+    if session:
+        return {'message': f"Verified inside campaign '{session.name}'.", 'session': session}
+    return {'message': "Standalone verification recorded.", 'session': None}
+
+
 def _audit_to_dict(audit, category: str, expected_location_name: str = None) -> dict:
     """Serialize one AssetAudit to a JSON-safe dict for the stored report."""
     from django.urls import reverse
