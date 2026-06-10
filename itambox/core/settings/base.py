@@ -6,6 +6,7 @@ Contains all common settings shared between dev and prod.
 import os
 from pathlib import Path
 from django.utils.translation import gettext_lazy as _
+from itambox.release import VERSION
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -25,7 +26,6 @@ if env_path.exists():
                 v = v[1:-1]
             os.environ.setdefault(k, v)
 
-VERSION = '1.0.0-alpha'
 DEBUG = False
 
 SECRET_KEY = os.environ.get('ITAMBOX_SECRET_KEY', '')
@@ -226,7 +226,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     'TITLE': 'ITAMbox API',
     'DESCRIPTION': 'IT Asset Management API',
-    'VERSION': '1.0.0',
+    'VERSION': VERSION,
     'COMPONENT_SPLIT_REQUEST': True,  # Critical for clean client gen
     'ENUM_ADD_EXPLICIT_BLANK_NULL_CHOICE': False,
     'SCHEMA_PATH_PREFIX': r'/api/',
