@@ -1,0 +1,55 @@
+{% load i18n %}
+{# compliance/templates/compliance/audits/audit_session_flag_missing.html #}
+{% load partials %}
+
+{% startpartial flag-missing-form %}
+<div class="modal-body">
+    {% if missing_count == 0 %}
+        <div class="alert alert-info mb-0">
+            {% translate "No missing assets recorded in this session's report." %}
+        </div>
+    {% else %}
+        <p>
+            {% blocktranslate with count=missing_count name=session.name %}
+                This will set the status of <strong>{{ count }} missing asset(s)</strong>
+                from campaign <em>{{ name }}</em> to <strong>"Missing"</strong> (undeployable).
+            {% endblocktranslate %}
+        </p>
+        <p class="text-muted small mb-0">
+            {% translate "Assets whose status has been manually changed since the session closed will be skipped." %}
+        </p>
+    {% endif %}
+</div>
+{% endpartial %}
+
+<div class="modal modal-blur fade" id="flag-missing-modal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <form id="flag-missing-form"
+                  hx-post="{% url 'compliance:auditsession_flag_missing' pk=session.pk %}"
+                  hx-target="#flag-missing-modal-body"
+                  hx-swap="innerHTML">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="mdi mdi-alert-circle-outline me-2 text-warning"></i>
+                        {% translate "Flag Missing Assets" %}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+                </div>
+                <div id="flag-missing-modal-body">
+                    {% partial flag-missing-form %}
+                </div>
+                <div class="modal-footer justify-content-start">
+                    {% if missing_count > 0 %}
+                        <button type="submit" class="btn btn-warning">
+                            <i class="mdi mdi-flag me-1"></i>
+                            {% translate "Flag as Missing" %}
+                        </button>
+                    {% endif %}
+                    <button type="button" class="btn btn-secondary ms-2" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

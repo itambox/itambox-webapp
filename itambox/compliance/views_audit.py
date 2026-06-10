@@ -18,7 +18,7 @@ from compliance.models import AuditSession, AssetAudit
 from compliance.forms_audit import AuditSessionForm, AssetAuditForm, AuditBarcodeScanForm
 from compliance.filters import AuditSessionFilterSet
 from compliance.forms_filter import AuditSessionFilterForm
-from compliance.reconciliation import audit_asset, close_audit_session, rehome_audit_session_mismatches
+from compliance.reconciliation import audit_asset, close_audit_session, rehome_audit_session_mismatches, flag_missing_assets
 
 User = get_user_model()
 
@@ -228,6 +228,52 @@ class AuditSessionReportCsvView(LoginRequiredMixin, PermissionRequiredMixin, Vie
                 row.get('timestamp_display', '') or (row.get('timestamp', '') or '')[:16],
             ])
         return response
+
+
+class AuditSessionFlagMissingForm(forms.Form):
+    """Empty confirmation form — submit confirms the bulk flag action."""
+    pass
+
+
+class AuditSessionFlagMissingView(GenericTransactionView):
+    """Confirm + execute bulk 'Flag missing as Missing' action on completed sessions."""
+    queryset = AuditSession.objects.filter(status='completed')
+    model_form = AuditSessionFlagMissingForm
+    template_name = 'compliance/audits/audit_session_flag_missing.html'
+    error_partial = 'compliance/audits/audit_session_flag_missing.html#flag-missing-form'
+    service_callable = flag_missing_assets
+    permission_required = 'compliance.change_asset'
+    context_object_name = 'session'
+    hx_trigger = 'tableRefreshRequired'
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs.pop('instance', None)
+        return kwargs
+
+    def get_service_kwargs(self, form):
+        return {}
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        session = self.get_object()
+        if session.reconciliation_report:
+            missing_rows = [
+                r for r in session.reconciliation_report.get('rows', [])
+                if r.get('category') == 'missing'
+            ]
+            context['missing_count'] = len(missing_rows)
+        else:
+            context['missing_count'] = 0
+        return context
+
+    def get_success_message(self, result=None):
+        if result:
+            return (
+                f"{result['flagged']} asset(s) flagged as Missing. "
+                f"{result['skipped']} skipped (status changed since close)."
+            )
+        return "Missing assets flagged."
 
 
 class AuditSessionDeleteView(ObjectDeleteView):

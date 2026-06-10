@@ -138,7 +138,6 @@ def _audit_to_dict(audit, category: str, expected_location_name: str = None) -> 
 
 
 def _missing_asset_to_dict(asset, session_location) -> dict:
-    from django.urls import reverse
     try:
         asset_url = asset.get_absolute_url()
     except Exception:
@@ -153,6 +152,7 @@ def _missing_asset_to_dict(asset, session_location) -> dict:
         'observed_location': None,
         'expected_location': session_location.name if session_location else 'Global',
         'serial_number': asset.serial_number if hasattr(asset, 'serial_number') else None,
+        'status_id': asset.status_id,
         'status_name': asset.status.name if asset.status else None,
         'status_color': asset.status.color if asset.status else None,
         'auditor': None,
@@ -231,3 +231,54 @@ def rehome_audit_session_mismatches(session: AuditSession, user=None, request=No
         asset.snapshot()
         asset.location = session.location
         asset.save(update_fields=['location'])
+
+
+@transaction.atomic
+def flag_missing_assets(session: AuditSession, user=None, request=None, **kwargs) -> dict:
+    """Set missing assets' status to 'Missing' (undeployable), skipping any
+    whose status has changed since the session closed.
+
+    Returns counts: flagged, skipped.
+    """
+    if session.status != 'completed':
+        raise ValidationError("Audit session must be closed before flagging missing assets.")
+
+    if not session.reconciliation_report:
+        raise ValidationError("No reconciliation report found. Close the session first.")
+
+    missing_rows = [
+        row for row in session.reconciliation_report.get('rows', [])
+        if row.get('category') == 'missing'
+    ]
+    if not missing_rows:
+        return {'flagged': 0, 'skipped': 0}
+
+    missing_status, _ = StatusLabel.objects.get_or_create(
+        name='Missing',
+        defaults={'type': StatusLabel.TYPE_UNDEPLOYABLE, 'color': 'dc3545'},
+    )
+    if missing_status.type != StatusLabel.TYPE_UNDEPLOYABLE:
+        missing_status.type = StatusLabel.TYPE_UNDEPLOYABLE
+        missing_status.save(update_fields=['type'])
+
+    asset_ids = [row['asset_id'] for row in missing_rows]
+    stored_status_by_id = {row['asset_id']: row.get('status_id') for row in missing_rows}
+
+    assets = {a.pk: a for a in Asset.objects.filter(pk__in=asset_ids).select_related('status')}
+
+    flagged = 0
+    skipped = 0
+    for asset_id, stored_status_id in stored_status_by_id.items():
+        asset = assets.get(asset_id)
+        if asset is None:
+            skipped += 1
+            continue
+        if stored_status_id is not None and asset.status_id != stored_status_id:
+            skipped += 1
+            continue
+        asset.snapshot()
+        asset.status = missing_status
+        asset.save(update_fields=['status'])
+        flagged += 1
+
+    return {'flagged': flagged, 'skipped': skipped}

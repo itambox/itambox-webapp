@@ -31,6 +31,15 @@
                         </button>
                     </form>
                 {% endif %}
+                {% if missing_assets %}
+                    <button class="btn btn-warning"
+                            hx-get="{% url 'compliance:auditsession_flag_missing' pk=object.pk %}"
+                            hx-target="#modal-placeholder"
+                            hx-swap="innerHTML">
+                        <i class="mdi mdi-flag me-1"></i>
+                        {% translate "Flag Missing Assets" %}
+                    </button>
+                {% endif %}
             {% endif %}
             <a href="{% url 'compliance:auditsession_list' %}" class="btn btn-outline-secondary">
                 {% translate "Back to Campaigns" %}
