@@ -46,6 +46,19 @@
 //
 // ============================================================
 
+// ---- Link affordance (ink links need underline to be distinguishable from body text) ----
+// Scoped to detail/prose contexts only — table rows and nav opt out naturally via
+// .nav-link / .dropdown-item exclusions below.
+.page-body a:not(.btn):not(.nav-link):not(.dropdown-item):not(.badge):not(.list-group-item):not(.page-link) {
+    text-decoration: underline;
+    text-decoration-color: rgba(var(--tblr-body-color-rgb), 0.35);
+    text-underline-offset: 2px;
+
+    &:hover {
+        text-decoration-color: currentColor;
+    }
+}
+
 // ---- Changelog diff styles ----
 
 pre.change-data {
@@ -59,8 +72,8 @@ pre.change-data {
     }
 
     >span.added {
-        background-color: rgba(47, 179, 68, 0.1);
-        color: #2fb344;
+        background-color: rgba(var(--tblr-success-rgb), 0.1);
+        color: var(--tblr-success);
     }
 
     >span.removed {
@@ -77,9 +90,9 @@ pre.change-diff {
     line-height: 1.4;
 
     &.change-added {
-        background-color: rgba(47, 179, 68, 0.08);
-        color: #2fb344;
-        border: 1px solid rgba(47, 179, 68, 0.15);
+        background-color: rgba(var(--tblr-success-rgb), 0.08);
+        color: var(--tblr-success);
+        border: 1px solid rgba(var(--tblr-success-rgb), 0.15);
     }
 
     &.change-removed {
@@ -220,24 +233,24 @@ html,
     --tblr-gray-900: #1c1917;
     --tblr-gray-950: #0c0a09;
 
-    // --- Accent Theme: Tabler Green ---
-    --tblr-primary: #2fb344;
-    --tblr-primary-rgb: 47, 179, 68;
-    --tblr-primary-fg: #ffffff;
+    // --- Accent Theme: Ink Monochrome (stone-900 light) ---
+    --tblr-primary: #1c1917;
+    --tblr-primary-rgb: 28, 25, 23;
+    --tblr-primary-fg: #fafaf9;
 
     // ITAMbox Custom Tokens
-    --itambox-primary: #2fb344;
-    --itambox-primary-dark: #2fb344;
+    --itambox-primary: #1c1917;
+    --itambox-primary-dark: #fafaf9;
 
     // Focus rings, links, and selections
-    --tblr-focus-ring-color: rgba(47, 179, 68, 0.25);
-    --tblr-link-color: #2fb344;
-    --tblr-link-hover-color: #238230;
+    --tblr-focus-ring-color: rgba(28, 25, 23, 0.2);
+    --tblr-link-color: #1c1917;
+    --tblr-link-hover-color: #44403c;
 
-    // Alert/notification coloring overrides
-    --tblr-alert-bg: rgba(47, 179, 68, 0.05);
-    --tblr-alert-border-color: rgba(47, 179, 68, 0.15);
-    --tblr-alert-color: #2fb344;
+    // Alert/notification coloring — neutral (semantic alerts keep their own colors)
+    --tblr-alert-bg: var(--tblr-bg-surface-secondary);
+    --tblr-alert-border-color: var(--tblr-border-color);
+    --tblr-alert-color: var(--tblr-body-color);
 
     // Light Mode background/border tones (Stone-based)
     --tblr-body-bg: #fafaf9; // stone-50
@@ -265,10 +278,10 @@ html,
     --itambox-sidebar-border: #e7e5e4; // stone-200
     --itambox-sidebar-color: #44403c; // stone-700
     --itambox-sidebar-muted-color: #a8a29e; // stone-400
-    --itambox-sidebar-hover-bg: rgba(47, 179, 68, 0.06);
-    --itambox-sidebar-hover-color: #2fb344;
-    --itambox-sidebar-active-bg: rgba(47, 179, 68, 0.08);
-    --itambox-sidebar-active-color: #2fb344;
+    --itambox-sidebar-hover-bg: #f5f5f4;
+    --itambox-sidebar-hover-color: #44403c;
+    --itambox-sidebar-active-bg: #e7e5e4;
+    --itambox-sidebar-active-color: #1c1917;
 }
 
 body.modal-open,
@@ -285,18 +298,19 @@ body.offcanvas-open {
 
 // Dark Mode Overrides
 [data-bs-theme="dark"] {
-    // --- Accent Theme: Tabler Green ---
-    --tblr-primary: #2fb344;
-    --tblr-primary-rgb: 47, 179, 68;
-    --tblr-primary-fg: #ffffff;
+    // --- Accent Theme: Ink Monochrome (stone-50 dark) ---
+    --tblr-primary: #fafaf9;
+    --tblr-primary-rgb: 250, 250, 249;
+    --tblr-primary-fg: #1c1917; // dark text on light button — critical
 
-    --tblr-focus-ring-color: rgba(47, 179, 68, 0.3);
-    --tblr-link-color: #2fb344;
-    --tblr-link-hover-color: #4cd964;
+    --tblr-focus-ring-color: rgba(250, 250, 249, 0.25);
+    --tblr-link-color: #e7e5e4;
+    --tblr-link-hover-color: #ffffff;
 
-    --tblr-alert-bg: rgba(47, 179, 68, 0.1);
-    --tblr-alert-border-color: rgba(47, 179, 68, 0.2);
-    --tblr-alert-color: #2fb344;
+    // Alert/notification coloring — neutral (semantic alerts keep their own colors)
+    --tblr-alert-bg: var(--tblr-bg-surface-secondary);
+    --tblr-alert-border-color: var(--tblr-border-color);
+    --tblr-alert-color: var(--tblr-body-color);
 
     // Dark Mode background/border tones (Stone-based)
     --tblr-body-bg: #0c0a09; // stone-950
@@ -320,7 +334,7 @@ body.offcanvas-open {
     --tblr-input-border-color: #292524; // stone-800 input border
     --tblr-input-placeholder-color: #57534e; // stone-600
     --tblr-input-focus-bg: #0c0a09;
-    --tblr-input-focus-border-color: #2fb344;
+    --tblr-input-focus-border-color: #a8a29e; // stone-400: a white focus border is too loud in dark
     --tblr-input-focus-color: #e7e5e4;
     --tblr-input-disabled-bg: #1c1917; // stone-900
     --tblr-input-disabled-border-color: #292524;
@@ -344,7 +358,7 @@ body.offcanvas-open {
     --itambox-sidebar-border: #292524; // stone-800
     --itambox-sidebar-color: #d6d3d1; // stone-300
     --itambox-sidebar-muted-color: #a8a29e; // stone-400
-    --itambox-sidebar-hover-bg: rgba(47, 179, 68, 0.08);
+    --itambox-sidebar-hover-bg: #1c1917;
     --itambox-sidebar-hover-color: #fafaf9;
     --itambox-sidebar-active-bg: #292524; // stone-800
     --itambox-sidebar-active-color: #fafaf9;
@@ -372,9 +386,9 @@ body.offcanvas-open {
 
         &:focus {
             background-color: var(--tblr-input-focus-bg, #0c0a09) !important;
-            border-color: var(--tblr-input-focus-border-color, #2fb344) !important;
+            border-color: var(--tblr-input-focus-border-color, #a8a29e) !important;
             color: var(--tblr-input-focus-color, #e7e5e4) !important;
-            box-shadow: 0 0 0 0.25rem rgba(47, 179, 68, 0.25) !important;
+            box-shadow: 0 0 0 0.25rem rgba(var(--tblr-primary-rgb), 0.25) !important;
             outline: 0 !important;
         }
 
@@ -399,7 +413,7 @@ body.offcanvas-open {
 
         &:focus {
             border-color: var(--tblr-primary) !important;
-            box-shadow: 0 0 0 0.25rem rgba(47, 179, 68, 0.25) !important;
+            box-shadow: 0 0 0 0.25rem rgba(var(--tblr-primary-rgb), 0.25) !important;
         }
     }
 
@@ -552,6 +566,8 @@ body.offcanvas-open {
                 background-color: var(--itambox-sidebar-active-bg, rgba(var(--tblr-primary-rgb), 0.09)) !important;
                 color: var(--itambox-sidebar-active-color, var(--tblr-primary)) !important;
                 font-weight: 600;
+                box-shadow: inset 2px 0 0 var(--tblr-primary);
+                border-radius: 0 var(--tblr-border-radius-sm) var(--tblr-border-radius-sm) 0;
 
                 .nav-link-icon {
                     color: var(--itambox-sidebar-active-color, var(--tblr-primary)) !important;
@@ -981,7 +997,7 @@ html {
 
             // Active tab: ALWAYS show text label (on all screen sizes!) and animate expansion
             &.active {
-                background-color: rgba(var(--tblr-primary-rgb, 32, 107, 196), 0.06);
+                background-color: rgba(var(--tblr-primary-rgb), 0.06);
                 border-color: transparent transparent var(--tblr-primary);
                 font-weight: 600;
 
@@ -1158,9 +1174,9 @@ textarea {
 
     &:focus {
         background-color: var(--tblr-input-focus-bg, #ffffff) !important;
-        border-color: var(--tblr-input-focus-border-color, #2fb344) !important;
+        border-color: var(--tblr-input-focus-border-color, var(--tblr-primary)) !important;
         color: var(--tblr-input-focus-color, #1c1917) !important;
-        box-shadow: 0 0 0 0.2rem rgba(47, 179, 68, 0.15) !important;
+        box-shadow: 0 0 0 0.2rem rgba(var(--tblr-primary-rgb), 0.15) !important;
         outline: 0 !important;
     }
 }
@@ -1232,7 +1248,7 @@ textarea {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(15, 23, 42, 0.85);
+    background: rgba(12, 10, 9, 0.85); // stone-950
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     z-index: 9999;
@@ -1249,8 +1265,9 @@ textarea {
     height: 280px;
     border-radius: 24px;
     overflow: hidden;
-    border: 3px solid #2fb344;
-    box-shadow: 0 0 25px rgba(47, 179, 68, 0.4);
+    // scan UI is quiet; GREEN appears only at the success moment (success partial + beep)
+    border: 3px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 0 25px rgba(255, 255, 255, 0.15);
     background: #000000;
 
     video {
@@ -1266,8 +1283,8 @@ textarea {
     left: 5%;
     width: 90%;
     height: 3px;
-    background: linear-gradient(90deg, transparent, #2fb344, transparent);
-    box-shadow: 0 0 10px #2fb344;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.9), transparent);
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
     z-index: 5;
     animation: scanner-sweep 2s infinite linear;
 }
@@ -1589,12 +1606,12 @@ $action-bar-fab-size: 56px;
     }
 
     &:hover, &:focus {
-        color: var(--tblr-primary, #2fb344);
+        color: var(--tblr-primary);
         outline: none;
     }
 
     &.active {
-        color: var(--tblr-primary, #2fb344);
+        color: var(--tblr-primary);
     }
 }
 
@@ -1603,7 +1620,7 @@ $action-bar-fab-size: 56px;
     flex: 0 0 auto;
     // Extra bottom padding so the FAB visually "floats" above the bar
     padding-bottom: 12px;
-    color: var(--tblr-primary, #2fb344);
+    color: var(--tblr-primary);
 
     span:last-child {
         font-size: 0.6rem;
@@ -1617,9 +1634,9 @@ $action-bar-fab-size: 56px;
     width: $action-bar-fab-size;
     height: $action-bar-fab-size;
     border-radius: 50%;
-    background: var(--tblr-primary, #2fb344);
+    background: var(--tblr-primary);
     color: #fff;
-    box-shadow: 0 4px 14px rgba(47,179,68,.45);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
     // Lift it above the bar baseline
     margin-top: -($action-bar-fab-size * 0.4);
     margin-bottom: 2px;
@@ -1632,7 +1649,7 @@ $action-bar-fab-size: 56px;
     .mobile-action-bar__btn--scanner:hover &,
     .mobile-action-bar__btn--scanner:focus & {
         transform: scale(1.08);
-        box-shadow: 0 6px 18px rgba(47,179,68,.55);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
     }
 
     .mobile-action-bar__btn--scanner:active & {
