@@ -11,7 +11,7 @@ from core.api.nested_serializers import (
 from assets.models import (
     Asset, AssetRole, Manufacturer, AssetType,
     StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence,
-    AssetAssignment, AuditSession, AssetAudit
+    AssetAssignment
 )
 from organization.models import Location, Tenant
 from software.models import Software
@@ -244,55 +244,6 @@ class AssetAssignmentSerializer(BaseModelSerializer):
             return str(obj.assigned_to)
         except Exception:
             return None
-
-
-class AuditSessionSerializer(BaseModelSerializer):
-    location = NestedLocationSerializer(read_only=True)
-    location_id = serializers.PrimaryKeyRelatedField(
-        queryset=Location.objects.all(), source='location', write_only=True, required=False, allow_null=True
-    )
-    created_by = serializers.StringRelatedField(read_only=True)
-    created_by_id = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(), source='created_by', write_only=True, required=False
-    )
-    status_display = serializers.CharField(source='get_status_display', read_only=True)
-
-    class Meta:
-        model = AuditSession
-        fields = [
-            'id', 'name', 'location', 'location_id', 'status', 'status_display',
-            'started_at', 'completed_at', 'created_by', 'created_by_id',
-            'created_at', 'updated_at'
-        ]
-        brief_fields = ['id', 'name', 'status', 'started_at']
-
-
-class AssetAuditSerializer(serializers.ModelSerializer):
-    session = serializers.PrimaryKeyRelatedField(
-        queryset=AuditSession.objects.all(), required=False, allow_null=True
-    )
-    asset = NestedAssetSerializer(read_only=True)
-    asset_id = serializers.PrimaryKeyRelatedField(
-        queryset=Asset.objects.all(), source='asset'
-    )
-    auditor = serializers.StringRelatedField(read_only=True)
-    location = NestedLocationSerializer(read_only=True)
-    location_id = serializers.PrimaryKeyRelatedField(
-        queryset=Location.objects.all(), source='location'
-    )
-    status = StatusLabelSerializer(read_only=True)
-    status_id = serializers.PrimaryKeyRelatedField(
-        queryset=StatusLabel.objects.all(), source='status'
-    )
-    verification_method_display = serializers.CharField(source='get_verification_method_display', read_only=True)
-
-    class Meta:
-        model = AssetAudit
-        fields = [
-            'id', 'session', 'asset', 'asset_id', 'auditor', 'timestamp',
-            'location', 'location_id', 'status', 'status_id', 'notes',
-            'verification_method', 'verification_method_display'
-        ]
 
 
 class AssetCheckOutAPISerializer(serializers.Serializer):

@@ -82,8 +82,8 @@ class LocationDetailView(ObjectDetailView):
         context['asset_assignments_table'] = asset_assignments_table
 
         # Audit Campaigns
-        from assets.models import AuditSession
-        from assets.views.audit_views import AuditSessionTable
+        from compliance.models import AuditSession
+        from compliance.views_audit import AuditSessionTable
         audits_qs = AuditSession.objects.filter(location=location)
         audits_table = AuditSessionTable(audits_qs, request=self.request)
         audits_table.configure(self.request)
@@ -137,7 +137,7 @@ class LocationDetailView(ObjectDetailView):
             related_objects_list.append({
                 'label': 'Audit Campaigns',
                 'count': audit_count,
-                'url': f"{reverse('assets:auditsession_list')}?location={location.slug}"
+                'url': f"{reverse('compliance:auditsession_list')}?location={location.slug}"
             })
 
         context['related_objects_list'] = related_objects_list

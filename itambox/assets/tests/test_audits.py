@@ -5,8 +5,9 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from assets.models import (
-    Asset, AssetType, StatusLabel, AssetRole, Manufacturer, AuditSession, AssetAudit
+    Asset, AssetType, StatusLabel, AssetRole, Manufacturer,
 )
+from compliance.models import AuditSession, AssetAudit
 from organization.models import Site, Location
 from assets.reconciliation import audit_asset, close_audit_session, rehome_audit_session_mismatches
 
@@ -193,7 +194,7 @@ class AuditReconciliationTestCase(TestCase):
         self.client.login(username='adminuser', password='password123')
 
         # 1. Create a campaign session
-        response = self.client.post(reverse('assets:auditsession_create'), data={
+        response = self.client.post(reverse('compliance:auditsession_create'), data={
             'name': 'Server Room Audit Q2',
             'location': self.server_room.pk
         })
@@ -204,7 +205,7 @@ class AuditReconciliationTestCase(TestCase):
 
         # 2. HTMX Barcode Scanning endpoint
         response = self.client.post(
-            reverse('assets:auditsession_scan', kwargs={'pk': session.pk}),
+            reverse('compliance:auditsession_scan', kwargs={'pk': session.pk}),
             data={'barcode': 'ASSET-000003'},
             HTTP_HX_REQUEST='true'  # Simulate HTMX request
         )
@@ -217,7 +218,7 @@ class AuditReconciliationTestCase(TestCase):
 
         # 3. Close the campaign
         response = self.client.post(
-            reverse('assets:auditsession_close', kwargs={'pk': session.pk}),
+            reverse('compliance:auditsession_close', kwargs={'pk': session.pk}),
             HTTP_HX_REQUEST='true'
         )
         self.assertEqual(response.status_code, 204)  # Success without content, sends HTMX triggers
@@ -240,7 +241,7 @@ class AuditReconciliationTestCase(TestCase):
 
         # Let's post to re-home endpoint
         response = self.client.post(
-            reverse('assets:auditsession_rehome', kwargs={'pk': session.pk}),
+            reverse('compliance:auditsession_rehome', kwargs={'pk': session.pk}),
             HTTP_HX_REQUEST='true'
         )
         self.assertEqual(response.status_code, 204)
@@ -285,7 +286,7 @@ class AuditAPIViewsTestCase(TestCase):
             'location_id': self.staging_room.pk,
             'status': 'planned'
         }
-        create_url = reverse('api:assets_api:auditsession-list')
+        create_url = reverse('api:compliance_api:auditsession-list')
         response = self.client.post(create_url, session_data, format='json')
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data['name'], 'API Q2 Audit Session')
@@ -294,7 +295,7 @@ class AuditAPIViewsTestCase(TestCase):
         session_id = response.data['id']
         
         # 2. List sessions via API
-        list_url = reverse('api:assets_api:auditsession-list')
+        list_url = reverse('api:compliance_api:auditsession-list')
         response = self.client.get(list_url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 1)
@@ -308,14 +309,14 @@ class AuditAPIViewsTestCase(TestCase):
             'verification_method': 'barcode',
             'notes': 'Verified successfully'
         }
-        audit_create_url = reverse('api:assets_api:assetaudit-list')
+        audit_create_url = reverse('api:compliance_api:assetaudit-list')
         response = self.client.post(audit_create_url, audit_data, format='json')
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data['notes'], 'Verified successfully')
         self.assertEqual(response.data['auditor'], self.user.username)
         
         # 4. List audit logs via API
-        audit_list_url = reverse('api:assets_api:assetaudit-list')
+        audit_list_url = reverse('api:compliance_api:assetaudit-list')
         response = self.client.get(audit_list_url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 1)
@@ -323,7 +324,7 @@ class AuditAPIViewsTestCase(TestCase):
 
 class AuditSessionFilterSetTests(TestCase):
     def setUp(self):
-        from assets.models import AuditSession
+        from compliance.models import AuditSession
         from organization.models import Site, Location
         self.site = Site.objects.create(name="Stuttgart HQ", slug="stuttgart-hq")
         self.loc1 = Location.objects.create(name="Server Room", slug="server-room", site=self.site)
@@ -341,21 +342,21 @@ class AuditSessionFilterSetTests(TestCase):
 
 
     def test_filter_by_status(self):
-        from assets.filters import AuditSessionFilterSet
+        from compliance.filters import AuditSessionFilterSet
         f = AuditSessionFilterSet({'status': 'active'}, queryset=AuditSession.objects.all())
         self.assertTrue(f.is_valid())
         self.assertIn(self.session_active, f.qs)
         self.assertNotIn(self.session_planned, f.qs)
 
     def test_filter_by_location(self):
-        from assets.filters import AuditSessionFilterSet
+        from compliance.filters import AuditSessionFilterSet
         f = AuditSessionFilterSet({'location': self.loc2.pk}, queryset=AuditSession.objects.all())
         self.assertTrue(f.is_valid())
         self.assertIn(self.session_planned, f.qs)
         self.assertNotIn(self.session_active, f.qs)
 
     def test_filter_search(self):
-        from assets.filters import AuditSessionFilterSet
+        from compliance.filters import AuditSessionFilterSet
         f = AuditSessionFilterSet({'q': 'Planned'}, queryset=AuditSession.objects.all())
         self.assertTrue(f.is_valid())
         self.assertIn(self.session_planned, f.qs)

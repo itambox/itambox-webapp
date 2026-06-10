@@ -3,7 +3,6 @@ from ..filters import (
     AssetFilterSet, AssetRoleFilterSet, ManufacturerFilterSet, AssetTypeFilterSet,
     StatusLabelFilterSet, DepreciationFilterSet,
     SupplierFilterSet, CategoryFilterSet, AssetRequestFilterSet, AssetTagSequenceFilterSet,
-    AuditSessionFilterSet
 )
 
 class AssetFilterForm(FilterForm):
@@ -89,7 +88,4 @@ class AssetTagSequenceFilterForm(FilterForm):
             'label_field': 'name',
         },
     }
-
-class AuditSessionFilterForm(FilterForm):
-    filterset_class = AuditSessionFilterSet
 

@@ -1,12 +1,15 @@
 import secrets
+from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.urls import reverse
 from django.utils import timezone
+from django.contrib.auth import get_user_model
 
-from core.models import BaseModel, ChangeLoggingMixin
+from core.models import BaseModel, ChangeLoggingMixin, StandardModel
 from core.mixins import TaggableMixin, CloneableMixin, ExportableMixin, JournalingMixin, ImageAttachmentMixin, FileAttachmentMixin, SoftDeleteMixin
 from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingManager, TenantScopingSoftDeleteManager, TenantScopingAllObjectsManager
+from compliance.choices import AuditSessionStatusChoices, AuditVerificationMethodChoices
 
 
 def generate_token():
@@ -218,3 +221,85 @@ class AssetMaintenance(TaggableMixin, CloneableMixin, ExportableMixin,
         if self.start_date and self.completion_date:
             return (self.completion_date - self.start_date).days
         return None
+
+
+User = get_user_model()
+
+
+class AuditSession(StandardModel, SoftDeleteMixin):
+    name = models.CharField(max_length=200)
+    location = models.ForeignKey(
+        'organization.Location',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Target location expected to be audited. If omitted, applies globally."
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=AuditSessionStatusChoices.choices,
+        default=AuditSessionStatusChoices.PLANNED,
+    )
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='audit_sessions')
+
+    class Meta:
+        ordering = ['-started_at']
+        verbose_name = _("Audit Session")
+        verbose_name_plural = _("Audit Sessions")
+
+    def __str__(self):
+        return f"{self.name} ({self.get_status_display()})"
+
+    def get_absolute_url(self):
+        return reverse('compliance:auditsession_detail', kwargs={'pk': self.pk})
+
+    @property
+    def expected_assets_queryset(self):
+        from assets.models import Asset, StatusLabel
+        qs = Asset.objects.exclude(status__type=StatusLabel.TYPE_ARCHIVED)
+        if not self.location:
+            return qs.filter(status__type__in=[
+                StatusLabel.TYPE_DEPLOYABLE,
+                StatusLabel.TYPE_PENDING,
+                StatusLabel.TYPE_DEPLOYED
+            ])
+        return qs.filter(location=self.location)
+
+
+class AssetAudit(models.Model):
+    session = models.ForeignKey(
+        AuditSession,
+        on_delete=models.CASCADE,
+        related_name='audits',
+        null=True,
+        blank=True
+    )
+    asset = models.ForeignKey('assets.Asset', on_delete=models.CASCADE, related_name='audits')
+    auditor = models.ForeignKey(User, on_delete=models.PROTECT, related_name='audits_performed')
+    timestamp = models.DateTimeField(auto_now_add=True)
+    location = models.ForeignKey(
+        'organization.Location',
+        on_delete=models.PROTECT,
+        help_text="The observed physical location of the asset during audit."
+    )
+    status = models.ForeignKey(
+        'assets.StatusLabel',
+        on_delete=models.PROTECT,
+        help_text="The observed physical status of the asset during audit."
+    )
+    notes = models.TextField(blank=True)
+    verification_method = models.CharField(
+        max_length=30,
+        choices=AuditVerificationMethodChoices.choices,
+        default=AuditVerificationMethodChoices.MANUAL,
+    )
+
+    class Meta:
+        ordering = ['-timestamp']
+        constraints = [
+            models.UniqueConstraint(fields=['session', 'asset'], name='unique_session_asset')
+        ]
+        verbose_name = _("Asset Audit")
+        verbose_name_plural = _("Asset Audits")

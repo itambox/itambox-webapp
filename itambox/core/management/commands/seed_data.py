@@ -97,7 +97,7 @@ class Command(BaseCommand):
             ('extras', 'ConfigContext'), ('extras', 'Dashboard'),
             ('procurement', 'FulfillmentLink'), ('procurement', 'PurchaseOrderLine'),
             ('procurement', 'PurchaseOrder'),
-            ('assets', 'AssetRequest'), ('assets', 'AssetAudit'), ('assets', 'AuditSession'),
+            ('assets', 'AssetRequest'), ('compliance', 'AssetAudit'), ('compliance', 'AuditSession'),
             ('compliance', 'CustodyReceipt'), ('compliance', 'CustodyTemplate'),
             ('compliance', 'AssetMaintenance'),
             ('licenses', 'LicenseSeatAssignment'),
@@ -1349,7 +1349,8 @@ class Command(BaseCommand):
         from core.models import (NotificationChannel, AlertRule, AlertLog, ReportTemplate, ScheduledReport,
                                  EventRule, WebhookEndpoint, LabelTemplate, JournalEntry)
         from extras.models import ConfigContext, Dashboard
-        from assets.models import Asset, AssetType, AssetRequest, AuditSession, AssetAudit
+        from assets.models import Asset, AssetType, AssetRequest
+        from compliance.models import AuditSession, AssetAudit
         from licenses.models import License
         self.stdout.write('--- Operations: alerts, reports, automation ---')
 

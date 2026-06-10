@@ -148,7 +148,7 @@ class AssetDetailView(ObjectDetailView):
         context['requests_table'] = requests_table
 
         # Audits
-        from ..models import AssetAudit
+        from compliance.models import AssetAudit
         audit_qs = AssetAudit.objects.filter(asset=asset).select_related('session', 'auditor', 'location', 'status')
         audits_table = tables.AssetAuditTable(audit_qs, request=self.request)
         RequestConfig(self.request, paginate={'per_page': 10}).configure(audits_table)
@@ -339,8 +339,8 @@ class AssetAuditView(SimplePostView):
     def post(self, request, *args, **kwargs):
         asset = self.get_object()
         
-        from ..models import AuditSession
-        from ..reconciliation import audit_asset
+        from compliance.models import AuditSession
+        from compliance.reconciliation import audit_asset
         from django.core.exceptions import ValidationError
 
         # 1. Try to find an active AuditSession campaign

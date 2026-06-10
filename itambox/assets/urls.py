@@ -1,8 +1,7 @@
 from django.urls import path, include
+from django.views.generic import RedirectView
 from . import views
 from .views import request_views
-from inventory import views as component_views
-from extras import views as extras_views
 
 app_name = 'assets'
 
@@ -58,25 +57,9 @@ urlpatterns = [
     path('types/<int:pk>/edit/', views.AssetTypeEditView.as_view(), name='assettype_update'),
     path('types/<int:pk>/delete/', views.AssetTypeDeleteView.as_view(), name='assettype_delete'),
 
-    # Component Catalog (quantity-based)
-    path('components/', component_views.ComponentListView.as_view(), name='component_list'),
-    path('components/add/', component_views.ComponentEditView.as_view(), name='component_create'),
-    path('components/<int:pk>/', component_views.ComponentDetailView.as_view(), name='component_detail'),
-    path('components/<int:pk>/edit/', component_views.ComponentEditView.as_view(), name='component_update'),
-    path('components/<int:pk>/delete/', component_views.ComponentDeleteView.as_view(), name='component_delete'),
-    path('components/<int:pk>/clone/', component_views.ComponentCloneView.as_view(), name='component_clone'),
-
-    # Component Stock
-    path('component-stocks/', component_views.ComponentStockListView.as_view(), name='componentstock_list'),
-    path('component-stocks/add/', component_views.ComponentStockEditView.as_view(), name='componentstock_create'),
-    path('component-stocks/<int:pk>/edit/', component_views.ComponentStockEditView.as_view(), name='componentstock_update'),
-    path('component-stocks/<int:pk>/delete/', component_views.ComponentStockDeleteView.as_view(), name='componentstock_delete'),
-
-    # Component Allocations
-    path('component-allocations/', component_views.ComponentAllocationListView.as_view(), name='componentallocation_list'),
-    path('component-allocations/add/', component_views.ComponentAllocationEditView.as_view(), name='componentallocation_create'),
-    path('component-allocations/<int:pk>/edit/', component_views.ComponentAllocationEditView.as_view(), name='componentallocation_update'),
-    path('component-allocations/<int:pk>/delete/', component_views.ComponentAllocationDeleteView.as_view(), name='componentallocation_delete'),
+    # Components live in the inventory app/namespace (inventory:component_*).
+    # The duplicate routes that used to live here are gone — one canonical URL
+    # per object, the NetBox way.
 
     # Phase 4 Audits & Barcoding
     path('<int:pk>/audit/', views.AssetAuditView.as_view(), name='asset_audit'),
@@ -125,19 +108,12 @@ urlpatterns = [
     path('asset-tag-sequences/<int:pk>/edit/', views.AssetTagSequenceEditView.as_view(), name='assettagsequence_update'),
     path('asset-tag-sequences/<int:pk>/delete/', views.AssetTagSequenceDeleteView.as_view(), name='assettagsequence_delete'),
 
-    # Custom Fields
-    path('custom-fields/', extras_views.CustomFieldListView.as_view(), name='customfield_list'),
-    path('custom-fields/add/', extras_views.CustomFieldEditView.as_view(), name='customfield_create'),
-    path('custom-fields/<int:pk>/', extras_views.CustomFieldDetailView.as_view(), name='customfield_detail'),
-    path('custom-fields/<int:pk>/edit/', extras_views.CustomFieldEditView.as_view(), name='customfield_update'),
-    path('custom-fields/<int:pk>/delete/', extras_views.CustomFieldDeleteView.as_view(), name='customfield_delete'),
-
-    # Custom Fieldsets
-    path('custom-fieldsets/', extras_views.CustomFieldsetListView.as_view(), name='customfieldset_list'),
-    path('custom-fieldsets/add/', extras_views.CustomFieldsetEditView.as_view(), name='customfieldset_create'),
-    path('custom-fieldsets/<int:pk>/', extras_views.CustomFieldsetDetailView.as_view(), name='customfieldset_detail'),
-    path('custom-fieldsets/<int:pk>/edit/', extras_views.CustomFieldsetEditView.as_view(), name='customfieldset_update'),
-    path('custom-fieldsets/<int:pk>/delete/', extras_views.CustomFieldsetDeleteView.as_view(), name='customfieldset_delete'),
+    # Custom fields moved to the extras app (extras:customfield_*).
+    # Redirects keep old bookmarks alive.
+    path('custom-fields/', RedirectView.as_view(pattern_name='extras:customfield_list', permanent=True)),
+    path('custom-fields/<int:pk>/', RedirectView.as_view(pattern_name='extras:customfield_detail', permanent=True)),
+    path('custom-fieldsets/', RedirectView.as_view(pattern_name='extras:customfieldset_list', permanent=True)),
+    path('custom-fieldsets/<int:pk>/', RedirectView.as_view(pattern_name='extras:customfieldset_detail', permanent=True)),
 
     # Requisition System routes
     path('', include('assets.urls_requests')),

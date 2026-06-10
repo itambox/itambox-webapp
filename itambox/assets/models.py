@@ -11,10 +11,7 @@ from extras.models import CustomFieldset
 from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import get_user_model
-from assets.choices import (
-    StatusTypeChoices, RequestStatusChoices,
-    AuditSessionStatusChoices, AuditVerificationMethodChoices,
-)
+from assets.choices import StatusTypeChoices, RequestStatusChoices
 
 User = get_user_model()
 
@@ -1045,87 +1042,5 @@ class AssetAssignment(SoftDeleteMixin, JournalingMixin, TaggableMixin, ChangeLog
 
     def get_absolute_url(self):
         return self.asset.get_absolute_url()
-
-
-# --- Audit & Campaign Models ---
-from core.mixins import SoftDeleteMixin
-
-class AuditSession(StandardModel, SoftDeleteMixin):
-    name = models.CharField(max_length=200)
-    location = models.ForeignKey(
-        'organization.Location', 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True,
-        help_text="Target location expected to be audited. If omitted, applies globally."
-    )
-    status = models.CharField(
-        max_length=20,
-        choices=AuditSessionStatusChoices.choices,
-        default=AuditSessionStatusChoices.PLANNED,
-    )
-    started_at = models.DateTimeField(auto_now_add=True)
-    completed_at = models.DateTimeField(null=True, blank=True)
-    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='audit_sessions')
-
-    class Meta:
-        ordering = ['-started_at']
-        verbose_name = _("Audit Session")
-        verbose_name_plural = _("Audit Sessions")
-
-    def __str__(self):
-        return f"{self.name} ({self.get_status_display()})"
-
-    def get_absolute_url(self):
-        return reverse('assets:auditsession_detail', kwargs={'pk': self.pk})
-
-    @property
-    def expected_assets_queryset(self):
-        """Returns QuerySet of Assets expected to be at this location."""
-        qs = Asset.objects.exclude(status__type=StatusLabel.TYPE_ARCHIVED)
-        if not self.location:
-            return qs.filter(status__type__in=[
-                StatusLabel.TYPE_DEPLOYABLE,
-                StatusLabel.TYPE_PENDING,
-                StatusLabel.TYPE_DEPLOYED
-            ])
-        return qs.filter(location=self.location)
-
-
-class AssetAudit(models.Model):
-    session = models.ForeignKey(
-        AuditSession, 
-        on_delete=models.CASCADE, 
-        related_name='audits', 
-        null=True, 
-        blank=True
-    )
-    asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='audits')
-    auditor = models.ForeignKey(User, on_delete=models.PROTECT, related_name='audits_performed')
-    timestamp = models.DateTimeField(auto_now_add=True)
-    location = models.ForeignKey(
-        'organization.Location', 
-        on_delete=models.PROTECT,
-        help_text="The observed physical location of the asset during audit."
-    )
-    status = models.ForeignKey(
-        StatusLabel, 
-        on_delete=models.PROTECT,
-        help_text="The observed physical status of the asset during audit."
-    )
-    notes = models.TextField(blank=True)
-    verification_method = models.CharField(
-        max_length=30,
-        choices=AuditVerificationMethodChoices.choices,
-        default=AuditVerificationMethodChoices.MANUAL,
-    )
-
-    class Meta:
-        ordering = ['-timestamp']
-        constraints = [
-            models.UniqueConstraint(fields=['session', 'asset'], name='unique_session_asset')
-        ]
-        verbose_name = _("Asset Audit")
-        verbose_name_plural = _("Asset Audits")
 
 

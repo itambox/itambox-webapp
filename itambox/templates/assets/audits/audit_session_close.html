@@ -25,7 +25,7 @@
             <form method="post">
                 {% csrf_token %}
                 <div class="d-flex justify-content-end mt-3">
-                    <a href="{% url 'assets:auditsession_detail' pk=object.pk %}" class="btn btn-link me-2">{% translate "Cancel" %}</a>
+                    <a href="{% url 'compliance:auditsession_detail' pk=object.pk %}" class="btn btn-link me-2">{% translate "Cancel" %}</a>
                     <button type="submit" class="btn btn-warning">{% translate "Close & Reconcile" %}</button>
                 </div>
             </form>

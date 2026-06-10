@@ -11,20 +11,19 @@ from core.api.viewsets import ITAMBoxModelViewSet
 from assets.models import (
     Asset, AssetRole, Manufacturer, AssetType,
     StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence,
-    AssetAssignment, AuditSession, AssetAudit
+    AssetAssignment
 )
 from assets.filters import (
     AssetFilterSet, AssetRoleFilterSet, ManufacturerFilterSet,
     AssetTypeFilterSet, StatusLabelFilterSet, DepreciationFilterSet,
     SupplierFilterSet, CategoryFilterSet, AssetRequestFilterSet, AssetTagSequenceFilterSet,
-    AuditSessionFilterSet, AssetAuditFilterSet
 )
 from .serializers import (
     AssetSerializer, AssetRoleSerializer, ManufacturerSerializer, AssetTypeSerializer,
     StatusLabelSerializer, DepreciationSerializer,
     SupplierSerializer, CategorySerializer, AssetRequestSerializer,
     AssetTagSequenceSerializer, AssetAssignmentSerializer,
-    AuditSessionSerializer, AssetAuditSerializer, AssetCheckOutAPISerializer,
+    AssetCheckOutAPISerializer,
     AssetCheckInAPISerializer
 )
 from assets.services import checkout_asset, checkin_asset
@@ -174,24 +173,4 @@ class AssetAssignmentViewSet(ITAMBoxModelViewSet):
     filterset_fields = ['asset_id', 'is_active', 'checked_out_by_id', 'assigned_user_id']
 
 
-class AuditSessionViewSet(ITAMBoxModelViewSet):
-    queryset = AuditSession.objects.select_related('location', 'created_by').all()
-    serializer_class = AuditSessionSerializer
-    filter_backends = (DjangoFilterBackend,)
-    filterset_class = AuditSessionFilterSet
-
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
-
-
-class AssetAuditViewSet(ITAMBoxModelViewSet):
-    queryset = AssetAudit.objects.select_related(
-        'session', 'asset', 'auditor', 'location', 'status'
-    ).all()
-    serializer_class = AssetAuditSerializer
-    filter_backends = (DjangoFilterBackend,)
-    filterset_class = AssetAuditFilterSet
-
-    def perform_create(self, serializer):
-        serializer.save(auditor=self.request.user)
 

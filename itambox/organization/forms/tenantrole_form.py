@@ -25,15 +25,15 @@ MATRIX_MODELS = {
     },
     'auditsession': {
         'label': 'Audit Sessions',
-        'app': 'assets',
+        'app': 'compliance',
         'model_name': 'auditsession',
-        'group': 'Inventory & Hardware',
+        'group': 'Compliance & Custody',
     },
     'assetaudit': {
         'label': 'Asset Audits',
-        'app': 'assets',
+        'app': 'compliance',
         'model_name': 'assetaudit',
-        'group': 'Inventory & Hardware',
+        'group': 'Compliance & Custody',
     },
     'accessory': {
         'label': 'Accessories',

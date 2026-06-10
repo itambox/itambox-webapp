@@ -222,21 +222,21 @@ OPERATIONS_MENU = Menu(
             label=_('Compliance'),
             items=(
                 MenuItem(
-                    link='assets:auditsession_list',
+                    link='compliance:auditsession_list',
                     link_text=_('Audit Sessions'),
-                    permissions=['assets.view_auditsession'],
+                    permissions=['compliance.view_auditsession'],
                     buttons=(
                         MenuItemButton(
-                            link='assets:auditsession_create',
+                            link='compliance:auditsession_create',
                             title='Add',
                             icon_class='mdi mdi-plus-thick',
-                            permissions=['assets.add_auditsession'],
+                            permissions=['compliance.add_auditsession'],
                         ),
                         MenuItemButton(
-                            link='/import/assets/auditsession/',
+                            link='/import/compliance/auditsession/',
                             title='Import',
                             icon_class='mdi mdi-upload',
-                            permissions=['assets.add_auditsession'],
+                            permissions=['compliance.add_auditsession'],
                             color='outline text-success',
                         ),
                     ),
@@ -333,8 +333,8 @@ EXTRAS_MENU = Menu(
         MenuGroup(
             label=_('Data Model'),
             items=(
-                get_model_item('assets', 'customfield', _('Custom Fields')),
-                get_model_item('assets', 'customfieldset', _('Custom Fieldsets')),
+                get_model_item('extras', 'customfield', _('Custom Fields')),
+                get_model_item('extras', 'customfieldset', _('Custom Fieldsets')),
                 MenuItem(
                     link='extras:configcontext_list',
                     link_text=_('Config Contexts'),

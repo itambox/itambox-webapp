@@ -1,7 +1,8 @@
 # itambox/assets/tables.py
 import django_tables2 as tables
 from django_tables2.utils import A  # Alias for Accessor
-from .models import Asset, AssetRole, Manufacturer, AssetType, StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence, AssetAudit
+from .models import Asset, AssetRole, Manufacturer, AssetType, StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence
+from compliance.models import AssetAudit
 from core.tables import ActionsColumn, AssigneeColumn, BaseTable, ToggleColumn
 from extras.tables import TagColumn # Import TagColumn
 from django.urls import reverse
@@ -388,7 +389,7 @@ class AssetTagSequenceTable(BaseTable):
 class AssetAuditTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     timestamp = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name="Timestamp")
-    session = tables.LinkColumn('assets:auditsession_detail', args=[A('session_id')], verbose_name='Campaign')
+    session = tables.LinkColumn('compliance:auditsession_detail', args=[A('session_id')], verbose_name='Campaign')
     auditor = tables.Column(accessor='auditor.username', verbose_name='Auditor')
     location = tables.LinkColumn('organization:location_detail', args=[A('location_id')], accessor='location.name', verbose_name='Location')
     status = tables.Column(verbose_name='Status')

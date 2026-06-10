@@ -13,12 +13,12 @@
     <div class="col-auto ms-auto d-print-none">
         <div class="btn-list">
             {% if object.status == 'active' %}
-                <a href="{% url 'assets:auditsession_close' pk=object.pk %}" class="btn btn-warning">
+                <a href="{% url 'compliance:auditsession_close' pk=object.pk %}" class="btn btn-warning">
                     <i class="mdi mdi-check-circle-outline"></i>
                     {% translate "Close Campaign & Reconcile" %}
                 </a>
             {% elif object.status == 'completed' and mismatches %}
-                <form method="post" action="{% url 'assets:auditsession_rehome' pk=object.pk %}" class="d-inline">
+                <form method="post" action="{% url 'compliance:auditsession_rehome' pk=object.pk %}" class="d-inline">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-success">
                         <i class="mdi mdi-link-variant"></i>
@@ -26,7 +26,7 @@
                     </button>
                 </form>
             {% endif %}
-            <a href="{% url 'assets:auditsession_list' %}" class="btn btn-outline-secondary">
+            <a href="{% url 'compliance:auditsession_list' %}" class="btn btn-outline-secondary">
                 {% translate "Back to Campaigns" %}
             </a>
         </div>
@@ -36,7 +36,7 @@
 
 {% block content %}
 <div id="reconciliation-container" 
-     hx-get="{% url 'assets:auditsession_detail' pk=object.pk %}" 
+     hx-get="{% url 'compliance:auditsession_detail' pk=object.pk %}" 
      hx-trigger="updateReconciliation from:body" 
      hx-select="#reconciliation-container" 
      hx-swap="outerHTML">
@@ -151,7 +151,7 @@
                     <div class="card-body">
                         <p class="text-secondary small">{% translate "Set your barcode scanner to enter/newline mode, focus on the input box below, and scan your physical assets." %}</p>
                         
-                        <form hx-post="{% url 'assets:auditsession_scan' pk=object.pk %}"
+                        <form hx-post="{% url 'compliance:auditsession_scan' pk=object.pk %}"
                                hx-target="#scan-result"
                                hx-swap="innerHTML"
                                hx-indicator="#scan-indicator"
