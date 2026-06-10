@@ -3,8 +3,8 @@ from rest_framework import serializers as drf_serializers, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from core.api.permissions import TokenPermissions, StrictTenantPermission
-from core.api.viewsets import ITAMBoxModelViewSet
+from itambox.api.permissions import TokenPermissions, StrictTenantPermission
+from itambox.api.viewsets import ITAMBoxModelViewSet
 from subscriptions.filters import ProviderFilterSet, SubscriptionFilterSet, SubscriptionAssignmentFilterSet
 from subscriptions.models import Provider, Subscription, SubscriptionAssignment
 from .serializers import ProviderSerializer, SubscriptionSerializer, SubscriptionAssignmentSerializer

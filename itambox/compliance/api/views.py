@@ -1,5 +1,5 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from core.api.viewsets import ITAMBoxModelViewSet
+from itambox.api.viewsets import ITAMBoxModelViewSet
 from compliance.models import CustodyReceipt, AuditSession, AssetAudit
 from assets.models import AssetMaintenance
 from compliance.filters import CustodyReceiptFilterSet, AssetMaintenanceFilterSet, AuditSessionFilterSet, AssetAuditFilterSet

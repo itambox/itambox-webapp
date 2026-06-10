@@ -1,8 +1,8 @@
 from rest_framework import serializers
 
 from assets.models import Manufacturer, Asset
-from core.api.base import BaseModelSerializer
-from core.api.nested_serializers import NestedManufacturerSerializer, NestedAssetSerializer
+from itambox.api.base import BaseModelSerializer
+from itambox.api.nested_serializers import NestedManufacturerSerializer, NestedAssetSerializer
 from extras.api.serializers import TagSerializer
 from software.models import Software, InstalledSoftware
 

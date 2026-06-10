@@ -1,8 +1,8 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
-from core.api.base import BaseModelSerializer
+from itambox.api.base import BaseModelSerializer
 from itambox.api.fields import RelatedObjectCountField
-from core.api.nested_serializers import (
+from itambox.api.nested_serializers import (
     NestedAssetRoleSerializer,
     NestedManufacturerSerializer,
     NestedAssetSerializer,

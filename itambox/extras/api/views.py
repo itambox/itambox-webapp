@@ -1,5 +1,5 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from core.api.viewsets import ITAMBoxModelViewSet
+from itambox.api.viewsets import ITAMBoxModelViewSet
 from extras.models import Tag, Dashboard, CustomField, CustomFieldset
 from extras.filters import TagFilter, CustomFieldFilterSet, CustomFieldsetFilterSet
 from .serializers import TagSerializer, DashboardSerializer, CustomFieldSerializer, CustomFieldsetSerializer

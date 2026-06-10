@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import RetrieveUpdateAPIView
 from rest_framework.response import Response
 
-from core.api.viewsets import ITAMBoxReadOnlyModelViewSet, ITAMBoxModelViewSet
+from itambox.api.viewsets import ITAMBoxReadOnlyModelViewSet, ITAMBoxModelViewSet
 from users.models import UserPreference, Token
 from .serializers import UserSerializer, GroupSerializer, UserConfigSerializer, TokenSerializer
 

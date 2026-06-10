@@ -1,6 +1,6 @@
 from rest_framework import serializers
-from core.api.base import BaseModelSerializer
-from core.api.nested_serializers import NestedManufacturerSerializer, NestedAssetSerializer
+from itambox.api.base import BaseModelSerializer
+from itambox.api.nested_serializers import NestedManufacturerSerializer, NestedAssetSerializer
 from licenses.models import License, LicenseSeatAssignment
 from extras.api.serializers import TagSerializer
 from software.api.serializers import SoftwareSerializer

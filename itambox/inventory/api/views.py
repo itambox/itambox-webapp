@@ -1,7 +1,7 @@
 from django.db import models
 from django_filters.rest_framework import DjangoFilterBackend
-from core.api.permissions import TokenPermissions, StrictTenantPermission
-from core.api.viewsets import ITAMBoxModelViewSet
+from itambox.api.permissions import TokenPermissions, StrictTenantPermission
+from itambox.api.viewsets import ITAMBoxModelViewSet
 from inventory.models import (
     Accessory, AccessoryStock, AccessoryAssignment,
     Consumable, ConsumableStock, ConsumableAssignment,

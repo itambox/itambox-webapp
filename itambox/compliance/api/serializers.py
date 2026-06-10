@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from core.api.base import BaseModelSerializer
-from core.api.nested_serializers import NestedAssetSerializer
+from itambox.api.base import BaseModelSerializer
+from itambox.api.nested_serializers import NestedAssetSerializer
 from compliance.models import CustodyReceipt, AuditSession, AssetAudit
 from assets.models import AssetMaintenance
 from organization.api.serializers import AssetHolderSerializer, NestedLocationSerializer

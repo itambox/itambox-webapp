@@ -8,7 +8,7 @@ from core.filters import BaseFilterSet
 from core.managers import set_current_tenant
 from organization.models import Tenant, Location
 from assets.models import Manufacturer, Asset, AssetType
-from core.api.pagination import ITAMBoxPagination
+from itambox.api.pagination import ITAMBoxPagination
 from itambox.middleware import CSPMiddleware
 from rest_framework.test import APIRequestFactory
 

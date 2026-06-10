@@ -1,8 +1,8 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.permissions import BasePermission
 
-from core.api.permissions import TokenPermissions
-from core.api.viewsets import ITAMBoxModelViewSet, ITAMBoxReadOnlyModelViewSet
+from itambox.api.permissions import TokenPermissions
+from itambox.api.viewsets import ITAMBoxModelViewSet, ITAMBoxReadOnlyModelViewSet
 from software.filters import SoftwareFilterSet
 from software.models import Software, InstalledSoftware
 from .serializers import SoftwareSerializer, InstalledSoftwareSerializer

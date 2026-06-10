@@ -5,9 +5,9 @@ from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema
-from core.api.permissions import TokenPermissions, StrictTenantPermission
+from itambox.api.permissions import TokenPermissions, StrictTenantPermission
 
-from core.api.viewsets import ITAMBoxModelViewSet
+from itambox.api.viewsets import ITAMBoxModelViewSet
 from assets.models import (
     Asset, AssetRole, Manufacturer, AssetType,
     StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence,

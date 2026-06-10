@@ -1,6 +1,6 @@
 from rest_framework import serializers
-from core.api.base import BaseModelSerializer
-from core.api.nested_serializers import NestedManufacturerSerializer, NestedAssetTypeSerializer, NestedAssetSerializer
+from itambox.api.base import BaseModelSerializer
+from itambox.api.nested_serializers import NestedManufacturerSerializer, NestedAssetTypeSerializer, NestedAssetSerializer
 from inventory.models import (
     Accessory, AccessoryStock, AccessoryAssignment,
     Consumable, ConsumableStock, ConsumableAssignment,

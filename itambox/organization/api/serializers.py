@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.contenttypes.models import ContentType
 
-from core.api.base import BaseModelSerializer
+from itambox.api.base import BaseModelSerializer
 from itambox.api.fields import ContentTypeField
 from itambox.api.serializers import GenericObjectSerializer
 from organization.models import (

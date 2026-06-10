@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from core.api.base import BaseModelSerializer
+from itambox.api.base import BaseModelSerializer
 from extras.models import Tag, Dashboard, CustomField, CustomFieldset
 
 

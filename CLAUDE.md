@@ -126,7 +126,7 @@ Permissions flow: `TenantMembershipBackend` (`core/auth/__init__.py`) is the fir
 
 `StrictTenantPermission` (DRF) enforces object-level tenant boundary on all API detail endpoints via `DEFAULT_PERMISSION_CLASSES`.
 
-**`core.api`** is a compatibility shim package — all its files are single-line `from itambox.api.X import *`. The canonical implementation lives in `itambox/api/`. App-level API code imports from `core.api`; the DRF settings reference `itambox.api`.
+The canonical API implementation lives in `itambox/api/`. All app-level API code (`serializers.py`, `views.py`) imports directly from `itambox.api.*`.
 
 ## Architecture: background tasks
 

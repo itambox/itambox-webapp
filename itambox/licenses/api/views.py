@@ -1,9 +1,9 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from core.api.viewsets import ITAMBoxModelViewSet, ITAMBoxReadOnlyModelViewSet
+from itambox.api.viewsets import ITAMBoxModelViewSet, ITAMBoxReadOnlyModelViewSet
 from licenses.models import License, LicenseSeatAssignment
 from licenses.filters import LicenseFilterSet, LicenseSeatAssignmentFilterSet
 from .serializers import LicenseSerializer, LicenseSeatAssignmentSerializer
-from core.api.permissions import TokenPermissions, StrictTenantPermission
+from itambox.api.permissions import TokenPermissions, StrictTenantPermission
 
 
 class LicenseViewSet(ITAMBoxModelViewSet):

@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 
-from core.api.base import BaseModelSerializer
+from itambox.api.base import BaseModelSerializer
 from subscriptions.models import Provider, Subscription, SubscriptionAssignment
 from organization.api.serializers import NestedTenantSerializer, NestedTenantGroupSerializer, ContactAssignmentSerializer
 from organization.models import Tenant, TenantGroup

@@ -1,6 +1,6 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from core.api.permissions import TokenPermissions, StrictTenantPermission
-from core.api.viewsets import ITAMBoxModelViewSet, ITAMBoxReadOnlyModelViewSet
+from itambox.api.permissions import TokenPermissions, StrictTenantPermission
+from itambox.api.viewsets import ITAMBoxModelViewSet, ITAMBoxReadOnlyModelViewSet
 from organization.models import (
     Site, Region, SiteGroup, Location, Tenant, TenantGroup,
     AssetHolder, Contact, ContactRole, ContactAssignment

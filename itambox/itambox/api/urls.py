@@ -1,12 +1,16 @@
 from django.urls import path, include
-from itambox.api.views import APIRootView, StatusView, AuthenticationCheckView
-from inventory.api.views import ComponentViewSet, ComponentStockViewSet, ComponentAllocationViewSet
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularSwaggerView,
     SpectacularJSONAPIView,
     SpectacularRedocView
 )
+from itambox.api.routers import ITAMBoxRouter
+from itambox.api.views import APIRootView, StatusView, AuthenticationCheckView, ObjectChangeViewSet
+from inventory.api.views import ComponentViewSet, ComponentStockViewSet, ComponentAllocationViewSet
+
+_core_router = ITAMBoxRouter()
+_core_router.register(r'object-changes', ObjectChangeViewSet, basename='objectchange')
 
 app_name = 'api'
 
@@ -25,7 +29,7 @@ urlpatterns = [
         path('component-allocations/', ComponentAllocationViewSet.as_view({'get': 'list', 'post': 'create'})),
         path('component-allocations/<int:pk>/', ComponentAllocationViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='componentallocation-detail'),
     ], 'components_api'), namespace='components_api')),
-    path('core/', include('core.api.urls', namespace='core_api')),
+    path('core/', include((_core_router.urls, 'core_api'))),
     path('extras/', include('extras.api.urls', namespace='extras_api')),
     path('inventory/', include('inventory.api.urls', namespace='inventory_api')),
     path('licenses/', include('licenses.api.urls', namespace='licenses_api')),
