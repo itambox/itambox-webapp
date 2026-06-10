@@ -138,6 +138,7 @@ Tasks live in `core/tasks/`. Each task function should be wrapped in `TaskContex
 |---|---|---|
 | `ITAMBOX_ENV` | `dev` or `prod` | fail-closed to `prod` when unset (dev under tests) |
 | `ITAMBOX_SECRET_KEY` | Django secret key | insecure default (dev only) |
+| `ITAMBOX_BASE_URL` | Public base URL for QR labels & outbound links (no trailing slash) | `""` (bare-tag QR used) |
 | `ITAMBOX_DB_*` | DB connection | `itambox`/`localhost`/`5432` |
 | `ITAMBOX_CACHE_BACKEND` | `locmem` or `redis` | `locmem` |
 | `ITAMBOX_REDIS_URL` | Redis connection when cache=redis | `redis://127.0.0.1:6379/1` |

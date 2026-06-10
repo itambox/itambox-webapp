@@ -115,11 +115,12 @@ def generate_base64_barcode(asset, barcode_format):
     fmt = barcode_format.lower() if barcode_format else 'code128'
     if fmt == 'qr':
         import segno
-        # Generate QR code pointing to the object URL (fall back to an opaque URI)
-        try:
-            qr_data = f"http://localhost:8000{asset.get_absolute_url()}"
-        except Exception:
-            qr_data = f"itambox://object/{getattr(asset, 'pk', '')}"
+        # Encode the bare asset tag with the itambox: scheme so QR codes
+        # scan correctly off any device / host (no localhost hardcoding).
+        # resolve_scanned_code() understands this format on both the audit
+        # and global scan-to-find paths.
+        asset_tag = getattr(asset, 'asset_tag', None) or str(getattr(asset, 'pk', ''))
+        qr_data = f"itambox:{asset_tag}"
         qr = segno.make_qr(qr_data)
         # border=4 is the mandatory QR "quiet zone" — without it the code won't
         # scan and its edge modules visually merge with neighbouring content.

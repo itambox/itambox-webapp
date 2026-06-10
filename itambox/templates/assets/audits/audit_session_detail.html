@@ -177,11 +177,16 @@
                                 <h3 class="text-white mb-1">{% translate "Scan Asset Code" %}</h3>
                                 <p class="text-secondary small mb-0">{% translate "Align the barcode or QR code within the frame" %}</p>
                             </div>
-                            
+
                             <div class="scanner-viewfinder" id="scanner-reader">
                                 <div class="scanner-laser"></div>
                             </div>
-                            
+
+                            <div id="scanner-error" class="alert alert-warning mt-3" style="display:none;">
+                                <i class="mdi mdi-alert-outline me-2"></i>
+                                <span data-scanner-error-msg>{% translate "Camera unavailable. On iPhone/iPad this requires HTTPS and camera permission — check Settings › Safari › Camera, or use a hardware scanner / type the tag." %}</span>
+                            </div>
+
                             <div class="mt-4 d-flex gap-2">
                                 <button type="button" id="toggle-torch-btn" class="btn btn-outline-light" style="display: none;">
                                     <i class="mdi mdi-flashlight"></i> {% translate "Toggle Flash" %}

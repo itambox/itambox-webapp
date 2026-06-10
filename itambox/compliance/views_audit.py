@@ -113,12 +113,8 @@ class AssetAuditScanView(View):
         if form.is_valid():
             barcode = form.cleaned_data['barcode'].strip()
 
-            from django.db.models import Q
-            from assets.models import Asset
-            asset = Asset.objects.filter(
-                Q(asset_tag=barcode) |
-                Q(serial_number=barcode)
-            ).first()
+            from assets.scanning import resolve_scanned_code
+            asset = resolve_scanned_code(barcode)
 
             if not asset:
                 response = HttpResponse(

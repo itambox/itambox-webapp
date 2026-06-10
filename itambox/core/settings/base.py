@@ -28,6 +28,10 @@ if env_path.exists():
 
 DEBUG = False
 
+# Public base URL used to construct scannable QR links (no trailing slash).
+# Set in production to e.g. https://itam.example.com
+ITAMBOX_BASE_URL = os.environ.get('ITAMBOX_BASE_URL', '').rstrip('/')
+
 SECRET_KEY = os.environ.get('ITAMBOX_SECRET_KEY', '')
 
 if not SECRET_KEY:
