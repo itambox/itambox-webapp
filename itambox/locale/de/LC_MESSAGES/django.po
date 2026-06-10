@@ -3787,3 +3787,81 @@ msgstr "Benutzerpräferenz"
 
 msgid "Tokens"
 msgstr "Token"
+
+
+# --- Bookmarks & Watch (users/views.py, templates/users/, templates/generic/) ---
+
+msgid "Bookmarks"
+msgstr "Lesezeichen"
+
+msgid "My Bookmarks"
+msgstr "Meine Lesezeichen"
+
+msgid "Watching"
+msgstr "Beobachtet"
+
+msgid "Objects you have starred for quick access. Bookmarks are personal pins — no notifications are sent."
+msgstr "Objekte, die du als Lesezeichen markiert hast. Lesezeichen sind persönliche Pins – es werden keine Benachrichtigungen gesendet."
+
+msgid "Bookmarked on"
+msgstr "Als Lesezeichen gespeichert am"
+
+msgid "Remove Bookmark"
+msgstr "Lesezeichen entfernen"
+
+msgid "Remove"
+msgstr "Entfernen"
+
+msgid "No bookmarks yet."
+msgstr "Noch keine Lesezeichen vorhanden."
+
+msgid "Use the star icon on any object details page to pin it here."
+msgstr "Nutze das Stern-Symbol auf einer Detailseite, um Objekte hier anzuheften."
+
+msgid "Objects you are watching. You receive a notification whenever a watched object is created, updated, or deleted."
+msgstr "Objekte, die du beobachtest. Du erhältst eine Benachrichtigung, wenn ein beobachtetes Objekt erstellt, aktualisiert oder gelöscht wird."
+
+msgid "Watching since"
+msgstr "Beobachtet seit"
+
+msgid "Stop Watching"
+msgstr "Nicht mehr beobachten"
+
+msgid "Unwatch"
+msgstr "Nicht mehr beobachten"
+
+msgid "Not watching any objects."
+msgstr "Keine Objekte werden beobachtet."
+
+msgid "Use the bell icon on any object details page to receive notifications on changes."
+msgstr "Nutze das Glockensymbol auf einer Detailseite, um Benachrichtigungen bei Änderungen zu erhalten."
+
+msgid "Bookmark"
+msgstr "Lesezeichen"
+
+msgid "Watch (notify me on changes)"
+msgstr "Beobachten (bei Änderungen benachrichtigen)"
+
+msgid "Star any object to pin it here."
+msgstr "Markiere ein Objekt mit einem Stern, um es hier anzuheften."
+
+msgid "Bookmarked {name}."
+msgstr "Lesezeichen für {name} gesetzt."
+
+msgid "Bookmark removed from {name}."
+msgstr "Lesezeichen für {name} entfernt."
+
+msgid "Now watching {name}."
+msgstr "{name} wird jetzt beobachtet."
+
+msgid "Unwatched {name}."
+msgstr "Beobachtung von {name} beendet."
+
+msgid "Unsubscribed from {name}."
+msgstr "Abonnement von {name} beendet."
+
+msgid "Object Watch"
+msgstr "Beobachtetes Objekt"
+
+msgid "Object Watches"
+msgstr "Beobachtete Objekte"
