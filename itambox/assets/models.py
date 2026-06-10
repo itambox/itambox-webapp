@@ -145,8 +145,42 @@ class Manufacturer(StandardModel, SoftDeleteMixin):
 class Depreciation(StandardModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    name = models.CharField(max_length=100, verbose_name="Depreciation Name")
-    months = models.PositiveIntegerField(verbose_name="Lifespan (Months)", help_text="Useful lifespan in months for straight-line calculations")
+
+    class Method(models.TextChoices):
+        STRAIGHT_LINE = 'straight_line', _('Straight-line')
+        NONE = 'none', _('None (no depreciation)')
+
+    class Convention(models.TextChoices):
+        EXCLUDE_PURCHASE_MONTH = 'exclude_purchase_month', _('Exclude purchase month (month diff)')
+        INCLUDE_PURCHASE_MONTH = 'include_purchase_month', _('Include purchase month (pro rata temporis)')
+
+    name = models.CharField(max_length=100, verbose_name=_("Depreciation Name"))
+    months = models.PositiveIntegerField(
+        verbose_name=_("Lifespan (Months)"),
+        help_text=_("Useful lifespan in months for straight-line calculations"),
+    )
+    method = models.CharField(
+        max_length=20,
+        choices=Method.choices,
+        default=Method.STRAIGHT_LINE,
+        verbose_name=_("Method"),
+    )
+    convention = models.CharField(
+        max_length=30,
+        choices=Convention.choices,
+        default=Convention.INCLUDE_PURCHASE_MONTH,
+        verbose_name=_("Convention"),
+        help_text=_("Determines whether the acquisition month counts as a full depreciation month."),
+    )
+    immediate_expense_threshold = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name=_("Immediate expense threshold (GWG)"),
+        help_text=_("Assets with purchase cost at or below this amount are fully expensed in the month of acquisition (e.g. 800 for German GWG)."),
+    )
+    description = models.TextField(blank=True, verbose_name=_("Description"))
 
     class Meta:
         ordering = ['name']
@@ -315,6 +349,30 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
     )
     # custom_field_data JSONField comes from CustomFieldDataMixin
     requestable = models.BooleanField(null=True, blank=True, default=None, db_index=True, help_text="Allow users to request this asset")
+    depreciation_override = models.ForeignKey(
+        'Depreciation',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='asset_overrides',
+        verbose_name=_("Depreciation override"),
+        help_text=_("Override depreciation policy — leave empty to use the tenant default or asset-type schedule."),
+    )
+    in_service_date = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name=_("In-service date"),
+        help_text=_("Depreciation starts here; falls back to purchase date."),
+    )
+    disposed_at = models.DateTimeField(null=True, blank=True, editable=False, verbose_name=_("Disposed at"))
+    disposal_value = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        editable=False,
+        verbose_name=_("Sign-off value"),
+    )
 
     @property
     def is_requestable(self):
@@ -390,42 +448,9 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
 
     @property
     def current_value(self):
-        """Calculates straight-line depreciation value on a monthly basis."""
-        from decimal import Decimal
-        import datetime
-
-        if not self.purchase_cost:
-            return None
-
-        # If no depreciation scheme, value is original cost
-        if not self.asset_type or not self.asset_type.depreciation:
-            return self.purchase_cost
-
-        deprec = self.asset_type.depreciation
-        if deprec.months <= 0:
-            return self.purchase_cost
-
-        if not self.purchase_date:
-            return self.purchase_cost
-
-        # Calculate exact month difference
-        today = datetime.date.today()
-        months_held = (today.year - self.purchase_date.year) * 12 + today.month - self.purchase_date.month
-        # If purchase date is in future, or same month, zero months held
-        if months_held <= 0:
-            return self.purchase_cost
-
-        # If held longer than the depreciation schedule, value is salvage value
-        salvage = self.salvage_value or Decimal('0.00')
-        if months_held >= deprec.months:
-            return salvage
-
-        # Straight-line depreciation math
-        depreciable_base = self.purchase_cost - salvage
-        monthly_depreciation = depreciable_base / Decimal(str(deprec.months))
-        current = self.purchase_cost - (monthly_depreciation * Decimal(str(months_held)))
-        
-        return max(current, salvage)
+        """Estimated book value — delegates to the pure compute_book_value function."""
+        from assets.depreciation import compute_book_value
+        return compute_book_value(self)
 
     @property
     def is_modular(self):
@@ -493,10 +518,25 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
         if not self.asset_tag:
             self.asset_tag = AssetTagSequence.get_next_tag_for_asset(self)
         else:
-            # If the user accepted/used the next expected tag sequence, increment it atomically
             seq = AssetTagSequence.resolve_sequence_for_asset(self)
             if seq and self.asset_tag == seq.next_tag_preview:
                 seq.next_tag()
+
+        # Freeze/unfreeze sign-off value on archive transition.
+        if self.pk:
+            old = Asset._base_manager.filter(pk=self.pk).select_related('status').first()
+            if old:
+                old_type = old.status.type if old.status else None
+                new_type = self.status.type if self.status else None
+                if old_type != 'archived' and new_type == 'archived':
+                    from assets.depreciation import compute_book_value
+                    from decimal import Decimal
+                    self.disposal_value = compute_book_value(self) or Decimal('0.00')
+                    self.disposed_at = timezone.now()
+                elif old_type == 'archived' and new_type != 'archived':
+                    self.disposed_at = None
+                    self.disposal_value = None
+
         super().save(*args, **kwargs)
 
 

@@ -32,6 +32,10 @@ DEBUG = False
 # Set in production to e.g. https://itam.example.com
 ITAMBOX_BASE_URL = os.environ.get('ITAMBOX_BASE_URL', '').rstrip('/')
 
+# Default display currency (ISO 4217) used when a tenant has not set its own.
+# Affects the {% money %} template filter — display only, no exchange rates.
+ITAMBOX_DEFAULT_CURRENCY = os.environ.get('ITAMBOX_DEFAULT_CURRENCY', 'EUR')
+
 SECRET_KEY = os.environ.get('ITAMBOX_SECRET_KEY', '')
 
 if not SECRET_KEY:

@@ -1,10 +1,10 @@
-{% load i18n %}
+{% load i18n money %}
 {# Panel: Financial & Lifecycle details #}
 <dl class="row mb-0">
     <dt class="col-sm-4">{% translate "Purchase Cost:" %}</dt>
     <dd class="col-sm-8">
         {% if object.purchase_cost %}
-            ${{ object.purchase_cost|floatformat:2 }}
+            {{ object.purchase_cost|money:object }}
         {% else %}
             <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
         {% endif %}
@@ -13,31 +13,57 @@
     <dt class="col-sm-4">{% translate "Salvage Value:" %}</dt>
     <dd class="col-sm-8">
         {% if object.salvage_value %}
-            ${{ object.salvage_value|floatformat:2 }}
+            {{ object.salvage_value|money:object }}
         {% else %}
             <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
         {% endif %}
     </dd>
 
-    <dt class="col-sm-4">{% translate "Depreciated Book Value:" %}</dt>
+    <dt class="col-sm-4">{% translate "Estimated value (indicative):" %}</dt>
     <dd class="col-sm-8">
-        {% if object.current_value is not None %}
-            <span class="h3 font-weight-bold text-success">
-                ${{ object.current_value|floatformat:2 }}
+        {% if object.disposed_at %}
+            <span class="h3 font-weight-bold text-secondary">
+                {{ object.disposal_value|money:object }}
             </span>
-            {% if object.asset_type.depreciation %}
+            <br>
+            <small class="text-muted">{% blocktranslate with d=object.disposed_at|date:"Y-m-d" %}Sign-off value (frozen at {{ d }}){% endblocktranslate %}</small>
+        {% elif object.current_value is not None %}
+            <span class="h3 font-weight-bold text-success">
+                {{ object.current_value|money:object }}
+            </span>
+            {% if resolved_depreciation_policy %}
                 <br>
-                <small class="text-muted">{% translate "Depreciated over" %} {{ object.asset_type.depreciation.months }} {% translate "months (" %}{{ object.asset_type.depreciation.name }})</small>
+                <small class="text-muted">
+                    {{ resolved_depreciation_policy }}
+                    {% if resolved_depreciation_rung == 'override' %}
+                        <span class="badge bg-blue-lt ms-1">{% translate "asset override" %}</span>
+                    {% elif resolved_depreciation_rung == 'tenant' %}
+                        <span class="badge bg-secondary-lt ms-1">{% translate "tenant default" %}</span>
+                    {% elif resolved_depreciation_rung == 'type' %}
+                        <span class="badge bg-secondary-lt ms-1">{% translate "asset type" %}</span>
+                    {% endif %}
+                </small>
             {% endif %}
         {% else %}
             <span class="text-muted"><i>{% translate "N/A (No Purchase Cost)" %}</i></span>
+        {% endif %}
+        <br>
+        <small class="text-muted fst-italic">{% translate "Indicative figure for IT asset management and budgeting — not a substitute for your accounting system." %}</small>
+    </dd>
+
+    <dt class="col-sm-4">{% translate "In-Service Date:" %}</dt>
+    <dd class="col-sm-8 text-secondary">
+        {% if object.in_service_date %}
+            {{ object.in_service_date|date:"Y-m-d" }}
+        {% else %}
+            <span class="text-muted"><i>{% translate "Not Set (uses purchase date)" %}</i></span>
         {% endif %}
     </dd>
 
     <dt class="col-sm-4">{% translate "Estimated EOL Date:" %}</dt>
     <dd class="col-sm-8">
         {% if eol_date %}
-            {{ eol_date|date:"Y-m-d" }} 
+            {{ eol_date|date:"Y-m-d" }}
             <span class="badge bg-secondary-lt ms-1">{{ object.asset_type.eol_months }} {% translate "months" %}</span>
         {% else %}
             <span class="text-muted"><i>N/A</i></span>
@@ -58,7 +84,7 @@
     <dt class="col-sm-4">{% translate "Total Cost of Ownership (TCO):" %}</dt>
     <dd class="col-sm-8">
         <span class="h3 font-weight-bold text-success">
-            ${{ total_cost_of_ownership|floatformat:2 }}
+            {{ total_cost_of_ownership|money:object }}
         </span>
         <br>
         <small class="text-muted">{% translate "Purchase +" %} {{ object.maintenances.count }} {% translate "repair/maintenance item" %}{{ object.maintenances.count|pluralize }}</small>

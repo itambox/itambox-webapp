@@ -1,7 +1,7 @@
-{% load i18n %}
+{% load i18n money %}
 {% translate "Maintenance Cost" as l_cost %}
 {% translate "Downtime Duration" as l_down %}
-{% blocktranslate with c=object.cost|default:0|floatformat:2 asvar cost_value %}${{ c }}{% endblocktranslate %}
+{% with cost_value=object.cost|money:object %}
 <div class="row g-3 mb-4">
     {% include "generic/includes/stat_card.html" with color="blue" icon="mdi mdi-currency-usd" label=l_cost value=cost_value %}
     {% if object.completion_date %}
@@ -16,3 +16,4 @@
         {% include "generic/includes/stat_card.html" with color="warning" icon="mdi mdi-clock-outline" label=l_down value=v_down %}
     {% endif %}
 </div>
+{% endwith %}

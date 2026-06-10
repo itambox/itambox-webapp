@@ -70,6 +70,7 @@ class AssetForm(forms.ModelForm):
             'asset_role', 'status', 'location', 'tenant',
             'purchase_date', 'warranty_expiration',
             'purchase_cost', 'salvage_value', 'order_number', 'supplier',
+            'in_service_date', 'depreciation_override',
             'notes', 'tags', 'requestable'
         ]
         widgets = {
@@ -79,6 +80,8 @@ class AssetForm(forms.ModelForm):
             'purchase_cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'salvage_value': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'order_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'in_service_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'depreciation_override': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'tenant': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
             'tags': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
@@ -338,6 +341,11 @@ class AssetForm(forms.ModelForm):
                 Div('salvage_value', css_class='col-md-3'),
                 Div('order_number', css_class='col-md-3'),
                 Div('supplier', css_class='col-md-3'),
+                css_class='row'
+            ),
+            Div(
+                Div('in_service_date', css_class='col-md-6'),
+                Div('depreciation_override', css_class='col-md-6'),
                 css_class='row'
             ),
         ]

@@ -175,6 +175,11 @@ class AssetDetailView(ObjectDetailView):
         context['time_to_eol'] = asset.time_to_eol
         context['total_cost_of_ownership'] = asset.total_cost_of_ownership
 
+        from assets.depreciation import resolve_policy
+        policy, rung = resolve_policy(asset)
+        context['resolved_depreciation_policy'] = str(policy) if policy else None
+        context['resolved_depreciation_rung'] = rung
+
         custody_receipt = None
         eula_token = None
         if active_assignment and active_assignment.assigned_target:

@@ -3883,3 +3883,120 @@ msgstr "Wie oft Objekte dieser Kategorie physisch inventarisiert werden müssen,
 
 msgid "Audit Overdue: %(asset_tag)s"
 msgstr "Prüfung überfällig: %(asset_tag)s"
+
+msgid "Start Campaign"
+msgstr "Kampagne starten"
+
+msgid "Campaign '%(name)s' started."
+msgstr "Kampagne '%(name)s' wurde gestartet."
+
+msgid "Start immediately"
+msgstr "Sofort starten"
+
+msgid "Uncheck to save as Planned and start the campaign later."
+msgstr "Deaktivieren, um die Kampagne als geplant zu speichern und später zu starten."
+
+msgid "Tenant (Optional)"
+msgstr "Mandant (Optional)"
+
+msgid "Scope this campaign to a specific tenant. Leave blank for MSP-wide / global."
+msgstr "Diese Kampagne auf einen bestimmten Mandanten beschränken. Leer lassen für mandantenübergreifende / globale Erfassung."
+
+msgid "Null = all tenants/MSP-wide"
+msgstr "Leer = alle Mandanten / MSP-weit"
+
+msgid "Depreciation Name"
+msgstr "Bezeichnung Abschreibungsregel"
+
+msgid "Lifespan (Months)"
+msgstr "Nutzungsdauer (Monate)"
+
+msgid "Method"
+msgstr "Methode"
+
+msgid "Straight-line"
+msgstr "Linear"
+
+msgid "None (no depreciation)"
+msgstr "Keine Abschreibung"
+
+msgid "Convention"
+msgstr "Konvention"
+
+msgid "Exclude purchase month (month diff)"
+msgstr "Anschaffungsmonat nicht mitrechnen (Monatsdifferenz)"
+
+msgid "Include purchase month (pro rata temporis)"
+msgstr "Anschaffungsmonat vollständig mitrechnen (pro rata temporis)"
+
+msgid "Determines whether the acquisition month counts as a full depreciation month."
+msgstr "Legt fest, ob der Anschaffungsmonat als vollständiger Abschreibungsmonat gilt."
+
+msgid "Immediate expense threshold (GWG)"
+msgstr "GWG-Sofortabschreibungsgrenze"
+
+msgid "Assets with purchase cost at or below this amount are fully expensed in the month of acquisition (e.g. 800 for German GWG)."
+msgstr "Wirtschaftsgüter mit Anschaffungskosten bis zu diesem Betrag werden im Anschaffungsmonat vollständig abgeschrieben (z. B. 800 für deutsche GWG-Regelung)."
+
+msgid "Description"
+msgstr "Beschreibung"
+
+msgid "Depreciation override"
+msgstr "Abschreibungsregel (Überschreibung)"
+
+msgid "Override depreciation policy — leave empty to use the tenant default or asset-type schedule."
+msgstr "Abschreibungsregel überschreiben — leer lassen, um die Mandantenstandard- oder Asset-Typ-Regel zu verwenden."
+
+msgid "In-service date"
+msgstr "Inbetriebnahmedatum"
+
+msgid "Depreciation starts here; falls back to purchase date."
+msgstr "Abschreibung beginnt hier; falls nicht gesetzt, wird das Kaufdatum verwendet."
+
+msgid "Disposed at"
+msgstr "Abgang am"
+
+msgid "Sign-off value"
+msgstr "Restbuchwert bei Abgang"
+
+msgid "Display currency"
+msgstr "Anzeigewährung"
+
+msgid "ISO 4217 currency code used for value display (display only, no conversion)."
+msgstr "ISO 4217-Währungscode für die Wertanzeige (nur Anzeige, keine Umrechnung)."
+
+msgid "Default depreciation policy"
+msgstr "Standard-Abschreibungsregel"
+
+msgid "Fallback policy applied to all assets that have no type-level schedule and no per-asset override."
+msgstr "Fallback-Regel für alle Assets ohne Asset-Typ-Zeitplan und ohne individuelle Überschreibung."
+
+msgid "Estimated value (indicative):"
+msgstr "Geschätzter Buchwert (indikativ):"
+
+msgid "Sign-off value (frozen at %(d)s)"
+msgstr "Restbuchwert bei Abgang (eingefroren am %(d)s)"
+
+msgid "asset override"
+msgstr "Asset-Überschreibung"
+
+msgid "tenant default"
+msgstr "Mandantenstandard"
+
+msgid "asset type"
+msgstr "Asset-Typ"
+
+msgid "In-Service Date:"
+msgstr "Inbetriebnahmedatum:"
+
+msgid "Not Set (uses purchase date)"
+msgstr "Nicht gesetzt (verwendet Kaufdatum)"
+
+msgid "Indicative figure for IT asset management and budgeting — not a substitute for your accounting system."
+msgstr "Indikative Kennzahl für IT-Asset-Management und Budgetplanung — kein Ersatz für Ihr Buchhaltungssystem."
+
+msgid "(assets at or below this cost are immediately expensed)"
+msgstr "(Assets bis zu diesem Betrag werden sofort vollständig abgeschrieben)"
+
+msgid "GWG Threshold:"
+msgstr "GWG-Grenze:"

@@ -1,7 +1,7 @@
 from django import forms
 from django.urls import reverse
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, HTML
+from crispy_forms.layout import Layout, Submit, HTML, Row, Column, Field
 
 from ..models import Depreciation
 
@@ -9,10 +9,16 @@ from ..models import Depreciation
 class DepreciationForm(forms.ModelForm):
     class Meta:
         model = Depreciation
-        fields = ['name', 'months']
+        fields = ['name', 'months', 'method', 'convention', 'immediate_expense_threshold', 'description']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'months': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+            'method': forms.Select(attrs={'class': 'form-select'}),
+            'convention': forms.Select(attrs={'class': 'form-select'}),
+            'immediate_expense_threshold': forms.NumberInput(
+                attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}
+            ),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -26,9 +32,17 @@ class DepreciationForm(forms.ModelForm):
 
         self.helper.layout = Layout(
             'name',
-            'months',
+            Row(
+                Column('months', css_class='col-md-6'),
+                Column('method', css_class='col-md-6'),
+            ),
+            Row(
+                Column('convention', css_class='col-md-6'),
+                Column('immediate_expense_threshold', css_class='col-md-6'),
+            ),
+            Field('description'),
             HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
-            HTML('</div>')
+            HTML('</div>'),
         )

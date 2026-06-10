@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n money %}
 <dl class="row mb-0">
     <dt class="col-sm-3">{% translate "Asset:" %}</dt>
     <dd class="col-sm-9">
@@ -42,7 +42,7 @@
     <dt class="col-sm-3">{% translate "Cost:" %}</dt>
     <dd class="col-sm-9 text-secondary">
         {% if object.cost %}
-            ${{ object.cost|floatformat:2 }}
+            {{ object.cost|money:object }}
         {% else %}
             <span class="text-muted"><i>{% translate "No Cost Recorded" %}</i></span>
         {% endif %}

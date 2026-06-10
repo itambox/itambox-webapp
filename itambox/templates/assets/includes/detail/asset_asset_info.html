@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n money %}
 {# Panel: Asset core information (tag, serial, type, manufacturer, role, status, purchase info) #}
 <dl class="row mb-0">
     <dt class="col-sm-3">{% translate "Asset Tag:" %}</dt>
@@ -79,7 +79,7 @@
     <dt class="col-sm-3">{% translate "Purchase Cost:" %}</dt>
     <dd class="col-sm-9 text-secondary">
         {% if object.purchase_cost %}
-            ${{ object.purchase_cost|floatformat:2 }}
+            {{ object.purchase_cost|money:object }}
         {% else %}
             <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
         {% endif %}

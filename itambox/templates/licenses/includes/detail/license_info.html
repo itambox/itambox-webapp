@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n money %}
 {% load utility_tags %}
 
 <dl class="row mb-0">
@@ -45,7 +45,7 @@
     <dt class="col-sm-3">{% translate "Purchase Cost:" %}</dt>
     <dd class="col-sm-9 text-secondary">
         {% if object.purchase_cost %}
-            ${{ object.purchase_cost }}
+            {{ object.purchase_cost|money:object }}
         {% else %}
             <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
         {% endif %}

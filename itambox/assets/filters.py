@@ -242,16 +242,18 @@ class StatusLabelFilterSet(BaseFilterSet):
 
 class DepreciationFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(method='search', label='Search')
+    method = django_filters.ChoiceFilter(choices=Depreciation.Method.choices)
+    convention = django_filters.ChoiceFilter(choices=Depreciation.Convention.choices)
 
     class Meta:
         model = Depreciation
-        fields = ['name', 'months']
+        fields = ['name', 'months', 'method', 'convention']
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
         return queryset.filter(
-            Q(name__icontains=value)
+            Q(name__icontains=value) | Q(description__icontains=value)
         ).distinct()
 class SupplierFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(method='search', label='Search', widget=forms.TextInput(attrs={'placeholder': 'Name...'}))

@@ -328,12 +328,14 @@ class DepreciationTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('assets:depreciation_detail', args=[A('pk')], verbose_name='Name')
     months = tables.Column(verbose_name='Lifespan (Months)')
+    method = tables.Column(verbose_name='Method')
+    convention = tables.Column(verbose_name='Convention')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = Depreciation
-        fields = ('pk', 'name', 'months', 'actions')
-        default_columns = ('pk', 'name', 'months', 'actions')
+        fields = ('pk', 'name', 'months', 'method', 'convention', 'actions')
+        default_columns = ('pk', 'name', 'months', 'method', 'actions')
 
 
 

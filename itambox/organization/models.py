@@ -175,15 +175,30 @@ class Tenant(DeletableVaultModel, BookmarkableMixin):
     name = models.CharField(max_length=100)
     slug = models.SlugField(max_length=100)
     group = models.ForeignKey(
-        TenantGroup, # Reference the new TenantGroup model
-        on_delete=models.SET_NULL, # Or PROTECT
+        TenantGroup,
+        on_delete=models.SET_NULL,
         related_name='tenants',
         blank=True,
         null=True
     )
     description = models.TextField(blank=True)
-    comments = models.TextField(blank=True) # Added comments
+    comments = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', related_name="tenants", blank=True)
+    currency = models.CharField(
+        max_length=3,
+        default='EUR',
+        verbose_name=_("Display currency"),
+        help_text=_("ISO 4217 currency code used for value display (display only, no conversion)."),
+    )
+    default_depreciation = models.ForeignKey(
+        'assets.Depreciation',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='tenants_defaulting',
+        verbose_name=_("Default depreciation policy"),
+        help_text=_("Fallback policy applied to all assets that have no type-level schedule and no per-asset override."),
+    )
 
     class Meta:
         ordering = ['name']

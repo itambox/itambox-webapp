@@ -3,12 +3,29 @@
     <dt class="col-sm-3">{% translate "Name:" %}</dt>
     <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
 
-    <dt class="col-sm-3">{% translate "Rate:" %}</dt>
-    <dd class="col-sm-9">{{ object.rate }}%</dd>
+    <dt class="col-sm-3">{% translate "Lifespan:" %}</dt>
+    <dd class="col-sm-9">{{ object.months }} {% translate "months" %}</dd>
 
-    <dt class="col-sm-3">{% translate "Duration (months):" %}</dt>
-    <dd class="col-sm-9">{{ object.duration_months }}</dd>
+    <dt class="col-sm-3">{% translate "Method:" %}</dt>
+    <dd class="col-sm-9">{{ object.get_method_display }}</dd>
+
+    <dt class="col-sm-3">{% translate "Convention:" %}</dt>
+    <dd class="col-sm-9">{{ object.get_convention_display }}</dd>
+
+    {% if object.immediate_expense_threshold %}
+    <dt class="col-sm-3">{% translate "GWG Threshold:" %}</dt>
+    <dd class="col-sm-9">
+        {{ object.immediate_expense_threshold }}
+        <small class="text-muted">{% translate "(assets at or below this cost are immediately expensed)" %}</small>
+    </dd>
+    {% endif %}
 
     <dt class="col-sm-3">{% translate "Description:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{% if object.description %}{{object.description|linebreaksbr}}{% else %}<i>No description.</i>{% endif %}</dd>
+    <dd class="col-sm-9 text-secondary">
+        {% if object.description %}
+            {{ object.description|linebreaksbr }}
+        {% else %}
+            <i class="text-muted">{% translate "No description." %}</i>
+        {% endif %}
+    </dd>
 </dl>
