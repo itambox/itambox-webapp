@@ -70,3 +70,13 @@ node_modules/
 # Python package metadata
 *.egg-info/
 
+# Generated OpenAPI schema (regenerate with: manage.py spectacular --file schema.yaml)
+itambox/schema.yaml
+
+# Local-only HTTP settings override
+local_http_settings.py
+
+# Build artefacts
+build.log
+itambox/static/docs/
+
