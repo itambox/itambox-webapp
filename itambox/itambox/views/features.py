@@ -435,6 +435,7 @@ class WebhookEndpointListView(ObjectListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Webhook Endpoints'
+        context['is_beta_module'] = True
         return context
 
 
@@ -546,6 +547,7 @@ class EventRuleListView(ObjectListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Event Rules'
+        context['is_beta_module'] = True
         return context
 
 

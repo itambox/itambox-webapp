@@ -1,0 +1,25 @@
+{% load i18n %}
+{% if is_beta_module %}
+<div class="alert alert-warning border-0 rounded-0 border-bottom d-flex align-items-center justify-content-between mb-0 px-3 py-2"
+     id="beta-module-banner"
+     style="display:none!important">
+    <div class="d-flex align-items-center">
+        <i class="mdi mdi-flask-outline me-2 fs-3"></i>
+        <div>
+            {% blocktranslate %}This module is in <strong>Beta</strong>. The API and data model may change in future releases. Your feedback is welcome.{% endblocktranslate %}
+        </div>
+    </div>
+    <button type="button"
+            class="btn-close ms-3 flex-shrink-0"
+            aria-label="{% translate 'Dismiss' %}"
+            onclick="sessionStorage.setItem('beta_banner_dismissed','1');document.getElementById('beta-module-banner').remove()"></button>
+</div>
+<script>
+  (function(){
+    var el = document.getElementById('beta-module-banner');
+    if (el && !sessionStorage.getItem('beta_banner_dismissed')) {
+      el.style.removeProperty('display');
+    }
+  })();
+</script>
+{% endif %}

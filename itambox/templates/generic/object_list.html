@@ -77,6 +77,8 @@
             </div>
             {% endif %}
 
+            {% include "generic/includes/beta_banner.html" %}
+
             <div id="object-list-dynamic-content"
                  hx-get="{{ request.get_full_path }}"
                  hx-trigger="tableRefreshRequired from:body"

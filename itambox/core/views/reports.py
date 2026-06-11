@@ -38,6 +38,7 @@ class ReportTemplateListView(ObjectListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Report Templates'
+        context['is_beta_module'] = True
         return context
 
 
@@ -101,6 +102,7 @@ class ScheduledReportListView(ObjectListView):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Scheduled Reports'
         context['templates'] = ReportTemplate.objects.all()
+        context['is_beta_module'] = True
         return context
 
 

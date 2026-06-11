@@ -175,6 +175,9 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         context['model_name'] = _model._meta.model_name
         context['object_type'] = _model._meta.verbose_name
 
+        from core.features import module_maturity, BETA
+        context.setdefault('is_beta_module', module_maturity(_model._meta.app_label) == BETA)
+
         context.setdefault('title', _model._meta.verbose_name_plural)
 
         # Export/label template catalogs feed dropdowns that only exist on the

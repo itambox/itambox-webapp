@@ -158,6 +158,7 @@ SOFTWARE_MENU = Menu(
                 get_model_item('subscriptions', 'subscription', _('Subscriptions')),
                 get_model_item('subscriptions', 'provider', _('Providers')),
             ),
+            beta=True,
         ),
     ),
 )
@@ -168,6 +169,7 @@ OPERATIONS_MENU = Menu(
     groups=(
         MenuGroup(
             label=_('Procurement'),
+            beta=True,
             items=(
                 MenuItem(
                     link='procurement:purchaseorder_list',
@@ -291,6 +293,7 @@ MONITORING_MENU = Menu(
         ),
         MenuGroup(
             label=_('Reporting'),
+            beta=True,
             items=(
                 MenuItem(
                     link='scheduledreport_list',
@@ -388,6 +391,7 @@ EXTRAS_MENU = Menu(
         ),
         MenuGroup(
             label=_('Automation'),
+            beta=True,
             items=(
                 MenuItem(
                     link='webhookendpoint_list',
