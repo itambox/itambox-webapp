@@ -223,27 +223,30 @@ class Command(BaseCommand):
             obj, _ = Tag.objects.get_or_create(slug=slug, defaults={'name': name, 'color': color})
             self._tags[slug] = obj
 
-        # Asset roles
+        # Asset roles — (name, slug, color, desc, allows_components)
         self._asset_roles = {}
-        for name, slug, color, desc in [
-            ('Standard Workstation', 'standard-workstation', '007bff', 'Laptop/desktop for general office staff'),
-            ('Developer Workstation', 'developer-workstation', '6f42c1', 'High-performance workstation for engineers'),
-            ('Executive Workstation', 'executive-workstation', 'e83e8c', 'Premium device for executives'),
-            ('CAD/Design Workstation', 'cad-design-workstation', 'fd7e14', 'GPU workstation for CAD/3D'),
-            ('Lab / Cleanroom Terminal', 'lab-terminal', 'adb5bd', 'Restricted terminal for lab or production-floor use'),
-            ('Field Tablet', 'field-tablet', '20c997', 'Ruggedized tablet for field/warehouse work'),
-            ('Corporate Smartphone', 'corporate-smartphone', 'fd7e14', 'Company smartphone for voice/chat/MFA'),
-            ('Virtualization Host', 'virtualization-host-server', 'dc3545', 'Hypervisor host (ESXi/Proxmox/Hyper-V)'),
-            ('Database Server', 'database-server', '17a2b8', 'Production database host'),
-            ('Application Server', 'application-server', '20c997', 'Line-of-business application host'),
-            ('Backup / Storage', 'backup-server', 'fd7e14', 'Backup target or NAS'),
-            ('Core Router / Firewall', 'core-router-firewall', 'dc3545', 'Edge security gateway'),
-            ('Access / Distribution Switch', 'access-switch', '0d6efd', 'Network switch'),
-            ('Wireless Access Point', 'wireless-ap', '20c997', 'Enterprise WiFi access point'),
-            ('Conference Room AV', 'conference-av', 'e83e8c', 'Meeting-room camera/audio hub'),
-            ('Desktop Monitor', 'desktop-monitor', '6f42c1', 'External display'),
+        for name, slug, color, desc, allows_comp in [
+            ('Standard Workstation', 'standard-workstation', '007bff', 'Laptop/desktop for general office staff', True),
+            ('Developer Workstation', 'developer-workstation', '6f42c1', 'High-performance workstation for engineers', True),
+            ('Executive Workstation', 'executive-workstation', 'e83e8c', 'Premium device for executives', True),
+            ('CAD/Design Workstation', 'cad-design-workstation', 'fd7e14', 'GPU workstation for CAD/3D', True),
+            ('Lab / Cleanroom Terminal', 'lab-terminal', 'adb5bd', 'Restricted terminal for lab or production-floor use', False),
+            ('Field Tablet', 'field-tablet', '20c997', 'Ruggedized tablet for field/warehouse work', False),
+            ('Corporate Smartphone', 'corporate-smartphone', 'fd7e14', 'Company smartphone for voice/chat/MFA', False),
+            ('Virtualization Host', 'virtualization-host-server', 'dc3545', 'Hypervisor host (ESXi/Proxmox/Hyper-V)', True),
+            ('Database Server', 'database-server', '17a2b8', 'Production database host', True),
+            ('Application Server', 'application-server', '20c997', 'Line-of-business application host', True),
+            ('Backup / Storage', 'backup-server', 'fd7e14', 'Backup target or NAS', True),
+            ('Core Router / Firewall', 'core-router-firewall', 'dc3545', 'Edge security gateway', False),
+            ('Access / Distribution Switch', 'access-switch', '0d6efd', 'Network switch', False),
+            ('Wireless Access Point', 'wireless-ap', '20c997', 'Enterprise WiFi access point', False),
+            ('Conference Room AV', 'conference-av', 'e83e8c', 'Meeting-room camera/audio hub', False),
+            ('Desktop Monitor', 'desktop-monitor', '6f42c1', 'External display', False),
         ]:
-            obj, _ = AssetRole.objects.get_or_create(slug=slug, defaults={'name': name, 'color': color, 'description': desc})
+            obj, _ = AssetRole.objects.get_or_create(
+                slug=slug,
+                defaults={'name': name, 'color': color, 'description': desc, 'allows_components': allows_comp},
+            )
             self._asset_roles[slug] = obj
 
         # Manufacturers

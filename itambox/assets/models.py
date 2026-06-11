@@ -80,8 +80,11 @@ class AssetRole(StandardModel, SoftDeleteMixin):
     name = models.CharField(max_length=100)
     slug = models.SlugField(max_length=100)
     description = models.TextField(blank=True)
-    # Add new fields
     color = models.CharField(max_length=6, blank=True, help_text="RGB color in hexadecimal (e.g. 00ff00)")
+    allows_components = models.BooleanField(
+        default=False,
+        help_text=_("Assets with this role can have components allocated (servers, workstations, …)"),
+    )
     tags = models.ManyToManyField(
         to='extras.Tag',
         related_name='asset_roles',
@@ -456,10 +459,7 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
     def is_modular(self):
         if self.component_allocations.filter(deleted_at__isnull=True).exists():
             return True
-        if self.asset_role:
-            role_slug = self.asset_role.slug.lower()
-            return 'server' in role_slug or 'modular' in role_slug or 'workstation' in role_slug or 'hypervisor' in role_slug
-        return False
+        return bool(self.asset_role and self.asset_role.allows_components)
 
     @property
     def active_assignment(self):

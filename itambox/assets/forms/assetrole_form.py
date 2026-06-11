@@ -10,7 +10,7 @@ from ..models import AssetRole
 class AssetRoleForm(ColorFieldFormMixin, forms.ModelForm):
     class Meta:
         model = AssetRole
-        fields = ['name', 'slug', 'description', 'color', 'tags']
+        fields = ['name', 'slug', 'description', 'color', 'allows_components', 'tags']
 
     color = forms.CharField(
         max_length=7,
@@ -34,6 +34,7 @@ class AssetRoleForm(ColorFieldFormMixin, forms.ModelForm):
                 'slug',
                 'description',
                 'color',
+                'allows_components',
                 'tags'
             ),
             Row(
