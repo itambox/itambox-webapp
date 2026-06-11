@@ -104,6 +104,7 @@ nav:
   - Integrations & API:
       - Developer Guide: 'integration/developer_guide.md'
       - Bulk CSV Import Guide: 'integration/bulk_import_guide.md'
+      - Migrate from Snipe-IT: 'integration/migrate-from-snipe-it.md'
   - Plugin Development:
       - Getting Started: 'plugins/getting_started.md'
       - API Reference: 'plugins/api_reference.md'
