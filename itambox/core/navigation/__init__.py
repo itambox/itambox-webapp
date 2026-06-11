@@ -67,6 +67,7 @@ class MenuGroup:
 
     label: str
     items: Sequence[MenuItem]
+    beta: bool = False
 
 
 @dataclass
