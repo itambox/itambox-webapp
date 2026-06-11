@@ -192,25 +192,10 @@ class EventRuleForm(forms.ModelForm):
 class LabelTemplateForm(forms.ModelForm):
     class Meta:
         model = LabelTemplate
-        fields = ['name', 'description', 'page_width', 'page_height', 'barcode_format', 'template_code', 'printer_settings']
+        fields = ['name', 'description', 'page_width', 'page_height', 'barcode_format', 'template_code']
         widgets = {
             'template_code': forms.Textarea(attrs={'rows': 10}),
-            'printer_settings': forms.Textarea(attrs={'rows': 4}),
         }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self.instance and self.instance.printer_settings:
-            self.initial['printer_settings'] = json.dumps(self.instance.printer_settings, indent=2)
-
-    def clean_printer_settings(self):
-        data = self.cleaned_data['printer_settings']
-        if isinstance(data, str):
-            try:
-                return json.loads(data)
-            except json.JSONDecodeError:
-                raise forms.ValidationError('Printer settings must be valid JSON.')
-        return data
 
 
 class ConfirmationForm(forms.Form):

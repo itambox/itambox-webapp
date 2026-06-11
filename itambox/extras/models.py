@@ -470,7 +470,6 @@ class LabelTemplate(ChangeLoggingMixin, BaseModel):
         ('datamatrix', 'Data Matrix'),
     ])
     template_code = models.TextField(blank=True, help_text="Jinja2/HTML template for label layout")
-    printer_settings = models.JSONField(default=dict, blank=True)
 
     class Meta:
         ordering = ['name']
