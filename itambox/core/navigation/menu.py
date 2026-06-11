@@ -260,32 +260,32 @@ MONITORING_MENU = Menu(
                 MenuItem(
                     link='alertlog_list',
                     link_text=_('Alerts Center'),
-                    permissions=['core.view_alertlog'],
+                    permissions=['extras.view_alertlog'],
                     buttons=(),
                 ),
                 MenuItem(
                     link='alertrule_list',
                     link_text=_('Alert Rules'),
-                    permissions=['core.view_alertrule'],
+                    permissions=['extras.view_alertrule'],
                     buttons=(
                         MenuItemButton(
                             link='alertrule_add',
                             title='Add',
                             icon_class='mdi mdi-plus-thick',
-                            permissions=['core.add_alertrule'],
+                            permissions=['extras.add_alertrule'],
                         ),
                     ),
                 ),
                 MenuItem(
                     link='notificationchannel_list',
                     link_text=_('Notification Channels'),
-                    permissions=['core.view_notificationchannel'],
+                    permissions=['extras.view_notificationchannel'],
                     buttons=(
                         MenuItemButton(
                             link='notificationchannel_add',
                             title='Add',
                             icon_class='mdi mdi-plus-thick',
-                            permissions=['core.add_notificationchannel'],
+                            permissions=['extras.add_notificationchannel'],
                         ),
                     ),
                 ),
@@ -298,13 +298,13 @@ MONITORING_MENU = Menu(
                 MenuItem(
                     link='scheduledreport_list',
                     link_text=_('Scheduled Reports'),
-                    permissions=['core.view_scheduledreport'],
+                    permissions=['extras.view_scheduledreport'],
                     buttons=(),
                 ),
                 MenuItem(
                     link='reporttemplate_list',
                     link_text=_('Report Templates'),
-                    permissions=['core.view_reporttemplate'],
+                    permissions=['extras.view_reporttemplate'],
                     buttons=(),
                 ),
             ),
@@ -378,13 +378,13 @@ EXTRAS_MENU = Menu(
                 MenuItem(
                     link='export_template_list',
                     link_text=_('Export Templates'),
-                    permissions=['core.view_exporttemplate'],
+                    permissions=['extras.view_exporttemplate'],
                     buttons=(),
                 ),
                 MenuItem(
                     link='labeltemplate_list',
                     link_text=_('Label Templates'),
-                    permissions=['core.view_labeltemplate'],
+                    permissions=['extras.view_labeltemplate'],
                     buttons=(),
                 ),
             ),
@@ -396,13 +396,13 @@ EXTRAS_MENU = Menu(
                 MenuItem(
                     link='webhookendpoint_list',
                     link_text=_('Webhook Endpoints'),
-                    permissions=['core.view_webhookendpoint'],
+                    permissions=['extras.view_webhookendpoint'],
                     buttons=(),
                 ),
                 MenuItem(
                     link='eventrule_list',
                     link_text=_('Event Rules'),
-                    permissions=['core.view_eventrule'],
+                    permissions=['extras.view_eventrule'],
                     buttons=(),
                 ),
             ),

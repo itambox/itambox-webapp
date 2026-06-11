@@ -219,7 +219,7 @@ class ScheduledReportDeleteView(ObjectDeleteView):
 
 @method_decorator(login_required, name='dispatch')
 class ReportTriggerImmediateView(PermissionRequiredMixin, LoginRequiredMixin, View):
-    permission_required = ('core.view_scheduledreport',)
+    permission_required = ('extras.view_scheduledreport',)
 
     def has_permission(self):
         perms = self.get_permission_required()
@@ -248,7 +248,7 @@ class ReportTriggerImmediateView(PermissionRequiredMixin, LoginRequiredMixin, Vi
 
 @method_decorator(login_required, name='dispatch')
 class ReportTemplatePreviewView(PermissionRequiredMixin, View):
-    permission_required = ('core.view_reporttemplate',)
+    permission_required = ('extras.view_reporttemplate',)
     def post(self, request, *args, **kwargs):
         report_type = request.POST.get('report_type')
         style_preset = request.POST.get('style_preset', 'default')
@@ -329,7 +329,7 @@ class ReportTemplatePreviewView(PermissionRequiredMixin, View):
 
 @method_decorator(login_required, name='dispatch')
 class ReportTemplateDownloadView(PermissionRequiredMixin, LoginRequiredMixin, View):
-    permission_required = ('core.view_reporttemplate',)
+    permission_required = ('extras.view_reporttemplate',)
 
     def has_permission(self):
         perms = self.get_permission_required()

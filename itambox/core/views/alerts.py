@@ -94,7 +94,7 @@ class AlertRuleRunNowView(SimplePostView):
     would contaminate the request's context for the remainder of the response.
     """
     queryset = AlertRule.objects.all()
-    permission_required = ('core.change_alertrule',)
+    permission_required = ('extras.change_alertrule',)
 
     def perform_action(self, rule, request):
         from django_q.tasks import async_task
@@ -143,7 +143,7 @@ class AlertLogListView(ObjectListView):
 
 class AlertAcknowledgeView(SimplePostView):
     queryset = AlertLog.objects.all()
-    permission_required = ('core.change_alertlog',)
+    permission_required = ('extras.change_alertlog',)
 
     def perform_action(self, alert, request):
         if alert.status == AlertLog.STATUS_ACTIVE:
@@ -160,7 +160,7 @@ class AlertAcknowledgeView(SimplePostView):
 
 class AlertResolveView(SimplePostView):
     queryset = AlertLog.objects.all()
-    permission_required = ('core.change_alertlog',)
+    permission_required = ('extras.change_alertlog',)
 
     def perform_action(self, alert, request):
         if alert.status in [AlertLog.STATUS_ACTIVE, AlertLog.STATUS_ACKNOWLEDGED]:
@@ -183,7 +183,7 @@ class _BulkAlertActionView(LoginRequiredMixin, PermissionRequiredMixin, View):
     eligible logs. Tenant-scoped: AlertLog.objects only exposes the current
     tenant's logs, so a user can never act on another tenant's alerts.
     """
-    permission_required = ('core.change_alertlog',)
+    permission_required = ('extras.change_alertlog',)
     hx_trigger = 'tableRefreshRequired'
     eligible_statuses = ()
 
@@ -294,7 +294,7 @@ class NotificationChannelDeleteView(ObjectDeleteView):
 class NotificationChannelTestView(SimplePostView):
     """Send a test notification through a channel and report success/failure inline."""
     queryset = NotificationChannel.objects.all()
-    permission_required = ('core.change_notificationchannel',)
+    permission_required = ('extras.change_notificationchannel',)
 
     def perform_action(self, channel, request):
         from core.events import send_notification_to_channel

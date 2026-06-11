@@ -319,7 +319,7 @@ class TenantRoleSecurityTests(TestCase):
         alert_admin_role = TenantRole.objects.create(
             tenant=self.tenant_a,
             name="Alert Admin",
-            permissions=["core.change_alertlog"]
+            permissions=["extras.change_alertlog"]
         )
         membership_a = TenantMembership.objects.create(
             user=self.user_a,
@@ -383,7 +383,7 @@ class TenantRoleSecurityTests(TestCase):
         report_admin_role = TenantRole.objects.create(
             tenant=self.tenant_a,
             name="Report Admin",
-            permissions=["core.view_reporttemplate", "core.view_scheduledreport"]
+            permissions=["extras.view_reporttemplate", "extras.view_scheduledreport"]
         )
         membership_a = TenantMembership.objects.create(
             user=self.user_a,
@@ -429,3 +429,103 @@ class TenantRoleSecurityTests(TestCase):
         
         response = self.client.post(trigger_url)
         self.assertEqual(response.status_code, 403) # Forbidden
+
+    def test_extras_perms_not_injected_as_strings(self):
+        """Regression: permission strings must match real auth.Permission app_label.
+
+        Builds roles from real auth.Permission rows (app_label='extras') rather than
+        injecting literal strings — catches any future drift between model location and
+        perm-string constants in views / MATRIX_MODELS.
+        """
+        from django.contrib.auth.models import Permission
+        from django.urls import reverse
+
+        MOVED_MODELS = [
+            'alertrule', 'alertlog', 'notificationchannel',
+            'reporttemplate', 'scheduledreport', 'exporttemplate',
+            'webhookendpoint', 'eventrule', 'labeltemplate',
+        ]
+
+        # Assert every perm for these models lives under app_label='extras', not 'core'.
+        for model_name in MOVED_MODELS:
+            core_perms = Permission.objects.filter(
+                content_type__app_label='core',
+                content_type__model=model_name,
+            )
+            self.assertFalse(
+                core_perms.exists(),
+                f"Permission for {model_name} still has app_label='core' — model not fully moved to extras"
+            )
+            extras_perms = Permission.objects.filter(
+                content_type__app_label='extras',
+                content_type__model=model_name,
+            )
+            self.assertTrue(
+                extras_perms.exists(),
+                f"No extras.* permission found for {model_name}"
+            )
+
+        # Build perm strings from real Permission rows — no literal injection.
+        change_alertlog_perm = Permission.objects.get(
+            content_type__app_label='extras',
+            content_type__model='alertlog',
+            codename='change_alertlog',
+        )
+        change_alertlog_str = f"{change_alertlog_perm.content_type.app_label}.{change_alertlog_perm.codename}"
+
+        view_reporttemplate_perm = Permission.objects.get(
+            content_type__app_label='extras',
+            content_type__model='reporttemplate',
+            codename='view_reporttemplate',
+        )
+        view_reporttemplate_str = f"{view_reporttemplate_perm.content_type.app_label}.{view_reporttemplate_perm.codename}"
+
+        # Create role with real-sourced perm strings and verify auth backend accepts them.
+        role = TenantRole.objects.create(
+            tenant=self.tenant_a,
+            name="Extras Regression Role",
+            permissions=[change_alertlog_str, view_reporttemplate_str],
+        )
+        membership = TenantMembership.objects.create(
+            user=self.user_a,
+            tenant=self.tenant_a,
+            role=role,
+        )
+        set_current_tenant(self.tenant_a)
+        set_current_membership(membership)
+        self.assertTrue(
+            self.user_a.has_perm(change_alertlog_str),
+            f"user_a should have {change_alertlog_str} via TenantMembershipBackend",
+        )
+        self.assertTrue(
+            self.user_a.has_perm(view_reporttemplate_str),
+            f"user_a should have {view_reporttemplate_str} via TenantMembershipBackend",
+        )
+
+        # Verify role form initial values pre-check the right boxes for an edited role.
+        form = TenantRoleForm(instance=role, tenant=self.tenant_a)
+        self.assertTrue(
+            form.fields['perm_alertlog_edit'].initial,
+            "Role form should pre-check alertlog edit for a role carrying extras.change_alertlog",
+        )
+        self.assertTrue(
+            form.fields['perm_reporttemplate_read'].initial,
+            "Role form should pre-check reporttemplate read for a role carrying extras.view_reporttemplate",
+        )
+
+        # Verify form save round-trip: checking the matrix boxes generates extras.* strings.
+        form_data = {
+            'name': 'Extras Regression Role',
+            'perm_alertlog_edit': True,
+            'perm_reporttemplate_read': True,
+        }
+        form2 = TenantRoleForm(
+            data=form_data,
+            instance=role,
+            tenant=self.tenant_a,
+            user=self.super_user,
+        )
+        self.assertTrue(form2.is_valid(), f"Form errors: {form2.errors}")
+        saved = form2.save()
+        self.assertIn(change_alertlog_str, saved.permissions)
+        self.assertIn(view_reporttemplate_str, saved.permissions)
