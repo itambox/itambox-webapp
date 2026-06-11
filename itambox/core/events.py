@@ -6,7 +6,7 @@ import logging
 import requests
 from django.contrib.contenttypes.models import ContentType
 
-from core.models import ChangeLoggingMixin, Job
+from core.models import ChangeLoggingMixin
 from extras.models import Event, EventRule, NotificationChannel
 
 logger = logging.getLogger(__name__)
@@ -121,8 +121,8 @@ def _execute_event_action(rule, event):
         _send_webhook(rule, event)
     elif rule.action_type == EventRule.ACTION_NOTIFICATION:
         _send_notification(rule, event)
-    elif rule.action_type == EventRule.ACTION_SCRIPT:
-        _run_script_job(rule, event)
+    # 'script' action_type was removed; existing rows are silently skipped.
+    # Scripts may return as a proper plugin hook post-1.0.
 
 
 def _send_webhook(rule, event):
@@ -205,25 +205,6 @@ def _send_notification(rule, event):
         message=body,
         level=level,
         target_url=target_url,
-    )
-
-
-def _run_script_job(rule, event):
-    """Create a background job to run a custom script."""
-
-    config = rule.action_config or {}
-    script_name = config.get('script', 'unknown')
-
-    Job.objects.create(
-        name=f"Script: {script_name}",
-        model=event.model,
-        object_id=event.object_id,
-        status=Job.STATUS_PENDING,
-        data={
-            'script': script_name,
-            'event_action': event.action,
-            'event_data': event.data,
-        },
     )
 
 

@@ -222,12 +222,10 @@ class Event(ChangeLoggingMixin, BaseModel):
 class EventRule(ChangeLoggingMixin, BaseModel):
     ACTION_WEBHOOK = 'webhook'
     ACTION_NOTIFICATION = 'notification'
-    ACTION_SCRIPT = 'script'
 
     ACTION_TYPE_CHOICES = [
         (ACTION_WEBHOOK, 'Webhook'),
         (ACTION_NOTIFICATION, 'Notification'),
-        (ACTION_SCRIPT, 'Script'),
     ]
 
     name = models.CharField(max_length=255)

@@ -7,7 +7,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core import mail
 from django.db import transaction
 
-from core.models import Job, Notification
+from core.models import Notification
 from extras.models import NotificationChannel
 from extras.models import Event, EventRule
 from core.events import dispatch_event, send_notification_to_channel
@@ -128,30 +128,26 @@ class EventsSystemTestCase(TransactionTestCase):
         ).hexdigest()
         self.assertEqual(headers['X-Hub-Signature-256'], f'sha256={expected_sig}')
 
-    def test_script_job_action(self):
-        rule = EventRule.objects.create(
-            name="Test Script Rule",
+    def test_legacy_script_rule_does_not_crash(self):
+        # Rows with action_type='script' may exist in the DB from before the action was
+        # removed. They must be silently skipped without raising.
+        EventRule.objects.filter(pk__gt=0).delete()
+        EventRule.objects.create(
+            name="Legacy Script Rule",
             model=self.manufacturer_ct,
             events=['update'],
-            action_type=EventRule.ACTION_SCRIPT,
-            action_config={'script': 'my_custom_script.py'},
-            enabled=True
+            action_type='script',  # no longer a valid choice, but old rows may exist
+            action_config={'script': 'legacy.py'},
+            enabled=True,
         )
-
-        event = Event.objects.create(
-            model=self.manufacturer_ct,
-            object_id=202,
-            action='update',
-            data={'app_label': 'assets', 'model_name': 'manufacturer'},
-        )
-
-        dispatch_event(Manufacturer, event, 'update')
-
-        # Check job created
-        job = Job.objects.filter(name="Script: my_custom_script.py").first()
-        self.assertIsNotNone(job)
-        self.assertEqual(job.status, Job.STATUS_PENDING)
-        self.assertEqual(job.data['event_action'], 'update')
+        mfr = Manufacturer.objects.create(name="LegacyTest", slug="legacy-test-mfr")
+        # Must not raise; dispatch_event creates and processes a new Event.
+        dispatch_event(Manufacturer, mfr, 'update')
+        dispatched = Event.objects.filter(
+            model=self.manufacturer_ct, object_id=mfr.pk, action='update'
+        ).order_by('-pk').first()
+        self.assertIsNotNone(dispatched)
+        self.assertTrue(dispatched.processed)
 
     @patch('requests.post')
     def test_notification_channels(self, mock_post):
