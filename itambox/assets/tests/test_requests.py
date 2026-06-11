@@ -1098,5 +1098,48 @@ class RequisitionSystemTestCase(TestCase):
         self.assertEqual(response.status_code, 200) # Returns form with validation errors
         self.assertContains(response, "Asset with this serial number already exists.")
 
+    def test_bulk_receive_blank_order_number_succeeds(self):
+        """Regression: blank order_number (required=False in form) must store '' not NULL."""
+        self.client.login(username='adminuser', password='password123')
+
+        req = AssetRequest.objects.create(
+            requester=self.requester_user,
+            asset_type=self.type_requestable,
+            status=AssetRequest.STATUS_APPROVED,
+            tenant=self.tenant,
+        )
+        status = StatusLabel.objects.filter(type='deployable').first()
+        supplier = Supplier.objects.create(name="Blank Order Supplier", slug="blank-order-supplier")
+
+        dummy = Asset(tenant=self.tenant, asset_type=self.type_requestable)
+        seq = AssetTagSequence.resolve_sequence_for_asset(dummy)
+        next_tag = f"{seq.prefix}{seq.next_value:0{seq.zero_padding}d}"
+
+        formset_data = {
+            'form-TOTAL_FORMS': 1,
+            'form-INITIAL_FORMS': 0,
+            'form-MIN_NUM_FORMS': 0,
+            'form-MAX_NUM_FORMS': 1000,
+            'form-0-request_id': req.pk,
+            'form-0-asset_tag': next_tag,
+            'form-0-serial_number': 'BLANK-ORDER-SN-001',
+            'form-0-name': 'Blank Order Test',
+            'form-0-status': status.pk,
+            'form-0-location': self.location.pk,
+            'form-0-supplier': supplier.pk,
+            'form-0-order_number': '',     # optional field — must store '' not raise IntegrityError
+            'form-0-purchase_cost': '999.00',
+            'form-0-purchase_date': '2026-06-11',
+            'form-0-warranty_expiration': '',
+            'submit': 'Receive & Allocate Stock',
+        }
+        bulk_url = reverse('assets:request_bulk_receive')
+        response = self.client.post(bulk_url, data=formset_data)
+        self.assertEqual(response.status_code, 302, f"Expected redirect on success; got {response.status_code}")
+
+        req.refresh_from_db()
+        self.assertIsNotNone(req.asset)
+        self.assertEqual(req.asset.order_number, '')
+
 
 

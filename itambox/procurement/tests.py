@@ -260,6 +260,28 @@ class ProcurementStatusTransitionTests(TestCase):
         # It should redirect to absolute URL on success
         self.assertEqual(response.status_code, 302)
 
+    def test_receive_po_with_blank_serial_stores_empty_string(self):
+        """Regression: blank serial_number must store '' not NULL (IntegrityError guard)."""
+        from assets.models import StatusLabel
+        StatusLabel.objects.get_or_create(name='Deployable', type='deployable', slug='deployable')
+
+        line = PurchaseOrderLine.objects.create(
+            purchase_order=self.po,
+            asset_type=self.asset_type,
+            qty_ordered=1,
+            unit_price=99.00
+        )
+        from procurement.services import approve_purchase_order, order_purchase_order, receive_purchase_order
+        approve_purchase_order(self.po)
+        order_purchase_order(self.po)
+
+        # Blank serial — the form allows "Optional" and must not IntegrityError.
+        receive_purchase_order(self.po, {line.pk: 1}, asset_details=[{'line_id': line.pk, 'serial_number': '', 'asset_tag': '', 'name': 'Test Asset'}])
+
+        from assets.models import Asset
+        asset = Asset.objects.get(purchase_order_line=line)
+        self.assertEqual(asset.serial_number, '', "Blank serial should be stored as '' not NULL")
+
     def test_line_edit_view_get_returns_editing_line_id(self):
         line = PurchaseOrderLine.objects.create(
             purchase_order=self.po,
