@@ -167,3 +167,64 @@ class ScanResolveViewTests(TenantTestMixin, TestCase):
         if resp.status_code == 200:
             data = json.loads(resp.content)
             self.assertFalse(data.get("found"))
+
+    def test_no_active_tenant_returns_404_no_leak(self):
+        """User authenticated but no active tenant → fail closed (404), no cross-tenant data."""
+        # Log in without setting active_tenant_id in session — TenantMiddleware leaves tenant None.
+        no_tenant_user = User.objects.create_user(
+            username="notenant", email="notenant@example.com", password="password"
+        )
+        self.client.force_login(no_tenant_user)
+        # Deliberately omit session['active_tenant_id'] so TenantMiddleware finds no tenant.
+        resp = self.client.get(self.url, {"code": "SCAN-001"})
+        self.assertEqual(resp.status_code, 404)
+        data = json.loads(resp.content)
+        self.assertFalse(data.get("found"))
+
+    def test_member_without_view_asset_gets_403(self):
+        """Member with no assets.view_asset permission is denied."""
+        # tenant_user has empty permissions (setup_tenant_context default).
+        self.client_login_to_tenant(self.tenant_user, self.tenant)
+        resp = self.client.get(self.url, {"code": "SCAN-001"})
+        self.assertEqual(resp.status_code, 403)
+        data = json.loads(resp.content)
+        self.assertFalse(data.get("found"))
+
+    def test_member_with_view_asset_sees_own_tenant_not_other(self):
+        """Member with view_asset resolves own-tenant asset and gets 404 for other tenant's tag."""
+        from assets.models import Manufacturer, AssetRole, StatusLabel, AssetType
+
+        # Give tenant_user the view_asset permission.
+        self.tenant_role.permissions = ["assets.view_asset"]
+        self.tenant_role.save()
+
+        # Reuse the type / role / status already created in setUp (avoid unique-constraint clash).
+        existing_atype = AssetType.objects.filter(slug="test-model").first()
+        existing_role = AssetRole.objects.filter(slug="testrole").first()
+        existing_status = StatusLabel.objects.filter(slug="active-scan-test").first()
+
+        # Create an asset in a second tenant.
+        other_tenant = Tenant.objects.create(name="OtherTenant", slug="other-tenant-scan")
+        other_asset = Asset.objects.create(
+            name="Other Tenant Asset",
+            asset_tag="OTHER-999",
+            serial_number="SN-OTHER-999",
+            asset_type=existing_atype,
+            asset_role=existing_role,
+            status=existing_status,
+            tenant=other_tenant,
+        )
+
+        self.client_login_to_tenant(self.tenant_user, self.tenant)
+
+        # Own-tenant asset — should be found.
+        resp = self.client.get(self.url, {"code": "SCAN-001"})
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertTrue(data["found"])
+
+        # Other tenant's asset — must NOT be visible.
+        resp2 = self.client.get(self.url, {"code": "OTHER-999"})
+        self.assertIn(resp2.status_code, (404, 403))
+        data2 = json.loads(resp2.content)
+        self.assertFalse(data2.get("found"))
