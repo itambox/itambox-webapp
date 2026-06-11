@@ -233,14 +233,35 @@ function initGlobalScanner(): void {
 function showGlobalScanToast(message: string): void {
   const container = document.getElementById('django-messages');
   if (!container) return;
+
   const toast = document.createElement('div');
   toast.className = 'toast show align-items-center text-bg-warning border-0 mb-2';
   toast.setAttribute('role', 'alert');
-  toast.innerHTML = `
-    <div class="d-flex">
-      <div class="toast-body"><i class="mdi mdi-barcode-off me-2"></i>${message}</div>
-      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-    </div>`;
+
+  const row = document.createElement('div');
+  row.className = 'd-flex';
+
+  const body = document.createElement('div');
+  body.className = 'toast-body';
+
+  const icon = document.createElement('i');
+  icon.className = 'mdi mdi-barcode-off me-2';
+
+  // Use textContent so scanned codes cannot inject markup.
+  const text = document.createElement('span');
+  text.textContent = message;
+
+  body.appendChild(icon);
+  body.appendChild(text);
+
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'btn-close btn-close-white me-2 m-auto';
+  closeBtn.setAttribute('data-bs-dismiss', 'toast');
+
+  row.appendChild(body);
+  row.appendChild(closeBtn);
+  toast.appendChild(row);
   container.appendChild(toast);
   setTimeout(() => toast.remove(), 4000);
 }
