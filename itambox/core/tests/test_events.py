@@ -198,3 +198,71 @@ class EventsSystemTestCase(TransactionTestCase):
         self.assertGreater(Notification.objects.count(), initial_count)
         notif = Notification.objects.filter(user=staff_user).latest('pk')
         self.assertEqual(notif.subject, "Subject In-App")
+
+
+class WebhookRetryTestCase(TransactionTestCase):
+    """send_webhook_task retry behaviour."""
+
+    BASE_KWARGS = dict(
+        url='https://example.com/hook',
+        method='POST',
+        headers={},
+        secret='',
+        event_action='create',
+        event_model_app_label='assets',
+        event_model_name='manufacturer',
+        event_object_id=1,
+        event_timestamp_iso='2024-01-01T00:00:00+00:00',
+        event_data={},
+    )
+
+    @patch('core.tasks.webhooks.requests.request')
+    @patch('core.tasks.webhooks.async_task')
+    def test_5xx_retries(self, mock_async, mock_request):
+        from core.tasks.webhooks import send_webhook_task
+        resp = MagicMock(status_code=503)
+        resp.raise_for_status.side_effect = __import__('requests').HTTPError(response=resp)
+        mock_request.return_value = resp
+
+        send_webhook_task(**self.BASE_KWARGS, retry_count=2, retry_backoff=0)
+
+        mock_async.assert_called_once()
+        _, kw = mock_async.call_args
+        self.assertEqual(kw['attempt'], 1)
+        self.assertEqual(kw['retry_count'], 2)
+
+    @patch('core.tasks.webhooks.requests.request')
+    @patch('core.tasks.webhooks.async_task')
+    def test_5xx_gives_up_after_max_attempts(self, mock_async, mock_request):
+        from core.tasks.webhooks import send_webhook_task
+        resp = MagicMock(status_code=503)
+        resp.raise_for_status.side_effect = __import__('requests').HTTPError(response=resp)
+        mock_request.return_value = resp
+
+        send_webhook_task(**self.BASE_KWARGS, attempt=2, retry_count=2)
+
+        mock_async.assert_not_called()
+
+    @patch('core.tasks.webhooks.requests.request')
+    @patch('core.tasks.webhooks.async_task')
+    def test_4xx_does_not_retry(self, mock_async, mock_request):
+        from core.tasks.webhooks import send_webhook_task
+        resp = MagicMock(status_code=422)
+        resp.raise_for_status.return_value = None
+        mock_request.return_value = resp
+
+        send_webhook_task(**self.BASE_KWARGS, retry_count=3)
+
+        mock_async.assert_not_called()
+
+    @patch('core.tasks.webhooks.requests.request')
+    @patch('core.tasks.webhooks.async_task')
+    def test_2xx_no_retry(self, mock_async, mock_request):
+        from core.tasks.webhooks import send_webhook_task
+        resp = MagicMock(status_code=200)
+        resp.raise_for_status.return_value = None
+        mock_request.return_value = resp
+
+        send_webhook_task(**self.BASE_KWARGS, retry_count=3)
+
+        mock_async.assert_not_called()

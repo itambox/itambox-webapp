@@ -7,7 +7,7 @@ import requests
 from django.contrib.contenttypes.models import ContentType
 
 from core.models import ChangeLoggingMixin
-from extras.models import Event, EventRule, NotificationChannel
+from extras.models import Event, EventRule, NotificationChannel, WebhookEndpoint
 
 logger = logging.getLogger(__name__)
 
@@ -137,40 +137,31 @@ def _send_webhook(rule, event):
     headers = config.get('headers', {})
     secret = config.get('secret', '')
 
+    # Pull retry settings from the matching WebhookEndpoint if one is registered for this URL.
+    endpoint = WebhookEndpoint.objects.filter(url=url, enabled=True).first()
+    retry_count = endpoint.retry_count if endpoint else 3
+    retry_backoff = endpoint.retry_backoff if endpoint else 60
+
     from django_q.tasks import async_task
     from django.db import transaction
     from django.conf import settings
 
+    task_kwargs = dict(
+        url=url, method=method, headers=headers, secret=secret,
+        event_action=event.action,
+        event_model_app_label=event.model.app_label,
+        event_model_name=event.model.model,
+        event_object_id=event.object_id,
+        event_timestamp_iso=event.timestamp.isoformat(),
+        event_data=event.data,
+        retry_count=retry_count,
+        retry_backoff=retry_backoff,
+    )
+
     if getattr(settings, 'Q_CLUSTER', {}).get('sync', False):
-        async_task(
-            'core.tasks.send_webhook_task',
-            url=url,
-            method=method,
-            headers=headers,
-            secret=secret,
-            event_action=event.action,
-            event_model_app_label=event.model.app_label,
-            event_model_name=event.model.model,
-            event_object_id=event.object_id,
-            event_timestamp_iso=event.timestamp.isoformat(),
-            event_data=event.data,
-        )
+        async_task('core.tasks.send_webhook_task', **task_kwargs)
     else:
-        transaction.on_commit(
-            lambda: async_task(
-                'core.tasks.send_webhook_task',
-                url=url,
-                method=method,
-                headers=headers,
-                secret=secret,
-                event_action=event.action,
-                event_model_app_label=event.model.app_label,
-                event_model_name=event.model.model,
-                event_object_id=event.object_id,
-                event_timestamp_iso=event.timestamp.isoformat(),
-                event_data=event.data,
-            )
-        )
+        transaction.on_commit(lambda: async_task('core.tasks.send_webhook_task', **task_kwargs))
 
 
 def _send_notification(rule, event):
