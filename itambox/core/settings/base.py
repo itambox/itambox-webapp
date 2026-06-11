@@ -312,6 +312,15 @@ except Exception as e:
     logging.getLogger(__name__).warning('Failed to parse ITAMBOX_TENANT_OIDC_CONFIGS: %s', e)
     ITAMBOX_TENANT_OIDC_CONFIGS = {}
 
+# Intune discovery connector — per-tenant config.
+# Keys per tenant slug: azure_tenant_id, client_id, client_secret,
+#   create_missing (bool, default false), default_status (StatusLabel slug, default "deployable"),
+#   sync_software (bool, default true).
+try:
+    ITAMBOX_TENANT_INTUNE_CONFIGS = json.loads(os.environ.get('ITAMBOX_TENANT_INTUNE_CONFIGS', '{}'))
+except Exception:
+    ITAMBOX_TENANT_INTUNE_CONFIGS = {}
+
 
 # SAML SSO Configuration Loader
 SAML_CONFIG_LOADER = 'core.auth.saml.load_saml_config'
