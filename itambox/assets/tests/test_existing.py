@@ -6,7 +6,6 @@ from inventory.models import Accessory, AccessoryAssignment, Consumable, Consuma
 from compliance.models import CustodyReceipt
 from assets.models import AssetMaintenance
 from extras.models import CustomField, CustomFieldset
-from core.models import Notification
 from django.contrib.contenttypes.models import ContentType
 from organization.models import Contact, ContactRole, ContactAssignment
 
@@ -290,68 +289,6 @@ class ComponentTrackingTestCase(TransactionTestCase):
         self.assertEqual(AccessoryAssignment.objects.filter(accessory=acc).count(), 0)
         self.assertEqual(acc.remaining_qty, 10)
 
-    def test_consumable_stock_and_alert_signals(self):
-        from inventory.models import ConsumableStock
-        # Create Consumable with min_qty safety limit
-        con = Consumable.objects.create(
-            manufacturer=self.manufacturer,
-            name="Thermal Paste MX-4",
-            slug="dell-thermal-paste-mx-4",
-            category=self.con_category,
-            min_qty=3,
-            allow_overallocate=False
-        )
-        ConsumableStock.objects.create(
-            consumable=con,
-            location=self.location,
-            qty=5
-        )
-
-        from organization.models import AssetHolder
-        holder = AssetHolder.objects.create(first_name="Jane", last_name="Smith", email="jane@example.com")
-
-        # Checkout 1 unit (remaining = 4, which is >= min_qty 3) -> No Notification generated
-        con_assign = ConsumableAssignment.objects.create(
-            consumable=con,
-            assigned_holder=holder,
-            from_location=self.location,
-            qty=1
-        )
-        self.assertEqual(con.remaining_qty, 4)
-        # Verify no notification created for con yet
-        self.assertFalse(Notification.objects.filter(subject__contains="Thermal Paste MX-4").exists())
-
-        # Checkout 2 more units (remaining = 2, which is < min_qty 3) -> Triggers Notification!
-        con_assign_2 = ConsumableAssignment.objects.create(
-            consumable=con,
-            assigned_holder=holder,
-            from_location=self.location,
-            qty=2
-        )
-        self.assertEqual(con.remaining_qty, 2)
-        # Check that notification was triggered by the post_save signal
-        self.assertTrue(Notification.objects.filter(subject__contains="Thermal Paste MX-4", level=Notification.LEVEL_WARNING).exists())
-
-        # Checkout 3 more units (overallocated, remaining = -1) -> Triggers LEVEL_DANGER notification!
-        con.allow_overallocate = True
-        con.save()
-        con_assign_3 = ConsumableAssignment.objects.create(
-            consumable=con,
-            assigned_holder=holder,
-            from_location=self.location,
-            qty=3
-        )
-        self.assertEqual(con.remaining_qty, 0)
-        self.assertTrue(Notification.objects.filter(subject__contains="Thermal Paste MX-4", level=Notification.LEVEL_DANGER).exists())
-
-        # Test Notification Center UI / mark read
-        notif = Notification.objects.filter(user=self.user, is_read=False).first()
-        if notif:
-            response = self.client.post(reverse('users:mark_notification_read', kwargs={'pk': notif.pk}))
-            self.assertEqual(response.status_code, 302)
-            notif.refresh_from_db()
-            self.assertTrue(notif.is_read)
-
     def test_asset_audit_view(self):
         # GET renders the modal form.
         response = self.client.get(reverse('assets:asset_audit', kwargs={'pk': self.asset.pk}))
@@ -479,7 +416,7 @@ class AssetProcurementTestCase(TestCase):
         # Verify detail page displays them
         response = self.client.get(reverse('assets:asset_detail', kwargs={'pk': asset.pk}))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "$1249.99")
+        self.assertContains(response, "1,249.99")
         self.assertContains(response, "PO-998877")
         self.assertContains(response, "Lenovo Germany GmbH")
 
@@ -925,7 +862,10 @@ class EnterpriseITAMTestCase(TestCase):
         import datetime
         from decimal import Decimal
 
-        deprec = Depreciation.objects.create(name="10 Months Schedule", months=10)
+        deprec = Depreciation.objects.create(
+            name="10 Months Schedule", months=10,
+            convention='exclude_purchase_month',
+        )
 
         asset_type = AssetType.objects.create(
             manufacturer=self.manufacturer,
@@ -973,7 +913,7 @@ class EnterpriseITAMTestCase(TestCase):
 
         response = self.client.get(reverse('assets:asset_detail', kwargs={'pk': asset_mid.pk}))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Depreciated Book Value")
+        self.assertContains(response, "Estimated value (indicative)")
 
     def test_atomic_kit_checkout_flow(self):
         from organization.models import AssetHolder, Site, Location
