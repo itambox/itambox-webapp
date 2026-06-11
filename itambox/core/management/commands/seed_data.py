@@ -121,28 +121,37 @@ class Command(BaseCommand):
             ('organization', 'Region'), ('organization', 'SiteGroup'),
             ('assets', 'AssetRole'), ('assets', 'StatusLabel'),
             ('assets', 'Manufacturer'), ('assets', 'Supplier'), ('assets', 'Category'),
-            ('assets', 'CustomFieldset'), ('assets', 'CustomField'), ('assets', 'Depreciation'),
+            ('extras', 'CustomFieldset'), ('extras', 'CustomField'), ('assets', 'Depreciation'),
             ('extras', 'Tag'),
         ]
-        # Delete via _base_manager (bypasses tenant scoping + soft-delete filters so
-        # EVERY row is removed) and retry across passes so PROTECT ordering between
-        # the existing dataset and this one resolves regardless of FK direction.
+        # Delete all rows via the unfiltered manager (bypasses tenant scoping and
+        # soft-delete filters). Retry across passes to resolve FK ordering.
+        def _unfiltered_qs(model):
+            # Prefer all_objects (AllObjectsManager) which skips every filter;
+            # fall back to _default_manager which may still scope by tenant/soft-delete.
+            mgr = getattr(model, 'all_objects', None) or model._default_manager
+            return mgr.all()
+
         pending = list(models_to_clear)
+        last_errors = {}
         for _attempt in range(5):
             failed = []
             for app_label, model_name in pending:
                 try:
                     model = apps.get_model(app_label, model_name)
-                    count, _ = model._base_manager.all().delete()
+                    count, _ = _unfiltered_qs(model).delete()
                     if count:
                         self.stdout.write(f'  Deleted {count} {model_name}(s)')
-                except Exception:
+                    last_errors.pop(model_name, None)
+                except Exception as exc:
                     failed.append((app_label, model_name))
+                    last_errors[model_name] = str(exc)
             if not failed:
                 break
             pending = failed
         for app_label, model_name in pending:
-            self.stdout.write(self.style.WARNING(f'  Could not fully clear {model_name}'))
+            self.stdout.write(self.style.WARNING(
+                f'  Could not fully clear {model_name}: {last_errors.get(model_name, "unknown")}'))
 
         User.objects.filter(is_superuser=False).delete()
         ContentType.objects.clear_cache()
@@ -313,15 +322,15 @@ class Command(BaseCommand):
         for name, label, ftype, required, choices, model_level in cf_data:
             obj, _ = CustomField.objects.get_or_create(name=name, defaults={
                 'label': label, 'field_type': ftype, 'required': required,
-                'choices': choices})
+                'choices': choices or ''})
             # model_level=True described the hardware type (a spec); otherwise
             # the field is a per-device detail on the asset.
             obj.object_types.add(assettype_ct if model_level else asset_ct)
             self._custom_fields[name] = obj
 
         def fieldset(name, *field_names):
-            fs = CustomFieldset.objects.create(name=name)
-            fs.fields.add(*[self._custom_fields[f] for f in field_names])
+            fs, _ = CustomFieldset.objects.get_or_create(name=name)
+            fs.fields.set([self._custom_fields[f] for f in field_names])
             return fs
 
         self._fs_laptop = fieldset('Laptop / Workstation Specs', 'cpu', 'ram_gb', 'storage_gb', 'storage_type',
@@ -1278,7 +1287,7 @@ class Command(BaseCommand):
     # ─────────────────────────────────────────────────────────────────
 
     def _seed_maintenance(self):
-        from compliance.models import AssetMaintenance
+        from assets.models import AssetMaintenance
         self.stdout.write('--- Maintenance ---')
         sample = random.sample(self._assets, k=min(40, len(self._assets)))
         kinds = [('repair', 'Keyboard replacement under warranty', 0),
