@@ -285,12 +285,47 @@ class Command(BaseCommand):
                 'name': name, 'contact_email': email, 'contact_phone': phone, 'website': website})
             self._suppliers[slug] = obj
 
-        # Depreciation schedules
+        # Depreciation schedules — generic named first (used by asset types)
         self._depreciations = {}
         for name, months in [('3-Year Straight-Line', 36), ('4-Year Straight-Line', 48),
                              ('5-Year Straight-Line', 60), ('7-Year Straight-Line', 84)]:
             obj, _ = Depreciation.objects.get_or_create(name=name, defaults={'months': months})
             self._depreciations[name] = obj
+
+        # German AfA / GWG example policies for the demo tenant (opt-in via seed_data;
+        # migration 0043 also seeds these on every install — see FIX-05 note).
+        _afa_policies = [
+            {
+                'name': 'IT-Hardware 36 Monate (AfA)',
+                'months': 36,
+                'method': 'straight_line',
+                'convention': 'include_purchase_month',
+                'description': 'AfA-Tabelle 2021 — Computer, Notebooks, Tablets: 3 Jahre',
+            },
+            {
+                'name': 'Server 60 Monate (AfA)',
+                'months': 60,
+                'method': 'straight_line',
+                'convention': 'include_purchase_month',
+                'description': 'AfA-Tabelle 2021 — Server / Workstations: 5 Jahre',
+            },
+            {
+                'name': 'Sofortabschreibung GWG (≤ 800 €)',
+                'months': 1,
+                'method': 'straight_line',
+                'convention': 'include_purchase_month',
+                'immediate_expense_threshold': '800.00',
+                'description': 'Geringwertige Wirtschaftsgüter §6 Abs. 2 EStG — Sofortabschreibung bis 800 €',
+            },
+        ]
+        self._demo_depreciation_afa = None
+        for p in _afa_policies:
+            obj, _ = Depreciation.objects.get_or_create(
+                name=p['name'],
+                defaults={k: v for k, v in p.items() if k != 'name'},
+            )
+            if self._demo_depreciation_afa is None:
+                self._demo_depreciation_afa = obj  # first entry = tenant default showcase
 
         # Custom fields + fieldsets
         cf_data = [
@@ -704,8 +739,16 @@ class Command(BaseCommand):
                 self._tgroups[gslug] = group_obj
 
             for t in org['tenants']:
+                # Set the demo-tenant default depreciation on the primary MSP tenant so
+                # the "tenant-level default" resolution rung is visible in the demo UI.
+                demo_dep = (
+                    self._demo_depreciation_afa
+                    if t['slug'] == 'northwind-internal-it'
+                    else None
+                )
                 tenant, _ = Tenant.objects.get_or_create(slug=t['slug'], defaults={
                     'name': t['name'], 'group': group_obj,
+                    'default_depreciation': demo_dep,
                     'description': f"{org.get('industry', 'Managed Service Provider')} — managed by Northwind Managed Services."})
                 self._tenants[t['slug']] = tenant
                 self._tenant_meta[t['slug']] = dict(profile=t['profile'], domain=org['domain'], code=t['code'],

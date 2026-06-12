@@ -75,9 +75,9 @@ class ObjectChangeFilterSet(BaseFilterSet):
     # noise in the audit trail. Hidden by default; surfaced via "show_system_events".
     NOISE_CONTENT_TYPES = (
         ('core', 'job'),
-        ('core', 'bookmark'),
+        ('extras', 'bookmark'),
         ('extras', 'event'),
-        ('core', 'reportgenerationarchive'),
+        ('extras', 'reportgenerationarchive'),
     )
 
     q = django_filters.CharFilter(

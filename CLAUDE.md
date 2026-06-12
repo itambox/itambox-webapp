@@ -1,4 +1,4 @@
-# CLAUDE.md
+﻿# CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -20,7 +20,8 @@ itambox/          # Django project root
   subscriptions/  # SaaS subscription tracking
   licenses/       # Software license seat management
   software/       # Installed software catalogue
-  extras/         # Tags, custom fields, config contexts, dashboards, webhooks, event rules
+  extras/         # Tags, custom fields, config contexts, dashboards, journal entries,
+  |               #   attachments, reporting, alerting, webhooks, event rules
   users/          # User model, preferences, SCIM provisioning
   static/src/     # TypeScript + SCSS source
   static/dist/    # Compiled frontend (git-ignored, rebuild with npm)
@@ -84,23 +85,38 @@ python manage.py qcluster   # Start django-q2 worker
 
 In tests, `Q_CLUSTER['sync'] = True` is set automatically so tasks run inline.
 
+### Docs (MkDocs)
+```bash
+# Build docs to static/docs/ (run from itambox/)
+mkdocs build --strict
+
+# Live-reload preview
+mkdocs serve
+```
+
+### API schema
+```bash
+# Regenerate schema.yaml after model/serializer changes
+python manage.py spectacular --file schema.yaml
+```
+
 ## Architecture: tenant scoping
 
 Every request is scoped to one active tenant, stored in a `contextvars.ContextVar` (`core/managers.py`). **`TenantMiddleware`** resolves the tenant from session/query-param and sets it via `set_current_tenant()` / `set_current_membership()`. This propagates automatically through ORM queries.
 
 Manager hierarchy for tenant-aware models:
-- `SoftDeleteManager` — default manager; filters `deleted_at__isnull=True`
-- `TenantScopingManager` — also filters to the current tenant's objects
-- `AllObjectsManager` — unfiltered; use only for admin/recycle-bin operations
-- `TenantScopingSoftDeleteManager` — combines both
+- `SoftDeleteManager` â€” default manager; filters `deleted_at__isnull=True`
+- `TenantScopingManager` â€” also filters to the current tenant's objects
+- `AllObjectsManager` â€” unfiltered; use only for admin/recycle-bin operations
+- `TenantScopingSoftDeleteManager` â€” combines both
 
 Soft-delete models must use `UniqueConstraint(..., condition=Q(deleted_at__isnull=True))` rather than `unique=True` on name/slug fields (active rows only must be unique).
 
 ## Architecture: change logging
 
 `ChangeLoggingMixin` (`core/models.py`) records an `ObjectChange` on every `save()` and `delete()`. It relies on two contextvars from `itambox/middleware.py`:
-- `_request_id` — a UUID set per HTTP request by `CurrentUserMiddleware`
-- `_current_user` — the authenticated user
+- `_request_id` â€” a UUID set per HTTP request by `CurrentUserMiddleware`
+- `_current_user` â€” the authenticated user
 
 **If either is `None`, the save is not logged.** Background tasks must use `TaskContext` (`core/tasks/context.py`) as a context manager, which sets both variables for the lifetime of the task, ensuring changes are attributed to the task's user rather than silently skipped.
 
@@ -109,8 +125,8 @@ Call `obj.snapshot()` before making changes to capture the pre-change state; oth
 ## Architecture: generic views
 
 `itambox/views/generic/__init__.py` provides the reusable view base classes:
-- `ObjectListView` — paginated, filterable, tenant-scoped, HTMX-aware list
-- `ObjectDetailView` — detail with layout panels
+- `ObjectListView` â€” paginated, filterable, tenant-scoped, HTMX-aware list
+- `ObjectDetailView` â€” detail with layout panels
 - `ObjectEditView` / `ObjectDeleteView` / `ObjectCloneView`
 - `ObjectBulkEditView` / `ObjectBulkDeleteView` / `ObjectImportView`
 
@@ -118,7 +134,7 @@ Call `obj.snapshot()` before making changes to capture the pre-change state; oth
 
 Layout panels are declared as a tuple of `Panel(slot, title)` objects on the view; the `{% render_panel %}` template tag renders them.
 
-**URL routing convention:** URLs are pk-based; slugs are stable natural keys for import/export and filtering — never routing. `AutoSlugMixin` populates the slug on save; `ObjectDetailView`/`ObjectEditView` resolve edit/delete/clone URLs exclusively via `kwargs={'pk': ...}`.
+**URL routing convention:** URLs are pk-based; slugs are stable natural keys for import/export and filtering â€” never routing. `AutoSlugMixin` populates the slug on save; `ObjectDetailView`/`ObjectEditView` resolve edit/delete/clone URLs exclusively via `kwargs={'pk': ...}`.
 
 ## Architecture: permissions & auth
 
@@ -139,6 +155,7 @@ Tasks live in `core/tasks/`. Each task function should be wrapped in `TaskContex
 | `ITAMBOX_ENV` | `dev` or `prod` | fail-closed to `prod` when unset (dev under tests) |
 | `ITAMBOX_SECRET_KEY` | Django secret key | insecure default (dev only) |
 | `ITAMBOX_BASE_URL` | Public base URL for QR labels & outbound links (no trailing slash) | `""` (bare-tag QR used) |
+| `ITAMBOX_DEFAULT_CURRENCY` | ISO 4217 fallback for money display; `{{ value|money:obj }}` resolves tenant currency first | `EUR` |
 | `ITAMBOX_DB_*` | DB connection | `itambox`/`localhost`/`5432` |
 | `ITAMBOX_CACHE_BACKEND` | `locmem` or `redis` | `locmem` |
 | `ITAMBOX_REDIS_URL` | Redis connection when cache=redis | `redis://127.0.0.1:6379/1` |
@@ -146,6 +163,12 @@ Tasks live in `core/tasks/`. Each task function should be wrapped in `TaskContex
 | `ITAMBOX_TENANT_LDAP_CONFIGS` | JSON per-tenant LDAP configs | `{}` |
 | `ITAMBOX_TENANT_SAML_CONFIGS` | JSON per-tenant SAML configs | `{}` |
 | `ITAMBOX_TENANT_OIDC_CONFIGS` | JSON per-tenant OIDC configs | `{}` |
+| `ITAMBOX_TENANT_INTUNE_CONFIGS` | JSON per-tenant Intune discovery configs | `{}` |
+| `ITAMBOX_DOCS_ROOT` | Filesystem path to compiled MkDocs output | `BASE_DIR/docs` |
+| `ITAMBOX_REQUIRE_CUSTODY_SIGNIN` | Require digital signature on custody receipt sign-off | `True` |
+| `ITAMBOX_ALLOW_GLOBAL_CUSTODY_TEMPLATES` | Allow custody templates not scoped to a tenant | `True` |
+| `ITAMBOX_SERVER_EMAIL` | From-address for error emails (prod only) | `DEFAULT_FROM_EMAIL` |
+| `ITAMBOX_ENABLE_EXTENDED_ORG_HIERARCHY` | Show Regions & Site Groups in sidebar nav | `False` |
 
 Reads `.env` from `BASE_DIR` or `BASE_DIR/../` at startup (hand-rolled parser; no `python-dotenv`).
 
@@ -154,7 +177,7 @@ Reads `.env` from `BASE_DIR` or `BASE_DIR/../` at startup (hand-rolled parser; n
 - Use `TenantTestMixin` (`core/tests/mixins.py`) for any test that touches tenant-scoped models. It provides `setup_tenant_context()`, `set_active_tenant()`, and a `tenant_context()` context manager.
 - `model_bakery` recipes are in `core/tests/baker_recipes.py`.
 - Tenant/user contextvars are cleared automatically after each test by `conftest.py`.
-- Security boundary tests live in `core/tests/test_tenant_security.py` and `test_security_boundaries.py` — run these when touching auth, middleware, or manager code.
+- Security boundary tests live in `core/tests/test_tenant_security.py` and `test_security_boundaries.py` â€” run these when touching auth, middleware, or manager code.
 
 ## Plugin system
 
