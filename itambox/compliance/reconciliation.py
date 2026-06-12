@@ -39,7 +39,15 @@ def classify_session_audits(session: AuditSession) -> dict:
         else:
             mismatched.append(audit)
 
-    missing = Asset.objects.filter(id__in=(expected_ids - scanned_ids)).select_related('location', 'status')
+    # Bypass ambient tenant scoping: use explicit IDs already restricted by
+    # expected_assets_queryset, then filter by session.tenant when set so that
+    # a viewer from a different tenant sees the same missing list.
+    from django.db.models import QuerySet as _RawQS
+    missing_ids = expected_ids - scanned_ids
+    _missing_qs = _RawQS(model=Asset).filter(deleted_at__isnull=True, id__in=missing_ids)
+    if session.tenant_id is not None:
+        _missing_qs = _missing_qs.filter(tenant_id=session.tenant_id)
+    missing = _missing_qs.select_related('location', 'status')
 
     return {
         'matching': matching,
@@ -222,7 +230,11 @@ def rehome_audit_session_mismatches(session: AuditSession, user=None, request=No
             for row in session.reconciliation_report.get('rows', [])
             if row.get('category') == 'mismatched'
         ]
-        assets = Asset.objects.filter(pk__in=mismatch_ids)
+        from django.db.models import QuerySet as _RawQS
+        assets = _RawQS(model=Asset).filter(
+            deleted_at__isnull=True, pk__in=mismatch_ids,
+            **({'tenant_id': session.tenant_id} if session.tenant_id else {}),
+        )
     else:
         result = classify_session_audits(session)
         assets = [audit.asset for audit in result['mismatched']]
@@ -264,7 +276,13 @@ def flag_missing_assets(session: AuditSession, user=None, request=None, **kwargs
     asset_ids = [row['asset_id'] for row in missing_rows]
     stored_status_by_id = {row['asset_id']: row.get('status_id') for row in missing_rows}
 
-    assets = {a.pk: a for a in Asset.objects.filter(pk__in=asset_ids).select_related('status')}
+    from django.db.models import QuerySet as _RawQS
+    assets = {
+        a.pk: a for a in _RawQS(model=Asset).filter(
+            deleted_at__isnull=True, pk__in=asset_ids,
+            **({'tenant_id': session.tenant_id} if session.tenant_id else {}),
+        ).select_related('status')
+    }
 
     flagged = 0
     skipped = 0

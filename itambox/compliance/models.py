@@ -155,7 +155,19 @@ User = get_user_model()
 
 
 class AuditSession(StandardModel, SoftDeleteMixin):
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
+    allow_global_tenant = True
+
     name = models.CharField(max_length=200)
+    tenant = models.ForeignKey(
+        to='organization.Tenant',
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name='audit_sessions',
+        help_text='Tenant this campaign belongs to. Leave blank for MSP-wide / global sessions.',
+    )
     location = models.ForeignKey(
         'organization.Location',
         on_delete=models.SET_NULL,
@@ -189,8 +201,19 @@ class AuditSession(StandardModel, SoftDeleteMixin):
 
     @property
     def expected_assets_queryset(self):
+        """Return the set of assets this session expects to audit.
+
+        Bypasses ambient tenant scoping: when the session is tenant-scoped it filters
+        explicitly by session.tenant; when global (tenant=None) no tenant filter is
+        applied, so the queryset is stable regardless of which viewer calls it.
+        """
         from assets.models import Asset, StatusLabel
-        qs = Asset.objects.exclude(status__type=StatusLabel.TYPE_ARCHIVED)
+        from django.db.models import QuerySet
+        # Raw queryset — bypasses TenantScopingSoftDeleteManager ambient filter.
+        qs = QuerySet(model=Asset).filter(deleted_at__isnull=True)
+        if self.tenant_id is not None:
+            qs = qs.filter(tenant_id=self.tenant_id)
+        qs = qs.exclude(status__type=StatusLabel.TYPE_ARCHIVED)
         if not self.location:
             return qs.filter(status__type__in=[
                 StatusLabel.TYPE_DEPLOYABLE,

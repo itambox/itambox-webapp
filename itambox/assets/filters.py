@@ -113,6 +113,8 @@ class AssetFilterSet(BaseFilterSet):
         """Perform basic search across designated fields."""
         if not value.strip():
             return queryset
+        from assets.scanning import strip_itambox_prefix
+        value = strip_itambox_prefix(value)
         # Basic search across name, asset_tag, serial_number (can be expanded)
         # Consider adding asset_holder.name if performance allows
         return queryset.filter(
@@ -120,6 +122,7 @@ class AssetFilterSet(BaseFilterSet):
             Q(asset_tag__icontains=value) |
             Q(serial_number__icontains=value)
         ).distinct()
+
 
     def filter_assigned_to(self, queryset, name, value):
         if not value:
@@ -131,13 +134,18 @@ class AssetFilterSet(BaseFilterSet):
             return queryset
         from django.utils import timezone
         from datetime import timedelta
+        from django.db.models import ExpressionWrapper, DurationField, F, Case, When
         today = timezone.now()
-        # Build a Q filter per category: assets overdue per their category cadence.
+        # Policy (matches Asset.audit_due_date and core/tasks/alerts._match_audit_overdue):
+        # never-audited assets are overdue at created_at + interval, not immediately.
         overdue_q = Q(pk__in=[])  # start empty
         for cat in Category.objects.filter(audit_interval_months__isnull=False):
-            cutoff = today - timedelta(days=cat.audit_interval_months * 30)
+            interval = timedelta(days=cat.audit_interval_months * 30)
+            cutoff = today - interval
+            # audited and past cutoff, OR never audited and created before cutoff
             overdue_q |= Q(asset_type__category=cat) & (
-                Q(last_audited__isnull=True) | Q(last_audited__lt=cutoff)
+                Q(last_audited__lt=cutoff) |
+                (Q(last_audited__isnull=True) & Q(created_at__lt=cutoff))
             )
         if value:
             return queryset.filter(overdue_q)

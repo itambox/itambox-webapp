@@ -69,9 +69,15 @@ class AuditSessionCreateView(ObjectEditView):
     model_form = AuditSessionForm
     template_name = 'generic/object_edit.html'
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['request'] = self.request
+        return kwargs
+
     def form_valid(self, form):
         form.instance.created_by = self.request.user
-        form.instance.status = 'active'
+        start_immediately = form.cleaned_data.get('start_immediately', True)
+        form.instance.status = 'active' if start_immediately else 'planned'
         return super().form_valid(form)
 
 
@@ -183,6 +189,7 @@ class AuditSessionCloseView(GenericTransactionView):
     model_form = AuditSessionCloseForm
     template_name = 'compliance/audits/audit_session_close.html'
     service_callable = close_audit_session
+    permission_required = 'compliance.change_auditsession'
     success_message = "Audit session closed. Reconciliation report generated."
 
     def get_service_kwargs(self, form):
@@ -191,6 +198,7 @@ class AuditSessionCloseView(GenericTransactionView):
 
 class AuditSessionRehomeView(SimplePostView):
     queryset = AuditSession.objects.filter(status='completed')
+    permission_required = 'assets.change_asset'
 
     def perform_action(self, session, request) -> dict:
         rehome_audit_session_mismatches(session, request.user)
@@ -242,7 +250,7 @@ class AuditSessionFlagMissingView(GenericTransactionView):
     template_name = 'compliance/audits/audit_session_flag_missing.html'
     error_partial = 'compliance/audits/audit_session_flag_missing.html#flag-missing-form'
     service_callable = flag_missing_assets
-    permission_required = 'compliance.change_asset'
+    permission_required = 'assets.change_asset'
     context_object_name = 'session'
     hx_trigger = 'tableRefreshRequired'
 
@@ -281,3 +289,17 @@ class AuditSessionDeleteView(ObjectDeleteView):
     model = AuditSession
     template_name = 'generic/object_confirm_delete.html'
     success_url = reverse_lazy('compliance:auditsession_list')
+
+
+class AuditSessionStartView(SimplePostView):
+    """Transition a planned session to active."""
+    queryset = AuditSession.objects.filter(status='planned')
+    permission_required = 'compliance.change_auditsession'
+
+    def perform_action(self, session, request) -> dict:
+        from django.core.exceptions import ValidationError
+        if session.status != 'planned':
+            raise ValidationError("Only planned sessions can be started.")
+        session.status = 'active'
+        session.save(update_fields=['status'])
+        return {'message': f"Campaign '{session.name}' is now active."}

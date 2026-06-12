@@ -115,7 +115,7 @@ class FlagMissingViewTests(TenantTestMixin, TestCase):
 
     def setUp(self):
         self.setup_tenant_context(name='FlagTenant', slug='flag-tenant')
-        self.tenant_role.permissions = ['compliance.change_asset', 'compliance.view_auditsession']
+        self.tenant_role.permissions = ['assets.change_asset', 'compliance.view_auditsession']
         self.tenant_role.save()
 
         self.loc = baker.make(Location, name='FlagRoom', tenant=self.tenant)
