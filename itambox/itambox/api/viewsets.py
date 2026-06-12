@@ -25,6 +25,13 @@ class BaseViewSet(GenericViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+
+        # The viewset's `queryset` class attribute is evaluated at import time when no
+        # tenant context is active, so filter_by_tenant() is a no-op then.  Re-apply it
+        # here at request time so the correct tenant scope is enforced on every call.
+        if hasattr(qs, 'filter_by_tenant'):
+            qs = qs.filter_by_tenant()
+
         serializer_class = self.get_serializer_class()
 
         if not hasattr(serializer_class, 'Meta') or not hasattr(serializer_class.Meta, 'model'):

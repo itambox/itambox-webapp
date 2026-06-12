@@ -1189,10 +1189,15 @@ class ObjectBulkEditView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXVi
             model_name = self.request.POST.get('model_name') or self.request.GET.get('model_name')
             if model_name:
                 try:
-                    app_label, model_name = model_name.split('.')
-                    return apps.get_model(app_label, model_name)
+                    app_label, mn = model_name.split('.')
+                    model = apps.get_model(app_label, mn)
                 except (ValueError, LookupError):
-                    pass
+                    from django.http import Http404
+                    raise Http404
+                if not hasattr(model.objects, 'filter_by_tenant'):
+                    from django.http import Http404
+                    raise Http404
+                return model
         return None
 
     def _get_queryset(self, pks):
@@ -1342,10 +1347,15 @@ class ObjectBulkDeleteView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMX
             model_name = self.request.POST.get('model_name') or self.request.GET.get('model_name')
             if model_name:
                 try:
-                    app_label, model_name = model_name.split('.')
-                    return apps.get_model(app_label, model_name)
+                    app_label, mn = model_name.split('.')
+                    model = apps.get_model(app_label, mn)
                 except (ValueError, LookupError):
-                    pass
+                    from django.http import Http404
+                    raise Http404
+                if not hasattr(model.objects, 'filter_by_tenant'):
+                    from django.http import Http404
+                    raise Http404
+                return model
         return None
 
     def _get_queryset(self, pks):

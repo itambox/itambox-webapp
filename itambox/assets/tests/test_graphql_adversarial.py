@@ -418,3 +418,55 @@ class GraphQLAdversarialTestCase(TestCase):
         self.assertIn('errors', res_data)
         self.assertIn('denied', res_data['errors'][0]['message'].lower())
 
+    # =========================================================================
+    # Family 7 — Cross-tenant read (query) probes with token auth
+    # =========================================================================
+
+    def test_cross_tenant_query_asset_by_id_not_leaked(self):
+        """Querying tenant B's asset by pk while authenticated as tenant A returns null."""
+        # Pass switch_tenant so TenantMiddleware sets active_tenant = tenant_a
+        url = self.graphql_url + f'?switch_tenant={self.tenant_a.pk}'
+        query = f'''
+        query {{
+            asset(id: "{self.asset_b.id}") {{
+                id
+                name
+                assetTag
+            }}
+        }}
+        '''
+        response = self.client.post(
+            url,
+            data=json.dumps({'query': query}),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+        )
+        self.assertEqual(response.status_code, 200)
+        res_data = response.json()
+        asset_data = (res_data.get('data') or {}).get('asset')
+        self.assertIsNone(asset_data,
+            f"Cross-tenant asset data leaked to tenant A user: {res_data}")
+
+    def test_cross_tenant_query_assets_list_excludes_tenant_b(self):
+        """Listing assets as tenant A must not include tenant B's asset."""
+        url = self.graphql_url + f'?switch_tenant={self.tenant_a.pk}'
+        query = '''
+        query {
+            assets {
+                assetTag
+            }
+        }
+        '''
+        response = self.client.post(
+            url,
+            data=json.dumps({'query': query}),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+        )
+        self.assertEqual(response.status_code, 200)
+        res_data = response.json()
+        if res_data.get('data') and res_data['data'].get('assets'):
+            tags = [a.get('assetTag') for a in res_data['data']['assets']]
+            self.assertNotIn('TAG-B', tags,
+                "Tenant B asset tag appeared in tenant A's asset list query")
+

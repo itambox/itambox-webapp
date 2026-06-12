@@ -205,6 +205,12 @@ class ObjectExportView(LoginRequiredMixin, View):
             queryset = model.objects.all()
 
         if template_id == 0:
+            _REDACTED_FIELD_SUBSTRINGS = ('secret', 'password', 'token')
+
+            def _is_redacted(field_name):
+                name = field_name.lower()
+                return any(sub in name for sub in _REDACTED_FIELD_SUBSTRINGS)
+
             if export_format == 'yaml':
                 import yaml
                 fields = [f for f in model._meta.fields if not f.many_to_many]
@@ -212,6 +218,9 @@ class ObjectExportView(LoginRequiredMixin, View):
                 for obj in queryset:
                     row_dict = {}
                     for field in fields:
+                        if _is_redacted(field.name):
+                            row_dict[field.name] = '***'
+                            continue
                         val = getattr(obj, field.name)
                         if val is None:
                             val = ''
@@ -220,7 +229,7 @@ class ObjectExportView(LoginRequiredMixin, View):
                         else:
                             row_dict[field.name] = str(val)
                     export_data.append(row_dict)
-                
+
                 yaml_content = yaml.safe_dump(export_data, default_flow_style=False, sort_keys=False)
                 response = HttpResponse(yaml_content, content_type='text/yaml')
                 response['Content-Disposition'] = f'attachment; filename="{model_name}_export.yaml"'
@@ -229,14 +238,17 @@ class ObjectExportView(LoginRequiredMixin, View):
                 import csv
                 response = HttpResponse(content_type='text/csv')
                 response['Content-Disposition'] = f'attachment; filename="{model_name}_export.csv"'
-                
+
                 writer = csv.writer(response)
                 fields = [f for f in model._meta.fields if not f.many_to_many]
                 writer.writerow([f.name for f in fields])
-                
+
                 for obj in queryset:
                     row = []
                     for field in fields:
+                        if _is_redacted(field.name):
+                            row.append('***')
+                            continue
                         val = getattr(obj, field.name)
                         if val is None:
                             val = ''
@@ -297,11 +309,14 @@ class ExportTemplateDeleteView(ObjectDeleteView):
 
 class JournalEntryCreateView(LoginRequiredMixin, View):
     def post(self, request, app_label, model_name, object_id):
-        model = apps.get_model(app_label, model_name)
-        obj = get_object_or_404(model, pk=object_id)
+        try:
+            model_class = apps.get_model(app_label, model_name)
+        except LookupError:
+            raise Http404
+        obj_type = ContentType.objects.get_for_model(model_class)
+        obj = _check_attachment_parent_access(request, obj_type, object_id)
         form = JournalEntryForm(request.POST)
         if form.is_valid():
-            obj_type = ContentType.objects.get_for_model(model)
             JournalEntry.objects.create(
                 model=obj_type,
                 object_id=obj.pk,
@@ -319,9 +334,12 @@ class JournalEntryCreateView(LoginRequiredMixin, View):
 
 class ImageAttachmentUploadView(LoginRequiredMixin, View):
     def post(self, request, app_label, model_name, object_id):
-        model = apps.get_model(app_label, model_name)
-        obj = get_object_or_404(model, pk=object_id)
-        obj_type = ContentType.objects.get_for_model(obj)
+        try:
+            model_class = apps.get_model(app_label, model_name)
+        except LookupError:
+            raise Http404
+        obj_type = ContentType.objects.get_for_model(model_class)
+        obj = _check_attachment_parent_access(request, obj_type, object_id)
         uploaded_file = request.FILES.get('image')
         if uploaded_file:
             ImageAttachment.objects.create(
@@ -336,9 +354,12 @@ class ImageAttachmentUploadView(LoginRequiredMixin, View):
 
 class FileAttachmentUploadView(LoginRequiredMixin, View):
     def post(self, request, app_label, model_name, object_id):
-        model = apps.get_model(app_label, model_name)
-        obj = get_object_or_404(model, pk=object_id)
-        obj_type = ContentType.objects.get_for_model(obj)
+        try:
+            model_class = apps.get_model(app_label, model_name)
+        except LookupError:
+            raise Http404
+        obj_type = ContentType.objects.get_for_model(model_class)
+        obj = _check_attachment_parent_access(request, obj_type, object_id)
         uploaded_file = request.FILES.get('file')
         if uploaded_file:
             import mimetypes
