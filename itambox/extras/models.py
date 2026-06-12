@@ -291,6 +291,21 @@ class WebhookEndpoint(ChangeLoggingMixin, BaseModel):
     def get_absolute_url(self):
         return reverse('webhookendpoint_detail', kwargs={'pk': self.pk})
 
+    def save(self, *args, **kwargs):
+        if self.secret and not self.secret.startswith("enc$"):
+            from core.crypto import encrypt_string
+            self.secret = encrypt_string(self.secret)
+        super().save(*args, **kwargs)
+
+    @property
+    def secret_decrypted(self) -> str:
+        if not self.secret:
+            return ""
+        if self.secret.startswith("enc$"):
+            from core.crypto import decrypt_string
+            return decrypt_string(self.secret)
+        return self.secret
+
 
 class JournalEntry(ChangeLoggingMixin, BaseModel):
     model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='journal_entries')
