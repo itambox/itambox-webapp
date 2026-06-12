@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.humanize',
     'corsheaders',
     'assets',
     'inventory',
@@ -121,6 +122,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'itambox.context_processors.settings_processor',
                 'itambox.context_processors.breadcrumbs',
                 'itambox.context_processors.notifications_processor',
                 'itambox.context_processors.tenant_switcher_processor',
@@ -356,6 +358,10 @@ if 'test' in sys.argv or any('test' in arg or 'pytest' in arg for arg in sys.arg
 
 ALLOW_GLOBAL_CUSTODY_TEMPLATES = os.environ.get('ITAMBOX_ALLOW_GLOBAL_CUSTODY_TEMPLATES', 'True') == 'True'
 REQUIRE_CUSTODY_SIGNIN = os.environ.get('ITAMBOX_REQUIRE_CUSTODY_SIGNIN', 'True') == 'True'
+
+# Show Regions and Site Groups in the sidebar navigation.
+# Off by default — most single-site installs do not need the extra hierarchy.
+ITAMBOX_ENABLE_EXTENDED_ORG_HIERARCHY = os.environ.get('ITAMBOX_ENABLE_EXTENDED_ORG_HIERARCHY', 'False') == 'True'
 
 
 # ==============================================================================

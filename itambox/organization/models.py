@@ -4,7 +4,11 @@ from django.utils.text import slugify # For potential slug generation
 from django.urls import reverse
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from django.conf import settings # Import settings
+from django.conf import settings
+
+
+def _default_currency():
+    return getattr(settings, 'ITAMBOX_DEFAULT_CURRENCY', 'EUR')
 from core.models import BaseModel, ChangeLoggingMixin, StandardModel, VaultModel, DeletableVaultModel
 from core.managers import TenantScopingManager, SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager, TenantScopingAllObjectsManager
 from core.mixins import ExportableMixin, TaggableMixin, JournalingMixin, AutoSlugMixin, CloneableMixin, ImageAttachmentMixin, FileAttachmentMixin, BookmarkableMixin, SubscribableMixin, SoftDeleteMixin, CustomFieldDataMixin
@@ -186,7 +190,7 @@ class Tenant(DeletableVaultModel, BookmarkableMixin):
     tags = models.ManyToManyField('extras.Tag', related_name="tenants", blank=True)
     currency = models.CharField(
         max_length=3,
-        default='EUR',
+        default=_default_currency,
         verbose_name=_("Display currency"),
         help_text=_("ISO 4217 currency code used for value display (display only, no conversion)."),
     )

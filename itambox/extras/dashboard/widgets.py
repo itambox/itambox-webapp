@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 import json
 from django import forms
+from django.conf import settings
 from django.db.models import Sum, Count, Q, Avg, F, Case, When, Value, IntegerField, Subquery, OuterRef
 from django.db.models.functions import Extract, Coalesce
 
@@ -133,6 +134,7 @@ class DashboardWidget:
     title = ''                  # Default display title
     description = ''            # Short description shown in add-widget modal
     template_name = None        # Template for widget body content
+    icon = 'view-grid-outline'  # MDI icon name (without 'mdi-' prefix) for the header chip
     admin_only = False          # Restricted to global administrators
 
     def __init__(self, config=None):
@@ -203,6 +205,7 @@ class DashboardWidget:
 @register_widget
 class NoteWidget(DashboardWidget):
     widget_id = 'note'
+    icon = 'note-text-outline'
     title = 'Note'
     description = 'Display arbitrary custom content. Markdown is supported.'
     template_name = 'extras/dashboard/widgets/note.html'
@@ -211,12 +214,29 @@ class NoteWidget(DashboardWidget):
         content = forms.CharField(
             label='Content',
             widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 6}),
-            required=False
+            required=False,
+            help_text='Markdown is supported (headings, bold, lists, links, tables, code).'
         )
 
     def get_context(self, request):
+        import markdown as md
+        from django.utils.html import escape
+        from django.utils.safestring import mark_safe
+
+        raw = self.get_config_value('content', '')
+        content_html = ''
+        if raw:
+            # Escape FIRST so user-supplied raw HTML/scripts are neutralized,
+            # then let markdown add formatting on top of the escaped text.
+            # (Tradeoff: the blockquote '>' prefix is escaped away — acceptable
+            # in exchange for XSS safety without a sanitizer dependency.)
+            content_html = mark_safe(md.markdown(
+                escape(raw),
+                extensions=['extra', 'sane_lists', 'nl2br'],
+            ))
         return {
-            'content': self.get_config_value('content', ''),
+            'content': raw,
+            'content_html': content_html,
         }
 
 
@@ -240,25 +260,19 @@ OBJECT_COUNT_MODEL_CHOICES = [
 @register_widget
 class ObjectCountsWidget(DashboardWidget):
     widget_id = 'object-counts'
+    icon = 'counter'
     title = 'Object Counts'
     description = 'Display counts of object types with links to their list views.'
     template_name = 'extras/dashboard/widgets/object_counts.html'
 
     class ConfigForm(WidgetConfigForm):
+        # NOTE: the former 'display_style' option was dropped — the widget now
+        # always renders the quiet label/number row list. Stale values in
+        # saved configs are simply ignored.
         models = forms.MultipleChoiceField(
             label='Models',
             choices=OBJECT_COUNT_MODEL_CHOICES,
             widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
-            required=False
-        )
-        display_style = forms.ChoiceField(
-            label='Display Style',
-            choices=[
-                ('grid', 'Badge Grid'),
-                ('list', 'List View'),
-            ],
-            initial='grid',
-            widget=forms.Select(attrs={'class': 'form-select'}),
             required=False
         )
 
@@ -308,32 +322,48 @@ class ObjectCountsWidget(DashboardWidget):
         return {
             'counts': counts,
             'has_data': True,
-            'display_style': self.get_config_value('display_style', 'grid'),
         }
 
 
 @register_widget
 class FinancialWidget(DashboardWidget):
     widget_id = 'financial-overview'
+    icon = 'wallet-outline'
     title = 'Financial Overview'
     description = 'Total cost of ownership, purchase costs, maintenance, and salvage values'
     template_name = 'extras/dashboard/widgets/financial.html'
 
+    METRIC_CHOICES = [
+        ('purchase', 'Original Purchase Cost'),
+        ('maintenance', 'Maintenance Expenditures'),
+        ('salvage', 'Total Salvage Book Value'),
+        ('asset_count', 'Costed Asset Count'),
+    ]
+
+    # NOTE: the former per-widget 'currency' symbol option was dropped —
+    # formatting now goes through the `money` template filter, which derives
+    # currency (symbol, placement, separators) from the tenant /
+    # ITAMBOX_DEFAULT_CURRENCY. Stale saved values are ignored.
     class ConfigForm(WidgetConfigForm):
-        currency = forms.CharField(
-            label='Currency Symbol',
-            max_length=5,
-            initial='$',
-            widget=forms.TextInput(attrs={'class': 'form-control'}),
-            required=False
-        )
         budget_limit = forms.DecimalField(
             label='Budget Limit',
             max_digits=12,
             decimal_places=2,
             widget=forms.NumberInput(attrs={'class': 'form-control'}),
             required=False,
-            help_text='If set, progress bars will reflect percentages against this budget.'
+            help_text='If set, a budget utilization bar compares TCO against this limit.'
+        )
+        metrics = forms.MultipleChoiceField(
+            label='Metrics to Display',
+            choices=[
+                ('purchase', 'Original Purchase Cost'),
+                ('maintenance', 'Maintenance Expenditures'),
+                ('salvage', 'Total Salvage Book Value'),
+                ('asset_count', 'Costed Asset Count'),
+            ],
+            widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
+            required=False,
+            help_text='Rows shown below the TCO headline. If none selected, all are shown.'
         )
 
     def get_context(self, request):
@@ -342,25 +372,48 @@ class FinancialWidget(DashboardWidget):
 
         asset_sums = assets.aggregate(
             purchase_total=Sum('purchase_cost'),
-            salvage_total=Sum('salvage_value')
+            salvage_total=Sum('salvage_value'),
+            costed_count=Count('pk', filter=Q(purchase_cost__isnull=False)),
         )
         total_purchase = float(asset_sums['purchase_total'] or 0.0)
         total_salvage = float(asset_sums['salvage_total'] or 0.0)
         total_maintenance = float(maintenances.aggregate(total=Sum('cost'))['total'] or 0.0)
         total_tco = total_purchase + total_maintenance
-        
-        currency = self.get_config_value('currency', '$')
+
         budget_limit = self.get_config_value('budget_limit')
+        budget_pct = None
+        budget_exceeded = False
         if budget_limit:
             budget_limit = float(budget_limit)
+            budget_pct = min(100, round(total_tco / budget_limit * 100)) if budget_limit > 0 else 100
+            budget_exceeded = total_tco > budget_limit
+
+        metrics = self.get_config_value('metrics') or [k for k, _label in self.METRIC_CHOICES]
+
+        # Currency context for the `money` filter: the scoped tenant (if any)
+        # provides per-tenant currency; otherwise ITAMBOX_DEFAULT_CURRENCY.
+        # The filter resolves obj.tenant, so wrap the Tenant in a namespace.
+        from types import SimpleNamespace
+        tenant = None
+        tenant_id = self.get_config_value('tenant_id') or self.config.get('tenant_id')
+        if tenant_id:
+            from organization.models import Tenant
+            tenant = Tenant.objects.filter(id=tenant_id).first()
+        if tenant is None:
+            tenant = getattr(request, 'active_tenant', None)
+        currency_obj = SimpleNamespace(tenant=tenant) if tenant else None
 
         return {
             'total_tco': total_tco,
             'total_purchase_cost': total_purchase,
             'total_maintenance_cost': total_maintenance,
             'total_salvage_value': total_salvage,
-            'currency': currency,
+            'costed_asset_count': asset_sums['costed_count'] or 0,
             'budget_limit': budget_limit,
+            'budget_pct': budget_pct,
+            'budget_exceeded': budget_exceeded,
+            'metrics': metrics,
+            'currency_obj': currency_obj,
         }
 
     def get_footer_links(self, request):
@@ -370,6 +423,7 @@ class FinancialWidget(DashboardWidget):
 @register_widget
 class StatusLabelsWidget(DashboardWidget):
     widget_id = 'status-labels'
+    icon = 'label-multiple-outline'
     title = 'Asset Status Labels'
     description = 'Donut chart showing asset distribution by status label'
     template_name = 'extras/dashboard/widgets/status_labels.html'
@@ -438,6 +492,7 @@ class StatusLabelsWidget(DashboardWidget):
 @register_widget
 class LicenseWidget(DashboardWidget):
     widget_id = 'license-utilization'
+    icon = 'certificate-outline'
     title = 'Software License Seats'
     description = 'Top 5 licenses by seat utilization percentage'
     template_name = 'extras/dashboard/widgets/licenses.html'
@@ -482,6 +537,7 @@ class LicenseWidget(DashboardWidget):
 @register_widget
 class MaintenanceWidget(DashboardWidget):
     widget_id = 'active-maintenances'
+    icon = 'wrench-outline'
     title = 'Active Repairs & Maintenances'
     description = 'Ongoing repairs and maintenance tasks with associated costs'
     template_name = 'extras/dashboard/widgets/maintenances.html'
@@ -494,22 +550,40 @@ class MaintenanceWidget(DashboardWidget):
             required=False
         )
         highlight_overdue = forms.BooleanField(
-            label='Highlight Overdue',
+            label='Highlight Long-Running Repairs',
             initial=True,
             widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             required=False,
-            help_text='Flag repairs that have exceeded expected timelines.'
+            help_text='Flag repairs running longer than the threshold below.'
+        )
+        overdue_days = forms.IntegerField(
+            label='Long-Running Threshold (days)',
+            initial=30,
+            min_value=1,
+            widget=forms.NumberInput(attrs={'class': 'form-control'}),
+            required=False
         )
 
     def get_context(self, request):
         limit = self.get_config_value('limit', 10)
+        highlight_overdue = self.get_config_value('highlight_overdue', True)
+        overdue_days = int(self.get_config_value('overdue_days') or 30)
+        today = date.today()
+
         maintenances = get_scoped_queryset(AssetMaintenance, request, config=self.config.get("config", {})).filter(
             completion_date__isnull=True
         ).select_related('asset').order_by('-start_date')
+
+        items = list(maintenances[:limit])
+        for maint in items:
+            maint.days_running = (today - maint.start_date).days if maint.start_date else 0
+            maint.is_overdue = highlight_overdue and maint.days_running > overdue_days
+
         return {
-            'active_maintenances': maintenances[:limit],
+            'active_maintenances': items,
             'active_maintenance_count': maintenances.count(),
-            'highlight_overdue': self.get_config_value('highlight_overdue', True),
+            'highlight_overdue': highlight_overdue,
+            'overdue_days': overdue_days,
         }
 
     def get_footer_links(self, request):
@@ -519,6 +593,7 @@ class MaintenanceWidget(DashboardWidget):
 @register_widget
 class EOLAlertsWidget(DashboardWidget):
     widget_id = 'eol-alerts'
+    icon = 'calendar-alert'
     title = 'EOL Planning Alerts'
     description = 'Hardware expiring within 90 days or already past EOL'
     template_name = 'extras/dashboard/widgets/eol_alerts.html'
@@ -582,6 +657,7 @@ class EOLAlertsWidget(DashboardWidget):
 @register_widget
 class ChangelogWidget(DashboardWidget):
     widget_id = 'recent-activity'
+    icon = 'history'
     title = 'Change Log'
     description = 'Recent object changes across the system (create, update, delete)'
     template_name = 'extras/dashboard/widgets/activity.html'
@@ -612,17 +688,30 @@ class ChangelogWidget(DashboardWidget):
             required=False,
             help_text='If none selected, changes for all object types will be shown.'
         )
+        hide_event_noise = forms.BooleanField(
+            label='Hide Internal Event Entries',
+            initial=True,
+            widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            required=False,
+            help_text='Each change also writes an internal Event row — showing both duplicates the feed.'
+        )
 
     def get_context(self, request):
         from core.models import ObjectChange
         from django.contrib.contenttypes.models import ContentType
-        
+
         limit = self.get_config_value('limit', 10)
         action = self.get_config_value('action_filter', '')
         selected_models = self.get_config_value('models', [])
-        
+
         qs = get_scoped_queryset(ObjectChange, request, config=self.config.get("config", {}))
-        
+
+        if self.get_config_value('hide_event_noise', True):
+            qs = qs.exclude(
+                changed_object_type__app_label='extras',
+                changed_object_type__model='event',
+            )
+
         if action:
             qs = qs.filter(action=action)
             
@@ -654,6 +743,7 @@ class ChangelogWidget(DashboardWidget):
 @register_widget
 class RenewalsWidget(DashboardWidget):
     widget_id = 'upcoming-renewals'
+    icon = 'autorenew'
     title = 'Upcoming Renewals'
     description = 'Active subscriptions renewing within 90 days'
     template_name = 'extras/dashboard/widgets/renewals.html'
@@ -720,6 +810,7 @@ class RenewalsWidget(DashboardWidget):
 @register_widget
 class LowStockWidget(DashboardWidget):
     widget_id = 'low-stock'
+    icon = 'package-variant-closed'
     title = 'Low Stock Alerts'
     description = 'Accessories, consumables, and components below minimum quantity'
     template_name = 'extras/dashboard/widgets/low_stock.html'
@@ -879,14 +970,26 @@ class LowStockWidget(DashboardWidget):
 @register_widget
 class BookmarksWidget(DashboardWidget):
     widget_id = 'my-bookmarks'
+    icon = 'star-outline'
     title = 'My Bookmarks'
     description = 'Quick-access list of objects you have starred (personal, per-user)'
     template_name = 'extras/dashboard/widgets/bookmarks.html'
 
+    class ConfigForm(WidgetConfigForm):
+        limit = forms.IntegerField(
+            label='Max Items to Display',
+            initial=10,
+            min_value=1,
+            max_value=50,
+            widget=forms.NumberInput(attrs={'class': 'form-control'}),
+            required=False
+        )
+
     def get_context(self, request):
         from extras.models import Bookmark
         from extras.utils import resolve_generic_items
-        rows = list(Bookmark.objects.filter(user=request.user).select_related('model')[:50])
+        limit = self.get_config_value('limit') or 10
+        rows = list(Bookmark.objects.filter(user=request.user).select_related('model')[:limit])
         return {'bookmarked_items': resolve_generic_items(rows)}
 
     def get_footer_links(self, request):
@@ -897,6 +1000,7 @@ class BookmarksWidget(DashboardWidget):
 @register_widget
 class AssetAgeWidget(DashboardWidget):
     widget_id = 'asset-age'
+    icon = 'chart-bar'
     title = 'Asset Age Distribution'
     description = 'Breakdown of assets by age bucket and average age'
     template_name = 'extras/dashboard/widgets/asset_age.html'
@@ -961,6 +1065,7 @@ class AssetAgeWidget(DashboardWidget):
 @register_widget
 class TenantSpendWidget(DashboardWidget):
     widget_id = 'tenant-spend'
+    icon = 'cash-multiple'
     title = 'Tenant Spend'
     description = 'Purchase cost grouped by tenant (top 8)'
     template_name = 'extras/dashboard/widgets/tenant_spend.html'
@@ -988,7 +1093,7 @@ class TenantSpendWidget(DashboardWidget):
         currency = forms.CharField(
             label='Currency Symbol',
             max_length=5,
-            initial='€',
+            initial=getattr(settings, 'ITAMBOX_DEFAULT_CURRENCY', 'EUR'),
             widget=forms.TextInput(attrs={'class': 'form-control'}),
             required=False
         )
