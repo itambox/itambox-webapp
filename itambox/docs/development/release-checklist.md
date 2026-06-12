@@ -7,6 +7,8 @@ Use this checklist for every tagged release.
 - [ ] All tests pass: `pytest -q --no-cov`
 - [ ] No open critical/security issues on the milestone
 - [ ] `docs/` is up to date for any new features
+- [ ] API schema regenerated: `python manage.py spectacular --file schema.yaml` (commit if changed)
+- [ ] Docs build clean: `cd itambox && mkdocs build --strict` (run from repo root; output goes to `static/docs/`)
 
 ## Version bump
 

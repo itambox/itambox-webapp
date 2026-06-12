@@ -1,5 +1,8 @@
 # ITAMbox Plugins API Reference
 
+!!! warning "Status: Beta"
+    The plugin API is under active development. Interfaces documented here may change between minor releases.
+
 This document provides a detailed reference for all base classes and registry utilities available to plugin developers.
 
 ---

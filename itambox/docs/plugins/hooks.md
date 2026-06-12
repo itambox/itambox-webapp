@@ -1,5 +1,8 @@
 # ITAMbox Plugin Extension Hooks
 
+!!! warning "Status: Beta"
+    The plugin extension hook API is under active development and may change between minor releases.
+
 This document details the developer hooks available to extend the web UI, menus, REST API, and GraphQL schema.
 
 ---

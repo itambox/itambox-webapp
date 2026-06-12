@@ -1,5 +1,9 @@
 # Getting Started with ITAMbox Plugins
 
+!!! warning "Status: Beta"
+    The plugin system is under active development. APIs may change between minor releases.
+    Production use is supported but test your plugin against each ITAMbox upgrade before deploying.
+
 ITAMbox features a powerful, extensible plugin system modeled after **NetBox**. This allows developers to extend the core functionality of ITAMbox without modifying the core codebase.
 
 ---

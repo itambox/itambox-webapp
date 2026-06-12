@@ -101,10 +101,15 @@ nav:
       - DocuSign Envelopes: 'models/itambox_esign/docusignenvelope.md'
       - Metadata Tags: 'models/extras/tag.md'
       - Object Changelog: 'models/core/objectchange.md'
+  - Guides:
+      - Scanning Assets: 'usage/scanning.md'
+      - Depreciation Guide: 'usage/depreciation.md'
   - Integrations & API:
       - Developer Guide: 'integration/developer_guide.md'
       - Bulk CSV Import Guide: 'integration/bulk_import_guide.md'
       - Migrate from Snipe-IT: 'integration/migrate-from-snipe-it.md'
+      - Discovery Sync (Intune): 'integration/discovery-sync.md'
+      - SCIM Provisioning (Beta): 'integration/scim.md'
   - Plugin Development:
       - Getting Started: 'plugins/getting_started.md'
       - API Reference: 'plugins/api_reference.md'
@@ -115,3 +120,4 @@ nav:
       - Backup & Restore: 'operations/backup-restore.md'
   - Development:
       - Release Checklist: 'development/release-checklist.md'
+      - Module Maturity: 'development/module-maturity.md'

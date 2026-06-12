@@ -1,5 +1,9 @@
 # SaaS Subscriptions
 
+!!! warning "Status: Beta"
+    The Subscriptions module is Beta. Core functionality is stable; reporting and renewal
+    automation features are still evolving.
+
 A **SaaS Subscription** represents a recurring subscription contract for SaaS platforms, tools, or cloud resources (e.g. `Figma Professional Plan`, `GitHub Enterprise Cloud`, `AWS Organization Account`).
 
 ## Attributes
