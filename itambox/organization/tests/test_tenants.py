@@ -59,14 +59,14 @@ class TenantViewTests(TestCase):
 
     def test_create_view_post(self):
         url = reverse('organization:tenant_create')
-        response = self.client.post(url, {'name': 'Globex Inc', 'slug': 'globex-inc'})
+        response = self.client.post(url, {'name': 'Globex Inc', 'slug': 'globex-inc', 'currency': 'EUR'})
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Tenant.objects.filter(name='Globex Inc').exists())
 
     def test_edit_view_post(self):
         url = reverse('organization:tenant_update', kwargs={'pk': self.tenant.pk})
         response = self.client.post(url, {
-            'name': 'Acme Corp Renamed', 'slug': 'acme-corp-renamed'
+            'name': 'Acme Corp Renamed', 'slug': 'acme-corp-renamed', 'currency': 'EUR'
         })
         if response.status_code != 302:
             form = response.context.get('form')

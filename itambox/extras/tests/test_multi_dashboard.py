@@ -256,10 +256,11 @@ class MultiDashboardTenantScopingTests(TestCase):
         self.assertIn("Active", rendered)
         self.assertIn("1", rendered) # Admin should only see 1 asset because dashboard is scoped to Tenant A
 
-        # Render financial widget and verify scoped TCO cost
+        # Render financial widget and verify scoped TCO cost.
+        # Money filter formats with locale thousand-separators (1,500.00) and currency symbol.
         financial_rendered = render_widget(ctx, db.layout[1], index=1)
-        self.assertIn("1500.00", financial_rendered) # Scoped purchase cost from Asset A
-        self.assertNotIn("2500.00", financial_rendered) # Scoped purchase cost from Asset B should not appear
+        self.assertIn("1,500", financial_rendered)  # Scoped purchase cost from Asset A
+        self.assertNotIn("2,500", financial_rendered)  # Scoped purchase cost from Asset B should not appear
 
     def test_global_admin_scoped_to_tenant_b(self):
         # Admin dashboard scoped to Tenant B
@@ -276,10 +277,10 @@ class MultiDashboardTenantScopingTests(TestCase):
         self.assertIn("Active", rendered)
         self.assertIn("1", rendered) # Admin should only see 1 asset because dashboard is scoped to Tenant B
 
-        # Render financial widget and verify scoped TCO cost
+        # Render financial widget and verify scoped TCO cost.
         financial_rendered = render_widget(ctx, db.layout[1], index=1)
-        self.assertIn("2500.00", financial_rendered) # Scoped purchase cost from Asset B
-        self.assertNotIn("1500.00", financial_rendered) # Scoped purchase cost from Asset A should not appear
+        self.assertIn("2,500", financial_rendered)  # Scoped purchase cost from Asset B
+        self.assertNotIn("1,500", financial_rendered)  # Scoped purchase cost from Asset A should not appear
 
     def test_tenant_user_always_sandboxed(self):
         # Tenant A user creates a dashboard and tries to scope it to Tenant B (or leave it unscoped)
@@ -293,13 +294,13 @@ class MultiDashboardTenantScopingTests(TestCase):
 
         # Render status widget
         rendered = render_widget(ctx, db.layout[0], index=0)
-        
+
         # Even though dashboard is scoped to Tenant B, user_a belongs to Tenant A!
         # Sandboxing must strictly enforce Tenant A limits and NEVER leak Tenant B.
         self.assertIn("Active", rendered)
         self.assertIn("1", rendered) # Must still show 1 (Asset A) because of active user sandboxing
-        
+
         # Render financial widget
         financial_rendered = render_widget(ctx, db.layout[1], index=1)
-        self.assertIn("1500.00", financial_rendered) # Must show Tenant A's asset cost
-        self.assertNotIn("2500.00", financial_rendered) # Tenant B's asset cost must remain hidden
+        self.assertIn("1,500", financial_rendered)  # Must show Tenant A's asset cost
+        self.assertNotIn("2,500", financial_rendered)  # Tenant B's asset cost must remain hidden

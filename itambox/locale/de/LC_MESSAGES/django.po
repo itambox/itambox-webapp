@@ -4000,3 +4000,29 @@ msgstr "(Assets bis zu diesem Betrag werden sofort vollständig abgeschrieben)"
 
 msgid "GWG Threshold:"
 msgstr "GWG-Grenze:"
+
+# --- Beta module banner ---
+
+msgid ""
+"This module is in <strong>Beta</strong>. The API and data model may change "
+"in future releases. Your feedback is welcome."
+msgstr ""
+"Dieses Modul befindet sich im <strong>Beta</strong>-Stadium. API und "
+"Datenmodell können sich in zukünftigen Versionen ändern. Ihr Feedback "
+"ist willkommen."
+
+msgid "Dismiss"
+msgstr "Schließen"
+
+# --- Dashboard activity widget ---
+
+msgid "Updated"
+msgstr "Aktualisiert"
+
+msgid "Deleted"
+msgstr "Gelöscht"
+
+# --- AssetRole allows_components ---
+
+msgid "Assets with this role can have components allocated (servers, workstations, …)"
+msgstr "Assets mit dieser Rolle können Komponenten zugewiesen bekommen (Server, Workstations, …)"
