@@ -14,6 +14,20 @@ _SIGNAL_SKIP_MODELS = frozenset(
     ('Event', 'ObjectChange', 'JournalEntry', 'Notification', 'Bookmark', 'ObjectWatch')
 )
 
+# Tables confirmed to exist, cached for the lifetime of the process.  Positive only:
+# a table that exists will always exist; a missing table is re-checked each time.
+_TABLES_CONFIRMED: set = set()
+
+
+def _table_exists(name: str) -> bool:
+    if name in _TABLES_CONFIRMED:
+        return True
+    from django.db import connection
+    if name in connection.introspection.table_names():
+        _TABLES_CONFIRMED.add(name)
+        return True
+    return False
+
 
 @receiver(pre_save)
 def validate_custom_validators_on_save(sender, instance, **kwargs):
@@ -71,8 +85,7 @@ def event_on_delete(sender, instance, **kwargs):
 
 
 def _safe_dispatch(sender, instance, action, created=None):
-    from django.db import connection
-    if 'extras_event' not in connection.introspection.table_names():
+    if not _table_exists('extras_event'):
         return
     try:
         dispatch_event(sender, instance, action=action, created=created)
@@ -83,10 +96,9 @@ def _safe_dispatch(sender, instance, action, created=None):
 
 
 def _notify_watchers(sender, instance, action):
-    from django.db import connection
     # Pre-flight table check: avoids aborting the Postgres transaction (unlike catching
     # DatabaseError after the fact, which leaves the connection in "transaction aborted" state).
-    if 'extras_objectwatch' not in connection.introspection.table_names():
+    if not _table_exists('extras_objectwatch'):
         return
 
     from extras.models import ObjectWatch
@@ -109,7 +121,14 @@ def _notify_watchers(sender, instance, action):
     subject = f"Watched item {action}: {instance}"
     message = f"The item '{instance}' you are watching has been {action}."
 
+    app_label = ct.app_label
+    model_name = ct.model
+
     for watch in watches:
+        # Re-verify the watcher still has view access before sending — watches outlive
+        # tenant-membership removal, so skip silently if access was revoked.
+        if not watch.user.has_perm(f'{app_label}.view_{model_name}', instance):
+            continue
         Notification.objects.create(
             user=watch.user,
             subject=subject,

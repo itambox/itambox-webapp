@@ -315,18 +315,29 @@ class BookmarkToggleView(LoginRequiredMixin, View):
     """
     def post(self, request, content_type_id, object_id):
         import json
+        from django.http import Http404
         from extras.models import Bookmark
         from django.contrib.contenttypes.models import ContentType
-        
+        from itambox.registry import registry
+
         content_type = get_object_or_404(ContentType, id=content_type_id)
-        target_obj = get_object_or_404(content_type.model_class(), id=object_id)
-        
+        model_class = content_type.model_class()
+        if model_class is None or not registry.model_has_feature(model_class, 'bookmarkable'):
+            raise Http404
+
+        target_obj = get_object_or_404(model_class, id=object_id)
+
+        app_label = content_type.app_label
+        model_name = content_type.model
+        if not request.user.has_perm(f'{app_label}.view_{model_name}', target_obj):
+            raise Http404
+
         bookmark_qs = Bookmark.objects.filter(
             user=request.user,
             model=content_type,
             object_id=object_id
         )
-        
+
         if bookmark_qs.exists():
             bookmark_qs.delete()
             is_bookmarked = False
@@ -337,45 +348,32 @@ class BookmarkToggleView(LoginRequiredMixin, View):
                 object_id=object_id
             )
             is_bookmarked = True
-            
+
         if getattr(request, 'htmx', False):
-            referer = request.META.get('HTTP_REFERER', '')
-            if 'subscriptions' in referer:
-                # If deleted from subscriptions page, return empty content to remove list item
+            # ?context=list → list-page row; omitted/other → detail-page button
+            if request.GET.get('context') == 'list':
+                msg = _("Unsubscribed from {name}.").format(name=str(target_obj)) if not is_bookmarked else _("Bookmarked {name}.").format(name=str(target_obj))
                 response = HttpResponse("")
-                response['HX-Trigger'] = json.dumps({
-                    "showMessage": {
-                        "message": _("Unsubscribed from {name}.").format(name=str(target_obj)),
-                        "level": "success"
-                    }
-                })
+                response['HX-Trigger'] = json.dumps({"showMessage": {"message": msg, "level": "success"}})
                 return response
-                
-            # Detail page toggle response
+
             from django.middleware.csrf import get_token
             csrf_token = get_token(request)
-            btn_class = 'btn-warning' if is_bookmarked else 'btn-outline-secondary'
+            btn_class = 'btn-soft-warning' if is_bookmarked else 'btn-ghost-secondary'
             star_icon = 'mdi-star' if is_bookmarked else 'mdi-star-outline'
             title = 'Remove Bookmark' if is_bookmarked else 'Bookmark'
-            button_html = f"""
-            <button type="button" class="btn btn-icon {btn_class}"
-                    hx-post="{reverse('users:bookmark_toggle', kwargs={'content_type_id': content_type_id, 'object_id': object_id})}"
-                    hx-headers='{{"X-CSRFToken": "{csrf_token}"}}'
-                    hx-target="this"
-                    hx-swap="outerHTML"
-                    title="{title}">
-                <i class="mdi {star_icon}"></i>
-            </button>
-            """
+            button_html = (
+                f'<button type="button" class="btn btn-icon {btn_class}"'
+                f' hx-post="{reverse("users:bookmark_toggle", kwargs={"content_type_id": content_type_id, "object_id": object_id})}"'
+                f' hx-headers=\'{{"X-CSRFToken": "{csrf_token}"}}\''
+                f' hx-target="this" hx-swap="outerHTML" title="{title}">'
+                f'<i class="mdi {star_icon}"></i></button>'
+            )
+            msg = _("Bookmarked {name}.").format(name=str(target_obj)) if is_bookmarked else _("Bookmark removed from {name}.").format(name=str(target_obj))
             response = HttpResponse(button_html)
-            response['HX-Trigger'] = json.dumps({
-                "showMessage": {
-                    "message": _("Bookmarked {name}.").format(name=str(target_obj)) if is_bookmarked else _("Bookmark removed from {name}.").format(name=str(target_obj)),
-                    "level": "success"
-                }
-            })
+            response['HX-Trigger'] = json.dumps({"showMessage": {"message": msg, "level": "success"}})
             return response
-            
+
         return redirect(target_obj.get_absolute_url())
 
 
@@ -383,11 +381,22 @@ class WatchToggleView(LoginRequiredMixin, View):
     """Toggle an ObjectWatch for a generic object (used via HTMX)."""
     def post(self, request, content_type_id, object_id):
         import json
+        from django.http import Http404
         from extras.models import ObjectWatch
         from django.contrib.contenttypes.models import ContentType
+        from itambox.registry import registry
 
         content_type = get_object_or_404(ContentType, id=content_type_id)
-        target_obj = get_object_or_404(content_type.model_class(), id=object_id)
+        model_class = content_type.model_class()
+        if model_class is None or not registry.model_has_feature(model_class, 'watchable'):
+            raise Http404
+
+        target_obj = get_object_or_404(model_class, id=object_id)
+
+        app_label = content_type.app_label
+        model_name = content_type.model
+        if not request.user.has_perm(f'{app_label}.view_{model_name}', target_obj):
+            raise Http404
 
         watch_qs = ObjectWatch.objects.filter(
             user=request.user,
@@ -407,39 +416,28 @@ class WatchToggleView(LoginRequiredMixin, View):
             is_watched = True
 
         if getattr(request, 'htmx', False):
-            referer = request.META.get('HTTP_REFERER', '')
-            if 'subscriptions' in referer or 'watching' in referer:
+            # ?context=list → list-page row; omitted/other → detail-page button
+            if request.GET.get('context') == 'list':
+                msg = _("Unwatched {name}.").format(name=str(target_obj)) if not is_watched else _("Now watching {name}.").format(name=str(target_obj))
                 response = HttpResponse("")
-                response['HX-Trigger'] = json.dumps({
-                    "showMessage": {
-                        "message": _("Unwatched {name}.").format(name=str(target_obj)),
-                        "level": "success"
-                    }
-                })
+                response['HX-Trigger'] = json.dumps({"showMessage": {"message": msg, "level": "success"}})
                 return response
 
             from django.middleware.csrf import get_token
             csrf_token = get_token(request)
-            btn_class = 'btn-info' if is_watched else 'btn-outline-secondary'
+            btn_class = 'btn-soft-info' if is_watched else 'btn-ghost-secondary'
             bell_icon = 'mdi-bell' if is_watched else 'mdi-bell-outline'
             title = 'Stop Watching' if is_watched else 'Watch (notify me on changes)'
-            button_html = f"""
-            <button type="button" class="btn btn-icon {btn_class}"
-                    hx-post="{reverse('users:watch_toggle', kwargs={'content_type_id': content_type_id, 'object_id': object_id})}"
-                    hx-headers='{{"X-CSRFToken": "{csrf_token}"}}'
-                    hx-target="this"
-                    hx-swap="outerHTML"
-                    title="{title}">
-                <i class="mdi {bell_icon}"></i>
-            </button>
-            """
+            button_html = (
+                f'<button type="button" class="btn btn-icon {btn_class}"'
+                f' hx-post="{reverse("users:watch_toggle", kwargs={"content_type_id": content_type_id, "object_id": object_id})}"'
+                f' hx-headers=\'{{"X-CSRFToken": "{csrf_token}"}}\''
+                f' hx-target="this" hx-swap="outerHTML" title="{title}">'
+                f'<i class="mdi {bell_icon}"></i></button>'
+            )
+            msg = _("Now watching {name}.").format(name=str(target_obj)) if is_watched else _("Unwatched {name}.").format(name=str(target_obj))
             response = HttpResponse(button_html)
-            response['HX-Trigger'] = json.dumps({
-                "showMessage": {
-                    "message": _("Now watching {name}.").format(name=str(target_obj)) if is_watched else _("Unwatched {name}.").format(name=str(target_obj)),
-                    "level": "success"
-                }
-            })
+            response['HX-Trigger'] = json.dumps({"showMessage": {"message": msg, "level": "success"}})
             return response
 
         return redirect(target_obj.get_absolute_url())

@@ -99,12 +99,36 @@ class AssetScanner {
         { facingMode: 'environment' },
         config,
         (decodedText: string) => {
-          this.config.onResult(decodedText);
+          let raw = decodedText.trim();
+          // Strip surrounding quotes
+          if (raw.startsWith('"') && raw.endsWith('"')) {
+            raw = raw.slice(1, -1).trim();
+          }
+          if (raw.startsWith("'") && raw.endsWith("'")) {
+            raw = raw.slice(1, -1).trim();
+          }
+          
+          // Normalize full-width colons
+          raw = raw.replace(/：/g, ':');
+
+          // Deep link: keep itambox://asset/<pk> intact for backend resolution
+          if (raw.toLowerCase().startsWith('itambox://asset/')) {
+            this.config.onResult(raw);
+            return;
+          }
+
+          if (raw.toLowerCase().startsWith('itambox://')) {
+            raw = raw.slice(10).replace(/^\/+|\/+$/g, '').trim();
+          } else if (raw.toLowerCase().startsWith('itambox:')) {
+            raw = raw.slice(8).replace(/^\/+|\/+$/g, '').trim();
+          }
+          this.config.onResult(raw);
         },
         (_errorMessage: string) => {
           // Frame failures are normal while no code is in view — suppress
         }
       );
+
 
       try {
         const capabilities = this.html5QrcodeScanner.getRunningTrackCapabilities();
@@ -172,7 +196,9 @@ class AssetScanner {
 // ─── Audit page scanner (fills #barcode-scan-input, submits via HTMX form) ─────
 
 function initAuditScanner(): void {
-  if (!document.getElementById('open-scanner-btn')) return;
+  const openBtn = document.getElementById('open-scanner-btn');
+  if (!openBtn || openBtn.dataset.scannerInitialized) return;
+  openBtn.dataset.scannerInitialized = 'true';
   const searchField = document.getElementById('barcode-scan-input') as HTMLInputElement | null;
   let instance: AssetScanner;
   instance = new AssetScanner({
@@ -197,7 +223,8 @@ function initAuditScanner(): void {
 
 function initGlobalScanner(): void {
   const openBtn = document.getElementById('global-open-scanner-btn');
-  if (!openBtn) return;
+  if (!openBtn || openBtn.dataset.scannerInitialized) return;
+  openBtn.dataset.scannerInitialized = 'true';
 
   const instance = new AssetScanner({
     readerId: 'global-scanner-reader',
@@ -207,7 +234,6 @@ function initGlobalScanner(): void {
     closeBtnId: 'global-close-scanner-btn',
     errorDivId: 'global-scanner-error',
     onResult(code: string) {
-      instance.stop();
       fetch('/scan/resolve/?code=' + encodeURIComponent(code))
         .then(res => {
           if (!res.ok) throw new Error('not_found');
@@ -215,6 +241,7 @@ function initGlobalScanner(): void {
         })
         .then((data: { found: boolean; url?: string; label?: string }) => {
           if (data.found && data.url) {
+            instance.stop();
             document.dispatchEvent(new Event('playAuditSound'));
             window.location.href = data.url;
           } else {

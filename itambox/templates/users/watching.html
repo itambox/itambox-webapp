@@ -21,7 +21,7 @@
                     </div>
                     <div>
                         <button type="button" class="btn btn-sm btn-outline-danger"
-                                hx-post="{{ item.toggle_url }}"
+                                hx-post="{{ item.toggle_url }}?context=list"
                                 hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                                 hx-target="closest .list-group-item"
                                 hx-swap="outerHTML"
