@@ -21,8 +21,18 @@ def get_model_viewname(model, action):
     elif app_label == 'auth':
         app_label = 'users'
     model_name = model._meta.model_name
-    if app_label == 'core':
-        # Core app URL naming traditionally registers f"{model_name}_add" for creation
+    
+    # Map model name for URL mapping if they have underscores in URL config
+    if model_name == 'exporttemplate':
+        model_name = 'export_template'
+        
+    _global_extras_models = {
+        'reporttemplate', 'scheduledreport', 'alertrule', 'notificationchannel',
+        'alertlog', 'export_template', 'labeltemplate', 'webhookendpoint', 'eventrule'
+    }
+    
+    if app_label == 'core' or (app_label == 'extras' and model_name in _global_extras_models):
+        # Core/Global app URL naming traditionally registers f"{model_name}_add" for creation
         act = 'add' if action == 'create' else action
         return f"{model_name}_{act}"
     return f"{app_label}:{model_name}_{action}"

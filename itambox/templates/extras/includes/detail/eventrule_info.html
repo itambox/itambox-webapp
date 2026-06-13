@@ -31,6 +31,26 @@
     <dt class="col-sm-3">{% translate "Action Type:" %}</dt>
     <dd class="col-sm-9"><span class="badge bg-purple-lt px-2.5 py-1 text-uppercase">{{ object.get_action_type_display }}</span></dd>
 
+    {% if object.action_type == 'webhook' %}
+    <dt class="col-sm-3">{% translate "Webhook Endpoint:" %}</dt>
+    <dd class="col-sm-9">
+        {% if object.webhook %}
+            <a href="{{ object.webhook.get_absolute_url }}" class="text-decoration-none">
+                {{ object.webhook.name }}
+            </a>
+            <span class="text-secondary small font-monospace ms-1">{{ object.webhook.url }}</span>
+            {% if not object.webhook.enabled %}
+                <span class="badge bg-warning ms-1">{% translate "Endpoint disabled" %}</span>
+            {% endif %}
+        {% elif object.action_config.url %}
+            <span class="font-monospace">{{ object.action_config.url }}</span>
+            <span class="text-secondary small ms-1">{% translate "(inline URL — consider linking a Webhook Endpoint)" %}</span>
+        {% else %}
+            <span class="badge bg-danger">{% translate "No endpoint set — this rule will not deliver" %}</span>
+        {% endif %}
+    </dd>
+    {% endif %}
+
     {% if object.conditions %}
     <dt class="col-sm-3">{% translate "Matching Conditions:" %}</dt>
     <dd class="col-sm-9">

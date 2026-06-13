@@ -36,7 +36,7 @@ def process_event_rules(event):
     rules = EventRule.objects.filter(
         model=event.model,
         enabled=True,
-    )
+    ).select_related('webhook')
 
     if not rules.exists():
         return
@@ -126,21 +126,43 @@ def _execute_event_action(rule, event):
 
 
 def _send_webhook(rule, event):
-    """Send a webhook request based on the rule's action_config."""
+    """Send a webhook request for the rule.
+
+    Prefers the linked WebhookEndpoint (``rule.webhook``) — its URL, method, headers,
+    decrypted secret and retry policy. Falls back to the legacy ``action_config`` JSON
+    (``url``/``method``/``headers``/``secret``) for rules created before endpoints could
+    be linked; in that case retry settings are borrowed from an endpoint registered for
+    the same URL, if any.
+    """
 
     config = rule.action_config or {}
-    url = config.get('url')
+    endpoint = rule.webhook
+
+    if endpoint is not None:
+        if not endpoint.enabled:
+            return
+        url = endpoint.url
+        method = endpoint.http_method
+        headers = endpoint.headers or {}
+        secret = endpoint.secret_decrypted
+        retry_count = endpoint.retry_count
+        retry_backoff = endpoint.retry_backoff
+        # Allow header overrides from action_config without leaking the secret into JSON.
+        headers = {**headers, **(config.get('headers') or {})}
+    else:
+        url = config.get('url')
+        if not url:
+            return
+        method = config.get('method', 'POST')
+        headers = config.get('headers', {})
+        secret = config.get('secret', '')
+        match = WebhookEndpoint.objects.filter(url=url, enabled=True).first()
+        retry_count = match.retry_count if match else 3
+        retry_backoff = match.retry_backoff if match else 60
+
     if not url:
         return
-
-    method = config.get('method', 'POST').upper()
-    headers = config.get('headers', {})
-    secret = config.get('secret', '')
-
-    # Pull retry settings from the matching WebhookEndpoint if one is registered for this URL.
-    endpoint = WebhookEndpoint.objects.filter(url=url, enabled=True).first()
-    retry_count = endpoint.retry_count if endpoint else 3
-    retry_backoff = endpoint.retry_backoff if endpoint else 60
+    method = (method or 'POST').upper()
 
     from django_q.tasks import async_task
     from django.db import transaction
