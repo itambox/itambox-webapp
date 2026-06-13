@@ -29,8 +29,8 @@ class TenantMembershipCreateView(ObjectEditView):
         return initial
 
     def get_success_url(self):
-        if self.instance and self.instance.user:
-            return reverse('users:user_detail', kwargs={'pk': self.instance.user.pk})
+        if self.object and self.object.user:
+            return reverse('users:user_detail', kwargs={'pk': self.object.user.pk})
         user_pk = self.request.GET.get('user')
         if user_pk:
             return reverse('users:user_detail', kwargs={'pk': user_pk})
