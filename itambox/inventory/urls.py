@@ -32,6 +32,7 @@ urlpatterns = [
     path('consumables/add/', views.ConsumableEditView.as_view(), name='consumable_create'),
     path('consumables/edit/', views.ConsumableBulkEditView.as_view(), name='consumable_bulk_edit'),
     path('consumables/delete/', views.ConsumableBulkDeleteView.as_view(), name='consumable_bulk_delete'),
+    path('inventory/bulk-checkout/', views.bulk_checkout_inventory, name='inventory_bulk_checkout'),
     path('consumables/consumptions/', views.ConsumableAssignmentListView.as_view(), name='consumableassignment_list'),
     path('consumables/<int:pk>/', views.ConsumableDetailView.as_view(), name='consumable_detail'),
     path('consumables/<int:pk>/edit/', views.ConsumableEditView.as_view(), name='consumable_update'),
