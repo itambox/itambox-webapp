@@ -63,6 +63,24 @@ class TenantViewTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Tenant.objects.filter(name='Globex Inc').exists())
 
+    def test_tenant_membership_create_view(self):
+        from organization.models import TenantRole, TenantMembership
+        role = TenantRole.objects.create(
+            tenant=self.tenant,
+            name="Test Role",
+            permissions=[]
+        )
+        url = reverse('organization:tenantmembership_create') + f"?user={self.user.pk}"
+        response = self.client.post(url, {
+            'user': self.user.pk,
+            'tenant': self.tenant.pk,
+            'role': role.pk
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse('users:user_detail', kwargs={'pk': self.user.pk}), response.url)
+        self.assertTrue(TenantMembership.objects.filter(user=self.user, tenant=self.tenant).exists())
+
+
     def test_edit_view_post(self):
         url = reverse('organization:tenant_update', kwargs={'pk': self.tenant.pk})
         response = self.client.post(url, {
