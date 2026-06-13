@@ -45,7 +45,7 @@ class TokenSerializer(serializers.ModelSerializer):
         model = Token
         fields = [
             'id', 'key', 'user', 'user_id', 'created',
-            'expires', 'last_used', 'write_enabled', 'description'
+            'expires', 'last_used', 'write_enabled', 'allowed_ips', 'description'
         ]
         read_only_fields = ['key', 'created', 'last_used']
         brief_fields = ['id', 'key', 'user', 'created']

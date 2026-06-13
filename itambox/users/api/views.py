@@ -30,6 +30,21 @@ class TokenViewSet(ITAMBoxModelViewSet):
     def get_queryset(self):
         return Token.objects.select_related('user').filter(user=self.request.user)
 
+    def _pin_user(self, serializer):
+        # A user must never be able to provision a token bound to another account
+        # (privilege escalation). Only superusers may set an explicit `user`;
+        # everyone else is pinned to themselves regardless of any supplied user_id.
+        if self.request.user.is_superuser and serializer.validated_data.get('user'):
+            serializer.save()
+        else:
+            serializer.save(user=self.request.user)
+
+    def perform_create(self, serializer):
+        self._pin_user(serializer)
+
+    def perform_update(self, serializer):
+        self._pin_user(serializer)
+
 
 class UserConfigView(RetrieveUpdateAPIView):
     serializer_class = UserConfigSerializer

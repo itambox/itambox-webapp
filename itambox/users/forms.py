@@ -284,15 +284,33 @@ class TokenForm(forms.ModelForm):
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
         help_text=_("Optional expiration date. Leave blank for a token that never expires.")
     )
+    allowed_ips = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('e.g., 192.168.1.0/24, 10.0.0.5')}),
+        help_text=_("Comma-separated IPs or CIDR prefixes allowed to use this token. Leave blank to allow any address."),
+    )
 
     class Meta:
         from .models import Token
         model = Token
-        fields = ['description', 'write_enabled', 'expires']
+        fields = ['description', 'write_enabled', 'allowed_ips', 'expires']
         widgets = {
             'description': forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('e.g., Personal Laptop API Access')}),
             'write_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
+
+    def clean_allowed_ips(self):
+        import ipaddress
+        raw = self.cleaned_data.get('allowed_ips', '')
+        prefixes = [p.strip() for p in raw.replace('\n', ',').split(',') if p.strip()]
+        for prefix in prefixes:
+            try:
+                ipaddress.ip_network(prefix, strict=False)
+            except ValueError:
+                raise forms.ValidationError(
+                    _('"%(prefix)s" is not a valid IP address or CIDR prefix.') % {'prefix': prefix}
+                )
+        return prefixes
 
 
 from core.forms import FilterForm

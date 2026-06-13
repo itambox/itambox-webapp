@@ -12,6 +12,27 @@ def _get_cache():
     return caches[alias]
 
 
+def get_client_ip(request):
+    """
+    Resolve the client IP for a request. Defaults to the safe REMOTE_ADDR and
+    only trusts X-Forwarded-For when RATELIMIT_USE_X_FORWARDED_FOR is enabled,
+    counting back RATELIMIT_NUM_PROXIES hops to skip attacker-supplied entries.
+
+    Shared by the rate limiter and API token IP restrictions so both resolve the
+    client identically under the same proxy assumptions.
+    """
+    use_x_forwarded = getattr(settings, 'RATELIMIT_USE_X_FORWARDED_FOR', False)
+    if use_x_forwarded:
+        num_proxies = getattr(settings, 'RATELIMIT_NUM_PROXIES', 1)
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            parts = [ip.strip() for ip in x_forwarded_for.split(',')]
+            if len(parts) >= num_proxies:
+                return parts[-num_proxies]
+            return parts[0]
+    return request.META.get('REMOTE_ADDR', '127.0.0.1')
+
+
 class RateLimitMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
@@ -64,15 +85,5 @@ class RateLimitMiddleware:
         return self.get_response(request)
 
     def get_client_ip(self, request):
-        # Default to safe REMOTE_ADDR. Only trust X-Forwarded-For if explicitly configured in settings.
-        use_x_forwarded = getattr(settings, 'RATELIMIT_USE_X_FORWARDED_FOR', False)
-        if use_x_forwarded:
-            num_proxies = getattr(settings, 'RATELIMIT_NUM_PROXIES', 1)
-            x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-            if x_forwarded_for:
-                parts = [ip.strip() for ip in x_forwarded_for.split(',')]
-                if len(parts) >= num_proxies:
-                    return parts[-num_proxies]
-                return parts[0]
-        return request.META.get('REMOTE_ADDR', '127.0.0.1')
+        return get_client_ip(request)
 

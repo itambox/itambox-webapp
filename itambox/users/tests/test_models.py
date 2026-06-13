@@ -68,6 +68,43 @@ class TokenModelTests(TestCase):
         token = Token.objects.create(user=self.user)
         self.assertEqual(token.description, '')
 
+    def test_token_allowed_ips_empty_by_default(self):
+        token = Token.objects.create(user=self.user)
+        self.assertEqual(token.allowed_ips, [])
+
+    def test_validate_client_ip_no_restriction_allows_any(self):
+        token = Token.objects.create(user=self.user)
+        self.assertTrue(token.validate_client_ip('203.0.113.9'))
+        self.assertTrue(token.validate_client_ip('2001:db8::1'))
+
+    def test_validate_client_ip_within_cidr(self):
+        token = Token.objects.create(user=self.user, allowed_ips=['192.168.1.0/24'])
+        self.assertTrue(token.validate_client_ip('192.168.1.50'))
+        self.assertFalse(token.validate_client_ip('192.168.2.50'))
+
+    def test_validate_client_ip_exact_host(self):
+        token = Token.objects.create(user=self.user, allowed_ips=['10.0.0.5'])
+        self.assertTrue(token.validate_client_ip('10.0.0.5'))
+        self.assertFalse(token.validate_client_ip('10.0.0.6'))
+
+    def test_validate_client_ip_ipv6(self):
+        token = Token.objects.create(user=self.user, allowed_ips=['2001:db8::/32'])
+        self.assertTrue(token.validate_client_ip('2001:db8::1'))
+        self.assertFalse(token.validate_client_ip('2001:dead::1'))
+
+    def test_validate_client_ip_unparseable_is_rejected(self):
+        token = Token.objects.create(user=self.user, allowed_ips=['192.168.1.0/24'])
+        self.assertFalse(token.validate_client_ip('not-an-ip'))
+        self.assertFalse(token.validate_client_ip(None))
+
+    def test_validate_cidr_list_rejects_invalid(self):
+        from django.core.exceptions import ValidationError
+        from users.models import validate_cidr_list
+        with self.assertRaises(ValidationError):
+            validate_cidr_list(['192.168.1.0/24', 'garbage'])
+        # Valid entries raise nothing
+        validate_cidr_list(['192.168.1.0/24', '10.0.0.5', '2001:db8::/32'])
+
 class UserPreferenceModelTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='testuser', password='testpass')

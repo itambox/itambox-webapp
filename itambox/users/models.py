@@ -1,8 +1,24 @@
+import ipaddress
+import secrets
+
 from django.conf import settings
+from django.contrib.postgres.fields import ArrayField
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
-import secrets
+
+
+def validate_cidr_list(value):
+    """Validate that every entry in an allowed_ips list is a valid IPv4/IPv6 host or CIDR network."""
+    for prefix in value:
+        try:
+            ipaddress.ip_network(prefix, strict=False)
+        except ValueError:
+            raise ValidationError(
+                _('"%(prefix)s" is not a valid IP address or CIDR prefix.'),
+                params={'prefix': prefix},
+            )
 
 
 class UserPreference(models.Model):
@@ -55,6 +71,17 @@ class Token(models.Model):
     last_used = models.DateTimeField(blank=True, null=True)
     write_enabled = models.BooleanField(default=True)
     description = models.CharField(max_length=200, blank=True)
+    allowed_ips = ArrayField(
+        base_field=models.CharField(max_length=43),
+        blank=True,
+        default=list,
+        validators=[validate_cidr_list],
+        verbose_name=_('Allowed IPs'),
+        help_text=_(
+            'Permitted IPv4/IPv6 networks from which this token may be used, in CIDR notation '
+            '(e.g. "192.168.1.0/24, 10.0.0.5"). Leave blank to allow any source address.'
+        ),
+    )
 
     class Meta:
         ordering = ['-created']
@@ -90,3 +117,24 @@ class Token(models.Model):
         if self.expires is None:
             return False
         return timezone.now() >= self.expires
+
+    def validate_client_ip(self, client_ip):
+        """
+        Return True if the given client IP is permitted to use this token.
+
+        An empty allowed_ips list imposes no restriction. An unparseable client
+        IP, or one outside every configured prefix, is rejected (fail closed).
+        """
+        if not self.allowed_ips:
+            return True
+        try:
+            client_addr = ipaddress.ip_address(client_ip)
+        except (ValueError, TypeError):
+            return False
+        for prefix in self.allowed_ips:
+            try:
+                if client_addr in ipaddress.ip_network(prefix, strict=False):
+                    return True
+            except (ValueError, TypeError):
+                continue
+        return False

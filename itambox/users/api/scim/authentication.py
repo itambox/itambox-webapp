@@ -50,6 +50,18 @@ class SCIMBearerTokenAuthentication(BaseAuthentication):
             if token.is_expired:
                 raise exceptions.AuthenticationFailed('Token expired.')
 
+            if token.allowed_ips:
+                from itambox.ratelimit import get_client_ip
+                client_ip = get_client_ip(request)
+                if not token.validate_client_ip(client_ip):
+                    logger.warning(
+                        'SCIM token %s... rejected: source IP %s not in allowed_ips',
+                        token_key[:6], client_ip
+                    )
+                    raise exceptions.AuthenticationFailed(
+                        'Source IP address is not permitted to use this token.'
+                    )
+
             user = token.user
             if not user.is_active:
                 raise exceptions.AuthenticationFailed('User inactive or deleted.')
@@ -59,7 +71,11 @@ class SCIMBearerTokenAuthentication(BaseAuthentication):
                 membership = TenantMembership.objects.filter(user=user, tenant=tenant).select_related('role').first()
                 if not membership:
                     raise exceptions.AuthenticationFailed('User does not have a membership in this tenant.')
-                if membership.role.name.lower() not in ('admin', 'owner'):
+                # Fail closed when the membership has no role (nullable FK) instead of
+                # raising AttributeError (500). Authorise admin/owner only.
+                role = membership.role
+                role_name = (role.name or '').lower() if role else ''
+                if not role or role_name not in ('admin', 'owner'):
                     raise exceptions.AuthenticationFailed('User does not have sufficient permissions (admin or owner role required).')
 
             # Enforce write_enabled token flag for write methods
@@ -99,7 +115,11 @@ class SCIMBearerTokenAuthentication(BaseAuthentication):
                 membership = TenantMembership.objects.filter(user=user, tenant=tenant).select_related('role').first()
                 if not membership:
                     raise exceptions.AuthenticationFailed('User does not have a membership in this tenant.')
-                if membership.role.name.lower() not in ('admin', 'owner'):
+                # Fail closed when the membership has no role (nullable FK) instead of
+                # raising AttributeError (500). Authorise admin/owner only.
+                role = membership.role
+                role_name = (role.name or '').lower() if role else ''
+                if not role or role_name not in ('admin', 'owner'):
                     raise exceptions.AuthenticationFailed('User does not have sufficient permissions (admin or owner role required).')
 
             return (user, None)
