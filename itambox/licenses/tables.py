@@ -45,11 +45,15 @@ class LicenseSeatAssignmentTable(BaseTable):
         accessor='asset.name',
         verbose_name=_("Asset")
     )
-    assigned_holder = tables.LinkColumn(
-        viewname='organization:assetholder_detail',
-        args=[tables.A('assigned_holder__pk')],
-        accessor='assigned_holder.upn',
-        verbose_name=_("Asset Holder")
+    # Resolves the holder of the seat. Seats assigned directly to a holder show
+    # that holder; seats assigned to an *asset* fall back to whoever the asset is
+    # currently checked out to (empty_values=() so the renderer runs even when
+    # the seat has no direct holder).
+    assigned_holder = tables.Column(
+        accessor='assigned_holder',
+        verbose_name=_("Asset Holder"),
+        orderable=False,
+        empty_values=(),
     )
     assigned_date = tables.DateTimeColumn(verbose_name=_("Assigned At"), format='Y-m-d H:i')
     notes = tables.Column(verbose_name=_("Notes"))
@@ -76,6 +80,29 @@ class LicenseSeatAssignmentTable(BaseTable):
             }
         }
     )
+
+    def render_assigned_holder(self, record):
+        from django.urls import reverse
+        from django.utils.html import format_html
+        from organization.models import AssetHolder
+
+        holder = record.assigned_holder
+        via_asset = False
+        if holder is None and record.asset_id:
+            target = record.asset.assigned_to  # the asset's current holder/location/asset
+            if isinstance(target, AssetHolder):
+                holder = target
+                via_asset = True
+        if holder is None:
+            return '—'
+        url = reverse('organization:assetholder_detail', kwargs={'pk': holder.pk})
+        label = holder.upn or str(holder)
+        if via_asset:
+            return format_html(
+                '<a href="{}">{}</a> <span class="text-muted small">({})</span>',
+                url, label, _('via asset')
+            )
+        return format_html('<a href="{}">{}</a>', url, label)
 
     class Meta(BaseTable.Meta):
         model = LicenseSeatAssignment

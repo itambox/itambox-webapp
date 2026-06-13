@@ -1605,15 +1605,18 @@ class Command(BaseCommand):
                     seats=seats, purchase_cost=cost, purchase_date=days_ago(random.randint(60, 600)),
                     order_number=f"PO-SW-{random.randint(1000, 9999)}", tenant=tenant, expiration_date=expiry)
                 self._licenses.append(lic)
-                # Assign seats to a sample of holders for the seat-based subscriptions
+                # Assign seats to a sample of holders for the seat-based subscriptions.
+                # Per-user products (e.g. Microsoft 365 E5) are user-bound — the seat
+                # targets the holder. Per-device products (e.g. CrowdStrike Falcon, an
+                # endpoint agent) are device-bound — the seat targets the holder's
+                # primary laptop when known. The model enforces asset XOR holder.
+                DEVICE_BOUND_SOFTWARE = {'CrowdStrike Falcon'}
                 if ltype == 'subscription_seat' and holders and sw_name in ('Microsoft 365 E5', 'CrowdStrike Falcon'):
+                    device_bound = sw_name in DEVICE_BOUND_SOFTWARE
                     for h in random.sample(holders, k=min(len(holders), max(3, len(holders) // 2))):
                         try:
-                            # A seat targets the holder's actual primary laptop where one is
-                            # known (device-bound), otherwise the holder (user-bound). The model
-                            # enforces asset XOR holder, so never both.
                             laptop = self._primary_laptop_by_holder.get(h.pk)
-                            if laptop is not None:
+                            if device_bound and laptop is not None:
                                 LicenseSeatAssignment.objects.create(license=lic, asset=laptop)
                             else:
                                 LicenseSeatAssignment.objects.create(license=lic, assigned_holder=h)

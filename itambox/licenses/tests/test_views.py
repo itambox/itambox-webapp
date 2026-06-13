@@ -51,6 +51,28 @@ class LicenseViewTests(TestCase):
         self.assertContains(response, "Seat Assignments")
         self.assertTemplateUsed(response, 'licenses/license_detail.html')
 
+    def test_license_detail_seats_tab_renders_assignments(self):
+        """The ?tab=seats pane renders seat assignments, and the Asset Holder
+        column resolves: directly for holder-seats, and via the asset's current
+        holder for asset-seats."""
+        from organization.models import AssetHolder
+        from assets.models import Asset, AssetAssignment
+        # 1. Seat assigned directly to a holder.
+        holder = baker.make(AssetHolder, first_name='Jane', last_name='Roe', upn='jane.roe@example.com', tenant=None)
+        baker.make('licenses.LicenseSeatAssignment', license=self.license, assigned_holder=holder, asset=None)
+        # 2. Seat assigned to an asset that is itself checked out to a holder.
+        asset_holder = baker.make(AssetHolder, first_name='Asset', last_name='User', upn='asset.holder@example.com', tenant=None)
+        asset = baker.make(Asset, name='REPRO-LAPTOP-01', tenant=None)
+        baker.make(AssetAssignment, asset=asset, assigned_user=asset_holder, is_active=True)
+        baker.make('licenses.LicenseSeatAssignment', license=self.license, asset=asset, assigned_holder=None)
+
+        url = reverse('licenses:license_detail', kwargs={'pk': self.license.pk}) + '?tab=seats'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'REPRO-LAPTOP-01')
+        self.assertContains(response, 'jane.roe@example.com')        # direct holder seat
+        self.assertContains(response, 'asset.holder@example.com')    # resolved via the asset
+
     def test_license_create_view_loads(self):
         """Verify that the License Add form view loads successfully."""
         url = reverse('licenses:license_create')

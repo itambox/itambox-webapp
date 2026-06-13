@@ -46,8 +46,15 @@ class LicenseDetailView(ObjectDetailView):
         context = super().get_context_data(**kwargs)
         license_obj = self.get_object()
 
-        # Query all seat assignments (to either assets or holders)
-        assignments_qs = license_obj.assignments.all()
+        # Query all seat assignments (to either assets or holders). Prefetch each
+        # asset's active assignment + its holder so the "Asset Holder" column can
+        # resolve an asset-targeted seat's effective holder without N+1 queries.
+        from django.db.models import Prefetch
+        from assets.models import AssetAssignment
+        active_asset_assignments = AssetAssignment.objects.filter(is_active=True).select_related('assigned_user')
+        assignments_qs = license_obj.assignments.select_related('asset', 'assigned_holder', 'license').prefetch_related(
+            Prefetch('asset__assignments', queryset=active_asset_assignments, to_attr='prefetched_active_assignments')
+        )
         assignments_table = tables.LicenseSeatAssignmentTable(assignments_qs, request=self.request)
         assignments_table.configure(self.request)
         context['assignments_table'] = assignments_table
