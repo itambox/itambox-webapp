@@ -27,11 +27,9 @@
             </div>
         {% endif %}
     </div>
-    {% if unread_notifications_count > 0 %}
-        <div class="card-footer text-center py-2">
-            <a href="{% url 'users:user_notifications' %}" class="small font-weight-bold">{% translate "View Notification Center" %}</a>
-        </div>
-    {% endif %}
+    <div class="card-footer text-center py-2">
+        <a href="{% url 'users:user_notifications' %}" class="small font-weight-bold" hx-target="#page-content-wrapper">{% translate "View Notification Center" %}</a>
+    </div>
 </div>
 
 {# OOB swap for the badge dot on the bell icon #}
