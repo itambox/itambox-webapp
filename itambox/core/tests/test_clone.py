@@ -74,7 +74,7 @@ class ObjectCloneHttpFlowTests(TestCase):
 
 
 class ActionsColumnCloneButtonTests(TestCase):
-    """The generic table actions column adds a yellow clone button for any model
+    """The generic table actions column adds a ghost clone button for any model
     with a clone view, and omits it otherwise."""
 
     def test_clone_button_rendered_for_cloneable_model(self):
@@ -84,7 +84,7 @@ class ActionsColumnCloneButtonTests(TestCase):
         html = ActionsColumn().render(mfr, table=None)
 
         self.assertIn('mdi-content-copy', html)
-        self.assertIn('btn-warning', html)
+        self.assertIn('btn-action', html)
         self.assertIn(f'/clone/', html)
 
     def test_clone_button_omitted_for_non_cloneable_model(self):

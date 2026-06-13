@@ -2,66 +2,62 @@
 {% load i18n %}
 {% load render_table from django_tables2 %}
 
-{% block content %}
-<div class="container-xl">
-    <!-- Page header -->
-    <div class="page-header d-print-none mb-3">
-        <div class="row align-items-center">
-            <div class="col">
-                <h2 class="page-title">
-                    <i class="mdi mdi-cpu-64-bit me-2 text-primary"></i>
-                    {% translate "Background Tasks & Jobs" %}
-                </h2>
-                <div class="text-muted mt-1">{% translate "Monitor the status and execution logs of asynchronous operations." %}</div>
-            </div>
-        </div>
-    </div>
+{% block title %}{% translate "Jobs" %} {% translate "- ITAMbox" %}{% endblock %}
 
-    <!-- Quick Metrics Summary -->
+{% block page_header %}
+    <div class="page-pretitle">
+        {% translate "Overview" %}
+    </div>
+    <h2 class="page-title">
+        {% translate "Jobs" %}
+    </h2>
+{% endblock %}
+
+{% block content %}
+<div id="jobs-panel"
+     {% if has_active_jobs %}
+     hx-get="{% url 'job_list' %}"
+     hx-trigger="every 5s"
+     hx-select="#jobs-panel"
+     hx-target="#jobs-panel"
+     hx-swap="outerHTML"
+     {% endif %}>
     <div class="row row-cards mb-3">
-        <div class="col-sm-6 col-lg-3">
+        <div class="col-6 col-lg-3">
             <div class="card card-sm">
                 <div class="card-body">
                     <div class="row align-items-center">
                         <div class="col-auto">
-                            <span class="bg-blue text-white avatar">
+                            <span class="bg-info text-white avatar">
                                 <i class="mdi mdi-clock-outline"></i>
                             </span>
                         </div>
                         <div class="col">
-                            <div class="font-weight-medium">
-                                {{ table.data|length }} {% translate "Total Tasks" %}
-                            </div>
-                            <div class="text-muted">
-                                {% translate "Historical runs queue" %}
-                            </div>
+                            <div class="font-weight-medium">{{ status_counts.pending }}</div>
+                            <div class="text-muted">{% translate "Pending" %}</div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-sm-6 col-lg-3">
+        <div class="col-6 col-lg-3">
             <div class="card card-sm">
                 <div class="card-body">
                     <div class="row align-items-center">
                         <div class="col-auto">
                             <span class="bg-warning text-white avatar">
-                                <i class="mdi mdi-loading"></i>
+                                <i class="mdi mdi-progress-clock"></i>
                             </span>
                         </div>
                         <div class="col">
-                            <div class="font-weight-medium">
-                                <span class="text-warning">{% translate "Active Workers" %}</span>
-                            </div>
-                            <div class="text-muted">
-                                {% translate "Zero N+1 query storm" %}
-                            </div>
+                            <div class="font-weight-medium">{{ status_counts.running }}</div>
+                            <div class="text-muted">{% translate "Running" %}</div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-sm-6 col-lg-3">
+        <div class="col-6 col-lg-3">
             <div class="card card-sm">
                 <div class="card-body">
                     <div class="row align-items-center">
@@ -71,18 +67,14 @@
                             </span>
                         </div>
                         <div class="col">
-                            <div class="font-weight-medium">
-                                <span class="text-success">{% translate "Fast Async Actions" %}</span>
-                            </div>
-                            <div class="text-muted">
-                                {% translate "Django-Q2 ORM Broker" %}
-                            </div>
+                            <div class="font-weight-medium">{{ status_counts.completed }}</div>
+                            <div class="text-muted">{% translate "Completed" %}</div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-sm-6 col-lg-3">
+        <div class="col-6 col-lg-3">
             <div class="card card-sm">
                 <div class="card-body">
                     <div class="row align-items-center">
@@ -92,12 +84,8 @@
                             </span>
                         </div>
                         <div class="col">
-                            <div class="font-weight-medium">
-                                <span class="text-danger">{% translate "Audit Safety" %}</span>
-                            </div>
-                            <div class="text-muted">
-                                {% translate "Centralized logs registry" %}
-                            </div>
+                            <div class="font-weight-medium">{{ status_counts.failed }}</div>
+                            <div class="text-muted">{% translate "Failed" %}</div>
                         </div>
                     </div>
                 </div>
@@ -105,39 +93,25 @@
         </div>
     </div>
 
-    <!-- Central Table -->
-    <!-- We dynamically poll only if there's any pending or running job to conserve resources -->
-    {% if table.data %}
-        <div id="jobs-table-card" class="card" 
-             {% if "pending" in table.data.queryset.values_list|stringformat:"s" or "running" in table.data.queryset.values_list|stringformat:"s" %}
-             hx-get="{% url 'job_list' %}" 
-             hx-trigger="every 4s" 
-             hx-select="#jobs-table-card" 
-             hx-target="#jobs-table-card" 
-             hx-swap="outerHTML"
-             {% endif %}>
+    {% if table.rows %}
+        <div class="card">
+            {% if has_active_jobs %}
             <div class="card-header">
-                <h3 class="card-title">{% translate "Tasks Queue" %}</h3>
-                <!-- Simple status indicator -->
-                {% if "running" in table.data.queryset.values_list|stringformat:"s" %}
-                <span class="spinner-border spinner-border-sm text-warning ms-2" role="status"></span>
-                <span class="text-muted font-monospace fs-5 ms-1">{% translate "processing..." %}</span>
-                {% endif %}
+                <span class="spinner-border spinner-border-sm text-muted" role="status"></span>
+                <span class="text-muted ms-2">{% translate "Refreshing automatically" %}</span>
             </div>
+            {% endif %}
             <div class="table-responsive">
                 {% render_table table %}
             </div>
         </div>
     {% else %}
-        <div class="card card-md">
+        <div class="card">
             <div class="card-body text-center py-5">
                 <div class="empty">
-                    <div class="empty-icon">
-                        <i class="mdi mdi-emoticon-neutral-outline text-muted"></i>
-                    </div>
-                    <p class="empty-title">{% translate "No jobs found" %}</p>
+                    <p class="empty-title">{% translate "No jobs yet" %}</p>
                     <p class="empty-subtitle text-muted">
-                        {% translate "Asynchronous import and checkout tasks will appear in this registry." %}
+                        {% translate "Background tasks like imports and bulk checkouts will appear here." %}
                     </p>
                 </div>
             </div>

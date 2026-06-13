@@ -187,6 +187,7 @@ class Command(BaseCommand):
             self._seed_maintenance()
             self._seed_procurement()
             self._seed_operations()
+            self._seed_changelog()
 
     # ─────────────────────────────────────────────────────────────────
     # Catalog (tenant-agnostic reference data)
@@ -613,73 +614,101 @@ class Command(BaseCommand):
                   'Baumann', 'Franke', 'Albrecht', 'Ludwig']
 
     def _org_spec(self):
-        """Compact specification of the MSP and its customers."""
+        """Compact specification of the MSP and its customers.
+
+        Each multi-tenant 'group' is a corporate family of distinct **legal
+        entities** (different legal forms, registered seats and — where the
+        country differs — currencies), not a single company split by function.
+        Tenant slugs/codes/profiles/sites stay stable; only the legal identity
+        (name suffix, currency, registered seat + commercial-register number)
+        is added so downstream slug-based wiring keeps working.
+        """
         return [
-            # kind, group(name,slug), domain, [tenants...]
-            dict(kind='msp', group=('Northwind Managed Services', 'northwind-msp'), domain='northwind-it.com',
+            # kind, group(name,slug,description), domain, [tenants...]
+            dict(kind='msp',
+                 group=('Northwind Managed Services Group', 'northwind-msp',
+                        'Berlin-based managed-service provider: the operating company plus its corporate holding.'),
+                 domain='northwind-it.com',
                  tenants=[
-                     dict(name='Northwind — Internal IT', slug='northwind-internal-it', code='NW-IT',
-                          profile='msp_internal', headcount=12,
+                     dict(name='Northwind Managed Services GmbH', slug='northwind-internal-it', code='NW-IT',
+                          profile='msp_internal', headcount=12, currency='EUR',
+                          legal_seat='Berlin, Germany', reg_no='HRB 121544 B (Amtsgericht Berlin-Charlottenburg)',
                           site=('Northwind Berlin HQ', 'nw-berlin-hq', 'Berlin', 'Friedrichstrasse 88\n10117 Berlin\nGermany',
                                 'dach', 'corporate-offices', '52.5200', '13.4050'),
                           extra_sites=[('Northwind Frankfurt DC', 'nw-frankfurt-dc', 'Frankfurt',
                                         'Hanauer Landstrasse 200\n60314 Frankfurt\nGermany', 'dach', 'datacenters', '50.1109', '8.6821')],
                           locations=[('Engineering Floor', 'nw-eng-floor'), ('Service Desk', 'nw-service-desk'),
                                      ('DC Rack Row 1', 'nw-dc-rack-1'), ('DC Rack Row 2', 'nw-dc-rack-2')]),
-                     dict(name='Northwind — Corporate', slug='northwind-corporate', code='NW-CORP',
-                          profile='msp_corp', headcount=16,
+                     dict(name='Northwind Services Holding GmbH', slug='northwind-corporate', code='NW-CORP',
+                          profile='msp_corp', headcount=16, currency='EUR',
+                          legal_seat='Berlin, Germany', reg_no='HRB 121310 B (Amtsgericht Berlin-Charlottenburg)',
                           site=('Northwind Berlin HQ', 'nw-berlin-hq', 'Berlin', '', 'dach', 'corporate-offices', None, None),
                           locations=[('Finance & HR', 'nw-finance-hr'), ('Sales Floor', 'nw-sales-floor')]),
                  ]),
-            dict(kind='customer', industry='Pharmaceuticals', group=('Helix Biopharma', 'helix-biopharma'),
+            dict(kind='customer', industry='Pharmaceuticals',
+                 group=('Helix Biopharma Group', 'helix-biopharma',
+                        'Swiss life-sciences group: research (Basel), production (Visp) and commercial (Zürich) entities.'),
                  domain='helixbio.com',
                  tenants=[
-                     dict(name='Helix Biopharma — R&D', slug='helix-rnd', code='HLX-RD', profile='pharma_rnd', headcount=22,
+                     dict(name='Helix Biopharma AG', slug='helix-rnd', code='HLX-RD', profile='pharma_rnd', headcount=22,
+                          currency='CHF', legal_seat='Basel, Switzerland', reg_no='CHE-114.227.911 (Handelsregister Basel-Stadt)',
                           site=('Helix Basel Research Campus', 'helix-basel', 'Basel',
                                 'Hochbergerstrasse 60\n4057 Basel\nSwitzerland', 'western-europe', 'labs-plants', '47.5596', '7.5886'),
                           locations=[('Lab Block A', 'helix-lab-a'), ('Lab Block B', 'helix-lab-b'),
                                      ('R&D Offices', 'helix-rnd-offices'), ('Server Room', 'helix-basel-srv')]),
-                     dict(name='Helix Biopharma — Manufacturing', slug='helix-mfg', code='HLX-MF', profile='pharma_mfg', headcount=16,
+                     dict(name='Helix Biopharma Production GmbH', slug='helix-mfg', code='HLX-MF', profile='pharma_mfg', headcount=16,
+                          currency='CHF', legal_seat='Visp, Switzerland', reg_no='CHE-217.034.882 (Handelsregister Wallis)',
                           site=('Helix Visp Plant', 'helix-visp', 'Visp',
                                 'Schachenstrasse 12\n3930 Visp\nSwitzerland', 'western-europe', 'labs-plants', '46.2940', '7.8810'),
                           locations=[('Production Line 1', 'helix-line-1'), ('Production Line 2', 'helix-line-2'),
                                      ('QA Lab', 'helix-qa-lab'), ('Plant IT Room', 'helix-visp-srv')]),
-                     dict(name='Helix Biopharma — Commercial', slug='helix-commercial', code='HLX-CO', profile='pharma_commercial', headcount=14,
+                     dict(name='Helix Biopharma Commercial AG', slug='helix-commercial', code='HLX-CO', profile='pharma_commercial', headcount=14,
+                          currency='CHF', legal_seat='Zürich, Switzerland', reg_no='CHE-330.519.704 (Handelsregister Zürich)',
                           site=('Helix Zurich Office', 'helix-zurich', 'Zurich',
                                 'Bahnhofstrasse 45\n8001 Zurich\nSwitzerland', 'western-europe', 'corporate-offices', '47.3769', '8.5417'),
                           locations=[('Commercial Floor', 'helix-commercial-floor'), ('Meeting Suites', 'helix-meeting-suites')]),
                  ]),
-            dict(kind='customer', industry='Banking', group=('Meridian Capital Bank', 'meridian-bank'),
+            dict(kind='customer', industry='Banking',
+                 group=('Meridian Capital Group', 'meridian-bank',
+                        'Cross-border banking group: German retail bank (AG), UK capital-markets arm (plc) and a shared risk-services entity.'),
                  domain='meridianbank.com',
                  tenants=[
-                     dict(name='Meridian — Retail Banking', slug='meridian-retail', code='MER-RT', profile='bank_retail', headcount=26,
+                     dict(name='Meridian Bank AG', slug='meridian-retail', code='MER-RT', profile='bank_retail', headcount=26,
+                          currency='EUR', legal_seat='Frankfurt am Main, Germany', reg_no='HRB 88245 (Amtsgericht Frankfurt am Main)',
                           site=('Meridian Frankfurt Tower', 'meridian-frankfurt', 'Frankfurt',
                                 'Taunusanlage 12\n60325 Frankfurt\nGermany', 'dach', 'corporate-offices', '50.1109', '8.6700'),
                           locations=[('Retail Floor 2', 'mer-retail-f2'), ('Retail Floor 3', 'mer-retail-f3'),
                                      ('Branch Ops', 'mer-branch-ops'), ('Data Center', 'mer-frankfurt-dc')]),
-                     dict(name='Meridian — Investment', slug='meridian-investment', code='MER-IB', profile='bank_invest', headcount=16,
+                     dict(name='Meridian Capital Markets plc', slug='meridian-investment', code='MER-IB', profile='bank_invest', headcount=16,
+                          currency='GBP', legal_seat='London, United Kingdom', reg_no='Companies House 09183477',
                           site=('Meridian London Office', 'meridian-london', 'London',
                                 '30 St Mary Axe\nLondon EC3A 8BF\nUnited Kingdom', 'western-europe', 'corporate-offices', '51.5145', '-0.0803'),
                           locations=[('Trading Floor', 'mer-trading-floor'), ('Deal Rooms', 'mer-deal-rooms')]),
-                     dict(name='Meridian — Risk & Compliance', slug='meridian-risk', code='MER-RC', profile='bank_risk', headcount=10,
+                     dict(name='Meridian Risk Services GmbH', slug='meridian-risk', code='MER-RC', profile='bank_risk', headcount=10,
+                          currency='EUR', legal_seat='Frankfurt am Main, Germany', reg_no='HRB 90112 (Amtsgericht Frankfurt am Main)',
                           site=('Meridian Frankfurt Tower', 'meridian-frankfurt', 'Frankfurt', '', 'dach', 'corporate-offices', None, None),
                           locations=[('Risk Analytics', 'mer-risk-analytics')]),
                  ]),
-            dict(kind='customer', industry='Asset Management', group=('Sterling Asset Management', 'sterling-am'),
+            dict(kind='customer', industry='Asset Management',
+                 group=('Sterling Asset Management Group', 'sterling-am',
+                        'Munich fund manager (KVG) with a dedicated fund-services entity.'),
                  domain='sterling-am.com',
                  tenants=[
-                     dict(name='Sterling — Portfolio Management', slug='sterling-portfolio', code='STG-PM', profile='fund_portfolio', headcount=14,
+                     dict(name='Sterling Asset Management GmbH', slug='sterling-portfolio', code='STG-PM', profile='fund_portfolio', headcount=14,
+                          currency='EUR', legal_seat='Munich, Germany', reg_no='HRB 204417 (Amtsgericht München)',
                           site=('Sterling Munich Office', 'sterling-munich', 'Munich',
                                 'Maximilianstrasse 35\n80539 Munich\nGermany', 'dach', 'corporate-offices', '48.1391', '11.5802'),
                           locations=[('Portfolio Desk', 'stg-portfolio-desk'), ('Partner Suites', 'stg-partner-suites'),
                                      ('Server Closet', 'stg-server-closet')]),
-                     dict(name='Sterling — Operations', slug='sterling-ops', code='STG-OP', profile='fund_ops', headcount=8,
+                     dict(name='Sterling Fund Services GmbH', slug='sterling-ops', code='STG-OP', profile='fund_ops', headcount=8,
+                          currency='EUR', legal_seat='Munich, Germany', reg_no='HRB 204902 (Amtsgericht München)',
                           site=('Sterling Munich Office', 'sterling-munich', 'Munich', '', 'dach', 'corporate-offices', None, None),
                           locations=[('Fund Operations', 'stg-fund-ops')]),
                  ]),
             dict(kind='customer', industry='Legal Services', group=None, domain='brightwell-legal.com',
                  tenants=[
-                     dict(name='Brightwell Legal', slug='brightwell-legal', code='BWL', profile='legal', headcount=16,
+                     dict(name='Brightwell Legal PartG mbB', slug='brightwell-legal', code='BWL', profile='legal', headcount=16,
+                          currency='EUR', legal_seat='Berlin, Germany', reg_no='PR 1284 B (Partnerschaftsregister Berlin)',
                           site=('Brightwell Berlin Chambers', 'brightwell-berlin', 'Berlin',
                                 'Kurfurstendamm 21\n10719 Berlin\nGermany', 'dach', 'corporate-offices', '52.5030', '13.3270'),
                           locations=[('Partner Offices', 'bwl-partner-offices'), ('Associate Bullpen', 'bwl-associates'),
@@ -687,14 +716,16 @@ class Command(BaseCommand):
                  ]),
             dict(kind='customer', industry='Architecture & Design', group=None, domain='aurora-arch.com',
                  tenants=[
-                     dict(name='Aurora Architects', slug='aurora-architects', code='AUR', profile='architecture', headcount=11,
+                     dict(name='Aurora Architekten GmbH', slug='aurora-architects', code='AUR', profile='architecture', headcount=11,
+                          currency='EUR', legal_seat='Hamburg, Germany', reg_no='HRB 167733 (Amtsgericht Hamburg)',
                           site=('Aurora Hamburg Studio', 'aurora-hamburg', 'Hamburg',
                                 'Am Kaiserkai 10\n20457 Hamburg\nGermany', 'dach', 'corporate-offices', '53.5413', '9.9920'),
                           locations=[('Design Studio', 'aur-design-studio'), ('Render Farm', 'aur-render-farm')]),
                  ]),
             dict(kind='customer', industry='Logistics', group=None, domain='vantage-logistics.com',
                  tenants=[
-                     dict(name='Vantage Logistics', slug='vantage-logistics', code='VAN', profile='logistics', headcount=18,
+                     dict(name='Vantage Logistics GmbH & Co. KG', slug='vantage-logistics', code='VAN', profile='logistics', headcount=18,
+                          currency='EUR', legal_seat='Frankfurt am Main, Germany', reg_no='HRA 49882 (Amtsgericht Frankfurt am Main)',
                           site=('Vantage Frankfurt Airport Depot', 'vantage-fra', 'Frankfurt',
                                 'CargoCity Sued, Gebaude 535\n60549 Frankfurt\nGermany', 'dach', 'field-depots', '50.0490', '8.5870'),
                           locations=[('Warehouse Floor', 'van-warehouse'), ('Dispatch Office', 'van-dispatch'),
@@ -734,26 +765,33 @@ class Command(BaseCommand):
         for org in self._orgs:
             group_obj = None
             if org['group']:
-                gname, gslug = org['group']
-                group_obj, _ = TenantGroup.objects.get_or_create(slug=gslug, defaults={'name': gname})
+                gname, gslug, gdesc = org['group']
+                group_obj, _ = TenantGroup.objects.get_or_create(
+                    slug=gslug, defaults={'name': gname, 'description': gdesc})
                 self._tgroups[gslug] = group_obj
 
             for t in org['tenants']:
-                # Set the demo-tenant default depreciation on the primary MSP tenant so
-                # the "tenant-level default" resolution rung is visible in the demo UI.
-                demo_dep = (
-                    self._demo_depreciation_afa
-                    if t['slug'] == 'northwind-internal-it'
-                    else None
+                # Per-entity depreciation default: German (EUR) entities default to the German
+                # AfA 36-month policy so the "tenant-level default" resolution rung is visible;
+                # foreign-currency entities fall back to a generic straight-line schedule.
+                currency = t.get('currency', 'EUR')
+                default_dep = (self._demo_depreciation_afa if currency == 'EUR'
+                               else self._depreciations.get('3-Year Straight-Line'))
+                industry = org.get('industry', 'Managed Service Provider')
+                description = (
+                    f"{t['name']} — {industry} entity of "
+                    f"{(org['group'][0] if org['group'] else t['name'])}.\n"
+                    f"Registered seat: {t['legal_seat']} · {t['reg_no']} · functional currency {currency}.\n"
+                    f"IT managed by Northwind Managed Services GmbH."
                 )
                 tenant, _ = Tenant.objects.get_or_create(slug=t['slug'], defaults={
-                    'name': t['name'], 'group': group_obj,
-                    'default_depreciation': demo_dep,
-                    'description': f"{org.get('industry', 'Managed Service Provider')} — managed by Northwind Managed Services."})
+                    'name': t['name'], 'group': group_obj, 'currency': currency,
+                    'default_depreciation': default_dep, 'description': description})
                 self._tenants[t['slug']] = tenant
                 self._tenant_meta[t['slug']] = dict(profile=t['profile'], domain=org['domain'], code=t['code'],
                                                     group_slug=org['group'][1] if org['group'] else None,
-                                                    industry=org.get('industry'), kind=org['kind'])
+                                                    industry=org.get('industry'), kind=org['kind'],
+                                                    currency=currency, legal_seat=t['legal_seat'])
                 self._tenant_locations[t['slug']] = []
 
                 # Primary site (may be shared across tenants of the same org)
@@ -800,6 +838,44 @@ class Command(BaseCommand):
                     contact=c, role=self._contact_roles['customer-primary'],
                     content_type=ContentType.objects.get_for_model(tenant), object_id=tenant.pk,
                     defaults={'priority': 'primary'})
+
+        # Vendor-support reps attached to the hardware manufacturers (exercises
+        # Manufacturer.contacts + the vendor-support role).
+        vendor_contacts = {
+            'dell-technologies': ('Dell ProSupport Plus Desk', 'support.de@dell.com', '+49-69-9792-0000'),
+            'apple-inc': ('Apple Business Care', 'business.eu@apple.com', '+49-800-2000-136'),
+            'hp-inc': ('HP Care Pack Support', 'enterprise.support@hp.com', '+49-7031-986-0'),
+            'lenovo-group': ('Lenovo Premier Support', 'premier.eu@lenovo.com', '+49-711-6517-0'),
+            'cisco-systems': ('Cisco TAC EMEA', 'tac@cisco.com', '+31-20-357-1000'),
+            'samsung-electronics': ('Samsung B2B Support', 'b2b.support@samsung.com', '+49-6196-77-55555'),
+            'microsoft-corporation': ('Microsoft Premier Support', 'premier@microsoft.com', '+49-89-31760-0'),
+            'logitech-international': ('Logitech B2B Care', 'b2bsupport@logitech.com', '+41-21-863-5111'),
+            'brother-industries': ('Brother Business Support', 'support@brother.de', '+49-6172-863-0'),
+            'synology-inc': ('Synology Technical Support', 'support@synology.com', '+49-89-3838-2700'),
+            'ubiquiti-inc': ('Ubiquiti Enterprise Support', 'support@ui.com', '+1-844-674-4357'),
+        }
+        mfr_ct = ContentType.objects.get_for_model(next(iter(self._manufacturers.values())))
+        for mfr_slug, (cname, cemail, cphone) in vendor_contacts.items():
+            mfr = self._manufacturers.get(mfr_slug)
+            if not mfr:
+                continue
+            vc = Contact.objects.create(name=cname, title='Vendor Support', email=cemail, phone=cphone)
+            self._contacts.append(vc)
+            ContactAssignment.objects.get_or_create(
+                contact=vc, role=self._contact_roles['vendor-support'],
+                content_type=mfr_ct, object_id=mfr.pk, defaults={'priority': 'primary'})
+
+        # MSP account managers as contacts on the MSP operating entity.
+        msp_tenant = self._tenants['northwind-internal-it']
+        msp_ct = ContentType.objects.get_for_model(msp_tenant)
+        for am_name, am_email in [('Nadia Haas', 'nadia.haas@northwind-it.com'),
+                                  ('Peter Voss', 'peter.voss@northwind-it.com')]:
+            ac = Contact.objects.create(name=am_name, title='Account Manager, Northwind Managed Services',
+                                        email=am_email, phone='+49-30-555-0%03d' % random.randint(100, 999))
+            self._contacts.append(ac)
+            ContactAssignment.objects.get_or_create(
+                contact=ac, role=self._contact_roles['account-manager'],
+                content_type=msp_ct, object_id=msp_tenant.pk, defaults={'priority': 'secondary'})
 
         total_holders = sum(len(v) for v in self._tenant_holders.values())
         self.stdout.write(f'  {len(self._tgroups)} tenant groups, {len(self._tenants)} tenants, '
@@ -923,7 +999,45 @@ class Command(BaseCommand):
                     holders[0].user = user
                     holders[0].save(update_fields=['user'])
 
+        # Realistic permission spread: the vast majority of customer logins are NOT
+        # admins. Per tenant we promote one existing holder to a single-tenant
+        # "Asset Manager" (team lead) and a few more to single-tenant "Read-Only"
+        # (self-service end users). They log in with their own holder identity.
+        team_leads = 0
+        end_users = 0
+        for slug, tenant in self._tenants.items():
+            if self._tenant_meta[slug]['kind'] == 'msp':
+                continue  # MSP staff are handled above
+            holders = [h for h in self._tenant_holders.get(slug, []) if h.user_id is None]
+            if not holders:
+                continue
+            # 1 team lead (Asset Manager), scoped to this tenant only.
+            lead = holders[0]
+            scoped_logins = [(lead, 'Asset Manager')]
+            # 2-3 read-only self-service users, scoped to this tenant only.
+            for h in holders[1:1 + random.randint(2, 3)]:
+                scoped_logins.append((h, 'Read-Only'))
+            for holder, role_name in scoped_logins:
+                username = holder.upn  # email-style UPN as the login
+                user, created = User.objects.get_or_create(username=username, defaults={
+                    'email': holder.email or username, 'first_name': holder.first_name,
+                    'last_name': holder.last_name, 'is_staff': False, 'is_superuser': False})
+                if created:
+                    user.set_password(SEED_PASSWORD)
+                    user.save()
+                self._users[username] = user
+                holder.user = user
+                holder.save(update_fields=['user'])
+                TenantMembership.objects.get_or_create(
+                    user=user, tenant=tenant, defaults={'role': self._roles[(slug, role_name)]})
+                if role_name == 'Asset Manager':
+                    team_leads += 1
+                else:
+                    end_users += 1
+
         total_memberships = TenantMembership.objects.count()
+        self.stdout.write(f'  {team_leads} single-tenant team leads (Asset Manager), '
+                          f'{end_users} single-tenant read-only end users.')
         self.stdout.write(f'  {len(self._roles)} tenant roles, {len(self._users)} login users '
                           f'({customer_admins} customer admins), {total_memberships} memberships.')
 
@@ -957,40 +1071,92 @@ class Command(BaseCommand):
         return 'Windows 11 23H2'
 
     def _seed_assets(self):
-        from assets.models import Asset, AssetAssignment
+        from assets.models import Asset, AssetAssignment, AssetTagSequence
         from software.models import InstalledSoftware
         from inventory.models import ComponentAllocation
         from compliance.models import CustodyTemplate, CustodyReceipt
         self.stdout.write('--- Assets ---')
 
-        # Global custody templates (category-matched).
+        # Global custody templates (category-matched), fully configured with QMS
+        # references, disclaimers and tags.
         self._custody_templates = {}
-        for name, slug, cat_slug, eula in [
+        for name, slug, cat_slug, eula, tag_slugs in [
             ('Standard Workstation & Laptop Agreement', 'laptop-agreement', 'laptops',
              'I acknowledge receipt of the issued laptop/workstation and agree to the acceptable-use and '
-             'disk-encryption policy. The equipment remains company property and must be returned on demand.'),
+             'disk-encryption policy. The equipment remains company property and must be returned on demand.',
+             ['production', 'encrypted']),
             ('Mobile Device Agreement', 'mobile-agreement', 'mobile-phones',
              'I acknowledge receipt of the mobile device and SIM. I will keep it secured with a passcode/biometrics '
-             'and will not remove the mobile device management (MDM) profile.'),
+             'and will not remove the mobile device management (MDM) profile.',
+             ['mdm-enrolled']),
             ('Desktop Workstation Agreement', 'desktop-agreement', 'desktops',
              'I acknowledge custody of the desktop workstation and agree not to modify its hardware or connect it to '
-             'unauthorized networks without IT approval.'),
+             'unauthorized networks without IT approval.',
+             ['production']),
+            ('Field Tablet Agreement', 'tablet-agreement', 'tablets',
+             'I acknowledge receipt of the ruggedized field tablet and agree to return it undamaged at the end of '
+             'my assignment. Lost or damaged devices must be reported to the service desk within 24 hours.',
+             ['field', 'mdm-enrolled']),
         ]:
-            self._custody_templates[cat_slug] = CustodyTemplate.objects.get_or_create(name=name, defaults={
+            tmpl = CustodyTemplate.objects.get_or_create(name=name, defaults={
                 'category': self._categories[cat_slug], 'eula_text': eula,
                 'disclaimer': 'This equipment remains the property of the organization.',
                 'qms_reference': f'NMS-IT-{slug.upper()}', 'is_active': True, 'require_acceptance': True,
                 'email_signature_request': True, 'signature_provider': 'local'})[0]
+            tmpl.tags.set([self._tags[t] for t in tag_slugs if t in self._tags])
+            self._custody_templates[cat_slug] = tmpl
 
-        self._asset_seq = {}
+        # Tenant-scoped, regulator-specific agreements (PCI / GxP) — show per-tenant
+        # custody configuration layered on top of the global defaults.
+        for tname, tslug, cat_slug, qms, eula, tags in [
+            ('Meridian — PCI-DSS Laptop Custody Agreement', 'meridian-retail', 'laptops', 'MER-PCI-IT-007',
+             'I acknowledge that this device operates within PCI-DSS scope. I will not store cardholder data locally, '
+             'will keep the endpoint agent active and will comply with quarterly access reviews.', ['pci-scope', 'critical']),
+            ('Brightwell — Confidential Records Custody Agreement', 'brightwell-legal', 'laptops', 'BWL-LEG-IT-003',
+             'I acknowledge custody of a device with access to privileged client matter files and agree to full-disk '
+             'encryption and the firm’s information-barrier policy.', ['encrypted', 'vip']),
+        ]:
+            tenant = self._tenants.get(tslug)
+            if not tenant:
+                continue
+            t = CustodyTemplate.objects.get_or_create(name=tname, defaults={
+                'tenant': tenant, 'category': self._categories[cat_slug], 'eula_text': eula,
+                'disclaimer': 'Regulated equipment — handle per the referenced policy.',
+                'qms_reference': qms, 'is_active': True, 'require_acceptance': True,
+                'email_signature_request': True, 'signature_provider': 'local'})[0]
+            t.tags.set([self._tags[x] for x in tags if x in self._tags])
+            self._custody_templates.setdefault(f'{tslug}:{cat_slug}', t)
+
+        # A group-scoped (tenant_group) GxP laptop agreement shared across all Helix
+        # Biopharma entities — exercises CustodyTemplate.tenant_group / group-wide sharing.
+        helix_group = self._tgroups.get('helix-biopharma')
+        self._gxp_custody_template = None
+        if helix_group:
+            self._gxp_custody_template = CustodyTemplate.objects.get_or_create(
+                name='Helix Biopharma — GxP Laptop & Workstation Agreement', defaults={
+                    'tenant_group': helix_group, 'category': self._categories['laptops'],
+                    'eula_text': ('I acknowledge receipt of a GxP-validated workstation. I will not install '
+                                  'unvalidated software, will keep audit logging enabled and will follow the '
+                                  'Helix Biopharma QMS change-control procedure for any modification.'),
+                    'disclaimer': 'GxP-validated equipment — subject to QMS change control.',
+                    'qms_reference': 'HLX-QMS-IT-014', 'is_active': True, 'require_acceptance': True,
+                    'email_signature_request': True, 'signature_provider': 'local'})[0]
+
         self._assets = []
         self._assets_by_tenant = {}
         self._laptops_by_tenant = {}
+        self._primary_laptop_by_holder = {}   # holder.pk -> current laptop (for license seats)
+        self._retired_assets = []
         self._servers = []
 
-        def next_tag(code):
-            self._asset_seq[code] = self._asset_seq.get(code, 0) + 1
-            return f"{code}-{self._asset_seq[code]:04d}"
+        # Per-tenant asset-tag sequence (prefix = tenant code). Assets are created with a
+        # blank asset_tag so Asset.save() draws the next value from AssetTagSequence — the
+        # product's real numbering mechanism — instead of hand-formatted tags.
+        for slug, tenant in self._tenants.items():
+            AssetTagSequence.objects.get_or_create(
+                tenant=tenant, category=None,
+                defaults={'prefix': f"{self._tenant_meta[slug]['code']}-",
+                          'zero_padding': 4, 'next_value': 1, 'is_active': True})
 
         def shared_location(tenant_slug):
             locs = self._tenant_locations[tenant_slug]
@@ -1003,15 +1169,37 @@ class Command(BaseCommand):
         def make_asset(tenant, code, atype_slug, status_slug, holder, location, dept, tags=None):
             atype = self._asset_types[atype_slug]
             role = atype.asset_role
-            tag = next_tag(code)
             base_cost = self.PRICES.get(atype_slug, 1000)
             cost = round(base_cost * random.uniform(0.95, 1.05), 2)
             years_old = random.choice([0, 1, 1, 2, 2, 3])
             p_date = days_ago(years_old * 365 + random.randint(0, 300))
             warranty = p_date + datetime.timedelta(days=(atype.eol_months or 36) * 30)
             fs_name = atype.custom_fieldset.name if atype.custom_fieldset else ''
-            cv = {}
+
+            base_location = None if (holder and status_slug == 'in-use') else location
+            salvage = round(cost * 0.1, 2)
+            # In service a few days after purchase; book value straight-lined to salvage over EoL.
+            in_service = p_date + datetime.timedelta(days=random.randint(2, 14))
+            eol_months = atype.eol_months or 36
+            age_months = max(0, (TODAY - p_date).days / 30.0)
+            fraction = min(age_months / eol_months, 1.0)
+            book_value = round(cost - (cost - salvage) * fraction, 2)
+            # Blank asset_tag → Asset.save() draws the next value from the tenant's
+            # AssetTagSequence. Tag-derived fields (hostname, display name) are filled
+            # in the second save, once the generated tag is known.
+            asset = Asset(
+                name=f"{atype.model} (provisioning)", asset_tag='', asset_type=atype, asset_role=role,
+                status=self._status_labels[status_slug], location=base_location, tenant=tenant,
+                serial_number=f"{code}{random.randint(100000, 999999)}", purchase_cost=cost,
+                salvage_value=salvage, purchase_date=p_date, in_service_date=in_service,
+                current_book_value=book_value, depreciation_updated_at=timezone.now(),
+                warranty_expiration=warranty,
+                supplier=self._suppliers[random.choice(self.HW_SUPPLIERS)],
+                order_number=f"PO-{p_date.year}-{random.randint(1000, 9999)}", custom_field_data={})
+            asset.save()
+            tag = asset.asset_tag
             host = f"{code.lower()}-{tag.split('-')[-1]}"
+            cv = {}
             if fs_name == 'Laptop / Workstation Specs':
                 cv = {'hostname': host, 'os_version': self._os_for(atype_slug), 'encrypted': True,
                       'department': dept}
@@ -1027,15 +1215,9 @@ class Command(BaseCommand):
                       'firmware_version': f"v{random.randint(7, 17)}.{random.randint(0, 12)}.{random.randint(0, 9)}"}
             elif fs_name == 'AV & Conference Specs':
                 cv = {'mounted_state': random.choice(['Wall-Mounted', 'Table-Top'])}
-
-            base_location = None if (holder and status_slug == 'in-use') else location
-            asset = Asset.objects.create(
-                name=f"{atype.model} ({tag})", asset_tag=tag, asset_type=atype, asset_role=role,
-                status=self._status_labels[status_slug], location=base_location, tenant=tenant,
-                serial_number=f"{code}{random.randint(100000, 999999)}", purchase_cost=cost,
-                salvage_value=round(cost * 0.1, 2), purchase_date=p_date, warranty_expiration=warranty,
-                supplier=self._suppliers[random.choice(self.HW_SUPPLIERS)],
-                order_number=f"PO-{p_date.year}-{random.randint(1000, 9999)}", custom_field_data=cv)
+            asset.name = f"{atype.model} ({tag})"
+            asset.custom_field_data = cv
+            asset.save(update_fields=['name', 'custom_field_data'])
             if tags:
                 asset.tags.add(*[self._tags[t] for t in tags if t in self._tags])
             if status_slug == 'in-use' and holder:
@@ -1065,8 +1247,20 @@ class Command(BaseCommand):
                 laptop_slug = random.choice(profile['laptops'])
                 lt = make_asset(tenant, code, laptop_slug, 'in-use', holder, None, dept,
                                 tags=['encrypted'] + (['gxp-validated'] if regulated and 'pharma' in meta['profile'] else []))
+                # ~25% of laptops carry re-issue history: a prior, closed assignment to a
+                # different employee who returned the device (lifecycle realism).
+                if len(holders) > 3 and random.random() < 0.25:
+                    prev = random.choice([h for h in holders if h.pk != holder.pk])
+                    co = timezone.now() - datetime.timedelta(days=random.randint(220, 700))
+                    ci = co + datetime.timedelta(days=random.randint(60, 200))
+                    AssetAssignment.objects.create(
+                        asset=lt, assigned_user=prev, checked_out_by=self._provisioner,
+                        checked_out_at=co, is_active=False, checked_in_at=ci,
+                        checked_in_by=self._provisioner,
+                        notes='Previously issued; returned to the service desk on a role change.')
                 self._laptops_by_tenant[slug].append(lt)
                 self._assets_by_tenant[slug].append(lt)
+                self._primary_laptop_by_holder[holder.pk] = lt
                 if random.random() < profile['mobile']:
                     self._assets_by_tenant[slug].append(
                         make_asset(tenant, code, random.choice(['iphone-15-pro', 'galaxy-s24-ultra']),
@@ -1098,27 +1292,90 @@ class Command(BaseCommand):
                             'virtualization-host-server', 'database-server', 'application-server', 'backup-server'):
                         self._servers.append(a)
 
-        # Installed software on a sample of laptops + all servers
+            # A couple of retired/replaced devices per larger tenant: the old unit was
+            # superseded by a current in-use laptop (lifecycle + disposal realism).
+            if len(holders) > 6:
+                for _ in range(random.randint(1, 2)):
+                    replacement = random.choice(self._laptops_by_tenant[slug]) if self._laptops_by_tenant[slug] else None
+                    old = make_asset(tenant, code, random.choice(profile['laptops']), 'retired', None,
+                                     locs[0] if locs else None, random.choice(profile['depts']),
+                                     tags=['legacy'])
+                    disposed = timezone.now() - datetime.timedelta(days=random.randint(20, 180))
+                    old.disposed_at = disposed
+                    old.disposal_value = round(float(old.purchase_cost) * random.uniform(0.03, 0.12), 2)
+                    old.current_book_value = 0
+                    if replacement:
+                        old.notes = f"Decommissioned and superseded by {replacement.asset_tag} ({replacement.name})."
+                    old.save(update_fields=['disposed_at', 'disposal_value', 'current_book_value', 'notes'])
+                    self._assets_by_tenant[slug].append(old)
+                    self._retired_assets.append(old)
+
+        # Installed software — every managed endpoint carries a security/productivity
+        # baseline (discovered by the MDM/inventory agent), plus role- and industry-
+        # specific titles. Versions are populated so the software inventory looks real.
+        sw_versions = {
+            'Microsoft 365 E5': ['16.83.2', '16.84.1', '16.85.0'],
+            'CrowdStrike Falcon': ['7.16.18019', '7.17.18101', '7.18.18206'],
+            '1Password Business': ['8.10.40', '8.10.42', '8.10.44'],
+            'Zoom Workplace Enterprise': ['6.0.10', '6.1.5', '6.2.0'],
+            'Microsoft Office LTSC 2024': ['16.0.17328', '16.0.17425'],
+            'Adobe Creative Cloud': ['6.4.0.345', '6.5.0.348'],
+            'JetBrains All Products Pack': ['2024.1.4', '2024.2.1'],
+            'Autodesk AutoCAD': ['2024.1.3', '2025.0.1'],
+            'Bloomberg Terminal': ['DAPI-4.18', 'DAPI-4.19'],
+            'SAS Analytics Pro': ['9.4M8', '9.4M9'],
+        }
+
+        def install(asset, sw_name, agent, install_date):
+            sw = self._software.get(sw_name)
+            if not sw:
+                return 0
+            ver = random.choice(sw_versions.get(sw_name, ['']))
+            _, created = InstalledSoftware.objects.get_or_create(
+                asset=asset, software=sw, version_detected=ver,
+                defaults={'discovered_by_agent': agent, 'install_date': install_date,
+                          'last_seen_date': timezone.now() - datetime.timedelta(days=random.randint(0, 14))})
+            return int(created)
+
         sw_count = 0
         for slug in self._tenants:
             meta = self._tenant_meta[slug]
             for lt in self._laptops_by_tenant[slug]:
-                installs = [(lt.custom_field_data.get('os_version', 'Windows 11 23H2'), 'Intune'),
-                            ('Microsoft 365 E5', 'Intune'), ('CrowdStrike Falcon', 'Intune'),
-                            ('1Password Business', 'Intune')]
-                if meta['industry'] == 'Architecture & Design':
-                    installs.append(('Autodesk AutoCAD', 'Intune'))
-                if meta['industry'] == 'Asset Management':
-                    installs.append(('Bloomberg Terminal', 'Lansweeper'))
-                for sw_name, agent in random.sample(installs, k=min(len(installs), random.randint(2, 4))):
-                    sw = self._software.get(sw_name if sw_name in self._software else 'Windows 11 Enterprise')
-                    if not sw:
-                        continue
-                    _, created = InstalledSoftware.objects.get_or_create(
-                        asset=lt, software=sw, version_detected='',
+                agent = 'Lansweeper' if meta['industry'] == 'Asset Management' else 'Intune'
+                # OS title (resolve the detected OS string back to a catalogue product).
+                os_str = lt.custom_field_data.get('os_version', 'Windows 11 23H2')
+                os_sw = ('macOS Sequoia' if 'macOS' in os_str
+                         else 'Ubuntu Pro 24.04' if 'Ubuntu' in os_str
+                         else 'Windows 11 Enterprise')
+                os_obj = self._software.get(os_sw)
+                if os_obj:
+                    _, c = InstalledSoftware.objects.get_or_create(
+                        asset=lt, software=os_obj, version_detected=os_str,
                         defaults={'discovered_by_agent': agent, 'install_date': lt.purchase_date,
-                                  'last_seen_date': timezone.now() - datetime.timedelta(days=random.randint(0, 14))})
-                    sw_count += created
+                                  'last_seen_date': timezone.now() - datetime.timedelta(days=random.randint(0, 7))})
+                    sw_count += int(c)
+                # Security + productivity baseline on every laptop.
+                for sw_name in ('Microsoft 365 E5', 'CrowdStrike Falcon', '1Password Business',
+                                'Zoom Workplace Enterprise'):
+                    sw_count += install(lt, sw_name, agent, lt.purchase_date)
+                # Role / industry specific titles.
+                role_slug = lt.asset_role.slug if lt.asset_role else ''
+                if role_slug == 'developer-workstation':
+                    sw_count += install(lt, 'JetBrains All Products Pack', agent, lt.purchase_date)
+                if meta['industry'] == 'Architecture & Design':
+                    sw_count += install(lt, 'Autodesk AutoCAD', agent, lt.purchase_date)
+                    sw_count += install(lt, 'Adobe Creative Cloud', agent, lt.purchase_date)
+                if meta['industry'] in ('Banking', 'Asset Management') and random.random() < 0.4:
+                    sw_count += install(lt, 'Bloomberg Terminal', agent, lt.purchase_date)
+                if meta['industry'] == 'Pharmaceuticals' and random.random() < 0.3:
+                    sw_count += install(lt, 'SAS Analytics Pro', agent, lt.purchase_date)
+                if meta['kind'] == 'msp' and random.random() < 0.5:
+                    sw_count += install(lt, 'Microsoft Office LTSC 2024', agent, lt.purchase_date)
+            # Mobile devices report MDM-managed apps too.
+            for a in self._assets_by_tenant[slug]:
+                if a.asset_type and a.asset_type.category and a.asset_type.category.slug == 'mobile-phones':
+                    for sw_name in ('Microsoft 365 E5', '1Password Business'):
+                        sw_count += install(a, sw_name, 'Intune', a.purchase_date)
         for srv in self._servers:
             for sw_name in random.sample(['VMware vSphere 8 Enterprise Plus', 'Ubuntu Pro 24.04',
                                           'Veeam Backup & Replication'], 2):
@@ -1149,11 +1406,21 @@ class Command(BaseCommand):
         # Custody receipts for regulated-industry laptops/mobiles (signed)
         receipts = 0
         for slug, tenant in self._tenants.items():
-            if self._tenant_meta[slug]['industry'] not in ('Pharmaceuticals', 'Banking'):
+            # Sign receipts for regulated industries plus any tenant that has its own
+            # tenant-scoped custody template (e.g. Brightwell Legal).
+            has_scoped = any(k.startswith(f'{slug}:') for k in self._custody_templates)
+            if self._tenant_meta[slug]['industry'] not in ('Pharmaceuticals', 'Banking') and not has_scoped:
                 continue
+            is_helix = self._tenant_meta[slug]['group_slug'] == 'helix-biopharma'
             for asset in self._assets_by_tenant[slug]:
                 cat = asset.asset_type.category.slug if asset.asset_type and asset.asset_type.category else None
-                tmpl = self._custody_templates.get(cat)
+                # Preference: tenant-scoped template > group GxP (Helix laptops) > global default.
+                if f'{slug}:{cat}' in self._custody_templates:
+                    tmpl = self._custody_templates[f'{slug}:{cat}']
+                elif is_helix and cat == 'laptops' and self._gxp_custody_template:
+                    tmpl = self._gxp_custody_template
+                else:
+                    tmpl = self._custody_templates.get(cat)
                 active = asset.assignments.filter(is_active=True, assigned_user__isnull=False).first()
                 if not (tmpl and active and random.random() < 0.5):
                     continue
@@ -1175,7 +1442,7 @@ class Command(BaseCommand):
 
     def _seed_inventory_stock(self):
         from inventory.models import (Accessory, Consumable, AccessoryStock, ConsumableStock,
-                                       AccessoryAssignment, ConsumableAssignment, Kit, KitItem)
+                                       ComponentStock, AccessoryAssignment, ConsumableAssignment, Kit, KitItem)
         self.stdout.write('--- Inventory: stock & kits ---')
 
         catalog_tenant = self._tenants['northwind-internal-it']
@@ -1207,6 +1474,35 @@ class Command(BaseCommand):
                 ConsumableStock.objects.get_or_create(consumable=self._consumables[con_slug], location=loc,
                                                        defaults={'qty': random.choice([1, 4, 10, 25])})
                 stock_count += 1
+
+        # Spare-parts (component) stock held at server rooms / DC racks. The MSP holds
+        # the deepest spares pool; tenants with their own server location keep a few.
+        comp_count = 0
+
+        def _infra_loc(tslug):
+            for kw in ('srv', 'rack', 'dc', 'server', 'network', 'closet', 'cabinet', 'farm'):
+                for lo in self._tenant_locations.get(tslug, []):
+                    if kw in lo.slug:
+                        return lo
+            return None
+
+        # Deep central spares pool at the MSP Frankfurt DC (or its first infra location).
+        msp_loc = _infra_loc('northwind-internal-it') or self._tenant_locations['northwind-internal-it'][0]
+        for comp_slug, comp in self._components.items():
+            ComponentStock.objects.get_or_create(
+                component=comp, location=msp_loc,
+                defaults={'qty': random.choice([2, 4, 5, 8, 12, 0])})  # one 0 → low-stock signal
+            comp_count += 1
+        # A shallower spares pool at customer server rooms.
+        for tslug in self._tenants:
+            loc = _infra_loc(tslug)
+            if not loc or tslug == 'northwind-internal-it':
+                continue
+            for comp_slug in random.sample(list(self._components), k=random.randint(2, 4)):
+                ComponentStock.objects.get_or_create(
+                    component=self._components[comp_slug], location=loc,
+                    defaults={'qty': random.choice([1, 2, 3, 4])})
+                comp_count += 1
 
         # Accessory assignments to a sample of holders
         assign_count = 0
@@ -1240,7 +1536,8 @@ class Command(BaseCommand):
                 KitItem.objects.create(kit=kit, accessory=self._accessories[acc_slug], qty=qty)
 
         self.stdout.write(f'  {len(self._accessories)} accessories, {len(self._consumables)} consumables, '
-                          f'{stock_count} stock rows, {assign_count} accessory assignments, {len(kits)} kits.')
+                          f'{stock_count} accessory/consumable stock rows, {comp_count} component stock rows, '
+                          f'{assign_count} accessory assignments, {len(kits)} kits.')
 
     # ─────────────────────────────────────────────────────────────────
     # Licensing
@@ -1280,7 +1577,14 @@ class Command(BaseCommand):
                 if ltype == 'subscription_seat' and holders and sw_name in ('Microsoft 365 E5', 'CrowdStrike Falcon'):
                     for h in random.sample(holders, k=min(len(holders), max(3, len(holders) // 2))):
                         try:
-                            LicenseSeatAssignment.objects.create(license=lic, assigned_holder=h)
+                            # A seat targets the holder's actual primary laptop where one is
+                            # known (device-bound), otherwise the holder (user-bound). The model
+                            # enforces asset XOR holder, so never both.
+                            laptop = self._primary_laptop_by_holder.get(h.pk)
+                            if laptop is not None:
+                                LicenseSeatAssignment.objects.create(license=lic, asset=laptop)
+                            else:
+                                LicenseSeatAssignment.objects.create(license=lic, assigned_holder=h)
                             seat_assigns += 1
                         except Exception:
                             pass
@@ -1296,10 +1600,13 @@ class Command(BaseCommand):
         self.stdout.write('--- Subscriptions ---')
         self._subscriptions = []
         ct_asset = ContentType.objects.get_for_model(Asset)
-        # One cloud footprint per organization, owned by its primary tenant.
+        # One cloud footprint per organization, contracted centrally by the parent
+        # entity (the group's primary tenant) and consumed across its sibling entities.
+        x_entity = 0
         for org in self._orgs:
             primary_slug = org['tenants'][0]['slug']
             tenant = self._tenants[primary_slug]
+            currency = self._tenant_meta[primary_slug]['currency']
             label = org['group'][0] if org['group'] else org['tenants'][0]['name']
             plan = [('Amazon Web Services', random.randint(30000, 150000)),
                     ('Microsoft Azure', random.randint(40000, 200000))]
@@ -1307,23 +1614,39 @@ class Command(BaseCommand):
                 plan.append(('GitHub Enterprise', random.randint(4000, 40000)))
             if random.random() < 0.5:
                 plan.append(('Datadog', random.randint(8000, 36000)))
+            aws_sub = None
             for prov_name, cost in plan:
                 start = days_ago(random.randint(60, 700))
                 renewal = days_ahead(random.choice([20, 35, 60, 120, 300]))
                 sub = Subscription.objects.create(
                     name=f"{label} — {prov_name}", provider=self._providers[prov_name], type='saas',
-                    start_date=start, renewal_date=renewal, renewal_cost=cost,
-                    term_months=12, description=f"{prov_name} cloud subscription for {label}.", tenant=tenant)
+                    start_date=start, renewal_date=renewal, renewal_cost=cost, currency=currency,
+                    billing_cycle='annual', term_months=12, auto_renewal=True,
+                    cost_center=f"{self._tenant_meta[primary_slug]['code']}-CLOUD",
+                    contract_reference=f"MSA-{prov_name.split()[0].upper()}-{start.year}",
+                    owner=self._provisioner,
+                    description=f"{prov_name} cloud subscription — group contract held by {tenant.name}.",
+                    tenant=tenant)
                 self._subscriptions.append(sub)
-            # Link AWS workloads to a couple of the tenant's servers
-            servers = [a for a in self._assets_by_tenant.get(primary_slug, [])
-                       if a.asset_role and 'server' in a.asset_role.slug]
-            if servers and self._subscriptions:
-                for srv in servers[:3]:
-                    SubscriptionAssignment.objects.get_or_create(
-                        subscription=self._subscriptions[-len(plan)], content_type=ct_asset,
-                        object_id=srv.pk, defaults={'notes': 'Hybrid workload node'})
-        self.stdout.write(f'  {len(self._subscriptions)} subscriptions across {len(self._orgs)} organizations.')
+                if prov_name == 'Amazon Web Services':
+                    aws_sub = sub
+            # Cross-entity consumption: assign the group AWS contract to servers in EVERY
+            # entity of the group, not just the contracting one (shared-service realism).
+            if aws_sub:
+                for t in org['tenants']:
+                    servers = [a for a in self._assets_by_tenant.get(t['slug'], [])
+                               if a.asset_role and 'server' in a.asset_role.slug]
+                    sibling = t['slug'] != primary_slug
+                    for srv in servers[:3]:
+                        _, made = SubscriptionAssignment.objects.get_or_create(
+                            subscription=aws_sub, content_type=ct_asset, object_id=srv.pk,
+                            defaults={'assigned_by': self._provisioner,
+                                      'notes': ('Hybrid workload node (intercompany — billed to group contract)'
+                                                if sibling else 'Hybrid workload node')})
+                        if made and sibling:
+                            x_entity += 1
+        self.stdout.write(f'  {len(self._subscriptions)} subscriptions across {len(self._orgs)} organizations, '
+                          f'{x_entity} cross-entity workload assignments.')
 
     # ─────────────────────────────────────────────────────────────────
     # Maintenance
@@ -1359,9 +1682,11 @@ class Command(BaseCommand):
 
     def _seed_procurement(self):
         from procurement.models import PurchaseOrder, PurchaseOrderLine
+        from assets.models import Asset
         self.stdout.write('--- Procurement ---')
         po_count = 0
         line_count = 0
+        fulfilled = 0
         statuses = ['ordered', 'partial', 'received', 'draft', 'approved']
         target_slugs = ['northwind-internal-it', 'helix-rnd', 'meridian-retail', 'meridian-investment',
                         'sterling-portfolio', 'brightwell-legal', 'aurora-architects', 'vantage-logistics']
@@ -1392,9 +1717,30 @@ class Command(BaseCommand):
                     kwargs['asset_type'] = self._asset_types[key]
                 else:
                     kwargs['accessory'] = self._accessories[key]
-                PurchaseOrderLine.objects.create(**kwargs)
+                line = PurchaseOrderLine.objects.create(**kwargs)
                 line_count += 1
-        self.stdout.write(f'  {po_count} purchase orders, {line_count} order lines.')
+                # Received asset-type lines materialise into real Assets that point back
+                # to the originating PO line (Asset.purchase_order_line) — closes the
+                # order → inventory loop instead of leaving received qty abstract.
+                if kind == 'asset_type' and received:
+                    atype = self._asset_types[key]
+                    for n in range(min(received, 3)):
+                        cost = round(float(line.unit_price or 0) * random.uniform(0.97, 1.03), 2)
+                        a = Asset(
+                            name=f"{atype.model} (receiving)", asset_tag='', asset_type=atype,
+                            asset_role=atype.asset_role, status=self._status_labels['available'],
+                            location=locs[0], tenant=tenant, purchase_order_line=line,
+                            serial_number=f"{meta['code']}{random.randint(100000, 999999)}",
+                            purchase_cost=cost, salvage_value=round(cost * 0.1, 2),
+                            purchase_date=order_date, in_service_date=order_date,
+                            order_number=po.order_number,
+                            supplier=po.supplier, notes='Received against purchase order; awaiting deployment.')
+                        a.save()  # asset_tag drawn from the tenant's AssetTagSequence
+                        a.name = f"{atype.model} ({a.asset_tag})"
+                        a.save(update_fields=['name'])
+                        fulfilled += 1
+        self.stdout.write(f'  {po_count} purchase orders, {line_count} order lines, '
+                          f'{fulfilled} assets received against PO lines.')
 
     # ─────────────────────────────────────────────────────────────────
     # Operations: alerts, reports, event rules, config, dashboards, audit
@@ -1548,13 +1894,116 @@ class Command(BaseCommand):
                                                 'Confirmed asset present and tagged during audit.']))
 
         # Label template
-        LabelTemplate.objects.get_or_create(name='Standard QR Asset Label', defaults={
-            'description': '2x1 inch QR label', 'barcode_format': 'qr',
-            'template_code': ('<table style="width:100%"><tr>'
-                              '<td style="width:55%"><div style="font-weight:bold">{{ asset.name }}</div>'
-                              '<div style="font-family:monospace">{{ asset.asset_tag }}</div></td>'
-                              '<td style="width:45%;text-align:right">{{ barcode_img }}</td></tr></table>')})
+        qr_cell = ('<table style="width:100%"><tr>'
+                   '<td style="width:55%"><div style="font-weight:bold">{{ asset.name }}</div>'
+                   '<div style="font-family:monospace">{{ asset.asset_tag }}</div></td>'
+                   '<td style="width:45%;text-align:right">{{ barcode_img }}</td></tr></table>')
+        label_templates = [
+            ('Standard QR Asset Label', '2.0 x 1.0 inch QR label for laptops & desktops', 'qr', 2.0, 1.0, qr_cell),
+            ('Compact QR Asset Tag', '1.5 x 0.5 inch QR tag for accessories & small items', 'qr', 1.5, 0.5,
+             '<div style="text-align:center">{{ barcode_img }}'
+             '<div style="font-family:monospace;font-size:7pt">{{ asset.asset_tag }}</div></div>'),
+            ('Datacenter Rack Label (Code 128)', '4.0 x 1.0 inch barcode label for rack/server gear', 'code128', 4.0, 1.0,
+             '<table style="width:100%"><tr><td><div style="font-weight:bold;font-size:11pt">{{ asset.name }}</div>'
+             '<div>{{ asset.asset_tag }} · {{ asset.serial_number }}</div></td>'
+             '<td style="text-align:right">{{ barcode_img }}</td></tr></table>'),
+            ('Shipping / Transfer Label (Code 39)', '4.0 x 2.0 inch label for in-transit assets', 'code39', 4.0, 2.0,
+             '<div><div style="font-weight:bold">{{ asset.name }}</div>'
+             '<div>From: {{ asset.location }}</div><div>{{ asset.asset_tag }}</div>{{ barcode_img }}</div>'),
+            ('High-Security Data Matrix Label', '1.0 x 1.0 inch 2D label for regulated / GxP assets', 'datamatrix', 1.0, 1.0,
+             '<div style="text-align:center">{{ barcode_img }}'
+             '<div style="font-family:monospace;font-size:6pt">{{ asset.asset_tag }}</div></div>'),
+        ]
+        for name, desc, fmt, w, h, code in label_templates:
+            LabelTemplate.objects.get_or_create(name=name, defaults={
+                'description': desc, 'barcode_format': fmt, 'page_width': w, 'page_height': h,
+                'template_code': code})
 
         self.stdout.write(f'  {len(rules)} alert rules, {log_count} alert logs, 4 report templates, '
                           f'2 schedules, 2 event rules, config contexts, {audited} audited assets, '
                           f'{req_count} asset requests.')
+
+    # ─────────────────────────────────────────────────────────────────
+    # Change history (ObjectChange)
+    # ─────────────────────────────────────────────────────────────────
+
+    def _seed_changelog(self):
+        """Backfill a believable audit trail.
+
+        Seeding runs in a management command with no request context, so
+        ChangeLoggingMixin records nothing on its own. The changelog is a product
+        strength, so we synthesise ObjectChange rows directly — provisioning,
+        re-assignment, status changes and audits — attributed to the right MSP
+        engineers and back-dated so history reads as naturally grown rather than
+        all-at-once.
+        """
+        import uuid
+        from core.models import ObjectChange
+        self.stdout.write('--- Change history ---')
+
+        actors = self._engineer_users or [self._provisioner]
+        helpdesk = [u for name, u in self._users.items()
+                    if name in ('ravi.anand', 'mia.koch')] or actors
+        rows = []  # ObjectChange instances whose .time we backdate via bulk_update
+
+        def aware_days_ago(n):
+            return timezone.now() - datetime.timedelta(days=max(0, n), hours=random.randint(0, 18))
+
+        def add(obj, action, post, pre=None, actor=None, when=None):
+            actor = actor or random.choice(actors)
+            ct = ContentType.objects.get_for_model(type(obj))
+            oc = ObjectChange.objects.create(
+                user=actor, user_name=actor.get_username(), request_id=uuid.uuid4(),
+                action=action, changed_object_type=ct, changed_object_id=obj.pk,
+                object_repr=str(obj)[:200], object_type_repr=f"{ct.app_label} | {ct.model}",
+                prechange_data=pre, postchange_data=post)
+            oc.time = when or timezone.now()
+            rows.append(oc)
+
+        # Asset lifecycle: provisioning at purchase, then later edits / checkouts / audits.
+        for slug in self._tenants:
+            assets = self._assets_by_tenant.get(slug, [])
+            for asset in random.sample(assets, k=min(18, len(assets))):
+                born = (TODAY - asset.purchase_date).days if asset.purchase_date else 120
+                add(asset, 'create',
+                    {'asset_tag': asset.asset_tag, 'status': asset.status.name if asset.status else None,
+                     'tenant': asset.tenant.name if asset.tenant else None,
+                     'purchase_cost': str(asset.purchase_cost)},
+                    when=aware_days_ago(born))
+                active = asset.assignments.filter(is_active=True, assigned_user__isnull=False).first()
+                if active and random.random() < 0.7:
+                    add(asset, 'checkout',
+                        {'assigned_user': str(active.assigned_user), 'status': 'In Use'},
+                        pre={'status': 'Available'},
+                        when=aware_days_ago(max(1, born - random.randint(2, 20))))
+                if random.random() < 0.35:
+                    new_note = random.choice([
+                        'Re-imaged and re-enrolled in MDM.', 'BIOS/firmware updated to latest.',
+                        'Warranty extended by 12 months.', 'Relocated during office move.'])
+                    add(asset, 'update', {'notes': new_note}, pre={'notes': ''},
+                        actor=random.choice(helpdesk),
+                        when=aware_days_ago(random.randint(5, max(6, born // 2))))
+                if random.random() < 0.25:
+                    add(asset, 'audit',
+                        {'last_audited': str(TODAY), 'status': asset.status.name if asset.status else None},
+                        when=aware_days_ago(random.randint(2, 90)))
+
+        # Retired assets: a clear decommission update.
+        for asset in self._retired_assets:
+            add(asset, 'update', {'status': 'Retired', 'disposed_at': str(asset.disposed_at)},
+                pre={'status': 'In Use'}, when=aware_days_ago(random.randint(10, 120)))
+
+        # License & subscription edits (seat-count bumps, renewals).
+        for lic in random.sample(self._licenses, k=min(20, len(self._licenses))):
+            add(lic, 'create', {'name': lic.name, 'seats': lic.seats}, when=aware_days_ago(random.randint(60, 600)))
+            if random.random() < 0.4:
+                add(lic, 'update', {'seats': lic.seats}, pre={'seats': max(1, lic.seats - 5)},
+                    when=aware_days_ago(random.randint(10, 120)))
+        for sub in random.sample(self._subscriptions, k=min(12, len(self._subscriptions))):
+            add(sub, 'update', {'renewal_date': str(sub.renewal_date), 'renewal_cost': str(sub.renewal_cost)},
+                pre={'renewal_cost': str(round(float(sub.renewal_cost) * 0.9, 2))},
+                when=aware_days_ago(random.randint(5, 90)))
+
+        # Back-date the auto_now_add timestamps in one pass.
+        ObjectChange.objects.bulk_update(rows, ['time'])
+        self.stdout.write(f'  {len(rows)} change-history entries across assets, licenses and subscriptions.')

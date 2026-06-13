@@ -25,7 +25,8 @@ class Command(BaseCommand):
 
         for job in pending_jobs:
             try:
-                job.mark_running()
+                if not job.mark_running():
+                    continue
                 self._execute_job(job)
                 job.mark_completed({'status': 'success'})
                 processed += 1

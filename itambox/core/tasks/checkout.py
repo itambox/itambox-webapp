@@ -21,7 +21,9 @@ def bulk_checkout_task(job_id, asset_pks, target_type_str, target_pk, user_id, n
                 logger.error(f"Job {job_id} not found during async checkout.")
                 return
 
-            job.mark_running()
+            if not job.mark_running():
+                logger.info("Job %s is no longer pending (cancelled?); skipping checkout.", job_id)
+                return
             job.append_log("Initializing asynchronous bulk checkout pipeline...")
             job.append_log(f"Assets to process: {len(asset_pks)}")
 

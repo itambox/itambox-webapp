@@ -35,7 +35,9 @@ def sync_tenant_intune(
             logger.error("Intune sync job %s not found.", job_id)
             return
 
-        job.mark_running()
+        if not job.mark_running():
+            logger.info("Job %s is no longer pending (cancelled?); skipping Intune sync.", job_id)
+            return
         if dry_run:
             job.append_log("[dry-run] No writes will be performed.")
 

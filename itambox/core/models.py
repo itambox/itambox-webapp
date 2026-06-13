@@ -315,6 +315,15 @@ class Job(ChangeLoggingMixin, BaseModel):
     STATUS_CHOICES = JobStatusChoices()
 
     name = models.CharField(max_length=255)
+    # Tenant the job was enqueued for. Null means a system-level job
+    # (e.g. management commands); those are only visible to superusers.
+    tenant = models.ForeignKey(
+        'organization.Tenant',
+        on_delete=models.CASCADE,
+        related_name='jobs',
+        null=True,
+        blank=True,
+    )
     model = models.ForeignKey(ContentType, on_delete=models.SET_NULL, null=True, blank=True)
     object_id = models.PositiveBigIntegerField(null=True, blank=True)
     content_object = GenericForeignKey('model', 'object_id')
@@ -342,9 +351,22 @@ class Job(ChangeLoggingMixin, BaseModel):
         return reverse('job_detail', kwargs={'pk': self.pk})
 
     def mark_running(self):
+        """
+        Atomically transition pending -> running. Returns False if the job is
+        no longer pending (e.g. it was cancelled before the worker picked it
+        up), in which case the caller must not execute the task.
+        """
+        started = timezone.now()
+        updated = Job.objects.filter(pk=self.pk, status=self.STATUS_PENDING).update(
+            status=self.STATUS_RUNNING,
+            started=started,
+        )
+        if not updated:
+            self.refresh_from_db(fields=['status', 'started', 'logs'])
+            return False
         self.status = self.STATUS_RUNNING
-        self.started = timezone.now()
-        self.save(update_fields=['status', 'started'])
+        self.started = started
+        return True
 
     def mark_completed(self, result=None):
         self.status = self.STATUS_COMPLETED
@@ -352,6 +374,27 @@ class Job(ChangeLoggingMixin, BaseModel):
         if result is not None:
             self.result = result
         self.save(update_fields=['status', 'completed', 'result'])
+
+    def cancel(self, reason=''):
+        """
+        Atomically cancel a still-pending job. Returns False if a worker
+        already picked it up (or it has finished) — a running task cannot
+        be stopped from here.
+        """
+        completed = timezone.now()
+        logs = f"{self.logs}\n{reason}" if self.logs else str(reason)
+        updated = Job.objects.filter(pk=self.pk, status=self.STATUS_PENDING).update(
+            status=self.STATUS_FAILED,
+            completed=completed,
+            logs=logs,
+        )
+        if not updated:
+            self.refresh_from_db(fields=['status', 'started', 'completed'])
+            return False
+        self.status = self.STATUS_FAILED
+        self.completed = completed
+        self.logs = logs
+        return True
 
     def mark_failed(self, error=None):
         self.status = self.STATUS_FAILED

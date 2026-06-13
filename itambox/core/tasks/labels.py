@@ -48,7 +48,9 @@ def generate_label_batch_task(job_id, asset_pks, label_format, user_id, tenant_i
                 logger.error(f"Job {job_id} not found during async label printing.")
                 return
 
-            job.mark_running()
+            if not job.mark_running():
+                logger.info("Job %s is no longer pending (cancelled?); skipping label generation.", job_id)
+                return
             job.append_log("Starting label batch generation...")
             job.append_log(f"Format: {label_format} | Total assets: {len(asset_pks)}")
 
@@ -358,7 +360,9 @@ def generate_label_pdf_batch_task(job_id, asset_pks, template_id, layout_mode, u
                 logger.error(f"Job {job_id} not found during async PDF label printing.")
                 return
 
-            job.mark_running()
+            if not job.mark_running():
+                logger.info("Job %s is no longer pending (cancelled?); skipping PDF label generation.", job_id)
+                return
             job.append_log("Starting asynchronous PDF label batch generation...")
 
             try:
