@@ -43,6 +43,11 @@ class CurrentUserMiddleware:
             user_token, request_id_token = tokens
             _current_user.reset(user_token)
             _request_id.reset(request_id_token)
+        else:
+            # Called directly without the entry tokens (e.g. tests, or middleware
+            # invoked outside __call__): clear to None as before.
+            _current_user.set(None)
+            _request_id.set(None)
         return response
 
 
