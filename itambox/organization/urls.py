@@ -100,10 +100,12 @@ urlpatterns = [
     # Tenant Roles
     path('roles/', views.TenantRoleListView.as_view(), name='tenantrole_list'),
     path('roles/add/', views.TenantRoleEditView.as_view(), name='tenantrole_create'),
+    path('roles/delete/', views.TenantRoleBulkDeleteView.as_view(), name='tenantrole_bulk_delete'),
     path('roles/<int:pk>/', views.TenantRoleDetailView.as_view(), name='tenantrole_detail'),
     path('roles/<int:pk>/edit/', views.TenantRoleEditView.as_view(), name='tenantrole_update'),
     path('roles/<int:pk>/clone/', views.TenantRoleCloneView.as_view(), name='tenantrole_clone'),
     path('roles/<int:pk>/delete/', views.TenantRoleDeleteView.as_view(), name='tenantrole_delete'),
+    path('roles/<int:pk>/assign/', views.TenantRoleAssignUsersView.as_view(), name='tenantrole_assign_users'),
 
     # Invitations
     path('invite-user/', views.InviteUserView.as_view(), name='invite_user'),
@@ -112,6 +114,9 @@ urlpatterns = [
     # Tenant Memberships
     path('memberships/', views.TenantMembershipListView.as_view(), name='tenantmembership_list'),
     path('memberships/add/', views.TenantMembershipCreateView.as_view(), name='tenantmembership_create'),
+    path('memberships/edit/', views.TenantMembershipBulkEditView.as_view(), name='tenantmembership_bulk_edit'),
+    path('memberships/delete/', views.TenantMembershipBulkDeleteView.as_view(), name='tenantmembership_bulk_delete'),
+    path('memberships/<int:pk>/edit/', views.TenantMembershipEditView.as_view(), name='tenantmembership_update'),
     path('memberships/<int:pk>/delete/', views.TenantMembershipDeleteView.as_view(), name='tenantmembership_delete'),
 ]
 

@@ -255,6 +255,7 @@ def tenant_ldap_sync(request, pk):
 
     job = Job.objects.create(
         name=f"LDAP Sync: {tenant.name}",
+        tenant=current_tenant,
         model=ct,
         status=Job.STATUS_PENDING
     )

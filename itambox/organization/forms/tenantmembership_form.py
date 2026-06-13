@@ -4,7 +4,9 @@ from crispy_forms.layout import Layout
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
+from core.forms import FilterForm, BulkEditForm
 from ..models import Tenant, TenantRole, TenantMembership
+from ..filters import TenantMembershipFilterSet
 
 User = get_user_model()
 
@@ -50,3 +52,30 @@ class TenantMembershipForm(forms.ModelForm):
         if tenant and role and role.tenant != tenant:
             raise forms.ValidationError(_("The selected role does not belong to the selected tenant."))
         return cleaned_data
+
+
+class TenantMembershipFilterForm(FilterForm):
+    filterset_class = TenantMembershipFilterSet
+
+
+class TenantMembershipBulkRoleForm(BulkEditForm):
+    role = forms.ModelChoiceField(
+        queryset=TenantRole.all_objects.all(),
+        required=True,
+        label=_("Role"),
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields.pop('add_tags', None)
+        self.fields.pop('remove_tags', None)
+
+
+class TenantRoleAssignUsersForm(forms.Form):
+    users = forms.ModelMultipleChoiceField(
+        queryset=User.objects.all(),
+        required=True,
+        label=_("Users"),
+        widget=forms.SelectMultiple(attrs={'class': 'form-select'})
+    )

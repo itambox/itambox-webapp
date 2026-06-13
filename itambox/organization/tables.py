@@ -69,8 +69,9 @@ class SiteTable(BaseTable):
             color = get_status_color(record.status)
             display = record.get_status_display()
             return format_html(
-                '<span class="badge" style="background-color: #{}1a; color: #{}; border: 1px solid #{}33;">{}</span>',
-                color, color, color, display
+                '<span class="badge badge-status" style="--status-color: #{};">'
+                '<span class="badge-status-dot"></span>{}</span>',
+                color, display
             )
         return "—"
 
@@ -97,8 +98,9 @@ class LocationTable(BaseTable):
             color = get_status_color(record.status)
             display = record.get_status_display()
             return format_html(
-                '<span class="badge" style="background-color: #{}1a; color: #{}; border: 1px solid #{}33;">{}</span>',
-                color, color, color, display
+                '<span class="badge badge-status" style="--status-color: #{};">'
+                '<span class="badge-status-dot"></span>{}</span>',
+                color, display
             )
         return "—"
 
@@ -187,8 +189,8 @@ class AssetAssignmentTable(BaseTable):
         
         url = reverse('assets:asset_checkin', kwargs={'pk': record.asset.pk})
         return format_html(
-            '<div class="d-inline-block"><a class="btn btn-sm btn-outline-success text-success" hx-post="{}" hx-swap="none" href="javascript:void(0)">'
-            '<i class="mdi mdi-keyboard-return"></i> Check-in</a></div>', url
+            '<div class="d-inline-block"><button type="button" class="btn btn-sm btn-outline-success text-success" hx-post="{}" hx-swap="none">'
+            '<i class="mdi mdi-keyboard-return"></i> Check-in</button></div>', url
         )
 
 
@@ -231,7 +233,7 @@ class ContactAssignmentTable(BaseTable):
     priority = tables.Column()
     actions = tables.TemplateColumn(
         template_code='''
-        <a href="{% url 'organization:contactassignment_delete' record.pk %}?return_url={{ request.path }}" class="btn btn-sm btn-danger px-2" title="Delete">
+        <a href="{% url 'organization:contactassignment_delete' record.pk %}?return_url={{ request.path }}" class="btn btn-sm btn-action btn-action-danger px-2" title="Delete">
             <i class="mdi mdi-trash-can-outline m-0"></i>
         </a>
         ''',
@@ -253,12 +255,18 @@ class TenantRoleTable(BaseTable):
     name = tables.LinkColumn('organization:tenantrole_detail', args=[A('pk')], verbose_name='Name')
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant')
     description = tables.Column()
+    member_count = tables.Column(verbose_name='Members', orderable=True, empty_values=[])
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = TenantRole
-        fields = ('pk', 'name', 'tenant', 'description', 'actions')
-        default_columns = ('pk', 'name', 'tenant', 'description', 'actions')
+        fields = ('pk', 'name', 'tenant', 'description', 'member_count', 'actions')
+        default_columns = ('pk', 'name', 'tenant', 'description', 'member_count', 'actions')
+
+    def render_member_count(self, value, record):
+        count = getattr(record, 'member_count', 0) or 0
+        url = f"{reverse('organization:tenantmembership_list')}?role={record.pk}"
+        return format_html('<a href="{}">{}</a>', url, count)
 
 
 class TenantMembershipTable(BaseTable):
@@ -267,7 +275,7 @@ class TenantMembershipTable(BaseTable):
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant', verbose_name='Tenant')
     role = tables.LinkColumn('organization:tenantrole_detail', args=[A('role_id')], accessor='role', verbose_name='Role')
     joined_at = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name='Joined')
-    actions = ActionsColumn(actions=('delete',))
+    actions = ActionsColumn(actions=('edit', 'delete'))
 
     class Meta(BaseTable.Meta):
         model = TenantMembership

@@ -4,7 +4,7 @@ from django import forms
 from django.db.models import Q
 from django.contrib.contenttypes.models import ContentType
 from assets.models import Manufacturer, AssetType
-from organization.models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, Contact, ContactRole, ContactAssignment
+from organization.models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, Contact, ContactRole, ContactAssignment, TenantRole, TenantMembership
 
 from extras.models import Tag # Import Tag
 from crispy_forms.helper import FormHelper
@@ -253,6 +253,64 @@ class ContactRoleFilterSet(BaseOrgFilterSet):
         ).distinct()
 
 
+
+
+class TenantRoleFilterSet(BaseOrgFilterSet):
+    tag = None  # TenantRole has no tags field
+    tenant = django_filters.ModelChoiceFilter(
+        queryset=Tenant.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    class Meta:
+        model = TenantRole
+        fields = ['name', 'tenant']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(description__icontains=value)
+        ).distinct()
+
+
+def _user_queryset(request):
+    from django.contrib.auth import get_user_model
+    return get_user_model().objects.all()
+
+
+class TenantMembershipFilterSet(BaseOrgFilterSet):
+    tag = None  # TenantMembership has no tags field
+    tenant = django_filters.ModelChoiceFilter(
+        queryset=Tenant.objects.all(),
+        label="Tenant",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    role = django_filters.ModelChoiceFilter(
+        queryset=TenantRole.objects.all(),
+        label="Role",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    user = django_filters.ModelChoiceFilter(
+        queryset=_user_queryset,
+        label="User",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    class Meta:
+        model = TenantMembership
+        fields = ['tenant', 'role', 'user']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(user__username__icontains=value) |
+            Q(user__email__icontains=value) |
+            Q(role__name__icontains=value) |
+            Q(tenant__name__icontains=value)
+        ).distinct()
 
 
 class ContactAssignmentFilterSet(BaseOrgFilterSet):

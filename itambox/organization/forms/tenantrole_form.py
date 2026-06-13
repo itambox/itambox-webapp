@@ -1,7 +1,9 @@
 from django import forms
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout
+from core.forms import FilterForm
 from ..models import TenantRole, Tenant
+from ..filters import TenantRoleFilterSet
 
 MATRIX_MODELS = {
     # Inventory & Hardware
@@ -79,6 +81,13 @@ MATRIX_MODELS = {
         'model_name': 'subscription',
         'group': 'Software & Subscriptions',
     },
+    'subscriptionassignment': {
+        'label': 'Subscription Assignments',
+        'app': 'subscriptions',
+        'model_name': 'subscriptionassignment',
+        'group': 'Software & Subscriptions',
+    },
+
 
     # Organization & Structure
     'location': {
@@ -510,3 +519,7 @@ class TenantRoleForm(forms.ModelForm):
                 'delete_field': self[f'perm_{key}_delete'],
             })
         return groups
+
+
+class TenantRoleFilterForm(FilterForm):
+    filterset_class = TenantRoleFilterSet

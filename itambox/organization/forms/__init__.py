@@ -9,6 +9,6 @@ from .assetholder_form import AssetHolderForm, AssetHolderFilterForm
 from .contact_form import ContactForm, ContactFilterForm
 from .contactrole_form import ContactRoleForm, ContactAssignmentForm, ContactRoleFilterForm
 from .invitation import TenantInvitationForm
-from .tenantrole_form import TenantRoleForm, MATRIX_MODELS
-from .tenantmembership_form import TenantMembershipForm
+from .tenantrole_form import TenantRoleForm, TenantRoleFilterForm, MATRIX_MODELS
+from .tenantmembership_form import TenantMembershipForm, TenantMembershipFilterForm, TenantMembershipBulkRoleForm, TenantRoleAssignUsersForm
 

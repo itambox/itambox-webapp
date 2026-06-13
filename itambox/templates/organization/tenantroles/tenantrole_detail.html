@@ -1,6 +1,13 @@
 {% extends "generic/object_detail.html" %}
 {% load i18n %}
 
+{% block extra_page_actions %}
+<a href="{% url 'organization:tenantrole_assign_users' pk=object.pk %}" class="btn btn-ghost-secondary">
+    <i class="mdi mdi-account-multiple-plus"></i>
+    {% translate "Assign Users" %}
+</a>
+{% endblock extra_page_actions %}
+
 {% block object_details %}
 <div class="row">
     <div class="col-md-6 mb-3">
@@ -10,6 +17,14 @@
     <div class="col-md-6 mb-3">
         <label class="form-label text-muted">{% translate "Description" %}</label>
         <div>{{ object.description|default:"—" }}</div>
+    </div>
+</div>
+
+<div class="mb-3">
+    <label class="form-label text-muted">{% translate "Members" %}</label>
+    <div>
+        <a href="{{ members_url }}" class="fw-bold fs-5">{{ member_count }}</a>
+        <span class="text-muted small ms-1">{% translate "user(s) with this role" %}</span>
     </div>
 </div>
 
