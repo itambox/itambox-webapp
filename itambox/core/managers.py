@@ -149,7 +149,18 @@ class TenantScopingQuerySet(models.QuerySet):
                     else:
                         qs = qs.filter(tenant_id__in=allowed_tenant_ids)
             except FieldDoesNotExist:
-                pass
+                # Models that derive their tenant through a relation rather than a
+                # direct `tenant` field (e.g. assignments/stock keyed off their
+                # parent item) declare `tenant_lookup`, an ORM path to the owning
+                # tenant (e.g. 'asset__tenant'). Scope through it so these rows
+                # cannot leak or be mutated across tenants. Rows whose parent has
+                # no tenant (global/shared catalogue items) remain visible.
+                tenant_lookup = getattr(self.model, 'tenant_lookup', None)
+                if tenant_lookup:
+                    qs = qs.filter(
+                        models.Q(**{f'{tenant_lookup}_id__in': allowed_tenant_ids}) |
+                        models.Q(**{f'{tenant_lookup}__isnull': True})
+                    )
 
             return qs
         return self

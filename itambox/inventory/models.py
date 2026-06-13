@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError, FieldError
 
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel, StandardModel
 from core.mixins import TaggableMixin, AutoSlugMixin, SoftDeleteMixin, JournalingMixin, ImageAttachmentMixin, CloneableMixin, ExportableMixin, SubscribableMixin
-from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager, TenantScopingAllObjectsManager, SoftDeleteQuerySet, TenantScopingQuerySet
+from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingManager, TenantScopingSoftDeleteManager, TenantScopingAllObjectsManager, SoftDeleteQuerySet, TenantScopingQuerySet
 from .abstract_models import AbstractInventoryItem, AbstractStock, AbstractAssignment
 
 
@@ -219,6 +219,13 @@ class Consumable(AbstractInventoryItem):
 
 
 class ComponentStock(AbstractStock):
+    tenant_lookup = 'component__tenant'
+    objects = TenantScopingManager()
+
+    @property
+    def tenant(self):
+        return self.component.tenant if self.component_id else None
+
     component = models.ForeignKey(
         Component, on_delete=models.PROTECT, related_name='stocks', db_index=True
     )
@@ -247,6 +254,13 @@ class ComponentStock(AbstractStock):
 
 
 class AccessoryStock(AbstractStock):
+    tenant_lookup = 'accessory__tenant'
+    objects = TenantScopingManager()
+
+    @property
+    def tenant(self):
+        return self.accessory.tenant if self.accessory_id else None
+
     accessory = models.ForeignKey(
         Accessory, on_delete=models.PROTECT, related_name='stocks', db_index=True
     )
@@ -269,6 +283,13 @@ class AccessoryStock(AbstractStock):
 
 
 class ConsumableStock(AbstractStock):
+    tenant_lookup = 'consumable__tenant'
+    objects = TenantScopingManager()
+
+    @property
+    def tenant(self):
+        return self.consumable.tenant if self.consumable_id else None
+
     consumable = models.ForeignKey(
         Consumable, on_delete=models.PROTECT, related_name='stocks', db_index=True
     )
@@ -291,8 +312,13 @@ class ConsumableStock(AbstractStock):
 
 
 class ComponentAllocation(AbstractAssignment):
-    objects = SoftDeleteManager()
-    all_objects = AllObjectsManager()
+    tenant_lookup = 'component__tenant'
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
+
+    @property
+    def tenant(self):
+        return self.component.tenant if self.component_id else None
 
     def __init__(self, *args, **kwargs):
         if 'qty_allocated' in kwargs:
@@ -379,8 +405,13 @@ class ComponentAllocation(AbstractAssignment):
 
 
 class AccessoryAssignment(AbstractAssignment):
-    objects = SoftDeleteManager()
-    all_objects = AllObjectsManager()
+    tenant_lookup = 'accessory__tenant'
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
+
+    @property
+    def tenant(self):
+        return self.accessory.tenant if self.accessory_id else None
 
     accessory = models.ForeignKey(Accessory, on_delete=models.PROTECT, related_name='assignments', db_index=True)
 
@@ -414,8 +445,13 @@ class AccessoryAssignment(AbstractAssignment):
 
 
 class ConsumableAssignment(AbstractAssignment):
-    objects = SoftDeleteManager()
-    all_objects = AllObjectsManager()
+    tenant_lookup = 'consumable__tenant'
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
+
+    @property
+    def tenant(self):
+        return self.consumable.tenant if self.consumable_id else None
 
     consumable = models.ForeignKey(Consumable, on_delete=models.PROTECT, related_name='consumptions', db_index=True)
 

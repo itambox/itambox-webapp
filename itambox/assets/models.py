@@ -1012,8 +1012,15 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
 
 
 class AssetAssignment(SoftDeleteMixin, JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel):
-    objects = SoftDeleteManager()
-    all_objects = AllObjectsManager()
+    # Tenant is derived from the parent asset; scope through it so assignments
+    # cannot be listed or mutated across tenant boundaries.
+    tenant_lookup = 'asset__tenant'
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
+
+    @property
+    def tenant(self):
+        return self.asset.tenant if self.asset_id else None
 
     asset = models.ForeignKey(
         Asset, on_delete=models.CASCADE, related_name='assignments', db_index=True

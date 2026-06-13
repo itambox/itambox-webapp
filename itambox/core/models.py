@@ -39,6 +39,19 @@ class BaseModel(models.Model):
 
 
 class ObjectChange(models.Model):
+    # Tenant-scoped so one tenant cannot read another tenant's change history
+    # (which includes full field-level prechange/postchange snapshots). Null for
+    # system/global changes made outside any tenant context.
+    objects = TenantScopingManager()
+
+    tenant = models.ForeignKey(
+        to='organization.Tenant',
+        on_delete=models.SET_NULL,
+        related_name='+',
+        blank=True,
+        null=True,
+        db_index=True,
+    )
     time = models.DateTimeField(
         default=timezone.now,
         editable=False,
@@ -179,8 +192,20 @@ class ChangeLoggingMixin:
 
         ct = ContentType.objects.get_for_model(self.__class__)
 
+        # Attribute the change to a tenant so the changelog can be scoped. Prefer
+        # the changed object's own tenant (works for both direct `tenant` fields
+        # and relation-derived `tenant` properties); fall back to the active
+        # request tenant for objects that carry no tenant of their own.
+        from core.managers import get_current_tenant
+        try:
+            change_tenant = getattr(self, 'tenant', None)
+        except Exception:
+            change_tenant = None
+        if change_tenant is None:
+            change_tenant = get_current_tenant()
 
-        ObjectChange.objects.create(
+        ObjectChange._base_manager.create(
+            tenant=change_tenant,
             user=user,
             user_name=user.username if user else 'System',
             request_id=request_id,
