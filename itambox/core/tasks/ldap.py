@@ -39,7 +39,9 @@ def sync_tenant_ldap_task(job_id, tenant_slug, user_id, tenant_id=None):
                 logger.error(f"Job {job_id} not found during async LDAP sync.")
                 return
 
-            job.mark_running()
+            if not job.mark_running():
+                logger.info("Job %s is no longer pending (cancelled?); skipping LDAP sync.", job_id)
+                return
             job.append_log(f"Initializing LDAP directory sync for tenant: {tenant_slug}...")
 
             log_stream = JobLogStream(job)

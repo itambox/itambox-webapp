@@ -141,6 +141,7 @@ class Command(BaseCommand):
             from django.contrib.contenttypes.models import ContentType
             job = Job.objects.create(
                 name=job_name,
+                tenant=tenant,
                 status=Job.STATUS_PENDING,
                 data={
                     'source': 'snipeit',

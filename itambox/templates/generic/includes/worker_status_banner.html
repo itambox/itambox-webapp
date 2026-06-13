@@ -1,0 +1,26 @@
+{% load i18n %}
+{% if worker_status %}
+{% if worker_status.detectable and worker_status.online %}
+<div class="alert alert-success border-0 rounded-0 border-bottom d-flex align-items-center mb-0 px-3 py-2">
+    <i class="mdi mdi-check-circle-outline me-2 fs-3"></i>
+    <div>
+        {% blocktranslate with n=worker_status.cluster_count %}Background worker online ({{ n }} cluster running). Webhook &amp; notification deliveries are being processed.{% endblocktranslate %}
+    </div>
+</div>
+{% elif worker_status.detectable and not worker_status.online %}
+<div class="alert alert-danger border-0 rounded-0 border-bottom d-flex align-items-center mb-0 px-3 py-2">
+    <i class="mdi mdi-alert-octagon-outline me-2 fs-3"></i>
+    <div>
+        {% blocktranslate %}No background worker is running. Webhook &amp; notification deliveries will be <strong>queued but never sent</strong> until you start the worker:{% endblocktranslate %}
+        <code>python manage.py qcluster</code>{% if worker_status.queued_tasks %} — {% blocktranslate count n=worker_status.queued_tasks %}{{ n }} task waiting in the queue.{% plural %}{{ n }} tasks waiting in the queue.{% endblocktranslate %}{% endif %}
+    </div>
+</div>
+{% else %}
+<div class="alert alert-info border-0 rounded-0 border-bottom d-flex align-items-center mb-0 px-3 py-2">
+    <i class="mdi mdi-information-outline me-2 fs-3"></i>
+    <div>
+        {% blocktranslate %}Webhook &amp; notification deliveries run on the background worker (<code>python manage.py qcluster</code>). Live worker status can't be shown with the local-memory cache.{% endblocktranslate %}{% if worker_status.queued_tasks %} {% blocktranslate count n=worker_status.queued_tasks %}{{ n }} task is currently queued.{% plural %}{{ n }} tasks are currently queued.{% endblocktranslate %}{% endif %}
+    </div>
+</div>
+{% endif %}
+{% endif %}

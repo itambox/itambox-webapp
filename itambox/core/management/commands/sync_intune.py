@@ -75,6 +75,7 @@ class Command(BaseCommand):
 
         job = Job.objects.create(
             name=f"intune-sync:{tenant_slug}",
+            tenant=tenant,
             data={"tenant_slug": tenant_slug, "dry_run": dry_run},
         )
         self.stdout.write(f"Created Job #{job.pk}: {job.name}")

@@ -446,8 +446,19 @@ class LabelPrintView(LoginRequiredMixin, View):
         return response
 
 
+class WorkerStatusContextMixin:
+    """Adds ``worker_status`` to the context so templates can warn when the django-q
+    worker isn't running (webhook/notification deliveries queue but never send)."""
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from core.worker_status import get_worker_status
+        context['worker_status'] = get_worker_status()
+        return context
+
+
 @method_decorator(login_required, name='dispatch')
-class WebhookEndpointListView(ObjectListView):
+class WebhookEndpointListView(WorkerStatusContextMixin, ObjectListView):
     queryset = WebhookEndpoint.objects.all()
     table = WebhookEndpointTable
     template_name = 'generic/object_list.html'
@@ -461,7 +472,7 @@ class WebhookEndpointListView(ObjectListView):
 
 
 @method_decorator(login_required, name='dispatch')
-class WebhookEndpointDetailView(ObjectDetailView):
+class WebhookEndpointDetailView(WorkerStatusContextMixin, ObjectDetailView):
     queryset = WebhookEndpoint.objects.all()
     layout = (
         ((Panel('info', 'Webhook Endpoint Details'),),),
@@ -559,7 +570,7 @@ class WebhookEndpointDeleteView(ObjectDeleteView):
 
 
 @method_decorator(login_required, name='dispatch')
-class EventRuleListView(ObjectListView):
+class EventRuleListView(WorkerStatusContextMixin, ObjectListView):
     queryset = EventRule.objects.select_related('model')
     table = EventRuleTable
     template_name = 'generic/object_list.html'
@@ -573,8 +584,8 @@ class EventRuleListView(ObjectListView):
 
 
 @method_decorator(login_required, name='dispatch')
-class EventRuleDetailView(ObjectDetailView):
-    queryset = EventRule.objects.select_related('model')
+class EventRuleDetailView(WorkerStatusContextMixin, ObjectDetailView):
+    queryset = EventRule.objects.select_related('model', 'webhook')
     layout = (
         ((Panel('info', 'Event Rule Details'),),),
     )

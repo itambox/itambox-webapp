@@ -22,7 +22,9 @@ def import_csv_task(job_id, rows_data, app_label, model_name, user_id, tenant_id
                 logger.error(f"Job {job_id} not found during async import.")
                 return
 
-            job.mark_running()
+            if not job.mark_running():
+                logger.info("Job %s is no longer pending (cancelled?); skipping import.", job_id)
+                return
             job.append_log("Initializing asynchronous import pipeline...")
             job.append_log(f"Target model: {app_label}.{model_name} | Row Count: {len(rows_data)}")
 

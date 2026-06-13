@@ -1023,20 +1023,20 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
 
                 model = self._get_model()
                 ct = ContentType.objects.get_for_model(model)
-                
-                # Create background Job tracker instance
-                job = Job.objects.create(
-                    name=f"Bulk Import: {str(model._meta.verbose_name_plural).title()}",
-                    model=ct,
-                    status=Job.STATUS_PENDING
-                )
-                
-                # Dispatch async task to worker queue safely after transaction commits (with sync bypass for tests)
+
                 from django.db import transaction
                 from django.conf import settings
                 from core.managers import get_current_tenant
                 current_tenant = get_current_tenant()
                 tenant_id = current_tenant.pk if current_tenant else None
+
+                # Create background Job tracker instance
+                job = Job.objects.create(
+                    name=f"Bulk Import: {str(model._meta.verbose_name_plural).title()}",
+                    tenant=current_tenant,
+                    model=ct,
+                    status=Job.STATUS_PENDING
+                )
 
                 if getattr(settings, 'Q_CLUSTER', {}).get('sync', False):
                     async_task(
