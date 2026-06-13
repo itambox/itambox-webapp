@@ -10,11 +10,11 @@ from core.managers import (
     TenantScopingManager, SoftDeleteManager, AllObjectsManager,
     TenantScopingSoftDeleteManager, TenantScopingAllObjectsManager,
 )
-from core.mixins import SoftDeleteMixin
+from core.mixins import SoftDeleteMixin, BookmarkableMixin
 from core.validators import validate_image_attachment, validate_file_attachment
 
 
-class Tag(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
+class Tag(ChangeLoggingMixin, BaseModel, SoftDeleteMixin, BookmarkableMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     name = models.CharField(max_length=100)
@@ -219,7 +219,11 @@ class Event(ChangeLoggingMixin, BaseModel):
         return f"Event {self.get_action_display()} on {self.content_object}"
 
 
-class EventRule(ChangeLoggingMixin, BaseModel):
+class EventRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
+    allow_global_tenant = True
+
     ACTION_WEBHOOK = 'webhook'
     ACTION_NOTIFICATION = 'notification'
 
@@ -255,6 +259,15 @@ class EventRule(ChangeLoggingMixin, BaseModel):
         help_text="Advanced/optional JSON config (notification body, header overrides, etc.)"
     )
     enabled = models.BooleanField(default=True)
+    tenant = models.ForeignKey(
+        'organization.Tenant',
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name='event_rules',
+        db_index=True,
+        help_text=_("The tenant owning this rule. Null represents system-wide rules."),
+    )
 
     class Meta:
         ordering = ['name']
@@ -267,8 +280,25 @@ class EventRule(ChangeLoggingMixin, BaseModel):
     def get_absolute_url(self):
         return reverse('eventrule_detail', kwargs={'pk': self.pk})
 
+    def clean(self):
+        super().clean()
+        if (
+            self.action_type == self.ACTION_WEBHOOK
+            and self.webhook_id
+            and self.tenant_id is not None
+        ):
+            endpoint_tenant_id = self.webhook.tenant_id
+            if endpoint_tenant_id is not None and endpoint_tenant_id != self.tenant_id:
+                raise ValidationError(
+                    {'webhook': _("Webhook endpoint must belong to the same tenant as the rule, or be system-wide.")}
+                )
 
-class WebhookEndpoint(ChangeLoggingMixin, BaseModel):
+
+class WebhookEndpoint(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
+    allow_global_tenant = True
+
     HTTP_GET = 'GET'
     HTTP_POST = 'POST'
     HTTP_PUT = 'PUT'
@@ -280,7 +310,7 @@ class WebhookEndpoint(ChangeLoggingMixin, BaseModel):
         (HTTP_PATCH, 'PATCH'),
     ]
 
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
     url = models.URLField(max_length=2000)
     http_method = models.CharField(max_length=10, choices=METHOD_CHOICES, default=HTTP_POST)
     headers = models.JSONField(default=dict, blank=True)
@@ -288,11 +318,27 @@ class WebhookEndpoint(ChangeLoggingMixin, BaseModel):
     enabled = models.BooleanField(default=True)
     retry_count = models.PositiveSmallIntegerField(default=3, help_text="Max retry attempts on failure")
     retry_backoff = models.PositiveSmallIntegerField(default=60, help_text="Backoff in seconds between retries")
+    tenant = models.ForeignKey(
+        'organization.Tenant',
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name='webhook_endpoints',
+        db_index=True,
+        help_text=_("The tenant owning this endpoint. Null represents system-wide endpoints."),
+    )
 
     class Meta:
         ordering = ['name']
         verbose_name = "Webhook Endpoint"
         verbose_name_plural = "Webhook Endpoints"
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tenant', 'name'],
+                condition=models.Q(deleted_at__isnull=True),
+                name='unique_webhookendpoint_tenant_name_active'
+            )
+        ]
 
     def __str__(self):
         return self.name
@@ -314,6 +360,8 @@ class WebhookEndpoint(ChangeLoggingMixin, BaseModel):
             from core.crypto import decrypt_string
             return decrypt_string(self.secret)
         return self.secret
+
+
 
 
 class JournalEntry(ChangeLoggingMixin, BaseModel):
