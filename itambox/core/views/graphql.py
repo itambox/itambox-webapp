@@ -11,19 +11,51 @@ from itambox.api.authentication import TokenAuthentication
 from itambox.middleware import TenantMiddleware, CurrentUserMiddleware
 
 
+def field_count_limit_validator(max_fields=500, max_aliases=50):
+    """Bound total field selections and aliases in a single operation.
+
+    Depth limiting alone does not stop *breadth*: a query can stay within the
+    depth cap while aliasing the same expensive root field hundreds of times
+    (`a1: assets(...) a2: assets(...) ...`) to amplify DB load. This rule rejects
+    operations whose field/alias counts exceed sane limits.
+    """
+    from graphql.validation import ValidationRule
+    from graphql.error import GraphQLError
+
+    class FieldCountLimitRule(ValidationRule):
+        def __init__(self, context):
+            super().__init__(context)
+            self._fields = 0
+            self._aliases = 0
+
+        def enter_field(self, node, *_args):
+            self._fields += 1
+            if node.alias:
+                self._aliases += 1
+            if self._fields > max_fields:
+                self.report_error(GraphQLError(
+                    f'Query exceeds the maximum of {max_fields} field selections.', node))
+            elif self._aliases > max_aliases:
+                self.report_error(GraphQLError(
+                    f'Query exceeds the maximum of {max_aliases} aliases.', node))
+
+    return FieldCountLimitRule
+
+
 @method_decorator(csrf_exempt, name='dispatch')
 class PrivateGraphQLView(GraphQLView):
     def __init__(self, *args, **kwargs):
         from graphql.validation import specified_rules
         from graphql.validation import NoSchemaIntrospectionCustomRule
         from graphene.validation import depth_limit_validator
-        
+
         rules = list(specified_rules)
         rules.append(depth_limit_validator(max_depth=10))
-        
+        rules.append(field_count_limit_validator(max_fields=500, max_aliases=50))
+
         if not settings.DEBUG:
             rules.append(NoSchemaIntrospectionCustomRule)
-            
+
         kwargs['validation_rules'] = rules
         super().__init__(*args, **kwargs)
 

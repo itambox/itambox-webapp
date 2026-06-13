@@ -36,9 +36,18 @@ class ManagementCommandsTestCase(TransactionTestCase):
         self.assertIn("Job processing complete", self.stdout.getvalue())
 
     def test_seed_data_command(self):
-        # Run seed data with --production option to verify minimal bootstrap execution paths
-        call_command('seed_data', production=True, stdout=self.stdout, stderr=self.stderr)
+        # Run seed data with --production option to verify minimal bootstrap execution paths.
+        # --force is required because seed_data refuses to clear data when DEBUG is off
+        # (the guard that prevents an accidental production wipe).
+        call_command('seed_data', production=True, force=True, stdout=self.stdout, stderr=self.stderr)
         self.assertIn("Database seeding complete", self.stdout.getvalue())
+
+    def test_seed_data_refuses_to_wipe_without_force_when_not_debug(self):
+        # The destructive clear must be blocked outside DEBUG unless --force is passed.
+        from django.test import override_settings
+        with override_settings(DEBUG=False):
+            with self.assertRaises(CommandError):
+                call_command('seed_data', production=True, stdout=self.stdout, stderr=self.stderr)
 
     def test_sync_tenant_ldap_command_invalid(self):
         with self.assertRaises(CommandError):

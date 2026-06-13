@@ -209,22 +209,10 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
         }
         db_role_name = role_title_map.get(resolved_role_name, 'Member')
 
-        # Provision role if it doesn't exist
-        role, created = TenantRole.objects.get_or_create(
-            tenant=tenant,
-            name=db_role_name,
-            defaults={
-                'description': f'Auto-provisioned {db_role_name} role via OIDC',
-                'permissions': self.get_permissions_for_role(db_role_name)
-            }
-        )
-
-        # Sync membership
-        TenantMembership.objects.update_or_create(
-            user=user,
-            tenant=tenant,
-            defaults={'role': role}
-        )
+        # Safe JIT provisioning: never auto-create a privileged role from a group
+        # claim; assign Admin/Manager only if the operator created them deliberately.
+        from core.auth.provisioning import provision_membership
+        provision_membership(user, tenant, db_role_name, self.get_permissions_for_role, 'OIDC')
 
     def get_permissions_for_role(self, role_name):
         from organization.forms.tenantrole_form import MATRIX_MODELS

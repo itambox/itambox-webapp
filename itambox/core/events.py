@@ -253,7 +253,21 @@ def _send_notification(rule, event):
     )
 
 
+def _is_safe_outbound_url(url):
+    """SSRF guard shared by the synchronous notification senders."""
+    from django.core.exceptions import ValidationError
+    from core.validators import validate_external_url
+    try:
+        validate_external_url(url)
+        return True
+    except ValidationError as exc:
+        logger.error("Outbound notification to %s blocked by SSRF guard: %s", url, exc)
+        return False
+
+
 def _send_slack_notification(webhook_url, message_text, title=None):
+    if not _is_safe_outbound_url(webhook_url):
+        return False
     payload = {
         'text': message_text,
     }
@@ -279,6 +293,8 @@ def _send_slack_notification(webhook_url, message_text, title=None):
 
 
 def _send_teams_notification(webhook_url, message_text, title=None):
+    if not _is_safe_outbound_url(webhook_url):
+        return False
     payload = {
         '@type': 'MessageCard',
         '@context': 'https://schema.org/extensions',

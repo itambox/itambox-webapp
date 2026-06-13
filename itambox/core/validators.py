@@ -1,6 +1,63 @@
+import ipaddress
 import re
+import socket
+from urllib.parse import urlsplit
+
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
+
+
+def validate_external_url(url, allow_private=False):
+    """
+    SSRF guard for user/tenant-configured outbound URLs (webhooks, notification
+    channels). Rejects non-HTTP(S) schemes and any URL whose host resolves to a
+    loopback, link-local (incl. cloud metadata 169.254.169.254), private,
+    reserved, multicast or unspecified address.
+
+    Resolution is performed here and the caller should connect to the validated
+    address; re-validate at send time to limit DNS-rebinding exposure.
+    Returns the list of resolved ip_address objects on success.
+    """
+    if not url:
+        raise ValidationError(_('A URL is required.'))
+
+    parts = urlsplit(url)
+    if parts.scheme not in ('http', 'https'):
+        raise ValidationError(_('URL scheme must be http or https.'))
+    host = parts.hostname
+    if not host:
+        raise ValidationError(_('URL has no host.'))
+
+    # A bare IP literal is checked directly even if DNS is unavailable.
+    try:
+        literal_ip = ipaddress.ip_address(host)
+    except ValueError:
+        literal_ip = None
+    if literal_ip is not None:
+        infos = [(None, None, None, None, (str(literal_ip), 0))]
+    else:
+        # Resolve every address the host maps to and reject if ANY is internal.
+        try:
+            infos = socket.getaddrinfo(host, parts.port or (443 if parts.scheme == 'https' else 80),
+                                       proto=socket.IPPROTO_TCP)
+        except socket.gaierror:
+            # Host does not resolve: there is no internal target to protect against
+            # and the request will fail on its own. Don't couple URL validation to
+            # transient DNS availability — allow it through.
+            return []
+
+    resolved = []
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        resolved.append(ip)
+        if allow_private:
+            continue
+        if (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
+                or ip.is_multicast or ip.is_unspecified):
+            raise ValidationError(
+                _('URL host resolves to a disallowed internal address (%(ip)s).') % {'ip': str(ip)}
+            )
+    return resolved
 
 
 class CustomValidator:
@@ -123,7 +180,10 @@ def validate_file_attachment(file):
         import magic
         mime_type = magic.from_buffer(chunk, mime=True).lower()
     except Exception:
-        mime_type = getattr(file, 'content_type', '').lower()
+        # libmagic unavailable: do NOT fall back to the client-supplied
+        # Content-Type (attacker-controlled, defeats this check). The extension
+        # blacklist above remains the gate; treat the signature as unknown.
+        mime_type = ''
 
     dangerous_mimes = {
         'application/x-dosexec',
@@ -163,20 +223,37 @@ def validate_image_attachment(file):
         )
 
     # 3. Magic Mime Validation (verify actual file signature)
-    try:
-        initial_pos = file.tell()
-        file.seek(0)
-        chunk = file.read(2048)
-        file.seek(initial_pos)
-        import magic
-        import sys
-        is_testing = 'test' in sys.argv or any('test' in arg or 'pytest' in arg for arg in sys.argv)
-        if is_testing and chunk in (b"image-data", b"x"):
-            mime_type = 'image/png'
-        else:
+    import sys
+    initial_pos = file.tell()
+    file.seek(0)
+    chunk = file.read(2048)
+    file.seek(initial_pos)
+
+    is_testing = 'test' in sys.argv or any('test' in arg or 'pytest' in arg for arg in sys.argv)
+    if is_testing and chunk in (b"image-data", b"x"):
+        mime_type = 'image/png'
+    else:
+        try:
+            import magic
             mime_type = magic.from_buffer(chunk, mime=True).lower()
-    except Exception:
-        mime_type = getattr(file, 'content_type', '').lower()
+        except Exception:
+            # libmagic unavailable: verify the bytes are a real image with Pillow
+            # rather than trusting the client-supplied Content-Type (which an
+            # attacker controls). Anything Pillow can't decode fails closed.
+            try:
+                from PIL import Image
+                file.seek(0)
+                with Image.open(file) as img:
+                    img.verify()
+                    pil_format = (img.format or '').lower()
+                file.seek(initial_pos)
+                mime_type = {
+                    'png': 'image/png', 'jpeg': 'image/jpeg', 'gif': 'image/gif',
+                    'bmp': 'image/bmp', 'webp': 'image/webp',
+                }.get(pil_format, '')
+            except Exception:
+                file.seek(initial_pos)
+                mime_type = ''
 
     allowed_mimes = {'image/png', 'image/jpeg', 'image/gif', 'image/bmp', 'image/x-ms-bmp', 'image/webp'}
     if mime_type not in allowed_mimes:

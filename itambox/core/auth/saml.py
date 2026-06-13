@@ -47,11 +47,14 @@ def load_saml_config():
                         (f'{base_url}/saml2/ls/', saml2.BINDING_HTTP_REDIRECT),
                     ],
                 },
-                'allow_unsolicited': True,
+                # Secure by default: reject forged/unsigned assertions. A tenant may
+                # explicitly relax these in its SAML config, but the defaults must be
+                # safe so an unsigned, unsolicited assertion cannot mint an admin.
+                'allow_unsolicited': tenant_config.get('allow_unsolicited', False),
                 'authn_requests_signed': tenant_config.get('authn_requests_signed', False),
                 'logout_requests_signed': tenant_config.get('logout_requests_signed', False),
-                'want_assertions_signed': tenant_config.get('want_assertions_signed', False),
-                'want_response_signed': tenant_config.get('want_response_signed', False),
+                'want_assertions_signed': tenant_config.get('want_assertions_signed', True),
+                'want_response_signed': tenant_config.get('want_response_signed', True),
             },
         },
         'metadata': tenant_config.get('metadata', {}),
@@ -185,20 +188,10 @@ class TenantSaml2Backend(Saml2Backend):
         }
         db_role_name = role_title_map.get(resolved_role_name, 'Member')
 
-        role, created = TenantRole.objects.get_or_create(
-            tenant=tenant,
-            name=db_role_name,
-            defaults={
-                'description': f'Auto-provisioned {db_role_name} role via SAML2',
-                'permissions': self.get_permissions_for_role(db_role_name)
-            }
-        )
-
-        TenantMembership.objects.update_or_create(
-            user=user,
-            tenant=tenant,
-            defaults={'role': role}
-        )
+        # Safe JIT provisioning: never auto-create a privileged role from a group
+        # claim; assign Admin/Manager only if the operator created them deliberately.
+        from core.auth.provisioning import provision_membership
+        provision_membership(user, tenant, db_role_name, self.get_permissions_for_role, 'SAML')
 
     def get_permissions_for_role(self, role_name):
         from organization.forms.tenantrole_form import MATRIX_MODELS

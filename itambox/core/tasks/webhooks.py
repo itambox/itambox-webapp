@@ -12,6 +12,18 @@ def send_webhook_task(url, method, headers, secret, event_action, event_model_ap
                       event_model_name, event_object_id, event_timestamp_iso, event_data,
                       attempt=0, retry_count=3, retry_backoff=60):
     """Dispatch a webhook event. Retries on 5xx and connection errors; 4xx are final."""
+    from django.core.exceptions import ValidationError
+    from core.validators import validate_external_url
+
+    # SSRF guard: never let a tenant-configured URL drive a request to an internal
+    # address. Re-checked here at send time (not just at save) to limit DNS
+    # rebinding. A blocked URL is final — do not retry.
+    try:
+        validate_external_url(url)
+    except ValidationError as exc:
+        logger.error("Webhook %s blocked by SSRF guard: %s", url, exc)
+        return
+
     try:
         if 'hooks.slack.com' in url:
             payload = {'text': f"Event: {event_action} on {event_model_name} (ID: {event_object_id})"}

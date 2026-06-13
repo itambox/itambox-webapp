@@ -53,11 +53,27 @@ class Command(BaseCommand):
                             help='Add data without clearing existing records.')
         parser.add_argument('--production', action='store_true', default=False,
                             help='Only create minimal essential data (admin user, status labels).')
+        parser.add_argument('--force', action='store_true', default=False,
+                            help='Required to clear data or run with DEBUG disabled.')
 
     def handle(self, *args, **options):
+        from django.core.management.base import CommandError
+
         random.seed(42)  # reproducible dataset
 
-        if not options['skip_drop']:
+        will_clear = not options['skip_drop']
+
+        # This command is destructive: unless --skip-drop is given it TRUNCATEs every
+        # domain table via the unfiltered manager. Refuse to do that against a non-DEBUG
+        # (production) database unless the operator explicitly passes --force.
+        if will_clear and not settings.DEBUG and not options['force']:
+            raise CommandError(
+                'Refusing to clear data with DEBUG disabled. This deletes ALL domain '
+                'records. Re-run with --skip-drop to only add data, or --force if you '
+                'really intend to wipe a production database.'
+            )
+
+        if will_clear:
             self._clear_all_data()
 
         if options['production']:
@@ -162,10 +178,26 @@ class Command(BaseCommand):
     # ─────────────────────────────────────────────────────────────────
 
     def _seed_minimal(self):
+        import os
+        import secrets as _secrets
         from assets.models import StatusLabel
         if not User.objects.filter(is_superuser=True).exists():
-            User.objects.create_superuser(username='admin', email='admin@itambox.local', password='admin123')
-            self.stdout.write('  Created admin user (admin / admin123)')
+            # Never ship a hardcoded credential. Use DJANGO_SUPERUSER_PASSWORD when
+            # provided (CI/automation), otherwise generate a strong random password
+            # and print it once so the operator can capture it.
+            password = os.environ.get('DJANGO_SUPERUSER_PASSWORD')
+            generated = password is None
+            if generated:
+                password = _secrets.token_urlsafe(18)
+            username = os.environ.get('DJANGO_SUPERUSER_USERNAME', 'admin')
+            email = os.environ.get('DJANGO_SUPERUSER_EMAIL', 'admin@itambox.local')
+            User.objects.create_superuser(username=username, email=email, password=password)
+            if generated:
+                self.stdout.write(self.style.WARNING(
+                    f'  Created superuser "{username}" with a generated password: {password}\n'
+                    f'  Store it now and change it after first login.'))
+            else:
+                self.stdout.write(f'  Created superuser "{username}" (password from DJANGO_SUPERUSER_PASSWORD).')
         for name, slug, stype, color in self._status_label_defs():
             StatusLabel.objects.get_or_create(slug=slug, defaults={'name': name, 'type': stype, 'color': color})
         self.stdout.write('  Seeded default StatusLabels.')

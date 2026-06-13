@@ -506,6 +506,14 @@ class WebhookEndpointDetailView(WorkerStatusContextMixin, ObjectDetailView):
         headers = endpoint.headers or {}
         headers.setdefault('Content-Type', 'application/json')
 
+        from django.core.exceptions import ValidationError
+        from core.validators import validate_external_url
+        try:
+            validate_external_url(endpoint.url)
+        except ValidationError as e:
+            messages.error(request, f"Test webhook blocked: {'; '.join(e.messages)}")
+            return redirect(self.object.get_absolute_url())
+
         try:
             response = http_requests.request(
                 method=endpoint.http_method,
@@ -537,6 +545,15 @@ class WebhookEndpointEditView(ObjectEditView):
         if not url:
             messages.error(request, "No URL configured.")
             return redirect(request.get_full_path())
+
+        from django.core.exceptions import ValidationError
+        from core.validators import validate_external_url
+        try:
+            validate_external_url(url)
+        except ValidationError as e:
+            messages.error(request, f"Webhook test blocked: {'; '.join(e.messages)}")
+            return redirect(request.get_full_path())
+
         success = False
         try:
             test_payload = "Test notification from ITAMbox"

@@ -69,6 +69,20 @@ class AcceptInvitationView(View):
             messages.info(request, f"Please sign in or register to accept your invitation to {invitation.tenant.name}.")
             return redirect(f"{reverse('login')}?next={request.path}")
 
+        # Bind the invitation to its intended recipient: the signed-in account's
+        # email must match the address the invite was issued to. Without this, any
+        # authenticated user holding the link could join the tenant at the invited
+        # role (potentially Admin).
+        user_email = (request.user.email or '').strip().lower()
+        invite_email = (invitation.email or '').strip().lower()
+        if user_email != invite_email:
+            messages.error(
+                request,
+                f"This invitation was issued to {invitation.email}. "
+                f"Please sign in with that account to accept it."
+            )
+            return redirect('dashboard')
+
         # Accept the invitation
         accept_invitation(invitation, request.user)
 
