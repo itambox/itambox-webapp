@@ -10,6 +10,7 @@ class ProviderTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('subscriptions:provider_detail', args=[A('pk')], verbose_name='Name')
     is_active = tables.BooleanColumn(verbose_name='Active', yesno='✓,✗')
+    contact_email = tables.Column(accessor='primary_contact.email', verbose_name='Contact Email')
     subscription_count = tables.Column(accessor='subscription_count', verbose_name='Subscriptions', orderable=False)
     tags = TagColumn(url_name='subscriptions:provider_list')
     actions = ActionsColumn()
@@ -55,8 +56,9 @@ class SubscriptionTable(BaseTable):
             display = record.get_status_display()
             color = get_status_color(record.status)
             return format_html(
-                '<span class="badge" style="background-color: #{}1a; color: #{}; border: 1px solid #{}33;">{}</span>',
-                color, color, color, display
+                '<span class="badge badge-status" style="--status-color: #{};">'
+                '<span class="badge-status-dot"></span>{}</span>',
+                color, display
             )
         return "—"
 

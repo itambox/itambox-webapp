@@ -11,15 +11,6 @@
     </div>
     <button type="button"
             class="btn-close ms-3 flex-shrink-0"
-            aria-label="{% translate 'Dismiss' %}"
-            onclick="sessionStorage.setItem('beta_banner_dismissed','1');document.getElementById('beta-module-banner').remove()"></button>
+            aria-label="{% translate 'Dismiss' %}"></button>
 </div>
-<script>
-  (function(){
-    var el = document.getElementById('beta-module-banner');
-    if (el && !sessionStorage.getItem('beta_banner_dismissed')) {
-      el.style.removeProperty('display');
-    }
-  })();
-</script>
 {% endif %}

@@ -5,7 +5,7 @@ from .models import Provider, Subscription
 @register_search()
 class ProviderIndex(SearchIndex):
     model = Provider
-    fields = ('name', 'account_id', 'support_contact', 'admin_notes')
+    fields = ('name', 'account_id', 'admin_notes')
     category = 'Subscriptions'
 
 

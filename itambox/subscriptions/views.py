@@ -5,7 +5,7 @@ from itambox.utils import get_paginate_count
 from itambox.panels import Panel
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse, HttpResponseBadRequest
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.views.generic import View
 import json
 from django.contrib import messages
@@ -142,11 +142,12 @@ class SubscriptionBulkDeleteView(ObjectBulkDeleteView):
     queryset = Subscription.objects.all()
 
 
-class SubscriptionRenewView(LoginRequiredMixin, View):
+class SubscriptionRenewView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    permission_required = 'subscriptions.change_subscription'
     template_name = 'subscriptions/includes/subscription_renew_modal.html'
 
     def get(self, request, pk, *args, **kwargs):
-        subscription = get_object_or_404(Subscription, pk=pk)
+        subscription = get_object_or_404(Subscription.objects.all(), pk=pk)
         form = forms.SubscriptionRenewForm(subscription=subscription)
         return render(request, self.template_name, {
             'form': form,
@@ -154,13 +155,23 @@ class SubscriptionRenewView(LoginRequiredMixin, View):
         })
 
     def post(self, request, pk, *args, **kwargs):
-        subscription = get_object_or_404(Subscription, pk=pk)
+        subscription = get_object_or_404(Subscription.objects.all(), pk=pk)
         form = forms.SubscriptionRenewForm(request.POST, subscription=subscription)
         if form.is_valid():
             renewal_date = form.cleaned_data['renewal_date']
             renewal_cost = form.cleaned_data['renewal_cost']
             subscription.renew(renewal_date, renewal_cost)
             
+            # Create Journal Entry
+            from extras.models import JournalEntry
+            obj_type = ContentType.objects.get_for_model(Subscription)
+            JournalEntry.objects.create(
+                model=obj_type,
+                object_id=subscription.pk,
+                user=request.user,
+                comment=f"Renewed subscription. Next renewal date: {renewal_date}. Cost: {renewal_cost or '—'} {subscription.currency}."
+            )
+
             messages.success(request, f"Subscription '{subscription.name}' renewed successfully.")
             if request.htmx:
                 response = HttpResponse(status=204)
@@ -180,11 +191,12 @@ class SubscriptionRenewView(LoginRequiredMixin, View):
         })
 
 
-class SubscriptionCancelView(LoginRequiredMixin, View):
+class SubscriptionCancelView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    permission_required = 'subscriptions.change_subscription'
     template_name = 'subscriptions/includes/subscription_cancel_modal.html'
 
     def get(self, request, pk, *args, **kwargs):
-        subscription = get_object_or_404(Subscription, pk=pk)
+        subscription = get_object_or_404(Subscription.objects.all(), pk=pk)
         form = forms.SubscriptionCancelForm()
         return render(request, self.template_name, {
             'form': form,
@@ -192,13 +204,26 @@ class SubscriptionCancelView(LoginRequiredMixin, View):
         })
 
     def post(self, request, pk, *args, **kwargs):
-        subscription = get_object_or_404(Subscription, pk=pk)
+        subscription = get_object_or_404(Subscription.objects.all(), pk=pk)
         form = forms.SubscriptionCancelForm(request.POST)
         if form.is_valid():
             cancellation_date = form.cleaned_data['cancellation_date']
             reason = form.cleaned_data['reason']
             subscription.cancel(cancellation_date, reason)
             
+            # Create Journal Entry
+            from extras.models import JournalEntry
+            obj_type = ContentType.objects.get_for_model(Subscription)
+            comment_text = f"Cancelled subscription. Cancellation Date: {cancellation_date}."
+            if reason:
+                comment_text += f" Reason: {reason}"
+            JournalEntry.objects.create(
+                model=obj_type,
+                object_id=subscription.pk,
+                user=request.user,
+                comment=comment_text
+            )
+
             messages.success(request, f"Subscription '{subscription.name}' cancelled successfully.")
             if request.htmx:
                 response = HttpResponse(status=204)
@@ -218,10 +243,23 @@ class SubscriptionCancelView(LoginRequiredMixin, View):
         })
 
 
-class SubscriptionSuspendView(LoginRequiredMixin, View):
+class SubscriptionSuspendView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    permission_required = 'subscriptions.change_subscription'
+
     def post(self, request, pk, *args, **kwargs):
-        subscription = get_object_or_404(Subscription, pk=pk)
+        subscription = get_object_or_404(Subscription.objects.all(), pk=pk)
         subscription.suspend()
+
+        # Create Journal Entry
+        from extras.models import JournalEntry
+        obj_type = ContentType.objects.get_for_model(Subscription)
+        JournalEntry.objects.create(
+            model=obj_type,
+            object_id=subscription.pk,
+            user=request.user,
+            comment="Suspended subscription."
+        )
+
         messages.success(request, f"Subscription '{subscription.name}' suspended successfully.")
         if request.htmx:
             response = HttpResponse(status=204)
@@ -236,11 +274,12 @@ class SubscriptionSuspendView(LoginRequiredMixin, View):
         return redirect(subscription.get_absolute_url())
 
 
-class SubscriptionCheckoutView(LoginRequiredMixin, View):
+class SubscriptionCheckoutView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    permission_required = 'subscriptions.change_subscription'
     template_name = 'subscriptions/includes/subscription_checkout_modal.html'
 
     def get(self, request, pk, *args, **kwargs):
-        subscription = get_object_or_404(Subscription, pk=pk)
+        subscription = get_object_or_404(Subscription.objects.all(), pk=pk)
         form = forms.SubscriptionCheckoutForm(subscription=subscription)
         return render(request, self.template_name, {
             'form': form,
@@ -248,7 +287,7 @@ class SubscriptionCheckoutView(LoginRequiredMixin, View):
         })
 
     def post(self, request, pk, *args, **kwargs):
-        subscription = get_object_or_404(Subscription, pk=pk)
+        subscription = get_object_or_404(Subscription.objects.all(), pk=pk)
         form = forms.SubscriptionCheckoutForm(request.POST, subscription=subscription)
         if form.is_valid():
             target_type = form.cleaned_data['target_type']
@@ -303,7 +342,8 @@ class ProviderBulkDeleteView(ObjectBulkDeleteView):
 # Subscription Assignment Views
 # =============================================================================
 
-class SubscriptionAssignmentCreateView(LoginRequiredMixin, View):
+class SubscriptionAssignmentCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    permission_required = 'subscriptions.add_subscriptionassignment'
     template_name = 'subscriptions/subscriptionassignments/subscriptionassignment_form.html'
 
     def get(self, request, *args, **kwargs):
@@ -314,7 +354,7 @@ class SubscriptionAssignmentCreateView(LoginRequiredMixin, View):
             return HttpResponseBadRequest("Missing content_type or object_id")
 
         content_type = get_object_or_404(ContentType, id=content_type_id)
-        target_obj = get_object_or_404(content_type.model_class(), id=object_id)
+        target_obj = get_object_or_404(content_type.model_class().objects.all(), id=object_id)
 
         form = forms.SubscriptionAssignmentForm(content_type=content_type, object_id=object_id)
         context = {
@@ -334,7 +374,7 @@ class SubscriptionAssignmentCreateView(LoginRequiredMixin, View):
             return HttpResponseBadRequest("Missing content_type or object_id")
 
         content_type = get_object_or_404(ContentType, id=content_type_id)
-        target_obj = get_object_or_404(content_type.model_class(), id=object_id)
+        target_obj = get_object_or_404(content_type.model_class().objects.all(), id=object_id)
 
         form = forms.SubscriptionAssignmentForm(request.POST, content_type=content_type, object_id=object_id)
         if form.is_valid():

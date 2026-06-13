@@ -187,6 +187,20 @@ class SubscriptionAssignmentForm(forms.ModelForm):
         model = SubscriptionAssignment
         fields = ['subscription', 'notes']
 
+    def clean(self):
+        cleaned_data = super().clean()
+        subscription = cleaned_data.get('subscription')
+        if subscription and self.content_type and self.object_id:
+            if SubscriptionAssignment.objects.filter(
+                subscription=subscription,
+                content_type=self.content_type,
+                object_id=self.object_id
+            ).exists():
+                raise forms.ValidationError(
+                    "This subscription is already assigned to this object."
+                )
+        return cleaned_data
+
     def __init__(self, *args, **kwargs):
         content_type = kwargs.pop('content_type', None)
         object_id = kwargs.pop('object_id', None)
@@ -355,10 +369,33 @@ class SubscriptionCheckoutForm(forms.Form):
             raise forms.ValidationError("Must select a Location.", code='location_required')
         if not target_type:
             raise forms.ValidationError("Must select a target type.", code='target_type_required')
+
+        # Check for duplicate assignment
+        target_obj = None
+        if target_type == 'holder':
+            target_obj = holder
+        elif target_type == 'asset':
+            target_obj = asset
+        elif target_type == 'location':
+            target_obj = location
+
+        if target_obj and getattr(self, 'subscription', None):
+            from django.contrib.contenttypes.models import ContentType
+            content_type = ContentType.objects.get_for_model(target_obj)
+            if SubscriptionAssignment.objects.filter(
+                subscription=self.subscription,
+                content_type=content_type,
+                object_id=target_obj.pk
+            ).exists():
+                raise forms.ValidationError(
+                    f"This subscription is already assigned to {target_obj}."
+                )
+
         return cleaned_data
 
     def __init__(self, *args, **kwargs):
         subscription = kwargs.pop('subscription', None)
+        self.subscription = subscription
         super().__init__(*args, **kwargs)
         
         # If tenant is restricted, filter candidates
