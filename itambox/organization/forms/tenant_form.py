@@ -9,11 +9,33 @@ from ..models import Tenant, TenantGroup
 from ..filters import TenantFilterSet
 
 
+# Codes the `money` template filter renders with a proper symbol/placement;
+# anything else falls back to an ISO-code suffix.
+CURRENCY_CHOICES = [
+    ('EUR', 'EUR — Euro (€)'),
+    ('USD', 'USD — US Dollar ($)'),
+    ('GBP', 'GBP — British Pound (£)'),
+    ('CHF', 'CHF — Swiss Franc'),
+    ('SEK', 'SEK — Swedish Krona'),
+    ('NOK', 'NOK — Norwegian Krone'),
+    ('DKK', 'DKK — Danish Krone'),
+    ('CAD', 'CAD — Canadian Dollar'),
+    ('AUD', 'AUD — Australian Dollar'),
+    ('JPY', 'JPY — Japanese Yen (¥)'),
+]
+
+
 class TenantForm(forms.ModelForm):
     group = forms.ModelChoiceField(
         queryset=TenantGroup.objects.all(),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    currency = forms.ChoiceField(
+        choices=CURRENCY_CHOICES,
+        initial='EUR',
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        help_text='ISO 4217 code used when displaying this tenant\'s monetary values (display only, no conversion).',
     )
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
@@ -23,7 +45,7 @@ class TenantForm(forms.ModelForm):
 
     class Meta:
         model = Tenant
-        fields = ['name', 'slug', 'group', 'description', 'comments', 'tags']
+        fields = ['name', 'slug', 'group', 'currency', 'description', 'comments', 'tags']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'slug': forms.TextInput(attrs={'class': 'form-control'}),
@@ -36,11 +58,16 @@ class TenantForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Preserve exotic codes set via the API: keep the saved value selectable
+        # instead of silently dropping it on the next edit.
+        current = getattr(self.instance, 'currency', None)
+        if current and current not in dict(CURRENCY_CHOICES):
+            self.fields['currency'].choices = list(CURRENCY_CHOICES) + [(current, current)]
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
         self.helper.form_tag = True
         self.helper.layout = Layout(
-            'name', 'slug', 'group', 'description', 'comments', 'tags'
+            'name', 'slug', 'group', 'currency', 'description', 'comments', 'tags'
         )
         from .helpers import add_standard_buttons
         add_standard_buttons(self.helper, self.instance, 'organization:tenant_list')

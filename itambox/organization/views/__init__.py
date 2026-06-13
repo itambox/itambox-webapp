@@ -37,9 +37,10 @@ from .contactrole_views import (
 from .invitation_views import InviteUserView, AcceptInvitationView
 from .tenantrole_views import (
     TenantRoleListView, TenantRoleDetailView, TenantRoleEditView, TenantRoleDeleteView,
-    TenantRoleCloneView,
+    TenantRoleCloneView, TenantRoleBulkDeleteView, TenantRoleAssignUsersView,
 )
 from .tenantmembership_views import (
-    TenantMembershipListView, TenantMembershipCreateView, TenantMembershipDeleteView,
+    TenantMembershipListView, TenantMembershipCreateView, TenantMembershipEditView,
+    TenantMembershipDeleteView, TenantMembershipBulkEditView, TenantMembershipBulkDeleteView,
 )
 

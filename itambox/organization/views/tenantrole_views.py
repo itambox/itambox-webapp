@@ -1,18 +1,31 @@
-from django.urls import reverse_lazy
+from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db import transaction
+from django.db.models import Count, ProtectedError
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse, reverse_lazy
+from django.views.generic import View
+
 from itambox.views.generic import (
-    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectCloneView,
+    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
+    ObjectBulkDeleteView, ObjectCloneView,
 )
-from ..models import TenantRole
-from ..forms import TenantRoleForm
+from ..models import TenantRole, TenantMembership
+from ..forms import TenantRoleForm, TenantRoleFilterForm, TenantRoleAssignUsersForm
 from ..tables import TenantRoleTable
+from ..filters import TenantRoleFilterSet
+
 
 class TenantRoleListView(ObjectListView):
-    queryset = TenantRole.objects.all()
+    queryset = TenantRole.objects.annotate(member_count=Count('memberships', distinct=True))
+    filterset = TenantRoleFilterSet
+    filterset_form = TenantRoleFilterForm
     table = TenantRoleTable
     action_buttons = ('add',)
 
+
 class TenantRoleDetailView(ObjectDetailView):
-    queryset = TenantRole.objects.all()
+    queryset = TenantRole.objects.annotate(member_count=Count('memberships', distinct=True))
     template_name = 'organization/tenantroles/tenantrole_detail.html'
 
     def get_context_data(self, **kwargs):
@@ -33,7 +46,11 @@ class TenantRoleDetailView(ObjectDetailView):
                 'delete_codename': f'{app}.delete_{model}',
             })
         context['matrix_grouped_items'] = groups
+        role = self.get_object()
+        context['member_count'] = getattr(role, 'member_count', 0) or 0
+        context['members_url'] = f"{reverse('organization:tenantmembership_list')}?role={role.pk}"
         return context
+
 
 class TenantRoleEditView(ObjectEditView):
     queryset = TenantRole.objects.all()
@@ -46,6 +63,7 @@ class TenantRoleEditView(ObjectEditView):
         kwargs['user'] = self.request.user
         kwargs['tenant'] = getattr(self.request, 'active_tenant', None)
         return kwargs
+
 
 class TenantRoleCloneView(ObjectCloneView):
     """Clone a role's permission set into (potentially) a different tenant.
@@ -77,3 +95,119 @@ class TenantRoleDeleteView(ObjectDeleteView):
     model = TenantRole
     template_name = 'generic/object_confirm_delete.html'
     success_url = reverse_lazy('organization:tenantrole_list')
+
+
+class TenantRoleBulkDeleteView(ObjectBulkDeleteView):
+    queryset = TenantRole.objects.all()
+
+    def post(self, request, *args, **kwargs):
+        from django.db import transaction
+        from itambox.views.generic.utils import safe_return_url
+        from django.http import HttpResponseRedirect
+
+        pks = request.POST.getlist('pk')
+        model = self._get_model()
+        return_url = safe_return_url(
+            request,
+            request.POST.get('return_url') or request.META.get('HTTP_REFERER'),
+            reverse('organization:tenantrole_list'),
+        )
+
+        if not pks:
+            messages.warning(request, "No roles were selected.")
+            return HttpResponseRedirect(return_url)
+
+        queryset = self._get_queryset(pks)
+        objects_to_delete = list(queryset)
+
+        if not objects_to_delete:
+            messages.warning(request, "No valid roles selected for deletion.")
+            return HttpResponseRedirect(return_url)
+
+        if '_confirm' in request.POST:
+            try:
+                deleted_count = 0
+                with transaction.atomic():
+                    for obj in objects_to_delete:
+                        obj.delete()
+                        deleted_count += 1
+                messages.success(request, f"Successfully deleted {deleted_count} role(s).")
+                return HttpResponseRedirect(return_url)
+            except ProtectedError as e:
+                # Extract the names of the roles that still have memberships.
+                blocked_names = ', '.join(str(o) for o in objects_to_delete if o.memberships.exists())
+                messages.error(
+                    request,
+                    f"Cannot delete: the following roles still have members and are protected: {blocked_names}. "
+                    "Remove all memberships from these roles before deleting them."
+                )
+                return HttpResponseRedirect(return_url)
+        else:
+            context = {
+                'model': model,
+                'model_name': f'{model._meta.app_label}.{model._meta.model_name}',
+                'model_verbose_name': model._meta.verbose_name,
+                'model_verbose_name_plural': model._meta.verbose_name_plural,
+                'objects': objects_to_delete,
+                'object_pks': pks,
+                'return_url': return_url,
+                'title': 'Confirm Bulk Deletion',
+                'breadcrumbs': [
+                    (reverse('dashboard'), 'Dashboard'),
+                    (return_url, 'Tenant Roles'),
+                    (None, f'Delete ({len(objects_to_delete)})'),
+                ],
+            }
+            return self.render_to_response(context)
+
+
+class TenantRoleAssignUsersView(LoginRequiredMixin, View):
+    # NOTE: TenantMembership has no ChangeLoggingMixin — these mutations are not change-logged.
+    template_name = 'organization/tenantroles/tenantrole_assign_users.html'
+
+    def _get_role(self, pk):
+        return get_object_or_404(TenantRole, pk=pk)
+
+    def _check_perms(self, request, role):
+        return (
+            request.user.has_perm('organization.add_tenantmembership', obj=role.tenant) and
+            request.user.has_perm('organization.change_tenantmembership', obj=role.tenant)
+        )
+
+    def get(self, request, pk, *args, **kwargs):
+        role = self._get_role(pk)
+        if not self._check_perms(request, role):
+            from django.core.exceptions import PermissionDenied
+            raise PermissionDenied
+        form = TenantRoleAssignUsersForm()
+        return render(request, self.template_name, {'role': role, 'form': form})
+
+    def post(self, request, pk, *args, **kwargs):
+        role = self._get_role(pk)
+        if not self._check_perms(request, role):
+            from django.core.exceptions import PermissionDenied
+            raise PermissionDenied
+
+        form = TenantRoleAssignUsersForm(request.POST)
+        if form.is_valid():
+            users = form.cleaned_data['users']
+            added = updated = unchanged = 0
+            with transaction.atomic():
+                for user in users:
+                    existing = TenantMembership.objects.filter(user=user, tenant=role.tenant).first()
+                    if existing is None:
+                        TenantMembership.objects.create(user=user, tenant=role.tenant, role=role)
+                        added += 1
+                    elif existing.role_id != role.pk:
+                        existing.role = role
+                        existing.save()
+                        updated += 1
+                    else:
+                        unchanged += 1
+            messages.success(
+                request,
+                f"Assigned '{role.name}': {added} added, {updated} updated, {unchanged} unchanged."
+            )
+            return redirect(reverse('organization:tenantrole_detail', kwargs={'pk': role.pk}))
+
+        return render(request, self.template_name, {'role': role, 'form': form})
