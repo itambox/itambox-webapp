@@ -12,7 +12,7 @@ class AlertRuleTable(BaseTable):
     severity = tables.Column()
     is_active = BooleanColumn()
     is_muted = BooleanColumn(verbose_name='Muted')
-    tenant = tables.Column(verbose_name='Tenant', accessor='tenant.name')
+    tenant = tables.Column(verbose_name='Tenant', accessor='tenant.name', linkify=False)
     actions = tables.TemplateColumn(
         template_code="""
         <div class="d-flex gap-1 justify-content-end">
@@ -53,10 +53,10 @@ class AlertRuleTable(BaseTable):
 
 
 class NotificationChannelTable(BaseTable):
-    name = tables.Column(linkify=True)
+    name = tables.Column(linkify=False)
     channel_type = tables.Column(verbose_name='Channel Type')
     enabled = BooleanColumn()
-    tenant = tables.Column(verbose_name='Tenant', accessor='tenant.name')
+    tenant = tables.Column(verbose_name='Tenant', accessor='tenant.name', linkify=False)
     actions = tables.TemplateColumn(
         template_code="""
         <div class="d-flex gap-1 justify-content-end">

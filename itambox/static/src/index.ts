@@ -23,4 +23,7 @@ import './report-designer';
 import './object-detail';
 import './object-import';
 import './permission-matrix';
+import './beta-banner';
+import './command-k';
+import './inline-actions';
 

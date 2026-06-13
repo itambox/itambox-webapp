@@ -63,10 +63,13 @@ class AssetTable(BaseTable): # Inherit from BaseTable
         return value.name if value else "—"
 
     def render_status(self, value):
+        # .badge-status derives fill/text/border from --status-color and adds
+        # the leading dot (light/dark variants handled in _components.scss).
         if value:
             return format_html(
-                '<span class="badge" style="background-color: #{}1a; color: #{}; border: 1px solid #{}33;">{}</span>',
-                value.color or '6c757d', value.color or '6c757d', value.color or '6c757d', value.name
+                '<span class="badge badge-status" style="--status-color: #{};">'
+                '<span class="badge-status-dot"></span>{}</span>',
+                value.color or '6c757d', value.name
             )
         return "—"
 
@@ -104,14 +107,14 @@ class AssetTable(BaseTable): # Inherit from BaseTable
             purge_confirm = _("Are you sure you want to PERMANENTLY delete this asset? This action cannot be undone!")
 
             restore_btn = (
-                f'<a class="btn btn-sm btn-success me-1" href="{restore_url}" '
+                f'<a class="btn btn-sm btn-soft-success me-1" href="{restore_url}" '
                 f'hx-post="{restore_url}" hx-target="#object-list-dynamic-content" '
                 f'hx-confirm="{restore_confirm}" '
                 f'title="{restore_title}" aria-label="{restore_title}">'
                 f'<i class="mdi mdi-backup-restore"></i></a>'
             )
             purge_btn = (
-                f'<a class="btn btn-sm btn-danger" href="{purge_url}" '
+                f'<a class="btn btn-sm btn-soft-danger" href="{purge_url}" '
                 f'hx-post="{purge_url}" hx-target="#object-list-dynamic-content" '
                 f'hx-confirm="{purge_confirm}" '
                 f'title="{purge_title}" aria-label="{purge_title}">'
@@ -136,43 +139,62 @@ class AssetTable(BaseTable): # Inherit from BaseTable
         if can_edit:
             # Check-out (filled green) / Check-in (outline green), merged into the
             # actions group. Labeled for clarity; HTMX drives the click (CSP-safe).
+            # The one colored action in the row, both in the soft family:
+            # check-out = soft filled tint (give out), check-in = soft
+            # outline (take back). Equal width via .check-action.
             if record.active_assignment:
                 checkin_url = reverse('assets:asset_checkin', kwargs={'pk': record.pk})
                 html += (
-                    '<a class="btn btn-sm btn-outline-success check-action" role="button" style="cursor: pointer" '
+                    '<a class="btn btn-sm btn-soft-outline-success check-action" role="button" style="cursor: pointer" '
                     f'hx-get="{checkin_url}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
                     'title="Check-in" aria-label="Check-in"><i class="mdi mdi-login me-1"></i>Check-in</a>'
                 )
             else:
                 checkout_url = reverse('assets:asset_checkout_modal', kwargs={'pk': record.pk})
                 html += (
-                    '<a class="btn btn-sm btn-success check-action" role="button" style="cursor: pointer" '
+                    '<a class="btn btn-sm btn-soft-success check-action" role="button" style="cursor: pointer" '
                     f'hx-get="{checkout_url}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
                     'title="Check-out" aria-label="Check-out"><i class="mdi mdi-logout me-1"></i>Check-out</a>'
                 )
 
         if can_clone:
             clone_url = reverse('assets:asset_clone', kwargs={'pk': record.pk})
-            html += f'<a class="btn btn-sm btn-warning" href="{clone_url}" title="Copy/Clone"><i class="mdi mdi-content-copy"></i></a>'
+            html += f'<a class="btn btn-sm btn-action" href="{clone_url}" title="Copy/Clone"><i class="mdi mdi-content-copy"></i></a>'
             
+        changelog_url = reverse('assets:asset_detail', kwargs={'pk': record.pk}) + '?tab=changelog'
+        changelog_li = (
+            f'<li><a class="dropdown-item" href="{changelog_url}">'
+            f'<i class="mdi mdi-history me-1"></i>Changelog</a></li>'
+        )
+
         if can_edit and can_delete:
             edit_url = reverse('assets:asset_update', kwargs={'pk': record.pk})
             del_url = reverse('assets:asset_delete', kwargs={'pk': record.pk})
             html += (
                 f'<span class="btn-group dropdown">'
-                f'<a class="btn btn-sm btn-primary" href="{edit_url}" title="Edit Details"><i class="mdi mdi-pencil-outline"></i></a>'
-                f'<a class="btn btn-sm btn-primary dropdown-toggle dropdown-toggle-split" type="button" data-bs-toggle="dropdown" aria-expanded="false">'
+                f'<a class="btn btn-sm btn-action" href="{edit_url}" title="Edit Details"><i class="mdi mdi-pencil-outline"></i></a>'
+                f'<a class="btn btn-sm btn-action dropdown-toggle dropdown-toggle-split" type="button" data-bs-toggle="dropdown" aria-expanded="false">'
                 f'</a>'
                 f'<ul class="dropdown-menu dropdown-menu-end">'
+                f'{changelog_li}'
+                f'<li><hr class="dropdown-divider"></li>'
                 f'<li><a class="dropdown-item text-danger" href="{del_url}"><i class="mdi mdi-trash-can-outline me-1"></i>Delete</a></li>'
                 f'</ul></span>'
             )
         elif can_edit:
             edit_url = reverse('assets:asset_update', kwargs={'pk': record.pk})
-            html += f'<a class="btn btn-sm btn-primary" href="{edit_url}" title="Edit Details"><i class="mdi mdi-pencil-outline"></i></a>'
+            html += (
+                f'<span class="btn-group dropdown">'
+                f'<a class="btn btn-sm btn-action" href="{edit_url}" title="Edit Details"><i class="mdi mdi-pencil-outline"></i></a>'
+                f'<a class="btn btn-sm btn-action dropdown-toggle dropdown-toggle-split" type="button" data-bs-toggle="dropdown" aria-expanded="false">'
+                f'</a>'
+                f'<ul class="dropdown-menu dropdown-menu-end">'
+                f'{changelog_li}'
+                f'</ul></span>'
+            )
         elif can_delete:
             del_url = reverse('assets:asset_delete', kwargs={'pk': record.pk})
-            html += f'<a class="btn btn-sm btn-danger" href="{del_url}" title="Delete"><i class="mdi mdi-trash-can-outline"></i></a>'
+            html += f'<a class="btn btn-sm btn-action btn-action-danger" href="{del_url}" title="Delete"><i class="mdi mdi-trash-can-outline"></i></a>'
             
         html += '</div>'
         return mark_safe(html)

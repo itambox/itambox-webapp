@@ -5,70 +5,60 @@
         <thead>
             <tr class="text-uppercase text-muted fw-bold" style="font-size: 0.65rem; letter-spacing: 0.05em;">
                 <th>{% translate "Time" %}</th>
-                <th>{% translate "Action" %}</th>
-                <th>{% translate "Category" %}</th>
                 <th>{% translate "User" %}</th>
-                <th>{% translate "Modified Object" %}</th>
+                <th class="d-none d-lg-table-cell">{% translate "Full Name" %}</th>
+                <th>{% translate "Action" %}</th>
+                <th>{% translate "Type" %}</th>
+                <th>{% translate "Object" %}</th>
+                <th class="d-none d-xxl-table-cell">{% translate "Request ID" %}</th>
             </tr>
         </thead>
         <tbody>
             {% for change in recent_changes %}
             <tr>
-                <!-- Time Column -->
-                <td class="text-nowrap" style="width: 15%;">
-                    <div class="d-flex align-items-center gap-1 text-secondary">
-                        <i class="mdi mdi-clock-outline text-muted fs-5"></i>
-                        <span>{{ change.time|date:"Y-m-d H:i:s" }}</span>
-                    </div>
+                {# Time — monospace, scannable #}
+                <td class="text-nowrap text-secondary" style="width: 12%; font-family: var(--tblr-font-monospace); font-size: 0.75rem;">
+                    {{ change.time|date:"Y-m-d H:i" }}
                 </td>
-                
-                <!-- Action Column -->
-                <td style="width: 10%;">
+
+                {# Username #}
+                <td class="text-nowrap" style="width: 10%;">
+                    <span class="fw-medium">{{ change.user_name }}</span>
+                </td>
+
+                {# Full name (resolved from the user FK when it still exists) #}
+                <td class="text-nowrap text-secondary d-none d-lg-table-cell" style="width: 13%;">
+                    {% if change.user %}{{ change.user.get_full_name|default:"—" }}{% else %}—{% endif %}
+                </td>
+
+                {# Action — plain bg-* badges; the soft-badge overlay styles them #}
+                <td style="width: 9%;">
                     {% if change.action == 'create' %}
-                    <span class="badge badge-outline text-success d-inline-flex align-items-center gap-1 border-success-subtle bg-success-lt px-2 py-1">
-                        <i class="mdi mdi-plus-circle-outline"></i>
-                        <span>{% translate "Created" %}</span>
-                    </span>
+                    <span class="badge bg-success">{% translate "Created" %}</span>
                     {% elif change.action == 'update' %}
-                    <span class="badge badge-outline text-info d-inline-flex align-items-center gap-1 border-info-subtle bg-info-lt px-2 py-1">
-                        <i class="mdi mdi-pencil-outline"></i>
-                        <span>{% translate "Updated" %}</span>
-                    </span>
+                    <span class="badge bg-info">{% translate "Updated" %}</span>
                     {% else %}
-                    <span class="badge badge-outline text-danger d-inline-flex align-items-center gap-1 border-danger-subtle bg-danger-lt px-2 py-1">
-                        <i class="mdi mdi-delete-outline"></i>
-                        <span>{% translate "Deleted" %}</span>
-                    </span>
+                    <span class="badge bg-danger">{% translate "Deleted" %}</span>
                     {% endif %}
                 </td>
-                
-                <!-- Category Column -->
-                <td class="text-nowrap text-secondary fw-semibold" style="width: 15%;">
-                    <span class="d-inline-flex align-items-center gap-1">
-                        <i class="mdi mdi-shape-outline text-muted fs-5"></i>
-                        <span>{{ change.changed_object_type.name|title }}</span>
-                    </span>
+
+                {# Object type #}
+                <td class="text-nowrap text-secondary" style="width: 12%;">
+                    {{ change.changed_object_type.name|title }}
                 </td>
-                
-                <!-- User Column -->
-                <td class="text-nowrap" style="width: 15%;">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="avatar avatar-xs rounded-circle bg-primary-lt fw-bold text-uppercase" style="font-size: 0.65rem; width: 1.5rem; height: 1.5rem;">
-                            {{ change.user_name|slice:":2" }}
-                        </span>
-                        <span class="fw-medium text-body">{{ change.user_name }}</span>
-                    </div>
-                </td>
-                
-                <!-- Object Column -->
-                <td class="text-nowrap text-truncate pe-0" style="max-width: 350px;">
+
+                {# Object link #}
+                <td class="text-nowrap text-truncate pe-0" style="max-width: 340px;">
                     {% if change.changed_object and change.get_changed_object_url %}
-                    <a href="{{ change.get_changed_object_url }}" class="text-primary fw-semibold text-decoration-none hover-underline">
-                        <i class="mdi mdi-link-variant text-muted me-1"></i>{{ change.object_repr }}
-                    </a>
+                    <a href="{{ change.get_changed_object_url }}" class="fw-medium text-decoration-none">{{ change.object_repr }}</a>
                     {% else %}
-                    <span class="text-muted"><i class="mdi mdi-cube-outline text-muted me-1"></i>{{ change.object_repr }}</span>
+                    <span class="text-muted">{{ change.object_repr }}</span>
                     {% endif %}
+                </td>
+
+                {# Request ID — correlate all changes from one request #}
+                <td class="text-nowrap text-secondary d-none d-xxl-table-cell" style="width: 14%; font-family: var(--tblr-font-monospace); font-size: 0.72rem;" title="{{ change.request_id }}">
+                    {{ change.request_id }}
                 </td>
             </tr>
             {% endfor %}

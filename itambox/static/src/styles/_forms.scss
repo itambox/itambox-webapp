@@ -1,0 +1,258 @@
+// ============================================================
+//  Forms — inputs, Tom Select, search affordances
+// ============================================================
+
+// ---- Tom Select Customizations ----
+
+.ts-wrapper {
+    &.form-select {
+        border: none;
+        padding: 0;
+        height: auto;
+    }
+
+    &.multi .ts-control>div {
+        background: var(--tblr-primary);
+        color: var(--tblr-primary-fg);
+        border-radius: var(--tblr-border-radius-sm);
+        padding: 0.15rem 0.5rem;
+        margin: 0.125rem 0.25rem 0.125rem 0;
+
+        .remove {
+            border-left: 1px solid var(--tblr-secondary-fg);
+            margin-left: 0.25rem;
+            padding-left: 0.25rem;
+            opacity: 0.7;
+
+            &:hover {
+                opacity: 1;
+            }
+        }
+    }
+}
+
+.ts-control {
+    border-color: var(--tblr-border-color);
+    background-color: var(--tblr-bg-surface);
+    color: var(--tblr-body-color);
+    box-shadow: none !important;
+    padding: 0.5rem 0.75rem;
+    min-height: calc(1.5em + 1rem + 2px);
+    align-items: center;
+}
+
+.ts-dropdown {
+    background: var(--tblr-bg-surface);
+    border: 1px solid var(--tblr-border-color);
+    box-shadow: var(--tblr-box-shadow-lg);
+    color: var(--tblr-body-color);
+
+    .ts-dropdown-content {
+        max-height: 200px;
+    }
+
+    .active {
+        background-color: var(--tblr-secondary);
+        color: var(--tblr-primary-fg);
+    }
+
+    .option {
+        padding: 0.5rem 0.75rem;
+    }
+
+    .optgroup-header {
+        color: var(--tblr-secondary);
+        font-weight: bold;
+        padding: 0.5rem 0.75rem 0.25rem;
+    }
+}
+
+// Dark mode overrides for Tom Select
+[data-bs-theme="dark"] {
+    .ts-control {
+        border-color: var(--tblr-border-color);
+        background-color: var(--tblr-bg-surface);
+        color: var(--tblr-body-color);
+    }
+
+    .ts-wrapper.multi .ts-control>div {
+        background: var(--tblr-secondary);
+        color: var(--tblr-secondary-fg);
+
+        .remove {
+            border-left-color: var(--tblr-secondary-fg);
+        }
+    }
+
+    .ts-dropdown {
+        background: var(--tblr-bg-surface);
+        border-color: var(--tblr-border-color);
+        color: var(--tblr-body-color);
+
+        .active {
+            background-color: var(--tblr-secondary);
+            color: var(--tblr-secondary-fg);
+        }
+
+        .optgroup-header {
+            color: var(--tblr-secondary);
+        }
+    }
+}
+
+// ============================================================
+//  Premium Global Buttons & Inputs Standardization
+// ============================================================
+
+// Form controls & inputs standardization
+.form-control,
+.form-select,
+input[type="text"],
+input[type="search"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+select,
+textarea {
+    background-color: var(--tblr-input-bg, #ffffff) !important;
+    border: 1px solid var(--tblr-input-border-color, #cbd5e1) !important;
+    color: var(--tblr-input-color, #1c1917) !important;
+    transition: border-color var(--itambox-duration, 150ms) var(--itambox-ease, ease-in-out),
+        box-shadow var(--itambox-duration, 150ms) var(--itambox-ease, ease-in-out) !important;
+
+    &::placeholder {
+        color: var(--tblr-input-placeholder-color, #a8a29e) !important;
+        opacity: 1 !important;
+    }
+
+    &:focus {
+        background-color: var(--tblr-input-focus-bg, #ffffff) !important;
+        border-color: var(--tblr-input-focus-border-color, var(--tblr-primary)) !important;
+        color: var(--tblr-input-focus-color, #1c1917) !important;
+        box-shadow: 0 0 0 0.2rem rgba(var(--tblr-primary-rgb), 0.15) !important;
+        outline: 0 !important;
+    }
+}
+
+// Ensure search/icon input text padding
+.input-icon {
+
+    .form-control,
+    input[type="text"],
+    input[type="search"] {
+        padding-left: 2.5rem !important;
+    }
+}
+
+// Style input-group-flat to ensure input and clear button merge seamlessly and center the icon
+.input-group-flat {
+
+    .form-control,
+    input[type="search"] {
+        border-right: 0 !important;
+        border-top-right-radius: 0 !important;
+        border-bottom-right-radius: 0 !important;
+    }
+
+    .input-group-text {
+        border-left: 0 !important;
+        border-top-left-radius: 0 !important;
+        border-bottom-left-radius: 0 !important;
+        background-color: var(--tblr-input-bg, #ffffff) !important;
+        border-color: var(--tblr-input-border-color, #cbd5e1) !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding-left: 0.25rem !important;
+        padding-right: 0.5rem !important;
+        align-self: stretch !important;
+
+        a {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            line-height: 1 !important;
+            height: 100% !important;
+            width: 100% !important;
+            color: var(--tblr-secondary-color, #a8a29e) !important;
+            text-decoration: none !important;
+
+            &:hover {
+                color: var(--tblr-body-color, #1c1917) !important;
+            }
+        }
+
+        i {
+            line-height: 1 !important;
+            font-size: 1rem !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+    }
+}
+
+// ============================================================
+//  Dark mode form enforcement
+// ============================================================
+[data-bs-theme="dark"] {
+
+    // Enforce form inputs & textareas formatting in dark mode
+    .form-control,
+    .form-select,
+    input[type="text"],
+    input[type="search"],
+    input[type="number"],
+    input[type="email"],
+    input[type="password"],
+    select,
+    textarea {
+        background-color: var(--tblr-input-bg) !important;
+        border: 1px solid var(--tblr-input-border-color) !important;
+        color: var(--tblr-input-color) !important;
+        border-radius: var(--tblr-border-radius-sm, 4px) !important;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
+
+        &::placeholder {
+            color: var(--tblr-input-placeholder-color, #526071) !important;
+            opacity: 1 !important;
+        }
+
+        &:focus {
+            background-color: var(--tblr-input-focus-bg, #0c0a09) !important;
+            border-color: var(--tblr-input-focus-border-color, #a8a29e) !important;
+            color: var(--tblr-input-focus-color, #e7e5e4) !important;
+            box-shadow: 0 0 0 0.25rem rgba(var(--tblr-primary-rgb), 0.25) !important;
+            outline: 0 !important;
+        }
+
+        &:disabled,
+        &[readonly] {
+            background-color: var(--tblr-input-disabled-bg, #1c1917) !important;
+            border-color: var(--tblr-input-disabled-border-color, #292524) !important;
+            color: var(--tblr-secondary-color) !important;
+            opacity: 0.7 !important;
+        }
+    }
+
+    // Enforce checkbox/radio styling
+    .form-check-input {
+        background-color: var(--tblr-input-bg) !important;
+        border-color: var(--tblr-input-border-color) !important;
+
+        &:checked {
+            background-color: var(--tblr-primary) !important;
+            border-color: var(--tblr-primary) !important;
+        }
+
+        &:focus {
+            border-color: var(--tblr-primary) !important;
+            box-shadow: 0 0 0 0.25rem rgba(var(--tblr-primary-rgb), 0.25) !important;
+        }
+    }
+
+    // Body text contrast
+    body {
+        color: var(--tblr-body-color) !important;
+    }
+}

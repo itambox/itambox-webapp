@@ -43,6 +43,17 @@ def render_widget(context, widget_config, index=0):
         return f'<!-- Widget error ({widget_id}): {e} -->'
 
 
+@register.simple_tag
+def get_widget_icon(widget_config):
+    """
+    Return the MDI icon name (without 'mdi-' prefix) for a widget config.
+
+    Usage: {% get_widget_icon entry.config as widget_icon %}
+    """
+    widget_cls = get_widget(widget_config.get('widget'))
+    return getattr(widget_cls, 'icon', None) or 'view-grid-outline'
+
+
 @register.simple_tag(takes_context=True)
 def get_widget_footer_links(context, widget_config, index=0):
     """

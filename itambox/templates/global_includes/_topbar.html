@@ -1,5 +1,5 @@
 {% load i18n %}
-<header class="navbar navbar-expand-md d-none d-lg-flex d-print-none" >
+<header class="navbar navbar-expand-md d-none d-lg-flex d-print-none itambox-topbar">
     <div class="container-fluid">
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu" aria-controls="navbar-menu" aria-expanded="false" aria-label="{% translate 'Toggle navigation' %}">
             <span class="navbar-toggler-icon"></span>
@@ -11,7 +11,8 @@
                     <span class="input-icon-addon">
                         <i class="mdi mdi-magnify"></i>
                     </span>
-                    <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="form-control" placeholder="{% translate "Search…" %}" aria-label="{% translate "Search in website" %}">
+                    <input type="text" id="global-search-input" name="q" value="{{ request.GET.q|default:'' }}" class="form-control" placeholder="{% translate "Search…" %}" aria-label="{% translate "Search in website" %}">
+                    <kbd class="global-search-kbd" aria-hidden="true">Ctrl K</kbd>
                 </div>
             </form>
         </div>
@@ -20,8 +21,11 @@
                 {# Workspace Switcher #}
                 {% if request.user.is_authenticated %}
                 <div class="nav-item dropdown me-3 d-none d-md-flex">
-                    <a href="#" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        <i class="mdi mdi-briefcase-outline"></i>
+                    <a href="#" class="btn workspace-switcher dropdown-toggle" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <span class="workspace-switcher-icon" aria-hidden="true">
+                            <i class="mdi mdi-briefcase-outline"></i>
+                        </span>
+                        <span class="workspace-switcher-name">
                         {% if request.active_tenant %}
                             {{ request.active_tenant.name }}
                         {% elif request.active_tenant_group %}
@@ -29,6 +33,7 @@
                         {% else %}
                             {% translate "All Tenants" %}
                         {% endif %}
+                        </span>
                     </a>
                     <div class="dropdown-menu dropdown-menu-end dropdown-menu-card dropdown-menu-arrow" style="min-width: 250px;">
                         <div class="card">

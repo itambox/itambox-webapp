@@ -1,0 +1,256 @@
+// ============================================================
+//  Premium Sidebar & Vertical Navigation Styles
+// ============================================================
+.navbar-vertical {
+    background-color: var(--itambox-sidebar-bg, var(--tblr-bg-surface)) !important;
+    border-right: 1px solid var(--itambox-sidebar-border, var(--tblr-border-color)) !important;
+
+    // Sidebar Brand Accent Text
+    .navbar-brand {
+        font-family: inherit;
+        font-weight: 700;
+        letter-spacing: -0.025em;
+        font-size: 1.25rem;
+        padding-top: 1.5rem;
+        color: var(--tblr-body-color) !important;
+    }
+
+    // Keep the brand in normal flow on mobile so it never overlaps the
+    // right-hand action icons (notifications / theme toggle / profile).
+    @media (max-width: 991.98px) {
+        .navbar-brand {
+            position: static;
+            transform: none;
+            margin: 0 0.5rem !important;
+            padding-top: 0.5rem !important;
+            padding-bottom: 0.5rem !important;
+            min-width: 0;
+            flex-shrink: 1;
+
+            .navbar-brand-image {
+                height: 28px !important;
+                min-height: 28px !important;
+                max-width: 100%;
+            }
+        }
+    }
+
+    // Force left-alignment and vertical layout for navigation elements inside the sidebar menu (desktop & mobile)
+    #sidebar-menu {
+        .navbar-nav {
+            text-align: left !important;
+            flex-direction: column !important;
+        }
+
+        .nav-link {
+            display: flex !important;
+            flex-direction: row !important;
+            justify-content: flex-start !important;
+            align-items: center !important;
+            text-align: left !important;
+        }
+
+        .dropdown-menu {
+            position: static !important;
+            float: none !important;
+            text-align: left !important;
+        }
+
+        .dropdown-header {
+            text-align: left !important;
+        }
+    }
+
+    // Sidebar Category / Dropdown Headers — quiet, letter-spaced overlines.
+    // Muted on purpose: section labels aren't interactive, so they don't get
+    // the accent color (indigo is reserved for hover/active states).
+    .dropdown-header,
+    .text-info {
+        font-size: 0.68rem !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.1em !important;
+        color: var(--itambox-sidebar-muted-color, var(--tblr-secondary-color)) !important;
+        padding-top: 0.875rem !important;
+        padding-bottom: 0.25rem !important;
+        margin-top: 0.25rem !important;
+        margin-bottom: 0.25rem !important;
+        display: block;
+    }
+
+    // Sidebar navigation items
+    .nav-item {
+        margin: 0.125rem 0.5rem;
+
+        .nav-link {
+            font-size: 0.825rem;
+            font-weight: 500;
+            padding: 0.45rem 0.75rem;
+            color: var(--itambox-sidebar-color, rgba(var(--tblr-body-color-rgb), 0.65)) !important;
+            border-radius: var(--tblr-border-radius-sm);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+            .nav-link-icon {
+                color: var(--itambox-sidebar-muted-color, rgba(var(--tblr-body-color-rgb), 0.45)) !important;
+                transition: color 0.2s ease;
+                margin-right: 0.5rem;
+            }
+
+            &:hover {
+                background-color: var(--itambox-sidebar-hover-bg, rgba(var(--tblr-primary-rgb), 0.06)) !important;
+                color: var(--itambox-sidebar-hover-color, var(--tblr-primary)) !important;
+                padding-left: 0.95rem; // Subtle organic slide-in animation
+
+                .nav-link-icon {
+                    color: var(--itambox-sidebar-hover-color, var(--tblr-primary)) !important;
+                }
+            }
+
+            &.active,
+            &.show {
+                background-color: var(--itambox-sidebar-active-bg, rgba(var(--tblr-primary-rgb), 0.09)) !important;
+                color: var(--itambox-sidebar-active-color, var(--tblr-primary)) !important;
+                font-weight: 600;
+                box-shadow: inset 2px 0 0 var(--tblr-primary);
+                border-radius: 0 var(--tblr-border-radius-sm) var(--tblr-border-radius-sm) 0;
+
+                .nav-link-icon {
+                    color: var(--itambox-sidebar-active-color, var(--tblr-primary)) !important;
+                }
+            }
+        }
+
+        // Expanded nested items
+        .dropdown-menu {
+            background-color: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 0 0 1rem !important;
+            margin: 0 !important;
+
+            .dropdown-item {
+                font-size: 0.8rem;
+                font-weight: 500;
+                padding: 0.35rem 0.75rem;
+                color: var(--itambox-sidebar-color, rgba(var(--tblr-body-color-rgb), 0.6)) !important;
+                border-left: 2px solid transparent;
+                border-radius: 0;
+                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+                &:hover {
+                    background-color: var(--itambox-sidebar-hover-bg, rgba(var(--tblr-primary-rgb), 0.05)) !important;
+                    color: var(--itambox-sidebar-hover-color, var(--tblr-primary)) !important;
+                    border-left-color: var(--itambox-sidebar-hover-color, var(--tblr-primary)) !important;
+                    padding-left: 0.95rem; // Micro-slide
+                }
+
+                &.active,
+                &:active {
+                    background-color: var(--itambox-sidebar-active-bg, rgba(var(--tblr-primary-rgb), 0.08)) !important;
+                    color: var(--itambox-sidebar-active-color, var(--tblr-primary)) !important;
+                    border-left-color: var(--itambox-sidebar-active-color, var(--tblr-primary)) !important;
+                    font-weight: 600;
+                }
+            }
+        }
+    }
+}
+
+// ============================================================
+//  Mobile Offcanvas Sidebar Styling (Slide-in Drawer)
+// ============================================================
+@media (max-width: 991.98px) {
+    #sidebar-menu.offcanvas-lg {
+        background-color: var(--itambox-sidebar-bg, var(--tblr-bg-surface)) !important;
+        border-right: 1px solid var(--itambox-sidebar-border, var(--tblr-border-color)) !important;
+        // A touch wider for comfortable reading; capped so it never swallows the screen
+        width: min(86vw, 320px) !important;
+
+        .offcanvas-header {
+            background-color: var(--itambox-sidebar-bg, var(--tblr-bg-surface)) !important;
+            border-bottom: 1px solid var(--itambox-sidebar-border, var(--tblr-border-color)) !important;
+
+            .offcanvas-title {
+                color: var(--tblr-body-color) !important;
+            }
+        }
+
+        .offcanvas-body {
+            background-color: var(--itambox-sidebar-bg, var(--tblr-bg-surface)) !important;
+            padding: 0 !important;
+
+            // Allow the scrollable nav region to actually shrink & scroll inside
+            // the flex column (min-height:auto would otherwise block overflow).
+            > .flex-grow-1 {
+                min-height: 0;
+            }
+        }
+
+        // Workspace/tenant switcher pinned at the bottom — keep it solidly opaque
+        // so the scrolling nav above never bleeds through it.
+        .mobile-tenant-switcher-wrap {
+            background-color: var(--itambox-sidebar-bg, var(--tblr-bg-surface)) !important;
+
+            .list-group,
+            .list-group-item {
+                background-color: var(--itambox-sidebar-bg, var(--tblr-bg-surface));
+            }
+        }
+    }
+}
+
+// ============================================================
+//  Mobile-header action dropdowns (notifications / profile)
+// ============================================================
+// These dropdowns sit inside the vertical navbar but OUTSIDE #sidebar-menu,
+// so they wrongly inherited the sidebar's transparent dropdown styling and
+// rendered invisible. Restore the standard solid dropdown surface.
+.navbar-vertical .d-lg-none .nav-item .dropdown-menu {
+    background-color: var(--tblr-dropdown-bg, var(--tblr-bg-surface)) !important;
+    border: 1px solid var(--tblr-dropdown-border-color, var(--tblr-border-color)) !important;
+    box-shadow: var(--tblr-box-shadow-lg) !important;
+    padding: 0.5rem 0 !important;
+    margin-top: 0.25rem !important;
+
+    .dropdown-item {
+        border-left: 0 !important;
+        border-radius: 0 !important;
+        padding: 0.5rem 1rem !important;
+        font-size: 0.875rem !important;
+        color: var(--tblr-dropdown-link-color, var(--tblr-body-color)) !important;
+
+        &:hover,
+        &:focus {
+            padding-left: 1rem !important; // cancel the sidebar's micro-slide
+            background-color: var(--tblr-dropdown-link-hover-bg, var(--tblr-bg-surface-secondary)) !important;
+            color: var(--tblr-dropdown-link-hover-color, var(--tblr-body-color)) !important;
+        }
+    }
+}
+
+// Full-width mobile dropdown panel (e.g. notifications): span the whole
+// viewport width instead of a narrow card that overflows off-screen.
+// Pairs with data-bs-display="static" on the toggle so Popper doesn't fight us.
+@media (max-width: 991.98px) {
+    .navbar-vertical .d-lg-none .dropdown-menu.mobile-fullwidth-dropdown {
+        position: fixed !important;
+        top: 3.5rem !important;
+        left: 0 !important;
+        right: 0 !important;
+        transform: none !important;
+        width: 100vw !important;
+        max-width: 100vw !important;
+        margin: 0 !important;
+        border-left: 0 !important;
+        border-right: 0 !important;
+        border-radius: 0 !important;
+
+        .card {
+            width: auto !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+            border-left: 0 !important;
+            border-right: 0 !important;
+        }
+    }
+}

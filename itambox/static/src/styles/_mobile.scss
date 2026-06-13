@@ -1,0 +1,214 @@
+// ============================================================
+//  Mobile (phone) Responsive Enhancements
+// ============================================================
+// Phones have very little horizontal room. These rules reclaim the
+// wasted left/right gutters, shrink chrome a touch, and keep page
+// headers/panels inside the viewport.
+
+// ---- Page-header action guards (all sizes) ----
+// Detail views can stack many actions (bookmark, watch, edit, clone,
+// check-in/out, plugin buttons). Let the action column shrink and wrap
+// instead of overlapping the title or escaping the viewport.
+.page-header {
+    .row {
+        row-gap: 0.5rem;
+    }
+
+    .col-auto {
+        max-width: 100%;
+        min-width: 0;
+    }
+
+    .btn-list {
+        flex-wrap: wrap;
+        row-gap: 0.375rem;
+    }
+}
+
+// Flex/grid children default to min-width:auto, which lets wide content
+// (tables, long tokens) push panels past the viewport on phones.
+.tab-content .row > [class*="col-"],
+.page-body .row > [class*="col-"] {
+    min-width: 0;
+}
+
+@media (max-width: 575.98px) {
+
+    // ---- Reclaim horizontal space: near edge-to-edge content ----
+    .page-body > .container-fluid,
+    .page-header > .container-fluid {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+
+    // Tighten the grid gutter so list/detail cards sit closer to the edges
+    .page-body > .container-fluid > .row {
+        --bs-gutter-x: 0.5rem;
+        --tblr-gutter-x: 0.5rem;
+    }
+
+    // ---- A tiny bit more compact buttons ----
+    .btn {
+        padding: 0.3125rem 0.625rem;
+        font-size: 0.8125rem;
+    }
+
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+
+    // Page-header action row: shrink the gap so the compact controls fit
+    .page-header .btn-list {
+        gap: 0.375rem;
+    }
+
+    // Quick search reclaims the room freed by the now icon-only toolbar buttons
+    .quicksearch-results-tab {
+        max-width: none !important;
+        margin-right: 0.5rem !important;
+    }
+
+    // Attribute tables: give the label column less room on phones so values
+    // (serials, mail addresses) keep readable width.
+    .attr-table {
+
+        th:first-child,
+        td:first-child {
+            width: 38%;
+            min-width: 100px;
+        }
+    }
+
+    // Code/diff blocks inside panels wrap instead of widening the card
+    .card pre.change-data,
+    .card pre.change-diff {
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+}
+
+// ============================================================
+//  Mobile Bottom Action Bar
+// ============================================================
+// Fixed bar visible on small screens (< lg / 992px). A safe-area-aware
+// bottom offset ensures the bar clears the iPhone home indicator.
+
+$action-bar-height: 60px;
+$action-bar-fab-size: 56px;
+
+.mobile-action-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1040;          // above page content, below modals (Bootstrap modal is 1050+)
+    background: var(--tblr-bg-surface, #fff);
+    border-top: 1px solid var(--tblr-border-color, rgba(0,0,0,.1));
+    box-shadow: 0 -2px 12px rgba(0,0,0,.08);
+    // Push above the safe area (iPhone home indicator)
+    padding-bottom: env(safe-area-inset-bottom, 0);
+
+    [data-bs-theme="dark"] & {
+        background: var(--tblr-bg-surface, #1e2433);
+        border-top-color: rgba(255,255,255,.1);
+    }
+}
+
+.mobile-action-bar__inner {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    height: $action-bar-height;
+    padding: 0 0.25rem;
+}
+
+.mobile-action-bar__btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 2px;
+    min-width: 0;
+    padding: 6px 4px;
+    color: var(--tblr-secondary, #6c757d);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 0.6rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    transition: color 0.15s;
+
+    .mdi {
+        font-size: 1.35rem;
+        line-height: 1;
+    }
+
+    &:hover, &:focus {
+        color: var(--tblr-primary);
+        outline: none;
+    }
+
+    &.active {
+        color: var(--tblr-primary);
+    }
+}
+
+// Elevated centre FAB (scanner button)
+.mobile-action-bar__btn--scanner {
+    flex: 0 0 auto;
+    // Extra bottom padding so the FAB visually "floats" above the bar
+    padding-bottom: 12px;
+    color: var(--tblr-primary);
+
+    span:last-child {
+        font-size: 0.6rem;
+    }
+}
+
+.mobile-action-bar__scanner-fab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: $action-bar-fab-size;
+    height: $action-bar-fab-size;
+    border-radius: 50%;
+    background: var(--tblr-primary);
+    // primary-fg keeps contrast in dark mode (dark text on light-violet fill)
+    color: var(--tblr-primary-fg, #fff);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
+    // Lift it above the bar baseline
+    margin-top: -($action-bar-fab-size * 0.4);
+    margin-bottom: 2px;
+    transition: transform 0.15s, box-shadow 0.15s;
+
+    .mdi {
+        font-size: 1.6rem;
+    }
+
+    .mobile-action-bar__btn--scanner:hover &,
+    .mobile-action-bar__btn--scanner:focus & {
+        transform: scale(1.08);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
+    }
+
+    .mobile-action-bar__btn--scanner:active & {
+        transform: scale(0.95);
+    }
+}
+
+// Add bottom padding on mobile so page content isn't hidden behind the bar.
+// Applied on the same breakpoint the bar appears (< lg).
+@media (max-width: 991.98px) {
+    .page-body {
+        padding-bottom: calc(#{$action-bar-height} + env(safe-area-inset-bottom, 0px) + 0.5rem);
+    }
+
+    // Toasts must sit above the action bar
+    #django-messages {
+        bottom: calc(#{$action-bar-height} + env(safe-area-inset-bottom, 0px) + 0.5rem) !important;
+    }
+}

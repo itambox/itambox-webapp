@@ -24,7 +24,7 @@
                 </div>
                 <div class="input-group">
                     <input type="text" class="form-control font-monospace fw-bold select-all" value="{{ new_token_key }}" readonly id="token-key-display">
-                    <button class="btn btn-success" type="button" onclick="navigator.clipboard.writeText('{{ new_token_key }}'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy', 2000)">
+                    <button class="btn btn-success" type="button" data-copy-input="#token-key-display" data-copy-feedback="Copied!">
                         {% translate "Copy" %}
                     </button>
                 </div>

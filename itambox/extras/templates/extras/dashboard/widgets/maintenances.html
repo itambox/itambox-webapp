@@ -10,7 +10,13 @@
         </div>
         <div class="d-flex justify-content-between text-muted small">
             <span>{{ maint.get_maintenance_type_display }} ({{ maint.supplier|default:"Internal" }})</span>
-            <span>{% translate "Started:" %} {{ maint.start_date|date:"Y-m-d" }}</span>
+            <span>
+                {% if maint.is_overdue %}
+                <span class="badge bg-danger" title="{% blocktranslate with days=overdue_days %}Running longer than {{ days }} days{% endblocktranslate %}">{{ maint.days_running }}d</span>
+                {% else %}
+                {% translate "Started:" %} {{ maint.start_date|date:"Y-m-d" }}
+                {% endif %}
+            </span>
         </div>
     </div>
     {% endfor %}
@@ -18,4 +24,3 @@
 {% else %}
 <div class="text-muted text-center py-4">{% translate "No active maintenance tasks recorded." %}</div>
 {% endif %}
-

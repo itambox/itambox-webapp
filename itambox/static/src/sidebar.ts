@@ -86,18 +86,22 @@
 
   document.addEventListener('DOMContentLoaded', updateSidebarActiveState);
   document.body.addEventListener('htmx:afterSettle', function (evt: Event) {
-    updateSidebarActiveState();
-
-    // Automatically hide mobile offcanvas menu only after page navigation (swap target is page-content-wrapper)
+    // Only react to actual page navigations (boosted swaps target
+    // #page-content-wrapper). Partial swaps — e.g. the 30s notification
+    // poll — must NOT reset the sidebar: updateSidebarActiveState()
+    // collapses every menu the user has manually expanded.
     const detail = (evt as CustomEvent).detail;
     const target = detail && (detail.target as HTMLElement);
-    if (target && target.id === 'page-content-wrapper') {
-      const sidebar = document.getElementById('sidebar-menu');
-      if (sidebar && typeof bootstrap !== 'undefined' && bootstrap.Offcanvas) {
-        const offcanvasInstance = bootstrap.Offcanvas.getInstance(sidebar);
-        if (offcanvasInstance) {
-          offcanvasInstance.hide();
-        }
+    if (!target || target.id !== 'page-content-wrapper') return;
+
+    updateSidebarActiveState();
+
+    // Automatically hide the mobile offcanvas menu after page navigation
+    const sidebar = document.getElementById('sidebar-menu');
+    if (sidebar && typeof bootstrap !== 'undefined' && bootstrap.Offcanvas) {
+      const offcanvasInstance = bootstrap.Offcanvas.getInstance(sidebar);
+      if (offcanvasInstance) {
+        offcanvasInstance.hide();
       }
     }
   });

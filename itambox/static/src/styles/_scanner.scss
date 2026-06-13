@@ -1,0 +1,67 @@
+// ============================================================
+//  Camera Barcode/QR Scanner Styles
+// ============================================================
+.scanner-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(12, 10, 9, 0.85); // stone-950
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 9999;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+}
+
+.scanner-viewfinder {
+    position: relative;
+    width: 280px;
+    height: 280px;
+    border-radius: 24px;
+    overflow: hidden;
+    // violet = scanning state; GREEN reserved for the success moment (success partial + beep)
+    border: 3px solid var(--tblr-primary);
+    box-shadow: 0 0 25px rgba(var(--tblr-primary-rgb), 0.25);
+    background: #000000;
+
+    video {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+    }
+}
+
+.scanner-laser {
+    position: absolute;
+    top: 0;
+    left: 5%;
+    width: 90%;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--tblr-primary), transparent);
+    box-shadow: 0 0 10px rgba(var(--tblr-primary-rgb), 0.5);
+    z-index: 5;
+    animation: scanner-sweep 2s infinite linear;
+}
+
+@keyframes scanner-sweep {
+    0% { top: 0%; }
+    50% { top: 100%; }
+    100% { top: 0%; }
+}
+
+.scanner-viewfinder::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 20px;
+    pointer-events: none;
+    box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.7);
+}

@@ -108,20 +108,20 @@ class ActionsColumn(tables.Column):
             purge_confirm = _("Are you sure you want to PERMANENTLY delete this {model_name}? This action cannot be undone!").format(model_name=model._meta.verbose_name)
 
             restore_btn = (
-                f'<a class="btn btn-sm btn-success me-1" href="{restore_url}" '
+                f'<a class="btn btn-sm btn-soft-success me-1" href="{restore_url}" '
                 f'hx-post="{restore_url}" hx-target="#object-list-dynamic-content" '
                 f'hx-confirm="{restore_confirm}" '
                 f'title="{restore_title}" aria-label="{restore_title}">'
                 f'<i class="mdi mdi-backup-restore"></i></a>'
             )
             purge_btn = (
-                f'<a class="btn btn-sm btn-danger" href="{purge_url}" '
+                f'<a class="btn btn-sm btn-soft-danger" href="{purge_url}" '
                 f'hx-post="{purge_url}" hx-target="#object-list-dynamic-content" '
                 f'hx-confirm="{purge_confirm}" '
                 f'title="{purge_title}" aria-label="{purge_title}">'
                 f'<i class="mdi mdi-delete-forever"></i></a>'
             )
-            
+
             return mark_safe(restore_btn + purge_btn)
 
         icon_edit = '<i class="mdi mdi-pencil-outline"></i>'
@@ -134,11 +134,9 @@ class ActionsColumn(tables.Column):
 
         html = ''
         button = None
-        dropdown_class = 'secondary'
         dropdown_links = []
 
         for idx, (action, attrs) in enumerate(self.actions.items()):
-            css_class = attrs['css_class']
             icon = icons.get(action, '')
             viewname = get_model_viewname(model, 'update' if action == 'edit' else 'delete')
             url = None
@@ -154,22 +152,46 @@ class ActionsColumn(tables.Column):
                 continue
 
             if len(self.actions) == 1 or (self.split_actions and idx == 0):
-                dropdown_class = css_class
+                # Ghost treatment: monochrome at rest, accent on hover
+                # (indigo for edit, red for delete). Keeps rows calm.
+                ghost_class = 'btn-action btn-action-danger' if action == 'delete' else 'btn-action'
                 button = (
-                    f'<a class="btn btn-sm btn-{css_class}" href="{url}" type="button" '
-                    f'aria-label="{attrs["title"]}">{icon}</a>'
+                    f'<a class="btn btn-sm {ghost_class}" href="{url}" type="button" '
+                    f'title="{attrs["title"]}" aria-label="{attrs["title"]}">{icon}</a>'
                 )
             else:
                 dropdown_links.append(
                     f'<li><a class="dropdown-item" href="{url}">{icon} {attrs["title"]}</a></li>'
                 )
 
+        # Changelog — link to the object's detail page changelog tab, shown at
+        # the top of the dropdown for every model with a detail view. The
+        # destructive Delete entry stays last, behind a divider.
+        detail_viewname = get_model_viewname(model, 'detail')
+        for detail_kwargs in ({'pk': record.pk}, {'slug': getattr(record, 'slug', None)}):
+            if None in detail_kwargs.values():
+                continue
+            try:
+                detail_url = reverse(detail_viewname, kwargs=detail_kwargs)
+            except NoReverseMatch:
+                continue
+            changelog_title = _('Changelog')
+            changelog_li = (
+                f'<li><a class="dropdown-item" href="{detail_url}?tab=changelog">'
+                f'<i class="mdi mdi-history"></i> {changelog_title}</a></li>'
+            )
+            if dropdown_links:
+                dropdown_links.insert(0, changelog_li + '<li><hr class="dropdown-divider"></li>')
+            else:
+                dropdown_links.append(changelog_li)
+            break
+
         toggle_text = _('Toggle Dropdown')
         if button and dropdown_links:
             html += (
                 f'<span class="btn-group dropdown">'
                 f'{button}'
-                f'<a class="btn btn-sm btn-{dropdown_class} dropdown-toggle dropdown-toggle-split" type="button" data-bs-toggle="dropdown" aria-expanded="false">'
+                f'<a class="btn btn-sm btn-action dropdown-toggle dropdown-toggle-split" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="{toggle_text}">'
                 f'</a>'
                 f'<ul class="dropdown-menu dropdown-menu-end">{"".join(dropdown_links)}</ul>'
                 f'</span>'
@@ -179,15 +201,15 @@ class ActionsColumn(tables.Column):
         elif dropdown_links:
             html += (
                 f'<span class="btn-group dropdown">'
-                f'<a class="btn btn-sm btn-secondary dropdown-toggle dropdown-toggle-split" type="button" data-bs-toggle="dropdown" aria-expanded="false">'
+                f'<a class="btn btn-sm btn-action dropdown-toggle dropdown-toggle-split" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="{toggle_text}">'
                 f'</a>'
                 f'<ul class="dropdown-menu dropdown-menu-end">{"".join(dropdown_links)}</ul>'
                 f'</span>'
             )
 
         # Clone — a standalone leading button shown for any model that has a
-        # clone view wired (i.e. uses CloneableMixin + a *_clone URL). Yellow to
-        # match the Asset table's clone button.
+        # clone view wired (i.e. uses CloneableMixin + a *_clone URL). Ghost
+        # like edit: monochrome at rest, indigo on hover.
         clone_html = ''
         clone_viewname = get_model_viewname(model, 'clone')
         for clone_kwargs in ({'pk': record.pk}, {'slug': getattr(record, 'slug', None)}):
@@ -199,7 +221,7 @@ class ActionsColumn(tables.Column):
                 continue
             clone_title = _('Clone')
             clone_html = (
-                f'<a class="btn btn-sm btn-warning me-1" href="{clone_url}" '
+                f'<a class="btn btn-sm btn-action me-1" href="{clone_url}" '
                 f'title="{clone_title}" aria-label="{clone_title}">'
                 f'<i class="mdi mdi-content-copy"></i></a>'
             )

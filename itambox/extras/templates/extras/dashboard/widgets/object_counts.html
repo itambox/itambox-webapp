@@ -1,15 +1,18 @@
 {% load i18n %}
 {% if has_data %}
-<div class="list-group list-group-flush" style="font-size: 0.85rem;">
+<div class="widget-count-list">
     {% for item in counts %}
-    <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
-        <span>{{ item.label }}</span>
-        {% if item.url %}
-        <a href="{{ item.url }}" class="badge bg-blue-lt text-blue text-decoration-none">{{ item.count }}</a>
-        {% else %}
-        <span class="badge bg-blue-lt text-blue">{{ item.count }}</span>
-        {% endif %}
+    {% if item.url %}
+    <a href="{{ item.url }}" class="widget-count-row">
+        <span class="widget-count-label">{{ item.label }}</span>
+        <span class="widget-count-value">{{ item.count }}</span>
+    </a>
+    {% else %}
+    <div class="widget-count-row">
+        <span class="widget-count-label">{{ item.label }}</span>
+        <span class="widget-count-value">{{ item.count }}</span>
     </div>
+    {% endif %}
     {% endfor %}
 </div>
 {% else %}
