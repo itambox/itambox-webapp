@@ -4,7 +4,10 @@ from django.urls import reverse
 from extras.models import Tag
 from core.models import BaseModel, ChangeLoggingMixin, VaultModel, DeletableVaultModel
 from core.mixins import CustomFieldDataMixin
-from core.managers import SoftDeleteManager, AllObjectsManager
+from core.managers import (
+    SoftDeleteManager, AllObjectsManager,
+    TenantScopingSoftDeleteManager, TenantScopingAllObjectsManager,
+)
 class SoftwareCategoryChoices(models.TextChoices):
     OPERATING_SYSTEM = 'operating_system', 'Operating System'
     PRODUCTIVITY = 'productivity', 'Productivity'
@@ -21,16 +24,29 @@ class SoftwareLicenseTypeChoices(models.TextChoices):
     SUBSCRIPTION = 'subscription', 'Subscription'
 
 class Software(CustomFieldDataMixin, DeletableVaultModel):
-    objects = SoftDeleteManager()
-    all_objects = AllObjectsManager()
+    # Tenant-scoped catalogue. A null tenant denotes a shared/global entry that
+    # is visible to every tenant (allow_global_tenant); a tenant-set entry is
+    # private to that tenant. This closes the cross-tenant software exposure
+    # (the software report compiler previously returned all tenants' rows).
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
+    allow_global_tenant = True
 
     """
     Represents a catalog entry for a software product.
     """
+    tenant = models.ForeignKey(
+        to='organization.Tenant',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='software',
+        db_index=True,
+        help_text="Owning tenant. Null denotes a shared/global catalogue entry visible to all tenants.",
+    )
     name = models.CharField(
-        max_length=255, 
-        unique=True, 
-        help_text="Unique name of the software product (e.g., Microsoft Visio Professional 2021)"
+        max_length=255,
+        help_text="Name of the software product (e.g., Microsoft Visio Professional 2021). Unique per tenant."
     )
     manufacturer = models.ForeignKey(
         to='assets.Manufacturer',
@@ -73,6 +89,20 @@ class Software(CustomFieldDataMixin, DeletableVaultModel):
         ordering = ('manufacturer', 'name')
         verbose_name = _("Software")
         verbose_name_plural = _("Software")
+        constraints = [
+            # Active (non-soft-deleted) names are unique within a tenant, and
+            # separately unique among global (null-tenant) entries.
+            models.UniqueConstraint(
+                fields=['tenant', 'name'],
+                condition=models.Q(deleted_at__isnull=True, tenant__isnull=False),
+                name='unique_tenant_software_name',
+            ),
+            models.UniqueConstraint(
+                fields=['name'],
+                condition=models.Q(deleted_at__isnull=True, tenant__isnull=True),
+                name='unique_global_software_name',
+            ),
+        ]
 
     def __str__(self):
         return f"{self.manufacturer.name} - {self.name}"
@@ -148,3 +178,17 @@ class InstalledSoftware(ChangeLoggingMixin, BaseModel):
 
     def get_absolute_url(self):
         return self.asset.get_absolute_url()
+
+    def clean(self):
+        super().clean()
+        # A tenant-owned software product can only be installed on assets of the
+        # same tenant. Global (null-tenant) software is usable everywhere.
+        if (
+            self.software_id and self.asset_id
+            and self.software.tenant_id is not None
+            and self.software.tenant_id != self.asset.tenant_id
+        ):
+            from django.core.exceptions import ValidationError
+            raise ValidationError({
+                'software': _("Selected software belongs to a different tenant than the asset."),
+            })

@@ -27,11 +27,12 @@ class LicenseForm(CustomFieldModelFormMixin, forms.ModelForm):
 
     class Meta:
         model = License
-        fields = ('name', 'software', 'license_type', 'product_key', 'seats', 'purchase_date', 'purchase_cost', 'order_number', 'expiration_date', 'notes', 'tags', 'tenant')
+        fields = ('name', 'software', 'license_type', 'product_key', 'seats', 'purchase_date', 'purchase_cost', 'order_number', 'subscription', 'expiration_date', 'notes', 'tags', 'tenant')
         widgets = {
             'product_key': forms.Textarea(attrs={'rows': 2}),
             'purchase_date': forms.DateInput(attrs={'type': 'date'}),
             'expiration_date': forms.DateInput(attrs={'type': 'date'}),
+            'subscription': forms.Select(attrs={'class': 'form-select'}),
             'notes': forms.Textarea(attrs={'rows': 3}),
         }
         help_texts = {
@@ -65,6 +66,7 @@ class LicenseForm(CustomFieldModelFormMixin, forms.ModelForm):
                 'purchase_date',
                 'purchase_cost',
                 'order_number',
+                'subscription',
                 'expiration_date',
                 'tenant',
                 'notes',

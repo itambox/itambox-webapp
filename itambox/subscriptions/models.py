@@ -302,6 +302,29 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
     def __str__(self):
         return f"{self.provider} - {self.name}"
 
+    @property
+    def total_seats(self):
+        """Total entitled seats across all licenses funded by this subscription."""
+        from django.db.models import Sum
+        return self.licenses.filter(deleted_at__isnull=True).aggregate(
+            total=Sum('seats')
+        )['total'] or 0
+
+    @property
+    def assigned_seats(self):
+        """Seats currently assigned across this subscription's licenses."""
+        from licenses.models import LicenseSeatAssignment
+        return LicenseSeatAssignment.objects.filter(
+            license__subscription=self,
+            license__deleted_at__isnull=True,
+            deleted_at__isnull=True,
+        ).count()
+
+    @property
+    def available_seats(self):
+        """Unassigned seats across this subscription's licenses."""
+        return max(0, self.total_seats - self.assigned_seats)
+
     def get_absolute_url(self):
         try:
             return reverse('subscriptions:subscription_detail', kwargs={'pk': self.pk})

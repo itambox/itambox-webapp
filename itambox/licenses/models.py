@@ -76,6 +76,15 @@ class License(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
     notes = models.TextField(blank=True)
     tags = models.ManyToManyField(Tag, blank=True, related_name='licenses')
     supplier = models.ForeignKey('assets.Supplier', on_delete=models.SET_NULL, blank=True, null=True, related_name='licenses', db_index=True)
+    subscription = models.ForeignKey(
+        'subscriptions.Subscription',
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='licenses',
+        db_index=True,
+        help_text="Optional subscription (billing agreement) that funds this license; seats roll up to it.",
+    )
     tenant = models.ForeignKey('organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='licenses', db_index=True)
 
     objects = SoftDeleteLicenseManager()
@@ -88,6 +97,29 @@ class License(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
 
     def __str__(self):
         return f"{self.software.name} - {self.name} ({self.seats} seats)"
+
+    def clean(self):
+        super().clean()
+        # A license may only reference software in its own tenant (or a global,
+        # null-tenant catalogue entry). Prevents a tenant from entitling against
+        # another tenant's software product.
+        if (
+            self.software_id
+            and self.software.tenant_id is not None
+            and self.software.tenant_id != self.tenant_id
+        ):
+            raise ValidationError({
+                'software': _("Selected software belongs to a different tenant."),
+            })
+        # The funding subscription must belong to the same tenant.
+        if (
+            self.subscription_id
+            and self.subscription.tenant_id is not None
+            and self.subscription.tenant_id != self.tenant_id
+        ):
+            raise ValidationError({
+                'subscription': _("Selected subscription belongs to a different tenant."),
+            })
 
     def get_absolute_url(self):
         try:

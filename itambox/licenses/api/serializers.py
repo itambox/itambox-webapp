@@ -6,6 +6,7 @@ from extras.api.serializers import TagSerializer
 from software.api.serializers import SoftwareSerializer
 from organization.api.serializers import AssetHolderSerializer, NestedTenantSerializer
 from software.models import Software
+from subscriptions.models import Subscription
 from organization.models import Tenant, AssetHolder
 from assets.models import Asset
 
@@ -22,6 +23,12 @@ class LicenseSerializer(BaseModelSerializer):
     tenant_id = serializers.PrimaryKeyRelatedField(
         queryset=Tenant.objects.all(), source='tenant', write_only=True, required=False, allow_null=True
     )
+    subscription = serializers.StringRelatedField(read_only=True)
+    # Subscription.objects is tenant-scoped, so a license cannot be funded by
+    # another tenant's subscription.
+    subscription_id = serializers.PrimaryKeyRelatedField(
+        queryset=Subscription.objects.all(), source='subscription', write_only=True, required=False, allow_null=True
+    )
 
     class Meta:
         model = License
@@ -29,6 +36,7 @@ class LicenseSerializer(BaseModelSerializer):
             'id', 'name', 'software', 'software_id', 'license_type', 'license_type_display', 'product_key',
             'seats', 'available_seats', 'purchase_date', 'purchase_cost',
             'order_number', 'expiration_date', 'notes', 'tags', 'tenant', 'tenant_id',
+            'subscription', 'subscription_id',
             'created_at', 'updated_at'
         )
         brief_fields = ['id', 'name', 'software', 'license_type', 'seats', 'available_seats']

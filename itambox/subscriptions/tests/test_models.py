@@ -1,5 +1,6 @@
 import datetime
 from django.test import TestCase
+from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.db import IntegrityError
@@ -10,8 +11,42 @@ from subscriptions.models import (
     Provider, Subscription, SubscriptionAssignment,
     SubscriptionTypeChoices, SubscriptionStatusChoices, BillingCycleChoices,
 )
+from model_bakery import baker
+from software.models import Software
+from licenses.models import License, LicenseSeatAssignment
 
 User = get_user_model()
+
+
+class SubscriptionSeatRollupTests(TestCase):
+    """Seats are tracked on Licenses; a Subscription rolls them up across the
+    licenses it funds (Subscription -> License -> Software)."""
+
+    def test_seats_roll_up_from_funded_licenses(self):
+        sub = baker.make(Subscription, tenant=None)
+        software = baker.make(Software, manufacturer__name="Acme", manufacturer__slug="acme", tenant=None)
+        baker.make(License, software=software, subscription=sub, seats=10, tenant=None)
+        l2 = baker.make(License, software=software, subscription=sub, seats=5, tenant=None)
+        # A license NOT funded by this subscription must not be counted.
+        baker.make(License, software=software, subscription=None, seats=99, tenant=None)
+
+        self.assertEqual(sub.total_seats, 15)
+        self.assertEqual(sub.assigned_seats, 0)
+        self.assertEqual(sub.available_seats, 15)
+
+        holder = baker.make(AssetHolder, tenant=None)
+        baker.make(LicenseSeatAssignment, license=l2, assigned_holder=holder, asset=None)
+        self.assertEqual(sub.assigned_seats, 1)
+        self.assertEqual(sub.available_seats, 14)
+
+    def test_license_rejects_cross_tenant_subscription(self):
+        t_a = baker.make(Tenant, name="A", slug="a")
+        t_b = baker.make(Tenant, name="B", slug="b")
+        sub_b = baker.make(Subscription, tenant=t_b)
+        software = baker.make(Software, manufacturer__name="Acme2", manufacturer__slug="acme2", tenant=None)
+        lic = baker.prepare(License, software=software, subscription=sub_b, seats=1, tenant=t_a)
+        with self.assertRaises(ValidationError):
+            lic.clean()
 
 class ProviderModelTests(TestCase):
     def setUp(self):
