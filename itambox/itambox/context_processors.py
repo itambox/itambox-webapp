@@ -1,6 +1,17 @@
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
+from itambox.release import VERSION
+
+
+def settings_processor(request):
+    """
+    Expose a minimal, explicit settings dict to templates ({{ settings.VERSION }}).
+    Deliberately NOT the full Django settings object — only what templates need.
+    """
+    return {'settings': {'VERSION': VERSION}}
+
+
 def breadcrumbs(request):
     """
     Generate breadcrumbs based on the current request path.
