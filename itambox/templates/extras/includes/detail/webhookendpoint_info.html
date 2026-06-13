@@ -47,4 +47,19 @@
         <pre class="bg-dark text-light p-3 rounded font-monospace" style="max-height: 150px; overflow-y: auto; font-size: 8.5pt;">{{ object.headers }}</pre>
     </dd>
     {% endif %}
+
+    <dt class="col-sm-3">{% translate "Used By Rules:" %}</dt>
+    <dd class="col-sm-9">
+        {% with rules=object.event_rules.all %}
+        {% if rules %}
+            <div class="d-flex flex-wrap gap-1">
+                {% for rule in rules %}
+                    <a href="{{ rule.get_absolute_url }}" class="badge bg-blue-lt text-decoration-none">{{ rule.name }}</a>
+                {% endfor %}
+            </div>
+        {% else %}
+            <span class="text-muted"><i>{% translate "No event rules target this endpoint yet." %}</i></span>
+        {% endif %}
+        {% endwith %}
+    </dd>
 </dl>

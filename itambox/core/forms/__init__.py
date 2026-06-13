@@ -11,7 +11,26 @@ from core.search import SEARCH_INDEXES
 from core.utils import get_model_viewname
 import django_filters
 from itambox.middleware import get_current_user
-from extras.models import WebhookEndpoint, EventRule, LabelTemplate, ReportTemplate, ScheduledReport, AlertRule, NotificationChannel
+from extras.models import WebhookEndpoint, EventRule, Event, LabelTemplate, ReportTemplate, ScheduledReport, AlertRule, NotificationChannel
+
+
+def logged_content_types():
+    """ContentTypes whose model actually emits Events (ChangeLoggingMixin, not skipped).
+
+    An EventRule pointed at any other model would never fire — constraining the dropdown
+    to these keeps users out of that silent dead-end.
+    """
+    from core.models import ChangeLoggingMixin
+    from core.signals import _SIGNAL_SKIP_MODELS
+
+    ids = []
+    for ct in ContentType.objects.all():
+        model = ct.model_class()
+        if model is None:
+            continue
+        if issubclass(model, ChangeLoggingMixin) and model.__name__ not in _SIGNAL_SKIP_MODELS:
+            ids.append(ct.id)
+    return ContentType.objects.filter(id__in=ids).order_by('app_label', 'model')
 
 OBJ_TYPE_CHOICES = [
     (
@@ -135,6 +154,12 @@ class WebhookEndpointForm(forms.ModelForm):
 
 
 class EventRuleForm(forms.ModelForm):
+    events = forms.MultipleChoiceField(
+        choices=Event.ACTION_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        label='Trigger Events',
+        help_text='Fire this rule when any of the selected change types occur on the target model.',
+    )
     payload_preset = forms.ChoiceField(
         choices=PAYLOAD_PRESET_CHOICES,
         required=False,
@@ -144,49 +169,66 @@ class EventRuleForm(forms.ModelForm):
 
     class Meta:
         model = EventRule
-        fields = ['name', 'model', 'events', 'conditions', 'action_type', 'action_config', 'enabled']
+        fields = ['name', 'model', 'events', 'action_type', 'webhook', 'conditions', 'action_config', 'enabled']
         widgets = {
-            'events': forms.Textarea(attrs={'rows': 3}),
             'conditions': forms.Textarea(attrs={'rows': 3}),
             'action_config': forms.Textarea(attrs={'rows': 4}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.instance:
+        # Only models that emit Events are selectable — others would never trigger the rule.
+        self.fields['model'].queryset = logged_content_types()
+        self.fields['model'].label = 'Target Model'
+        self.fields['webhook'].queryset = WebhookEndpoint.objects.filter(enabled=True)
+        self.fields['webhook'].label = 'Webhook Endpoint'
+        self.fields['webhook'].help_text = (
+            'Required for Webhook rules. Manage endpoints under Webhook Endpoints. '
+            'Leave blank only if you supply a "url" in Action Configuration below.'
+        )
+        self.fields['conditions'].required = False
+        self.fields['action_config'].required = False
+        if self.instance and self.instance.pk:
             if self.instance.events:
-                self.initial['events'] = json.dumps(self.instance.events, indent=2)
+                self.initial['events'] = self.instance.events
             if self.instance.conditions:
                 self.initial['conditions'] = json.dumps(self.instance.conditions, indent=2)
             if self.instance.action_config:
                 self.initial['action_config'] = json.dumps(self.instance.action_config, indent=2)
 
-    def clean_events(self):
-        data = self.cleaned_data['events']
-        if isinstance(data, str):
-            try:
-                return json.loads(data)
-            except json.JSONDecodeError:
-                raise forms.ValidationError('Events must be valid JSON list.')
-        return data
-
     def clean_conditions(self):
         data = self.cleaned_data['conditions']
         if isinstance(data, str):
+            if not data.strip():
+                return {}
             try:
                 return json.loads(data)
             except json.JSONDecodeError:
                 raise forms.ValidationError('Conditions must be valid JSON.')
-        return data
+        return data or {}
 
     def clean_action_config(self):
         data = self.cleaned_data['action_config']
         if isinstance(data, str):
+            if not data.strip():
+                return {}
             try:
                 return json.loads(data)
             except json.JSONDecodeError:
                 raise forms.ValidationError('Action config must be valid JSON.')
-        return data
+        return data or {}
+
+    def clean(self):
+        cleaned = super().clean()
+        action_type = cleaned.get('action_type')
+        if action_type == EventRule.ACTION_WEBHOOK:
+            config = cleaned.get('action_config') or {}
+            if not cleaned.get('webhook') and not config.get('url'):
+                self.add_error(
+                    'webhook',
+                    'Select a Webhook Endpoint (or provide a "url" in Action Configuration) for a Webhook rule.',
+                )
+        return cleaned
 
 
 class LabelTemplateForm(forms.ModelForm):

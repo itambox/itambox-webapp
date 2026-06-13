@@ -240,10 +240,19 @@ class EventRule(ChangeLoggingMixin, BaseModel):
         help_text="Optional conditions for rule matching"
     )
     action_type = models.CharField(max_length=20, choices=ACTION_TYPE_CHOICES)
+    webhook = models.ForeignKey(
+        'WebhookEndpoint',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='event_rules',
+        help_text="Endpoint to call when the action type is Webhook. "
+                  "Takes precedence over any 'url' in action_config.",
+    )
     action_config = models.JSONField(
         default=dict,
         blank=True,
-        help_text="Configuration for the action (webhook URL, template, etc.)"
+        help_text="Advanced/optional JSON config (notification body, header overrides, etc.)"
     )
     enabled = models.BooleanField(default=True)
 

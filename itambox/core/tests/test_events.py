@@ -9,7 +9,7 @@ from django.db import transaction
 
 from core.models import Notification
 from extras.models import NotificationChannel
-from extras.models import Event, EventRule
+from extras.models import Event, EventRule, WebhookEndpoint
 from core.events import dispatch_event, send_notification_to_channel
 from assets.models import Manufacturer
 
@@ -127,6 +127,85 @@ class EventsSystemTestCase(TransactionTestCase):
             hashlib.sha256
         ).hexdigest()
         self.assertEqual(headers['X-Hub-Signature-256'], f'sha256={expected_sig}')
+
+    @patch('requests.request')
+    def test_webhook_delivery_via_linked_endpoint(self, mock_request):
+        # A rule linked to a WebhookEndpoint sources URL/method/headers/secret/retry from
+        # the endpoint — no url/secret needed in action_config.
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_request.return_value = mock_response
+
+        endpoint = WebhookEndpoint.objects.create(
+            name="Linked Endpoint",
+            url="https://example.com/linked-receiver",
+            http_method="POST",
+            secret="endpoint-secret",
+            headers={'X-From': 'endpoint'},
+            retry_count=5,
+            retry_backoff=30,
+        )
+        EventRule.objects.create(
+            name="Linked Webhook Rule",
+            model=self.manufacturer_ct,
+            events=['create'],
+            action_type=EventRule.ACTION_WEBHOOK,
+            webhook=endpoint,
+            action_config={},
+            enabled=True,
+        )
+        event = Event.objects.create(
+            model=self.manufacturer_ct,
+            object_id=202,
+            action='create',
+            data={'app_label': 'assets', 'model_name': 'manufacturer'},
+        )
+
+        with transaction.atomic():
+            dispatch_event(Manufacturer, event, 'create')
+
+        self.assertTrue(mock_request.called)
+        call_args = mock_request.call_args[1]
+        self.assertEqual(call_args['url'], 'https://example.com/linked-receiver')
+        self.assertEqual(call_args['method'], 'POST')
+
+        headers = call_args['headers']
+        self.assertEqual(headers['X-From'], 'endpoint')
+        body = call_args['data']
+        expected_sig = hmac.new(
+            endpoint.secret_decrypted.encode('utf-8'),
+            body.encode('utf-8'),
+            hashlib.sha256,
+        ).hexdigest()
+        self.assertEqual(headers['X-Hub-Signature-256'], f'sha256={expected_sig}')
+
+    @patch('requests.request')
+    def test_disabled_linked_endpoint_suppresses_delivery(self, mock_request):
+        endpoint = WebhookEndpoint.objects.create(
+            name="Disabled Endpoint",
+            url="https://example.com/disabled",
+            http_method="POST",
+            enabled=False,
+        )
+        EventRule.objects.create(
+            name="Rule With Disabled Endpoint",
+            model=self.manufacturer_ct,
+            events=['create'],
+            action_type=EventRule.ACTION_WEBHOOK,
+            webhook=endpoint,
+            enabled=True,
+        )
+        event = Event.objects.create(
+            model=self.manufacturer_ct,
+            object_id=203,
+            action='create',
+            data={'app_label': 'assets', 'model_name': 'manufacturer'},
+        )
+
+        with transaction.atomic():
+            dispatch_event(Manufacturer, event, 'create')
+
+        self.assertFalse(mock_request.called)
 
     def test_legacy_script_rule_does_not_crash(self):
         # Rows with action_type='script' may exist in the DB from before the action was
