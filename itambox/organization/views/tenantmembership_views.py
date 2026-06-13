@@ -39,8 +39,8 @@ class TenantMembershipCreateView(ObjectEditView):
         return initial
 
     def get_success_url(self):
-        if self.instance and self.instance.user:
-            return reverse('users:user_detail', kwargs={'pk': self.instance.user.pk})
+        if self.object and self.object.user:
+            return reverse('users:user_detail', kwargs={'pk': self.object.user.pk})
         user_pk = self.request.GET.get('user')
         if user_pk:
             return reverse('users:user_detail', kwargs={'pk': user_pk})
@@ -54,16 +54,16 @@ class TenantMembershipEditView(ObjectEditView):
     model_form = TenantMembershipForm
     template_name = 'generic/object_edit.html'
 
-    def get_form(self, data=None, files=None, **kwargs):
-        form = super().get_form(data=data, files=files, **kwargs)
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class=form_class)
         # Disable user and tenant — only role is editable on an existing membership.
         form.fields['user'].disabled = True
         form.fields['tenant'].disabled = True
         return form
 
     def get_success_url(self):
-        if self.instance and self.instance.user:
-            return reverse('users:user_detail', kwargs={'pk': self.instance.user.pk})
+        if self.object and self.object.user:
+            return reverse('users:user_detail', kwargs={'pk': self.object.user.pk})
         return reverse('organization:tenantmembership_list')
 
 
@@ -89,7 +89,7 @@ class TenantMembershipBulkEditView(ObjectBulkEditView):
     def _get_queryset(self, pks):
         qs = TenantMembership.objects.filter(pk__in=pks)
         allowed_tenant_pks = [
-            t.pk for t in Tenant.objects.all()
+            t.pk for t in Tenant.all_objects.all()
             if self.request.user.has_perm('organization.change_tenantmembership', obj=t)
         ]
         return qs.filter(tenant__in=allowed_tenant_pks)
@@ -184,7 +184,7 @@ class TenantMembershipBulkDeleteView(ObjectBulkDeleteView):
     def _get_queryset(self, pks):
         qs = TenantMembership.objects.filter(pk__in=pks)
         allowed_tenant_pks = [
-            t.pk for t in Tenant.objects.all()
+            t.pk for t in Tenant.all_objects.all()
             if self.request.user.has_perm('organization.delete_tenantmembership', obj=t)
         ]
         return qs.filter(tenant__in=allowed_tenant_pks)
