@@ -215,7 +215,7 @@ class AssetForm(forms.ModelForm):
         if seq:
             suggested_tag = seq.next_tag_preview
             self.fields['asset_tag'].help_text = mark_safe(
-                f'<span class="text-muted small">Suggested: <a href="javascript:void(0)" onclick="document.getElementById(\'id_asset_tag\').value = \'{suggested_tag}\'; return false;" class="text-primary font-monospace">{suggested_tag}</a></span>'
+                f'<span class="text-muted small">Suggested: <a href="#" class="text-primary font-monospace" data-fill-target="id_asset_tag" data-fill-value="{suggested_tag}">{suggested_tag}</a></span>'
             )
         else:
             self.fields['asset_tag'].help_text = mark_safe(
