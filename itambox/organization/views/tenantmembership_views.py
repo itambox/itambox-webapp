@@ -89,7 +89,7 @@ class TenantMembershipBulkEditView(ObjectBulkEditView):
     def _get_queryset(self, pks):
         qs = TenantMembership.objects.filter(pk__in=pks)
         allowed_tenant_pks = [
-            t.pk for t in Tenant.all_objects.all()
+            t.pk for t in Tenant._base_manager.all()
             if self.request.user.has_perm('organization.change_tenantmembership', obj=t)
         ]
         return qs.filter(tenant__in=allowed_tenant_pks)
@@ -184,7 +184,7 @@ class TenantMembershipBulkDeleteView(ObjectBulkDeleteView):
     def _get_queryset(self, pks):
         qs = TenantMembership.objects.filter(pk__in=pks)
         allowed_tenant_pks = [
-            t.pk for t in Tenant.all_objects.all()
+            t.pk for t in Tenant._base_manager.all()
             if self.request.user.has_perm('organization.delete_tenantmembership', obj=t)
         ]
         return qs.filter(tenant__in=allowed_tenant_pks)

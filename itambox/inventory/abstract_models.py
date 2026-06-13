@@ -87,7 +87,11 @@ class AbstractStock(ChangeLoggingMixin, BaseModel):
         related_name='%(class)s_stocks',
         db_index=True
     )
-    qty = models.PositiveIntegerField(default=0)
+    # Signed: when an item allows over-allocation, a checkout can drive on-hand
+    # below zero. The balance must be able to represent that deficit so check-in
+    # restores symmetrically instead of materialising phantom stock. Non-over-
+    # allocatable items are guarded against going negative in adjust_inventory_stock.
+    qty = models.IntegerField(default=0)
 
     class Meta:
         abstract = True

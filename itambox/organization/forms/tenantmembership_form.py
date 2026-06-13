@@ -60,7 +60,7 @@ class TenantMembershipFilterForm(FilterForm):
 
 class TenantMembershipBulkRoleForm(BulkEditForm):
     role = forms.ModelChoiceField(
-        queryset=TenantRole.all_objects.all(),
+        queryset=TenantRole._base_manager.all(),
         required=True,
         label=_("Role"),
         widget=forms.Select(attrs={'class': 'form-select'})

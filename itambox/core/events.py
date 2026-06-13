@@ -12,6 +12,42 @@ from extras.models import Event, EventRule, NotificationChannel, WebhookEndpoint
 logger = logging.getLogger(__name__)
 
 
+# Field-name substrings whose values must never be snapshotted into an Event
+# (and therefore never forwarded to webhook payloads). Mirrors the redaction
+# convention used by ObjectExportView.
+_SENSITIVE_FIELD_TOKENS = ('password', 'secret', 'token', 'product_key', 'api_key')
+
+
+def _serialize_instance_fields(instance):
+    """Build a JSON-serializable snapshot of an instance's concrete field values.
+
+    Foreign keys are stored under their ``<field>_id`` attname. Values that the
+    JSON encoder can't handle natively (dates, Decimals, UUIDs, etc.) are coerced
+    to ``str`` so the snapshot is always serializable. Fields whose names look
+    sensitive are skipped entirely, since this snapshot is forwarded to webhooks.
+    """
+    import datetime
+    import decimal
+    import uuid as _uuid
+
+    data = {}
+    for field in instance._meta.concrete_fields:
+        name = field.attname.lower()
+        if any(tok in name for tok in _SENSITIVE_FIELD_TOKENS):
+            continue
+        try:
+            value = getattr(instance, field.attname)
+        except Exception:
+            continue
+        if isinstance(value, (datetime.datetime, datetime.date, datetime.time,
+                              decimal.Decimal, _uuid.UUID)):
+            value = str(value)
+        elif not isinstance(value, (str, int, float, bool, type(None))):
+            value = str(value)
+        data[field.attname] = value
+    return data
+
+
 def dispatch_event(sender, instance, action, created=None):
     """Dispatch an event when a ChangeLoggingMixin model is created, updated, or deleted."""
 
@@ -20,11 +56,18 @@ def dispatch_event(sender, instance, action, created=None):
 
     ct = ContentType.objects.get_for_model(sender)
 
+    # Snapshot the instance's fields so EventRule conditions can be evaluated
+    # against actual values. Metadata lives under reserved keys to avoid colliding
+    # with a model field literally named ``app_label``/``model_name``.
+    data = _serialize_instance_fields(instance)
+    data['_app_label'] = ct.app_label
+    data['_model_name'] = ct.model
+
     event = Event.objects.create(
         model=ct,
         object_id=instance.pk,
         action=action,
-        data={'app_label': ct.app_label, 'model_name': ct.model},
+        data=data,
     )
 
     process_event_rules(event)
@@ -69,7 +112,9 @@ def _check_conditions(conditions, event):
 
     results = []
     for rule in rules:
-        if 'and' in rule or 'or' in rule:
+        # A nested group has the same shape as the top level ({'type', 'rules'});
+        # a leaf condition has 'field'/'op'. Detect groups by the 'rules' key.
+        if isinstance(rule, dict) and 'rules' in rule:
             results.append(_check_conditions(rule, event))
         else:
             results.append(_evaluate_condition(rule, event))
@@ -186,6 +231,31 @@ def _send_webhook(rule, event):
         transaction.on_commit(lambda: async_task('core.tasks.send_webhook_task', **task_kwargs))
 
 
+def _render_template(template, event):
+    """Substitute a fixed set of ``{token}`` placeholders in an admin-supplied string.
+
+    Only the whitelisted keys below are interpolated; any other ``{...}`` is left
+    untouched. Avoids ``str.format`` attribute traversal entirely.
+    """
+    import re
+
+    if not template:
+        return template
+
+    values = {
+        'action': str(event.action),
+        'model': str(event.model.model),
+        'app_label': str(event.model.app_label),
+        'object_id': str(event.object_id),
+    }
+
+    def _replace(match):
+        key = match.group(1)
+        return values.get(key, match.group(0))
+
+    return re.sub(r'\{(\w+)\}', _replace, template)
+
+
 def _send_notification(rule, event):
     """Create an in-app notification based on the rule's action_config."""
 
@@ -196,11 +266,11 @@ def _send_notification(rule, event):
     subject = config.get('subject', f"Event: {event.action} on {event.model.model}")
     body = config.get('body', str(event.data))
 
-    try:
-        subject = subject.format(event=event, data=event.data)
-        body = body.format(event=event, data=event.data)
-    except (KeyError, ValueError):
-        pass
+    # Safe, whitelisted token substitution. Deliberately NOT str.format(), which
+    # allows attribute/index traversal on the supplied objects ({event.__class__…})
+    # and is an injection vector for anyone who can edit a rule's action_config.
+    subject = _render_template(subject, event)
+    body = _render_template(body, event)
 
     target_url = ''
     try:

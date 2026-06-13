@@ -21,22 +21,28 @@ class CurrentUserMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        self.process_request(request)
+        tokens = self.process_request(request)
         try:
             response = self.get_response(request)
         except Exception as e:
-            self.process_response(request, None)
+            self.process_response(request, None, tokens)
             raise e
-        return self.process_response(request, response)
+        return self.process_response(request, response, tokens)
 
     def process_request(self, request):
         user = request.user if hasattr(request, 'user') and request.user.is_authenticated else None
-        _current_user.set(user)
-        _request_id.set(uuid.uuid4())
+        # Keep the reset tokens so the prior context is restored (not clobbered to
+        # None) — correct for nested/async-shared contexts under ASGI.
+        return (
+            _current_user.set(user),
+            _request_id.set(uuid.uuid4()),
+        )
 
-    def process_response(self, request, response):
-        _current_user.set(None)
-        _request_id.set(None)
+    def process_response(self, request, response, tokens=None):
+        if tokens is not None:
+            user_token, request_id_token = tokens
+            _current_user.reset(user_token)
+            _request_id.reset(request_id_token)
         return response
 
 
@@ -85,7 +91,10 @@ class CSPMiddleware:
         return response
 
 
-from core.managers import set_current_tenant, set_current_tenant_group, set_current_membership
+from core.managers import (
+    set_current_tenant, set_current_tenant_group, set_current_membership,
+    get_current_tenant, get_current_tenant_group, get_current_membership,
+)
 
 class TenantMiddleware:
     """
@@ -96,15 +105,23 @@ class TenantMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        self.process_request(request)
+        prev = self.process_request(request)
         try:
             response = self.get_response(request)
         except Exception as e:
-            self.process_response(request, None)
+            self.process_response(request, None, prev)
             raise e
-        return self.process_response(request, response)
+        return self.process_response(request, response, prev)
 
     def process_request(self, request):
+        # Snapshot the context active on entry so process_response can restore it
+        # rather than clobbering it to None (the setters also clear the descendant
+        # cache, so restore goes through them too).
+        prev = (
+            get_current_tenant(),
+            get_current_tenant_group(),
+            get_current_membership(),
+        )
         if not hasattr(request, 'user') or not request.user.is_authenticated:
             request.active_tenant = None
             request.active_tenant_group = None
@@ -112,7 +129,7 @@ class TenantMiddleware:
             set_current_tenant(None)
             set_current_tenant_group(None)
             set_current_membership(None)
-            return
+            return prev
 
         # 1. Resolve selected tenant or group from Session or URL Query Parameter
         session_tenant_id = request.session.get('active_tenant_id')
@@ -217,8 +234,16 @@ class TenantMiddleware:
         set_current_tenant_group(active_tenant_group)
         set_current_membership(active_membership)
 
-    def process_response(self, request, response):
-        set_current_tenant(None)
-        set_current_tenant_group(None)
-        set_current_membership(None)
+        return prev
+
+    def process_response(self, request, response, prev=None):
+        if prev is not None:
+            prev_tenant, prev_group, prev_membership = prev
+            set_current_tenant(prev_tenant)
+            set_current_tenant_group(prev_group)
+            set_current_membership(prev_membership)
+        else:
+            set_current_tenant(None)
+            set_current_tenant_group(None)
+            set_current_membership(None)
         return response

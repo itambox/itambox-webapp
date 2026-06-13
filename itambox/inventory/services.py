@@ -173,7 +173,10 @@ def adjust_inventory_stock(
                 raise ValidationError(
                     f"Insufficient stock at {location}. Available: {stock.qty}, Requested: {abs(qty_diff)}"
                 )
-        stock.qty = max(0, stock.qty + qty_diff)
+        # No max(0, ...) clamp: clamping the deduction while restoring the full qty
+        # on check-in materialises stock out of nothing. The signed `qty` field lets
+        # over-allocation go negative so deduction and restoration stay symmetric.
+        stock.qty = stock.qty + qty_diff
         stock.save(update_fields=['qty'])
 
     with transaction.atomic():

@@ -197,16 +197,15 @@ class ITAMBoxModelViewSet(
     def perform_destroy(self, instance):
         model = self.queryset.model
         logger.info(f"Deleting {model._meta.verbose_name} {instance} (PK: {instance.pk})")
-        from core.managers import get_current_tenant
-        print("PERFORM DESTROY CURRENT TENANT:", get_current_tenant())
-        print("INSTANCE TENANT ID:", getattr(instance, 'tenant_id', None))
 
         try:
             with transaction.atomic(using=router.db_for_write(model)):
                 locked = model.objects.select_for_update().get(pk=instance.pk)
                 self._validate_etag(self.request, locked)
                 super().perform_destroy(instance)
-        except ObjectDoesNotExist as e:
-            import traceback
-            traceback.print_exc()
+        except ObjectDoesNotExist:
+            logger.warning(
+                "perform_destroy: %s pk=%s not visible in tenant scope; denying.",
+                model._meta.verbose_name, instance.pk,
+            )
             raise PermissionDenied()

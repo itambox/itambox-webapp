@@ -24,7 +24,15 @@ from core.managers import TenantScopingSoftDeleteQuerySet
 class LicenseQuerySet(TenantScopingSoftDeleteQuerySet):
     def with_counts(self):
         from django.db.models import Count
-        return self.annotate(assigned_count=Count('assignments'))
+        # Only count *active* (non-soft-deleted) assignments. A bare
+        # Count('assignments') joins the raw table and counts checked-in seats as
+        # occupied, disagreeing with the related-manager path in available_seats.
+        return self.annotate(
+            assigned_count=Count(
+                'assignments',
+                filter=Q(assignments__deleted_at__isnull=True),
+            )
+        )
 
 
 class SoftDeleteLicenseManager(TenantScopingSoftDeleteManager.from_queryset(LicenseQuerySet)):
