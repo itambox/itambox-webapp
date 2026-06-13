@@ -91,6 +91,7 @@ class PurchaseOrderLineForm(forms.ModelForm):
             self.fields['license'].queryset = self.fields['license'].queryset.filter(tenant=tenant)
 
         self.helper = FormHelper()
+        self.helper.form_tag = False
         self.helper.layout = Layout(
             'item_category',
             'asset_type',
