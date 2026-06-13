@@ -285,6 +285,16 @@ class CoreViewsTestCase(TestCase):
         tenant = Tenant.objects.create(name="ACME Corp", slug="acme")
         std_user = User.objects.create_user(username='stduser', password='password123')
         
+        # Create standard TenantRole with view permissions but NO recycle bin permissions
+        std_role = TenantRole.objects.create(
+            tenant=tenant,
+            name="Standard Viewer",
+            permissions=[
+                'assets.view_asset',
+            ]
+        )
+        membership = TenantMembership.objects.create(user=std_user, tenant=tenant, role=std_role)
+        
         # Setup asset
         mfr = Manufacturer.objects.create(name="Perm Mfr", slug="perm-mfr")
         role = AssetRole.objects.create(name="Laptop", slug="laptop")
@@ -303,6 +313,12 @@ class CoreViewsTestCase(TestCase):
         self.client.force_login(std_user)
         active_list_url = reverse('assets:asset_list')
         recycle_bin_url = active_list_url + "?deleted=true"
+        
+        # Verify user can access the active list view, but cannot see the Recycle Bin button
+        response = self.client.get(active_list_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "?deleted=true")
+        self.assertNotContains(response, "Recycle Bin")
         
         response = self.client.get(recycle_bin_url)
         self.assertEqual(response.status_code, 403) # Forbidden
@@ -332,11 +348,18 @@ class CoreViewsTestCase(TestCase):
                 'core.delete_recyclebin',
             ]
         )
-        TenantMembership.objects.create(user=std_user, tenant=tenant, role=role_obj)
+        membership.role = role_obj
+        membership.save()
         
         # 4. Try again with permissions
         # Force a reload of the user object to update cached memberships
         std_user = User.objects.get(pk=std_user.pk)
+        
+        # Verify user can access active list view and now sees the Recycle Bin button
+        response = self.client.get(active_list_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "?deleted=true")
+        self.assertContains(response, "Recycle Bin")
         
         # Set active tenant in session or request context if needed (scoping middleware handles it based on membership)
         response = self.client.get(recycle_bin_url)
