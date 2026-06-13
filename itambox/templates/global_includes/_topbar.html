@@ -1,7 +1,8 @@
 {% load i18n %}
-<header class="navbar navbar-expand-md d-none d-lg-flex d-print-none" >
+<header class="navbar navbar-expand-md d-none d-lg-flex d-print-none">
     <div class="container-fluid">
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu" aria-controls="navbar-menu" aria-expanded="false" aria-label="{% translate 'Toggle navigation' %}">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu"
+            aria-controls="navbar-menu" aria-expanded="false" aria-label="{% translate 'Toggle navigation' %}">
             <span class="navbar-toggler-icon"></span>
         </button>
 
@@ -11,7 +12,8 @@
                     <span class="input-icon-addon">
                         <i class="mdi mdi-magnify"></i>
                     </span>
-                    <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="form-control" placeholder="{% trans "Search…" %}" aria-label="{% trans "Search in website" %}">
+                    <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="form-control"
+                        placeholder="{% trans " Search…" %}" aria-label="{% trans " Search in website" %}">
                 </div>
             </form>
         </div>
@@ -20,88 +22,104 @@
                 {# Workspace Switcher #}
                 {% if request.user.is_authenticated %}
                 <div class="nav-item dropdown me-3 d-none d-md-flex">
-                    <a href="#" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <a href="#" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"
+                        aria-haspopup="true" aria-expanded="false">
                         <i class="mdi mdi-briefcase-outline"></i>
                         {% if request.active_tenant %}
-                            {{ request.active_tenant.name }}
+                        {{ request.active_tenant.name }}
                         {% elif request.active_tenant_group %}
-                            {{ request.active_tenant_group.name }} {% trans "(Group)" %}
+                        {{ request.active_tenant_group.name }} {% trans "(Group)" %}
                         {% else %}
-                            {% trans "All Tenants" %}
+                        {% trans "All Tenants" %}
                         {% endif %}
                     </a>
-                    <div class="dropdown-menu dropdown-menu-end dropdown-menu-card dropdown-menu-arrow" style="min-width: 250px;">
+                    <div class="dropdown-menu dropdown-menu-end dropdown-menu-card dropdown-menu-arrow"
+                        style="min-width: 250px;">
                         <div class="card">
                             <div class="card-header py-2">
                                 <h3 class="card-title text-reset fs-6">{% trans "Active Workspace" %}</h3>
                             </div>
-                            <div class="list-group list-group-flush list-group-hoverable" style="max-height: 400px; overflow-y: auto;">
+                            <div class="list-group list-group-flush list-group-hoverable"
+                                style="max-height: 400px; overflow-y: auto;">
                                 {% if request.user.is_superuser %}
-                                    <a href="?switch_tenant=" class="list-group-item list-group-item-action py-2 {% if not request.active_tenant and not request.active_tenant_group %}active{% endif %}">
-                                        <div class="d-flex align-items-center">
-                                            <span class="status-dot bg-blue me-2"></span>
-                                            <strong>{% trans "All Tenants (Global)" %}</strong>
-                                        </div>
-                                    </a>
-                                    {% for item in grouped_tenants_switcher %}
-                                        {% if item.group %}
-                                            <a href="?switch_tenant_group={{ item.group.id }}" class="list-group-header list-group-item-action py-1 px-3 text-muted fs-6 font-weight-bold text-uppercase d-flex justify-content-between align-items-center {% if request.active_tenant_group.id == item.group.id %}active bg-secondary-lt{% endif %}" style="letter-spacing: 0.05em; font-size: 0.7rem !important; cursor: pointer; text-decoration: none;">
-                                                <span>{{ item.group.name }}</span>
-                                                <span class="badge bg-secondary-lt">{% trans "Show All" %}</span>
-                                            </a>
-                                        {% else %}
-                                            <div class="list-group-header py-1 px-3 text-muted fs-6 font-weight-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.7rem !important;">
-                                                {% trans "Ungrouped Tenants" %}
-                                            </div>
-                                        {% endif %}
-                                        {% for tenant in item.tenants %}
-                                            <a href="?switch_tenant={{ tenant.id }}" class="list-group-item list-group-item-action py-2 ps-4 {% if request.active_tenant.id == tenant.id %}active{% endif %}">
-                                                <div class="d-flex align-items-center">
-                                                    <span class="status-dot bg-secondary me-2"></span>
-                                                    <span>{{ tenant.name }}</span>
-                                                </div>
-                                            </a>
-                                        {% endfor %}
-                                    {% empty %}
-                                        <div class="list-group-item text-muted text-center py-3">
-                                            {% trans "No tenants available" %}
-                                        </div>
-                                    {% endfor %}
+                                <a href="?switch_tenant="
+                                    class="list-group-item list-group-item-action py-2 {% if not request.active_tenant and not request.active_tenant_group %}active{% endif %}">
+                                    <div class="d-flex align-items-center">
+                                        <span class="status-dot bg-blue me-2"></span>
+                                        <strong>{% trans "All Tenants (Global)" %}</strong>
+                                    </div>
+                                </a>
+                                {% for item in grouped_tenants_switcher %}
+                                {% if item.group %}
+                                <a href="?switch_tenant_group={{ item.group.id }}"
+                                    class="list-group-header list-group-item-action py-1 px-3 text-muted fs-6 font-weight-bold text-uppercase d-flex justify-content-between align-items-center {% if request.active_tenant_group.id == item.group.id %}active bg-secondary-lt{% endif %}"
+                                    style="letter-spacing: 0.05em; font-size: 0.7rem !important; cursor: pointer; text-decoration: none;">
+                                    <span>{{ item.group.name }}</span>
+                                    <span class="badge bg-secondary-lt">{% trans "Show All" %}</span>
+                                </a>
                                 {% else %}
-                                    {% for item in grouped_memberships_switcher %}
-                                        {% if item.group %}
-                                            <a href="?switch_tenant_group={{ item.group.id }}" class="list-group-header list-group-item-action py-1 px-3 text-muted fs-6 font-weight-bold text-uppercase d-flex justify-content-between align-items-center {% if request.active_tenant_group.id == item.group.id %}active bg-secondary-lt{% endif %}" style="letter-spacing: 0.05em; font-size: 0.7rem !important; cursor: pointer; text-decoration: none;">
-                                                <span>{{ item.group.name }}</span>
-                                                <span class="badge bg-secondary-lt">{% trans "Show All" %}</span>
-                                            </a>
-                                        {% else %}
-                                            <div class="list-group-header py-1 px-3 text-muted fs-6 font-weight-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.7rem !important;">
-                                                {% trans "Ungrouped" %}
-                                            </div>
-                                        {% endif %}
-                                        {% for membership in item.memberships %}
-                                            <a href="?switch_tenant={{ membership.tenant.id }}" class="list-group-item list-group-item-action py-2 ps-4 {% if request.active_tenant.id == membership.tenant.id %}active{% endif %}">
-                                                <div class="d-flex align-items-center">
-                                                    <span class="status-dot {% if membership.role == 'admin' %}bg-red{% elif membership.role == 'member' %}bg-green{% else %}bg-orange{% endif %} me-2"></span>
-                                                    <span class="text-truncate" style="max-width: 130px;">{{ membership.tenant.name }}</span>
-                                                    <span class="badge bg-secondary-lt ms-auto">{{ membership.get_role_display }}</span>
-                                                </div>
-                                            </a>
-                                        {% endfor %}
-                                    {% empty %}
-                                        <div class="list-group-item text-muted text-center py-3">
-                                            {% trans "No workspace memberships" %}
-                                        </div>
-                                    {% endfor %}
+                                <div class="list-group-header py-1 px-3 text-muted fs-6 font-weight-bold text-uppercase"
+                                    style="letter-spacing: 0.05em; font-size: 0.7rem !important;">
+                                    {% trans "Ungrouped Tenants" %}
+                                </div>
+                                {% endif %}
+                                {% for tenant in item.tenants %}
+                                <a href="?switch_tenant={{ tenant.id }}"
+                                    class="list-group-item list-group-item-action py-2 ps-4 {% if request.active_tenant.id == tenant.id %}active{% endif %}">
+                                    <div class="d-flex align-items-center">
+                                        <span class="status-dot bg-secondary me-2"></span>
+                                        <span>{{ tenant.name }}</span>
+                                    </div>
+                                </a>
+                                {% endfor %}
+                                {% empty %}
+                                <div class="list-group-item text-muted text-center py-3">
+                                    {% trans "No tenants available" %}
+                                </div>
+                                {% endfor %}
+                                {% else %}
+                                {% for item in grouped_memberships_switcher %}
+                                {% if item.group %}
+                                <a href="?switch_tenant_group={{ item.group.id }}"
+                                    class="list-group-header list-group-item-action py-1 px-3 text-muted fs-6 font-weight-bold text-uppercase d-flex justify-content-between align-items-center {% if request.active_tenant_group.id == item.group.id %}active bg-secondary-lt{% endif %}"
+                                    style="letter-spacing: 0.05em; font-size: 0.7rem !important; cursor: pointer; text-decoration: none;">
+                                    <span>{{ item.group.name }}</span>
+                                    <span class="badge bg-secondary-lt">{% trans "Show All" %}</span>
+                                </a>
+                                {% else %}
+                                <div class="list-group-header py-1 px-3 text-muted fs-6 font-weight-bold text-uppercase"
+                                    style="letter-spacing: 0.05em; font-size: 0.7rem !important;">
+                                    {% trans "Ungrouped" %}
+                                </div>
+                                {% endif %}
+                                {% for membership in item.memberships %}
+                                <a href="?switch_tenant={{ membership.tenant.id }}"
+                                    class="list-group-item list-group-item-action py-2 ps-4 {% if request.active_tenant.id == membership.tenant.id %}active{% endif %}">
+                                    <div class="d-flex align-items-center">
+                                        <span
+                                            class="status-dot {% if membership.role == 'admin' %}bg-red{% elif membership.role == 'member' %}bg-green{% else %}bg-orange{% endif %} me-2"></span>
+                                        <span class="text-truncate" style="max-width: 130px;">{{ membership.tenant.name
+                                            }}</span>
+                                        <span class="badge bg-secondary-lt ms-auto">{{ membership.get_role_display
+                                            }}</span>
+                                    </div>
+                                </a>
+                                {% endfor %}
+                                {% empty %}
+                                <div class="list-group-item text-muted text-center py-3">
+                                    {% trans "No workspace memberships" %}
+                                </div>
+                                {% endfor %}
                                 {% endif %}
                             </div>
                             {% if request.user.is_superuser or request.active_membership.role == 'admin' %}
-                                <div class="card-footer text-center py-2">
-                                    <a href="{% url 'organization:invite_user' %}" class="small font-weight-bold d-flex align-items-center justify-content-center gap-1">
-                                        <i class="mdi mdi-account-plus-outline"></i>
-                                        {% trans "Invite Member" %}
-                                    </a>
-                                </div>
+                            <div class="card-footer text-center py-2">
+                                <a href="{% url 'organization:invite_user' %}"
+                                    class="small font-weight-bold d-flex align-items-center justify-content-center gap-1">
+                                    <i class="mdi mdi-account-plus-outline"></i>
+                                    {% trans "Invite Member" %}
+                                </a>
+                            </div>
                             {% endif %}
                         </div>
                     </div>
@@ -112,82 +130,116 @@
                 {% get_current_language as CURRENT_LANG %}
                 {% if LANGUAGES|length > 1 %}
                 <div class="nav-item dropdown me-2">
-                    <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" aria-label="{% translate 'Change language' %}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" /><path d="M3.6 9h16.8" /><path d="M3.6 15h16.8" /><path d="M11.5 3a17 17 0 0 0 0 18" /><path d="M12.5 3a17 17 0 0 1 0 18" /></svg>
+                    <a href="#" class="nav-link px-0" data-bs-toggle="dropdown"
+                        aria-label="{% translate 'Change language' %}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24"
+                            stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" />
+                            <path d="M3.6 9h16.8" />
+                            <path d="M3.6 15h16.8" />
+                            <path d="M11.5 3a17 17 0 0 0 0 18" />
+                            <path d="M12.5 3a17 17 0 0 1 0 18" />
+                        </svg>
                     </a>
-                    <form action="{% url 'set_language' %}" method="post" class="dropdown-menu dropdown-menu-end dropdown-menu-arrow py-1" hx-boost="false">
+                    <form action="{% url 'set_language' %}" method="post"
+                        class="dropdown-menu dropdown-menu-end dropdown-menu-arrow py-1" hx-boost="false">
                         {% csrf_token %}
                         <input name="next" type="hidden" value="{{ request.get_full_path }}">
                         <input name="language" type="hidden" value="">
                         {% for lang_code, lang_name in LANGUAGES %}
-                        <button type="submit" value="{{ lang_code }}" onclick="this.form.language.value='{{ lang_code }}';"
-                                class="dropdown-item text-start border-0 bg-transparent w-100 {% if lang_code == CURRENT_LANG %}active{% endif %}">
+                        <button type="submit" value="{{ lang_code }}"
+                            onclick="this.form.language.value='{{ lang_code }}';"
+                            class="dropdown-item text-start border-0 bg-transparent w-100 {% if lang_code == CURRENT_LANG %}active{% endif %}">
                             {{ lang_name }}
                         </button>
                         {% endfor %}
                     </form>
                 </div>
                 {% endif %}
-                <button class="nav-link px-0 color-mode-toggle hide-theme-dark" title="{% translate 'Enable dark mode' %}" data-bs-toggle="tooltip" data-bs-placement="bottom">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" /></svg>
+                <button class="nav-link px-0 color-mode-toggle hide-theme-dark"
+                    title="{% translate 'Enable dark mode' %}" data-bs-toggle="tooltip" data-bs-placement="bottom">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24"
+                        stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+                    </svg>
                 </button>
-                <button class="nav-link px-0 color-mode-toggle hide-theme-light" title="{% translate 'Enable light mode' %}" data-bs-toggle="tooltip" data-bs-placement="bottom">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" /><path d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7" /></svg>
+                <button class="nav-link px-0 color-mode-toggle hide-theme-light"
+                    title="{% translate 'Enable light mode' %}" data-bs-toggle="tooltip" data-bs-placement="bottom">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24"
+                        stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" />
+                        <path
+                            d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7" />
+                    </svg>
                 </button>
-                <div class="nav-item dropdown d-none d-md-flex me-3"
-                     hx-get="{% url 'users:notification_poll' %}"
-                     hx-trigger="load, every 30s"
-                     hx-target="#notification-dropdown-content"
-                     hx-swap="innerHTML">
-                    <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" tabindex="-1" aria-label="{% translate 'Show notifications' %}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6" /><path d="M9 17v1a3 3 0 0 0 6 0v-1" /></svg>
+                <div class="nav-item dropdown d-none d-md-flex me-3" hx-get="{% url 'users:notification_poll' %}"
+                    hx-trigger="load, every 30s" hx-target="#notification-dropdown-content" hx-swap="innerHTML">
+                    <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" tabindex="-1"
+                        aria-label="{% translate 'Show notifications' %}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24"
+                            stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path
+                                d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6" />
+                            <path d="M9 17v1a3 3 0 0 0 6 0v-1" />
+                        </svg>
                         <span id="notification-badge">
-                        {% if unread_notifications_count > 0 %}
+                            {% if unread_notifications_count > 0 %}
                             <span class="badge bg-red"></span>
-                        {% endif %}
+                            {% endif %}
                         </span>
                     </a>
                     <div class="dropdown-menu dropdown-menu-arrow dropdown-menu-end dropdown-menu-card">
                         <div id="notification-dropdown-content">
-                        <div class="card">
-                            <div class="card-header">
-                                <h3 class="card-title">{% trans "Unread Alerts" %} ({{ unread_notifications_count }})</h3>
-                            </div>
-                            <div class="list-group list-group-flush list-group-hoverable">
-                                {% if recent_unread_notifications %}
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">{% trans "Unread Alerts" %} ({{ unread_notifications_count
+                                        }})</h3>
+                                </div>
+                                <div class="list-group list-group-flush list-group-hoverable">
+                                    {% if recent_unread_notifications %}
                                     {% for notif in recent_unread_notifications %}
-                                        <div class="list-group-item">
-                                            <div class="row align-items-center">
-                                                <div class="col-auto">
-                                                    <span class="status-dot status-dot-animated {% if notif.level == 'danger' %}bg-red{% elif notif.level == 'warning' %}bg-warning{% else %}bg-blue{% endif %} d-block"></span>
-                                                </div>
-                                                <div class="col text-truncate">
-                                                    <a href="{% url 'users:view_notification' pk=notif.pk %}" class="text-body d-block font-weight-bold">{{ notif.subject }}</a>
-                                                    <div class="d-block text-muted text-truncate mt-n1 small">
-                                                        {{ notif.message }}
-                                                    </div>
+                                    <div class="list-group-item">
+                                        <div class="row align-items-center">
+                                            <div class="col-auto">
+                                                <span
+                                                    class="status-dot status-dot-animated {% if notif.level == 'danger' %}bg-red{% elif notif.level == 'warning' %}bg-warning{% else %}bg-blue{% endif %} d-block"></span>
+                                            </div>
+                                            <div class="col text-truncate">
+                                                <a href="{% url 'users:view_notification' pk=notif.pk %}"
+                                                    class="text-body d-block font-weight-bold" hx-target="#page-content-wrapper">{{ notif.subject }}</a>
+                                                <div class="d-block text-muted text-truncate mt-n1 small">
+                                                    {{ notif.message }}
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
                                     {% endfor %}
-                                {% else %}
+                                    {% else %}
                                     <div class="list-group-item text-muted text-center py-3">
                                         {% trans "No unread notifications" %}
                                     </div>
-                                {% endif %}
-                            </div>
-                            {% if unread_notifications_count > 0 %}
-                                <div class="card-footer text-center py-2">
-                                    <a href="{% url 'users:user_notifications' %}" class="small font-weight-bold">{% trans "View Notification Center" %}</a>
+                                    {% endif %}
                                 </div>
-                            {% endif %}
-                        </div>
+                                <div class="card-footer text-center py-2">
+                                    <a href="{% url 'users:user_notifications' %}" class="small font-weight-bold" hx-target="#page-content-wrapper">{%
+                                        trans "View Notification Center" %}</a>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="nav-item dropdown">
-                <a href="#" class="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown" aria-label="{% translate 'Open user menu' %}">
+                <a href="#" class="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown"
+                    aria-label="{% translate 'Open user menu' %}">
                     <div class="d-none d-xl-block ps-2">
                         <div>{% if user.is_authenticated %}{{ user.get_full_name|default:user.username }}{% else %}{% trans "Guest" %}{% endif %}</div>
                         <div class="mt-1 small text-muted">{% if user.is_staff %}{% trans "Admin" %}{% elif user.is_authenticated %}{% trans "User" %}{% else %}{% trans "Not Logged In" %}{% endif %}</div>
@@ -195,44 +247,86 @@
                 </a>
                 <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
                     {% if user.is_authenticated %}
-                        <a href="{% url 'users:user_profile' %}" class="dropdown-item">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon dropdown-item-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M6.168 18.849a4 4 0 0 1 3.832 -2.849h4a4 4 0 0 1 3.834 2.855" /></svg>
-                             {% trans "Profile" %}
-                        </a>
-                        <a href="{% url 'users:user_notifications' %}" class="dropdown-item">
-                             <svg xmlns="http://www.w3.org/2000/svg" class="icon dropdown-item-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6" /><path d="M9 17v1a3 3 0 0 0 6 0v-1" /></svg>
-                             {% trans "Notifications" %}
-                             {% if unread_notifications_count > 0 %}
-                                 <span class="badge bg-red-lt ms-auto">{{ unread_notifications_count }}</span>
-                             {% endif %}
-                        </a>
-                         <a href="{% url 'users:user_subscriptions' %}" class="dropdown-item">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon dropdown-item-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 7v12a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-12l6 -3z" /></svg>
-                             {% trans "Subscriptions" %}
-                        </a>
-                        <a href="{% url 'users:user_preferences' %}" class="dropdown-item">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon dropdown-item-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" /><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" /></svg>
-                             {% trans "Preferences" %}
-                        </a>
-                        <a href="{% url 'users:user_api_tokens' %}" class="dropdown-item">
-                             <svg xmlns="http://www.w3.org/2000/svg" class="icon dropdown-item-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 21h-8a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h8l6 6v4" /><path d="M19 16l-2 3h4l-2 3" /><path d="M17 12h-5" /></svg>{# Using key-off or different icon? #}
-                             {% trans "API Tokens" %}
-                        </a>
-                        <div class="dropdown-divider"></div>
-                        {# Logout Form #}
-                        <form action="{% url 'logout' %}" method="post" class="d-inline w-100" hx-boost="false"> {# Make form take width #}
-                            {% csrf_token %}
-                            <button type="submit" class="dropdown-item">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon dropdown-item-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 8v-2a2 2 0 0 0 -2 -2h-7a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2 -2v-2" /><path d="M9 12h12l-3 -3" /><path d="M18 15l3 -3" /></svg>
-                                {% trans "Logout" %}
-                            </button>
-                        </form>
+                    <a href="{% url 'users:user_profile' %}" class="dropdown-item">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon dropdown-item-icon" width="24" height="24"
+                            viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                            <path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" />
+                            <path d="M6.168 18.849a4 4 0 0 1 3.832 -2.849h4a4 4 0 0 1 3.834 2.855" />
+                        </svg>
+                        {% trans "Profile" %}
+                    </a>
+                    <a href="{% url 'users:user_notifications' %}" class="dropdown-item">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon dropdown-item-icon" width="24" height="24"
+                            viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path
+                                d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6" />
+                            <path d="M9 17v1a3 3 0 0 0 6 0v-1" />
+                        </svg>
+                        {% trans "Notifications" %}
+                        {% if unread_notifications_count > 0 %}
+                        <span class="badge bg-red-lt ms-auto">{{ unread_notifications_count }}</span>
+                        {% endif %}
+                    </a>
+                    <a href="{% url 'users:user_subscriptions' %}" class="dropdown-item">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon dropdown-item-icon" width="24" height="24"
+                            viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path d="M18 7v12a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-12l6 -3z" />
+                        </svg>
+                        {% trans "Subscriptions" %}
+                    </a>
+                    <a href="{% url 'users:user_preferences' %}" class="dropdown-item">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon dropdown-item-icon" width="24" height="24"
+                            viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path
+                                d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" />
+                            <path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" />
+                        </svg>
+                        {% trans "Preferences" %}
+                    </a>
+                    <a href="{% url 'users:user_api_tokens' %}" class="dropdown-item">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon dropdown-item-icon" width="24" height="24"
+                            viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path d="M15 21h-8a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h8l6 6v4" />
+                            <path d="M19 16l-2 3h4l-2 3" />
+                            <path d="M17 12h-5" />
+                        </svg>{# Using key-off or different icon? #}
+                        {% trans "API Tokens" %}
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    {# Logout Form #}
+                    <form action="{% url 'logout' %}" method="post" class="d-inline w-100" hx-boost="false"> {# Make
+                        form take width #}
+                        {% csrf_token %}
+                        <button type="submit" class="dropdown-item">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon dropdown-item-icon" width="24"
+                                height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                <path
+                                    d="M14 8v-2a2 2 0 0 0 -2 -2h-7a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2 -2v-2" />
+                                <path d="M9 12h12l-3 -3" />
+                                <path d="M18 15l3 -3" />
+                            </svg>
+                            {% trans "Logout" %}
+                        </button>
+                    </form>
                     {% else %}
-                        <a href="{% url 'login' %}" class="dropdown-item">{% trans "Login" %}</a>
+                    <a href="{% url 'login' %}" class="dropdown-item">{% trans "Login" %}</a>
                     {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </header>
-{# Removed the second header section which is now in _sidebar.html #} 
+{# Removed the second header section which is now in _sidebar.html #}
