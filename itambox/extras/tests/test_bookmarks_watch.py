@@ -80,9 +80,22 @@ class WatchNotificationTests(TenantTestMixin, TestCase):
     """
 
     def setUp(self):
-        self.setup_tenant_context(name="Notify Tenant", slug="notify-tenant")
+        self.setup_tenant_context(name="Notify Tenant", slug="notify-tenant", permissions=["extras.view_tag"])
         self.watcher = _make_user("watcher")
         self.bookmarker = _make_user("bookmarker")
+
+        # Associate users with the tenant so they pass the view permission checks
+        from organization.models import TenantMembership
+        TenantMembership.objects.create(
+            user=self.watcher,
+            tenant=self.tenant,
+            role=self.tenant_role
+        )
+        TenantMembership.objects.create(
+            user=self.bookmarker,
+            tenant=self.tenant,
+            role=self.tenant_role
+        )
 
         from extras.models import Tag
         _set_user_context(self.watcher)
@@ -124,8 +137,8 @@ _HTMX_HEADERS = {'HTTP_HX_REQUEST': 'true', 'HTTP_HX_CURRENT_URL': '/some/page/'
 class BookmarkToggleViewTests(TenantTestMixin, TestCase):
 
     def setUp(self):
-        self.setup_tenant_context(name="BT Tenant", slug="bt-tenant")
-        self.client.login(username=self.tenant_user.username, password="password")
+        self.setup_tenant_context(name="BT Tenant", slug="bt-tenant", permissions=["extras.view_tag"])
+        self.client_login_to_tenant(self.tenant_user, self.tenant)
         from extras.models import Tag
         _set_user_context(self.tenant_user)
         self.target_tag = Tag.objects.create(name="BT Tag", slug="bt-tag")
@@ -155,8 +168,8 @@ class BookmarkToggleViewTests(TenantTestMixin, TestCase):
 class WatchToggleViewTests(TenantTestMixin, TestCase):
 
     def setUp(self):
-        self.setup_tenant_context(name="WT Tenant", slug="wt-tenant")
-        self.client.login(username=self.tenant_user.username, password="password")
+        self.setup_tenant_context(name="WT Tenant", slug="wt-tenant", permissions=["extras.view_tag"])
+        self.client_login_to_tenant(self.tenant_user, self.tenant)
         from extras.models import Tag
         _set_user_context(self.tenant_user)
         self.target_tag = Tag.objects.create(name="WT Tag", slug="wt-tag")
