@@ -14,8 +14,10 @@ class ScanResolveView(View):
 
     def get(self, request, *args, **kwargs):
         # Fail closed: no active tenant means tenant-scoped queries open up.
-        if not get_current_tenant():
+        # Superusers are allowed to bypass this check as they have global view rights.
+        if not get_current_tenant() and not request.user.is_superuser:
             return JsonResponse({'found': False}, status=404)
+
 
         if not request.user.has_perm('assets.view_asset'):
             return JsonResponse({'found': False}, status=403)

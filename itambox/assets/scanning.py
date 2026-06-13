@@ -9,6 +9,25 @@ Handles the multiple input shapes that a scan can produce:
 from django.db.models import Q
 
 
+def strip_itambox_prefix(code: str) -> str:
+    """Strip standard itambox:// or itambox: prefix from the scanned code, leaving the bare tag/serial."""
+    if not code:
+        return ""
+    # Defensive cleaning: strip spaces, quotes, BOM, zero-width spaces, and normalize colons
+    raw = code.strip().replace('\ufeff', '').replace('\u200b', '')
+    raw = raw.replace('：', ':')
+    raw = raw.strip('"\' ')
+
+    if raw.lower().startswith('itambox://asset/'):
+        return raw
+
+    if raw.lower().startswith('itambox://'):
+        raw = raw[len('itambox://'):].strip('/ "\'')
+    elif raw.lower().startswith('itambox:'):
+        raw = raw[len('itambox:'):].strip('/ "\'')
+    return raw
+
+
 def resolve_scanned_code(code: str):
     """Resolve a scanned code to an Asset within the current tenant scope.
 
@@ -17,24 +36,20 @@ def resolve_scanned_code(code: str):
     """
     from assets.models import Asset
 
-    raw = code.strip()
+    raw = strip_itambox_prefix(code)
     if not raw:
         return None
 
     # itambox://asset/<pk>  — PK-based deep link
     if raw.lower().startswith('itambox://asset/'):
-        pk_str = raw[len('itambox://asset/'):].strip('/')
+        pk_str = raw[len('itambox://asset/'):].strip('/ "\'')
         try:
             return Asset.objects.get(pk=int(pk_str))
         except (Asset.DoesNotExist, ValueError):
             return None
 
-    # itambox:<tag>  — bare-tag scheme (emitted by generate_base64_barcode)
-    if raw.lower().startswith('itambox:'):
-        raw = raw[len('itambox:'):].strip('/')
-
     # Full URL — extract last non-empty path segment as pk or tag/serial
-    elif raw.lower().startswith(('http://', 'https://')):
+    if raw.lower().startswith(('http://', 'https://')):
         path_part = raw.split('?')[0].split('#')[0]
         segments = [s for s in path_part.split('/') if s]
         if segments:
@@ -48,5 +63,8 @@ def resolve_scanned_code(code: str):
             raw = candidate
 
     return Asset.objects.filter(
-        Q(asset_tag=raw) | Q(serial_number=raw)
+        Q(asset_tag__iexact=raw) | Q(serial_number__iexact=raw)
     ).first()
+
+
+

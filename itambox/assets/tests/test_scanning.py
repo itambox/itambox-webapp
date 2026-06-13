@@ -88,6 +88,45 @@ class ResolveScannedCodeTests(TenantTestMixin, TestCase):
         result = resolve_scanned_code("  ITM-00001  ")
         self.assertEqual(result, self.asset)
 
+    def test_case_insensitive_asset_tag(self):
+        result = resolve_scanned_code("itm-00001")
+        self.assertEqual(result, self.asset)
+
+    def test_case_insensitive_serial_number(self):
+        result = resolve_scanned_code("sn-laptop-99")
+        self.assertEqual(result, self.asset)
+
+    def test_case_insensitive_itambox_scheme_tag(self):
+        result = resolve_scanned_code("itambox:itm-00001")
+        self.assertEqual(result, self.asset)
+
+    def test_itambox_double_slash_tag(self):
+        result = resolve_scanned_code("itambox://itm-00001")
+        self.assertEqual(result, self.asset)
+
+    def test_itambox_nested_url(self):
+        result = resolve_scanned_code(f"itambox:https://itam.example.com/assets/{self.asset.pk}/")
+        self.assertEqual(result, self.asset)
+
+    def test_whitespace_and_slashes_stripped(self):
+        result = resolve_scanned_code("  itambox://itm-00001/  ")
+        self.assertEqual(result, self.asset)
+
+    def test_enclosed_in_quotes(self):
+        result = resolve_scanned_code('"itambox:ITM-00001"')
+        self.assertEqual(result, self.asset)
+
+    def test_full_width_colon(self):
+        result = resolve_scanned_code("itambox：ITM-00001")
+        self.assertEqual(result, self.asset)
+
+    def test_bom_and_zero_width_space(self):
+        result = resolve_scanned_code("\ufeffitambox:\u200bITM-00001")
+        self.assertEqual(result, self.asset)
+
+
+
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ScanResolveView endpoint tests
@@ -180,6 +219,16 @@ class ScanResolveViewTests(TenantTestMixin, TestCase):
         self.assertEqual(resp.status_code, 404)
         data = json.loads(resp.content)
         self.assertFalse(data.get("found"))
+
+    def test_superuser_no_active_tenant_resolves_global(self):
+        """Superuser without an active tenant set in session can still resolve scanned assets."""
+        self.client.force_login(self.tenant_admin)
+        # Deliberately omit session['active_tenant_id'] so TenantMiddleware finds no tenant.
+        resp = self.client.get(self.url, {"code": "SCAN-001"})
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertTrue(data["found"])
+
 
     def test_member_without_view_asset_gets_403(self):
         """Member with no assets.view_asset permission is denied."""
