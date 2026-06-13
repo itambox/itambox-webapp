@@ -36,6 +36,7 @@ from itambox.views.features import (
     LabelTemplateDeleteView, ImageAttachmentUploadView, ImageAttachmentDeleteView,
     FileAttachmentUploadView, FileAttachmentDeleteView, JournalEntryCreateView,
     LabelSelectView, LabelPrintView,
+    FileAttachmentDownloadView, ImageAttachmentServeView,
 )
 from itambox.views.utility import SearchView, health # Import core views, aliased to avoid clash
 from assets.views_scan import ScanResolveView
@@ -222,8 +223,10 @@ urlpatterns = [
     # Attachments
     path('attachments/image/upload/<str:app_label>/<str:model_name>/<int:object_id>/', ImageAttachmentUploadView.as_view(), name='image_attachment_upload'),
     path('attachments/image/delete/<int:pk>/', ImageAttachmentDeleteView.as_view(), name='image_attachment_delete'),
+    path('attachments/image/<int:pk>/', ImageAttachmentServeView.as_view(), name='image_attachment_serve'),
     path('attachments/file/upload/<str:app_label>/<str:model_name>/<int:object_id>/', FileAttachmentUploadView.as_view(), name='file_attachment_upload'),
     path('attachments/file/delete/<int:pk>/', FileAttachmentDeleteView.as_view(), name='file_attachment_delete'),
+    path('attachments/file/<int:pk>/download/', FileAttachmentDownloadView.as_view(), name='file_attachment_download'),
 
     # Journal Entries
     path('journal/add/<str:app_label>/<str:model_name>/<int:object_id>/', JournalEntryCreateView.as_view(), name='journal_entry_add'),

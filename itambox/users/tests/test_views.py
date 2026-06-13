@@ -181,10 +181,15 @@ class UserViewTests(TestCase):
         self.assertIsNotNone(token)
         self.assertTrue(token.write_enabled)
         self.assertIsNotNone(token.expires)
-        self.assertEqual(len(token.key), 40)
-        
-        self.assertEqual(response.context.get('new_token_key'), token.key)
-        
+        # Hashed at rest: the stored token cannot reveal its plaintext.
+        self.assertIsNone(token.key)
+        self.assertEqual(len(token.digest), 64)
+
+        # The plaintext is surfaced exactly once (and matches the stored digest).
+        new_key = response.context.get('new_token_key')
+        self.assertEqual(len(new_key), 40)
+        self.assertEqual(Token.find_by_key(new_key).pk, token.pk)
+
         response2 = self.client.get(url)
         self.assertIsNone(response2.context.get('new_token_key'))
 

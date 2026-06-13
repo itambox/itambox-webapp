@@ -8,6 +8,26 @@ from core.graphql_utils import check_permission, get_object_or_denied, generate_
 from graphql import GraphQLError
 from django.core.exceptions import ValidationError, PermissionDenied
 
+
+def _resolve_owner(owner_id, user, active_tenant):
+    """Resolve a User to assign as a subscription owner, enforcing that the
+    target user is a member of the active tenant.
+
+    Without this check, ``owner_id`` is resolved against the global (unscoped)
+    User table, letting a user in tenant A assign a user from tenant B as the
+    owner of A's subscription (cross-tenant assignment / existence oracle).
+    """
+    if not owner_id:
+        return None
+    user_model = get_user_model()
+    owner = get_object_or_denied(user_model, owner_id, user)
+    if active_tenant is not None:
+        from organization.models import TenantMembership
+        if not TenantMembership.objects.filter(user=owner, tenant=active_tenant).exists():
+            raise PermissionDenied("Owner must be a member of the active tenant.")
+    return owner
+
+
 # Node definitions
 
 class ContentTypeNode(DjangoObjectType):
@@ -358,8 +378,7 @@ class CreateSubscription(graphene.Mutation):
         subscription = Subscription(provider=provider, tenant=active_tenant)
 
         if 'owner_id' in kwargs:
-            User = get_user_model()
-            subscription.owner = get_object_or_denied(User, kwargs.pop('owner_id'), user)
+            subscription.owner = _resolve_owner(kwargs.pop('owner_id'), user, active_tenant)
 
         ALLOWED_FIELDS = {
             'name', 'slug', 'type', 'status', 'start_date', 'renewal_date', 'renewal_cost',
@@ -419,8 +438,7 @@ class UpdateSubscription(graphene.Mutation):
             subscription.provider = get_object_or_denied(Provider, kwargs.pop('provider_id'), user, tenant=active_tenant)
 
         if 'owner_id' in kwargs:
-            User = get_user_model()
-            subscription.owner = get_object_or_denied(User, kwargs.pop('owner_id'), user)
+            subscription.owner = _resolve_owner(kwargs.pop('owner_id'), user, active_tenant)
 
         ALLOWED_FIELDS = {
             'name', 'slug', 'type', 'status', 'start_date', 'renewal_date', 'renewal_cost',

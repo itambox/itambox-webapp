@@ -80,6 +80,9 @@ class CSPMiddleware:
                 "font-src 'self'; "
                 "media-src 'self' data:; "
                 "connect-src 'self'; "
+                "object-src 'none'; "
+                "base-uri 'self'; "
+                "form-action 'self'; "
                 "frame-ancestors 'self'"
             )
         else:
@@ -91,6 +94,9 @@ class CSPMiddleware:
                 "font-src 'self'; "
                 "media-src 'self' data:; "
                 "connect-src 'self'; "
+                "object-src 'none'; "
+                "base-uri 'self'; "
+                "form-action 'self'; "
                 "frame-ancestors 'self'"
             )
         return response

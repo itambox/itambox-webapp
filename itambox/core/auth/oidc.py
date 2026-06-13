@@ -1,6 +1,6 @@
 import logging
 from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, SuspiciousOperation
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
@@ -55,6 +55,44 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
     def __init__(self, *args, **kwargs):
         # Do not call super().__init__() because it assigns settings statically
         self.UserModel = get_user_model()
+
+    def verify_token(self, token, **kwargs):
+        """Verify the ID token and additionally enforce audience / issuer.
+
+        mozilla_django_oidc validates the signature (rejecting alg downgrade to
+        ``none``/HS256 via its alg-match check, with the RS256 default supplied
+        by :class:`TenantOIDCSettingsMixin`) and the nonce, but it calls the JWT
+        decoder with ``verify_aud=False`` and never checks the issuer. That
+        leaves the RP open to token-substitution / confused-deputy attacks where
+        a token minted for a *different* client of the same IdP — or by an
+        unexpected issuer — is replayed here. Enforce both.
+        """
+        payload = super().verify_token(token, **kwargs)
+
+        client_id = self.get_settings('OIDC_RP_CLIENT_ID')
+        aud = payload.get('aud')
+        aud_list = aud if isinstance(aud, list) else [aud]
+        if client_id not in aud_list:
+            raise SuspiciousOperation(
+                'OIDC ID token audience does not match the configured client ID.'
+            )
+
+        # Per the spec, when present `azp` must identify this client.
+        azp = payload.get('azp')
+        if azp is not None and azp != client_id:
+            raise SuspiciousOperation(
+                'OIDC ID token authorized party (azp) does not match the client ID.'
+            )
+
+        # Issuer is enforced only when an expected value is configured for the
+        # tenant (not all deployments set OIDC_OP_ISSUER); when set it must match.
+        expected_iss = self.get_settings('OIDC_OP_ISSUER', None)
+        if expected_iss and payload.get('iss') != expected_iss:
+            raise SuspiciousOperation(
+                'OIDC ID token issuer does not match the expected issuer.'
+            )
+
+        return payload
 
     def has_perm(self, user_obj, perm, obj=None):
         return False

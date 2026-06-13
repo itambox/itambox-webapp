@@ -3,12 +3,29 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 
 from itambox.api.base import BaseModelSerializer
+from itambox.api.fields import validate_gfk_target_tenant
 from subscriptions.models import Provider, Subscription, SubscriptionAssignment
 from organization.api.serializers import NestedTenantSerializer, NestedTenantGroupSerializer, ContactAssignmentSerializer
 from organization.models import Tenant, TenantGroup
 from extras.api.serializers import TagSerializer
 
 User = get_user_model()
+
+
+def _tenant_member_user_queryset():
+    """Users that are members of the active tenant (else, for the
+    superuser/global context where no tenant is bound, all users).
+
+    Used to scope ``owner_id`` / ``assigned_by_id`` so a tenant-scoped request
+    cannot assign or attribute records to users from another tenant.
+    """
+    from core.managers import get_current_tenant
+    from organization.models import TenantMembership
+    tenant = get_current_tenant()
+    if tenant is None:
+        return User.objects.all()
+    member_ids = TenantMembership.objects.filter(tenant=tenant).values_list('user_id', flat=True)
+    return User.objects.filter(pk__in=member_ids)
 
 
 class ProviderSerializer(BaseModelSerializer):
@@ -75,6 +92,11 @@ class SubscriptionSerializer(BaseModelSerializer):
         read_only_fields = ('created_at', 'updated_at', 'days_until_renewal', 'annual_cost')
         brief_fields = ('id', 'name', 'slug', 'provider', 'status', 'status_display', 'days_until_renewal')
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'owner_id' in self.fields:
+            self.fields['owner_id'].queryset = _tenant_member_user_queryset()
+
 
 class SubscriptionAssignmentSerializer(BaseModelSerializer):
     subscription = SubscriptionSerializer(read_only=True)
@@ -98,6 +120,22 @@ class SubscriptionAssignmentSerializer(BaseModelSerializer):
         )
         read_only_fields = ('created_at', 'updated_at', 'assigned_date')
         brief_fields = ('id', 'subscription', 'assigned_object')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'assigned_by_id' in self.fields:
+            self.fields['assigned_by_id'].queryset = _tenant_member_user_queryset()
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        content_type = attrs.get('content_type')
+        object_id = attrs.get('object_id')
+        if content_type is None and self.instance is not None:
+            content_type = getattr(self.instance, 'content_type', None)
+        if object_id is None and self.instance is not None:
+            object_id = getattr(self.instance, 'object_id', None)
+        validate_gfk_target_tenant(content_type, object_id)
+        return attrs
 
     def get_assigned_object(self, obj):
         if obj.assigned_object:

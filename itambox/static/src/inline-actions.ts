@@ -5,6 +5,8 @@
  * data-copy-input="#selector" — copy the referenced input's value to clipboard
  * data-copy-value="literal"  — copy a literal string to clipboard
  * data-action="print"        — call window.print()
+ * data-clear-refocus="id"    — on form submit, clear + refocus the input #id (rapid scan)
+ * data-preview-block="msg"   — on form submit, preventDefault and alert(msg) (preview mode)
  *
  * For copy buttons, data-copy-feedback sets the temporary success label (default "Copied!").
  */
@@ -59,6 +61,28 @@
     window.print();
   }
 
+  function handleClearRefocus(evt: Event): void {
+    const form = evt.currentTarget as HTMLElement;
+    const targetId = form.getAttribute('data-clear-refocus');
+    if (!targetId) return;
+    // Defer so the value is captured/submitted before we clear it (mirrors the
+    // previous inline setTimeout used for rapid barcode scanning).
+    setTimeout(function () {
+      const input = document.getElementById(targetId) as HTMLInputElement | null;
+      if (input) {
+        input.value = '';
+        input.focus();
+      }
+    }, 50);
+  }
+
+  function handlePreviewBlock(evt: Event): void {
+    evt.preventDefault();
+    const form = evt.currentTarget as HTMLElement;
+    const msg = form.getAttribute('data-preview-block') || 'This action is disabled in preview mode.';
+    alert(msg);
+  }
+
   function bind(root: Document | HTMLElement): void {
     root.querySelectorAll<HTMLButtonElement>('[data-confirm]').forEach(function (btn) {
       if ((btn as any)._inlineActionsBound) return;
@@ -82,6 +106,18 @@
       if ((btn as any)._inlineActionsBound) return;
       (btn as any)._inlineActionsBound = true;
       btn.addEventListener('click', handlePrint);
+    });
+
+    root.querySelectorAll<HTMLFormElement>('[data-clear-refocus]').forEach(function (form) {
+      if ((form as any)._inlineActionsBound) return;
+      (form as any)._inlineActionsBound = true;
+      form.addEventListener('submit', handleClearRefocus);
+    });
+
+    root.querySelectorAll<HTMLFormElement>('[data-preview-block]').forEach(function (form) {
+      if ((form as any)._inlineActionsBound) return;
+      (form as any)._inlineActionsBound = true;
+      form.addEventListener('submit', handlePreviewBlock);
     });
   }
 

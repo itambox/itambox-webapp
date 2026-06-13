@@ -180,6 +180,9 @@ def approve_purchase_order(po, user=None, request=None):
         raise ValidationError(f"Cannot approve a purchase order in '{po.get_status_display()}' status.")
     if not po.lines.exists():
         raise ValidationError("Cannot approve a purchase order with no line items.")
+    # Segregation of duties: the user who created the PO must not approve it.
+    if user is not None and po.created_by_id and po.created_by_id == getattr(user, 'id', None):
+        raise ValidationError("A purchase order cannot be approved by the user who created it.")
     po.status = PurchaseOrder.STATUS_APPROVED
     po.save(update_fields=['status'])
     return {"message": f"Purchase Order {po.order_number} has been approved."}

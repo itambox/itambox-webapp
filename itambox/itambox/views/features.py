@@ -410,6 +410,60 @@ class FileAttachmentDeleteView(LoginRequiredMixin, View):
         return redirect(obj_url)
 
 
+def _attachment_within_tenant(content_type, object_id):
+    """True if an attachment's parent object is inside the current tenant boundary.
+
+    Attachments have no tenant field of their own — they inherit it from the
+    object they are attached to. Without this check, files are reachable purely
+    by their /media/ path (served directly by the web server), so any user could
+    download another tenant's attachments (cross-tenant file IDOR). Parents that
+    are genuinely global (no tenant) are allowed; tenant-owned parents must match
+    the active tenant, and a missing tenant context fails closed.
+    """
+    model_class = content_type.model_class()
+    if model_class is None:
+        return False
+    parent = model_class._default_manager.filter(pk=object_id).first()
+    if parent is None:
+        return False
+    from core.managers import get_current_tenant
+    tenant = get_current_tenant()
+    parent_tenant = getattr(parent, 'tenant', None)
+    if parent_tenant is not None and parent_tenant != tenant:
+        return False
+    return True
+
+
+class FileAttachmentDownloadView(LoginRequiredMixin, View):
+    """Authenticated, tenant-scoped download proxy for file attachments.
+
+    Replaces linking files via their raw MEDIA_URL (which the web server would
+    serve with no auth/tenant check). Forces an attachment disposition and
+    nosniff so stored HTML/SVG cannot execute in the user's origin.
+    """
+    def get(self, request, pk):
+        from django.http import FileResponse
+        attachment = get_object_or_404(FileAttachment, pk=pk)
+        if not _attachment_within_tenant(attachment.model, attachment.object_id):
+            raise Http404
+        filename = attachment.name or attachment.file.name.rsplit('/', 1)[-1]
+        response = FileResponse(attachment.file.open('rb'), as_attachment=True, filename=filename)
+        response['X-Content-Type-Options'] = 'nosniff'
+        return response
+
+
+class ImageAttachmentServeView(LoginRequiredMixin, View):
+    """Authenticated, tenant-scoped serving of image attachments (inline)."""
+    def get(self, request, pk):
+        from django.http import FileResponse
+        attachment = get_object_or_404(ImageAttachment, pk=pk)
+        if not _attachment_within_tenant(attachment.model, attachment.object_id):
+            raise Http404
+        response = FileResponse(attachment.image.open('rb'))
+        response['X-Content-Type-Options'] = 'nosniff'
+        return response
+
+
 class LabelSelectView(LoginRequiredMixin, View):
     def get(self, request, app_label, model_name, object_id):
         templates = LabelTemplate.objects.all()

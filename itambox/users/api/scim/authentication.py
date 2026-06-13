@@ -42,9 +42,8 @@ class SCIMBearerTokenAuthentication(BaseAuthentication):
             except UnicodeError:
                 raise exceptions.AuthenticationFailed('Invalid token header. Token string should not contain invalid characters.')
 
-            try:
-                token = Token.objects.select_related('user').get(key=token_key)
-            except Token.DoesNotExist:
+            token = Token.find_by_key(token_key)
+            if token is None:
                 raise exceptions.AuthenticationFailed('Invalid token.')
 
             if token.is_expired:

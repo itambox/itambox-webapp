@@ -42,9 +42,9 @@
 
                 <!-- Delete Button -->
                 {% if dashboards|length > 1 %}
-                <form hx-post="{% url 'extras:dashboard_delete_dashboard' pk=db.pk %}" hx-target="#dashboard-modal-content" class="d-inline" onsubmit="return confirm('{% translate 'Delete this dashboard? All widget custom sizing and placements will be lost.' %}')">
+                <form hx-post="{% url 'extras:dashboard_delete_dashboard' pk=db.pk %}" hx-target="#dashboard-modal-content" class="d-inline">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-icon btn-sm btn-ghost-danger border-0" title="{% translate 'Delete Dashboard' %}">
+                    <button type="submit" class="btn btn-icon btn-sm btn-ghost-danger border-0" title="{% translate 'Delete Dashboard' %}" data-confirm="{% translate 'Delete this dashboard? All widget custom sizing and placements will be lost.' %}">
                         <i class="mdi mdi-trash-can-outline"></i>
                     </button>
                 </form>

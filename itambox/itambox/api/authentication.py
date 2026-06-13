@@ -39,9 +39,8 @@ class TokenAuthentication(BaseAuthentication):
     def authenticate_credentials(self, key, request=None):
         from users.models import Token
 
-        try:
-            token = Token.objects.select_related('user').get(key=key)
-        except Token.DoesNotExist:
+        token = Token.find_by_key(key)
+        if token is None:
             raise exceptions.AuthenticationFailed('Invalid token.')
 
         if token.is_expired:

@@ -130,6 +130,9 @@ class PurchaseOrderLineAddView(PermissionRequiredMixin, View):
 
     def post(self, request, *args, **kwargs):
         po = get_object_or_404(PurchaseOrder, pk=kwargs.get('po_pk'))
+        if po.status != PurchaseOrder.STATUS_DRAFT:
+            messages.error(request, "Line items can only be added while the purchase order is in Draft status.")
+            return redirect(po.get_absolute_url())
         form = PurchaseOrderLineForm(request.POST)
         if form.is_valid():
             line = form.save(commit=False)
@@ -168,6 +171,14 @@ class PurchaseOrderLineDeleteView(ObjectDeleteView):
         if request.headers.get('HX-Request'):
             obj = self.get_object()
             po = obj.purchase_order
+            if po.status != PurchaseOrder.STATUS_DRAFT:
+                messages.error(request, "Line items can only be removed while the purchase order is in Draft status.")
+                context = {
+                    'object': po,
+                    'lines': po.lines.all(),
+                    'line_form': PurchaseOrderLineForm(),
+                }
+                return render(request, 'procurement/includes/purchaseorder_lines_container.html', context)
             obj.delete()
             messages.success(request, "Line item deleted successfully.")
             context = {
@@ -195,7 +206,16 @@ class PurchaseOrderLineEditView(PermissionRequiredMixin, View):
     def post(self, request, *args, **kwargs):
         line = get_object_or_404(PurchaseOrderLine, pk=kwargs.get('pk'))
         po = line.purchase_order
-        
+
+        if po.status != PurchaseOrder.STATUS_DRAFT:
+            messages.error(request, "Line items can only be edited while the purchase order is in Draft status.")
+            context = {
+                'object': po,
+                'lines': po.lines.all(),
+                'line_form': PurchaseOrderLineForm(),
+            }
+            return render(request, 'procurement/includes/purchaseorder_lines_container.html', context)
+
         try:
             qty_ordered = int(request.POST.get('qty_ordered', 1))
             if qty_ordered < 1:

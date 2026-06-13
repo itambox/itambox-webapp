@@ -163,6 +163,21 @@ class TenantScopingQuerySet(models.QuerySet):
                     )
 
             return qs
+
+        # Fail closed: a request bound to an authenticated, non-superuser
+        # principal that reaches this point has NO resolved tenant context.
+        # Returning the unscoped queryset here would leak every tenant's rows
+        # (and allow cross-tenant writes/deletes via .get(pk=...)). Scope it to
+        # nothing instead. Superusers keep the global view, and system /
+        # anonymous contexts (migrations, background tasks with no bound user,
+        # the pre-tenant bootstrap in TenantMiddleware) are unaffected — those
+        # paths legitimately operate without a tenant. Note TenantMembership
+        # uses the default (unscoped) manager, so tenant resolution itself is
+        # not affected by this guard.
+        from itambox.middleware import get_current_user
+        user = get_current_user()
+        if user is not None and not getattr(user, 'is_superuser', False):
+            return self.none()
         return self
 
 

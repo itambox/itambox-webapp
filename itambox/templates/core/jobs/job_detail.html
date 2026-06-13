@@ -89,7 +89,7 @@
                         {% translate "Generated Files" %}
                     </h3>
                     {% for file in attachments %}
-                    <a href="{{ file.file.url }}" class="btn btn-outline-primary btn-sm w-100 mt-1" download hx-boost="false">
+                    <a href="{{ file.get_download_url }}" class="btn btn-outline-primary btn-sm w-100 mt-1" download hx-boost="false">
                         <i class="mdi mdi-download"></i>
                         {{ file.name }}
                     </a>

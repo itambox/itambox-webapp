@@ -90,10 +90,10 @@
             <span class="d-none d-sm-inline ms-1">{% translate 'Lock' %}</span>
         </button>
     </span>
-    <form method="post" action="{% url 'extras:dashboard_reset' dashboard_id=active_dashboard.id %}" class="d-inline"
-        onsubmit="return confirm('Reset dashboard to default layout? This cannot be undone.')">
+    <form method="post" action="{% url 'extras:dashboard_reset' dashboard_id=active_dashboard.id %}" class="d-inline">
         {% csrf_token %}
-        <button type="submit" class="btn btn-outline-danger" title="{% translate 'Reset' %}">
+        <button type="submit" class="btn btn-outline-danger" title="{% translate 'Reset' %}"
+            data-confirm="{% translate 'Reset dashboard to default layout? This cannot be undone.' %}">
             <i class="mdi mdi-refresh"></i>
             <span class="d-none d-sm-inline ms-1">{% translate 'Reset' %}</span>
         </button>

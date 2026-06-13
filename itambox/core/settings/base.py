@@ -359,6 +359,20 @@ if 'test' in sys.argv or any('test' in arg or 'pytest' in arg for arg in sys.arg
 ALLOW_GLOBAL_CUSTODY_TEMPLATES = os.environ.get('ITAMBOX_ALLOW_GLOBAL_CUSTODY_TEMPLATES', 'True') == 'True'
 REQUIRE_CUSTODY_SIGNIN = os.environ.get('ITAMBOX_REQUIRE_CUSTODY_SIGNIN', 'True') == 'True'
 
+# Server-side peppers used to HMAC-hash API tokens at rest (NetBox v4.5 style).
+# JSON object of {"<numeric id>": "<>=50-char secret>"}; the highest id hashes
+# new tokens, older ids remain valid so peppers can be rotated. When unset, the
+# token model falls back to a SECRET_KEY-derived pepper (fine for dev/tests);
+# production should set ITAMBOX_API_TOKEN_PEPPERS to a dedicated, secret value.
+_raw_api_token_peppers = os.environ.get('ITAMBOX_API_TOKEN_PEPPERS', '')
+if _raw_api_token_peppers:
+    try:
+        API_TOKEN_PEPPERS = {int(k): v for k, v in json.loads(_raw_api_token_peppers).items()}
+    except (ValueError, AttributeError, json.JSONDecodeError):
+        API_TOKEN_PEPPERS = {}
+else:
+    API_TOKEN_PEPPERS = {}
+
 # Show Regions and Site Groups in the sidebar navigation.
 # Off by default — most single-site installs do not need the extra hierarchy.
 ITAMBOX_ENABLE_EXTENDED_ORG_HIERARCHY = os.environ.get('ITAMBOX_ENABLE_EXTENDED_ORG_HIERARCHY', 'False') == 'True'

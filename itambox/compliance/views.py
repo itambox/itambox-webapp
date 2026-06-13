@@ -1,4 +1,5 @@
 import hashlib
+from django.contrib.auth.decorators import login_required, permission_required
 from django.shortcuts import render, get_object_or_404
 from django.urls import reverse_lazy
 from django.utils import timezone
@@ -15,6 +16,23 @@ from assets.views.maintenance_views import (  # noqa: F401
     AssetMaintenanceListView, AssetMaintenanceDetailView, AssetMaintenanceEditView,
     AssetMaintenanceCloneView, AssetMaintenanceDeleteView,
 )
+
+
+def _authenticated_user_is_holder(user, holder):
+    """True if the authenticated `user` is the holder the receipt is intended for.
+
+    Prefers the holder's linked user account; falls back to case-insensitive
+    email / UPN matching when the holder is not linked to a login.
+    """
+    bound_user_id = getattr(holder, 'user_id', None)
+    if bound_user_id is not None:
+        return bound_user_id == user.id
+    holder_email = (getattr(holder, 'email', '') or '').lower()
+    holder_upn = (getattr(holder, 'upn', '') or '').lower()
+    user_email = (getattr(user, 'email', '') or '').lower()
+    user_name = (getattr(user, 'username', '') or '').lower()
+    candidates = {c for c in (user_email, user_name) if c}
+    return bool((holder_email and holder_email in candidates) or (holder_upn and holder_upn in candidates))
 
 
 def custody_eula_sign(request, token):
@@ -50,6 +68,15 @@ def custody_eula_sign(request, token):
 
     asset = receipt.asset
     holder = receipt.holder
+
+    # Bind the signer to the intended holder. The receipt token is the primary
+    # credential, but if the visitor IS authenticated they must be the holder —
+    # otherwise a logged-in user (Bob) who obtains Alice's token could sign on
+    # her behalf, and the verification hash would falsely embed Alice's identity.
+    if request.user.is_authenticated and holder is not None and not _authenticated_user_is_holder(request.user, holder):
+        return render(request, "compliance/custody/sign_error.html", {
+            "error": "You are not the intended recipient of this custody receipt."
+        })
 
     if request.method == 'POST':
         from django.db import transaction
@@ -162,6 +189,8 @@ class CustodyTemplateDeleteView(ObjectDeleteView):
     success_url = reverse_lazy('compliance:custodytemplate_list')
 
 
+@login_required
+@permission_required('compliance.view_custodytemplate', raise_exception=True)
 def custody_template_preview(request, pk):
     template = get_object_or_404(CustodyTemplate, pk=pk)
 

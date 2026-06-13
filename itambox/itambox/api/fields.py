@@ -71,6 +71,36 @@ class ChoiceField(serializers.Field):
         return self._choices
 
 
+def validate_gfk_target_tenant(content_type, object_id):
+    """Validate that a generic-FK write ``(content_type, object_id)`` targets an
+    object visible within the current tenant, and return the resolved object.
+
+    Generic-FK serializers accept an arbitrary ``content_type`` + ``object_id``
+    pair. Without this check a user in tenant A can attach (contact / license /
+    subscription) assignments to objects owned by tenant B simply by supplying
+    that object's id (cross-tenant write / existence oracle). We resolve the
+    target through the model's *default* manager (tenant-scoped for tenant-aware
+    models) and additionally compare ``obj.tenant`` to the active tenant so the
+    check still holds for models whose default manager is not tenant-scoped.
+    Objects with no tenant (global/shared catalogue rows) are permitted.
+    """
+    from core.managers import get_current_tenant
+
+    if content_type is None or object_id is None:
+        return None
+    model_class = content_type.model_class()
+    if model_class is None:
+        raise ValidationError(_("Invalid content type."))
+    target = model_class._default_manager.filter(pk=object_id).first()
+    if target is None:
+        raise ValidationError(_("Referenced object was not found in the current tenant."))
+    tenant = get_current_tenant()
+    obj_tenant = getattr(target, 'tenant', None)
+    if tenant is not None and obj_tenant is not None and obj_tenant != tenant:
+        raise ValidationError(_("Referenced object belongs to another tenant."))
+    return target
+
+
 @extend_schema_field(OpenApiTypes.STR)
 class ContentTypeField(RelatedField):
     """

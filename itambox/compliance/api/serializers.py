@@ -35,6 +35,16 @@ class CustodyReceiptSerializer(BaseModelSerializer):
             'signature_canvas', 'signed_at', 'eula_version', 'created_date',
             'created_at', 'updated_at'
         ]
+        # Acceptance + signature state may only be set through the dedicated
+        # custody_eula_sign flow (which binds the signer and computes the
+        # verification hash). Exposing them as writable here would let any user
+        # with change_custodyreceipt forge an accepted, "signed" receipt.
+        read_only_fields = [
+            'token', 'accepted', 'accepted_date', 'acceptance_method',
+            'acceptance_status', 'signature_data', 'signature_hash',
+            'verification_hash', 'signature_canvas', 'signed_at',
+            'eula_version', 'created_date', 'created_at', 'updated_at',
+        ]
         brief_fields = ['id', 'asset', 'holder', 'acceptance_status', 'signed_at']
 
 
@@ -65,18 +75,19 @@ class AuditSessionSerializer(BaseModelSerializer):
         queryset=Location.objects.all(), source='location', write_only=True, required=False, allow_null=True
     )
     created_by = serializers.StringRelatedField(read_only=True)
-    created_by_id = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(), source='created_by', write_only=True, required=False
-    )
     status_display = serializers.CharField(source='get_status_display', read_only=True)
 
     class Meta:
         model = AuditSession
+        # `created_by` is forced to request.user in the viewset's perform_create;
+        # there is deliberately no writable created_by_id (it would let a client
+        # reattribute a session to another user on create/PATCH).
         fields = [
             'id', 'name', 'location', 'location_id', 'status', 'status_display',
-            'started_at', 'completed_at', 'created_by', 'created_by_id',
+            'started_at', 'completed_at', 'created_by',
             'created_at', 'updated_at'
         ]
+        read_only_fields = ['started_at', 'created_at', 'updated_at']
         brief_fields = ['id', 'name', 'status', 'started_at']
 
 

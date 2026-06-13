@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 import ipaddress
 import secrets
 
@@ -7,6 +9,35 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
+
+
+def token_peppers():
+    """Return the configured API-token peppers as ``{int id: secret}``.
+
+    Peppers are server-side secrets combined (via HMAC-SHA256) with the random
+    token before hashing, so a database leak alone does not yield usable tokens.
+    Configured via ``ITAMBOX_API_TOKEN_PEPPERS`` (a JSON object of id->secret).
+    When none are configured we fall back to a single pepper derived from
+    SECRET_KEY so the app/tests work out of the box — production deployments
+    should set an explicit, rotatable pepper.
+    """
+    configured = getattr(settings, 'API_TOKEN_PEPPERS', None)
+    if configured:
+        return {int(k): v for k, v in configured.items()}
+    return {1: settings.SECRET_KEY}
+
+
+def current_pepper_id():
+    """The highest (newest) configured pepper id — used to hash new tokens."""
+    return max(token_peppers())
+
+
+def hash_token(plaintext, pepper_id):
+    """HMAC-SHA256 digest of a plaintext token under the given pepper id."""
+    pepper = token_peppers()[pepper_id]
+    return hmac.new(
+        pepper.encode('utf-8'), plaintext.encode('utf-8'), hashlib.sha256
+    ).hexdigest()
 
 
 def validate_cidr_list(value):
@@ -53,8 +84,19 @@ class UserPreference(models.Model):
 class Token(models.Model):
     """
     An API token used for authenticating REST API requests.
+
+    The secret is never stored in plaintext: only an HMAC-SHA256 ``digest``
+    (keyed by a server-side pepper) and a short non-secret ``key_preview`` for
+    identification are persisted. The plaintext is generated once, shown once,
+    and available on the in-memory instance via the ``key`` property until the
+    object is reloaded from the database.
     """
-    key = models.CharField(max_length=40, unique=True, db_index=True)
+    # HMAC-SHA256(pepper, plaintext) — the only at-rest representation of the
+    # secret. `pepper` records which configured pepper produced this digest so
+    # peppers can be rotated without rehashing.
+    digest = models.CharField(max_length=64, unique=True, editable=False, blank=True)
+    pepper = models.PositiveSmallIntegerField(null=True, blank=True, editable=False)
+    key_preview = models.CharField(max_length=16, blank=True, editable=False)
     user = models.ForeignKey(
         to=settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -83,17 +125,35 @@ class Token(models.Model):
         ),
     )
 
+    # Transient plaintext, set on generation and cleared once the instance is
+    # reloaded from the DB. Never persisted.
+    _plaintext = None
+
     class Meta:
         ordering = ['-created']
         verbose_name = _("Token")
         verbose_name_plural = _("Tokens")
 
     def __str__(self):
-        return f"{self.user.username}: {self.key[:6]}..."
+        return f"{self.user.username}: {self.key_preview}..."
+
+    @property
+    def key(self):
+        """The plaintext token — only available on the in-memory instance
+        immediately after creation (shown once). Returns None once reloaded."""
+        return self._plaintext
+
+    @key.setter
+    def key(self, value):
+        self._plaintext = value
 
     def save(self, *args, **kwargs):
-        if not self.key:
-            self.key = self.generate_key()
+        if not self.digest:
+            if not self._plaintext:
+                self._plaintext = self.generate_key()
+            self.pepper = current_pepper_id()
+            self.digest = hash_token(self._plaintext, self.pepper)
+            self.key_preview = self._plaintext[:8]
         if not getattr(self, 'tenant_id', None):
             from core.managers import get_current_tenant
             tenant = get_current_tenant()
@@ -111,6 +171,15 @@ class Token(models.Model):
     @staticmethod
     def generate_key():
         return secrets.token_hex(20)
+
+    @classmethod
+    def find_by_key(cls, plaintext):
+        """Resolve a token from a presented plaintext by comparing HMAC digests
+        across all configured peppers (constant set, supports rotation)."""
+        if not plaintext:
+            return None
+        digests = [hash_token(plaintext, pid) for pid in token_peppers()]
+        return cls.objects.select_related('user').filter(digest__in=digests).first()
 
     @property
     def is_expired(self):

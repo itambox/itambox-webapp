@@ -16,10 +16,26 @@ class TokenModelTests(TestCase):
         self.assertEqual(len(token.key), 40)
 
     def test_token_key_is_unique(self):
-        Token.objects.create(user=self.user, description='Token 1')
-        Token.objects.create(user=self.user, description='Token 2')
-        keys = Token.objects.values_list('key', flat=True)
-        self.assertEqual(len(set(keys)), 2)
+        t1 = Token.objects.create(user=self.user, description='Token 1')
+        t2 = Token.objects.create(user=self.user, description='Token 2')
+        # Plaintext keys differ; at rest only the unique HMAC digests are stored.
+        self.assertNotEqual(t1.key, t2.key)
+        digests = Token.objects.values_list('digest', flat=True)
+        self.assertEqual(len(set(digests)), 2)
+
+    def test_token_plaintext_is_not_stored_at_rest(self):
+        token = Token.objects.create(user=self.user, description='Secret')
+        plaintext = token.key
+        self.assertTrue(plaintext)
+        # Digest is an HMAC, never the plaintext; preview is a short non-secret.
+        self.assertNotEqual(token.digest, plaintext)
+        self.assertEqual(len(token.digest), 64)
+        self.assertEqual(token.key_preview, plaintext[:8])
+        # A freshly loaded instance cannot reveal the plaintext.
+        reloaded = Token.objects.get(pk=token.pk)
+        self.assertIsNone(reloaded.key)
+        # ...but it still authenticates by digest.
+        self.assertEqual(Token.find_by_key(plaintext).pk, token.pk)
 
     def test_token_generate_key_length(self):
         key = Token.generate_key()

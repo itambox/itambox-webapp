@@ -104,10 +104,25 @@
     toastEl.setAttribute('role', 'alert');
     toastEl.setAttribute('aria-live', 'assertive');
     toastEl.setAttribute('aria-atomic', 'true');
-    toastEl.innerHTML =
-      '<div class="d-flex"><div class="toast-body">' +
-      message +
-      '</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>';
+
+    // Build the toast DOM explicitly and inject the message via textContent.
+    // `message` originates from server-side HX-Trigger payloads that frequently
+    // embed user-controlled data (object names, e.g. an asset named
+    // "<img src=x onerror=...>"). Using innerHTML here would be a DOM-XSS sink;
+    // textContent neutralises any markup. Only the static chrome is markup.
+    const flex = document.createElement('div');
+    flex.className = 'd-flex';
+    const body = document.createElement('div');
+    body.className = 'toast-body';
+    body.textContent = message;
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'btn-close btn-close-white me-2 m-auto';
+    closeBtn.setAttribute('data-bs-dismiss', 'toast');
+    closeBtn.setAttribute('aria-label', 'Close');
+    flex.appendChild(body);
+    flex.appendChild(closeBtn);
+    toastEl.appendChild(flex);
     container.appendChild(toastEl);
 
     const toast = new bootstrap.Toast(toastEl);

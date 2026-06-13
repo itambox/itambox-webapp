@@ -112,7 +112,7 @@
                 </div>
             </div>
 
-            <form method="post" id="custody-sign-form" {% if is_preview %}onsubmit="event.preventDefault(); alert('Sign-off submission is disabled in preview mode.');"{% endif %}>
+            <form method="post" id="custody-sign-form" {% if is_preview %}data-preview-block="{% translate 'Sign-off submission is disabled in preview mode.' %}"{% endif %}>
                 {% csrf_token %}
                 <input type="hidden" name="signature_canvas" id="signature-input" value="empty">
                 

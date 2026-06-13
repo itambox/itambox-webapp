@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.contenttypes.models import ContentType
 
 from itambox.api.base import BaseModelSerializer
-from itambox.api.fields import ContentTypeField
+from itambox.api.fields import ContentTypeField, validate_gfk_target_tenant
 from itambox.api.serializers import GenericObjectSerializer
 from organization.models import (
     Site, Region, SiteGroup, Location, Tenant, TenantGroup,
@@ -249,3 +249,17 @@ class ContactAssignmentSerializer(BaseModelSerializer):
             'priority', 'created_at', 'updated_at'
         ]
         brief_fields = ['id', 'url', 'contact', 'role']
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        # Enforce that the generic-FK target lives in the current tenant. The
+        # content-type may arrive under either the serializer field name or the
+        # model field name depending on `source` wiring.
+        content_type = attrs.get('content_type') or attrs.get('assigned_object_type')
+        object_id = attrs.get('object_id')
+        if content_type is None and self.instance is not None:
+            content_type = getattr(self.instance, 'content_type', None)
+        if object_id is None and self.instance is not None:
+            object_id = getattr(self.instance, 'object_id', None)
+        validate_gfk_target_tenant(content_type, object_id)
+        return attrs

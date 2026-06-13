@@ -467,6 +467,11 @@ class ImageAttachment(ChangeLoggingMixin, BaseModel):
     def __str__(self):
         return self.name or f"Image {self.pk}"
 
+    def get_serve_url(self):
+        # Serve through the authenticated, tenant-scoped proxy rather than the
+        # raw MEDIA_URL (which the web server exposes with no access control).
+        return reverse('image_attachment_serve', kwargs={'pk': self.pk})
+
 
 class FileAttachment(ChangeLoggingMixin, BaseModel):
     model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='file_attachments')
@@ -487,6 +492,11 @@ class FileAttachment(ChangeLoggingMixin, BaseModel):
 
     def __str__(self):
         return self.name or f"File {self.pk}"
+
+    def get_download_url(self):
+        # Download through the authenticated, tenant-scoped proxy (forces
+        # attachment + nosniff) instead of the raw MEDIA_URL.
+        return reverse('file_attachment_download', kwargs={'pk': self.pk})
 
 
 class ExportTemplate(BaseModel):

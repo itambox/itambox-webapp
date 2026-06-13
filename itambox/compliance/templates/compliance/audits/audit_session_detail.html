@@ -177,7 +177,7 @@
                                hx-target="#scan-result"
                                hx-swap="innerHTML"
                                hx-indicator="#scan-indicator"
-                               onsubmit="setTimeout(() => { document.getElementById('barcode-scan-input').value = ''; document.getElementById('barcode-scan-input').focus(); }, 50);">
+                               data-clear-refocus="barcode-scan-input">
                             {% csrf_token %}
                             <div class="mb-3">
                                 {{ scan_form.barcode.label_tag }}

@@ -40,12 +40,16 @@ class TokenSerializer(serializers.ModelSerializer):
     user_id = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(), source='user', write_only=True
     )
+    # The plaintext key is only present on the response to the CREATE call
+    # (shown once); subsequent reads return null. `key_preview` is the
+    # non-secret identifier shown in listings.
+    key = serializers.ReadOnlyField()
 
     class Meta:
         model = Token
         fields = [
-            'id', 'key', 'user', 'user_id', 'created',
+            'id', 'key', 'key_preview', 'user', 'user_id', 'created',
             'expires', 'last_used', 'write_enabled', 'allowed_ips', 'description'
         ]
-        read_only_fields = ['key', 'created', 'last_used']
-        brief_fields = ['id', 'key', 'user', 'created']
+        read_only_fields = ['key_preview', 'created', 'last_used']
+        brief_fields = ['id', 'key_preview', 'user', 'created']

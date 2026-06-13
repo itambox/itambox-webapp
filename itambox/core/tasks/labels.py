@@ -84,7 +84,7 @@ def generate_label_batch_task(job_id, asset_pks, label_format, user_id, tenant_i
                 job.append_log(f"ZIP package generated and saved successfully: {attachment.file.name}")
                 job.mark_completed(result={
                     'file_name': attachment.name,
-                    'download_url': attachment.file.url
+                    'download_url': attachment.get_download_url()
                 })
 
                 Notification.objects.create(
@@ -92,7 +92,7 @@ def generate_label_batch_task(job_id, asset_pks, label_format, user_id, tenant_i
                     subject="Label Generation Complete",
                     message=f"Successfully generated label batch zip for {assets.count()} asset(s). Click to download.",
                     level=Notification.LEVEL_SUCCESS,
-                    target_url=attachment.file.url
+                    target_url=attachment.get_download_url()
                 )
 
             except Exception as e:
@@ -315,11 +315,42 @@ def _build_labels_document(rendered_cards, label_template, layout_mode):
 </html>"""
 
 
+def _pdf_safe_link_callback(uri, rel):
+    """Resolve resource URIs for xhtml2pdf, blocking outbound network fetches.
+
+    xhtml2pdf's default link handler will fetch any ``<img src>`` / CSS
+    ``url()`` it encounters — including ``http(s)://`` and internal addresses —
+    which turns user-authored label/report templates into an SSRF primitive
+    (e.g. hitting cloud-metadata or internal services). We allow only inline
+    ``data:`` URIs and files physically under STATIC_ROOT / MEDIA_ROOT; anything
+    else (remote URLs, ``file://``, traversal) resolves to nothing.
+    """
+    import os
+    from django.conf import settings
+
+    if uri.startswith('data:'):
+        return uri
+
+    for url_prefix, root in (
+        (getattr(settings, 'STATIC_URL', None), getattr(settings, 'STATIC_ROOT', None)),
+        (getattr(settings, 'MEDIA_URL', None), getattr(settings, 'MEDIA_ROOT', None)),
+    ):
+        if url_prefix and root and uri.startswith(url_prefix):
+            root_abs = os.path.abspath(root)
+            candidate = os.path.abspath(os.path.join(root_abs, uri[len(url_prefix):].lstrip('/')))
+            # Reject path traversal outside the served root.
+            if os.path.commonpath([root_abs, candidate]) == root_abs and os.path.isfile(candidate):
+                return candidate
+            return ''
+    # Remote URLs (http/https), file://, protocol-relative, etc. are refused.
+    return ''
+
+
 def _html_to_pdf_bytes(html_content):
     """Render an HTML document to PDF bytes via xhtml2pdf."""
     from xhtml2pdf import pisa
     pdf_buffer = io.BytesIO()
-    pisa_status = pisa.CreatePDF(html_content, dest=pdf_buffer)
+    pisa_status = pisa.CreatePDF(html_content, dest=pdf_buffer, link_callback=_pdf_safe_link_callback)
     if pisa_status.err:
         raise RuntimeError(f"xhtml2pdf rendering failed with status code {pisa_status.err}")
     return pdf_buffer.getvalue()
@@ -414,7 +445,7 @@ def generate_label_pdf_batch_task(job_id, asset_pks, template_id, layout_mode, u
             job.append_log(f"PDF document generated and saved successfully: {attachment.file.name}")
             job.mark_completed(result={
                 'file_name': attachment.name,
-                'download_url': attachment.file.url
+                'download_url': attachment.get_download_url()
             })
 
             Notification.objects.create(
@@ -422,7 +453,7 @@ def generate_label_pdf_batch_task(job_id, asset_pks, template_id, layout_mode, u
                 subject="Label Generation Complete",
                 message=f"Successfully generated label PDF for {len(assets)} asset(s). Click to download.",
                 level=Notification.LEVEL_SUCCESS,
-                target_url=attachment.file.url
+                target_url=attachment.get_download_url()
             )
 
         except Exception as e:
