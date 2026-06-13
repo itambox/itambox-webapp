@@ -75,7 +75,7 @@
                 <div class="mt-2 input-group input-group-flat" style="max-width: 450px;">
                     <input type="text" class="form-control form-control-sm text-secondary small specs-container" readonly value="{{ request.scheme }}://{{ request.get_host }}{% url 'compliance:custody_eula_sign' token=eula_token %}" id="eula-link-input"/>
                     <span class="input-group-text p-0 bg-transparent">
-                        <button class="btn btn-sm btn-ghost-indigo font-weight-bold py-1 px-3 border-0" onclick="navigator.clipboard.writeText(document.getElementById('eula-link-input').value); alert('EULA custody sign-off link copied to clipboard!');">
+                        <button class="btn btn-sm btn-ghost-indigo font-weight-bold py-1 px-3 border-0" data-copy-input="#eula-link-input" data-copy-feedback="{% translate 'Copied!' %}">
                             {% translate "Copy Link" %}
                         </button>
                     </span>

@@ -1,0 +1,60 @@
+// ============================================================
+//  Typography — Inter Variable + numeric/heading refinement
+// ============================================================
+// The woff2 is vendored by copy-vendor.mjs into dist/vendor/inter/.
+// If the file is missing the stack in _tokens.scss falls back to
+// system fonts — nothing breaks.
+
+@font-face {
+    font-family: 'Inter Variable';
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('vendor/inter/inter-latin-wght-normal.woff2') format('woff2-variations');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+        U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+        U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Inter Variable';
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('vendor/inter/inter-latin-ext-wght-normal.woff2') format('woff2-variations');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+        U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+        U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+// Contextual alternates + tighter punctuation; keeps Inter looking crisp at UI sizes
+body {
+    font-feature-settings: 'cv03', 'cv04', 'liga';
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+// Page hierarchy — slightly tighter display text, letter-spaced overlines
+.page-title {
+    font-weight: 650;
+    letter-spacing: -0.015em;
+}
+
+.page-pretitle {
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--tblr-secondary-color);
+}
+
+.card-title {
+    font-weight: 600;
+    letter-spacing: -0.005em;
+}
+
+// Numbers line up like a terminal: tables, KPI figures, money, serials
+.table td,
+.attr-table td,
+.h1, .h2, .h3,
+h1, h2, h3 {
+    font-variant-numeric: tabular-nums;
+}

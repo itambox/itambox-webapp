@@ -1,0 +1,239 @@
+// ============================================================
+//  ITAMbox Design Tokens & CSS Variable Reference
+// ============================================================
+//
+//  Brand Color System — Indigo Violet on Stone Neutrals
+//  ------------------------------------------------------
+//  Accent  Role            Light mode              Dark mode
+//  ------  --------------  ----------------------  ----------------------
+//  primary --tblr-primary  #4f46e5 (indigo-600)    #818cf8 (indigo-400)
+//          primary-rgb     79, 70, 229             129, 140, 248
+//          primary-fg      #ffffff                 #0c0a09  ← DARK text on light fill
+//  link                    #4f46e5                 #818cf8
+//  link:hover              #4338ca (indigo-700)    #a5b4fc (indigo-300)
+//  focus ring              rgba(79,70,229,.25)      rgba(129,140,248,.3)
+//  input focus border      #4f46e5                 #818cf8
+//
+//  Brand-mark violet (mode-neutral, SVG only):
+//    "ITAM" text  #6366f1 (indigo-500)
+//    Cube top     #818cf8 (indigo-400)
+//    Cube left    #6366f1 (indigo-500)
+//    Cube right   #4f46e5 (indigo-600)
+//
+//  Status palette — SEMANTIC ONLY, never change for chrome:
+//    Success  --tblr-success  #2fb344
+//    Danger   --tblr-danger   #d63939
+//    Warning  --tblr-warning  #f59f00
+//    Info     --tblr-info     #206bc4
+//
+//  Color discipline (the premium rule):
+//    Indigo is the ONLY chrome accent. Semantic colors appear only when
+//    they carry meaning (status, destructive, check-in/out). Row actions
+//    are ghost/monochrome at rest and take color on hover.
+//
+//  Neutrals:
+//    LIGHT — warm Stone (unchanged): bg #fafaf9, surface #ffffff,
+//            border #e7e5e4, text #1c1917.
+//    DARK — "Midnight Indigo": an indigo-tinted near-black canvas with
+//            flat raised surfaces and hairline borders (NetBox-Labs-style).
+//            bg #0a0a10, surface #12121a, border #232331, text #e8e8ee.
+//            Cards are FLAT in dark mode (no shadows); accent glows carry
+//            the depth instead (badges, status dots, primary buttons).
+//
+//  Radius scale  (--itambox-radius-*)
+//    sm 6px (badges/small) · md 8px (buttons/inputs/dropdowns)
+//    lg 10px (cards) · xl 14px (modals)
+//
+//  Elevation scale (--itambox-shadow-*)  sm · md · lg — stone-tinted,
+//  stronger/darker in dark mode.
+//
+//  Motion (--itambox-duration / --itambox-ease)
+//    150ms · cubic-bezier(.4, 0, .2, 1) — one pair, used everywhere.
+//
+//  Spacing Scale (Tabler native)
+//  -----------------------------
+//  0.25rem  0.5rem  0.75rem  1rem  1.5rem  2rem  3rem  4rem
+//
+// ============================================================
+
+// Override Tabler core's scrollbar layout shift prevention
+// to resolve the 15px layout gap between fixed sidebar and page-wrapper
+// and compose the greenish style overrides using Tabler's native color classes
+html,
+:root {
+    margin-left: 0px !important;
+    scrollbar-gutter: stable;
+
+    // --- Tabler Stone Theme Base ---
+    --tblr-gray-50: #fafaf9;
+    --tblr-gray-100: #f5f5f4;
+    --tblr-gray-200: #e7e5e4;
+    --tblr-gray-300: #d6d3d1;
+    --tblr-gray-400: #a8a29e;
+    --tblr-gray-500: #78716c;
+    --tblr-gray-600: #57534e;
+    --tblr-gray-700: #44403c;
+    --tblr-gray-800: #292524;
+    --tblr-gray-900: #1c1917;
+    --tblr-gray-950: #0c0a09;
+
+    // --- Accent Theme: Indigo Violet ---
+    --tblr-primary: #4f46e5;
+    --tblr-primary-rgb: 79, 70, 229;
+    --tblr-primary-fg: #ffffff;
+
+    // ITAMbox Custom Tokens
+    --itambox-primary: #4f46e5;
+    --itambox-primary-dark: #818cf8;
+
+    // --- Radius scale (mapped onto Tabler) ---
+    --itambox-radius-sm: 6px;
+    --itambox-radius: 8px;
+    --itambox-radius-lg: 10px;
+    --itambox-radius-xl: 14px;
+    --tblr-border-radius-sm: var(--itambox-radius-sm);
+    --tblr-border-radius-md: var(--itambox-radius);
+    --tblr-border-radius-lg: var(--itambox-radius-lg);
+    --tblr-border-radius-xl: var(--itambox-radius-xl);
+
+    // --- Elevation scale (stone-tinted ambient shadows) ---
+    --itambox-shadow-sm: 0 1px 2px rgba(28, 25, 23, 0.04);
+    --itambox-shadow: 0 1px 2px rgba(28, 25, 23, 0.04), 0 4px 12px -2px rgba(28, 25, 23, 0.06);
+    --itambox-shadow-lg: 0 2px 6px rgba(28, 25, 23, 0.05), 0 16px 40px -8px rgba(28, 25, 23, 0.14);
+    --tblr-box-shadow-sm: var(--itambox-shadow-sm);
+    --tblr-box-shadow: var(--itambox-shadow);
+    --tblr-box-shadow-lg: var(--itambox-shadow-lg);
+    --tblr-box-shadow-dropdown: var(--itambox-shadow-lg);
+
+    // --- Motion (one duration/easing pair app-wide) ---
+    --itambox-duration: 150ms;
+    --itambox-ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+    // --- Typography: Inter Variable (vendored; graceful system fallback) ---
+    --tblr-font-sans-serif: 'Inter Variable', Inter, -apple-system, BlinkMacSystemFont,
+        'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif,
+        'Apple Color Emoji', 'Segoe UI Emoji';
+
+    // Focus rings, links, and selections
+    --tblr-focus-ring-color: rgba(79, 70, 229, 0.25);
+    --tblr-link-color: #4f46e5;
+    --tblr-link-hover-color: #4338ca;
+
+    // Light Mode background/border tones (Stone-based)
+    --tblr-body-bg: #fafaf9; // stone-50
+    --tblr-bg-surface: #ffffff;
+    --tblr-bg-surface-secondary: #f5f5f4; // stone-100
+    --tblr-bg-surface-tertiary: #f5f5f4; // stone-100 — modal footers, striped fills
+    --tblr-border-color: #e7e5e4; // stone-200
+
+    // Typography
+    --tblr-body-color: #1c1917; // stone-900
+    --tblr-body-color-rgb: 28, 25, 23;
+    --tblr-secondary-color: #57534e; // stone-600
+    --tblr-secondary-color-rgb: 87, 83, 78;
+    --tblr-text-muted: #57534e;
+    --tblr-muted-color: #57534e;
+    --tblr-card-title-color: #1c1917;
+
+    // Forms
+    --tblr-input-bg: #ffffff;
+    --tblr-input-color: #1c1917;
+    --tblr-input-border-color: #e7e5e4;
+    --tblr-input-placeholder-color: #a8a29e; // stone-400
+
+    // Custom sidebar variables for light mode
+    --itambox-sidebar-bg: #ffffff;
+    --itambox-sidebar-border: #e7e5e4; // stone-200
+    --itambox-sidebar-color: #44403c; // stone-700
+    --itambox-sidebar-muted-color: #a8a29e; // stone-400
+    --itambox-sidebar-hover-bg: rgba(79, 70, 229, 0.06);
+    --itambox-sidebar-hover-color: #4f46e5;
+    --itambox-sidebar-active-bg: rgba(79, 70, 229, 0.09);
+    --itambox-sidebar-active-color: #4f46e5;
+}
+
+// Dark Mode token overrides
+[data-bs-theme="dark"] {
+    // --- Accent Theme: Indigo Violet (dark) ---
+    --tblr-primary: #818cf8;
+    --tblr-primary-rgb: 129, 140, 248;
+    --tblr-primary-fg: #0c0a09; // dark text on light-violet fill — critical
+
+    --tblr-focus-ring-color: rgba(129, 140, 248, 0.3);
+    --tblr-link-color: #818cf8;
+    --tblr-link-hover-color: #a5b4fc;
+
+    // --- Elevation: dark surfaces are FLAT — hairlines + glows carry depth.
+    // Shadows remain for floating layers (dropdowns/modals) only.
+    --itambox-shadow-sm: none;
+    --itambox-shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 6px 16px -4px rgba(0, 0, 0, 0.5);
+    --itambox-shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.5), 0 24px 48px -12px rgba(0, 0, 0, 0.6);
+
+    // --- Midnight Indigo canvas ---
+    --tblr-body-bg: #0a0a10;
+    --tblr-bg-surface: #12121a;
+    --tblr-bg-surface-secondary: #0e0e15;
+    --tblr-bg-surface-tertiary: #16161f; // modal footers, striped/active fills
+    --tblr-border-color: #232331; // hairline
+    --tblr-border-color-translucent: rgba(99, 102, 241, 0.08);
+
+    // Re-tint the gray ramp for dark mode. The :root ramp is warm stone for
+    // light mode, but Tabler internals (striped tables, modal footers, list
+    // hovers) read these grays directly — left warm, they cast brown over
+    // the midnight-indigo canvas.
+    --tblr-gray-50: #f4f4f7;
+    --tblr-gray-100: #e8e8ee;
+    --tblr-gray-200: #d2d2dc;
+    --tblr-gray-300: #b0afc0;
+    --tblr-gray-400: #8b8a9e;
+    --tblr-gray-500: #6a6980;
+    --tblr-gray-600: #525166;
+    --tblr-gray-700: #3a3a4c;
+    --tblr-gray-800: #232331;
+    --tblr-gray-900: #16161f;
+    --tblr-gray-950: #0a0a10;
+
+    // Typography — cool indigo-tinted grays
+    --tblr-body-color: #e8e8ee;
+    --tblr-body-color-rgb: 232, 232, 238;
+    --tblr-secondary-color: #a09fb2;
+    --tblr-secondary-color-rgb: 160, 159, 178;
+    --tblr-text-muted: #a09fb2;
+    --tblr-muted-color: #a09fb2;
+    --tblr-card-title-color: #f4f4f9;
+
+    // Form inputs and textboxes
+    --tblr-input-bg: #0c0c13;
+    --tblr-input-color: #e8e8ee;
+    --tblr-input-border-color: #26263a;
+    --tblr-input-placeholder-color: #5d5c70;
+    --tblr-input-focus-bg: #0c0c13;
+    --tblr-input-focus-border-color: #818cf8; // indigo-400: violet focus border in dark mode
+    --tblr-input-focus-color: #e8e8ee;
+    --tblr-input-disabled-bg: #16161f;
+    --tblr-input-disabled-border-color: #26263a;
+
+    // Tables
+    --tblr-table-color: #e8e8ee;
+    --tblr-table-border-color: #232331;
+    --tblr-table-striped-bg: rgba(255, 255, 255, 0.015);
+    --tblr-table-hover-bg: rgba(255, 255, 255, 0.05);
+
+    // Dropdowns
+    --tblr-dropdown-bg: #16161f;
+    --tblr-dropdown-border-color: #2a2a3c;
+    --tblr-dropdown-color: #e8e8ee;
+    --tblr-dropdown-link-color: #e8e8ee;
+    --tblr-dropdown-link-hover-bg: #1f1f2c;
+    --tblr-dropdown-link-hover-color: #f4f4f9;
+
+    // Custom sidebar variables for dark mode
+    --itambox-sidebar-bg: #0a0a10;
+    --itambox-sidebar-border: #1c1c28;
+    --itambox-sidebar-color: #c5c4d4;
+    --itambox-sidebar-muted-color: #8b8a9e;
+    --itambox-sidebar-hover-bg: rgba(129, 140, 248, 0.08);
+    --itambox-sidebar-hover-color: #818cf8;
+    --itambox-sidebar-active-bg: rgba(129, 140, 248, 0.12);
+    --itambox-sidebar-active-color: #818cf8;
+}

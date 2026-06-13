@@ -19,6 +19,7 @@ mkdirSync(dist('tom-select/css'), { recursive: true });
 mkdirSync(dist('gridstack'), { recursive: true });
 mkdirSync(dist('mdi/css'), { recursive: true });
 mkdirSync(dist('mdi/fonts'), { recursive: true });
+mkdirSync(dist('inter'), { recursive: true });
 
 // --- CSS ---
 
@@ -42,6 +43,10 @@ cpSync('node_modules/@mdi/font/css/materialdesignicons.min.css', dist('mdi/css/m
 cpSync('node_modules/@mdi/font/fonts/materialdesignicons-webfont.woff2', dist('mdi/fonts/materialdesignicons-webfont.woff2'));
 cpSync('node_modules/@mdi/font/fonts/materialdesignicons-webfont.woff', dist('mdi/fonts/materialdesignicons-webfont.woff'));
 cpSync('node_modules/@mdi/font/fonts/materialdesignicons-webfont.ttf', dist('mdi/fonts/materialdesignicons-webfont.ttf'));
+
+// Inter Variable font (referenced by @font-face in _typography.scss)
+cpSync('node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2', dist('inter/inter-latin-wght-normal.woff2'));
+cpSync('node_modules/@fontsource-variable/inter/files/inter-latin-ext-wght-normal.woff2', dist('inter/inter-latin-ext-wght-normal.woff2'));
 
 // --- JS (loaded as separate <script> tags to preserve global assignments) ---
 

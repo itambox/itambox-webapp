@@ -1,0 +1,384 @@
+// ============================================================
+//  Data tables — sticky columns, premium header, hover, mobile
+// ============================================================
+
+// ---- Table Column Width Stabilization ----
+
+.card-table {
+    width: 100%;
+
+    // Prevent header and body cells from wrapping — each column
+    // expands to fit its widest content, forcing horizontal scroll.
+    thead th,
+    tbody td {
+        white-space: nowrap;
+    }
+
+    // Sticky first column (checkbox/pk) — pinned left
+    th:first-child,
+    td:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 2;
+        background-color: var(--tblr-bg-surface);
+    }
+
+    thead th:first-child {
+        z-index: 4;
+        background-color: var(--tblr-bg-surface-secondary, #f4f6fa);
+    }
+
+    // Sticky last column (actions) — pinned right
+    th:last-child,
+    td:last-child {
+        position: sticky;
+        right: 0;
+        z-index: 2;
+        background-color: var(--tblr-bg-surface);
+        white-space: nowrap;
+    }
+
+    thead th:last-child {
+        z-index: 4;
+        background-color: var(--tblr-bg-surface-secondary, #f4f6fa);
+    }
+
+    // Edge shadow on sticky cells to hint at scrollable content
+    td:first-child::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: -4px;
+        bottom: 0;
+        width: 5px;
+        background: linear-gradient(to right, rgba(0, 0, 0, 0.04), transparent);
+        pointer-events: none;
+    }
+
+    // Default right-side shadow on the last-child column (e.g. actions)
+    td:last-child::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: -4px;
+        bottom: 0;
+        width: 5px;
+        background: linear-gradient(to left, rgba(0, 0, 0, 0.04), transparent);
+        pointer-events: none;
+    }
+
+    // If col-checkout exists, it is the leftmost sticky column on the right, so it needs the shadow
+    td.col-checkout::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: -4px;
+        bottom: 0;
+        width: 4px;
+        background: linear-gradient(to left, rgba(0, 0, 0, 0.04), transparent);
+        pointer-events: none;
+    }
+
+    // Remove the last-child shadow if col-checkout is present in the row
+    td.col-checkout~td:last-child::before {
+        content: none !important;
+    }
+
+    // Column minimum-width guardrails for high-value columns
+    th.col-name,
+    td.col-name {
+        min-width: 200px;
+    }
+
+    th.col-serial,
+    td.col-serial {
+        min-width: 150px;
+    }
+
+    th.col-tag,
+    td.col-tag {
+        min-width: 120px;
+    }
+
+    th.col-relation,
+    td.col-relation {
+        min-width: 180px;
+    }
+
+    th.col-checkout,
+    td.col-checkout {
+        position: sticky !important;
+        right: 100px !important;
+        z-index: 2 !important;
+        background-color: var(--tblr-bg-surface) !important;
+        white-space: nowrap;
+        min-width: 96px !important;
+        width: 96px !important;
+        max-width: 96px !important;
+        text-align: center;
+    }
+
+    thead th.col-checkout {
+        z-index: 4 !important;
+        background-color: var(--tblr-bg-surface-secondary, #f4f6fa) !important;
+    }
+
+    th.col-actions,
+    td.col-actions {
+        min-width: 100px !important;
+        width: 100px !important;
+        max-width: 100px !important;
+        position: sticky !important;
+        right: 0 !important;
+        z-index: 2 !important;
+        background-color: var(--tblr-bg-surface) !important;
+        text-align: right;
+    }
+
+    th.col-actions-wide,
+    td.col-actions-wide {
+        min-width: auto !important;
+        width: 1% !important;
+        max-width: none !important;
+        position: sticky !important;
+        right: 0 !important;
+        z-index: 2 !important;
+        background-color: var(--tblr-bg-surface) !important;
+        text-align: right;
+    }
+
+    thead th.col-actions,
+    thead th.col-actions-wide {
+        z-index: 4 !important;
+        background-color: var(--tblr-bg-surface-secondary, #f4f6fa) !important;
+    }
+
+    // Elevate z-index of cells containing open dropdowns to render on top of sticky rows
+    td:has(.show) {
+        z-index: 10 !important;
+    }
+}
+
+// Dark mode: solid sticky column backgrounds
+[data-bs-theme="dark"] .card-table {
+
+    th:first-child,
+    td:first-child {
+        background-color: var(--tblr-bg-surface) !important;
+    }
+
+    thead th:first-child {
+        background-color: var(--tblr-bg-surface) !important;
+    }
+
+    th:last-child,
+    td:last-child {
+        background-color: var(--tblr-bg-surface) !important;
+    }
+
+    thead th:last-child {
+        background-color: var(--tblr-bg-surface) !important;
+    }
+
+    thead th.col-checkout,
+    thead th.col-actions,
+    thead th.col-actions-wide {
+        background-color: var(--tblr-bg-surface) !important;
+    }
+
+    // Shadow opacity boost in dark mode
+    td:first-child::after {
+        background: linear-gradient(to right, rgba(0, 0, 0, 0.15), transparent) !important;
+    }
+
+    td:last-child::before,
+    td.col-checkout::before {
+        background: linear-gradient(to left, rgba(0, 0, 0, 0.15), transparent) !important;
+    }
+}
+
+// ---- Dark table text styles ----
+[data-bs-theme="dark"] {
+    .table {
+        color: var(--tblr-body-color) !important;
+
+        thead th {
+            color: var(--tblr-secondary-color) !important;
+
+            a {
+                color: var(--tblr-primary) !important;
+
+                &:hover {
+                    color: var(--tblr-link-hover-color) !important;
+                }
+            }
+        }
+    }
+}
+
+// ============================================================
+//  Premium table refinement — quiet headers, indigo row hover
+// ============================================================
+.card-table {
+    thead th {
+        font-size: 0.6875rem;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--tblr-secondary-color);
+    }
+
+    tbody td {
+        padding-top: 0.55rem;
+        padding-bottom: 0.55rem;
+    }
+
+    // Machine identifiers read like data: monospace serials, tags, IDs
+    td.col-serial,
+    td.col-tag {
+        font-family: var(--tblr-font-monospace);
+        font-size: 0.8125rem;
+    }
+}
+
+// Dark mode: no header band — muted uppercase heads sit directly on the
+// card surface (hairline separator only), NetBox-Labs style. The sticky
+// cells already use bg-surface in dark, so transparent == surface here.
+[data-bs-theme="dark"] .card-table thead th {
+    background-color: var(--tblr-bg-surface);
+    border-bottom-color: var(--tblr-border-color);
+}
+
+// Row hover: a whisper of indigo. Sticky cells carry solid backgrounds with
+// !important, so the hover rule must out-rank them (and use a solid
+// color-mix so sticky and non-sticky cells match exactly).
+.card-table tbody tr:hover > td {
+    background-color: color-mix(in srgb, var(--tblr-primary) 4%, var(--tblr-bg-surface)) !important;
+    transition: background-color var(--itambox-duration, 150ms) var(--itambox-ease, ease);
+}
+
+[data-bs-theme="dark"] .card-table tbody tr:hover > td {
+    background-color: color-mix(in srgb, var(--tblr-primary) 6%, var(--tblr-bg-surface)) !important;
+}
+
+// ============================================================
+//  Card-mode tables (≤ 575.98px) — stack row columns into cards
+// ============================================================
+@media (max-width: 575.98px) {
+    .card-table {
+        display: block;
+        width: 100%;
+
+        // Column headers are redundant once values are labelled inline
+        thead {
+            display: none;
+        }
+
+        tbody,
+        tfoot {
+            display: block;
+            width: 100%;
+        }
+
+        tbody tr {
+            display: block;
+            position: relative;
+            margin: 0 0 0.625rem;
+            padding: 0.25rem 0;
+            border: 1px solid var(--tblr-border-color);
+            border-radius: var(--tblr-border-radius, 6px);
+            background: var(--tblr-bg-surface);
+        }
+
+        // Each cell becomes a "label : value" row
+        td {
+            display: flex !important;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            width: auto !important;
+            min-width: 0 !important;
+            max-width: none !important;
+            position: static !important;
+            inset: auto !important;
+            text-align: right !important;
+            white-space: normal !important;
+            padding: 0.4rem 0.85rem !important;
+            border: 0 !important;
+            border-bottom: 1px solid var(--tblr-border-color) !important;
+
+            // Field label sourced from the cell's data-label attribute
+            &::before {
+                content: attr(data-label);
+                flex: 0 0 auto;
+                margin-right: auto;
+                font-weight: 600;
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                letter-spacing: 0.02em;
+                color: var(--tblr-secondary-color);
+                text-align: left;
+                white-space: nowrap;
+            }
+        }
+
+        // Override the desktop sticky-column rules (these carry !important and
+        // higher specificity, so they must be neutralized at matching specificity)
+        td.col-actions,
+        td.col-actions-wide,
+        td.col-checkout {
+            position: static !important;
+            right: auto !important;
+            left: auto !important;
+            width: auto !important;
+            min-width: 0 !important;
+            max-width: none !important;
+            text-align: right !important;
+            justify-content: flex-end;
+        }
+
+        // Merged actions cell: drop the empty label, let the actions span the
+        // row, and grow the check button to fill the available space.
+        td.col-actions-wide::before { display: none; }
+        td.col-actions-wide > .d-flex { width: 100%; }
+        .btn.check-action {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        // Remove all desktop sticky edge-shadow pseudo-elements
+        td:first-child::after,
+        td:last-child::before,
+        td.col-checkout::before,
+        td.col-checkout~td:last-child::before {
+            content: none !important;
+        }
+
+        // Cells with no header (checkbox, actions, checkout): drop the empty label
+        td[data-label=""]::before {
+            content: none !important;
+        }
+
+        // Checkbox (select) cell — sit it at the card's top-left
+        td:first-child {
+            justify-content: flex-start;
+        }
+
+        // Flush the final cell against the card's rounded bottom
+        tbody tr td:last-child {
+            border-bottom: 0 !important;
+        }
+
+        // Promote the primary "name" cell to read like the card title
+        td.col-name {
+            font-weight: 600;
+            font-size: 0.9375rem;
+        }
+    }
+
+    // Mobile card-mode: row hover tint would paint whole stacked cards — disable
+    .card-table tbody tr:hover > td,
+    [data-bs-theme="dark"] .card-table tbody tr:hover > td {
+        background-color: transparent !important;
+    }
+}

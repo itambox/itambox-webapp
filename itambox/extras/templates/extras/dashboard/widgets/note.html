@@ -1,6 +1,6 @@
 {% load i18n %}
-{% if content %}
-<div class="small" style="white-space: pre-wrap; line-height: 1.6;">{{ content }}</div>
+{% if content_html %}
+<div class="markdown small widget-note-content">{{ content_html }}</div>
 {% else %}
 <div class="text-muted text-center py-3">
     <i class="mdi mdi-note-text-outline mb-2"></i>

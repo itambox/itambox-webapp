@@ -1,0 +1,95 @@
+// ============================================================
+//  Topbar — sticky translucent header + workspace switcher
+// ============================================================
+// .itambox-topbar is set on the desktop header in _topbar.html.
+
+.itambox-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 1020; // above page content, below offcanvas/modals (1045/1055)
+    background-color: color-mix(in srgb, var(--tblr-body-bg) 80%, transparent) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--tblr-border-color);
+
+    // Fallback when backdrop-filter is unavailable: solid background
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+        background-color: var(--tblr-body-bg) !important;
+    }
+}
+
+// Quick search — command-palette affordance with a Ctrl+K chip.
+// The shortcut itself is wired in static/src/command-k.ts.
+.itambox-topbar .input-icon {
+    position: relative;
+    min-width: 16rem;
+
+    .form-control {
+        padding-right: 4.25rem;
+        border-radius: var(--itambox-radius, 8px);
+    }
+
+    .global-search-kbd {
+        position: absolute;
+        top: 50%;
+        right: 0.5rem;
+        transform: translateY(-50%);
+        display: inline-flex;
+        align-items: center;
+        gap: 0.125rem;
+        padding: 0.125rem 0.4rem;
+        font-size: 0.6875rem;
+        font-family: inherit;
+        font-weight: 500;
+        line-height: 1.4;
+        color: var(--tblr-secondary-color);
+        background: var(--tblr-bg-surface-secondary);
+        border: 1px solid var(--tblr-border-color);
+        border-radius: 0.375rem;
+        pointer-events: none;
+    }
+}
+
+// Workspace (tenant) switcher — reads as a control, not a generic button
+.workspace-switcher {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    max-width: 18rem;
+    font-weight: 500;
+    background-color: var(--tblr-bg-surface);
+    border: 1px solid var(--tblr-border-color);
+    border-radius: var(--itambox-radius, 8px);
+    color: var(--tblr-body-color);
+
+    &:hover,
+    &:focus-visible {
+        border-color: rgba(var(--tblr-primary-rgb), 0.45);
+        background-color: var(--tblr-bg-surface);
+        color: var(--tblr-body-color);
+    }
+
+    .workspace-switcher-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.5rem;
+        height: 1.5rem;
+        flex: 0 0 auto;
+        border-radius: 0.4rem;
+        background-color: rgba(var(--tblr-primary-rgb), 0.1);
+        color: var(--tblr-primary);
+
+        i {
+            font-size: 0.95rem;
+            line-height: 1;
+        }
+    }
+
+    .workspace-switcher-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+    }
+}

@@ -13,7 +13,7 @@
     {# Check In Button (if assigned) #}
     {% if assignment and assignment.is_active %}
         {% if request.user.is_staff or perms.assets.change_asset %}
-            <button type="button" class="btn btn-success"
+            <button type="button" class="btn btn-soft-outline-success check-action"
                     hx-get="{% url 'assets:asset_checkin' pk=object.pk %}"
                     hx-target="#modal-placeholder"
                     hx-swap="innerHTML">
@@ -24,7 +24,7 @@
     {% else %}
         {# Check Out Button (only visible if not checked out) #}
         {% if request.user.is_staff or perms.assets.change_asset %}
-            <button type="button" class="btn btn-info"
+            <button type="button" class="btn btn-soft-success check-action"
                     hx-get="{% url 'assets:asset_checkout_modal' pk=object.pk %}"
                     hx-target="#modal-placeholder"
                     hx-swap="innerHTML">
@@ -38,7 +38,7 @@
     {% if approved_request %}
         <form method="post" action="{% url 'assets:request_claim' pk=approved_request.pk %}" class="d-inline">
             {% csrf_token %}
-            <button type="submit" class="btn btn-success" onclick="return confirm('Are you sure you want to claim this asset and confirm pickup?')">
+            <button type="submit" class="btn btn-soft-success" data-confirm="Are you sure you want to claim this asset and confirm pickup?">
                 <i class="mdi mdi-package-down"></i>
                 {% translate "Claim & Confirm Pickup" %}
             </button>

@@ -1,0 +1,521 @@
+// ============================================================
+//  Components — cards, badges, buttons, dropdowns, tabs
+// ============================================================
+
+// ---- Changelog diff styles ----
+
+pre.change-data {
+    border-radius: 0;
+    padding: 0;
+
+    >span {
+        display: block;
+        padding-right: 1rem;
+        padding-left: 1rem;
+    }
+
+    >span.added {
+        background-color: rgba(var(--tblr-success-rgb), 0.1);
+        color: var(--tblr-success);
+    }
+
+    >span.removed {
+        background-color: rgba(214, 57, 57, 0.1);
+        color: #d63939;
+    }
+}
+
+pre.change-diff {
+    border-radius: 4px;
+    padding: 12px;
+    font-family: var(--tblr-font-monospace);
+    font-size: 8.5pt;
+    line-height: 1.4;
+
+    &.change-added {
+        background-color: rgba(var(--tblr-success-rgb), 0.08);
+        color: var(--tblr-success);
+        border: 1px solid rgba(var(--tblr-success-rgb), 0.15);
+    }
+
+    &.change-removed {
+        background-color: rgba(214, 57, 57, 0.08);
+        color: #d63939;
+        border: 1px solid rgba(214, 57, 57, 0.15);
+    }
+}
+
+pre.block {
+    padding: 1rem;
+    border: 1px solid #dce1e7;
+    border-radius: 4px;
+}
+
+// ---- Card spacing & premium surface treatment ----
+
+.page-body .card {
+    margin-bottom: 1rem;
+}
+
+.card {
+    border-radius: var(--itambox-radius-lg, 10px);
+    box-shadow: var(--itambox-shadow-sm);
+}
+
+.modal-content {
+    border-radius: var(--itambox-radius-xl, 14px);
+    box-shadow: var(--itambox-shadow-lg);
+}
+
+.dropdown-menu {
+    border-radius: var(--itambox-radius, 8px);
+    box-shadow: var(--itambox-shadow-lg);
+    border: 1px solid var(--tblr-border-color);
+}
+
+// ---- Buttons: unified motion + press feedback ----
+.btn {
+    transition: color var(--itambox-duration, 150ms) var(--itambox-ease, ease),
+        background-color var(--itambox-duration, 150ms) var(--itambox-ease, ease),
+        border-color var(--itambox-duration, 150ms) var(--itambox-ease, ease),
+        box-shadow var(--itambox-duration, 150ms) var(--itambox-ease, ease),
+        transform 80ms var(--itambox-ease, ease);
+
+    &:active {
+        transform: scale(0.985);
+    }
+}
+
+// ---- Soft buttons (.btn-soft-*) ----
+// Tinted, calm action buttons: the treatment for high-frequency semantic
+// actions (check-in/out). One soft accent per row maximum.
+$soft-btn-colors: ('primary', 'secondary', 'success', 'danger', 'warning', 'info');
+
+@each $c in $soft-btn-colors {
+    .btn-soft-#{$c} {
+        --tblr-btn-color: var(--tblr-#{$c});
+        color: var(--tblr-#{$c});
+        background-color: rgba(var(--tblr-#{$c}-rgb), 0.08);
+        border-color: transparent;
+
+        &:hover,
+        &:focus-visible {
+            color: var(--tblr-#{$c});
+            background-color: rgba(var(--tblr-#{$c}-rgb), 0.16);
+            border-color: rgba(var(--tblr-#{$c}-rgb), 0.25);
+        }
+
+        &:active {
+            color: var(--tblr-#{$c});
+            background-color: rgba(var(--tblr-#{$c}-rgb), 0.22);
+            border-color: rgba(var(--tblr-#{$c}-rgb), 0.25);
+        }
+    }
+}
+
+[data-bs-theme="dark"] {
+    @each $c in $soft-btn-colors {
+        .btn-soft-#{$c} {
+            background-color: rgba(var(--tblr-#{$c}-rgb), 0.12);
+
+            &:hover,
+            &:focus-visible {
+                background-color: rgba(var(--tblr-#{$c}-rgb), 0.2);
+            }
+        }
+    }
+}
+
+// Soft-outline variant: same translucent family as .btn-soft-*, but the
+// border carries the weight instead of the fill — pairs with .btn-soft-*
+// to differentiate two related actions (check-out filled / check-in outline).
+.btn-soft-outline-success {
+    color: var(--tblr-success);
+    background-color: rgba(var(--tblr-success-rgb), 0.04);
+    border-color: rgba(var(--tblr-success-rgb), 0.45);
+
+    &:hover,
+    &:focus-visible {
+        color: var(--tblr-success);
+        background-color: rgba(var(--tblr-success-rgb), 0.14);
+        border-color: rgba(var(--tblr-success-rgb), 0.6);
+    }
+
+    &:active {
+        color: var(--tblr-success);
+        background-color: rgba(var(--tblr-success-rgb), 0.2);
+        border-color: rgba(var(--tblr-success-rgb), 0.6);
+    }
+}
+
+[data-bs-theme="dark"] .btn-soft-outline-success {
+    background-color: rgba(var(--tblr-success-rgb), 0.06);
+
+    &:hover,
+    &:focus-visible {
+        background-color: rgba(var(--tblr-success-rgb), 0.16);
+    }
+}
+
+// Row-action ghost buttons: monochrome at rest, accent on hover.
+// Applied via .btn-action (table rows, detail headers).
+.btn-action {
+    color: var(--tblr-secondary-color);
+    background: transparent;
+    border-color: transparent;
+
+    &:hover,
+    &:focus-visible {
+        color: var(--tblr-primary);
+        background-color: rgba(var(--tblr-primary-rgb), 0.1);
+        border-color: transparent;
+    }
+
+    &.btn-action-danger:hover,
+    &.btn-action-danger:focus-visible {
+        color: var(--tblr-danger);
+        background-color: rgba(var(--tblr-danger-rgb), 0.1);
+    }
+}
+
+// Comfortable hit targets for row-action buttons — overrides the global
+// mobile .btn-sm shrink as well (compound selectors out-rank it).
+.card-table .btn-sm,
+.btn-sm.btn-action {
+    padding: 0.375rem 0.5625rem;
+    font-size: 0.8125rem;
+    min-height: 2rem;
+}
+
+.btn-sm.btn-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+
+    .mdi {
+        font-size: 1rem;
+        line-height: 1;
+    }
+}
+
+// Split/dropdown segment on ghost buttons: faint resting tint + an
+// explicit chevron (the framework default is ~5px and near-invisible
+// on the transparent ghost background).
+.btn-group .btn-action.dropdown-toggle,
+.btn-action.dropdown-toggle-split {
+    min-width: 1.75rem;
+    padding-left: 0.375rem;
+    padding-right: 0.5rem;
+    border-left: 1px solid var(--tblr-border-color);
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    background-color: rgba(var(--tblr-body-color-rgb), 0.04);
+
+    &::after {
+        content: "";
+        display: inline-block;
+        width: 0.5em;
+        height: 0.5em;
+        margin-left: 0;
+        border: 0;
+        border-bottom: 2px solid currentColor;
+        border-left: 2px solid currentColor;
+        transform: rotate(-45deg);
+        vertical-align: 0.15em;
+        opacity: 1;
+    }
+}
+
+// Check-in / Check-out button merged into the actions column: one shared
+// width on desktop so the column lines up (sized generously enough that
+// longer localized labels — e.g. "Herausgeben" — don't break the alignment).
+.btn.check-action {
+    min-width: 8rem;
+    justify-content: center;
+}
+
+// The check pair needs clearly separated poles — at the default soft tints
+// they read as the same button. Check-out: unmistakably filled (still
+// translucent, no border). Check-in: pure outline, zero fill at rest.
+.check-action.btn-soft-success {
+    background-color: rgba(var(--tblr-success-rgb), 0.25);
+    border-color: transparent;
+
+    &:hover,
+    &:focus-visible {
+        background-color: rgba(var(--tblr-success-rgb), 0.38);
+        border-color: transparent;
+    }
+}
+
+.check-action.btn-soft-outline-success {
+    background-color: transparent;
+
+    &:hover,
+    &:focus-visible {
+        background-color: rgba(var(--tblr-success-rgb), 0.12);
+    }
+}
+
+// ============================================================
+//  Soft badges — solid bg-* badges become tinted pills
+// ============================================================
+// Solid saturated chips made the tables shout. Any *labeled* badge with a
+// bg-* utility renders as a calm tinted pill (colored text on a 10% fill).
+// Empty badges (notification dots, color swatches) keep their solid fill
+// via the :not(:empty) guard.
+$badge-colors: ('primary', 'secondary', 'success', 'info', 'warning', 'danger',
+    'blue', 'azure', 'indigo', 'purple', 'pink', 'red', 'orange', 'yellow',
+    'lime', 'green', 'teal', 'cyan');
+
+.badge {
+    border-radius: 999px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+}
+
+@each $c in $badge-colors {
+    .badge.bg-#{$c}:not(:empty) {
+        background-color: rgba(var(--tblr-#{$c}-rgb), 0.1) !important;
+        color: var(--tblr-#{$c}) !important;
+        border: 1px solid rgba(var(--tblr-#{$c}-rgb), 0.2);
+    }
+}
+
+[data-bs-theme="dark"] {
+    @each $c in $badge-colors {
+        .badge.bg-#{$c}:not(:empty) {
+            background-color: rgba(var(--tblr-#{$c}-rgb), 0.15) !important;
+            color: color-mix(in srgb, var(--tblr-#{$c}) 70%, #fff) !important;
+            border-color: rgba(var(--tblr-#{$c}-rgb), 0.3);
+            // Neon glow — the depth cue on the flat midnight canvas
+            box-shadow: 0 0 12px -4px rgba(var(--tblr-#{$c}-rgb), 0.55);
+        }
+    }
+}
+
+// Status badges with custom per-label hex colors (StatusLabel.color).
+// Server renders: <span class="badge badge-status" style="--status-color:#xxx">
+//                   <span class="badge-status-dot"></span>Label</span>
+.badge-status {
+    --status-color: var(--tblr-secondary);
+    background-color: color-mix(in srgb, var(--status-color) 10%, transparent);
+    color: color-mix(in srgb, var(--status-color) 85%, var(--tblr-body-color));
+    border: 1px solid color-mix(in srgb, var(--status-color) 25%, transparent);
+    border-radius: 999px;
+
+    .badge-status-dot {
+        display: inline-block;
+        width: 0.5em;
+        height: 0.5em;
+        border-radius: 50%;
+        background-color: var(--status-color);
+        margin-right: 0.4em;
+        vertical-align: 0.05em;
+    }
+}
+
+[data-bs-theme="dark"] .badge-status {
+    background-color: color-mix(in srgb, var(--status-color) 16%, transparent);
+    color: color-mix(in srgb, var(--status-color) 70%, #fff);
+    box-shadow: 0 0 12px -4px color-mix(in srgb, var(--status-color) 55%, transparent);
+
+    .badge-status-dot {
+        box-shadow: 0 0 8px color-mix(in srgb, var(--status-color) 70%, transparent);
+    }
+}
+
+// Primary button: indigo glow on hover (dark canvas only)
+[data-bs-theme="dark"] .btn-primary {
+    &:hover,
+    &:focus-visible {
+        box-shadow: 0 0 20px -6px rgba(var(--tblr-primary-rgb), 0.65);
+    }
+}
+
+// Dark mode: flat cards — hairline brightens on hover instead of a shadow
+[data-bs-theme="dark"] .card {
+    box-shadow: none;
+}
+
+// ---- Specs container ----
+.specs-container {
+    background-color: var(--tblr-bg-surface-secondary) !important;
+    color: var(--tblr-body-color) !important;
+    border: 1px solid var(--tblr-border-color) !important;
+}
+
+[data-bs-theme="dark"] .specs-container {
+    background-color: var(--tblr-bg-surface-secondary) !important;
+    color: var(--tblr-body-color) !important;
+    border: 1px solid var(--tblr-border-color) !important;
+}
+
+// ---- Panel cards ----
+.panel-card {
+    .card-header {
+        background: transparent;
+        border-bottom: 1px solid var(--tblr-border-color, #e6e7e9);
+    }
+}
+
+// ---- Compact & Interactive Slide-to-Expand Detail Tabs ----
+.page-header-tabs {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; // Firefox
+
+    &::-webkit-scrollbar {
+        display: none !important; // Chrome/Safari/Opera
+    }
+
+    .nav-item {
+        display: inline-block;
+
+        .nav-link {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: inline-flex;
+            align-items: center;
+            white-space: nowrap;
+            padding: 0.5rem 0.75rem;
+
+            // Inactive tabs: hide text labels, collapse padding to keep icons tidy
+            &:not(.active) {
+                span.d-xl-inline {
+                    display: none !important;
+                }
+
+                .badge {
+                    margin-left: 0.25rem !important;
+                }
+            }
+
+            // Active tab: ALWAYS show text label (on all screen sizes!) and animate expansion
+            &.active {
+                background-color: rgba(var(--tblr-primary-rgb), 0.06);
+                border-color: transparent transparent var(--tblr-primary);
+                font-weight: 600;
+
+                span.d-xl-inline {
+                    display: inline-block !important;
+                    animation: slideExpand 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+                }
+            }
+        }
+    }
+}
+
+@keyframes slideExpand {
+    from {
+        max-width: 0;
+        opacity: 0;
+        transform: translateX(-6px);
+    }
+
+    to {
+        max-width: 250px;
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+// ============================================================
+//  Card Actions & Buttons Alignment
+// ============================================================
+.card-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+    margin-left: auto !important;
+
+    .btn {
+        position: relative !important;
+        margin: 0 !important;
+    }
+}
+
+// ============================================================
+//  Premium Dropdown & Card Styling (Dark Mode Harmony)
+// ============================================================
+.dropdown-menu-card {
+    .card {
+        background-color: var(--tblr-bg-surface) !important;
+        border: 1px solid var(--tblr-border-color) !important;
+        box-shadow: var(--tblr-box-shadow-lg) !important;
+
+        .card-header {
+            background-color: var(--tblr-bg-surface) !important;
+            border-bottom: 1px solid var(--tblr-border-color) !important;
+        }
+
+        .list-group-header {
+            background-color: var(--tblr-bg-surface-secondary) !important;
+            border-bottom: 1px solid var(--tblr-border-color) !important;
+            border-top: 1px solid var(--tblr-border-color) !important;
+            margin-top: -1px; // prevent double borders
+            color: var(--tblr-secondary-color) !important;
+
+            &.active {
+                background-color: rgba(var(--tblr-primary-rgb), 0.1) !important;
+            }
+        }
+
+        .card-footer {
+            background-color: var(--tblr-bg-surface) !important;
+            border-top: 1px solid var(--tblr-border-color) !important;
+        }
+    }
+}
+
+// ============================================================
+//  NetBox-Inspired Attribute Table (.attr-table)
+// ============================================================
+// Used for clean, compact, flush key-value listings inside cards.
+// Eliminate card-body padding and place this table directly inside `.card`.
+.attr-table {
+    margin-bottom: 0 !important;
+    font-size: 0.825rem;
+
+    tr {
+        background: transparent !important;
+    }
+
+    th,
+    td {
+        padding: 0.45rem 0.75rem !important;
+        vertical-align: middle;
+        border-color: var(--tblr-border-color) !important;
+    }
+
+    // Label Column (Left side)
+    th:first-child,
+    td:first-child {
+        color: var(--tblr-secondary, #6e7e91) !important;
+        font-weight: 500;
+        width: 30%;
+        min-width: 130px;
+        border-right: none;
+    }
+
+    // Value Column (Right side)
+    td:last-child {
+        width: 70%;
+        color: var(--tblr-body-color);
+        // Long serials/URLs/tokens must wrap instead of stretching the panel
+        // beyond the viewport on narrow screens.
+        word-break: break-word;
+        overflow-wrap: anywhere;
+    }
+
+    // Remove the bottom border on the last row to sit flush in card
+    tr:last-child {
+
+        th,
+        td {
+            border-bottom: 0 !important;
+        }
+    }
+}

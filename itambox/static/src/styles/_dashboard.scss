@@ -1,0 +1,199 @@
+// ============================================================
+//  Dashboard — GridStack + neutral widget cards with icon chips
+// ============================================================
+
+#dashboard-grid {
+    transition: opacity 0.18s ease-in-out;
+
+    &.grid-stack-loading {
+        opacity: 0 !important;
+    }
+}
+
+#dashboard-grid.grid-stack {
+    max-width: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+// Uninitialized state height preservation (eliminates vertical layout shift)
+#dashboard-grid:not(.grid-stack) {
+    @for $h from 1 through 12 {
+        [data-gs-h="#{$h}"] {
+            .card {
+                height: ($h * 100px) + (($h - 1) * 8px) !important;
+            }
+        }
+    }
+}
+
+// ============================================================
+//  Widget cards — neutral headers, accent carried by the icon chip
+// ============================================================
+#dashboard-grid .card {
+    > .card-header {
+        background: transparent;
+        border-bottom: 1px solid var(--tblr-border-color);
+        padding-top: 0.625rem;
+        padding-bottom: 0.625rem;
+
+        .card-title {
+            color: var(--tblr-card-title-color);
+            font-size: 0.875rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+            min-width: 0;
+
+            > span:last-child,
+            > .widget-title-text {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+        }
+    }
+
+    // Gentle elevation on hover — makes the board feel alive without shouting
+    transition: box-shadow var(--itambox-duration, 150ms) var(--itambox-ease, ease),
+        border-color var(--itambox-duration, 150ms) var(--itambox-ease, ease);
+
+    &:hover {
+        box-shadow: var(--itambox-shadow);
+    }
+}
+
+// Dark mode is flat: hover brightens the hairline instead of casting shadow
+[data-bs-theme="dark"] #dashboard-grid .card:hover {
+    box-shadow: none;
+    border-color: #32324a;
+}
+
+// The icon chip: a small tinted square carrying the widget's accent color.
+// Color comes from --widget-accent(-rgb), set inline from the widget config
+// style (info/success/warning/danger) and defaulting to the brand accent.
+.widget-icon-chip {
+    --widget-accent: var(--tblr-primary);
+    --widget-accent-rgb: var(--tblr-primary-rgb);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    flex: 0 0 auto;
+    border-radius: 0.5rem;
+    background-color: rgba(var(--widget-accent-rgb), 0.1);
+    color: var(--widget-accent);
+
+    i {
+        font-size: 1.05rem;
+        line-height: 1;
+    }
+}
+
+.widget-icon-chip--info {
+    --widget-accent: var(--tblr-info);
+    --widget-accent-rgb: var(--tblr-info-rgb);
+}
+
+.widget-icon-chip--success {
+    --widget-accent: var(--tblr-success);
+    --widget-accent-rgb: var(--tblr-success-rgb);
+}
+
+.widget-icon-chip--warning {
+    --widget-accent: var(--tblr-warning);
+    --widget-accent-rgb: var(--tblr-warning-rgb);
+}
+
+.widget-icon-chip--danger {
+    --widget-accent: var(--tblr-danger);
+    --widget-accent-rgb: var(--tblr-danger-rgb);
+}
+
+// ============================================================
+//  Note widget — markdown content scaled for card context
+// ============================================================
+.widget-note-content {
+    line-height: 1.6;
+
+    h1, h2, h3, h4, h5, h6 {
+        font-size: 0.9375rem;
+        font-weight: 600;
+        margin: 0.625rem 0 0.25rem;
+    }
+
+    h1 { font-size: 1.0625rem; }
+    h2 { font-size: 1rem; }
+
+    > :first-child { margin-top: 0; }
+    > :last-child { margin-bottom: 0; }
+
+    ul, ol { padding-left: 1.25rem; }
+
+    code {
+        background: var(--tblr-bg-surface-secondary);
+        border: 1px solid var(--tblr-border-color);
+        border-radius: 4px;
+        padding: 0.0625rem 0.3125rem;
+        font-size: 0.75rem;
+    }
+}
+
+// ============================================================
+//  Object-counts widget — quiet label/number rows (NetBox-Labs style)
+// ============================================================
+.widget-count-list {
+    display: flex;
+    flex-direction: column;
+    margin: 0 -0.5rem;
+}
+
+.widget-count-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.45rem 0.5rem;
+    border-radius: var(--itambox-radius-sm, 6px);
+    font-size: 0.8125rem;
+    color: var(--tblr-secondary-color);
+    text-decoration: none;
+    transition: background-color var(--itambox-duration, 150ms) var(--itambox-ease, ease),
+        color var(--itambox-duration, 150ms) var(--itambox-ease, ease);
+
+    .widget-count-value {
+        font-variant-numeric: tabular-nums;
+        font-weight: 500;
+        color: var(--tblr-body-color);
+    }
+}
+
+a.widget-count-row:hover {
+    background-color: rgba(var(--tblr-primary-rgb), 0.07);
+    color: var(--tblr-primary);
+
+    .widget-count-value {
+        color: var(--tblr-primary);
+    }
+}
+
+// ============================================================
+//  Dashboard widgets on small screens  —  ≤ 991.98px
+// ============================================================
+// GridStack is skipped below 992px (see dashboard.ts), so the native
+// Bootstrap grid (col-12 / col-md-6) drives a 1–2 column stack. Let the
+// widget cards grow to fit their content instead of the fixed gs-h heights.
+@media (max-width: 991.98px) {
+    #dashboard-grid:not(.grid-stack) [data-gs-h] .card {
+        height: auto !important;
+        min-height: 8rem;
+    }
+
+    // Keep the dashboard control buttons on one tidy, wrapping row
+    #dashboard-controls {
+        gap: 0.375rem;
+    }
+}

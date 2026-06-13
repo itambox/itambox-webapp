@@ -109,17 +109,15 @@
          data-gs-w="{{ entry.config.w|default:4 }}" data-gs-h="{{ entry.config.h|default:2 }}"
          data-gs-x="{{ entry.config.x|default_if_none:'' }}" data-gs-y="{{ entry.config.y|default_if_none:'' }}">
         <div class="card card-sm">
-            {% if entry.config.style == 'info' %}
-                <div class="card-status-top bg-info"></div>
-            {% elif entry.config.style == 'warning' %}
-                <div class="card-status-top bg-warning"></div>
-            {% elif entry.config.style == 'success' %}
-                <div class="card-status-top bg-success"></div>
-            {% elif entry.config.style == 'danger' %}
-                <div class="card-status-top bg-danger"></div>
-            {% endif %}
-            <div class="card-header d-flex justify-content-between align-items-center{% if entry.config.style == 'info' %} bg-info-lt text-info{% elif entry.config.style == 'warning' %} bg-warning-lt text-warning{% elif entry.config.style == 'success' %} bg-success-lt text-success{% elif entry.config.style == 'danger' %} bg-danger-lt text-danger{% endif %}">
-                <h3 class="card-title{% if entry.config.style == 'info' %} text-info{% elif entry.config.style == 'warning' %} text-warning{% elif entry.config.style == 'success' %} text-success{% elif entry.config.style == 'danger' %} text-danger{% endif %}">{{ entry.config.title }}</h3>
+            {# Neutral header; the configured style accent lives in the icon chip #}
+            {% get_widget_icon entry.config as widget_icon %}
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="card-title">
+                    <span class="widget-icon-chip{% if entry.config.style %} widget-icon-chip--{{ entry.config.style }}{% endif %}" aria-hidden="true">
+                        <i class="mdi mdi-{{ widget_icon }}"></i>
+                    </span>
+                    <span class="widget-title-text">{{ entry.config.title }}</span>
+                </h3>
                 <div class="card-actions d-flex gap-1">
                     <button class="btn btn-icon btn-sm btn-ghost-secondary"
                         hx-get="{% url 'extras:dashboard_widget_config' dashboard_id=active_dashboard.id index=entry.index %}"

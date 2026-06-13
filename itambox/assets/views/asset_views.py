@@ -448,6 +448,7 @@ def bulk_assign_assets(request):
 
     job = Job.objects.create(
         name=f"Bulk Checkout: {len(object_pks)} Assets to {holder}",
+        tenant=current_tenant,
         model=ct,
         status=Job.STATUS_PENDING
     )
@@ -544,6 +545,7 @@ def bulk_print_labels(request):
 
     job = Job.objects.create(
         name=f"Label Batch Generation: {len(object_pks)} Assets",
+        tenant=current_tenant,
         model=ct,
         status=Job.STATUS_PENDING
     )

@@ -17,8 +17,8 @@
     
     {# PWA Meta and Capabilities #}
     <link rel="manifest" href="{% url 'manifest.json' %}">
-    <meta name="theme-color" content="#1c1917" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#4f46e5" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#818cf8" media="(prefers-color-scheme: dark)">
     <link rel="icon" type="image/svg+xml" href="{% static 'dist/brand/favicon.svg' %}">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
@@ -40,7 +40,7 @@
     <link href="{% static 'dist/vendor/tom-select/css/tom-select.bootstrap5.css' %}" rel="stylesheet">
     <link href="{% static 'dist/vendor/mdi/css/materialdesignicons.min.css' %}" rel="stylesheet"/>
     <link href="{% static 'dist/vendor/gridstack/gridstack.min.css' %}" rel="stylesheet"/>
-    <link href="{% static 'dist/itambox.css' %}?v=1.0.5" rel="stylesheet"/>
+    <link href="{% static 'dist/itambox.css' %}?v=1.1.0" rel="stylesheet"/>
     {# HTMX (in head for early hx-* processing) #}
     <script src="{% static 'dist/vendor/htmx.min.js' %}"></script>
     <script src="{% static 'dist/vendor/apexcharts.min.js' %}"></script>
@@ -82,8 +82,10 @@
     <script src="{% static 'dist/vendor/bootstrap.bundle.min.js' %}"></script>
     <script src="{% static 'dist/vendor/gridstack-all.js' %}"></script>
     <script src="{% static 'dist/vendor/tom-select.complete.min.js' %}"></script>
+    <script src="{% static 'dist/vendor/html5-qrcode.min.js' %}"></script>
     {# Application modules bundle #}
-    <script src="{% static 'dist/itambox.js' %}?v=1.0.9"></script>
+    <script src="{% static 'dist/itambox.js' %}?v=1.1.0"></script>
+
 
     {% block javascript %}{% endblock javascript %}
 

@@ -1,0 +1,145 @@
+// ============================================================
+//  Layout — scroll/modal stability, FOUC guards, global motion
+// ============================================================
+
+// Bootstrap's ScrollBarHelper sets an INLINE padding-right (15–17px) on
+// <body> whenever a modal OR offcanvas opens — the offcanvas path adds no
+// class, so class-based fixes never catch it. scrollbar-gutter: stable
+// already reserves the gutter, making the compensation a pure layout shift.
+// !important in a stylesheet outranks a non-important inline style.
+body {
+    padding-right: 0 !important;
+}
+
+body.modal-open,
+body.offcanvas-open {
+
+    .fixed-top,
+    .fixed-bottom,
+    .is-fixed,
+    .sticky-top {
+        padding-right: 0 !important;
+    }
+}
+
+// ---- Modal layout fixes ----
+
+.modal-open {
+    overflow: hidden;
+
+    .page {
+        padding-right: 0 !important;
+    }
+}
+
+@supports (scrollbar-gutter: stable) {
+    html {
+        scrollbar-gutter: stable;
+    }
+
+    .modal-open {
+        overflow: auto;
+    }
+}
+
+// ---- Filter panel collapse (FOUC prevention) ----
+// The .itambox-filters-hidden class is set on <html> by a blocking head script
+// (and kept in sync by filter-toggle.ts) so the collapsed state is applied before
+// first paint — no flash of the filter column and no layout jump on reload.
+html.itambox-filters-hidden #object-list-filter-col {
+    display: none !important;
+}
+
+@media (min-width: 768px) {
+    html.itambox-filters-hidden #object-list-main-col {
+        flex: 0 0 100% !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+}
+
+// ---- Batch action bar ----
+.batch-actions-bar {
+    transition: opacity var(--itambox-duration, 150ms) var(--itambox-ease, ease);
+}
+
+// ---- Notification dot animation ----
+.status-dot-animated {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+// ---- Layout utility ----
+.page-wrapper {
+    flex-grow: 1;
+}
+
+// Transition for theme changes
+html {
+    transition: background-color 0.2s ease;
+}
+
+// Table responsive base — ensures the scroll wrapper takes full width
+.table-responsive {
+    margin-bottom: 0;
+
+    .table {
+        margin-bottom: 0;
+    }
+}
+
+// ============================================================
+//  Premium details — selection color, thin dark scrollbars
+// ============================================================
+::selection {
+    background: rgba(var(--tblr-primary-rgb), 0.3);
+}
+
+[data-bs-theme="dark"] {
+    scrollbar-color: #2a2a3a transparent;
+
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: #2a2a3a;
+        border-radius: 999px;
+        border: 2px solid transparent;
+        background-clip: padding-box;
+
+        &:hover {
+            background: #3a3a4e;
+            background-clip: padding-box;
+        }
+    }
+
+    ::-webkit-scrollbar-track,
+    ::-webkit-scrollbar-corner {
+        background: transparent;
+    }
+}
+
+// ============================================================
+//  HTMX motion — content dims while a list refresh is in flight
+// ============================================================
+#object-list-dynamic-content {
+    transition: opacity var(--itambox-duration, 150ms) var(--itambox-ease, ease);
+
+    &.htmx-request {
+        opacity: 0.45;
+        pointer-events: none;
+    }
+}

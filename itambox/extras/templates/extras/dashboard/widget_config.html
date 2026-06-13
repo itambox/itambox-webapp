@@ -26,7 +26,8 @@
         <h6 class="mb-3">{% translate "Widget Settings" %}</h6>
         {% for field in widget_config_form %}
         <div class="mb-3">
-            {% if field.name == 'models' %}
+            {% if field.field.widget.input_type == 'checkbox' and field.field.widget.allow_multiple_selected %}
+                {# Any CheckboxSelectMultiple renders as a checkbox grid #}
                 <label class="form-label">{{ field.label }}</label>
                 <div class="row g-2">
                     {% for checkbox in field %}
