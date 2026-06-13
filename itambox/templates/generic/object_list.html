@@ -78,6 +78,7 @@
             {% endif %}
 
             {% include "generic/includes/beta_banner.html" %}
+            {% include "generic/includes/worker_status_banner.html" %}
 
             <div id="object-list-dynamic-content"
                  hx-get="{{ request.get_full_path }}"
@@ -226,6 +227,91 @@
         </div>
     </div>
     {% endif %}
+
+    {# Bulk Checkout Modal — rendered on Accessory, Consumable, Component lists #}
+    {% if model_name_str == 'inventory.consumable' or model_name_str == 'inventory.consumablestock' or model_name_str == 'inventory.accessory' or model_name_str == 'inventory.accessorystock' or model_name_str == 'inventory.component' or model_name_str == 'inventory.componentstock' %}
+    <div class="modal modal-blur fade" id="bulk-checkout-inventory-modal" tabindex="-1" aria-labelledby="bulkCheckoutModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form id="bulk-checkout-inventory-form" method="post" action="{% url 'inventory:inventory_bulk_checkout' %}" hx-boost="false">
+                    {% csrf_token %}
+                    <input type="hidden" name="model_name" value="{{ model_name_str }}">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="bulkCheckoutModalLabel">{% translate "Bulk Check-out Items" %}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Asset Holder Select -->
+                        <div class="mb-3" id="bulk-checkout-holder-container">
+                            <label for="bulk-checkout-holder" class="form-label">{% translate "Asset Holder" %}</label>
+                            <select name="assigned_holder" id="bulk-checkout-holder" class="form-select">
+                                <option value="">{% translate "— Select an Asset Holder —" %}</option>
+                                {% for holder in asset_holders %}
+                                <option value="{{ holder.pk }}">{{ holder }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <p class="text-muted text-center my-2">{% translate "OR" %}</p>
+
+                        <!-- Location Select -->
+                        <div class="mb-3" id="bulk-checkout-location-container">
+                            <label for="bulk-checkout-location" class="form-label">{% translate "Location" %}</label>
+                            <select name="assigned_location" id="bulk-checkout-location" class="form-select">
+                                <option value="">{% translate "— Select a Location —" %}</option>
+                                {% for location in locations %}
+                                <option value="{{ location.pk }}">{{ location }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <p class="text-muted text-center my-2">{% translate "OR" %}</p>
+
+                        <!-- Asset Select -->
+                        <div class="mb-3" id="bulk-checkout-asset-container">
+                            <label for="bulk-checkout-asset" class="form-label">{% translate "Asset" %}</label>
+                            <select name="assigned_asset" id="bulk-checkout-asset" class="form-select">
+                                <option value="">{% translate "— Select an Asset —" %}</option>
+                                {% for asset in assets %}
+                                <option value="{{ asset.pk }}">{{ asset.asset_tag }} - {{ asset.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- From Location (Only shown if we checkout from Catalog page) -->
+                        {% if model_name_str == 'inventory.consumable' or model_name_str == 'inventory.accessory' or model_name_str == 'inventory.component' %}
+                        <div class="mb-3">
+                            <label for="bulk-checkout-from-location" class="form-label">{% translate "From Location (source of stock)" %}</label>
+                            <select name="from_location" id="bulk-checkout-from-location" class="form-select" required>
+                                <option value="">{% translate "— Select Source Location —" %}</option>
+                                {% for location in locations %}
+                                <option value="{{ location.pk }}">{{ location }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
+
+                        <!-- Quantity -->
+                        <div class="mb-3">
+                            <label for="bulk-checkout-qty" class="form-label">{% translate "Quantity to Check-out (per item)" %}</label>
+                            <input type="number" name="qty" id="bulk-checkout-qty" value="1" min="1" class="form-control" required>
+                        </div>
+
+                        <!-- Notes -->
+                        <div class="mb-3">
+                            <label for="bulk-checkout-notes" class="form-label">{% translate "Notes" %}</label>
+                            <textarea name="notes" id="bulk-checkout-notes" class="form-control" rows="2"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                        <button type="submit" class="btn btn-primary">{% translate "Check-out" %}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 {% endblock page_modals %}
 
 {% block title %}{{ title|default:"List View" }} {% translate "- ITAMbox" %}{% endblock %}
@@ -245,7 +331,7 @@
 
         {% if is_deleted_view %}
             {% if has_soft_delete %}
-            <a href="?deleted=false" class="btn btn-outline-secondary" hx-get="?deleted=false" hx-push-url="true" hx-target="#object-list-dynamic-content">
+            <a href="?deleted=false" class="btn btn-ghost-secondary" hx-get="?deleted=false" hx-push-url="true" hx-target="#object-list-dynamic-content">
                 <i class="mdi mdi-arrow-left me-1"></i>
                 {% translate "Back to Active Items" %}
             </a>
@@ -261,7 +347,7 @@
                 {% endif %}
 
                 {% if import_url %}
-                <a href="{{ import_url }}" class="btn btn-secondary d-none d-sm-inline-block">
+                <a href="{{ import_url }}" class="btn btn-ghost-secondary d-none d-sm-inline-block">
                     <i class="mdi mdi-upload me-1"></i>
                     {% translate "Import" %}
                 </a>
@@ -270,7 +356,7 @@
 
             {# Export — desktop dropdown #}
             <div class="dropdown d-none d-sm-inline-block">
-                <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <button type="button" class="btn btn-ghost-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                     <i class="mdi mdi-download me-1"></i>
                     {% translate "Export" %}
                 </button>
@@ -281,7 +367,8 @@
 
             {% if has_soft_delete %}
                 {% if request.user.is_superuser or perms.core.view_recyclebin %}
-                <a href="?deleted=true" class="btn btn-outline-danger d-none d-sm-inline-block" hx-get="?deleted=true" hx-push-url="true" hx-target="#object-list-dynamic-content">
+                {# Neutral on purpose: this navigates to a view — red made it read as bulk-delete #}
+                <a href="?deleted=true" class="btn btn-ghost-secondary d-none d-sm-inline-block" hx-get="?deleted=true" hx-push-url="true" hx-target="#object-list-dynamic-content">
                     <i class="mdi mdi-trash-can-outline me-1"></i>
                     {% translate "Recycle Bin" %}
                 </a>
@@ -290,7 +377,7 @@
 
             {# Mobile overflow — folds Import / Export / Recycle Bin into a single [...] menu #}
             <div class="dropdown d-sm-none">
-                <button type="button" class="btn btn-outline-secondary btn-icon" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="{% translate 'More actions' %}">
+                <button type="button" class="btn btn-ghost-secondary btn-icon" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="{% translate 'More actions' %}">
                     <i class="mdi mdi-dots-vertical"></i>
                 </button>
                 <div class="dropdown-menu dropdown-menu-end">
@@ -307,8 +394,8 @@
                     {% if has_soft_delete %}
                         {% if request.user.is_superuser or perms.core.view_recyclebin %}
                         <div class="dropdown-divider"></div>
-                        <a class="dropdown-item text-danger" href="?deleted=true" hx-get="?deleted=true" hx-push-url="true" hx-target="#object-list-dynamic-content">
-                            <i class="mdi mdi-trash-can-outline me-2"></i>
+                        <a class="dropdown-item" href="?deleted=true" hx-get="?deleted=true" hx-push-url="true" hx-target="#object-list-dynamic-content">
+                            <i class="mdi mdi-trash-can-outline me-2 text-muted"></i>
                             {% translate "Recycle Bin" %}
                         </a>
                         {% endif %}

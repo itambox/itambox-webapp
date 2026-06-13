@@ -18,7 +18,7 @@
 {% block page_actions %}
     <div class="btn-list">
         {% if is_bookmarkable %}
-        <button type="button" class="btn btn-icon {% if is_bookmarked %}btn-warning{% else %}btn-outline-secondary{% endif %}"
+        <button type="button" class="btn btn-icon {% if is_bookmarked %}btn-soft-warning{% else %}btn-ghost-secondary{% endif %}"
                 hx-post="{% url 'users:bookmark_toggle' content_type_id=bookmark_content_type_id object_id=object.pk %}"
                 hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                 hx-target="this"
@@ -28,7 +28,7 @@
         </button>
         {% endif %}
         {% if is_watchable %}
-        <button type="button" class="btn btn-icon {% if is_watched %}btn-info{% else %}btn-outline-secondary{% endif %}"
+        <button type="button" class="btn btn-icon {% if is_watched %}btn-soft-info{% else %}btn-ghost-secondary{% endif %}"
                 hx-post="{% url 'users:watch_toggle' content_type_id=watch_content_type_id object_id=object.pk %}"
                 hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                 hx-target="this"
@@ -39,21 +39,21 @@
         {% endif %}
         {# --- Standard Edit/Delete using action_urls from context --- #}
         {% if action_urls.edit %}
-        <a href="{{ action_urls.edit }}" class="btn">
+        <a href="{{ action_urls.edit }}" class="btn btn-primary">
             <i class="mdi mdi-pencil-outline"></i>
             {% translate "Edit" %}
         </a>
         {% endif %}
          {% if action_urls.clone %}
-        {# Clone — yellow, matching the table action button. Folds into the [...] menu on mobile. #}
-        <a href="{{ action_urls.clone }}" class="btn btn-warning d-none d-sm-inline-flex" title="{% translate 'Copy/Clone' %}">
+        {# Clone — ghost secondary; folds into the [...] menu on mobile. #}
+        <a href="{{ action_urls.clone }}" class="btn btn-ghost-secondary d-none d-sm-inline-flex" title="{% translate 'Copy/Clone' %}">
             <i class="mdi mdi-content-copy"></i>
             {% translate "Clone" %}
         </a>
         {% endif %}
          {% if action_urls.delete %}
         {# Delete stays visible on tablet/desktop; on mobile it folds into the [...] menu below. #}
-        <a href="{{ action_urls.delete }}" class="btn btn-danger d-none d-sm-inline-flex">
+        <a href="{{ action_urls.delete }}" class="btn btn-ghost-danger d-none d-sm-inline-flex">
             <i class="mdi mdi-trash-can-outline"></i>
             {% translate "Delete" %}
         </a>
@@ -71,7 +71,7 @@
             </button>
             <div class="dropdown-menu dropdown-menu-end">
                 {% if action_urls.clone %}
-                <a class="dropdown-item text-warning" href="{{ action_urls.clone }}">
+                <a class="dropdown-item" href="{{ action_urls.clone }}">
                     <i class="mdi mdi-content-copy me-2"></i>
                     {% translate "Clone" %}
                 </a>
@@ -138,6 +138,11 @@
 <div class="tab-content">
     <div class="tab-pane fade {% if not request.GET.tab or request.GET.tab == 'details' %}show active{% endif %}" id="details" role="tabpanel">
         {% block details_tab %}
+        {% if worker_status %}
+        <div class="mb-3 rounded overflow-hidden border">
+            {% include "generic/includes/worker_status_banner.html" %}
+        </div>
+        {% endif %}
         <div class="row g-3">
             {# --- Left Column: Main area (Panels or primary info) --- #}
             <div class="col-12 col-lg-8">
@@ -385,7 +390,7 @@
                                     <form method="post" action="{% url 'image_attachment_delete' pk=img.pk %}" class="mt-1">
                                         {% csrf_token %}
                                         <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this image?')" title="{% translate 'Delete' %}">×</button>
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" data-confirm="Delete this image?" title="{% translate 'Delete' %}">×</button>
                                     </form>
                                 </div>
                             </div>
@@ -420,7 +425,7 @@
                             <form method="post" action="{% url 'file_attachment_delete' pk=file.pk %}" class="d-inline">
                                 {% csrf_token %}
                                 <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
-                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this file?')" title="{% translate 'Delete' %}">×</button>
+                                <button type="submit" class="btn btn-sm btn-outline-danger" data-confirm="Delete this file?" title="{% translate 'Delete' %}">×</button>
                             </form>
                         </li>
                         {% endfor %}

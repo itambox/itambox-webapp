@@ -130,11 +130,13 @@
     initBulkEditSelectors();
   }
 
-  // Bulk Assign and Bulk Print modal submit handler (asset list only). The modal
+  // Bulk Assign, Bulk Print and Bulk Checkout modal submit handler. The modal
   // forms live outside any selection scope, so they read from the list container.
   document.addEventListener('submit', function (event) {
     const target = event.target as HTMLElement;
-    const form = target.closest<HTMLFormElement>('#bulk-assign-form') || target.closest<HTMLFormElement>('#bulk-print-form');
+    const form = target.closest<HTMLFormElement>('#bulk-assign-form') || 
+                 target.closest<HTMLFormElement>('#bulk-print-form') ||
+                 target.closest<HTMLFormElement>('#bulk-checkout-inventory-form');
     if (!form) return;
 
     const checkboxes = document.querySelectorAll<HTMLInputElement>(
@@ -147,11 +149,13 @@
 
     if (pks.length === 0) {
       event.preventDefault();
-      alert('No assets selected.');
+      alert('No items selected.');
       return;
     }
 
-    const containerId = form.id === 'bulk-assign-form' ? 'bulk-assign-pks' : 'bulk-print-pks';
+    const containerId = form.id === 'bulk-assign-form' ? 'bulk-assign-pks' : 
+                        form.id === 'bulk-print-form' ? 'bulk-print-pks' : 
+                        'bulk-checkout-inventory-pks';
     let container = form.querySelector<HTMLElement>('#' + containerId);
     if (!container) {
       container = document.createElement('div');
@@ -168,6 +172,7 @@
     });
     // Let the event bubble naturally so HTMX or the browser processes the submit
   });
+
 
   // Delegated click handler for bulk delete/edit/restore/purge, scoped to the
   // selection container the button lives in. Aligns with strict CSP (no inline JS).

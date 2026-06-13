@@ -12,6 +12,7 @@
 {% include "htmx/includes/list_oob_header.html" %}
 
 {# --- OOB Swaps (These target elements OUTSIDE #object-list-dynamic-content) --- #}
+{% if filter_form %}
 <div id="filters-sidebar-content" hx-swap-oob="true">
     {% include 'htmx/filter_form_tab.html' %}
 </div>
@@ -19,6 +20,7 @@
 <span id="filters-applied-count" hx-swap-oob="true" class="badge bg-primary ms-2 {% if not filter_form.applied_filters %}d-none{% endif %}">
     {{ filter_form.applied_filters|length|default:"0" }}
 </span>
+{% endif %}
 
 <div id="object-list-pagination" hx-swap-oob="true">
     {% if table.page %}
