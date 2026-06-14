@@ -130,3 +130,14 @@ urlpatterns += [
     path('maintenances/<int:pk>/clone/', views.AssetMaintenanceCloneView.as_view(), name='assetmaintenance_clone'),
     path('maintenances/<int:pk>/delete/', views.AssetMaintenanceDeleteView.as_view(), name='assetmaintenance_delete'),
 ]
+
+urlpatterns += [
+    # Disposal list + CRUD
+    path('disposals/', views.AssetDisposalListView.as_view(), name='assetdisposal_list'),
+    path('disposals/add/', views.AssetDisposalEditView.as_view(), name='assetdisposal_create'),
+    path('disposals/<int:pk>/', views.AssetDisposalDetailView.as_view(), name='assetdisposal_detail'),
+    path('disposals/<int:pk>/edit/', views.AssetDisposalEditView.as_view(), name='assetdisposal_update'),
+    path('disposals/<int:pk>/delete/', views.AssetDisposalDeleteView.as_view(), name='assetdisposal_delete'),
+    # Asset-specific dispose action (pre-fills asset, calls dispose_asset service)
+    path('assets/<int:pk>/dispose/', views.AssetDisposeActionView.as_view(), name='asset_dispose'),
+]

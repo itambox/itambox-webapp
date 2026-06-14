@@ -11,7 +11,7 @@ from itambox.api.viewsets import ITAMBoxModelViewSet
 from assets.models import (
     Asset, AssetRole, Manufacturer, AssetType,
     StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence,
-    AssetAssignment
+    AssetAssignment, AssetDisposal,
 )
 from assets.filters import (
     AssetFilterSet, AssetRoleFilterSet, ManufacturerFilterSet,
@@ -24,7 +24,8 @@ from .serializers import (
     SupplierSerializer, CategorySerializer, AssetRequestSerializer,
     AssetTagSequenceSerializer, AssetAssignmentSerializer,
     AssetCheckOutAPISerializer,
-    AssetCheckInAPISerializer
+    AssetCheckInAPISerializer,
+    AssetDisposalSerializer,
 )
 from assets.services import checkout_asset, checkin_asset
 
@@ -171,6 +172,16 @@ class AssetAssignmentViewSet(ITAMBoxModelViewSet):
     serializer_class = AssetAssignmentSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_fields = ['asset_id', 'is_active', 'checked_out_by_id', 'assigned_user_id']
+
+
+class AssetDisposalViewSet(ITAMBoxModelViewSet):
+    permission_classes = [TokenPermissions, StrictTenantPermission]
+    queryset = AssetDisposal.objects.select_related(
+        'asset', 'asset__asset_type__manufacturer', 'asset__tenant',
+    )
+    serializer_class = AssetDisposalSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_fields = ['asset_id', 'disposal_method', 'data_sanitization_method', 'weee_compliant']
 
 
 

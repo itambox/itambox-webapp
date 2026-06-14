@@ -47,4 +47,8 @@ from .maintenance_views import (
     AssetMaintenanceListView, AssetMaintenanceDetailView, AssetMaintenanceEditView,
     AssetMaintenanceCloneView, AssetMaintenanceDeleteView,
 )
+from .disposal_views import (
+    AssetDisposalListView, AssetDisposalDetailView, AssetDisposalEditView,
+    AssetDisposalDeleteView, AssetDisposeActionView,
+)
 

@@ -1127,6 +1127,128 @@ class AssetAssignment(SoftDeleteMixin, JournalingMixin, TaggableMixin, ChangeLog
         return self.asset.get_absolute_url()
 
 
+class DisposalMethodChoices(models.TextChoices):
+    RESALE = 'resale', _('Resale')
+    RECYCLE = 'recycle', _('Recycle / WEEE')
+    DONATION = 'donation', _('Donation')
+    DESTRUCTION = 'destruction', _('Physical Destruction')
+    RETURN_TO_LESSOR = 'return_to_lessor', _('Return to Lessor')
+    OTHER = 'other', _('Other')
+
+
+class DataSanitizationMethodChoices(models.TextChoices):
+    """NIST SP 800-88 Rev. 1 aligned sanitization methods."""
+    NONE = 'none', _('None / Not Applicable')
+    NIST_CLEAR = 'nist_clear', _('NIST Clear (overwrite)')
+    NIST_PURGE = 'nist_purge', _('NIST Purge (cryptographic or ATA Secure Erase)')
+    NIST_DESTROY = 'nist_destroy', _('NIST Destroy (media destruction)')
+    DOD_3PASS = 'dod_3pass', _('DoD 5220.22-M 3-Pass')
+    DEGAUSS = 'degauss', _('Degaussing')
+    PHYSICAL_DESTRUCTION = 'physical_destruction', _('Physical Destruction (shred/crush)')
+    CRYPTO_ERASE = 'crypto_erase', _('Cryptographic Erase')
+
+
+class AssetDisposal(FileAttachmentMixin, JournalingMixin, SoftDeleteMixin,
+                    ChangeLoggingMixin, BaseModel):
+    """End-of-Life / Disposal record with data-sanitization evidence.
+
+    One record per asset (OneToOne). Tenant-scoped through the parent asset so
+    multi-tenant boundary checks flow through the same ``tenant_lookup`` pattern
+    as AssetMaintenance and AssetAssignment.
+
+    on_delete=PROTECT is used on the asset FK. Rationale: a disposal record is
+    evidence for GDPR Art. 17 / WEEE / SOC 2 audit purposes — deleting the
+    linked asset (which itself requires a vault-grade soft-delete) should not
+    silently cascade and destroy disposal proof. The operator must explicitly
+    delete or nullify the disposal record first, making the destruction of
+    evidence a deliberate, auditable action.
+    """
+
+    tenant_lookup = 'asset__tenant'
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
+
+    @property
+    def tenant(self):
+        return self.asset.tenant if self.asset_id else None
+
+    asset = models.OneToOneField(
+        'Asset',
+        on_delete=models.PROTECT,
+        related_name='disposal',
+        verbose_name=_('Asset'),
+    )
+    disposal_method = models.CharField(
+        max_length=30,
+        choices=DisposalMethodChoices.choices,
+        default=DisposalMethodChoices.DESTRUCTION,
+        verbose_name=_('Disposal Method'),
+        db_index=True,
+    )
+    disposal_date = models.DateField(
+        verbose_name=_('Disposal Date'),
+        db_index=True,
+    )
+    data_sanitization_method = models.CharField(
+        max_length=30,
+        choices=DataSanitizationMethodChoices.choices,
+        default=DataSanitizationMethodChoices.NONE,
+        verbose_name=_('Data Sanitization Method'),
+        help_text=_('NIST SP 800-88 Rev.1 aligned method used to sanitize storage media.'),
+        db_index=True,
+    )
+    sanitization_certificate = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_('Sanitization Certificate / Reference'),
+        help_text=_('Certificate serial number or reference ID from the sanitization vendor.'),
+    )
+    sanitized_by = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_('Sanitized By'),
+        help_text=_('Person or vendor who performed the data sanitization.'),
+    )
+    recipient = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_('Recipient'),
+        help_text=_('Buyer, recycler, charity, or other recipient of the disposed asset.'),
+    )
+    proceeds = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name=_('Proceeds'),
+        help_text=_('Amount received for the asset (resale / salvage). Leave blank if none.'),
+    )
+    currency = CurrencyField()
+    weee_compliant = models.BooleanField(
+        default=False,
+        verbose_name=_('WEEE Compliant'),
+        help_text=_('Disposal was carried out by an authorised WEEE recycler.'),
+    )
+    notes = models.TextField(blank=True, verbose_name=_('Notes'))
+
+    class Meta:
+        ordering = ['-disposal_date']
+        verbose_name = _('Asset Disposal')
+        verbose_name_plural = _('Asset Disposals')
+        permissions = [
+            ('dispose_asset', 'Can record asset disposal / end-of-life'),
+        ]
+
+    def __str__(self):
+        return (
+            f"Disposal of {self.asset} "
+            f"({self.get_disposal_method_display()}, {self.disposal_date})"
+        )
+
+    def get_absolute_url(self):
+        return reverse('assets:assetdisposal_detail', kwargs={'pk': self.pk})
+
+
 class MaintenanceStatusChoices(models.TextChoices):
     SCHEDULED = 'scheduled', 'Scheduled'
     IN_PROGRESS = 'in_progress', 'In Progress'

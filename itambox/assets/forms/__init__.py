@@ -10,6 +10,7 @@ from .category_form import CategoryForm
 from .request_forms import AssetRequestForm, AssetRequestResponseForm
 from .tag_sequence_form import AssetTagSequenceForm
 from .audit_forms import AssetAuditConfirmForm
+from .disposal_form import AssetDisposalForm
 from .checkout_forms import *
 from .filter_forms import *
 from .bulk_forms import *

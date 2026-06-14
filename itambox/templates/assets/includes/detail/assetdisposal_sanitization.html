@@ -1,0 +1,27 @@
+{% load i18n %}
+<dl class="row mb-0">
+    <dt class="col-sm-4">{% translate "Sanitization Method:" %}</dt>
+    <dd class="col-sm-8">
+        <span class="badge bg-blue-lt px-2 py-1">
+            {{ object.get_data_sanitization_method_display }}
+        </span>
+    </dd>
+
+    <dt class="col-sm-4">{% translate "Sanitized By:" %}</dt>
+    <dd class="col-sm-8">
+        {% if object.sanitized_by %}
+            {{ object.sanitized_by }}
+        {% else %}
+            <span class="text-muted"><i>{% translate "Not specified" %}</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">{% translate "Certificate / Reference:" %}</dt>
+    <dd class="col-sm-8">
+        {% if object.sanitization_certificate %}
+            <code>{{ object.sanitization_certificate }}</code>
+        {% else %}
+            <span class="text-muted"><i>{% translate "No certificate on record" %}</i></span>
+        {% endif %}
+    </dd>
+</dl>

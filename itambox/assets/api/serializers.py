@@ -11,7 +11,7 @@ from itambox.api.nested_serializers import (
 from assets.models import (
     Asset, AssetRole, Manufacturer, AssetType,
     StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence,
-    AssetAssignment
+    AssetAssignment, AssetDisposal,
 )
 from organization.models import Location, Tenant
 from software.models import Software
@@ -245,6 +245,36 @@ class AssetAssignmentSerializer(BaseModelSerializer):
             return str(obj.assigned_to)
         except Exception:
             return None
+
+
+class AssetDisposalSerializer(BaseModelSerializer):
+    asset = NestedAssetSerializer(read_only=True)
+    asset_id = serializers.PrimaryKeyRelatedField(
+        queryset=Asset.objects.all(), source='asset', write_only=True,
+    )
+    disposal_method_display = serializers.CharField(
+        source='get_disposal_method_display', read_only=True
+    )
+    data_sanitization_method_display = serializers.CharField(
+        source='get_data_sanitization_method_display', read_only=True
+    )
+
+    class Meta:
+        model = AssetDisposal
+        fields = [
+            'id',
+            'asset', 'asset_id',
+            'disposal_method', 'disposal_method_display',
+            'disposal_date',
+            'data_sanitization_method', 'data_sanitization_method_display',
+            'sanitization_certificate', 'sanitized_by',
+            'recipient',
+            'proceeds', 'currency',
+            'weee_compliant',
+            'notes',
+            'created_at', 'updated_at',
+        ]
+        brief_fields = ['id', 'asset', 'disposal_method', 'disposal_date']
 
 
 class AssetCheckOutAPISerializer(serializers.Serializer):
