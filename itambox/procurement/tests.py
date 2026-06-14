@@ -318,6 +318,7 @@ class ProcurementStatusTransitionTests(TestCase):
 
 from procurement.forms import PurchaseOrderForm, PurchaseOrderLineForm
 from organization.models import Tenant
+from core.currency import CURRENCY_CHOICES
 
 class PurchaseOrderFormTests(TestCase):
     def setUp(self):
@@ -415,4 +416,128 @@ class PurchaseOrderLineFormTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn('asset_type', form.errors)
         self.assertIn("Please select a Asset type.", form.errors['asset_type'])
+
+
+class PurchaseOrderCurrencyTests(TestCase):
+    """Tests for the per-PO currency field and the PurchaseOrderLine.currency property."""
+
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username='currencyuser', email='currency@example.com', password='password'
+        )
+        self.site = Site.objects.create(name='Currency Site', slug='currency-site')
+        self.location = Location.objects.create(
+            name='Currency Location', slug='currency-location', site=self.site
+        )
+        self.supplier = Supplier.objects.create(name='Currency Supplier', slug='currency-supplier')
+        self.manufacturer = Manufacturer.objects.create(
+            name='Currency Manufacturer', slug='currency-manufacturer'
+        )
+        self.asset_type = AssetType.objects.create(
+            manufacturer=self.manufacturer,
+            model='Currency Model',
+            slug='currency-model',
+            requestable=False,
+        )
+
+    def _make_po(self, currency=''):
+        return PurchaseOrder.objects.create(
+            order_number=f'PO-CUR-{currency or "blank"}',
+            supplier=self.supplier,
+            destination_location=self.location,
+            created_by=self.user,
+            currency=currency,
+        )
+
+    # --- PurchaseOrder.currency field ---
+
+    def test_currency_defaults_to_blank(self):
+        """A new PO should default to blank (inherit tenant currency at display time)."""
+        po = self._make_po()
+        self.assertEqual(po.currency, '')
+
+    def test_currency_explicit_value_stored(self):
+        """An explicit ISO currency code must round-trip through the DB."""
+        po = self._make_po(currency='USD')
+        po.refresh_from_db()
+        self.assertEqual(po.currency, 'USD')
+
+    def test_currency_choices_are_valid(self):
+        """All CURRENCY_CHOICES codes must be accepted by the field."""
+        valid_codes = [code for code, _ in CURRENCY_CHOICES]
+        for code in valid_codes:
+            po = PurchaseOrder(
+                order_number=f'PO-CHK-{code}',
+                supplier=self.supplier,
+                destination_location=self.location,
+                created_by=self.user,
+                currency=code,
+            )
+            # full_clean validates choices; this must not raise
+            po.full_clean()
+
+    def test_currency_field_in_form(self):
+        """PurchaseOrderForm must expose the currency field."""
+        form = PurchaseOrderForm()
+        self.assertIn('currency', form.fields)
+
+    def test_form_saves_currency(self):
+        """PurchaseOrderForm must persist an explicit currency on save."""
+        tenant = Tenant.objects.create(name='Curr Tenant', slug='curr-tenant')
+        form_data = {
+            'order_number': 'PO-FORM-GBP',
+            'supplier': self.supplier.pk,
+            'currency': 'GBP',
+            'order_date': '2026-06-14',
+            'expected_delivery_date': '2026-07-01',
+            'destination_location': self.location.pk,
+            'tenant': tenant.pk,
+            'notes': '',
+        }
+        form = PurchaseOrderForm(data=form_data)
+        self.assertTrue(form.is_valid(), form.errors)
+        po = form.save()
+        self.assertEqual(po.currency, 'GBP')
+
+    def test_form_saves_blank_currency(self):
+        """An empty currency selection must save as blank (tenant-fallback semantics)."""
+        tenant = Tenant.objects.create(name='Curr Tenant 2', slug='curr-tenant-2')
+        form_data = {
+            'order_number': 'PO-FORM-BLANK',
+            'supplier': self.supplier.pk,
+            'currency': '',
+            'order_date': '2026-06-14',
+            'expected_delivery_date': '2026-07-01',
+            'destination_location': self.location.pk,
+            'tenant': tenant.pk,
+            'notes': '',
+        }
+        form = PurchaseOrderForm(data=form_data)
+        self.assertTrue(form.is_valid(), form.errors)
+        po = form.save()
+        self.assertEqual(po.currency, '')
+
+    # --- PurchaseOrderLine.currency property ---
+
+    def test_line_currency_delegates_to_po(self):
+        """PurchaseOrderLine.currency must return the parent PO's currency."""
+        po = self._make_po(currency='EUR')
+        line = PurchaseOrderLine.objects.create(
+            purchase_order=po,
+            asset_type=self.asset_type,
+            qty_ordered=2,
+            unit_price='99.99',
+        )
+        self.assertEqual(line.currency, 'EUR')
+
+    def test_line_currency_blank_when_po_currency_blank(self):
+        """When the PO has no explicit currency, the line property also returns blank."""
+        po = self._make_po(currency='')
+        line = PurchaseOrderLine.objects.create(
+            purchase_order=po,
+            asset_type=self.asset_type,
+            qty_ordered=1,
+            unit_price='10.00',
+        )
+        self.assertEqual(line.currency, '')
 

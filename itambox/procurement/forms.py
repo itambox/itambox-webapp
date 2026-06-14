@@ -7,13 +7,14 @@ from .models import PurchaseOrder, PurchaseOrderLine
 class PurchaseOrderForm(forms.ModelForm):
     class Meta:
         model = PurchaseOrder
-        fields = ['order_number', 'supplier', 'order_date', 'expected_delivery_date', 'destination_location', 'tenant', 'notes']
+        fields = ['order_number', 'supplier', 'currency', 'order_date', 'expected_delivery_date', 'destination_location', 'tenant', 'notes']
         widgets = {
             'order_date': forms.DateInput(attrs={'type': 'date'}),
             'expected_delivery_date': forms.DateInput(attrs={'type': 'date'}),
             'supplier': forms.Select(attrs={'data-tom-select': ''}),
             'destination_location': forms.Select(attrs={'data-tom-select': ''}),
             'tenant': forms.Select(attrs={'data-tom-select': ''}),
+            'currency': forms.Select(attrs={'data-tom-select': ''}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -26,13 +27,17 @@ class PurchaseOrderForm(forms.ModelForm):
                 css_class='form-row'
             ),
             Row(
+                Column('currency', css_class='form-group col-md-6 mb-0'),
+                Column('tenant', css_class='form-group col-md-6 mb-0'),
+                css_class='form-row'
+            ),
+            Row(
                 Column('order_date', css_class='form-group col-md-6 mb-0'),
                 Column('expected_delivery_date', css_class='form-group col-md-6 mb-0'),
                 css_class='form-row'
             ),
             Row(
                 Column('destination_location', css_class='form-group col-md-6 mb-0'),
-                Column('tenant', css_class='form-group col-md-6 mb-0'),
                 css_class='form-row'
             ),
             'notes',

@@ -2,6 +2,7 @@ from django.db import models
 from django.urls import reverse
 from core.models import BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin
 from core.managers import TenantScopingSoftDeleteManager
+from core.currency import CurrencyField
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 
@@ -30,6 +31,7 @@ class PurchaseOrder(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixi
         'organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='purchase_orders'
     )
     order_number = models.CharField(max_length=100, db_index=True)
+    currency = CurrencyField()
     supplier = models.ForeignKey(
         'assets.Supplier', on_delete=models.PROTECT, related_name='purchase_orders'
     )
@@ -92,6 +94,11 @@ class PurchaseOrderLine(BaseModel, ChangeLoggingMixin, SoftDeleteMixin):
     def __str__(self):
         item = self.asset_type or self.component or self.accessory or self.consumable or self.license or "Unknown Item"
         return f"{self.qty_ordered}x {item} for PO {self.purchase_order.order_number}"
+
+    @property
+    def currency(self):
+        """Delegate to the parent PO's currency so ``{{ line.unit_price|money:line }}`` resolves correctly."""
+        return self.purchase_order.currency
 
     @property
     def qty_outstanding(self):
