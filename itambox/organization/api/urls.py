@@ -2,7 +2,8 @@ from itambox.api.routers import ITAMBoxRouter
 from .views import (
     SiteViewSet, RegionViewSet, SiteGroupViewSet, LocationViewSet,
     TenantViewSet, TenantGroupViewSet, AssetHolderViewSet,
-    ContactViewSet, ContactRoleViewSet, ContactAssignmentViewSet
+    ContactViewSet, ContactRoleViewSet, ContactAssignmentViewSet,
+    CostCenterViewSet,
 )
 
 app_name = 'organization_api'
@@ -19,5 +20,6 @@ router.register(r'asset-holders', AssetHolderViewSet)
 router.register(r'contacts', ContactViewSet)
 router.register(r'contact-roles', ContactRoleViewSet)
 router.register(r'contact-assignments', ContactAssignmentViewSet)
+router.register(r'cost-centers', CostCenterViewSet)
 
 urlpatterns = router.urls

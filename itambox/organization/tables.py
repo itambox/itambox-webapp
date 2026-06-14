@@ -1,7 +1,7 @@
 # itambox/organization/tables.py
 import django_tables2 as tables
 from django_tables2.utils import A
-from .models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, Contact, ContactRole, ContactAssignment, TenantRole, TenantMembership
+from .models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, Contact, ContactRole, ContactAssignment, TenantRole, TenantMembership, CostCenter
 from core.tables import ActionsColumn, BaseTable, ToggleColumn
 from extras.tables import TagColumn
 
@@ -282,4 +282,21 @@ class TenantMembershipTable(BaseTable):
         fields = ('pk', 'user', 'tenant', 'role', 'joined_at', 'actions')
         default_columns = ('pk', 'user', 'tenant', 'role', 'joined_at', 'actions')
 
- 
+
+class CostCenterTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    name = tables.LinkColumn('organization:costcenter_detail', args=[A('pk')], verbose_name='Name')
+    code = tables.Column(verbose_name='Code')
+    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant', verbose_name='Tenant')
+    parent = tables.LinkColumn('organization:costcenter_detail', args=[A('parent_id')], accessor='parent', verbose_name='Parent')
+    child_count = tables.Column(verbose_name='Sub-units', orderable=False)
+    is_active = tables.BooleanColumn(verbose_name='Active')
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = CostCenter
+        fields = ('pk', 'code', 'name', 'tenant', 'parent', 'description', 'child_count', 'is_active', 'actions')
+        default_columns = ('pk', 'code', 'name', 'tenant', 'parent', 'child_count', 'is_active', 'actions')
+
+    def render_child_count(self, value, record=None):
+        return value or 0

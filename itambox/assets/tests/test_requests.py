@@ -1030,8 +1030,7 @@ class RequisitionSystemTestCase(TestCase):
             'form-0-order_number': 'ORD-999-AA',
             'form-0-purchase_cost': '1250.00',
             'form-0-purchase_date': '2026-06-01',
-            'form-0-warranty_expiration': '2029-06-01',
-            
+
             # Form 1
             'form-1-request_id': req2.pk,
             'form-1-asset_tag': f"{seq.prefix}{next_tag_val+1:0{seq.zero_padding}d}",
@@ -1043,8 +1042,7 @@ class RequisitionSystemTestCase(TestCase):
             'form-1-order_number': 'ORD-999-AA',
             'form-1-purchase_cost': '1250.00',
             'form-1-purchase_date': '2026-06-01',
-            'form-1-warranty_expiration': '2029-06-01',
-            
+
             'submit': 'Receive & Allocate Stock'
         }
         
@@ -1064,7 +1062,6 @@ class RequisitionSystemTestCase(TestCase):
         self.assertEqual(req1.asset.order_number, 'ORD-999-AA')
         self.assertEqual(req1.asset.purchase_cost, Decimal('1250.00'))
         self.assertEqual(req1.asset.purchase_date.strftime('%Y-%m-%d'), '2026-06-01')
-        self.assertEqual(req1.asset.warranty_expiration.strftime('%Y-%m-%d'), '2029-06-01')
         
         self.assertIsNotNone(req2.asset)
         self.assertEqual(req2.asset.serial_number, 'SERIAL-REC-2222')
@@ -1075,7 +1072,6 @@ class RequisitionSystemTestCase(TestCase):
         self.assertEqual(req2.asset.order_number, 'ORD-999-AA')
         self.assertEqual(req2.asset.purchase_cost, Decimal('1250.00'))
         self.assertEqual(req2.asset.purchase_date.strftime('%Y-%m-%d'), '2026-06-01')
-        self.assertEqual(req2.asset.warranty_expiration.strftime('%Y-%m-%d'), '2029-06-01')
 
         # Verify the sequence was incremented
         seq.refresh_from_db()
@@ -1141,7 +1137,6 @@ class RequisitionSystemTestCase(TestCase):
             'form-0-order_number': '',     # optional field — must store '' not raise IntegrityError
             'form-0-purchase_cost': '999.00',
             'form-0-purchase_date': '2026-06-11',
-            'form-0-warranty_expiration': '',
             'submit': 'Receive & Allocate Stock',
         }
         bulk_url = reverse('assets:request_bulk_receive')

@@ -151,7 +151,7 @@ class ContractForm(forms.ModelForm):
             'supplier', 'cost', 'currency', 'billing_cycle',
             'start_date', 'end_date', 'renewal_date', 'auto_renew',
             'sla_response_time', 'sla_resolution_time', 'coverage_hours', 'sla_terms',
-            'assets', 'purchase_order', 'tenant', 'notes',
+            'assets', 'purchase_order', 'cost_center', 'tenant', 'notes',
         ]
         widgets = {
             'start_date': forms.DateInput(attrs={'type': 'date'}),
@@ -159,6 +159,7 @@ class ContractForm(forms.ModelForm):
             'renewal_date': forms.DateInput(attrs={'type': 'date'}),
             'supplier': forms.Select(attrs={'data-tom-select': ''}),
             'purchase_order': forms.Select(attrs={'data-tom-select': ''}),
+            'cost_center': forms.Select(attrs={'data-tom-select': ''}),
             'tenant': forms.Select(attrs={'data-tom-select': ''}),
             'currency': forms.Select(attrs={'data-tom-select': ''}),
             'contract_type': forms.Select(attrs={'class': 'form-select'}),
@@ -169,6 +170,18 @@ class ContractForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        # Scope tenant-aware querysets to the active tenant
+        from core.managers import get_current_tenant
+        tenant = get_current_tenant()
+        if tenant:
+            self.fields['assets'].queryset = self.fields['assets'].queryset.filter(tenant=tenant)
+            # CostCenter will be tenant-scoped once that model lands; guard with hasattr
+            # to avoid errors if the FK target doesn't exist yet (concurrent migration).
+            cc_qs = self.fields['cost_center'].queryset
+            if hasattr(cc_qs.model, 'tenant'):
+                self.fields['cost_center'].queryset = cc_qs.filter(tenant=tenant)
+
         self.helper = FormHelper()
         self.helper.layout = Layout(
             Row(
@@ -191,6 +204,10 @@ class ContractForm(forms.ModelForm):
                 Column('cost', css_class='form-group col-md-4 mb-0'),
                 Column('currency', css_class='form-group col-md-4 mb-0'),
                 Column('billing_cycle', css_class='form-group col-md-4 mb-0'),
+                css_class='form-row'
+            ),
+            Row(
+                Column('cost_center', css_class='form-group col-md-6 mb-0'),
                 css_class='form-row'
             ),
             Row(

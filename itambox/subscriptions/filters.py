@@ -2,7 +2,7 @@ import django_filters
 from core.filters import BaseFilterSet
 from django.db.models import Q
 from django import forms
-from organization.models import Tenant
+from organization.models import Tenant, CostCenter
 from .models import Provider, Subscription, SubscriptionAssignment, SubscriptionStatusChoices, SubscriptionTypeChoices
 
 
@@ -34,6 +34,11 @@ class SubscriptionFilterSet(BaseFilterSet):
         widget=forms.Select(attrs={'class': 'form-select'}),
         label='Provider'
     )
+    cost_center = django_filters.ModelChoiceFilter(
+        queryset=CostCenter.objects.filter(is_active=True),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Cost Center'
+    )
     renewal_within = django_filters.NumberFilter(
         method='filter_renewal_within',
         label='Renews Within (Days)',
@@ -42,7 +47,7 @@ class SubscriptionFilterSet(BaseFilterSet):
 
     class Meta:
         model = Subscription
-        fields = ['type', 'status', 'tenant', 'provider']
+        fields = ['type', 'status', 'tenant', 'provider', 'cost_center']
 
     def search(self, queryset, name, value):
         if not value.strip():

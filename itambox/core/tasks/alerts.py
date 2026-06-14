@@ -415,26 +415,28 @@ def _match_renewal_due(rule, today):
 
 
 def _match_warranty_expiry(rule, today):
-    from assets.models import Asset
+    from assets.models import Warranty
 
     deadline = today + timezone.timedelta(days=rule.threshold_value)
-    qs = Asset.objects.filter(
+    qs = Warranty.objects.filter(
         deleted_at__isnull=True,
-        warranty_expiration__lte=deadline,
-        warranty_expiration__gte=today,
-    ).select_related('asset_type')
+        asset__deleted_at__isnull=True,
+        end_date__lte=deadline,
+        end_date__gte=today,
+    ).select_related('asset', 'asset__asset_type')
     if rule.tenant:
-        qs = qs.filter(tenant=rule.tenant)
+        qs = qs.filter(asset__tenant=rule.tenant)
 
     matches = []
-    for asset in qs:
-        days_left = (asset.warranty_expiration - today).days
+    for warranty in qs:
+        asset = warranty.asset
+        days_left = (warranty.end_date - today).days
         matches.append({
             'obj': asset, 'tenant': asset.tenant,
             'subject': f"Warranty Expiring: {asset.asset_tag}",
             'message': (
-                f"Asset {asset.asset_tag} ({asset.name}) warranty expires on "
-                f"{asset.warranty_expiration:%Y-%m-%d} ({days_left} day(s) remaining)."
+                f"Asset {asset.asset_tag} ({asset.name}) {warranty.get_warranty_type_display()} "
+                f"warranty expires on {warranty.end_date:%Y-%m-%d} ({days_left} day(s) remaining)."
             ),
         })
     return matches

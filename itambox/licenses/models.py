@@ -84,6 +84,14 @@ class License(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
     notes = models.TextField(blank=True)
     tags = models.ManyToManyField(Tag, blank=True, related_name='licenses')
     supplier = models.ForeignKey('assets.Supplier', on_delete=models.SET_NULL, blank=True, null=True, related_name='licenses', db_index=True)
+    cost_center = models.ForeignKey(
+        'organization.CostCenter',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='licenses',
+        db_index=True,
+    )
     subscription = models.ForeignKey(
         'subscriptions.Subscription',
         on_delete=models.SET_NULL,
@@ -186,6 +194,18 @@ class LicenseSeatAssignment(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
         related_name='license_assignments',
         db_index=True
     )
+    # Optional precise link: an asset-assigned seat may point at the exact
+    # InstalledSoftware row it covers (seat-level SAM).  Only valid when the
+    # seat is asset-assigned (holder seats have no associated install), and the
+    # install must be on the same asset — enforced in clean().
+    installed_software = models.ForeignKey(
+        'software.InstalledSoftware',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='covering_seats',
+        db_index=True,
+    )
     assigned_date = models.DateTimeField(auto_now_add=True, editable=False)
     notes = models.TextField(blank=True)
 
@@ -210,7 +230,12 @@ class LicenseSeatAssignment(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
         return self.license.get_absolute_url()
 
     def clean(self):
-        """Ensure assignment is to either asset or holder, not both or neither."""
+        """Ensure assignment is to either asset or holder, not both or neither.
+
+        Also validates the optional ``installed_software`` link:
+        - It may only be set on asset-assigned seats (not holder-assigned seats).
+        - The install's asset must match the seat's asset (same physical machine).
+        """
         super().clean()
         if self.asset and self.assigned_holder:
             raise ValidationError(
@@ -222,3 +247,19 @@ class LicenseSeatAssignment(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
                  _("A license seat must be assigned to either an Asset or an Asset Holder."),
                  code='missing_assignment'
              )
+        if self.installed_software_id is not None:
+            if self.assigned_holder_id is not None:
+                raise ValidationError(
+                    {'installed_software': _(
+                        "An install link can only be set on asset-assigned seats, "
+                        "not on holder-assigned seats."
+                    )},
+                    code='install_link_holder_seat',
+                )
+            if self.asset_id is not None and self.installed_software.asset_id != self.asset_id:
+                raise ValidationError(
+                    {'installed_software': _(
+                        "The linked install must be on the same asset as this seat assignment."
+                    )},
+                    code='install_asset_mismatch',
+                )

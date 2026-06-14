@@ -257,6 +257,16 @@ class Contract(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin):
         help_text='The PO this contract originated from, if any',
     )
 
+    # --- Cost center ---
+    cost_center = models.ForeignKey(
+        'organization.CostCenter',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='contracts',
+        verbose_name='Cost Center',
+    )
+
     # --- Notes ---
     notes = models.TextField(blank=True)
 

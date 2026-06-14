@@ -51,4 +51,11 @@ from .disposal_views import (
     AssetDisposalListView, AssetDisposalDetailView, AssetDisposalEditView,
     AssetDisposalDeleteView, AssetDisposeActionView,
 )
+from .warranty_views import (
+    WarrantyListView, WarrantyDetailView, WarrantyEditView, WarrantyDeleteView,
+)
+from .reservation_views import (
+    AssetReservationListView, AssetReservationDetailView,
+    AssetReservationEditView, AssetReservationDeleteView,
+)
 

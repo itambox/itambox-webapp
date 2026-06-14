@@ -24,9 +24,9 @@ class ProviderAdmin(admin.ModelAdmin):
 class SubscriptionAdmin(admin.ModelAdmin):
     list_display = ('name', 'provider', 'tenant', 'status', 'type', 'renewal_date', 'renewal_cost', 'currency', 'auto_renewal')
     list_filter = ('status', 'type', 'provider', 'tenant', 'auto_renewal', 'tags', 'billing_cycle')
-    search_fields = ('name', 'provider__name', 'contract_reference', 'cost_center', 'description', 'notes', 'tenant__name')
+    search_fields = ('name', 'provider__name', 'contract_reference', 'cost_center__name', 'description', 'notes', 'tenant__name')
     readonly_fields = ('created_at', 'updated_at', 'is_expired_display', 'days_until_renewal_display')
-    raw_id_fields = ('provider', 'owner', 'tenant')
+    raw_id_fields = ('provider', 'owner', 'tenant', 'cost_center')
     filter_horizontal = ('tags',)
     inlines = [SubscriptionAssignmentInline]
     date_hierarchy = 'renewal_date'

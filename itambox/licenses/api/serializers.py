@@ -5,9 +5,9 @@ from licenses.models import License, LicenseSeatAssignment
 from extras.api.serializers import TagSerializer
 from software.api.serializers import SoftwareSerializer
 from organization.api.serializers import AssetHolderSerializer, NestedTenantSerializer
-from software.models import Software
+from software.models import Software, InstalledSoftware
 from subscriptions.models import Subscription
-from organization.models import Tenant, AssetHolder
+from organization.models import Tenant, AssetHolder, CostCenter
 from assets.models import Asset
 
 
@@ -29,6 +29,11 @@ class LicenseSerializer(BaseModelSerializer):
     subscription_id = serializers.PrimaryKeyRelatedField(
         queryset=Subscription.objects.all(), source='subscription', write_only=True, required=False, allow_null=True
     )
+    cost_center = serializers.StringRelatedField(read_only=True)
+    cost_center_id = serializers.PrimaryKeyRelatedField(
+        source='cost_center', queryset=CostCenter.objects.all(),
+        write_only=True, required=False, allow_null=True,
+    )
 
     class Meta:
         model = License
@@ -37,6 +42,7 @@ class LicenseSerializer(BaseModelSerializer):
             'seats', 'available_seats', 'purchase_date', 'purchase_cost', 'currency',
             'order_number', 'version', 'expiration_date', 'notes', 'tags', 'tenant', 'tenant_id',
             'subscription', 'subscription_id',
+            'cost_center', 'cost_center_id',
             'created_at', 'updated_at'
         )
         brief_fields = ['id', 'name', 'software', 'license_type', 'seats', 'available_seats']
@@ -55,12 +61,23 @@ class LicenseSeatAssignmentSerializer(BaseModelSerializer):
     assigned_holder_id = serializers.PrimaryKeyRelatedField(
         queryset=AssetHolder.objects.all(), source='assigned_holder', write_only=True, required=False, allow_null=True
     )
+    # Optional precise install link (seat-level SAM).  Read: nested string repr;
+    # write: bare PK via installed_software_id.
+    installed_software = serializers.StringRelatedField(read_only=True)
+    installed_software_id = serializers.PrimaryKeyRelatedField(
+        queryset=InstalledSoftware.objects.all(),
+        source='installed_software',
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
 
     class Meta:
         model = LicenseSeatAssignment
         fields = (
-            'id', 'license', 'license_id', 'asset', 'asset_id', 'assigned_holder', 'assigned_holder_id', 'assigned_date',
-            'notes', 'created_at', 'updated_at'
+            'id', 'license', 'license_id', 'asset', 'asset_id', 'assigned_holder', 'assigned_holder_id',
+            'installed_software', 'installed_software_id',
+            'assigned_date', 'notes', 'created_at', 'updated_at'
         )
         brief_fields = ['id', 'license', 'asset']
 

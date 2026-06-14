@@ -178,6 +178,7 @@ class ReconcileSoftwareTests(TenantTestMixin, TestCase):
             'software_id', 'software_name',
             'installed_count', 'entitled_seats',
             'delta', 'compliant', 'status',
+            'linked_seats',
         }
         self.assertEqual(set(result.keys()), expected_keys)
         self.assertEqual(result['software_id'], sw.pk)

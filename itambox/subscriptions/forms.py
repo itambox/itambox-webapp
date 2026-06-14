@@ -3,7 +3,7 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Div, Row, Column
 from django.urls import reverse
 from core.forms import FilterForm
-from organization.models import Tenant, TenantGroup, AssetHolder, Location
+from organization.models import Tenant, TenantGroup, AssetHolder, Location, CostCenter
 from assets.models import Asset
 from django.db import models as db_models
 from .models import Provider, Subscription, SubscriptionAssignment
@@ -79,6 +79,12 @@ class SubscriptionForm(CustomFieldModelFormMixin, forms.ModelForm):
         widget=forms.Select(attrs={'class': 'form-select'}),
         label="Tenant"
     )
+    cost_center = forms.ModelChoiceField(
+        queryset=CostCenter.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Cost Center",
+    )
 
     class Meta:
         model = Subscription
@@ -104,7 +110,6 @@ class SubscriptionForm(CustomFieldModelFormMixin, forms.ModelForm):
             'term_months': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
             'licensed_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
             'contract_reference': forms.TextInput(attrs={'class': 'form-control'}),
-            'cost_center': forms.TextInput(attrs={'class': 'form-control'}),
             'cancellation_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'owner': forms.Select(attrs={'class': 'form-select'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),

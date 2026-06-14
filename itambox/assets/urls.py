@@ -141,3 +141,21 @@ urlpatterns += [
     # Asset-specific dispose action (pre-fills asset, calls dispose_asset service)
     path('assets/<int:pk>/dispose/', views.AssetDisposeActionView.as_view(), name='asset_dispose'),
 ]
+
+urlpatterns += [
+    # Warranty CRUD
+    path('warranties/', views.WarrantyListView.as_view(), name='warranty_list'),
+    path('warranties/add/', views.WarrantyEditView.as_view(), name='warranty_create'),
+    path('warranties/<int:pk>/', views.WarrantyDetailView.as_view(), name='warranty_detail'),
+    path('warranties/<int:pk>/edit/', views.WarrantyEditView.as_view(), name='warranty_update'),
+    path('warranties/<int:pk>/delete/', views.WarrantyDeleteView.as_view(), name='warranty_delete'),
+]
+
+urlpatterns += [
+    # Asset Reservation CRUD
+    path('reservations/', views.AssetReservationListView.as_view(), name='assetreservation_list'),
+    path('reservations/add/', views.AssetReservationEditView.as_view(), name='assetreservation_create'),
+    path('reservations/<int:pk>/', views.AssetReservationDetailView.as_view(), name='assetreservation_detail'),
+    path('reservations/<int:pk>/edit/', views.AssetReservationEditView.as_view(), name='assetreservation_update'),
+    path('reservations/<int:pk>/delete/', views.AssetReservationDeleteView.as_view(), name='assetreservation_delete'),
+]

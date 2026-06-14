@@ -880,12 +880,18 @@ class SnipeITImporter:
                             obj.location = location
                             obj.purchase_date = purchase_date
                             obj.purchase_cost = purchase_cost
-                            obj.warranty_expiration = warranty_expiration
                             obj.order_number = order_number
                             obj.notes = notes
                             obj.supplier = supplier
                             obj.custom_field_data.update(cf_data)
                             obj.save()
+                            if warranty_expiration and purchase_date:
+                                from assets.models import Warranty, WarrantyTypeChoices
+                                Warranty.objects.update_or_create(
+                                    asset=obj, warranty_type=WarrantyTypeChoices.HARDWARE,
+                                    defaults={'start_date': purchase_date, 'end_date': warranty_expiration,
+                                              'provider': supplier.name if supplier else ''},
+                                )
                         c['updated'] += 1
                         self._asset_map[sid] = obj
                         continue
@@ -901,7 +907,6 @@ class SnipeITImporter:
                             tenant=tenant,
                             purchase_date=purchase_date,
                             purchase_cost=purchase_cost,
-                            warranty_expiration=warranty_expiration,
                             order_number=order_number,
                             notes=notes,
                             supplier=supplier,
@@ -909,6 +914,13 @@ class SnipeITImporter:
                         )
                     else:
                         obj = Asset(id=-sid, asset_tag=asset_tag, tenant=tenant)
+                    if not self.dry_run and warranty_expiration and purchase_date:
+                        from assets.models import Warranty, WarrantyTypeChoices
+                        Warranty.objects.update_or_create(
+                            asset=obj, warranty_type=WarrantyTypeChoices.HARDWARE,
+                            defaults={'start_date': purchase_date, 'end_date': warranty_expiration,
+                                      'provider': supplier.name if supplier else ''},
+                        )
                     c['created'] += 1
                     self._asset_map[sid] = obj
 

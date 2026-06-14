@@ -73,8 +73,8 @@
     <dt class="col-sm-3">{% translate "Purchase Date:" %}</dt>
     <dd class="col-sm-9 text-secondary">{% if object.purchase_date %}{{object.purchase_date|date:"Y-m-d"}}{% else %}<span class='text-muted'><i>Not Set</i></span>{% endif %}</dd>
 
-    <dt class="col-sm-3">{% translate "Warranty Expiration:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{% if object.warranty_expiration %}{{object.warranty_expiration|date:"Y-m-d"}}{% else %}<span class='text-muted'><i>Not Set</i></span>{% endif %}</dd>
+    <dt class="col-sm-3">{% translate "Warranty Until:" %}</dt>
+    <dd class="col-sm-9 text-secondary">{% if object.current_warranty_end %}{{object.current_warranty_end|date:"Y-m-d"}}{% else %}<span class='text-muted'><i>No active warranty</i></span>{% endif %}</dd>
 
     <dt class="col-sm-3">{% translate "Purchase Cost:" %}</dt>
     <dd class="col-sm-9 text-secondary">

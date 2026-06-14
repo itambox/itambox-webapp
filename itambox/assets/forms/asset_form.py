@@ -48,10 +48,6 @@ class AssetForm(forms.ModelForm):
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
         required=False
     )
-    warranty_expiration = forms.DateField(
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-        required=False
-    )
     requestable = forms.ChoiceField(
         choices=[
             ('', 'Inherit from Asset Type (Default)'),
@@ -68,8 +64,9 @@ class AssetForm(forms.ModelForm):
         fields = [
             'name', 'asset_tag', 'serial_number', 'asset_type',
             'asset_role', 'status', 'location', 'tenant',
-            'purchase_date', 'warranty_expiration',
+            'purchase_date',
             'purchase_cost', 'salvage_value', 'currency', 'order_number', 'supplier',
+            'cost_center',
             'in_service_date', 'depreciation_override',
             'notes', 'tags', 'requestable'
         ]
@@ -87,6 +84,7 @@ class AssetForm(forms.ModelForm):
             'tenant': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
             'tags': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
             'supplier': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+            'cost_center': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
         }
 
     def clean_status(self):
@@ -329,7 +327,6 @@ class AssetForm(forms.ModelForm):
             ),
             Div(
                 Div('purchase_date', css_class='col-md-6'),
-                Div('warranty_expiration', css_class='col-md-6'),
                 css_class='row'
             ),
             Div(
@@ -343,6 +340,10 @@ class AssetForm(forms.ModelForm):
                 Div('currency', css_class='col-md-2'),
                 Div('order_number', css_class='col-md-2'),
                 Div('supplier', css_class='col-md-2'),
+                css_class='row'
+            ),
+            Div(
+                Div('cost_center', css_class='col-md-6'),
                 css_class='row'
             ),
             Div(

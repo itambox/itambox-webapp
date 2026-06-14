@@ -71,15 +71,24 @@ class ProviderNode(DjangoObjectType):
         return self.contacts.all()
 
 class SubscriptionNode(DjangoObjectType):
+    cost_center_id = graphene.ID()
+    cost_center_name = graphene.String()
+
     class Meta:
         model = Subscription
         fields = (
             "id", "name", "slug", "provider", "type", "status",
             "start_date", "renewal_date", "renewal_cost", "currency",
             "billing_cycle", "term_months", "auto_renewal", "licensed_quantity",
-            "contract_reference", "cost_center", "cancellation_date", "owner",
+            "contract_reference", "cancellation_date", "owner",
             "description", "notes", "tenant", "created_at", "updated_at"
         )
+
+    def resolve_cost_center_id(self, info):
+        return self.cost_center_id
+
+    def resolve_cost_center_name(self, info):
+        return str(self.cost_center) if self.cost_center_id else None
 
 class SubscriptionAssignmentNode(DjangoObjectType):
     content_type = graphene.Field(ContentTypeNode)
@@ -346,6 +355,20 @@ class DeleteProvider(graphene.Mutation):
 
 # Subscription Mutations
 
+def _resolve_cost_center(cost_center_id, user):
+    """Resolve a CostCenter by PK. Returns None if cost_center_id is falsy.
+    Uses apps.get_model to avoid a hard import while the model is being
+    created concurrently by another agent."""
+    if not cost_center_id:
+        return None
+    try:
+        from django.apps import apps
+        CostCenter = apps.get_model('organization', 'CostCenter')
+    except LookupError:
+        raise GraphQLError("CostCenter model is not yet available.")
+    return get_object_or_denied(CostCenter, cost_center_id, user)
+
+
 class CreateSubscription(graphene.Mutation):
     class Arguments:
         name = graphene.String(required=True)
@@ -362,7 +385,7 @@ class CreateSubscription(graphene.Mutation):
         auto_renewal = graphene.Boolean()
         licensed_quantity = graphene.Int()
         contract_reference = graphene.String()
-        cost_center = graphene.String()
+        cost_center_id = graphene.ID()
         cancellation_date = graphene.Date()
         owner_id = graphene.ID()
         description = graphene.String()
@@ -380,10 +403,13 @@ class CreateSubscription(graphene.Mutation):
         if 'owner_id' in kwargs:
             subscription.owner = _resolve_owner(kwargs.pop('owner_id'), user, active_tenant)
 
+        if 'cost_center_id' in kwargs:
+            subscription.cost_center = _resolve_cost_center(kwargs.pop('cost_center_id'), user)
+
         ALLOWED_FIELDS = {
             'name', 'slug', 'type', 'status', 'start_date', 'renewal_date', 'renewal_cost',
             'currency', 'billing_cycle', 'term_months', 'auto_renewal', 'licensed_quantity',
-            'contract_reference', 'cost_center', 'cancellation_date', 'description', 'notes'
+            'contract_reference', 'cancellation_date', 'description', 'notes'
         }
         for key, val in kwargs.items():
             if key in ALLOWED_FIELDS:
@@ -419,7 +445,7 @@ class UpdateSubscription(graphene.Mutation):
         auto_renewal = graphene.Boolean()
         licensed_quantity = graphene.Int()
         contract_reference = graphene.String()
-        cost_center = graphene.String()
+        cost_center_id = graphene.ID()
         cancellation_date = graphene.Date()
         owner_id = graphene.ID()
         description = graphene.String()
@@ -440,10 +466,13 @@ class UpdateSubscription(graphene.Mutation):
         if 'owner_id' in kwargs:
             subscription.owner = _resolve_owner(kwargs.pop('owner_id'), user, active_tenant)
 
+        if 'cost_center_id' in kwargs:
+            subscription.cost_center = _resolve_cost_center(kwargs.pop('cost_center_id'), user)
+
         ALLOWED_FIELDS = {
             'name', 'slug', 'type', 'status', 'start_date', 'renewal_date', 'renewal_cost',
             'currency', 'billing_cycle', 'term_months', 'auto_renewal', 'licensed_quantity',
-            'contract_reference', 'cost_center', 'cancellation_date', 'description', 'notes'
+            'contract_reference', 'cancellation_date', 'description', 'notes'
         }
         for key, val in kwargs.items():
             if key in ALLOWED_FIELDS:

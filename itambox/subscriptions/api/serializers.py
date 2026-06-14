@@ -6,7 +6,7 @@ from itambox.api.base import BaseModelSerializer
 from itambox.api.fields import validate_gfk_target_tenant
 from subscriptions.models import Provider, Subscription, SubscriptionAssignment
 from organization.api.serializers import NestedTenantSerializer, NestedTenantGroupSerializer, ContactAssignmentSerializer
-from organization.models import Tenant, TenantGroup
+from organization.models import Tenant, TenantGroup, CostCenter
 from extras.api.serializers import TagSerializer
 
 User = get_user_model()
@@ -77,6 +77,11 @@ class SubscriptionSerializer(BaseModelSerializer):
     billing_cycle_display = serializers.CharField(source='get_billing_cycle_display', read_only=True)
     days_until_renewal = serializers.IntegerField(read_only=True)
     annual_cost = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    cost_center = serializers.StringRelatedField(read_only=True)
+    cost_center_id = serializers.PrimaryKeyRelatedField(
+        source='cost_center', queryset=CostCenter.objects.all(),
+        write_only=True, required=False, allow_null=True,
+    )
 
     class Meta:
         model = Subscription
@@ -85,7 +90,7 @@ class SubscriptionSerializer(BaseModelSerializer):
             'status', 'status_display', 'tenant', 'tenant_id', 'owner', 'owner_id',
             'start_date', 'renewal_date', 'renewal_cost', 'currency',
             'billing_cycle', 'billing_cycle_display', 'term_months', 'auto_renewal',
-            'licensed_quantity', 'contract_reference', 'cost_center',
+            'licensed_quantity', 'contract_reference', 'cost_center', 'cost_center_id',
             'cancellation_date', 'days_until_renewal', 'annual_cost',
             'description', 'notes', 'tags', 'created_at', 'updated_at'
         )

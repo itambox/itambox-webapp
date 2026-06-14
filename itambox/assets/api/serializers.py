@@ -120,6 +120,7 @@ class AssetSerializer(BaseModelSerializer):
     last_audited_by = serializers.StringRelatedField(read_only=True)
     tags = TagSerializer(many=True, read_only=True)
     assigned_to = serializers.SerializerMethodField()
+    cost_center = serializers.StringRelatedField(read_only=True)
 
     class Meta:
         model = Asset
@@ -127,14 +128,27 @@ class AssetSerializer(BaseModelSerializer):
             'id', 'name', 'asset_tag', 'serial_number', 'status', 'status_id',
             'asset_type', 'asset_type_id', 'asset_role', 'assetrole_id',
             'location', 'location_id', 'tenant', 'tenant_id',
-            'purchase_date', 'warranty_expiration',
+            'purchase_date',
             'purchase_cost', 'salvage_value', 'currency', 'order_number',
             'supplier', 'supplier_id',
+            'cost_center', 'cost_center_id',
             'last_audited', 'last_audited_by',
             'custom_field_data', 'requestable',
             'notes', 'tags', 'assigned_to', 'created_at', 'updated_at'
         ]
         brief_fields = ['id', 'name', 'asset_tag', 'serial_number', 'status']
+
+    def get_fields(self):
+        fields = super().get_fields()
+        from organization.models import CostCenter
+        fields['cost_center_id'] = serializers.PrimaryKeyRelatedField(
+            source='cost_center',
+            queryset=CostCenter.objects.all(),
+            allow_null=True,
+            required=False,
+            write_only=True,
+        )
+        return fields
 
     def get_assigned_to(self, obj):
         cached = getattr(obj, '_active_assignments', None)

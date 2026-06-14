@@ -396,7 +396,6 @@ class RequestBulkReceiveView(PermissionRequiredMixin, View):
                                 order_number=form.cleaned_data['order_number'].strip() or '',
                                 purchase_cost=form.cleaned_data['purchase_cost'],
                                 purchase_date=form.cleaned_data['purchase_date'] or timezone.now().date(),
-                                warranty_expiration=form.cleaned_data['warranty_expiration'],
                                 tenant=req.tenant,
                             )
                             

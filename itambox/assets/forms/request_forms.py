@@ -369,10 +369,6 @@ class AssetReceiveForm(forms.Form):
         required=False,
         widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
     )
-    warranty_expiration = forms.DateField(
-        required=False,
-        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
-    )
 
     def __init__(self, *args, **kwargs):
         from assets.models import StatusLabel, Supplier

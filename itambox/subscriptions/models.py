@@ -248,11 +248,15 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
         verbose_name="Contract Reference",
         help_text="Contract number, PO reference, or quote ID"
     )
-    cost_center = models.CharField(
-        max_length=50,
+    cost_center = models.ForeignKey(
+        'organization.CostCenter',
+        on_delete=models.SET_NULL,
+        null=True,
         blank=True,
-        verbose_name="Cost Center / Budget Code",
-        help_text="Financial tracking code for chargeback"
+        related_name='subscriptions',
+        verbose_name="Cost Center",
+        help_text="Financial cost center responsible for this subscription",
+        db_index=True,
     )
     cancellation_date = models.DateField(
         blank=True,

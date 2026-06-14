@@ -104,10 +104,6 @@
                         <label class="form-label small text-muted">{% translate "Purchase Date" %}</label>
                         <input type="date" id="bulk-fill-purchase-date" class="form-control">
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label small text-muted">{% translate "Warranty Expiration" %}</label>
-                        <input type="date" id="bulk-fill-warranty-expiration" class="form-control">
-                    </div>
                 </div>
                 <div class="mt-3 text-end">
                     <button type="button" id="btn-apply-bulk-fill" class="btn btn-sm btn-primary d-inline-flex align-items-center">
@@ -133,7 +129,6 @@
                             <th style="width: 7%;">{% translate "Order #" %}</th>
                             <th style="width: 6%;">{% translate "Cost" %}</th>
                             <th style="width: 8%;">{% translate "Purchase Date" %}</th>
-                            <th style="width: 8%;">{% translate "Warranty Exp" %}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -225,14 +220,6 @@
                                         </div>
                                     {% endif %}
                                 </td>
-                                <td>
-                                    {{ form.warranty_expiration }}
-                                    {% if form.warranty_expiration.errors %}
-                                        <div class="invalid-feedback d-block mt-1">
-                                            {{ form.warranty_expiration.errors.0 }}
-                                        </div>
-                                    {% endif %}
-                                </td>
                             </tr>
                         {% endfor %}
                     </tbody>
@@ -267,7 +254,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const orderNumberVal = document.getElementById('bulk-fill-order-number').value.trim();
         const purchaseCostVal = document.getElementById('bulk-fill-purchase-cost').value.trim();
         const purchaseDateVal = document.getElementById('bulk-fill-purchase-date').value;
-        const warrantyVal = document.getElementById('bulk-fill-warranty-expiration').value;
 
         // Iterate over all forms in formset
         const totalForms = parseInt(document.getElementById('id_form-TOTAL_FORMS').value, 10);
@@ -313,10 +299,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (purchaseDateVal) {
                 const input = document.querySelector(`[name="form-${i}-purchase_date"]`);
                 if (input) input.value = purchaseDateVal;
-            }
-            if (warrantyVal) {
-                const input = document.querySelector(`[name="form-${i}-warranty_expiration"]`);
-                if (input) input.value = warrantyVal;
             }
         }
     });
