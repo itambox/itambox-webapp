@@ -8,6 +8,13 @@ from .base import *
 DEBUG = True
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.50.54']
 
+# Local/CI Postgres instances typically lack TLS. Override the base default
+# ('require') so that dev and test runs connect without a certificate.
+# Production keeps 'require' (or overrides via ITAMBOX_DB_SSLMODE env var).
+import os as _os
+if not _os.environ.get('ITAMBOX_DB_SSLMODE'):
+    DATABASES['default']['OPTIONS']['sslmode'] = 'disable'
+
 # Mailpit local SMTP catcher settings for local development
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = '127.0.0.1'
