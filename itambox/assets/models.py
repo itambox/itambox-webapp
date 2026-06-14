@@ -490,7 +490,12 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
                 fields=['asset_tag'],
                 condition=models.Q(tenant__isnull=True),
                 name='unique_global_asset_tag'
-            )
+            ),
+            models.UniqueConstraint(
+                fields=['tenant', 'serial_number'],
+                condition=models.Q(deleted_at__isnull=True) & ~models.Q(serial_number=''),
+                name='uniq_active_tenant_serial'
+            ),
         ]
 
     def __str__(self):
@@ -1126,8 +1131,9 @@ class MaintenanceStatusChoices(models.TextChoices):
 class AssetMaintenance(TaggableMixin, CloneableMixin, ExportableMixin,
                         JournalingMixin, ImageAttachmentMixin, FileAttachmentMixin,
                         SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
-    objects = SoftDeleteManager()
-    all_objects = AllObjectsManager()
+    tenant_lookup = 'asset__tenant'
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
 
     MAINTENANCE_TYPE_UPGRADE = 'upgrade'
     MAINTENANCE_TYPE_REPAIR = 'repair'

@@ -6,7 +6,7 @@ from core.models import BaseModel, ChangeLoggingMixin, VaultModel, DeletableVaul
 from core.mixins import CustomFieldDataMixin
 from core.managers import (
     SoftDeleteManager, AllObjectsManager,
-    TenantScopingSoftDeleteManager, TenantScopingAllObjectsManager,
+    TenantScopingManager, TenantScopingSoftDeleteManager, TenantScopingAllObjectsManager,
 )
 class SoftwareCategoryChoices(models.TextChoices):
     OPERATING_SYSTEM = 'operating_system', 'Operating System'
@@ -125,6 +125,11 @@ class InstalledSoftware(ChangeLoggingMixin, BaseModel):
     Represents an instance of software discovered or inventoried on a specific asset.
     Distinct from license assignment/tracking.
     """
+    # Tenant scoping via asset FK — asset is non-null (no blank=True/null=True),
+    # so every row is always associated with a tenant through its asset.
+    tenant_lookup = 'asset__tenant'
+    objects = TenantScopingManager()
+
     asset = models.ForeignKey(
         to='assets.Asset',
         on_delete=models.CASCADE,

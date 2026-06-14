@@ -297,8 +297,8 @@ class AssetHolder(CustomFieldDataMixin, SubscribableMixin, StandardModel, SoftDe
     class Meta:
         ordering = ['last_name', 'first_name', 'upn']
         constraints = [
-            models.UniqueConstraint(fields=['tenant', 'user'], name='unique_tenant_user_profile'),
-            models.UniqueConstraint(fields=['tenant', 'upn'], name='unique_tenant_upn'),
+            models.UniqueConstraint(fields=['tenant', 'user'], condition=models.Q(deleted_at__isnull=True), name='unique_tenant_user_profile'),
+            models.UniqueConstraint(fields=['tenant', 'upn'], condition=models.Q(deleted_at__isnull=True), name='unique_tenant_upn'),
         ]
         verbose_name = _("Asset Holder")
         verbose_name_plural = _("Asset Holders")
@@ -427,6 +427,7 @@ class TenantRole(StandardModel, SoftDeleteMixin):
         constraints = [
             models.UniqueConstraint(
                 fields=['tenant', 'name'],
+                condition=models.Q(deleted_at__isnull=True),
                 name='organization_tenantrole_unique_tenant_name'
             )
         ]

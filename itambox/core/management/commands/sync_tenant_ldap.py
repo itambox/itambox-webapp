@@ -19,6 +19,7 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.conf import settings
 from core.managers import set_current_tenant, get_current_tenant
+from core.tasks.context import TaskContext
 from organization.models import Tenant
 
 logger = logging.getLogger('django_auth_ldap')
@@ -42,8 +43,19 @@ class Command(BaseCommand):
         except Tenant.DoesNotExist:
             raise CommandError(f"Tenant with slug '{tenant_slug}' does not exist.")
 
-        # Bind active tenant context
-        set_current_tenant(tenant)
+        # TaskContext sets the tenant scope AND wires _request_id + _current_user
+        # so that ChangeLoggingMixin records ObjectChange entries for all User/
+        # TenantMembership saves that happen during the sync.
+        # No user_id is available when the command is invoked directly from the
+        # CLI (no --user argument). Changes are attributed to a system/anonymous
+        # actor (user=None). When called via sync_tenant_ldap_task the outer
+        # TaskContext in core/tasks/ldap.py already provides the actor user;
+        # the nested TaskContext here is a no-op override that restores correctly
+        # on exit thanks to TaskContext's save/restore logic.
+        with TaskContext(tenant_id=tenant.pk, user_id=None):
+            self._run_sync(tenant)
+
+    def _run_sync(self, tenant):
         self.stdout.write(self.style.NOTICE(f"Scoping LDAP synchronization to tenant: {tenant.name} ({tenant.slug})"))
 
         # Retrieve configurations from settings
@@ -51,7 +63,7 @@ class Command(BaseCommand):
         config = tenant_configs.get(tenant.slug)
 
         if not config:
-            raise CommandError(f"No LDAP configuration found for tenant slug '{tenant_slug}' in settings.")
+            raise CommandError(f"No LDAP configuration found for tenant slug '{tenant.slug}' in settings.")
 
         server_uri = config.get('SERVER_URI') or config.get('server_uri')
         bind_dn = config.get('BIND_DN') or config.get('bind_dn')
@@ -188,5 +200,7 @@ class Command(BaseCommand):
         except ldap.LDAPError as e:
             raise CommandError(f"LDAP search failed: {e}")
         finally:
+            # Tenant context cleanup is handled by TaskContext.__exit__; do NOT
+            # call set_current_tenant(None) here as it would fire before TaskContext
+            # restores the previous context, breaking nested invocations.
             conn.unbind_s()
-            set_current_tenant(None)
