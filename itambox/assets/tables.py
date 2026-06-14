@@ -402,8 +402,8 @@ class SupplierTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = Supplier
-        fields = ('pk', 'name', 'website', 'contact_email', 'contact_phone', 'contact_name', 'tags', 'actions')
-        default_columns = ('pk', 'name', 'website', 'contact_email', 'contact_phone', 'contact_name', 'tags', 'actions')
+        fields = ('pk', 'name', 'website', 'address', 'tags', 'actions')
+        default_columns = ('pk', 'name', 'website', 'tags', 'actions')
 
 
 class CategoryTable(BaseTable):

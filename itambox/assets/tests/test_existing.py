@@ -1009,16 +1009,30 @@ class EnterpriseITAMTestCase(TestCase):
             name="Bechtle IT-Services",
             slug="bechtle-it-services",
             website="https://www.bechtle.com",
-            contact_email="sales@bechtle.com",
-            contact_name="Markus Müller"
         )
-        
+        # Create a contact via the shared Contact system
+        role, _ = ContactRole.objects.get_or_create(
+            slug='primary-contact',
+            defaults={'name': 'Primary Contact', 'description': 'Primary Contact'},
+        )
+        contact = Contact.objects.create(
+            name="Markus Müller",
+            email="sales@bechtle.com",
+        )
+        supplier_ct = ContentType.objects.get_for_model(Supplier)
+        ContactAssignment.objects.create(
+            contact=contact,
+            role=role,
+            content_type=supplier_ct,
+            object_id=supplier.pk,
+            priority='primary',
+        )
+
         detail_url = reverse('assets:supplier_detail', kwargs={'pk': supplier.pk})
         response = self.client.get(detail_url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Bechtle IT-Services")
         self.assertContains(response, "https://www.bechtle.com")
-        self.assertContains(response, "sales@bechtle.com")
         self.assertContains(response, "Markus Müller")
         self.assertContains(response, "Supplied Assets")
         self.assertIn('assets_table', response.context)

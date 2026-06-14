@@ -28,7 +28,7 @@ class ManufacturerIndex(SearchIndex):
 @register_search()
 class SupplierIndex(SearchIndex):
     model = Supplier
-    fields = ('name', 'website', 'contact_name', 'address', 'notes',)
+    fields = ('name', 'website', 'address', 'notes',)
     order_by = ('name',)
 
 @register_search()

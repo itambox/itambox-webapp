@@ -6,31 +6,10 @@
     <dt class="col-sm-3">{% translate "Slug:" %}</dt>
     <dd class="col-sm-9"><code>{{ object.slug }}</code></dd>
 
-    <dt class="col-sm-3">{% translate "Contact Person:" %}</dt>
-    <dd class="col-sm-9">{{ object.contact_name|default:"—" }}</dd>
-
-    <dt class="col-sm-3">{% translate "Email:" %}</dt>
-    <dd class="col-sm-9">
-        {% if object.contact_email %}
-            <a href="mailto:{{ object.contact_email }}" class="text-secondary font-weight-medium">{{ object.contact_email }}</a>
-        {% else %}
-            <span class="text-muted small"><i>{% translate "Not configured" %}</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">{% translate "Phone:" %}</dt>
-    <dd class="col-sm-9">
-        {% if object.contact_phone %}
-            <a href="tel:{{ object.contact_phone }}" class="text-secondary font-weight-medium">{{ object.contact_phone }}</a>
-        {% else %}
-            <span class="text-muted small"><i>{% translate "Not configured" %}</i></span>
-        {% endif %}
-    </dd>
-
     <dt class="col-sm-3">{% translate "Website:" %}</dt>
     <dd class="col-sm-9">
         {% if object.website %}
-            <a href="{{ object.website }}" target="_blank" class="link-primary font-weight-medium d-inline-flex align-items-center">
+            <a href="{{ object.website }}" target="_blank" rel="noopener" class="link-primary font-weight-medium d-inline-flex align-items-center">
                 {{ object.website }}
                 <i class="mdi mdi-open-in-new ms-1"></i>
             </a>
@@ -54,3 +33,33 @@
     </dd>
     {% endif %}
 </dl>
+
+{% if object.primary_contact %}
+<div class="card mt-4 border-0 shadow-sm">
+    <div class="card-header border-0 bg-transparent">
+        <h3 class="card-title d-flex align-items-center">
+            <i class="mdi mdi-phone-outline me-2 text-azure"></i>
+            {% translate "Primary Contact" %}
+        </h3>
+    </div>
+    <div class="card-body">
+        {% with c=object.primary_contact %}
+        <dl class="row mb-0">
+            <dt class="col-sm-4">{% translate "Name:" %}</dt>
+            <dd class="col-sm-8">
+                <a href="{{ c.get_absolute_url }}"><strong>{{ c.name }}</strong></a>
+                {% if c.title %}<br><span class="text-muted small">{{ c.title }}</span>{% endif %}
+            </dd>
+            {% if c.email %}
+            <dt class="col-sm-4">{% translate "Email:" %}</dt>
+            <dd class="col-sm-8"><a href="mailto:{{ c.email }}">{{ c.email }}</a></dd>
+            {% endif %}
+            {% if c.phone %}
+            <dt class="col-sm-4">{% translate "Phone:" %}</dt>
+            <dd class="col-sm-8"><a href="tel:{{ c.phone }}">{{ c.phone }}</a></dd>
+            {% endif %}
+        </dl>
+        {% endwith %}
+    </div>
+</div>
+{% endif %}
