@@ -1,5 +1,5 @@
 {% extends 'generic/object_detail.html' %}
-{% load i18n %}
+{% load i18n money %}
 
 {% block page_title %}PO {{ object.order_number }} - {{ object.supplier }}{% endblock %}
 
@@ -144,7 +144,7 @@
             <div class="card-body">
                 <div class="mb-3">
                     <div class="text-muted small">{% translate "Total Order Value" %}</div>
-                    <div class="h2 text-primary font-weight-bold mb-0">${{ total_value|floatformat:2 }}</div>
+                    <div class="h2 text-primary font-weight-bold mb-0">{{ total_value|money:object }}</div>
                 </div>
                 <div class="hr-text my-3">{% translate "Metadata" %}</div>
                 <div class="datagrid">

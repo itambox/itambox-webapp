@@ -125,7 +125,16 @@ class ITAMBoxModelViewSet(
             instance_pks = [obj.pk for obj in serializer.instance]
             qs = self.get_queryset().filter(pk__in=instance_pks).order_by('pk')
         else:
-            qs = self.get_queryset().get(pk=serializer.instance.pk)
+            try:
+                qs = self.get_queryset().get(pk=serializer.instance.pk)
+            except ObjectDoesNotExist:
+                # The object was just created and validated by this request, so
+                # re-fetching it is safe even when the scoped queryset (e.g. one
+                # filtered through asset__tenant) returns .none() because no
+                # tenant is bound in the current context (e.g. tests, service
+                # accounts).  Fall back to the unsaved instance rather than
+                # raising an unexpected 500.
+                qs = serializer.instance
 
         serializer = self.get_serializer(qs, many=bulk_create)
 

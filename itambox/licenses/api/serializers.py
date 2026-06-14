@@ -34,8 +34,8 @@ class LicenseSerializer(BaseModelSerializer):
         model = License
         fields = (
             'id', 'name', 'software', 'software_id', 'license_type', 'license_type_display', 'product_key',
-            'seats', 'available_seats', 'purchase_date', 'purchase_cost',
-            'order_number', 'expiration_date', 'notes', 'tags', 'tenant', 'tenant_id',
+            'seats', 'available_seats', 'purchase_date', 'purchase_cost', 'currency',
+            'order_number', 'version', 'expiration_date', 'notes', 'tags', 'tenant', 'tenant_id',
             'subscription', 'subscription_id',
             'created_at', 'updated_at'
         )

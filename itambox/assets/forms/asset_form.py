@@ -69,7 +69,7 @@ class AssetForm(forms.ModelForm):
             'name', 'asset_tag', 'serial_number', 'asset_type',
             'asset_role', 'status', 'location', 'tenant',
             'purchase_date', 'warranty_expiration',
-            'purchase_cost', 'salvage_value', 'order_number', 'supplier',
+            'purchase_cost', 'salvage_value', 'currency', 'order_number', 'supplier',
             'in_service_date', 'depreciation_override',
             'notes', 'tags', 'requestable'
         ]
@@ -79,6 +79,7 @@ class AssetForm(forms.ModelForm):
             'serial_number': forms.TextInput(attrs={'class': 'form-control'}),
             'purchase_cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'salvage_value': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'currency': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
             'order_number': forms.TextInput(attrs={'class': 'form-control'}),
             'in_service_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'depreciation_override': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
@@ -339,8 +340,9 @@ class AssetForm(forms.ModelForm):
             Div(
                 Div('purchase_cost', css_class='col-md-3'),
                 Div('salvage_value', css_class='col-md-3'),
-                Div('order_number', css_class='col-md-3'),
-                Div('supplier', css_class='col-md-3'),
+                Div('currency', css_class='col-md-2'),
+                Div('order_number', css_class='col-md-2'),
+                Div('supplier', css_class='col-md-2'),
                 css_class='row'
             ),
             Div(

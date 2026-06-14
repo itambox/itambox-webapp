@@ -2,18 +2,19 @@ from django import forms
 from django.core.exceptions import ValidationError
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, Row, Column
-from .models import PurchaseOrder, PurchaseOrderLine
+from .models import PurchaseOrder, PurchaseOrderLine, Contract
 
 class PurchaseOrderForm(forms.ModelForm):
     class Meta:
         model = PurchaseOrder
-        fields = ['order_number', 'supplier', 'order_date', 'expected_delivery_date', 'destination_location', 'tenant', 'notes']
+        fields = ['order_number', 'supplier', 'currency', 'order_date', 'expected_delivery_date', 'destination_location', 'tenant', 'notes']
         widgets = {
             'order_date': forms.DateInput(attrs={'type': 'date'}),
             'expected_delivery_date': forms.DateInput(attrs={'type': 'date'}),
             'supplier': forms.Select(attrs={'data-tom-select': ''}),
             'destination_location': forms.Select(attrs={'data-tom-select': ''}),
             'tenant': forms.Select(attrs={'data-tom-select': ''}),
+            'currency': forms.Select(attrs={'data-tom-select': ''}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -26,13 +27,17 @@ class PurchaseOrderForm(forms.ModelForm):
                 css_class='form-row'
             ),
             Row(
+                Column('currency', css_class='form-group col-md-6 mb-0'),
+                Column('tenant', css_class='form-group col-md-6 mb-0'),
+                css_class='form-row'
+            ),
+            Row(
                 Column('order_date', css_class='form-group col-md-6 mb-0'),
                 Column('expected_delivery_date', css_class='form-group col-md-6 mb-0'),
                 css_class='form-row'
             ),
             Row(
                 Column('destination_location', css_class='form-group col-md-6 mb-0'),
-                Column('tenant', css_class='form-group col-md-6 mb-0'),
                 css_class='form-row'
             ),
             'notes',
@@ -136,6 +141,79 @@ class PurchaseOrderLineForm(forms.ModelForm):
                 cleaned_data[field_name] = None
                 
         return cleaned_data
+
+
+class ContractForm(forms.ModelForm):
+    class Meta:
+        model = Contract
+        fields = [
+            'name', 'contract_number', 'contract_type', 'status',
+            'supplier', 'cost', 'currency', 'billing_cycle',
+            'start_date', 'end_date', 'renewal_date', 'auto_renew',
+            'sla_response_time', 'sla_resolution_time', 'coverage_hours', 'sla_terms',
+            'assets', 'purchase_order', 'tenant', 'notes',
+        ]
+        widgets = {
+            'start_date': forms.DateInput(attrs={'type': 'date'}),
+            'end_date': forms.DateInput(attrs={'type': 'date'}),
+            'renewal_date': forms.DateInput(attrs={'type': 'date'}),
+            'supplier': forms.Select(attrs={'data-tom-select': ''}),
+            'purchase_order': forms.Select(attrs={'data-tom-select': ''}),
+            'tenant': forms.Select(attrs={'data-tom-select': ''}),
+            'currency': forms.Select(attrs={'data-tom-select': ''}),
+            'contract_type': forms.Select(attrs={'class': 'form-select'}),
+            'status': forms.Select(attrs={'class': 'form-select'}),
+            'billing_cycle': forms.Select(attrs={'class': 'form-select'}),
+            'assets': forms.SelectMultiple(attrs={'data-tom-select': ''}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.layout = Layout(
+            Row(
+                Column('name', css_class='form-group col-md-8 mb-0'),
+                Column('contract_number', css_class='form-group col-md-4 mb-0'),
+                css_class='form-row'
+            ),
+            Row(
+                Column('contract_type', css_class='form-group col-md-4 mb-0'),
+                Column('status', css_class='form-group col-md-4 mb-0'),
+                Column('tenant', css_class='form-group col-md-4 mb-0'),
+                css_class='form-row'
+            ),
+            Row(
+                Column('supplier', css_class='form-group col-md-6 mb-0'),
+                Column('purchase_order', css_class='form-group col-md-6 mb-0'),
+                css_class='form-row'
+            ),
+            Row(
+                Column('cost', css_class='form-group col-md-4 mb-0'),
+                Column('currency', css_class='form-group col-md-4 mb-0'),
+                Column('billing_cycle', css_class='form-group col-md-4 mb-0'),
+                css_class='form-row'
+            ),
+            Row(
+                Column('start_date', css_class='form-group col-md-4 mb-0'),
+                Column('end_date', css_class='form-group col-md-4 mb-0'),
+                Column('renewal_date', css_class='form-group col-md-4 mb-0'),
+                css_class='form-row'
+            ),
+            Row(
+                Column('auto_renew', css_class='form-group col-md-12 mb-0'),
+                css_class='form-row'
+            ),
+            Row(
+                Column('sla_response_time', css_class='form-group col-md-4 mb-0'),
+                Column('sla_resolution_time', css_class='form-group col-md-4 mb-0'),
+                Column('coverage_hours', css_class='form-group col-md-4 mb-0'),
+                css_class='form-row'
+            ),
+            'sla_terms',
+            'assets',
+            'notes',
+            Submit('submit', 'Save Contract', css_class='btn btn-primary mt-3')
+        )
 
 
 from django.core.exceptions import ValidationError

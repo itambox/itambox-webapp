@@ -1,7 +1,7 @@
 # itambox/assets/tables.py
 import django_tables2 as tables
 from django_tables2.utils import A  # Alias for Accessor
-from .models import Asset, AssetRole, Manufacturer, AssetType, StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence, AssetMaintenance
+from .models import Asset, AssetRole, Manufacturer, AssetType, StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence, AssetMaintenance, AssetDisposal
 from compliance.models import AssetAudit
 from core.tables import ActionsColumn, AssigneeColumn, BaseTable, ToggleColumn
 from extras.tables import TagColumn # Import TagColumn
@@ -341,6 +341,37 @@ class AssetMaintenanceTable(BaseTable):
 
     def render_supplier(self, value):
         return value or "—"
+
+
+class AssetDisposalTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    asset = tables.LinkColumn('assets:asset_detail', args=[A('asset__pk')], accessor='asset', verbose_name='Asset')
+    disposal_method = tables.Column(verbose_name='Method')
+    disposal_date = tables.DateColumn(format="Y-m-d", verbose_name='Disposal Date')
+    data_sanitization_method = tables.Column(verbose_name='Sanitization')
+    recipient = tables.Column(verbose_name='Recipient')
+    proceeds = tables.Column(verbose_name='Proceeds')
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = AssetDisposal
+        fields = ('pk', 'asset', 'disposal_method', 'disposal_date', 'data_sanitization_method', 'recipient', 'proceeds', 'actions')
+        default_columns = ('pk', 'asset', 'disposal_method', 'disposal_date', 'data_sanitization_method', 'recipient', 'proceeds', 'actions')
+
+    def render_disposal_method(self, record):
+        return record.get_disposal_method_display()
+
+    def render_data_sanitization_method(self, record):
+        return record.get_data_sanitization_method_display()
+
+    def render_recipient(self, value):
+        return value or "—"
+
+    def render_proceeds(self, value, record):
+        if value is None:
+            return "—"
+        from extras.templatetags.money import money
+        return money(value, record)
 
 
 from extras.tables import CustomFieldTable, CustomFieldsetTable

@@ -11,7 +11,7 @@ from itambox.api.nested_serializers import (
 from assets.models import (
     Asset, AssetRole, Manufacturer, AssetType,
     StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence,
-    AssetAssignment
+    AssetAssignment, AssetDisposal,
 )
 from organization.models import Location, Tenant
 from software.models import Software
@@ -128,8 +128,9 @@ class AssetSerializer(BaseModelSerializer):
             'asset_type', 'asset_type_id', 'asset_role', 'assetrole_id',
             'location', 'location_id', 'tenant', 'tenant_id',
             'purchase_date', 'warranty_expiration',
-            'purchase_cost', 'order_number', 'supplier', 'supplier_id',
-            'salvage_value', 'last_audited', 'last_audited_by',
+            'purchase_cost', 'salvage_value', 'currency', 'order_number',
+            'supplier', 'supplier_id',
+            'last_audited', 'last_audited_by',
             'custom_field_data', 'requestable',
             'notes', 'tags', 'assigned_to', 'created_at', 'updated_at'
         ]
@@ -244,6 +245,36 @@ class AssetAssignmentSerializer(BaseModelSerializer):
             return str(obj.assigned_to)
         except Exception:
             return None
+
+
+class AssetDisposalSerializer(BaseModelSerializer):
+    asset = NestedAssetSerializer(read_only=True)
+    asset_id = serializers.PrimaryKeyRelatedField(
+        queryset=Asset.objects.all(), source='asset', write_only=True,
+    )
+    disposal_method_display = serializers.CharField(
+        source='get_disposal_method_display', read_only=True
+    )
+    data_sanitization_method_display = serializers.CharField(
+        source='get_data_sanitization_method_display', read_only=True
+    )
+
+    class Meta:
+        model = AssetDisposal
+        fields = [
+            'id',
+            'asset', 'asset_id',
+            'disposal_method', 'disposal_method_display',
+            'disposal_date',
+            'data_sanitization_method', 'data_sanitization_method_display',
+            'sanitization_certificate', 'sanitized_by',
+            'recipient',
+            'proceeds', 'currency',
+            'weee_compliant',
+            'notes',
+            'created_at', 'updated_at',
+        ]
+        brief_fields = ['id', 'asset', 'disposal_method', 'disposal_date']
 
 
 class AssetCheckOutAPISerializer(serializers.Serializer):

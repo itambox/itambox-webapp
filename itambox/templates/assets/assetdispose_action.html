@@ -1,0 +1,21 @@
+{% extends "generic/object_edit.html" %}
+{% load i18n %}
+
+{% block title %}{% translate "Dispose Asset" %} — {{ form.asset.value }}{% endblock %}
+
+{% block content_title %}
+<div class="page-header d-print-none mb-3">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <h2 class="page-title text-danger">
+                    <i class="mdi mdi-delete-forever me-2"></i>{% translate "Record Asset Disposal" %}
+                </h2>
+                <div class="text-muted mt-1">
+                    {% translate "This action will archive the asset and create a permanent disposal record for audit purposes." %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

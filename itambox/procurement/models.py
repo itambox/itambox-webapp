@@ -1,7 +1,11 @@
+import datetime
+
 from django.db import models
 from django.urls import reverse
+from django.utils import timezone
 from core.models import BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin
 from core.managers import TenantScopingSoftDeleteManager
+from core.currency import CurrencyField
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 
@@ -30,6 +34,7 @@ class PurchaseOrder(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixi
         'organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='purchase_orders'
     )
     order_number = models.CharField(max_length=100, db_index=True)
+    currency = CurrencyField()
     supplier = models.ForeignKey(
         'assets.Supplier', on_delete=models.PROTECT, related_name='purchase_orders'
     )
@@ -94,6 +99,11 @@ class PurchaseOrderLine(BaseModel, ChangeLoggingMixin, SoftDeleteMixin):
         return f"{self.qty_ordered}x {item} for PO {self.purchase_order.order_number}"
 
     @property
+    def currency(self):
+        """Delegate to the parent PO's currency so ``{{ line.unit_price|money:line }}`` resolves correctly."""
+        return self.purchase_order.currency
+
+    @property
     def qty_outstanding(self):
         return max(0, self.qty_ordered - self.qty_received)
 
@@ -116,6 +126,176 @@ class PurchaseOrderLine(BaseModel, ChangeLoggingMixin, SoftDeleteMixin):
             raise ValidationError("You must specify what item you are ordering.")
         if filled > 1:
             raise ValidationError("A line item can only refer to one type of item.")
+
+
+class ContractTypeChoices(models.TextChoices):
+    SUPPORT = 'support', 'Support'
+    MAINTENANCE = 'maintenance', 'Maintenance'
+    LEASE = 'lease', 'Lease'
+    WARRANTY = 'warranty', 'Warranty'
+    SERVICE = 'service', 'Service'
+    OTHER = 'other', 'Other'
+
+
+class ContractStatusChoices(models.TextChoices):
+    DRAFT = 'draft', 'Draft'
+    ACTIVE = 'active', 'Active'
+    EXPIRED = 'expired', 'Expired'
+    CANCELLED = 'cancelled', 'Cancelled'
+
+
+class ContractBillingCycleChoices(models.TextChoices):
+    MONTHLY = 'monthly', 'Monthly'
+    QUARTERLY = 'quarterly', 'Quarterly'
+    ANNUAL = 'annual', 'Annual'
+    BIANNUAL = 'biannual', 'Biannual'
+    MULTI_YEAR = 'multi_year', 'Multi-Year'
+    ONETIME = 'onetime', 'One-Time'
+
+
+class Contract(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin):
+    """A hardware/software support agreement, SLA, lease, or service contract."""
+
+    objects = TenantScopingSoftDeleteManager()
+
+    # --- Identity ---
+    tenant = models.ForeignKey(
+        'organization.Tenant',
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        related_name='contracts',
+    )
+    name = models.CharField(max_length=255)
+    contract_number = models.CharField(max_length=100, db_index=True)
+    contract_type = models.CharField(
+        max_length=20,
+        choices=ContractTypeChoices.choices,
+        default=ContractTypeChoices.SUPPORT,
+        verbose_name='Contract Type',
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=ContractStatusChoices.choices,
+        default=ContractStatusChoices.DRAFT,
+    )
+
+    # --- Vendor / commercial ---
+    supplier = models.ForeignKey(
+        'assets.Supplier',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='contracts',
+    )
+    cost = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name='Contract Cost',
+        help_text='Total or per-cycle cost',
+    )
+    currency = CurrencyField()
+    billing_cycle = models.CharField(
+        max_length=20,
+        choices=ContractBillingCycleChoices.choices,
+        default=ContractBillingCycleChoices.ANNUAL,
+        blank=True,
+        verbose_name='Billing Cycle',
+    )
+
+    # --- Dates ---
+    start_date = models.DateField()
+    end_date = models.DateField()
+    renewal_date = models.DateField(null=True, blank=True)
+    auto_renew = models.BooleanField(
+        default=False,
+        verbose_name='Auto-Renew',
+        help_text='Whether this contract renews automatically',
+    )
+
+    # --- SLA ---
+    sla_response_time = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name='SLA Response Time',
+        help_text='e.g. "4 business hours", "Next business day"',
+    )
+    sla_resolution_time = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name='SLA Resolution Time',
+        help_text='e.g. "8 business hours", "3 business days"',
+    )
+    coverage_hours = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name='Coverage Hours',
+        help_text='e.g. "24x7", "9-5 Mon-Fri"',
+    )
+    sla_terms = models.TextField(
+        blank=True,
+        verbose_name='SLA Terms',
+        help_text='Full SLA terms or summary text',
+    )
+
+    # --- Coverage ---
+    assets = models.ManyToManyField(
+        'assets.Asset',
+        blank=True,
+        related_name='contracts',
+        verbose_name='Covered Assets',
+    )
+    purchase_order = models.ForeignKey(
+        PurchaseOrder,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='contracts',
+        verbose_name='Purchase Order',
+        help_text='The PO this contract originated from, if any',
+    )
+
+    # --- Notes ---
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['name']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['contract_number'],
+                condition=models.Q(deleted_at__isnull=True),
+                name='unique_contract_number_active',
+            ),
+            models.CheckConstraint(
+                check=models.Q(end_date__gte=models.F('start_date')),
+                name='contract_end_date_gte_start_date',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.contract_number} – {self.name}"
+
+    def get_absolute_url(self):
+        return reverse('procurement:contract_detail', kwargs={'pk': self.pk})
+
+    @property
+    def days_until_expiry(self):
+        """Return the number of calendar days until end_date (negative if expired)."""
+        delta = self.end_date - timezone.now().date()
+        return delta.days
+
+    @property
+    def is_expiring_soon(self, threshold_days: int = 30) -> bool:
+        """True if the contract expires within *threshold_days* days."""
+        days = self.days_until_expiry
+        return 0 <= days <= threshold_days
+
+    def clean(self):
+        super().clean()
+        if self.start_date and self.end_date and self.end_date < self.start_date:
+            raise ValidationError({'end_date': 'End date must be on or after the start date.'})
 
 
 class FulfillmentLink(BaseModel, ChangeLoggingMixin, SoftDeleteMixin):

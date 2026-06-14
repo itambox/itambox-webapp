@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Asset, AssetRole, Manufacturer, AssetType
+from .models import Asset, AssetRole, Manufacturer, AssetType, AssetDisposal
 from software.models import InstalledSoftware
 
 # Register your models here.
@@ -43,5 +43,20 @@ class InstalledSoftwareAdmin(admin.ModelAdmin):
     search_fields = ('asset__name', 'asset__asset_tag', 'software__name', 'version_detected', 'notes')
     date_hierarchy = 'last_seen_date'
     raw_id_fields = ('asset', 'software')
+
+@admin.register(AssetDisposal)
+class AssetDisposalAdmin(admin.ModelAdmin):
+    list_display = (
+        'asset', 'disposal_method', 'disposal_date',
+        'data_sanitization_method', 'weee_compliant',
+        'sanitized_by', 'recipient',
+    )
+    list_filter = ('disposal_method', 'data_sanitization_method', 'weee_compliant')
+    search_fields = (
+        'asset__name', 'asset__asset_tag', 'asset__serial_number',
+        'sanitization_certificate', 'sanitized_by', 'recipient',
+    )
+    date_hierarchy = 'disposal_date'
+    raw_id_fields = ('asset',)
 
 # Registrations for Site, Region, SiteGroup, Tenant, Tag, Location moved to organization/admin.py

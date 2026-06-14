@@ -1,0 +1,20 @@
+{% load i18n money %}
+<dl class="row mb-0">
+    <dt class="col-sm-4">{% translate "Proceeds:" %}</dt>
+    <dd class="col-sm-8">
+        {% if object.proceeds is not None %}
+            <strong>{{ object.proceeds|money:object }}</strong>
+        {% else %}
+            <span class="text-muted"><i>{% translate "No proceeds recorded" %}</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">{% translate "Currency:" %}</dt>
+    <dd class="col-sm-8 text-secondary">
+        {% if object.currency %}
+            {{ object.currency }}
+        {% else %}
+            <span class="text-muted"><i>{% translate "Tenant default" %}</i></span>
+        {% endif %}
+    </dd>
+</dl>

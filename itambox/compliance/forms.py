@@ -45,13 +45,14 @@ class AssetMaintenanceForm(forms.ModelForm):
         model = AssetMaintenance
         fields = [
             'asset', 'title', 'supplier', 'maintenance_type', 'status',
-            'cost', 'start_date', 'completion_date', 'performed_by',
+            'cost', 'currency', 'start_date', 'completion_date', 'performed_by',
             'description', 'notes'
         ]
         widgets = {
             'title': forms.TextInput(attrs={'class': 'form-control'}),
             'performed_by': forms.TextInput(attrs={'class': 'form-control'}),
             'cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'currency': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
@@ -80,6 +81,7 @@ class AssetMaintenanceForm(forms.ModelForm):
             ),
             Row(
                 Column('cost', css_class='col-md-6'),
+                Column('currency', css_class='col-md-6'),
             ),
             Row(
                 Column('start_date', css_class='col-md-6'),

@@ -1,0 +1,50 @@
+{% load i18n money %}
+<dl class="row mb-0">
+    <dt class="col-sm-4">{% translate "Asset:" %}</dt>
+    <dd class="col-sm-8">
+        {% if object.asset %}
+            <a href="{{ object.asset.get_absolute_url }}" class="fw-bold text-decoration-none">
+                {{ object.asset.name }} ({{ object.asset.asset_tag }})
+            </a>
+        {% else %}
+            <span class="text-muted"><i>{% translate "None" %}</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">{% translate "Disposal Method:" %}</dt>
+    <dd class="col-sm-8">
+        <span class="badge bg-purple-lt px-2 py-1 text-uppercase">
+            {{ object.get_disposal_method_display }}
+        </span>
+    </dd>
+
+    <dt class="col-sm-4">{% translate "Disposal Date:" %}</dt>
+    <dd class="col-sm-8 text-secondary">{{ object.disposal_date|date:"Y-m-d" }}</dd>
+
+    <dt class="col-sm-4">{% translate "Recipient:" %}</dt>
+    <dd class="col-sm-8">
+        {% if object.recipient %}
+            {{ object.recipient }}
+        {% else %}
+            <span class="text-muted"><i>{% translate "Not specified" %}</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">{% translate "WEEE Compliant:" %}</dt>
+    <dd class="col-sm-8">
+        {% if object.weee_compliant %}
+            <span class="badge bg-success-lt text-success">{% translate "Yes" %}</span>
+        {% else %}
+            <span class="badge bg-secondary-lt text-secondary">{% translate "No" %}</span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">{% translate "Notes:" %}</dt>
+    <dd class="col-sm-8 text-secondary">
+        {% if object.notes %}
+            {{ object.notes|linebreaksbr }}
+        {% else %}
+            <span class="text-muted"><i>{% translate "No notes provided." %}</i></span>
+        {% endif %}
+    </dd>
+</dl>

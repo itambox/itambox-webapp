@@ -6,6 +6,7 @@ from django.utils.translation import gettext_lazy as _
 
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel
 from core.mixins import BookmarkableMixin, SoftDeleteMixin, CustomFieldDataMixin
+from core.currency import CurrencyField
 from extras.models import Tag
 from software.models import Software
 from assets.models import Asset
@@ -71,7 +72,14 @@ class License(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
     )
     purchase_date = models.DateField(blank=True, null=True, db_index=True)
     purchase_cost = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    currency = CurrencyField()
     order_number = models.CharField(max_length=100, blank=True)
+    version = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Optional version constraint for this license entitlement (e.g. '2021', '16.x'). "
+                  "Informational only — reconciliation is performed at the Software level (version-agnostic).",
+    )
     expiration_date = models.DateField(blank=True, null=True, db_index=True, help_text="For term licenses or maintenance")
     notes = models.TextField(blank=True)
     tags = models.ManyToManyField(Tag, blank=True, related_name='licenses')

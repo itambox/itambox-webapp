@@ -316,8 +316,10 @@ class ProcurementStatusTransitionTests(TestCase):
         self.assertEqual(float(line.unit_price), 15.50)
 
 
-from procurement.forms import PurchaseOrderForm, PurchaseOrderLineForm
+from procurement.forms import PurchaseOrderForm, PurchaseOrderLineForm, ContractForm
+from procurement.models import Contract
 from organization.models import Tenant
+from core.currency import CURRENCY_CHOICES
 
 class PurchaseOrderFormTests(TestCase):
     def setUp(self):
@@ -415,4 +417,370 @@ class PurchaseOrderLineFormTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn('asset_type', form.errors)
         self.assertIn("Please select a Asset type.", form.errors['asset_type'])
+
+
+class PurchaseOrderCurrencyTests(TestCase):
+    """Tests for the per-PO currency field and the PurchaseOrderLine.currency property."""
+
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username='currencyuser', email='currency@example.com', password='password'
+        )
+        self.site = Site.objects.create(name='Currency Site', slug='currency-site')
+        self.location = Location.objects.create(
+            name='Currency Location', slug='currency-location', site=self.site
+        )
+        self.supplier = Supplier.objects.create(name='Currency Supplier', slug='currency-supplier')
+        self.manufacturer = Manufacturer.objects.create(
+            name='Currency Manufacturer', slug='currency-manufacturer'
+        )
+        self.asset_type = AssetType.objects.create(
+            manufacturer=self.manufacturer,
+            model='Currency Model',
+            slug='currency-model',
+            requestable=False,
+        )
+
+    def _make_po(self, currency=''):
+        return PurchaseOrder.objects.create(
+            order_number=f'PO-CUR-{currency or "blank"}',
+            supplier=self.supplier,
+            destination_location=self.location,
+            created_by=self.user,
+            currency=currency,
+        )
+
+    # --- PurchaseOrder.currency field ---
+
+    def test_currency_defaults_to_blank(self):
+        """A new PO should default to blank (inherit tenant currency at display time)."""
+        po = self._make_po()
+        self.assertEqual(po.currency, '')
+
+    def test_currency_explicit_value_stored(self):
+        """An explicit ISO currency code must round-trip through the DB."""
+        po = self._make_po(currency='USD')
+        po.refresh_from_db()
+        self.assertEqual(po.currency, 'USD')
+
+    def test_currency_choices_are_valid(self):
+        """All CURRENCY_CHOICES codes must be accepted by the field."""
+        valid_codes = [code for code, _ in CURRENCY_CHOICES]
+        for code in valid_codes:
+            po = PurchaseOrder(
+                order_number=f'PO-CHK-{code}',
+                supplier=self.supplier,
+                destination_location=self.location,
+                created_by=self.user,
+                currency=code,
+            )
+            # full_clean validates choices; this must not raise
+            po.full_clean()
+
+    def test_currency_field_in_form(self):
+        """PurchaseOrderForm must expose the currency field."""
+        form = PurchaseOrderForm()
+        self.assertIn('currency', form.fields)
+
+    def test_form_saves_currency(self):
+        """PurchaseOrderForm must persist an explicit currency on save."""
+        tenant = Tenant.objects.create(name='Curr Tenant', slug='curr-tenant')
+        form_data = {
+            'order_number': 'PO-FORM-GBP',
+            'supplier': self.supplier.pk,
+            'currency': 'GBP',
+            'order_date': '2026-06-14',
+            'expected_delivery_date': '2026-07-01',
+            'destination_location': self.location.pk,
+            'tenant': tenant.pk,
+            'notes': '',
+        }
+        form = PurchaseOrderForm(data=form_data)
+        self.assertTrue(form.is_valid(), form.errors)
+        po = form.save()
+        self.assertEqual(po.currency, 'GBP')
+
+    def test_form_saves_blank_currency(self):
+        """An empty currency selection must save as blank (tenant-fallback semantics)."""
+        tenant = Tenant.objects.create(name='Curr Tenant 2', slug='curr-tenant-2')
+        form_data = {
+            'order_number': 'PO-FORM-BLANK',
+            'supplier': self.supplier.pk,
+            'currency': '',
+            'order_date': '2026-06-14',
+            'expected_delivery_date': '2026-07-01',
+            'destination_location': self.location.pk,
+            'tenant': tenant.pk,
+            'notes': '',
+        }
+        form = PurchaseOrderForm(data=form_data)
+        self.assertTrue(form.is_valid(), form.errors)
+        po = form.save()
+        self.assertEqual(po.currency, '')
+
+    # --- PurchaseOrderLine.currency property ---
+
+    def test_line_currency_delegates_to_po(self):
+        """PurchaseOrderLine.currency must return the parent PO's currency."""
+        po = self._make_po(currency='EUR')
+        line = PurchaseOrderLine.objects.create(
+            purchase_order=po,
+            asset_type=self.asset_type,
+            qty_ordered=2,
+            unit_price='99.99',
+        )
+        self.assertEqual(line.currency, 'EUR')
+
+    def test_line_currency_blank_when_po_currency_blank(self):
+        """When the PO has no explicit currency, the line property also returns blank."""
+        po = self._make_po(currency='')
+        line = PurchaseOrderLine.objects.create(
+            purchase_order=po,
+            asset_type=self.asset_type,
+            qty_ordered=1,
+            unit_price='10.00',
+        )
+        self.assertEqual(line.currency, '')
+
+
+# ---------------------------------------------------------------------------
+# Contract tests
+# ---------------------------------------------------------------------------
+
+import datetime
+from django.utils import timezone
+
+
+class ContractModelTests(TestCase):
+    """Unit tests for the Contract model."""
+
+    def setUp(self):
+        self.tenant = Tenant.objects.create(name='Contract Tenant', slug='contract-tenant')
+        self.supplier = Supplier.objects.create(name='Contract Supplier', slug='contract-supplier')
+
+    def _make_contract(self, **kwargs):
+        defaults = dict(
+            name='Hardware Support Agreement',
+            contract_number='CTR-001',
+            contract_type='support',
+            status='active',
+            supplier=self.supplier,
+            tenant=self.tenant,
+            start_date=datetime.date(2026, 1, 1),
+            end_date=datetime.date(2027, 1, 1),
+        )
+        defaults.update(kwargs)
+        return Contract.objects.create(**defaults)
+
+    # --- Basic creation ---
+
+    def test_contract_creation_defaults(self):
+        contract = self._make_contract()
+        self.assertEqual(contract.status, 'active')
+        self.assertEqual(contract.contract_type, 'support')
+        self.assertFalse(contract.auto_renew)
+        self.assertEqual(contract.currency, '')  # CurrencyField blanks = tenant default
+        self.assertIsNone(contract.cost)
+
+    def test_contract_str(self):
+        contract = self._make_contract()
+        self.assertEqual(str(contract), 'CTR-001 – Hardware Support Agreement')
+
+    def test_get_absolute_url(self):
+        contract = self._make_contract()
+        self.assertIn(str(contract.pk), contract.get_absolute_url())
+
+    # --- Uniqueness: contract_number per-active row ---
+
+    def test_unique_contract_number_active_enforced(self):
+        """Two active contracts with the same number must raise IntegrityError."""
+        self._make_contract(contract_number='CTR-DUP')
+        from django.db import IntegrityError
+        with self.assertRaises(IntegrityError):
+            # Bypass full_clean — hit the DB constraint directly
+            Contract.objects.create(
+                name='Duplicate',
+                contract_number='CTR-DUP',
+                contract_type='maintenance',
+                status='draft',
+                start_date=datetime.date(2026, 1, 1),
+                end_date=datetime.date(2027, 1, 1),
+            )
+
+    def test_unique_contract_number_allows_soft_deleted_resurrection(self):
+        """After soft-deleting a contract, a new one with the same number is allowed."""
+        contract = self._make_contract(contract_number='CTR-REBORN')
+        contract.delete()  # soft-delete sets deleted_at
+        # This must not raise — the old row is soft-deleted so the constraint lifts
+        new_contract = self._make_contract(contract_number='CTR-REBORN')
+        self.assertIsNotNone(new_contract.pk)
+
+    # --- Assets M2M ---
+
+    def test_assets_m2m(self):
+        from assets.models import Asset, AssetType, Manufacturer, StatusLabel
+        manufacturer = Manufacturer.objects.create(name='M2M Mfr', slug='m2m-mfr')
+        asset_type = AssetType.objects.create(
+            manufacturer=manufacturer, model='M2M Model', slug='m2m-model'
+        )
+        status_label, _ = StatusLabel.objects.get_or_create(
+            name='Deployable', defaults={'type': 'deployable', 'slug': 'deployable'}
+        )
+        asset = Asset.objects.create(
+            asset_type=asset_type,
+            name='Test Asset',
+            asset_tag='TAG-M2M',
+            status=status_label,
+        )
+        contract = self._make_contract()
+        contract.assets.add(asset)
+        self.assertIn(asset, contract.assets.all())
+        self.assertIn(contract, asset.contracts.all())
+
+    # --- Currency field ---
+
+    def test_currency_blank_default(self):
+        contract = self._make_contract()
+        self.assertEqual(contract.currency, '')
+
+    def test_currency_explicit(self):
+        contract = self._make_contract(currency='USD')
+        contract.refresh_from_db()
+        self.assertEqual(contract.currency, 'USD')
+
+    # --- Date properties ---
+
+    def test_days_until_expiry_future(self):
+        future_end = timezone.now().date() + datetime.timedelta(days=15)
+        contract = self._make_contract(end_date=future_end)
+        self.assertEqual(contract.days_until_expiry, 15)
+
+    def test_is_expiring_soon_true(self):
+        future_end = timezone.now().date() + datetime.timedelta(days=10)
+        contract = self._make_contract(end_date=future_end)
+        self.assertTrue(contract.is_expiring_soon)
+
+    def test_is_expiring_soon_false_when_far(self):
+        future_end = timezone.now().date() + datetime.timedelta(days=90)
+        contract = self._make_contract(end_date=future_end)
+        self.assertFalse(contract.is_expiring_soon)
+
+    def test_days_until_expiry_negative_when_past(self):
+        past_end = timezone.now().date() - datetime.timedelta(days=5)
+        contract = self._make_contract(
+            start_date=datetime.date(2020, 1, 1),
+            end_date=past_end,
+        )
+        self.assertLess(contract.days_until_expiry, 0)
+
+    # --- Validation ---
+
+    def test_clean_raises_when_end_before_start(self):
+        from django.core.exceptions import ValidationError
+        contract = Contract(
+            name='Bad Dates',
+            contract_number='CTR-BAD',
+            contract_type='lease',
+            status='draft',
+            start_date=datetime.date(2026, 6, 1),
+            end_date=datetime.date(2026, 1, 1),  # before start
+        )
+        with self.assertRaises(ValidationError):
+            contract.clean()
+
+    # --- PO link ---
+
+    def test_purchase_order_link(self):
+        self.site = Site.objects.create(name='Contract Site', slug='contract-site')
+        self.location = Location.objects.create(name='Contract Loc', slug='contract-loc', site=self.site)
+        user = User.objects.create_superuser(username='ctruser', email='ctr@example.com', password='pw')
+        po = PurchaseOrder.objects.create(
+            order_number='PO-CTR-001',
+            supplier=self.supplier,
+            destination_location=self.location,
+            created_by=user,
+        )
+        contract = self._make_contract(purchase_order=po)
+        self.assertEqual(contract.purchase_order, po)
+        self.assertIn(contract, po.contracts.all())
+
+
+class ContractFormTests(TestCase):
+    """Smoke tests for ContractForm."""
+
+    def setUp(self):
+        self.tenant = Tenant.objects.create(name='Form Tenant', slug='form-tenant')
+        self.supplier = Supplier.objects.create(name='Form Supplier', slug='form-supplier')
+
+    def test_contract_form_valid(self):
+        form_data = {
+            'name': 'Annual Support',
+            'contract_number': 'CTR-FORM-001',
+            'contract_type': 'support',
+            'status': 'draft',
+            'supplier': self.supplier.pk,
+            'cost': '12000.00',
+            'currency': 'EUR',
+            'billing_cycle': 'annual',
+            'start_date': '2026-01-01',
+            'end_date': '2027-01-01',
+            'renewal_date': '',
+            'auto_renew': False,
+            'sla_response_time': '4 business hours',
+            'sla_resolution_time': '8 business hours',
+            'coverage_hours': '24x7',
+            'sla_terms': '',
+            'assets': [],
+            'purchase_order': '',
+            'tenant': self.tenant.pk,
+            'notes': '',
+        }
+        form = ContractForm(data=form_data)
+        self.assertTrue(form.is_valid(), form.errors)
+        contract = form.save()
+        self.assertEqual(contract.contract_number, 'CTR-FORM-001')
+        self.assertEqual(contract.currency, 'EUR')
+
+    def test_contract_form_invalid_missing_dates(self):
+        form_data = {
+            'name': 'No Dates',
+            'contract_number': 'CTR-NODATE',
+            'contract_type': 'maintenance',
+            'status': 'draft',
+            # start_date and end_date deliberately omitted
+        }
+        form = ContractForm(data=form_data)
+        self.assertFalse(form.is_valid())
+        self.assertIn('start_date', form.errors)
+        self.assertIn('end_date', form.errors)
+
+
+class ContractViewSmokeTests(TestCase):
+    """List and detail view smoke tests."""
+
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username='contractview', email='cv@example.com', password='password'
+        )
+        self.supplier = Supplier.objects.create(name='View Supplier', slug='view-supplier')
+        self.contract = Contract.objects.create(
+            name='View Test Contract',
+            contract_number='CTR-VIEW-001',
+            contract_type='support',
+            status='active',
+            supplier=self.supplier,
+            start_date=datetime.date(2026, 1, 1),
+            end_date=datetime.date(2027, 1, 1),
+        )
+
+    def test_contract_list_view(self):
+        self.client.force_login(self.user)
+        response = self.client.get('/procurement/contracts/')
+        self.assertEqual(response.status_code, 200)
+
+    def test_contract_detail_view(self):
+        self.client.force_login(self.user)
+        response = self.client.get(f'/procurement/contracts/{self.contract.pk}/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.contract.contract_number)
 

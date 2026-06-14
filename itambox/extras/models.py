@@ -39,7 +39,12 @@ class Tag(ChangeLoggingMixin, BaseModel, SoftDeleteMixin, BookmarkableMixin):
 
 
 class Dashboard(models.Model):
-    objects = TenantScopingManager()
+    # Dashboards are personal user objects — they are NOT tenant-scoped rows.
+    # The `tenant` field only narrows widget data; it does not gate access to
+    # the dashboard itself.  Using the plain manager ensures that
+    # filter_by_tenant()'s fail-close (→ .none() when no tenant context) does
+    # not prevent users from seeing their own dashboards.
+    objects = models.Manager()
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,

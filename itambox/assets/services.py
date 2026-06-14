@@ -43,6 +43,14 @@ def checkout_asset(
         # Lock the asset row to prevent concurrent overallocation or state issues
         asset = Asset.objects.select_for_update().get(pk=asset.pk)
 
+        # Lifecycle guard: assets on order or in repair are not deployable.
+        if asset.status and asset.status.type in (
+            StatusTypeChoices.IN_REPAIR, StatusTypeChoices.ON_ORDER
+        ):
+            raise ValidationError(
+                f"Cannot check out an asset that is {asset.status.get_type_display()}."
+            )
+
         if asset.active_assignment:
             checkin_asset(asset, user=user, notes='Auto-checkin for reassignment')
 
@@ -218,6 +226,83 @@ def checkin_asset(
             return f"Checked in from Location: {checked_in_from}"
     else:
         return None
+
+
+def dispose_asset(
+    asset: Asset,
+    disposal_method: str,
+    disposal_date,
+    data_sanitization_method: str = 'none',
+    sanitization_certificate: str = '',
+    sanitized_by: str = '',
+    recipient: str = '',
+    proceeds=None,
+    currency: str = '',
+    weee_compliant: bool = False,
+    notes: str = '',
+    user=None,
+) -> 'AssetDisposal':
+    """Record the end-of-life disposal of an asset.
+
+    Creates (or replaces) an ``AssetDisposal`` record, stamps ``disposed_at``
+    and ``disposal_value`` on the ``Asset``, and transitions the asset to an
+    *archived* ``StatusLabel``.  If no archived label exists the asset status
+    is left unchanged and a warning is returned alongside the record.
+
+    The whole operation is wrapped in a database transaction; either
+    everything succeeds or nothing is written.
+    """
+    from assets.models import AssetDisposal  # local import avoids circular at module load
+
+    with transaction.atomic():
+        # Lock the asset row to prevent concurrent mutations
+        asset = Asset._base_manager.select_for_update().get(pk=asset.pk)
+
+        # Auto-checkin any active assignment before disposal
+        if asset.active_assignment:
+            checkin_asset(asset, user=user, notes='Auto-checkin for disposal')
+            asset.refresh_from_db()
+
+        # Transition to an archived status label (first one found)
+        archived_label = StatusLabel.objects.filter(
+            type=StatusTypeChoices.ARCHIVED
+        ).first()
+
+        # Remove any existing disposal record for this asset (idempotent re-run)
+        AssetDisposal.all_objects.filter(asset=asset).delete()
+
+        disposal = AssetDisposal(
+            asset=asset,
+            disposal_method=disposal_method,
+            disposal_date=disposal_date,
+            data_sanitization_method=data_sanitization_method,
+            sanitization_certificate=sanitization_certificate,
+            sanitized_by=sanitized_by,
+            recipient=recipient,
+            proceeds=proceeds,
+            currency=currency,
+            weee_compliant=weee_compliant,
+            notes=notes,
+        )
+        disposal.full_clean()
+        disposal.save()
+
+        # Update the asset: stamp disposal fields and transition status
+        asset.disposed_at = timezone.now()
+        if proceeds is not None:
+            asset.disposal_value = proceeds
+
+        if archived_label:
+            asset.status = archived_label
+
+        asset._changelog_action = 'dispose'
+        asset._changelog_message = (
+            f"Disposed via {disposal.get_disposal_method_display()} "
+            f"on {disposal_date}"
+        )
+        asset.save(update_fields=['disposed_at', 'disposal_value', 'status'])
+
+    return disposal
 
 
 def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_location=None, request=None, **kwargs):

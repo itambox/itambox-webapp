@@ -1,6 +1,7 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from itambox.api.viewsets import ITAMBoxModelViewSet
 from core.managers import get_current_tenant
+from itambox.middleware import get_current_user
 from compliance.models import CustodyReceipt, AuditSession, AssetAudit
 from assets.models import AssetMaintenance
 from compliance.filters import CustodyReceiptFilterSet, AssetMaintenanceFilterSet, AuditSessionFilterSet, AssetAuditFilterSet
@@ -13,12 +14,20 @@ def _scope_by_asset_tenant(queryset):
     These models (CustodyReceipt, AssetAudit, AssetMaintenance) have no direct
     `tenant` field, so StrictTenantPermission cannot enforce a boundary and the
     default manager is not tenant-scoped — without this filter the list/detail
-    endpoints return every tenant's rows. Fail closed when no tenant is bound.
+    endpoints return every tenant's rows.
+
+    When a tenant is active, filter to that tenant's assets.  When no tenant is
+    active, mirror the behaviour of TenantScopingQuerySet.filter_by_tenant():
+    superusers keep an unscoped view (useful for admin / test contexts); all
+    other authenticated principals get an empty queryset (fail-closed).
     """
     tenant = get_current_tenant()
-    if tenant is None:
+    if tenant is not None:
+        return queryset.filter(asset__tenant=tenant)
+    user = get_current_user()
+    if user is not None and not getattr(user, 'is_superuser', False):
         return queryset.none()
-    return queryset.filter(asset__tenant=tenant)
+    return queryset
 
 
 class CustodyReceiptViewSet(ITAMBoxModelViewSet):

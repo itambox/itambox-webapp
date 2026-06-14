@@ -1,4 +1,4 @@
-{% load i18n crispy_forms_tags %}
+{% load i18n crispy_forms_tags money %}
 
 <div class="table-responsive mb-4">
     <table class="table table-vcenter card-table">
@@ -30,7 +30,7 @@
                         <input type="number" name="qty_ordered" value="{{ line.qty_ordered }}" class="form-control form-control-sm" style="width: 80px;" min="1">
                     </td>
                     <td>{{ line.qty_received }}</td>
-                    <td>{% if line.total_cost %}${{ line.total_cost|floatformat:2 }}{% else %}-{% endif %}</td>
+                    <td>{% if line.total_cost %}{{ line.total_cost|money:line }}{% else %}-{% endif %}</td>
                     <td class="text-end">
                         <button class="btn btn-sm btn-success"
                                 hx-post="{% url 'procurement:purchaseorderline_edit' pk=line.pk %}"
@@ -54,10 +54,10 @@
                         {% if line.consumable %}{{ line.consumable }} <span class="badge bg-purple-lt ms-1">{% translate "Consumable" %}</span>{% endif %}
                         {% if line.license %}{{ line.license }} <span class="badge bg-orange-lt ms-1">{% translate "License" %}</span>{% endif %}
                     </td>
-                    <td>{% if line.unit_price %}${{ line.unit_price|floatformat:2 }}{% else %}-{% endif %}</td>
+                    <td>{% if line.unit_price %}{{ line.unit_price|money:line }}{% else %}-{% endif %}</td>
                     <td>{{ line.qty_ordered }}</td>
                     <td>{{ line.qty_received }}</td>
-                    <td>{% if line.total_cost %}${{ line.total_cost|floatformat:2 }}{% else %}-{% endif %}</td>
+                    <td>{% if line.total_cost %}{{ line.total_cost|money:line }}{% else %}-{% endif %}</td>
                     <td class="text-end">
                         {% if object.status == 'draft' %}
                         <button class="btn btn-sm btn-outline-secondary me-1"
