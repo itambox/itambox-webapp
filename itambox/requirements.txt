@@ -1,7 +1,7 @@
 # Core framework
 Django>=5.2,<5.3
 djangorestframework>=3.16,<3.17
-drf-spectacular>=0.29,<0.30
+drf-spectacular[sidecar]>=0.29,<0.30
 
 # UI / tables / forms
 django-tables2>=2.7,<2.8

@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     'procurement.apps.ProcurementConfig',
     'rest_framework',
     'drf_spectacular',
+    'drf_spectacular_sidecar',
     'users',
     'django_q',
     'graphene_django',
@@ -240,6 +241,9 @@ SPECTACULAR_SETTINGS = {
     'COMPONENT_SPLIT_REQUEST': True,  # Critical for clean client gen
     'ENUM_ADD_EXPLICIT_BLANK_NULL_CHOICE': False,
     'SCHEMA_PATH_PREFIX': r'/api/',
+    'SWAGGER_UI_DIST': 'SIDECAR',
+    'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
+    'REDOC_DIST': 'SIDECAR',
 }
 
 

@@ -1,7 +1,7 @@
 from django.urls import path, include
 from drf_spectacular.views import (
     SpectacularAPIView,
-    SpectacularSwaggerView,
+    SpectacularSwaggerSplitView,
     SpectacularJSONAPIView,
     SpectacularRedocView
 )
@@ -41,6 +41,6 @@ urlpatterns = [
 
     path('schema/openapi.json', SpectacularJSONAPIView.as_view(), name='openapi-schema'),
     path('schema/', SpectacularAPIView.as_view(), name='schema'),
-    path('schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='api:openapi-schema'), name='swagger-ui'),
+    path('schema/swagger-ui/', SpectacularSwaggerSplitView.as_view(url_name='api:openapi-schema'), name='swagger-ui'),
     path('schema/redoc/', SpectacularRedocView.as_view(url_name='api:openapi-schema'), name='redoc'),
 ]
