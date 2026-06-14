@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from assets.models import Asset, Supplier
-from organization.models import Tenant
+from organization.models import Tenant, CostCenter
 from itambox.api.base import BaseModelSerializer
 from itambox.api.nested_serializers import NestedAssetSerializer
 from organization.api.serializers import NestedTenantSerializer
@@ -39,11 +39,11 @@ class ContractSerializer(BaseModelSerializer):
         queryset=Supplier.objects.all(),
     )
 
-    # cost_center: CostCenter is being created by another agent concurrently.
-    # Expose a read-only display field now; the write field (cost_center_id) is
-    # added dynamically in __init__ once we know the model exists, so importing
-    # this serializer before the CostCenter migration lands is safe.
     cost_center_display = serializers.SerializerMethodField(read_only=True)
+    cost_center_id = serializers.PrimaryKeyRelatedField(
+        source='cost_center', queryset=CostCenter.objects.all(),
+        write_only=True, required=False, allow_null=True,
+    )
 
     assets = NestedAssetSerializer(many=True, read_only=True)
     assets_ids = serializers.PrimaryKeyRelatedField(
@@ -73,7 +73,7 @@ class ContractSerializer(BaseModelSerializer):
             'sla_response_time', 'sla_resolution_time', 'coverage_hours', 'sla_terms',
             'assets', 'assets_ids',
             'purchase_order',
-            'cost_center_display',
+            'cost_center_display', 'cost_center_id',
             'notes',
             'days_until_expiry',
             'created_at', 'updated_at',
@@ -81,25 +81,6 @@ class ContractSerializer(BaseModelSerializer):
         brief_fields = [
             'id', 'url', 'display', 'name', 'contract_number', 'status', 'end_date',
         ]
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Dynamically add the cost_center_id write field once CostCenter exists.
-        # This avoids the DRF assertion (queryset must not be None) at class-body
-        # evaluation time while still supporting writes after the migration lands.
-        try:
-            from django.apps import apps
-            CostCenter = apps.get_model('organization', 'CostCenter')
-            self.fields['cost_center_id'] = serializers.PrimaryKeyRelatedField(
-                source='cost_center',
-                write_only=True,
-                required=False,
-                allow_null=True,
-                queryset=CostCenter.objects.all(),
-            )
-        except LookupError:
-            # CostCenter not yet registered — skip the write field silently.
-            pass
 
     def get_cost_center_display(self, obj):
         cc = obj.cost_center

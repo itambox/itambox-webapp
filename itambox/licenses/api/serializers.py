@@ -7,7 +7,7 @@ from software.api.serializers import SoftwareSerializer
 from organization.api.serializers import AssetHolderSerializer, NestedTenantSerializer
 from software.models import Software, InstalledSoftware
 from subscriptions.models import Subscription
-from organization.models import Tenant, AssetHolder
+from organization.models import Tenant, AssetHolder, CostCenter
 from assets.models import Asset
 
 
@@ -29,37 +29,11 @@ class LicenseSerializer(BaseModelSerializer):
     subscription_id = serializers.PrimaryKeyRelatedField(
         queryset=Subscription.objects.all(), source='subscription', write_only=True, required=False, allow_null=True
     )
-    # CostCenter is referenced by string to avoid a hard import (the model is
-    # being created concurrently by another agent).  Read-only display uses
-    # StringRelatedField; writes accept a bare PK via cost_center_id.
-    # cost_center_id is declared read_only here as a safe fallback; __init__
-    # replaces it with a writable PrimaryKeyRelatedField once the model exists.
     cost_center = serializers.StringRelatedField(read_only=True)
-    cost_center_id = serializers.IntegerField(
-        read_only=True,
+    cost_center_id = serializers.PrimaryKeyRelatedField(
+        source='cost_center', queryset=CostCenter.objects.all(),
+        write_only=True, required=False, allow_null=True,
     )
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Resolve the CostCenter queryset lazily so the serializer can be
-        # imported even before the organization.CostCenter migration has run.
-        try:
-            from django.apps import apps
-            CostCenter = apps.get_model('organization', 'CostCenter')
-            # Replace the placeholder read-only IntegerField with a proper
-            # writable relational field.
-            cost_center_id_field = serializers.PrimaryKeyRelatedField(
-                queryset=CostCenter.objects.all(),
-                source='cost_center',
-                write_only=True,
-                required=False,
-                allow_null=True,
-            )
-            cost_center_id_field.bind('cost_center_id', self)
-            self.fields['cost_center_id'] = cost_center_id_field
-        except LookupError:
-            # Model not yet registered (pre-migration) — keep as read-only int.
-            pass
 
     class Meta:
         model = License
