@@ -84,10 +84,18 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
                 'OIDC ID token authorized party (azp) does not match the client ID.'
             )
 
-        # Issuer is enforced only when an expected value is configured for the
-        # tenant (not all deployments set OIDC_OP_ISSUER); when set it must match.
+        # Issuer validation is MANDATORY. If the tenant config omits OIDC_OP_ISSUER,
+        # authentication is rejected rather than accepting tokens from any issuer —
+        # which would be an open door for token-substitution attacks across IdP clients.
+        # Operators must configure OIDC_OP_ISSUER for every tenant that uses OIDC.
         expected_iss = self.get_settings('OIDC_OP_ISSUER', None)
-        if expected_iss and payload.get('iss') != expected_iss:
+        if not expected_iss:
+            raise SuspiciousOperation(
+                'OIDC issuer (OIDC_OP_ISSUER) is not configured for this tenant. '
+                'Authentication denied to prevent token-substitution attacks. '
+                'Set OIDC_OP_ISSUER in ITAMBOX_TENANT_OIDC_CONFIGS for this tenant.'
+            )
+        if payload.get('iss') != expected_iss:
             raise SuspiciousOperation(
                 'OIDC ID token issuer does not match the expected issuer.'
             )

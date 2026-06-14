@@ -7,5 +7,5 @@
     <dd class="col-sm-9">{{ object.get_status_display|default:"Active" }}</dd>
 
     <dt class="col-sm-3">{% translate "Description:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{{ object.description|linebreaksbr|default:"<i>No description provided.</i>"|safe }}</dd>
+    <dd class="col-sm-9 text-secondary">{% if object.description %}{{ object.description|linebreaksbr }}{% else %}<i>No description provided.</i>{% endif %}</dd>
 </dl>

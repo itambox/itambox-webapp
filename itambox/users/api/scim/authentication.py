@@ -1,6 +1,5 @@
 import logging
 import re
-from django.contrib.auth import authenticate as django_authenticate
 from rest_framework.authentication import BaseAuthentication, get_authorization_header
 from rest_framework import exceptions
 from django.utils import timezone
@@ -87,41 +86,6 @@ class SCIMBearerTokenAuthentication(BaseAuthentication):
                 Token.objects.filter(pk=token.pk).update(last_used=timezone.now())
 
             return (user, token)
-
-        # Fallback Basic Auth
-        elif auth and auth[0].lower() == b'basic':
-            import base64
-            if len(auth) == 1:
-                raise exceptions.AuthenticationFailed('Invalid basic header. No credentials provided.')
-            elif len(auth) > 2:
-                raise exceptions.AuthenticationFailed('Invalid basic header. Credentials should not contain spaces.')
-
-            try:
-                auth_parts = base64.b64decode(auth[1]).decode('utf-8').partition(':')
-                username, password = auth_parts[0], auth_parts[2]
-            except Exception:
-                raise exceptions.AuthenticationFailed('Invalid basic header. Encoding invalid.')
-
-            user = django_authenticate(request, username=username, password=password)
-            if user is None:
-                raise exceptions.AuthenticationFailed('Invalid username or password.')
-
-            if not user.is_active:
-                raise exceptions.AuthenticationFailed('User inactive or deleted.')
-
-            # Verify tenant membership with admin/owner role
-            if not user.is_superuser:
-                membership = TenantMembership.objects.filter(user=user, tenant=tenant).select_related('role').first()
-                if not membership:
-                    raise exceptions.AuthenticationFailed('User does not have a membership in this tenant.')
-                # Fail closed when the membership has no role (nullable FK) instead of
-                # raising AttributeError (500). Authorise admin/owner only.
-                role = membership.role
-                role_name = (role.name or '').lower() if role else ''
-                if not role or role_name not in ('admin', 'owner'):
-                    raise exceptions.AuthenticationFailed('User does not have sufficient permissions (admin or owner role required).')
-
-            return (user, None)
 
         return None
 

@@ -3,6 +3,7 @@ import io
 import zipfile
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.base import ContentFile
+from django.utils.html import escape
 
 from core.models import Job, Notification
 from extras.models import FileAttachment
@@ -145,10 +146,16 @@ def generate_base64_barcode(asset, barcode_format):
 def _default_label_card(asset, barcode_data_uri):
     """Built-in label card layout (xhtml2pdf-friendly). Used when a template
     has no custom code, or when its custom code fails to render. Reads fields
-    defensively so it also works for non-Asset objects."""
-    name = getattr(asset, 'name', None) or str(asset)
-    asset_tag = getattr(asset, 'asset_tag', '') or ''
-    serial_number = getattr(asset, 'serial_number', '') or ''
+    defensively so it also works for non-Asset objects.
+
+    All user-controlled string values (name, asset_tag, serial_number) are
+    HTML-escaped before interpolation so that the |safe template tag that
+    renders label_card cannot be abused for stored-XSS. barcode_data_uri is
+    a base64 data: URI produced entirely by this module and is safe as-is.
+    """
+    name = escape(getattr(asset, 'name', None) or str(asset))
+    asset_tag = escape(getattr(asset, 'asset_tag', '') or '')
+    serial_number = escape(getattr(asset, 'serial_number', '') or '')
     serial_html = (
         f'<div style="font-size: 7pt; font-weight: normal; color: #555;">S/N: {serial_number}</div>'
         if serial_number else ''

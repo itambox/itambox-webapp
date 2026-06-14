@@ -66,12 +66,10 @@ class TenantMembershipBackend:
                 membership = getattr(user_obj, cache_key)
                 
                 if membership is None:
-                    # Let's check if there's a fallback for tests/fixtures
-                    from organization.models import AssetHolder
-                    holder = user_obj.asset_holder_profiles.filter(tenant=obj_tenant).first()
-                    if holder and holder.tenant == obj_tenant:
-                        return ModelBackend().has_perm(user_obj, perm, None)
-                    # If they don't have membership in the target tenant, deny permission
+                    # Non-members of this tenant are denied regardless of AssetHolder presence.
+                    # The AssetHolder-linked ModelBackend fallback was removed because it allowed
+                    # users with no TenantMembership to escalate via Django model-level permissions,
+                    # bypassing the JSON-role RBAC system entirely.
                     return False
 
         # Fallback to active membership if no object-specific tenant is resolved
@@ -88,12 +86,10 @@ class TenantMembershipBackend:
                 set_current_tenant(membership.tenant)
                 set_current_membership(membership)
             else:
-                from organization.models import AssetHolder
-                holder = user_obj.asset_holder_profiles.first()
-                if holder and holder.tenant:
-                    from core.managers import set_current_tenant
-                    set_current_tenant(holder.tenant)
-                    return ModelBackend().has_perm(user_obj, perm, None)
+                # User has no TenantMembership at all. Previously the AssetHolder fallback
+                # delegated to ModelBackend, granting model-level permissions to non-members.
+                # Deny instead to enforce the JSON-role RBAC boundary.
+                return False
 
         if not membership or not getattr(membership, 'role', None):
             return False
@@ -117,12 +113,8 @@ class TenantMembershipBackend:
                 set_current_tenant(membership.tenant)
                 set_current_membership(membership)
             else:
-                from organization.models import AssetHolder
-                holder = user_obj.asset_holder_profiles.first()
-                if holder and holder.tenant:
-                    from core.managers import set_current_tenant
-                    set_current_tenant(holder.tenant)
-                    return ModelBackend().has_module_perms(user_obj, app_label)
+                # No TenantMembership found: deny rather than falling back to ModelBackend.
+                return False
         if not membership or not getattr(membership, 'role', None):
             return False
         
