@@ -6,10 +6,10 @@ from django.http import HttpResponse
 
 from itambox.views.generic import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
 from itambox.views.generic.service_views import SimplePostView
-from .models import PurchaseOrder, PurchaseOrderLine
-from .tables import PurchaseOrderTable
-from .filters import PurchaseOrderFilterSet
-from .forms import PurchaseOrderForm, PurchaseOrderLineForm
+from .models import PurchaseOrder, PurchaseOrderLine, Contract
+from .tables import PurchaseOrderTable, ContractTable
+from .filters import PurchaseOrderFilterSet, ContractFilterSet
+from .forms import PurchaseOrderForm, PurchaseOrderLineForm, ContractForm
 
 class PurchaseOrderListView(ObjectListView):
     queryset = PurchaseOrder.objects.all()
@@ -472,4 +472,40 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
                 context['lines_and_forms'] = list(zip(outstanding_lines, formset))
                 context['step'] = '1'
                 return render(request, 'procurement/purchaseorder_receive.html', context)
+
+
+# ---------------------------------------------------------------------------
+# Contract views
+# ---------------------------------------------------------------------------
+
+class ContractListView(ObjectListView):
+    queryset = Contract.objects.all()
+    filterset_class = ContractFilterSet
+    table_class = ContractTable
+    template_name = 'procurement/contract_list.html'
+    permission_required = 'procurement.view_contract'
+
+
+class ContractDetailView(ObjectDetailView):
+    queryset = Contract.objects.all()
+    template_name = 'procurement/contract_detail.html'
+    permission_required = 'procurement.view_contract'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        contract = self.object
+        context['covered_assets'] = contract.assets.select_related('asset_type', 'tenant')
+        return context
+
+
+class ContractEditView(ObjectEditView):
+    queryset = Contract.objects.all()
+    model_form = ContractForm
+    permission_required = 'procurement.change_contract'
+
+
+class ContractDeleteView(ObjectDeleteView):
+    queryset = Contract.objects.all()
+    permission_required = 'procurement.delete_contract'
+    default_return_url = 'procurement:contract_list'
 
