@@ -1,5 +1,6 @@
 node_modules/
 static/dist/
+staticfiles/
 *.css.map
 *.js.map
 static/docs/
