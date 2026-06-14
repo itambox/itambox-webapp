@@ -106,11 +106,15 @@ class MitigationsPhase4Tests(TestCase):
         
         # Delete asset using force_hard_delete
         self.asset.delete(force_hard_delete=True)
-        
-        # Verify seat assignment is not deleted, but asset is SET_NULL
-        seat.refresh_from_db()
-        self.assertIsNone(seat.asset)
-        self.assertEqual(seat.license, lic)
+
+        # The seat was assigned to that asset; hard-deleting the asset releases
+        # the seat (CASCADE) so it returns to the available pool. Leaving an
+        # asset+holder-null seat would violate chk_assignment_to_one_target.
+        self.assertFalse(
+            LicenseSeatAssignment.objects.filter(pk=seat.pk).exists()
+        )
+        # The license itself is untouched (PROTECT guards it separately).
+        self.assertTrue(License.objects.filter(pk=lic.pk).exists())
 
     def test_deletion_cascades_protected_compliance_data(self):
         # CustodyReceipt protects asset and holder

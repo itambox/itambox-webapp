@@ -95,10 +95,12 @@ class SCIMProvisioningTests(TestCase):
         response = self.client.get(url, HTTP_AUTHORIZATION=f'Bearer {self.no_membership_token.key}')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-        # 7. Basic Authentication fallback success
+        # 7. HTTP Basic auth is no longer accepted on SCIM endpoints (removed to
+        #    avoid transmitting credentials on every request) — rejected even
+        #    with otherwise-valid credentials. Bearer token is now required.
         basic_credentials = base64.b64encode(b'admin:adminpassword').decode('utf-8')
         response = self.client.get(url, HTTP_AUTHORIZATION=f'Basic {basic_credentials}')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
         # 8. Basic Authentication fallback failure
         basic_credentials_fail = base64.b64encode(b'admin:wrongpassword').decode('utf-8')

@@ -1,11 +1,1 @@
-Django~=5.0
-django-tables2~=2.7.0
-django-htmx~=1.27.0
-django-filter~=23.1
-django-crispy-forms>=2.0
-crispy-bootstrap5>=2022.1
-djangorestframework
-drf-spectacular
-django-template-partials
-psycopg2-binary
-cryptography
+-r itambox/requirements.txt

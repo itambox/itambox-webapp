@@ -300,6 +300,17 @@ class RequisitionSystemTestCase(TestCase):
         # Log in as admin
         self.client.login(username='adminuser', password='password123')
 
+        # Superusers select a tenant via the session. Without active_tenant_id the
+        # TenantMiddleware leaves active_tenant=None, so any AssetRequest created
+        # during the view gets tenant=None. The subsequent
+        # AssetRequest.objects.get(...) filters by the current tenant context
+        # (self.tenant, set in setUp via set_current_tenant), which would exclude
+        # null-tenant rows. Binding the session to self.tenant ensures the view
+        # creates the request with the correct tenant.
+        session = self.client.session
+        session['active_tenant_id'] = str(self.tenant.id)
+        session.save()
+
         # 1. Create a request via view POST
         post_data = {
             'asset_type': self.type_requestable.pk,

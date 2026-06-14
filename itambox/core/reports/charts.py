@@ -1,4 +1,5 @@
 import math
+from django.utils.html import escape
 from django.utils.translation import gettext as _
 
 def generate_doughnut_chart(data, title=""):
@@ -26,7 +27,7 @@ def generate_doughnut_chart(data, title=""):
     svg_parts.append('<svg viewBox="0 0 480 220" width="100%" height="220" xmlns="http://www.w3.org/2000/svg" style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">')
     
     if title:
-        svg_parts.append(f'<text x="20" y="25" font-size="13" font-weight="700" fill="#0f172a" letter-spacing="-0.2px">{title}</text>')
+        svg_parts.append(f'<text x="20" y="25" font-size="13" font-weight="700" fill="#0f172a" letter-spacing="-0.2px">{escape(title)}</text>')
     
     # Doughnut circle base
     svg_parts.append('<g transform="rotate(-90 110 120)">')
@@ -73,11 +74,11 @@ def generate_doughnut_chart(data, title=""):
         
         # Color indicator circle
         svg_parts.append(f'<circle cx="235" cy="{y_pos - 4}" r="5" fill="{color}" />')
-        # Label text
-        svg_parts.append(f'<text x="250" y="{y_pos}" font-size="11" font-weight="500" fill="#334155">{item["label"]}</text>')
-        # Value text (right-aligned at x=390)
+        # Label text — escape user-controlled category/status/provider names
+        svg_parts.append(f'<text x="250" y="{y_pos}" font-size="11" font-weight="500" fill="#334155">{escape(item["label"])}</text>')
+        # Value text (right-aligned at x=390) — numeric, safe as-is
         svg_parts.append(f'<text x="390" y="{y_pos}" font-size="11" font-weight="700" fill="#0f172a" text-anchor="end">{item["value"]:,}</text>')
-        # Percentage text (right-aligned at x=450)
+        # Percentage text (right-aligned at x=450) — computed float string, safe as-is
         svg_parts.append(f'<text x="450" y="{y_pos}" font-size="10" font-weight="600" fill="#64748b" text-anchor="end">{pct_str}</text>')
         
     svg_parts.append('</svg>')
@@ -109,7 +110,7 @@ def generate_bar_chart(data, title=""):
     svg_parts.append('<svg viewBox="0 0 480 220" width="100%" height="220" xmlns="http://www.w3.org/2000/svg" style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">')
     
     if title:
-        svg_parts.append(f'<text x="20" y="25" font-size="13" font-weight="700" fill="#0f172a" letter-spacing="-0.2px">{title}</text>')
+        svg_parts.append(f'<text x="20" y="25" font-size="13" font-weight="700" fill="#0f172a" letter-spacing="-0.2px">{escape(title)}</text>')
         
     y_start = 50
     row_height = 32
@@ -124,11 +125,11 @@ def generate_bar_chart(data, title=""):
         bar_width = max(int((val / max_val) * max_bar_width), 8)
         y_pos = y_start + (idx * row_height)
         
-        # Truncate label if too long
+        # Truncate label if too long, then escape — label is a user-controlled provider name
         short_label = label if len(label) <= 18 else label[:16] + "..."
-        
+
         # Label text
-        svg_parts.append(f'<text x="20" y="{y_pos + 12}" font-size="11" font-weight="600" fill="#475569" text-anchor="start">{short_label}</text>')
+        svg_parts.append(f'<text x="20" y="{y_pos + 12}" font-size="11" font-weight="600" fill="#475569" text-anchor="start">{escape(short_label)}</text>')
         
         # Bar background
         svg_parts.append(f'<rect x="140" y="{y_pos}" width="{max_bar_width}" height="16" rx="4" fill="#f1f5f9" />')

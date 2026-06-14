@@ -6,9 +6,9 @@
 
 version: 2
 updates:
-  # Check for Python pip dependency updates (requirements.txt / pyproject.toml)
+  # Check for Python pip dependency updates (itambox/requirements.txt)
   - package-ecosystem: "pip"
-    directory: "/"
+    directory: "/itambox"
     schedule:
       interval: "weekly"
       day: "monday"

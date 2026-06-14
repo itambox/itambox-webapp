@@ -161,7 +161,7 @@ DATABASES = {
         'PORT': os.environ.get('ITAMBOX_DB_PORT', '5432'),
         'CONN_MAX_AGE': int(os.environ.get('ITAMBOX_DB_CONN_MAX_AGE', '300')),
         'OPTIONS': {
-            'sslmode': os.environ.get('ITAMBOX_DB_SSLMODE', 'prefer'),
+            'sslmode': os.environ.get('ITAMBOX_DB_SSLMODE', 'require'),
         },
         'TEST': {
             'NAME': 'oidc_test_db',
@@ -244,6 +244,7 @@ SPECTACULAR_SETTINGS = {
     'SWAGGER_UI_DIST': 'SIDECAR',
     'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
     'REDOC_DIST': 'SIDECAR',
+    'SERVE_PERMISSIONS': ['rest_framework.permissions.IsAuthenticated'],
 }
 
 

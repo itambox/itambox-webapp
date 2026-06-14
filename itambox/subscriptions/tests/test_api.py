@@ -20,7 +20,7 @@ class SubscriptionAPITests(APITestCase):
         )
 
         # Create Tenant & AssetHolder profile for staff user
-        from organization.models import TenantGroup, Tenant, AssetHolder
+        from organization.models import TenantGroup, Tenant, AssetHolder, TenantRole, TenantMembership
         self.tg = TenantGroup.objects.create(name="API TG", slug="api-tg")
         self.tenant = Tenant.objects.create(name="API Tenant", slug="api-tenant", group=self.tg)
         self.holder = AssetHolder.objects.create(
@@ -46,22 +46,20 @@ class SubscriptionAPITests(APITestCase):
             tenant=self.tenant
         )
 
-        # Grant specific subscriptions permission codenames
-        from django.contrib.auth.models import Permission
-        from django.contrib.contenttypes.models import ContentType
-        
-        for model in [Provider, Subscription, SubscriptionAssignment]:
-            content_type = ContentType.objects.get_for_model(model)
-            for action in ['view', 'add', 'change', 'delete']:
-                codename = f'{action}_{model._meta.model_name}'
-                try:
-                    permission = Permission.objects.get(
-                        codename=codename,
-                        content_type=content_type,
-                    )
-                    self.staff.user_permissions.add(permission)
-                except Permission.DoesNotExist:
-                    pass
+        # Grant permissions via TenantRole + TenantMembership (RBAC backend requires this)
+        role = TenantRole.objects.create(
+            tenant=self.tenant,
+            name='Staff Role',
+            permissions=[
+                'subscriptions.view_provider', 'subscriptions.add_provider',
+                'subscriptions.change_provider', 'subscriptions.delete_provider',
+                'subscriptions.view_subscription', 'subscriptions.add_subscription',
+                'subscriptions.change_subscription', 'subscriptions.delete_subscription',
+                'subscriptions.view_subscriptionassignment', 'subscriptions.add_subscriptionassignment',
+                'subscriptions.change_subscriptionassignment', 'subscriptions.delete_subscriptionassignment',
+            ],
+        )
+        TenantMembership.objects.create(user=self.staff, tenant=self.tenant, role=role)
 
     def test_provider_api_crud(self):
         self.client.force_authenticate(user=self.staff)

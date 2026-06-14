@@ -6,7 +6,7 @@ from graphql import GraphQLError
 
 from core.schema import schema
 from subscriptions.models import Provider, Subscription, SubscriptionAssignment
-from organization.models import Tenant, TenantGroup, AssetHolder
+from organization.models import Tenant, TenantGroup, AssetHolder, TenantRole, TenantMembership
 from assets.models import Supplier, Asset, StatusLabel
 from itambox.middleware import set_current_tenant
 
@@ -15,22 +15,12 @@ class SubscriptionsGraphQLTestCase(TestCase):
         self.User = get_user_model()
         self.user = self.User.objects.create_user(username='testuser', email='test@example.com', password='password')
         self.superuser = self.User.objects.create_superuser(username='admin', email='admin@example.com', password='password')
-        
+
         self.tenant_group = TenantGroup.objects.create(name='Test Group', slug='test-group')
         self.tenant = Tenant.objects.create(name='Test Tenant', slug='test-tenant', group=self.tenant_group)
         self.other_tenant = Tenant.objects.create(name='Other Tenant', slug='other-tenant')
 
-        # Add all permissions
-        from django.contrib.auth.models import Permission
-        permissions = Permission.objects.filter(codename__in=[
-            'view_provider', 'add_provider', 'change_provider', 'delete_provider',
-            'view_subscription', 'add_subscription', 'change_subscription', 'delete_subscription',
-            'view_subscriptionassignment', 'add_subscriptionassignment', 'change_subscriptionassignment', 'delete_subscriptionassignment',
-            'view_asset', 'add_asset'
-        ])
-        self.user.user_permissions.add(*permissions)
-
-        # Create AssetHolder profile for self.user to link them to self.tenant for custom RBAC backend evaluation
+        # Create AssetHolder profile for self.user to link them to self.tenant
         self.holder = AssetHolder.objects.create(
             user=self.user,
             first_name="Test",
@@ -39,6 +29,22 @@ class SubscriptionsGraphQLTestCase(TestCase):
             email="test@example.com",
             tenant=self.tenant
         )
+
+        # Grant permissions via TenantRole + TenantMembership (RBAC backend requires this)
+        role = TenantRole.objects.create(
+            tenant=self.tenant,
+            name='Test Role',
+            permissions=[
+                'subscriptions.view_provider', 'subscriptions.add_provider',
+                'subscriptions.change_provider', 'subscriptions.delete_provider',
+                'subscriptions.view_subscription', 'subscriptions.add_subscription',
+                'subscriptions.change_subscription', 'subscriptions.delete_subscription',
+                'subscriptions.view_subscriptionassignment', 'subscriptions.add_subscriptionassignment',
+                'subscriptions.change_subscriptionassignment', 'subscriptions.delete_subscriptionassignment',
+                'assets.view_asset', 'assets.add_asset',
+            ],
+        )
+        TenantMembership.objects.create(user=self.user, tenant=self.tenant, role=role)
 
         # Set thread-local tenant context for models creation
         set_current_tenant(self.tenant)

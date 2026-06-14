@@ -75,6 +75,7 @@ class Component(AbstractInventoryItem):
         constraints = [
             models.UniqueConstraint(
                 fields=['manufacturer', 'name'],
+                condition=models.Q(deleted_at__isnull=True),
                 name='unique_component_manufacturer_name'
             )
         ]
@@ -146,6 +147,7 @@ class Accessory(AbstractInventoryItem):
         constraints = [
             models.UniqueConstraint(
                 fields=['manufacturer', 'name'],
+                condition=models.Q(deleted_at__isnull=True),
                 name='inventory_accessory_unique_manufacturer_name'
             )
         ]
@@ -187,6 +189,7 @@ class Consumable(AbstractInventoryItem):
         constraints = [
             models.UniqueConstraint(
                 fields=['manufacturer', 'name'],
+                condition=models.Q(deleted_at__isnull=True),
                 name='inventory_consumable_unique_manufacturer_name'
             )
         ]

@@ -8,7 +8,7 @@ from django.contrib.auth import get_user_model
 
 from core.models import BaseModel, ChangeLoggingMixin, StandardModel
 from core.mixins import TaggableMixin, CloneableMixin, ExportableMixin, JournalingMixin, ImageAttachmentMixin, FileAttachmentMixin, SoftDeleteMixin
-from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingManager, TenantScopingSoftDeleteManager, TenantScopingAllObjectsManager
+from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager, TenantScopingAllObjectsManager
 from compliance.choices import AuditSessionStatusChoices, AuditVerificationMethodChoices
 
 
@@ -25,14 +25,14 @@ class CustodyTemplate(TaggableMixin, CloneableMixin, ExportableMixin, ChangeLogg
 
     tenant = models.ForeignKey(
         to='organization.Tenant',
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         blank=True,
         null=True,
         related_name='custody_templates'
     )
     tenant_group = models.ForeignKey(
         to='organization.TenantGroup',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         blank=True,
         null=True,
         related_name='custody_templates',
@@ -105,6 +105,10 @@ class CustodyTemplate(TaggableMixin, CloneableMixin, ExportableMixin, ChangeLogg
 
 
 class CustodyReceipt(ChangeLoggingMixin, BaseModel):
+    # Tenant scoping is enforced at the API layer (CustodyReceiptViewSet uses
+    # _scope_by_asset_tenant). The default manager is intentionally unscoped so
+    # the token-based public sign view (custody_eula_sign) can resolve a receipt
+    # by its secret token regardless of the requester's tenant context.
     STATUS_PENDING = 'pending'
     STATUS_ACCEPTED = 'accepted'
     STATUS_DECLINED = 'declined'
@@ -162,7 +166,7 @@ class AuditSession(StandardModel, SoftDeleteMixin):
     name = models.CharField(max_length=200)
     tenant = models.ForeignKey(
         to='organization.Tenant',
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         blank=True,
         null=True,
         related_name='audit_sessions',
@@ -224,6 +228,10 @@ class AuditSession(StandardModel, SoftDeleteMixin):
 
 
 class AssetAudit(models.Model):
+    # Tenant scoping is enforced at the API layer (AssetAuditViewSet uses
+    # _scope_by_asset_tenant). The default manager is intentionally unscoped:
+    # audit classification/reconciliation reads `session.audits` and must see
+    # every audit in a session regardless of the viewer's tenant context.
     session = models.ForeignKey(
         AuditSession,
         on_delete=models.CASCADE,
@@ -231,7 +239,15 @@ class AssetAudit(models.Model):
         null=True,
         blank=True
     )
-    asset = models.ForeignKey('assets.Asset', on_delete=models.CASCADE, related_name='audits')
+    # SET_NULL preserves audit history as orphaned records when an asset is
+    # hard-purged via purge_deleted, rather than destroying compliance evidence.
+    asset = models.ForeignKey(
+        'assets.Asset',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='audits',
+    )
     auditor = models.ForeignKey(User, on_delete=models.PROTECT, related_name='audits_performed')
     timestamp = models.DateTimeField(auto_now_add=True)
     location = models.ForeignKey(

@@ -102,7 +102,7 @@
                 <label class="form-label text-muted">{% translate "Custody Terms & Conditions (EULA)" %}</label>
                 <div class="border p-3 rounded bg-white text-muted" style="height: 150px; overflow-y: auto; font-size: 8.5pt; line-height: 1.4;">
                     {% if receipt.eula_text %}
-                        {{ receipt.eula_text|linebreaksbr|safe }}
+                        {{ receipt.eula_text|linebreaksbr }}
                     {% else %}
                         <p><strong>{% translate "1. Custody & Care:" %}</strong> {% translate "The Custodian agrees to maintain and operate the assigned equipment in a safe, secure, and responsible manner, in compliance with organizational policies." %}</p>
                         <p><strong>{% translate "2. Return Policy:" %}</strong> {% translate "The equipment remains the sole property of the organization and must be returned in good condition upon request, termination of service, or transfer of role." %}</p>

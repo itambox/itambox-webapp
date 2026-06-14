@@ -154,21 +154,25 @@ class LicenseSeatAssignment(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
     """Tracks the explicit assignment of one license seat to an asset or holder."""
     license = models.ForeignKey(
         to=License,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name='assignments',
         db_index=True
     )
+    # CASCADE (not SET_NULL): a seat targets exactly one of asset/holder
+    # (chk_assignment_to_one_target). Hard-deleting the target releases the seat
+    # back to the pool; SET_NULL would leave an asset+holder-null row that
+    # violates the constraint.
     asset = models.ForeignKey(
         to=Asset,
-        on_delete=models.SET_NULL,
-        null=True, 
+        on_delete=models.CASCADE,
+        null=True,
         blank=True,
         related_name='license_assignments',
         db_index=True
     )
     assigned_holder = models.ForeignKey(
         to=AssetHolder,
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
         related_name='license_assignments',
@@ -183,9 +187,8 @@ class LicenseSeatAssignment(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
         verbose_name_plural = _("License Seat Assignments")
         constraints = [
             CheckConstraint(
-                check=Q(asset__isnull=False, assigned_holder__isnull=True) | 
-                      Q(asset__isnull=True, assigned_holder__isnull=False) |
-                      Q(asset__isnull=True, assigned_holder__isnull=True),
+                check=Q(asset__isnull=False, assigned_holder__isnull=True) |
+                      Q(asset__isnull=True, assigned_holder__isnull=False),
                 name='chk_assignment_to_one_target'
             )
         ]
