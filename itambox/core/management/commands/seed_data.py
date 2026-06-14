@@ -31,6 +31,12 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
+from core.management.commands._seed.engine import ChangeLogEngine
+from core.management.commands._seed.finance import SeedFinanceMixin
+from core.management.commands._seed.lifecycle import SeedLifecycleMixin
+from core.management.commands._seed.compliance import SeedComplianceMixin
+from core.management.commands._seed.history import SeedHistoryMixin
+
 User = get_user_model()
 
 SEED_PASSWORD = 'itambox2026'
@@ -45,7 +51,7 @@ def days_ahead(n):
     return TODAY + datetime.timedelta(days=n)
 
 
-class Command(BaseCommand):
+class Command(SeedFinanceMixin, SeedLifecycleMixin, SeedComplianceMixin, SeedHistoryMixin, BaseCommand):
     help = "Seed the database with a presentation-ready MSP demo dataset."
 
     def add_arguments(self, parser):
@@ -112,7 +118,7 @@ class Command(BaseCommand):
             ('core', 'Notification'), ('core', 'ObjectChange'),
             ('extras', 'ConfigContext'), ('extras', 'Dashboard'),
             ('procurement', 'FulfillmentLink'), ('procurement', 'PurchaseOrderLine'),
-            ('procurement', 'PurchaseOrder'),
+            ('procurement', 'PurchaseOrder'), ('procurement', 'Contract'),
             ('assets', 'AssetRequest'), ('compliance', 'AssetAudit'), ('compliance', 'AuditSession'),
             ('compliance', 'CustodyReceipt'), ('compliance', 'CustodyTemplate'),
             ('assets', 'AssetMaintenance'),
@@ -123,6 +129,7 @@ class Command(BaseCommand):
             ('inventory', 'AccessoryStock'), ('inventory', 'ConsumableStock'),
             ('inventory', 'KitItem'), ('inventory', 'Kit'),
             ('software', 'InstalledSoftware'), ('assets', 'AssetAssignment'),
+            ('assets', 'Warranty'), ('assets', 'AssetReservation'), ('assets', 'AssetDisposal'),
             ('assets', 'Asset'), ('assets', 'AssetType'),
             ('inventory', 'Component'), ('inventory', 'Accessory'), ('inventory', 'Consumable'),
             ('licenses', 'License'), ('software', 'Software'),
@@ -133,6 +140,7 @@ class Command(BaseCommand):
             ('organization', 'ContactRole'),
             ('organization', 'Location'), ('organization', 'Site'),
             ('organization', 'AssetHolder'),
+            ('organization', 'CostCenter'),
             ('organization', 'Tenant'), ('organization', 'TenantGroup'),
             ('organization', 'Region'), ('organization', 'SiteGroup'),
             ('assets', 'AssetRole'), ('assets', 'StatusLabel'),
@@ -208,7 +216,12 @@ class Command(BaseCommand):
 
     def _seed_all(self):
         self.stdout.write('\nSeeding MSP demo dataset...\n')
+        self._engine = ChangeLogEngine(stdout=self.stdout, style=self.style)
         with transaction.atomic():
+            # Existing phases run first, in their ORIGINAL order. They rely on the
+            # deterministic random stream seeded by random.seed(42); inserting a
+            # random-consuming phase earlier shifts the generated serials/keys and
+            # triggers unique-constraint collisions. New phases are appended below.
             self._seed_catalog()
             self._seed_organizations()
             self._seed_access()
@@ -219,7 +232,12 @@ class Command(BaseCommand):
             self._seed_maintenance()
             self._seed_procurement()
             self._seed_operations()
-            self._seed_changelog()
+            # New realistic-dataset phases (appended; order respects data deps).
+            self._seed_cost_centers()          # tenants + engineers
+            self._seed_lifecycle()             # warranties, reservations, disposals (assets)
+            self._seed_contracts_and_costing() # contracts + cost-centre backfill (licenses/subs)
+            self._seed_compliance()            # audit sessions + custody receipts
+            self._simulate_history()           # real 2-year change history (last)
 
     # ─────────────────────────────────────────────────────────────────
     # Catalog (tenant-agnostic reference data)
@@ -1986,83 +2004,6 @@ class Command(BaseCommand):
     # Change history (ObjectChange)
     # ─────────────────────────────────────────────────────────────────
 
-    def _seed_changelog(self):
-        """Backfill a believable audit trail.
-
-        Seeding runs in a management command with no request context, so
-        ChangeLoggingMixin records nothing on its own. The changelog is a product
-        strength, so we synthesise ObjectChange rows directly — provisioning,
-        re-assignment, status changes and audits — attributed to the right MSP
-        engineers and back-dated so history reads as naturally grown rather than
-        all-at-once.
-        """
-        import uuid
-        from core.models import ObjectChange
-        self.stdout.write('--- Change history ---')
-
-        actors = self._engineer_users or [self._provisioner]
-        helpdesk = [u for name, u in self._users.items()
-                    if name in ('ravi.anand', 'mia.koch')] or actors
-        rows = []  # ObjectChange instances whose .time we backdate via bulk_update
-
-        def aware_days_ago(n):
-            return timezone.now() - datetime.timedelta(days=max(0, n), hours=random.randint(0, 18))
-
-        def add(obj, action, post, pre=None, actor=None, when=None):
-            actor = actor or random.choice(actors)
-            ct = ContentType.objects.get_for_model(type(obj))
-            oc = ObjectChange.objects.create(
-                user=actor, user_name=actor.get_username(), request_id=uuid.uuid4(),
-                action=action, changed_object_type=ct, changed_object_id=obj.pk,
-                object_repr=str(obj)[:200], object_type_repr=f"{ct.app_label} | {ct.model}",
-                prechange_data=pre, postchange_data=post)
-            oc.time = when or timezone.now()
-            rows.append(oc)
-
-        # Asset lifecycle: provisioning at purchase, then later edits / checkouts / audits.
-        for slug in self._tenants:
-            assets = self._assets_by_tenant.get(slug, [])
-            for asset in random.sample(assets, k=min(18, len(assets))):
-                born = (TODAY - asset.purchase_date).days if asset.purchase_date else 120
-                add(asset, 'create',
-                    {'asset_tag': asset.asset_tag, 'status': asset.status.name if asset.status else None,
-                     'tenant': asset.tenant.name if asset.tenant else None,
-                     'purchase_cost': str(asset.purchase_cost)},
-                    when=aware_days_ago(born))
-                active = asset.assignments.filter(is_active=True, assigned_user__isnull=False).first()
-                if active and random.random() < 0.7:
-                    add(asset, 'checkout',
-                        {'assigned_user': str(active.assigned_user), 'status': 'In Use'},
-                        pre={'status': 'Available'},
-                        when=aware_days_ago(max(1, born - random.randint(2, 20))))
-                if random.random() < 0.35:
-                    new_note = random.choice([
-                        'Re-imaged and re-enrolled in MDM.', 'BIOS/firmware updated to latest.',
-                        'Warranty extended by 12 months.', 'Relocated during office move.'])
-                    add(asset, 'update', {'notes': new_note}, pre={'notes': ''},
-                        actor=random.choice(helpdesk),
-                        when=aware_days_ago(random.randint(5, max(6, born // 2))))
-                if random.random() < 0.25:
-                    add(asset, 'audit',
-                        {'last_audited': str(TODAY), 'status': asset.status.name if asset.status else None},
-                        when=aware_days_ago(random.randint(2, 90)))
-
-        # Retired assets: a clear decommission update.
-        for asset in self._retired_assets:
-            add(asset, 'update', {'status': 'Retired', 'disposed_at': str(asset.disposed_at)},
-                pre={'status': 'In Use'}, when=aware_days_ago(random.randint(10, 120)))
-
-        # License & subscription edits (seat-count bumps, renewals).
-        for lic in random.sample(self._licenses, k=min(20, len(self._licenses))):
-            add(lic, 'create', {'name': lic.name, 'seats': lic.seats}, when=aware_days_ago(random.randint(60, 600)))
-            if random.random() < 0.4:
-                add(lic, 'update', {'seats': lic.seats}, pre={'seats': max(1, lic.seats - 5)},
-                    when=aware_days_ago(random.randint(10, 120)))
-        for sub in random.sample(self._subscriptions, k=min(12, len(self._subscriptions))):
-            add(sub, 'update', {'renewal_date': str(sub.renewal_date), 'renewal_cost': str(sub.renewal_cost)},
-                pre={'renewal_cost': str(round(float(sub.renewal_cost) * 0.9, 2))},
-                when=aware_days_ago(random.randint(5, 90)))
-
-        # Back-date the auto_now_add timestamps in one pass.
-        ObjectChange.objects.bulk_update(rows, ['time'])
-        self.stdout.write(f'  {len(rows)} change-history entries across assets, licenses and subscriptions.')
+    # Change history is now produced by SeedHistoryMixin._simulate_history()
+    # (engine-driven, real ObjectChange diffs). The old hand-written backfill
+    # that synthesised ObjectChange rows directly has been removed.
