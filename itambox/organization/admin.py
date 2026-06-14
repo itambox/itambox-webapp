@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     Region, SiteGroup, Tenant, Location, TenantGroup, Site, Contact, ContactRole, ContactAssignment,
-    TenantMembership, TenantInvitation, TenantRole
+    TenantMembership, TenantInvitation, TenantRole, CostCenter,
 )
 
 
@@ -80,3 +80,12 @@ admin.site.register(TenantInvitation, TenantInvitationAdmin)
 admin.site.register(TenantRole, TenantRoleAdmin)
 
 
+class CostCenterAdmin(admin.ModelAdmin):
+    list_display = ('code', 'name', 'tenant', 'parent', 'is_active')
+    list_filter = ('tenant', 'is_active')
+    search_fields = ('name', 'code', 'description')
+    prepopulated_fields = {'slug': ('name',)}
+    raw_id_fields = ('parent',)
+
+
+admin.site.register(CostCenter, CostCenterAdmin)

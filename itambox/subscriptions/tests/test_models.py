@@ -6,7 +6,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import IntegrityError
 from django.utils import timezone
 from assets.models import Asset
-from organization.models import AssetHolder, Location, Site, Tenant, TenantGroup
+from organization.models import AssetHolder, Location, Site, Tenant, TenantGroup, CostCenter
 from subscriptions.models import (
     Provider, Subscription, SubscriptionAssignment,
     SubscriptionTypeChoices, SubscriptionStatusChoices, BillingCycleChoices,
@@ -113,12 +113,33 @@ class SubscriptionModelTests(TestCase):
             auto_renewal=True,
             licensed_quantity=25,
             contract_reference="PO-2026-0042",
-            cost_center="CC-ENG-001",
+            cost_center=None,
         )
         self.assertEqual(str(sub), "Adobe Inc. - Adobe Creative Cloud")
         self.assertEqual(sub.days_until_renewal, 275)
         self.assertFalse(sub.is_expired)
         self.assertEqual(sub.annual_cost, 599.99)
+
+    def test_subscription_cost_center_fk(self):
+        """cost_center is a FK to organization.CostCenter; null is the default."""
+        sub_no_cc = Subscription.objects.create(
+            name="No Cost Center Sub",
+            provider=self.provider,
+        )
+        self.assertIsNone(sub_no_cc.cost_center)
+
+        # Use baker so TenantScopingSoftDeleteManager's slug/unique constraints
+        # are handled automatically for the CostCenter.
+        cc = baker.make(CostCenter, name="Engineering", code="ENG-001", tenant=None)
+        sub_with_cc = Subscription.objects.create(
+            name="Engineering Tools",
+            provider=self.provider,
+            cost_center=cc,
+        )
+        self.assertEqual(sub_with_cc.cost_center, cc)
+        self.assertEqual(sub_with_cc.cost_center.code, "ENG-001")
+        # Reverse relation: the subscription should appear in cc.subscriptions
+        self.assertIn(sub_with_cc, CostCenter.all_objects.get(pk=cc.pk).subscriptions.all())
 
     def test_subscription_expired(self):
         sub = Subscription.objects.create(

@@ -107,6 +107,16 @@ urlpatterns = [
     path('roles/<int:pk>/delete/', views.TenantRoleDeleteView.as_view(), name='tenantrole_delete'),
     path('roles/<int:pk>/assign/', views.TenantRoleAssignUsersView.as_view(), name='tenantrole_assign_users'),
 
+    # Cost Centers
+    path('cost-centers/', views.CostCenterListView.as_view(), name='costcenter_list'),
+    path('cost-centers/add/', views.CostCenterEditView.as_view(), name='costcenter_create'),
+    path('cost-centers/edit/', views.CostCenterBulkEditView.as_view(), name='costcenter_bulk_edit'),
+    path('cost-centers/delete/', views.CostCenterBulkDeleteView.as_view(), name='costcenter_bulk_delete'),
+    path('cost-centers/<int:pk>/', views.CostCenterDetailView.as_view(), name='costcenter_detail'),
+    path('cost-centers/<int:pk>/edit/', views.CostCenterEditView.as_view(), name='costcenter_update'),
+    path('cost-centers/<int:pk>/clone/', views.CostCenterCloneView.as_view(), name='costcenter_clone'),
+    path('cost-centers/<int:pk>/delete/', views.CostCenterDeleteView.as_view(), name='costcenter_delete'),
+
     # Invitations
     path('invite-user/', views.InviteUserView.as_view(), name='invite_user'),
     path('accept-invitation/<uuid:token>/', views.AcceptInvitationView.as_view(), name='accept_invitation'),

@@ -4,7 +4,7 @@ from django import forms
 from django.db.models import Q
 from django.contrib.contenttypes.models import ContentType
 from assets.models import Manufacturer, AssetType
-from organization.models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, Contact, ContactRole, ContactAssignment, TenantRole, TenantMembership
+from organization.models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, Contact, ContactRole, ContactAssignment, TenantRole, TenantMembership, CostCenter
 
 from extras.models import Tag # Import Tag
 from crispy_forms.helper import FormHelper
@@ -310,6 +310,38 @@ class TenantMembershipFilterSet(BaseOrgFilterSet):
             Q(user__email__icontains=value) |
             Q(role__name__icontains=value) |
             Q(tenant__name__icontains=value)
+        ).distinct()
+
+
+class CostCenterFilterSet(BaseOrgFilterSet):
+    tag = None  # CostCenter has no tags field
+
+    tenant = django_filters.ModelChoiceFilter(
+        queryset=Tenant.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+    parent = django_filters.ModelChoiceFilter(
+        queryset=CostCenter.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+    is_active = django_filters.BooleanFilter(
+        widget=forms.Select(
+            choices=[('', 'Any'), ('true', 'Yes'), ('false', 'No')],
+            attrs={'class': 'form-select'},
+        ),
+    )
+
+    class Meta:
+        model = CostCenter
+        fields = ['name', 'code', 'tenant', 'parent', 'is_active']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(code__icontains=value) |
+            Q(description__icontains=value)
         ).distinct()
 
 

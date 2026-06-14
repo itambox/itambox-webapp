@@ -5,7 +5,7 @@ from licenses.models import License, LicenseSeatAssignment
 from extras.api.serializers import TagSerializer
 from software.api.serializers import SoftwareSerializer
 from organization.api.serializers import AssetHolderSerializer, NestedTenantSerializer
-from software.models import Software
+from software.models import Software, InstalledSoftware
 from subscriptions.models import Subscription
 from organization.models import Tenant, AssetHolder
 from assets.models import Asset
@@ -29,6 +29,37 @@ class LicenseSerializer(BaseModelSerializer):
     subscription_id = serializers.PrimaryKeyRelatedField(
         queryset=Subscription.objects.all(), source='subscription', write_only=True, required=False, allow_null=True
     )
+    # CostCenter is referenced by string to avoid a hard import (the model is
+    # being created concurrently by another agent).  Read-only display uses
+    # StringRelatedField; writes accept a bare PK via cost_center_id.
+    # cost_center_id is declared read_only here as a safe fallback; __init__
+    # replaces it with a writable PrimaryKeyRelatedField once the model exists.
+    cost_center = serializers.StringRelatedField(read_only=True)
+    cost_center_id = serializers.IntegerField(
+        read_only=True,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Resolve the CostCenter queryset lazily so the serializer can be
+        # imported even before the organization.CostCenter migration has run.
+        try:
+            from django.apps import apps
+            CostCenter = apps.get_model('organization', 'CostCenter')
+            # Replace the placeholder read-only IntegerField with a proper
+            # writable relational field.
+            cost_center_id_field = serializers.PrimaryKeyRelatedField(
+                queryset=CostCenter.objects.all(),
+                source='cost_center',
+                write_only=True,
+                required=False,
+                allow_null=True,
+            )
+            cost_center_id_field.bind('cost_center_id', self)
+            self.fields['cost_center_id'] = cost_center_id_field
+        except LookupError:
+            # Model not yet registered (pre-migration) — keep as read-only int.
+            pass
 
     class Meta:
         model = License
@@ -37,6 +68,7 @@ class LicenseSerializer(BaseModelSerializer):
             'seats', 'available_seats', 'purchase_date', 'purchase_cost', 'currency',
             'order_number', 'version', 'expiration_date', 'notes', 'tags', 'tenant', 'tenant_id',
             'subscription', 'subscription_id',
+            'cost_center', 'cost_center_id',
             'created_at', 'updated_at'
         )
         brief_fields = ['id', 'name', 'software', 'license_type', 'seats', 'available_seats']
@@ -55,12 +87,23 @@ class LicenseSeatAssignmentSerializer(BaseModelSerializer):
     assigned_holder_id = serializers.PrimaryKeyRelatedField(
         queryset=AssetHolder.objects.all(), source='assigned_holder', write_only=True, required=False, allow_null=True
     )
+    # Optional precise install link (seat-level SAM).  Read: nested string repr;
+    # write: bare PK via installed_software_id.
+    installed_software = serializers.StringRelatedField(read_only=True)
+    installed_software_id = serializers.PrimaryKeyRelatedField(
+        queryset=InstalledSoftware.objects.all(),
+        source='installed_software',
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
 
     class Meta:
         model = LicenseSeatAssignment
         fields = (
-            'id', 'license', 'license_id', 'asset', 'asset_id', 'assigned_holder', 'assigned_holder_id', 'assigned_date',
-            'notes', 'created_at', 'updated_at'
+            'id', 'license', 'license_id', 'asset', 'asset_id', 'assigned_holder', 'assigned_holder_id',
+            'installed_software', 'installed_software_id',
+            'assigned_date', 'notes', 'created_at', 'updated_at'
         )
         brief_fields = ['id', 'license', 'asset']
 

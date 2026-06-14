@@ -500,6 +500,111 @@ class TenantInvitation(models.Model):
         return f"Invite for {self.email} to {self.tenant.name}"
 
 
+class CostCenter(AutoSlugMixin, CustomFieldDataMixin, StandardModel, SoftDeleteMixin):
+    """
+    Represents a cost center or department.  A top-level instance (parent=None)
+    is a cost center; a child instance is a department within that cost center.
+    The same model handles both via the optional self-referential parent.
+    """
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
+
+    tenant = models.ForeignKey(
+        'Tenant',
+        on_delete=models.PROTECT,
+        related_name='cost_centers',
+        blank=True,
+        null=True,
+        db_index=True,
+    )
+    name = models.CharField(max_length=100, db_index=True)
+    slug = models.SlugField(max_length=100)
+    code = models.CharField(
+        max_length=50,
+        db_index=True,
+        help_text='Short identifier for this cost center (e.g. "CC-100").',
+    )
+    parent = models.ForeignKey(
+        'self',
+        on_delete=models.PROTECT,
+        related_name='children',
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = _("Cost Center")
+        verbose_name_plural = _("Cost Centers")
+        constraints = [
+            # code unique per active tenant (soft-delete-aware)
+            models.UniqueConstraint(
+                fields=['tenant', 'code'],
+                condition=models.Q(deleted_at__isnull=True),
+                name='organization_costcenter_unique_tenant_code_active',
+            ),
+            models.UniqueConstraint(
+                fields=['slug'],
+                condition=models.Q(deleted_at__isnull=True),
+                name='organization_costcenter_unique_slug_active',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.code} – {self.name}" if self.code else self.name
+
+    def get_absolute_url(self):
+        return reverse('organization:costcenter_detail', kwargs={'pk': self.pk})
+
+    @property
+    def depth(self):
+        """Zero-based depth in the hierarchy (0 = top-level cost center)."""
+        level = 0
+        node = self
+        while node.parent_id is not None:
+            node = node.parent
+            level += 1
+            if level > 50:  # guard against accidental cycles in DB
+                break
+        return level
+
+    @property
+    def full_path(self):
+        """Slash-joined name path from root to this node."""
+        parts = [self.name]
+        node = self
+        visited = {self.pk}
+        while node.parent_id is not None:
+            node = node.parent
+            if node.pk in visited:
+                break
+            visited.add(node.pk)
+            parts.insert(0, node.name)
+        return " / ".join(parts)
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.parent_id is None:
+            return
+        # Self-parent guard
+        if self.pk and self.parent_id == self.pk:
+            raise ValidationError({'parent': _("A cost center cannot be its own parent.")})
+        # Ancestor-cycle guard
+        if self.pk:
+            visited = set()
+            node = self.parent
+            while node is not None:
+                if node.pk == self.pk:
+                    raise ValidationError({'parent': _("Setting this parent would create a cycle in the hierarchy.")})
+                if node.pk in visited:
+                    break
+                visited.add(node.pk)
+                node = node.parent
+
+
 @transaction.atomic
 def accept_invitation(invitation, user):
     from django.core.exceptions import ValidationError

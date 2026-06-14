@@ -34,6 +34,7 @@ urlpatterns = [
     path('inventory/', include('inventory.api.urls', namespace='inventory_api')),
     path('licenses/', include('licenses.api.urls', namespace='licenses_api')),
     path('organization/', include('organization.api.urls', namespace='organization_api')),
+    path('procurement/', include('procurement.api.urls', namespace='procurement_api')),
     path('software/', include('software.api.urls', namespace='software_api')),
     path('subscriptions/', include('subscriptions.api.urls', namespace='subscriptions_api')),
     path('users/', include('users.api.urls', namespace='users_api')),

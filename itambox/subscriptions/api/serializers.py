@@ -77,6 +77,10 @@ class SubscriptionSerializer(BaseModelSerializer):
     billing_cycle_display = serializers.CharField(source='get_billing_cycle_display', read_only=True)
     days_until_renewal = serializers.IntegerField(read_only=True)
     annual_cost = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    # CostCenter: StringRelatedField for read; cost_center_id is a placeholder
+    # IntegerField (read-only) replaced in __init__ once the model is available.
+    cost_center = serializers.StringRelatedField(read_only=True)
+    cost_center_id = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Subscription
@@ -85,7 +89,7 @@ class SubscriptionSerializer(BaseModelSerializer):
             'status', 'status_display', 'tenant', 'tenant_id', 'owner', 'owner_id',
             'start_date', 'renewal_date', 'renewal_cost', 'currency',
             'billing_cycle', 'billing_cycle_display', 'term_months', 'auto_renewal',
-            'licensed_quantity', 'contract_reference', 'cost_center',
+            'licensed_quantity', 'contract_reference', 'cost_center', 'cost_center_id',
             'cancellation_date', 'days_until_renewal', 'annual_cost',
             'description', 'notes', 'tags', 'created_at', 'updated_at'
         )
@@ -96,6 +100,20 @@ class SubscriptionSerializer(BaseModelSerializer):
         super().__init__(*args, **kwargs)
         if 'owner_id' in self.fields:
             self.fields['owner_id'].queryset = _tenant_member_user_queryset()
+        # Resolve the CostCenter queryset lazily so the serializer can be
+        # imported even before the organization.CostCenter migration has run.
+        try:
+            from django.apps import apps
+            CostCenter = apps.get_model('organization', 'CostCenter')
+            self.fields['cost_center_id'] = serializers.PrimaryKeyRelatedField(
+                queryset=CostCenter.objects.all(),
+                source='cost_center',
+                write_only=True,
+                required=False,
+                allow_null=True,
+            )
+        except LookupError:
+            pass  # placeholder IntegerField (read-only) remains
 
 
 class SubscriptionAssignmentSerializer(BaseModelSerializer):

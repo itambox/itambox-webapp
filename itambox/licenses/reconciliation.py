@@ -24,6 +24,7 @@ Dict shape (both functions)
                                   #   negative  → over-deployed
     "compliant": bool,            # installed_count <= entitled_seats
     "status": str,                # 'compliant' | 'over_deployed' | 'unlicensed'
+    "linked_seats": int,          # seats with an explicit installed_software link
 }
 
 Tenant scoping
@@ -50,7 +51,7 @@ Result: a tenant A call cannot see tenant B's installs or entitlements.
 from django.db.models import Sum, Count, Q
 
 from software.models import Software, InstalledSoftware
-from licenses.models import License
+from licenses.models import License, LicenseSeatAssignment
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Status constants
@@ -70,7 +71,12 @@ def _compute_status(installed_count: int, entitled_seats: int) -> str:
     return STATUS_COMPLIANT
 
 
-def _build_result(software: Software, installed_count: int, entitled_seats: int) -> dict:
+def _build_result(
+    software: Software,
+    installed_count: int,
+    entitled_seats: int,
+    linked_seats: int = 0,
+) -> dict:
     """Assemble the reconciliation dict for one software entry."""
     delta = entitled_seats - installed_count
     compliant = installed_count <= entitled_seats
@@ -82,6 +88,7 @@ def _build_result(software: Software, installed_count: int, entitled_seats: int)
         'delta': delta,
         'compliant': compliant,
         'status': _compute_status(installed_count, entitled_seats),
+        'linked_seats': linked_seats,
     }
 
 
@@ -112,7 +119,16 @@ def reconcile_software(software: Software) -> dict:
         .aggregate(total=Sum('seats', default=0))['total']
     )
 
-    return _build_result(software, installed_count, entitled_seats)
+    # Count asset-assigned seats that carry an explicit install link for this
+    # software.  LicenseSeatAssignment has no direct tenant field, so we scope
+    # via the license FK (which is already tenant-scoped through License.objects).
+    linked_seats = LicenseSeatAssignment.objects.filter(
+        license__software=software,
+        installed_software__isnull=False,
+        deleted_at__isnull=True,
+    ).count()
+
+    return _build_result(software, installed_count, entitled_seats, linked_seats)
 
 
 def reconcile_tenant_licensing() -> list:
@@ -142,6 +158,17 @@ def reconcile_tenant_licensing() -> list:
         for row in License.objects.values('software_id').annotate(total=Sum('seats', default=0))
     }
 
+    # ── bulk linked-seat counts ───────────────────────────────────────────────
+    # Active asset-assigned seats with an explicit install link, grouped by
+    # the software they cover (resolved through the license FK).
+    linked_seat_counts: dict[int, int] = {
+        row['license__software_id']: row['count']
+        for row in LicenseSeatAssignment.objects.filter(
+            installed_software__isnull=False,
+            deleted_at__isnull=True,
+        ).values('license__software_id').annotate(count=Count('id'))
+    }
+
     # Union of software PKs that have at least one install or one license
     relevant_pks = set(install_counts.keys()) | set(seat_sums.keys())
 
@@ -156,7 +183,8 @@ def reconcile_tenant_licensing() -> list:
     for sw in software_qs:
         installed_count = install_counts.get(sw.pk, 0)
         entitled_seats = seat_sums.get(sw.pk, 0)
-        results.append(_build_result(sw, installed_count, entitled_seats))
+        linked_seats = linked_seat_counts.get(sw.pk, 0)
+        results.append(_build_result(sw, installed_count, entitled_seats, linked_seats))
 
     # Sort deterministically by software name for consistent output
     results.sort(key=lambda r: r['software_name'])

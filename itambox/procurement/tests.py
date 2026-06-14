@@ -784,3 +784,194 @@ class ContractViewSmokeTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.contract.contract_number)
 
+
+# ---------------------------------------------------------------------------
+# Contract.cost_center FK tests
+# ---------------------------------------------------------------------------
+
+class ContractCostCenterTests(TestCase):
+    """Tests for the cost_center FK on Contract."""
+
+    def setUp(self):
+        self.tenant = Tenant.objects.create(name='CC Tenant', slug='cc-tenant')
+        self.supplier = Supplier.objects.create(name='CC Supplier', slug='cc-supplier')
+
+    def _make_contract(self, **kwargs):
+        defaults = dict(
+            name='CC Contract',
+            contract_number='CTR-CC-001',
+            contract_type='support',
+            status='draft',
+            tenant=self.tenant,
+            start_date=datetime.date(2026, 1, 1),
+            end_date=datetime.date(2027, 1, 1),
+        )
+        defaults.update(kwargs)
+        return Contract.objects.create(**defaults)
+
+    def test_cost_center_defaults_to_null(self):
+        """A new Contract must have cost_center=None when not specified."""
+        contract = self._make_contract()
+        self.assertIsNone(contract.cost_center)
+
+    def test_cost_center_blank_is_valid_in_form(self):
+        """ContractForm must be valid when cost_center is omitted."""
+        form_data = {
+            'name': 'No CC Contract',
+            'contract_number': 'CTR-NOCC-001',
+            'contract_type': 'support',
+            'status': 'draft',
+            'supplier': self.supplier.pk,
+            'cost': '',
+            'currency': '',
+            'billing_cycle': 'annual',
+            'start_date': '2026-01-01',
+            'end_date': '2027-01-01',
+            'renewal_date': '',
+            'auto_renew': False,
+            'sla_response_time': '',
+            'sla_resolution_time': '',
+            'coverage_hours': '',
+            'sla_terms': '',
+            'assets': [],
+            'purchase_order': '',
+            'cost_center': '',
+            'tenant': self.tenant.pk,
+            'notes': '',
+        }
+        from procurement.forms import ContractForm
+        form = ContractForm(data=form_data)
+        self.assertTrue(form.is_valid(), form.errors)
+        contract = form.save()
+        self.assertIsNone(contract.cost_center)
+
+    def test_cost_center_field_present_in_form(self):
+        """ContractForm must expose the cost_center field."""
+        from procurement.forms import ContractForm
+        form = ContractForm()
+        self.assertIn('cost_center', form.fields)
+
+
+# ---------------------------------------------------------------------------
+# ContractForm asset queryset tenant-scoping test
+# ---------------------------------------------------------------------------
+
+class ContractFormAssetScopingTests(TestCase):
+    """Verify that ContractForm scopes the assets queryset to the active tenant."""
+
+    def setUp(self):
+        from assets.models import AssetType, Manufacturer, StatusLabel
+        self.tenant_a = Tenant.objects.create(name='Scope Tenant A', slug='scope-tenant-a')
+        self.tenant_b = Tenant.objects.create(name='Scope Tenant B', slug='scope-tenant-b')
+
+        manufacturer = Manufacturer.objects.create(name='Scope Mfr', slug='scope-mfr')
+        asset_type = AssetType.objects.create(
+            manufacturer=manufacturer, model='Scope Model', slug='scope-model'
+        )
+        status_label, _ = StatusLabel.objects.get_or_create(
+            name='Deployable', defaults={'type': 'deployable', 'slug': 'deployable'}
+        )
+        from assets.models import Asset
+        self.asset_a = Asset.objects.create(
+            asset_type=asset_type,
+            name='Asset A',
+            asset_tag='TAG-SCOPE-A',
+            status=status_label,
+            tenant=self.tenant_a,
+        )
+        self.asset_b = Asset.objects.create(
+            asset_type=asset_type,
+            name='Asset B',
+            asset_tag='TAG-SCOPE-B',
+            status=status_label,
+            tenant=self.tenant_b,
+        )
+
+    def test_assets_queryset_scoped_to_active_tenant(self):
+        """When Tenant A is active, ContractForm.assets must only list Tenant A's assets."""
+        from core.managers import set_current_tenant
+        from procurement.forms import ContractForm
+
+        set_current_tenant(self.tenant_a)
+        try:
+            form = ContractForm()
+            qs = form.fields['assets'].queryset
+            self.assertIn(self.asset_a, qs)
+            self.assertNotIn(self.asset_b, qs)
+        finally:
+            set_current_tenant(None)
+
+    def test_assets_queryset_unfiltered_when_no_tenant(self):
+        """When no tenant is active, ContractForm.assets falls back to the default manager queryset."""
+        from core.managers import set_current_tenant
+        from procurement.forms import ContractForm
+
+        set_current_tenant(None)
+        form = ContractForm()
+        qs = form.fields['assets'].queryset
+        # Both assets should be visible (no tenant restriction)
+        self.assertIn(self.asset_a, qs)
+        self.assertIn(self.asset_b, qs)
+
+
+# ---------------------------------------------------------------------------
+# Contract REST API smoke tests
+# ---------------------------------------------------------------------------
+
+class ContractAPITests(TestCase):
+    """Smoke tests for the Contract REST API (list + create)."""
+
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username='apiuser', email='api@example.com', password='password'
+        )
+        self.tenant = Tenant.objects.create(name='API Tenant', slug='api-tenant')
+        self.supplier = Supplier.objects.create(name='API Supplier', slug='api-supplier')
+        self.contract = Contract.objects.create(
+            name='API Contract',
+            contract_number='CTR-API-001',
+            contract_type='support',
+            status='active',
+            supplier=self.supplier,
+            tenant=self.tenant,
+            start_date=datetime.date(2026, 1, 1),
+            end_date=datetime.date(2027, 1, 1),
+        )
+
+    def test_contract_api_list(self):
+        """GET /api/procurement/contracts/ returns 200 for a superuser."""
+        self.client.force_login(self.user)
+        response = self.client.get('/api/procurement/contracts/')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn('results', data)
+
+    def test_contract_api_detail(self):
+        """GET /api/procurement/contracts/<pk>/ returns the contract."""
+        self.client.force_login(self.user)
+        response = self.client.get(f'/api/procurement/contracts/{self.contract.pk}/')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['contract_number'], 'CTR-API-001')
+
+    def test_contract_api_create(self):
+        """POST /api/procurement/contracts/ creates a new contract."""
+        self.client.force_login(self.user)
+        payload = {
+            'name': 'Created via API',
+            'contract_number': 'CTR-API-NEW',
+            'contract_type': 'maintenance',
+            'status': 'draft',
+            'start_date': '2026-06-01',
+            'end_date': '2027-06-01',
+            'billing_cycle': 'annual',
+            'tenant_id': self.tenant.pk,
+        }
+        response = self.client.post(
+            '/api/procurement/contracts/',
+            data=payload,
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertEqual(response.json()['contract_number'], 'CTR-API-NEW')
+

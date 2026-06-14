@@ -6,7 +6,7 @@ from itambox.api.fields import ContentTypeField, validate_gfk_target_tenant
 from itambox.api.serializers import GenericObjectSerializer
 from organization.models import (
     Site, Region, SiteGroup, Location, Tenant, TenantGroup,
-    AssetHolder, Contact, ContactRole, ContactAssignment
+    AssetHolder, Contact, ContactRole, ContactAssignment, CostCenter,
 )
 from extras.api.serializers import TagSerializer
 
@@ -203,6 +203,38 @@ class AssetHolderSerializer(BaseModelSerializer):
         ]
         brief_fields = ['id', 'url', 'upn', 'email']
 
+
+
+class NestedCostCenterSerializer(BaseModelSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:costcenter-detail')
+
+    class Meta:
+        model = CostCenter
+        fields = ['id', 'url', 'name', 'slug', 'code']
+        brief_fields = ['id', 'name', 'code']
+
+
+class CostCenterSerializer(BaseModelSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:costcenter-detail')
+    tenant = NestedTenantSerializer(read_only=True)
+    tenant_id = serializers.PrimaryKeyRelatedField(
+        queryset=Tenant.objects.all(), source='tenant', write_only=True, required=False, allow_null=True,
+    )
+    parent = NestedCostCenterSerializer(read_only=True)
+    parent_id = serializers.PrimaryKeyRelatedField(
+        queryset=CostCenter.objects.all(), source='parent', write_only=True, required=False, allow_null=True,
+    )
+    child_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = CostCenter
+        fields = [
+            'id', 'url', 'name', 'slug', 'code',
+            'tenant', 'tenant_id', 'parent', 'parent_id',
+            'description', 'is_active', 'child_count',
+            'created_at', 'updated_at',
+        ]
+        brief_fields = ['id', 'url', 'name', 'code']
 
 
 class ContactRoleSerializer(BaseModelSerializer):

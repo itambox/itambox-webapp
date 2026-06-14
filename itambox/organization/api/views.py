@@ -3,17 +3,19 @@ from itambox.api.permissions import TokenPermissions, StrictTenantPermission
 from itambox.api.viewsets import ITAMBoxModelViewSet, ITAMBoxReadOnlyModelViewSet
 from organization.models import (
     Site, Region, SiteGroup, Location, Tenant, TenantGroup,
-    AssetHolder, Contact, ContactRole, ContactAssignment
+    AssetHolder, Contact, ContactRole, ContactAssignment, CostCenter,
 )
 from organization.filters import (
     SiteFilterSet, RegionFilterSet, SiteGroupFilterSet, LocationFilterSet,
     TenantFilterSet, TenantGroupFilterSet, AssetHolderFilterSet,
-    ContactFilterSet, ContactRoleFilterSet, ContactAssignmentFilterSet
+    ContactFilterSet, ContactRoleFilterSet, ContactAssignmentFilterSet,
+    CostCenterFilterSet,
 )
 from .serializers import (
     SiteSerializer, RegionSerializer, SiteGroupSerializer, LocationSerializer,
     TenantSerializer, TenantGroupSerializer, AssetHolderSerializer,
-    ContactSerializer, ContactRoleSerializer, ContactAssignmentSerializer
+    ContactSerializer, ContactRoleSerializer, ContactAssignmentSerializer,
+    CostCenterSerializer,
 )
 
 
@@ -99,4 +101,12 @@ class ContactAssignmentViewSet(ITAMBoxModelViewSet):
     serializer_class = ContactAssignmentSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = ContactAssignmentFilterSet
+
+
+class CostCenterViewSet(ITAMBoxModelViewSet):
+    permission_classes = [TokenPermissions, StrictTenantPermission]
+    queryset = CostCenter.objects.select_related('tenant', 'parent').prefetch_related('children')
+    serializer_class = CostCenterSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = CostCenterFilterSet
 
