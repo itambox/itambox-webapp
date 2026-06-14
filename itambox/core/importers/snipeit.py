@@ -435,17 +435,19 @@ class SnipeITImporter:
 
     def _import_suppliers(self) -> None:
         from assets.models import Supplier
+        from organization.models import Contact, ContactRole
+        from django.contrib.contenttypes.models import ContentType as CT
         key = 'suppliers'
         self._log(f"\n[{key}]")
         c = self._counter(key)
         for row in self.client.get_all('/api/v1/suppliers'):
             sid = row['id']
             name = (row.get('name') or '').strip() or f'Supplier {sid}'
+            contact_email = (row.get('email') or '')[:254]
+            contact_phone = (row.get('phone') or '')[:50]
+            contact_name = (row.get('contact') or '')[:255]
             defaults = {
                 'website': (row.get('url') or '')[:200],
-                'contact_email': (row.get('email') or '')[:254],
-                'contact_phone': (row.get('phone') or '')[:50],
-                'contact_name': (row.get('contact') or '')[:100],
                 'notes': row.get('notes') or '',
                 'custom_field_data': {'snipeit_id': str(sid)},
             }
@@ -468,6 +470,25 @@ class SnipeITImporter:
                         continue
                     if not self.dry_run:
                         obj = Supplier.objects.create(name=name, **defaults)
+                        if contact_name or contact_email or contact_phone:
+                            from organization.models import ContactAssignment
+                            supplier_ct = CT.objects.get_for_model(Supplier)
+                            primary_role, _ = ContactRole.objects.get_or_create(
+                                slug='primary-contact',
+                                defaults={'name': 'Primary Contact', 'description': 'Primary Contact'},
+                            )
+                            contact = Contact.objects.create(
+                                name=contact_name or f"{name} Contact",
+                                phone=contact_phone,
+                                email=contact_email,
+                            )
+                            ContactAssignment.objects.create(
+                                contact=contact,
+                                role=primary_role,
+                                content_type=supplier_ct,
+                                object_id=obj.pk,
+                                priority='primary',
+                            )
                     else:
                         obj = Supplier(id=-sid, name=name)
                     c['created'] += 1

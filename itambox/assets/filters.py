@@ -274,7 +274,7 @@ class SupplierFilterSet(BaseFilterSet):
         if not value.strip():
             return queryset
         return queryset.filter(
-            Q(name__icontains=value) | Q(website__icontains=value) | Q(contact_name__icontains=value)
+            Q(name__icontains=value) | Q(website__icontains=value)
         ).distinct()
 
 

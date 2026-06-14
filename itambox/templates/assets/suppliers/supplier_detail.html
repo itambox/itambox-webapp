@@ -13,6 +13,12 @@
 {# --- Tabs Hook --- #}
 {% block extra_tabs %}
     <li class="nav-item" role="presentation">
+        <a href="?tab=contacts" class="nav-link {% if request.GET.tab == 'contacts' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#contacts" role="tab" aria-selected="{% if request.GET.tab == 'contacts' %}true{% else %}false{% endif %}">
+            <i class="mdi mdi-account-circle-outline me-1 text-purple"></i>
+            {% translate "Contacts" %} <span class="badge bg-purple-lt ms-2">{{ object.contacts.count }}</span>
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
         <a href="?tab=assets" class="nav-link {% if request.GET.tab == 'assets' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#assets" role="tab" aria-selected="{% if request.GET.tab == 'assets' %}true{% else %}false{% endif %}">
             <i class="mdi mdi-office-building-outline me-1 text-green"></i>
             {% translate "Supplied Assets" %} <span class="badge bg-green-lt ms-2">{{ assets_table.rows|length }}</span>
@@ -44,6 +50,71 @@
 
 {# --- Extra Tab Panes --- #}
 {% block extra_tab_panes %}
+    {# Contacts Tab Pane #}
+    <div class="tab-pane fade {% if request.GET.tab == 'contacts' %}show active{% endif %}" id="contacts" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
+                <h3 class="card-title">{% translate "Assigned Contacts" %}</h3>
+                {% with supplier_ct=object|content_type_id %}
+                <a href="{% url 'organization:contactassignment_create' %}?content_type={{ supplier_ct }}&object_id={{ object.pk }}" class="btn btn-sm btn-primary">
+                    <i class="mdi mdi-plus"></i>
+                    {% translate "Assign Contact" %}
+                </a>
+                {% endwith %}
+            </div>
+            {% if object.contacts.exists %}
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table">
+                        <thead>
+                            <tr>
+                                <th>{% translate "Contact" %}</th>
+                                <th>{% translate "Role" %}</th>
+                                <th>{% translate "Priority" %}</th>
+                                <th>{% translate "Phone" %}</th>
+                                <th>{% translate "Email" %}</th>
+                                <th class="w-1"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for assignment in object.contacts.all %}
+                            <tr>
+                                <td>
+                                    <a href="{{ assignment.contact.get_absolute_url }}"><strong>{{ assignment.contact.name }}</strong></a>
+                                    {% if assignment.contact.title %}<br><span class="text-muted small">{{ assignment.contact.title }}</span>{% endif %}
+                                </td>
+                                <td>{{ assignment.role.name }}</td>
+                                <td>
+                                    {% if assignment.priority == 'primary' %}
+                                        <span class="badge bg-green text-green-fg">{% translate "Primary" %}</span>
+                                    {% elif assignment.priority == 'secondary' %}
+                                        <span class="badge bg-blue text-blue-fg">{% translate "Secondary" %}</span>
+                                    {% elif assignment.priority == 'inactive' %}
+                                        <span class="badge bg-secondary text-secondary-fg">{% translate "Inactive" %}</span>
+                                    {% else %}
+                                        <span class="badge bg-light text-dark">{{ assignment.get_priority_display }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ assignment.contact.phone|default:"—" }}</td>
+                                <td>{{ assignment.contact.email|default:"—" }}</td>
+                                <td>
+                                    <a href="{% url 'organization:contactassignment_delete' assignment.pk %}?return_url={{ request.path }}" class="btn btn-sm btn-danger px-2" title="{% translate 'Delete' %}">
+                                        <i class="mdi mdi-trash-can-outline m-0"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="card-body py-5 text-muted text-center">
+                    <i class="mdi mdi-account-group-outline text-muted mb-2"></i>
+                    <p class="mb-0">{% translate "No contacts are assigned to this supplier yet." %}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
     {# Supplied Assets Tab Pane #}
     {% blocktranslate with name=object.name asvar t_assets %}Assets Sourced from {{ name }}{% endblocktranslate %}
     {% translate "No physical assets sourced from this supplier yet." as e_assets %}

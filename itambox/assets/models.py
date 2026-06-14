@@ -580,12 +580,15 @@ class Supplier(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMix
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255)
     website = models.URLField(max_length=500, blank=True)
-    contact_email = models.EmailField(max_length=255, blank=True)
-    contact_phone = models.CharField(max_length=50, blank=True)
     address = models.TextField(blank=True)
-    contact_name = models.CharField(max_length=255, blank=True)
     notes = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', related_name='suppliers', blank=True)
+    contacts = GenericRelation('organization.ContactAssignment')
+
+    @property
+    def primary_contact(self):
+        assignment = self.contacts.filter(priority='primary').first() or self.contacts.first()
+        return assignment.contact if assignment else None
 
     class Meta:
         ordering = ['name']

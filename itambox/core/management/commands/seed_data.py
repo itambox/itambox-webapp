@@ -305,6 +305,13 @@ class Command(BaseCommand):
             self._manufacturers[slug] = obj
 
         # Suppliers
+        from organization.models import Contact, ContactRole, ContactAssignment
+        from django.contrib.contenttypes.models import ContentType as CT
+        supplier_ct = CT.objects.get_for_model(Supplier)
+        primary_role, _ = ContactRole.objects.get_or_create(
+            slug='primary-contact',
+            defaults={'name': 'Primary Contact', 'description': 'Primary Contact'},
+        )
         self._suppliers = {}
         for name, slug, email, phone, website in [
             ('Northwind Procurement', 'northwind-procurement', 'buy@northwind-it.com', '+49-30-555-0100', 'https://northwind-it.com'),
@@ -314,8 +321,21 @@ class Command(BaseCommand):
             ('Bechtle AG', 'bechtle-ag', 'b2b@bechtle.com', '+49-7132-555-0700', 'https://bechtle.com'),
             ('Insight Enterprises', 'insight-enterprises', 'eu@insight.com', '+44-20-555-0800', 'https://insight.com'),
         ]:
-            obj, _ = Supplier.objects.get_or_create(slug=slug, defaults={
-                'name': name, 'contact_email': email, 'contact_phone': phone, 'website': website})
+            obj, created = Supplier.objects.get_or_create(slug=slug, defaults={
+                'name': name, 'website': website})
+            if created and not obj.contacts.filter(priority='primary').exists():
+                contact = Contact.objects.create(
+                    name=f"{name} Contact",
+                    phone=phone,
+                    email=email,
+                )
+                ContactAssignment.objects.create(
+                    contact=contact,
+                    role=primary_role,
+                    content_type=supplier_ct,
+                    object_id=obj.pk,
+                    priority='primary',
+                )
             self._suppliers[slug] = obj
 
         # Depreciation schedules — generic named first (used by asset types)

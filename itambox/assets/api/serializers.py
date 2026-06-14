@@ -15,7 +15,7 @@ from assets.models import (
 )
 from organization.models import Location, Tenant
 from software.models import Software
-from organization.api.serializers import NestedLocationSerializer, NestedTenantSerializer
+from organization.api.serializers import NestedLocationSerializer, NestedTenantSerializer, ContactAssignmentSerializer
 from extras.api.serializers import TagSerializer
 
 User = get_user_model()
@@ -173,13 +173,13 @@ class AssetSerializer(BaseModelSerializer):
 
 class SupplierSerializer(BaseModelSerializer):
     tags = TagSerializer(many=True, read_only=True)
+    contacts = ContactAssignmentSerializer(many=True, read_only=True)
 
     class Meta:
         model = Supplier
         fields = [
-            'id', 'name', 'slug', 'website', 'contact_email',
-            'contact_phone', 'address', 'contact_name', 'notes', 'tags',
-            'created_at', 'updated_at'
+            'id', 'name', 'slug', 'website', 'address', 'notes',
+            'tags', 'contacts', 'created_at', 'updated_at'
         ]
         brief_fields = ['id', 'name', 'slug']
 
