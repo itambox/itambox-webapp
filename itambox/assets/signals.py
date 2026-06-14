@@ -5,6 +5,7 @@ from django.db import DatabaseError, transaction
 from django_q.tasks import async_task
 
 from assets.models import AssetRequest, AssetAssignment
+from assets.choices import RequestStatusChoices
 from core.events import dispatch_event
 
 logger = logging.getLogger(__name__)
@@ -58,14 +59,14 @@ def auto_fulfill_asset_requests(sender, instance, created, **kwargs):
             # Identify any matching pending/approved/procurement requests
             matching_requests = AssetRequest.objects.filter(
                 requester=user,
-                status__in=[AssetRequest.STATUS_PENDING, AssetRequest.STATUS_APPROVED, AssetRequest.STATUS_PROCUREMENT]
+                status__in=[RequestStatusChoices.PENDING, RequestStatusChoices.APPROVED, RequestStatusChoices.PROCUREMENT]
             ).filter(
                 models.Q(asset=asset) | 
                 models.Q(asset_type=asset.asset_type, asset__isnull=True)
             )
 
             for req in matching_requests:
-                req.status = AssetRequest.STATUS_FULFILLED
+                req.status = RequestStatusChoices.FULFILLED
                 req.asset = asset
                 req.responded_by = instance.checked_out_by
                 req.response_date = timezone.now()

@@ -642,15 +642,6 @@ class Category(AutoSlugMixin, StandardModel, SoftDeleteMixin):
 class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()
-    # Back-compat aliases — canonical definitions live in assets.choices.
-    STATUS_PENDING = RequestStatusChoices.PENDING
-    STATUS_APPROVED = RequestStatusChoices.APPROVED
-    STATUS_PROCUREMENT = RequestStatusChoices.PROCUREMENT
-    STATUS_DENIED = RequestStatusChoices.DENIED
-    STATUS_FULFILLED = RequestStatusChoices.FULFILLED
-    STATUS_CANCELLED = RequestStatusChoices.CANCELLED
-    STATUS_CHOICES = RequestStatusChoices.choices
-
     tenant = models.ForeignKey(
         'organization.Tenant',
         on_delete=models.PROTECT,
@@ -674,7 +665,7 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
         related_name='source_requests',
         db_index=True
     )
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+    status = models.CharField(max_length=20, choices=RequestStatusChoices.choices, default=RequestStatusChoices.PENDING, db_index=True)
     request_date = models.DateTimeField(auto_now_add=True, db_index=True)
     response_date = models.DateTimeField(null=True, blank=True)
     responded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='asset_request_responses')
@@ -742,12 +733,12 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
                 old_status = AssetRequest._base_manager.get(pk=self.pk).status
                 if old_status != self.status:
                     VALID_TRANSITIONS = {
-                        AssetRequest.STATUS_PENDING: {AssetRequest.STATUS_APPROVED, AssetRequest.STATUS_DENIED, AssetRequest.STATUS_CANCELLED, AssetRequest.STATUS_FULFILLED},
-                        AssetRequest.STATUS_APPROVED: {AssetRequest.STATUS_FULFILLED, AssetRequest.STATUS_CANCELLED, AssetRequest.STATUS_PROCUREMENT},
-                        AssetRequest.STATUS_PROCUREMENT: {AssetRequest.STATUS_FULFILLED, AssetRequest.STATUS_CANCELLED, AssetRequest.STATUS_APPROVED},
-                        AssetRequest.STATUS_DENIED: set(),
-                        AssetRequest.STATUS_FULFILLED: set(),
-                        AssetRequest.STATUS_CANCELLED: set(),
+                        RequestStatusChoices.PENDING: {RequestStatusChoices.APPROVED, RequestStatusChoices.DENIED, RequestStatusChoices.CANCELLED, RequestStatusChoices.FULFILLED},
+                        RequestStatusChoices.APPROVED: {RequestStatusChoices.FULFILLED, RequestStatusChoices.CANCELLED, RequestStatusChoices.PROCUREMENT},
+                        RequestStatusChoices.PROCUREMENT: {RequestStatusChoices.FULFILLED, RequestStatusChoices.CANCELLED, RequestStatusChoices.APPROVED},
+                        RequestStatusChoices.DENIED: set(),
+                        RequestStatusChoices.FULFILLED: set(),
+                        RequestStatusChoices.CANCELLED: set(),
                     }
                     if self.status not in VALID_TRANSITIONS.get(old_status, set()):
                         raise ValidationError(f"Invalid state transition from {old_status} to {self.status}.")
@@ -784,7 +775,7 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
             if self.requester_id and not getattr(self, '_skip_duplicate_check', False):
                 duplicate_qs = AssetRequest.objects.filter(
                     requester_id=self.requester_id,
-                    status__in=[AssetRequest.STATUS_PENDING, AssetRequest.STATUS_APPROVED],
+                    status__in=[RequestStatusChoices.PENDING, RequestStatusChoices.APPROVED],
                     assigned_user_id=self.assigned_user_id,
                     assigned_location_id=self.assigned_location_id,
                     assigned_asset_id=self.assigned_asset_id
@@ -814,7 +805,7 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
             self.tenant = get_current_tenant()
             
         # Auto-approval check for Accessories and Consumables
-        if not self.pk and self.status == self.STATUS_PENDING:
+        if not self.pk and self.status == RequestStatusChoices.PENDING:
             from django.conf import settings
             from django.utils import timezone
             from extras.models import ConfigContext
@@ -834,13 +825,13 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
             if self.accessory:
                 max_qty = thresholds.get('accessory', 0)
                 if self.qty <= max_qty and self.accessory.available >= self.qty:
-                    self.status = self.STATUS_APPROVED
+                    self.status = RequestStatusChoices.APPROVED
                     self.response_date = timezone.now()
                     self.response_notes = "Automatically approved based on available stock."
             elif self.consumable:
                 max_qty = thresholds.get('consumable', 0)
                 if self.qty <= max_qty and self.consumable.available >= self.qty:
-                    self.status = self.STATUS_APPROVED
+                    self.status = RequestStatusChoices.APPROVED
                     self.response_date = timezone.now()
                     self.response_notes = "Automatically approved based on available stock."
                     

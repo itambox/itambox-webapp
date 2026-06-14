@@ -2,6 +2,7 @@ from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from assets.models import Asset, StatusLabel, AssetRequest
+from assets.choices import RequestStatusChoices
 from inventory.models import ComponentStock, AccessoryStock, ConsumableStock
 from procurement.models import PurchaseOrder, FulfillmentLink
 
@@ -50,7 +51,7 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
             linked_requests = list(
                 AssetRequest.objects.filter(
                     fulfillment_links__purchase_order_line=line,
-                    status=AssetRequest.STATUS_PROCUREMENT
+                    status=RequestStatusChoices.PROCUREMENT
                 ).select_for_update().order_by('request_date')
             )
             
@@ -83,7 +84,7 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
                 if req_idx < len(linked_requests):
                     req = linked_requests[req_idx]
                     req.asset = asset
-                    req.status = AssetRequest.STATUS_APPROVED
+                    req.status = RequestStatusChoices.APPROVED
                     req.save()
                     req_idx += 1
                     
@@ -100,11 +101,11 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
             linked_requests = list(
                 AssetRequest.objects.filter(
                     fulfillment_links__purchase_order_line=line,
-                    status=AssetRequest.STATUS_PROCUREMENT
+                    status=RequestStatusChoices.PROCUREMENT
                 ).select_for_update().order_by('request_date')
             )
             for req in linked_requests:
-                req.status = AssetRequest.STATUS_APPROVED
+                req.status = RequestStatusChoices.APPROVED
                 req.save()
                 
         elif line.accessory:
@@ -120,11 +121,11 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
             linked_requests = list(
                 AssetRequest.objects.filter(
                     fulfillment_links__purchase_order_line=line,
-                    status=AssetRequest.STATUS_PROCUREMENT
+                    status=RequestStatusChoices.PROCUREMENT
                 ).select_for_update().order_by('request_date')
             )
             for req in linked_requests:
-                req.status = AssetRequest.STATUS_APPROVED
+                req.status = RequestStatusChoices.APPROVED
                 req.save()
                 
         elif line.consumable:
@@ -140,11 +141,11 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
             linked_requests = list(
                 AssetRequest.objects.filter(
                     fulfillment_links__purchase_order_line=line,
-                    status=AssetRequest.STATUS_PROCUREMENT
+                    status=RequestStatusChoices.PROCUREMENT
                 ).select_for_update().order_by('request_date')
             )
             for req in linked_requests:
-                req.status = AssetRequest.STATUS_APPROVED
+                req.status = RequestStatusChoices.APPROVED
                 req.save()
         
         elif line.license:
@@ -152,11 +153,11 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
             linked_requests = list(
                 AssetRequest.objects.filter(
                     fulfillment_links__purchase_order_line=line,
-                    status=AssetRequest.STATUS_PROCUREMENT
+                    status=RequestStatusChoices.PROCUREMENT
                 ).select_for_update().order_by('request_date')
             )
             for req in linked_requests:
-                req.status = AssetRequest.STATUS_APPROVED
+                req.status = RequestStatusChoices.APPROVED
                 req.save()
         
         line.qty_received += qty
@@ -212,8 +213,8 @@ def cancel_purchase_order(po, user=None, request=None):
         links = FulfillmentLink.objects.filter(purchase_order_line=line)
         for link in links:
             req = link.asset_request
-            if req.status == AssetRequest.STATUS_PROCUREMENT:
-                req.status = AssetRequest.STATUS_APPROVED
+            if req.status == RequestStatusChoices.PROCUREMENT:
+                req.status = RequestStatusChoices.APPROVED
                 req.save(update_fields=['status'])
             link.delete()
 

@@ -124,7 +124,6 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'itambox.context_processors.settings_processor',
-                'itambox.context_processors.breadcrumbs',
                 'itambox.context_processors.notifications_processor',
                 'itambox.context_processors.tenant_switcher_processor',
                 'itambox.context_processors.base_template_processor',

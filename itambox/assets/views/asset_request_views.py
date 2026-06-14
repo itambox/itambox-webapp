@@ -2,6 +2,7 @@ from django.utils import timezone
 from django.urls import reverse, reverse_lazy
 
 from ..models import AssetRequest
+from assets.choices import RequestStatusChoices
 from .. import forms, tables, filters
 
 from itambox.panels import Panel
@@ -118,7 +119,7 @@ class AssetRequestEditView(ObjectEditView):
 
 
 class AssetRequestQueueView(ObjectListView):
-    queryset = AssetRequest.objects.filter(status=AssetRequest.STATUS_PENDING).select_related("requester", "asset", "asset_type")
+    queryset = AssetRequest.objects.filter(status=RequestStatusChoices.PENDING).select_related("requester", "asset", "asset_type")
     filterset = filters.AssetRequestFilterSet
     filterset_form = forms.AssetRequestFilterForm
     table = tables.AssetRequestTable

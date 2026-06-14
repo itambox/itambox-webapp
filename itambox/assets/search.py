@@ -1,6 +1,6 @@
 # itambox/assets/search.py
 from core.search import SearchIndex, register_search
-from .models import Asset, AssetRole, Manufacturer, Supplier, Category, AssetRequest
+from .models import Asset, AssetRole, Manufacturer, Supplier, Category, AssetRequest, AssetMaintenance
 
 @register_search()
 class AssetIndex(SearchIndex):
@@ -42,3 +42,9 @@ class AssetRequestIndex(SearchIndex):
     model = AssetRequest
     fields = ('notes', 'response_notes',)
     order_by = ('-request_date',)
+
+@register_search()
+class AssetMaintenanceIndex(SearchIndex):
+    model = AssetMaintenance
+    fields = ('notes', 'supplier__name', 'asset__name')
+    order_by = ('-start_date',)

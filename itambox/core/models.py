@@ -162,16 +162,6 @@ class ChangeLoggingMixin:
         self._prechange_snapshot = None
         super().__init__(*args, **kwargs)
 
-    def clean(self):
-        from core.validators import get_validators, parse_json_rules
-        for validator in get_validators(self):
-            if callable(validator):
-                validator_instance = validator()
-                validator_instance.validate(self)
-            elif isinstance(validator, dict):
-                parse_json_rules(self, validator)
-        super().clean()
-
     def snapshot(self):
         self._prechange_snapshot = serialize_object(
             self, exclude_fields=self._change_logging_excluded_fields

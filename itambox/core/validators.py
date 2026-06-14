@@ -73,14 +73,6 @@ class CustomValidator:
             parse_json_rules(instance, rules)
 
 
-CUSTOM_VALIDATORS = {}
-
-
-def get_validators(model):
-    model_path = f'{model._meta.app_label}.{model._meta.model_name}'
-    return CUSTOM_VALIDATORS.get(model_path, [])
-
-
 def parse_json_rules(instance, rules):
     errors = {}
 

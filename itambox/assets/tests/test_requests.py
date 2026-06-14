@@ -8,6 +8,7 @@ from decimal import Decimal
 from assets.models import (
     Asset, AssetType, AssetRequest, StatusLabel, AssetRole, Manufacturer, Category, AssetTagSequence, Supplier
 )
+from assets.choices import RequestStatusChoices
 from organization.models import AssetHolder, Site, Location, Tenant, TenantRole, TenantMembership
 from assets.views.request_views import approve_asset_request, deny_asset_request
 from assets.services import checkout_asset
@@ -170,7 +171,7 @@ class RequisitionSystemTestCase(TestCase):
             asset_type=self.type_requestable,
             notes="Need a development laptop"
         )
-        self.assertEqual(req1.status, AssetRequest.STATUS_PENDING)
+        self.assertEqual(req1.status, RequestStatusChoices.PENDING)
 
         # 2. Valid request for requestable asset only
         req2 = AssetRequest.objects.create(
@@ -178,7 +179,7 @@ class RequisitionSystemTestCase(TestCase):
             asset=self.asset_requestable,
             notes="Need a specific laptop"
         )
-        self.assertEqual(req2.status, AssetRequest.STATUS_PENDING)
+        self.assertEqual(req2.status, RequestStatusChoices.PENDING)
 
         # 3. Requesting an unrequestable asset type should fail
         with self.assertRaises(ValidationError):
@@ -216,7 +217,7 @@ class RequisitionSystemTestCase(TestCase):
             notes="Need a laptop"
         )
 
-        self.assertEqual(req.status, AssetRequest.STATUS_PENDING)
+        self.assertEqual(req.status, RequestStatusChoices.PENDING)
 
         # Check out the asset to the requester (holder)
         # Using checkout_asset service which triggers signals
@@ -229,7 +230,7 @@ class RequisitionSystemTestCase(TestCase):
 
         # Refresh request from DB
         req.refresh_from_db()
-        self.assertEqual(req.status, AssetRequest.STATUS_FULFILLED)
+        self.assertEqual(req.status, RequestStatusChoices.FULFILLED)
         self.assertEqual(req.asset, self.asset_requestable)
         self.assertEqual(req.responded_by, self.admin)
         self.assertIsNotNone(req.response_date)
@@ -253,7 +254,7 @@ class RequisitionSystemTestCase(TestCase):
 
         # Refresh request from DB
         req.refresh_from_db()
-        self.assertEqual(req.status, AssetRequest.STATUS_FULFILLED)
+        self.assertEqual(req.status, RequestStatusChoices.FULFILLED)
         self.assertEqual(req.asset, self.asset_requestable)
 
     def test_approve_asset_request_workflow(self):
@@ -272,7 +273,7 @@ class RequisitionSystemTestCase(TestCase):
         )
 
         req.refresh_from_db()
-        self.assertEqual(req.status, AssetRequest.STATUS_APPROVED)
+        self.assertEqual(req.status, RequestStatusChoices.APPROVED)
         self.assertEqual(req.responded_by, self.staff)
         self.assertEqual(req.asset, self.asset_requestable)
         self.assertEqual(req.response_notes, "Approved for collection")
@@ -292,7 +293,7 @@ class RequisitionSystemTestCase(TestCase):
         )
 
         req.refresh_from_db()
-        self.assertEqual(req.status, AssetRequest.STATUS_DENIED)
+        self.assertEqual(req.status, RequestStatusChoices.DENIED)
         self.assertEqual(req.responded_by, self.staff)
         self.assertEqual(req.response_notes, "Out of budget")
 
@@ -346,7 +347,7 @@ class RequisitionSystemTestCase(TestCase):
         self.assertEqual(response.status_code, 302) # Redirects
  
         user_req.refresh_from_db()
-        self.assertEqual(user_req.status, AssetRequest.STATUS_CANCELLED)
+        self.assertEqual(user_req.status, RequestStatusChoices.CANCELLED)
  
         # 5. Regular user cannot cancel other user's request
         other_type = AssetType.objects.create(
@@ -364,7 +365,7 @@ class RequisitionSystemTestCase(TestCase):
         response = self.client.post(reverse('assets:request_cancel', kwargs={'pk': admin_req.pk}))
         self.assertEqual(response.status_code, 403)
         admin_req.refresh_from_db()
-        self.assertNotEqual(admin_req.status, AssetRequest.STATUS_CANCELLED)
+        self.assertNotEqual(admin_req.status, RequestStatusChoices.CANCELLED)
  
     def test_request_inheritance_and_overrides(self):
         # 1. Asset inheriting True should succeed
@@ -374,7 +375,7 @@ class RequisitionSystemTestCase(TestCase):
             notes="Inherited requestable",
             tenant=self.tenant
         )
-        self.assertEqual(req_inherited_ok.status, AssetRequest.STATUS_PENDING)
+        self.assertEqual(req_inherited_ok.status, RequestStatusChoices.PENDING)
  
         # 2. Asset inheriting False should fail
         with self.assertRaises(ValidationError):
@@ -390,7 +391,7 @@ class RequisitionSystemTestCase(TestCase):
             asset=self.asset_override_requestable,
             tenant=self.tenant
         )
-        self.assertEqual(req_override_ok.status, AssetRequest.STATUS_PENDING)
+        self.assertEqual(req_override_ok.status, RequestStatusChoices.PENDING)
  
     def test_double_request_and_status_constraints(self):
         # 1. Create initial request
@@ -521,7 +522,7 @@ class RequisitionSystemTestCase(TestCase):
             requester=self.other_user,
             asset_type=self.type_requestable,
             assigned_location=self.location,
-            status=AssetRequest.STATUS_APPROVED,
+            status=RequestStatusChoices.APPROVED,
             asset=self.asset_requestable,
             tenant=self.tenant
         )
@@ -565,7 +566,7 @@ class RequisitionSystemTestCase(TestCase):
 
         # Check request status
         req.refresh_from_db()
-        self.assertEqual(req.status, AssetRequest.STATUS_FULFILLED)
+        self.assertEqual(req.status, RequestStatusChoices.FULFILLED)
         self.assertEqual(req.asset, self.asset_requestable)
 
     def test_self_service_claim(self):
@@ -588,7 +589,7 @@ class RequisitionSystemTestCase(TestCase):
         self.assertEqual(response.status_code, 302) # Redirects on success
         
         req.refresh_from_db()
-        self.assertEqual(req.status, AssetRequest.STATUS_FULFILLED)
+        self.assertEqual(req.status, RequestStatusChoices.FULFILLED)
         self.assertEqual(req.responded_by, self.requester_user)
         self.assertIsNotNone(req.response_date)
         
@@ -615,7 +616,7 @@ class RequisitionSystemTestCase(TestCase):
         self.assertEqual(response.status_code, 403) # PermissionDenied -> 403 response
         
         req_other.refresh_from_db()
-        self.assertEqual(req_other.status, AssetRequest.STATUS_APPROVED)
+        self.assertEqual(req_other.status, RequestStatusChoices.APPROVED)
 
         # 3. Validation block on non-approved requests
         req_pending = AssetRequest.objects.create(
@@ -640,7 +641,7 @@ class RequisitionSystemTestCase(TestCase):
             asset_type=self.type_requestable,
             tenant=self.tenant
         )
-        req_no_asset.status = AssetRequest.STATUS_APPROVED
+        req_no_asset.status = RequestStatusChoices.APPROVED
         req_no_asset.save()
         
         response = self.client.post(reverse('assets:request_claim', kwargs={'pk': req_no_asset.pk}))
@@ -695,7 +696,7 @@ class RequisitionSystemTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
         
         req_delegated.refresh_from_db()
-        self.assertEqual(req_delegated.status, AssetRequest.STATUS_FULFILLED)
+        self.assertEqual(req_delegated.status, RequestStatusChoices.FULFILLED)
         
         self.asset_requestable.refresh_from_db()
         self.assertTrue(self.asset_requestable.assignments.filter(assigned_user=self.holder, is_active=True).exists())
@@ -757,7 +758,7 @@ class RequisitionSystemTestCase(TestCase):
             qty=2,
             tenant=self.tenant
         )
-        self.assertEqual(req_comp.status, AssetRequest.STATUS_PENDING)
+        self.assertEqual(req_comp.status, RequestStatusChoices.PENDING)
         self.assertEqual(req_comp.qty, 2)
 
         # 2. Requesting multiple categories (e.g. component and accessory) should fail
@@ -803,7 +804,7 @@ class RequisitionSystemTestCase(TestCase):
             qty=2,
             tenant=self.tenant
         )
-        self.assertEqual(req_approved.status, AssetRequest.STATUS_APPROVED)
+        self.assertEqual(req_approved.status, RequestStatusChoices.APPROVED)
         self.assertIn("Automatically approved based on available stock.", req_approved.response_notes)
 
         # Qty = 4 (> 3) -> should remain pending
@@ -813,7 +814,7 @@ class RequisitionSystemTestCase(TestCase):
             qty=4,
             tenant=self.tenant
         )
-        self.assertEqual(req_pending.status, AssetRequest.STATUS_PENDING)
+        self.assertEqual(req_pending.status, RequestStatusChoices.PENDING)
 
         # Override via ConfigContext
         from extras.models import ConfigContext
@@ -833,7 +834,7 @@ class RequisitionSystemTestCase(TestCase):
             qty=4,
             tenant=self.tenant
         )
-        self.assertEqual(req_cc_approved.status, AssetRequest.STATUS_APPROVED)
+        self.assertEqual(req_cc_approved.status, RequestStatusChoices.APPROVED)
 
     def test_partial_approval_and_location(self):
         from assets.forms.request_forms import AssetRequestActionForm
@@ -880,7 +881,7 @@ class RequisitionSystemTestCase(TestCase):
             response_notes='Reduced to 3 units'
         )
         req.refresh_from_db()
-        self.assertEqual(req.status, AssetRequest.STATUS_APPROVED)
+        self.assertEqual(req.status, RequestStatusChoices.APPROVED)
         self.assertEqual(req.qty, 3)
         self.assertEqual(req.source_location, self.location)
 
@@ -903,7 +904,7 @@ class RequisitionSystemTestCase(TestCase):
             requester=self.requester_user,
             component=comp,
             qty=2,
-            status=AssetRequest.STATUS_APPROVED,
+            status=RequestStatusChoices.APPROVED,
             source_location=self.location,
             tenant=self.tenant
         )
@@ -912,7 +913,7 @@ class RequisitionSystemTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
         
         req_comp.refresh_from_db()
-        self.assertEqual(req_comp.status, AssetRequest.STATUS_FULFILLED)
+        self.assertEqual(req_comp.status, RequestStatusChoices.FULFILLED)
         self.assertTrue(ComponentAllocation.objects.filter(component=comp, assigned_holder=self.holder, qty=2).exists())
         comp_stock.refresh_from_db()
         self.assertEqual(comp_stock.qty, 3) # 5 - 2 = 3
@@ -922,7 +923,7 @@ class RequisitionSystemTestCase(TestCase):
             requester=self.requester_user,
             accessory=acc,
             qty=3,
-            status=AssetRequest.STATUS_APPROVED,
+            status=RequestStatusChoices.APPROVED,
             source_location=self.location,
             tenant=self.tenant
         )
@@ -930,7 +931,7 @@ class RequisitionSystemTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
 
         req_acc.refresh_from_db()
-        self.assertEqual(req_acc.status, AssetRequest.STATUS_FULFILLED)
+        self.assertEqual(req_acc.status, RequestStatusChoices.FULFILLED)
         self.assertTrue(AccessoryAssignment.objects.filter(accessory=acc, assigned_holder=self.holder, qty=3).exists())
         acc_stock.refresh_from_db()
         self.assertEqual(acc_stock.qty, 7) # 10 - 3 = 7
@@ -940,7 +941,7 @@ class RequisitionSystemTestCase(TestCase):
             requester=self.requester_user,
             consumable=cons,
             qty=5,
-            status=AssetRequest.STATUS_APPROVED,
+            status=RequestStatusChoices.APPROVED,
             source_location=self.location,
             tenant=self.tenant
         )
@@ -948,7 +949,7 @@ class RequisitionSystemTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
 
         req_cons.refresh_from_db()
-        self.assertEqual(req_cons.status, AssetRequest.STATUS_FULFILLED)
+        self.assertEqual(req_cons.status, RequestStatusChoices.FULFILLED)
         self.assertTrue(ConsumableAssignment.objects.filter(consumable=cons, assigned_holder=self.holder, qty=5).exists())
         cons_stock.refresh_from_db()
         self.assertEqual(cons_stock.qty, 15) # 20 - 5 = 15
@@ -972,7 +973,7 @@ class RequisitionSystemTestCase(TestCase):
         for req in new_requests:
             self.assertEqual(req.qty, 1)
             self.assertEqual(req.requester, self.requester_user)
-            self.assertEqual(req.status, AssetRequest.STATUS_PENDING)
+            self.assertEqual(req.status, RequestStatusChoices.PENDING)
 
     def test_request_bulk_receive_workflow(self):
         # Create approved requests for AssetType
@@ -982,13 +983,13 @@ class RequisitionSystemTestCase(TestCase):
         req1 = AssetRequest.objects.create(
             requester=self.requester_user,
             asset_type=self.type_requestable,
-            status=AssetRequest.STATUS_APPROVED,
+            status=RequestStatusChoices.APPROVED,
             tenant=self.tenant
         )
         req2 = AssetRequest.objects.create(
             requester=self.other_user,
             asset_type=self.type_requestable,
-            status=AssetRequest.STATUS_APPROVED,
+            status=RequestStatusChoices.APPROVED,
             tenant=self.tenant
         )
 
@@ -1081,7 +1082,7 @@ class RequisitionSystemTestCase(TestCase):
         req3 = AssetRequest.objects.create(
             requester=self.requester_user,
             asset_type=self.type_requestable,
-            status=AssetRequest.STATUS_APPROVED,
+            status=RequestStatusChoices.APPROVED,
             tenant=self.tenant
         )
         
@@ -1112,7 +1113,7 @@ class RequisitionSystemTestCase(TestCase):
         req = AssetRequest.objects.create(
             requester=self.requester_user,
             asset_type=self.type_requestable,
-            status=AssetRequest.STATUS_APPROVED,
+            status=RequestStatusChoices.APPROVED,
             tenant=self.tenant,
         )
         status = StatusLabel.objects.filter(type='deployable').first()

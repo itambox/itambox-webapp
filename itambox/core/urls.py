@@ -274,3 +274,9 @@ if settings.DEBUG and 'debug_toolbar' in settings.INSTALLED_APPS:
     urlpatterns += [
         path('__debug__/', include(debug_toolbar.urls)),
     ]
+
+
+# Custom error handlers — render the branded pages in templates/errors/.
+handler404 = 'itambox.views.errors.handler404'
+handler500 = 'itambox.views.errors.handler500'
+handler403 = 'itambox.views.errors.handler403'

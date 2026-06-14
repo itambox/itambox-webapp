@@ -8,6 +8,7 @@ from django.views import View
 
 
 from assets.models import AssetRequest, Asset, StatusLabel
+from assets.choices import RequestStatusChoices
 from assets.forms.request_forms import AssetRequestForm, AssetRequestActionForm
 from assets import filters, tables
 
@@ -23,7 +24,7 @@ from itambox.views.generic.service_views import GenericTransactionView, SimplePo
 @transaction.atomic
 def approve_asset_request(request_instance, user, request=None, **kwargs):
     request_instance = AssetRequest.objects.select_for_update().get(pk=request_instance.pk)
-    if request_instance.status != AssetRequest.STATUS_PENDING:
+    if request_instance.status != RequestStatusChoices.PENDING:
         raise ValidationError("Only pending requests can be approved.")
     
     asset = kwargs.get('allocated_asset')
@@ -49,15 +50,15 @@ def approve_asset_request(request_instance, user, request=None, **kwargs):
     if allocated_location:
         request_instance.source_location = allocated_location
 
-    request_instance.status = AssetRequest.STATUS_APPROVED
+    request_instance.status = RequestStatusChoices.APPROVED
     request_instance.responded_by = user
     request_instance.response_date = timezone.now()
     request_instance.response_notes = kwargs.get('response_notes', '')
     request_instance.save()
     
     if request_instance.is_group:
-        for child in request_instance.sub_requests.filter(status=AssetRequest.STATUS_PENDING):
-            child.status = AssetRequest.STATUS_APPROVED
+        for child in request_instance.sub_requests.filter(status=RequestStatusChoices.PENDING):
+            child.status = RequestStatusChoices.APPROVED
             child.responded_by = user
             child.response_date = timezone.now()
             child.response_notes = request_instance.response_notes
@@ -71,18 +72,18 @@ def approve_asset_request(request_instance, user, request=None, **kwargs):
 @transaction.atomic
 def deny_asset_request(request_instance, user, request=None, **kwargs):
     request_instance = AssetRequest.objects.select_for_update().get(pk=request_instance.pk)
-    if request_instance.status != AssetRequest.STATUS_PENDING:
+    if request_instance.status != RequestStatusChoices.PENDING:
         raise ValidationError("Only pending requests can be denied.")
 
-    request_instance.status = AssetRequest.STATUS_DENIED
+    request_instance.status = RequestStatusChoices.DENIED
     request_instance.responded_by = user
     request_instance.response_date = timezone.now()
     request_instance.response_notes = kwargs.get('response_notes', '')
     request_instance.save()
     
     if request_instance.is_group:
-        for child in request_instance.sub_requests.filter(status=AssetRequest.STATUS_PENDING):
-            child.status = AssetRequest.STATUS_DENIED
+        for child in request_instance.sub_requests.filter(status=RequestStatusChoices.PENDING):
+            child.status = RequestStatusChoices.DENIED
             child.responded_by = user
             child.response_date = timezone.now()
             child.response_notes = request_instance.response_notes
@@ -172,7 +173,7 @@ class RequestCreateView(ObjectEditView):
 
 class RequestApproveView(GenericTransactionView):
     permission_required = 'assets.approve_assetrequest'
-    queryset = AssetRequest.objects.filter(status=AssetRequest.STATUS_PENDING)
+    queryset = AssetRequest.objects.filter(status=RequestStatusChoices.PENDING)
     model_form = AssetRequestActionForm
     template_name = 'assets/requests/assetrequest_approve.html'
     service_callable = approve_asset_request
@@ -194,7 +195,7 @@ class RequestApproveView(GenericTransactionView):
 
 class RequestDenyView(GenericTransactionView):
     permission_required = 'assets.approve_assetrequest'
-    queryset = AssetRequest.objects.filter(status=AssetRequest.STATUS_PENDING)
+    queryset = AssetRequest.objects.filter(status=RequestStatusChoices.PENDING)
     model_form = AssetRequestActionForm
     template_name = 'assets/requests/assetrequest_deny.html'
     service_callable = deny_asset_request
@@ -220,18 +221,18 @@ class RequestCancelView(SimplePostView):
             
         with transaction.atomic():
             obj = AssetRequest.objects.select_for_update().get(pk=obj.pk)
-            if obj.status not in [AssetRequest.STATUS_PENDING, AssetRequest.STATUS_APPROVED, AssetRequest.STATUS_PROCUREMENT]:
+            if obj.status not in [RequestStatusChoices.PENDING, RequestStatusChoices.APPROVED, RequestStatusChoices.PROCUREMENT]:
                 raise ValidationError("Only pending, approved, or procurement requests can be cancelled.")
                 
-            if obj.status == AssetRequest.STATUS_APPROVED and obj.asset and obj.asset.assignments.filter(is_active=True).exists():
+            if obj.status == RequestStatusChoices.APPROVED and obj.asset and obj.asset.assignments.filter(is_active=True).exists():
                 raise ValidationError("Cannot cancel a request that has already initiated active physical checkout.")
 
-            obj.status = AssetRequest.STATUS_CANCELLED
+            obj.status = RequestStatusChoices.CANCELLED
             obj.save()
             
             if obj.is_group:
-                for child in obj.sub_requests.exclude(status__in=[AssetRequest.STATUS_CANCELLED, AssetRequest.STATUS_FULFILLED]):
-                    child.status = AssetRequest.STATUS_CANCELLED
+                for child in obj.sub_requests.exclude(status__in=[RequestStatusChoices.CANCELLED, RequestStatusChoices.FULFILLED]):
+                    child.status = RequestStatusChoices.CANCELLED
                     child.save()
                     
         return {'message': "Asset request cancelled successfully."}
@@ -249,7 +250,7 @@ class RequestClaimView(SimplePostView):
         with transaction.atomic():
             obj = AssetRequest.objects.select_for_update().get(pk=obj.pk)
             
-            if obj.status != AssetRequest.STATUS_APPROVED:
+            if obj.status != RequestStatusChoices.APPROVED:
                 raise ValidationError("Only approved requests can be claimed.")
 
             requests_to_claim = [obj] if not obj.is_group else list(obj.sub_requests.all())
@@ -316,13 +317,13 @@ class RequestClaimView(SimplePostView):
                         notes=f"Self-service claim for approved Request #{req.pk}"
                     )
                 
-                req.status = AssetRequest.STATUS_FULFILLED
+                req.status = RequestStatusChoices.FULFILLED
                 req.response_date = timezone.now()
                 req.responded_by = request.user
                 req.save(update_fields=['status', 'response_date', 'responded_by'])
                 
             if obj.is_group:
-                obj.status = AssetRequest.STATUS_FULFILLED
+                obj.status = RequestStatusChoices.FULFILLED
                 obj.response_date = timezone.now()
                 obj.responded_by = request.user
                 obj.save(update_fields=['status', 'response_date', 'responded_by'])
@@ -340,7 +341,7 @@ class RequestMarkFulfilledView(SimplePostView):
         with transaction.atomic():
             obj = AssetRequest.objects.select_for_update().get(pk=obj.pk)
             
-            if obj.status != AssetRequest.STATUS_APPROVED:
+            if obj.status != RequestStatusChoices.APPROVED:
                 raise ValidationError("Only approved requests can be marked fulfilled.")
 
             requests_to_mark = [obj] if not obj.is_group else list(obj.sub_requests.all())
@@ -350,13 +351,13 @@ class RequestMarkFulfilledView(SimplePostView):
                 if not is_inventory and not req.asset:
                     raise ValidationError("No asset has been allocated to this request.")
 
-                req.status = AssetRequest.STATUS_FULFILLED
+                req.status = RequestStatusChoices.FULFILLED
                 req.response_date = timezone.now()
                 req.responded_by = request.user
                 req.save(update_fields=['status', 'response_date', 'responded_by'])
                 
             if obj.is_group:
-                obj.status = AssetRequest.STATUS_FULFILLED
+                obj.status = RequestStatusChoices.FULFILLED
                 obj.response_date = timezone.now()
                 obj.responded_by = request.user
                 obj.save(update_fields=['status', 'response_date', 'responded_by'])
@@ -400,7 +401,7 @@ class RequestBulkReceiveView(PermissionRequiredMixin, View):
                             )
                             
                             req.asset = asset
-                            req.status = AssetRequest.STATUS_FULFILLED
+                            req.status = RequestStatusChoices.FULFILLED
                             req.responded_by = request.user
                             req.response_date = timezone.now()
                             req.save()
@@ -435,7 +436,7 @@ class RequestBulkReceiveView(PermissionRequiredMixin, View):
                 messages.warning(request, "No requests selected for bulk receipt.")
                 return redirect('assets:request_list')
                 
-            requests_qs = AssetRequest.objects.filter(pk__in=pks, status=AssetRequest.STATUS_APPROVED).select_related('asset_type', 'requester')
+            requests_qs = AssetRequest.objects.filter(pk__in=pks, status=RequestStatusChoices.APPROVED).select_related('asset_type', 'requester')
             if not requests_qs.exists():
                 messages.warning(request, "None of the selected requests are in Approved status.")
                 return redirect('assets:request_list')

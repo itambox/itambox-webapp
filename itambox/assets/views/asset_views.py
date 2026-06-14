@@ -17,6 +17,7 @@ from django.db import transaction
 logger = logging.getLogger(__name__)
 
 from ..models import Asset, StatusLabel, AssetAssignment
+from assets.choices import RequestStatusChoices
 from software.models import InstalledSoftware
 from .. import forms, tables, filters
 from ..services import checkout_asset, checkin_asset
@@ -200,7 +201,7 @@ class AssetDetailView(ObjectDetailView):
             from assets.models import AssetRequest
             approved_request_qs = AssetRequest.objects.filter(
                 asset=asset,
-                status=AssetRequest.STATUS_APPROVED
+                status=RequestStatusChoices.APPROVED
             )
             for req in approved_request_qs:
                 is_requester = req.requester == self.request.user
@@ -306,10 +307,10 @@ class AssetCheckoutView(GenericTransactionView):
             request_filter |= Q(asset__isnull=True, asset_type_id=obj.asset_type_id)
         asset_request = AssetRequest.objects.filter(
             pk=request_id,
-            status__in=(AssetRequest.STATUS_PENDING, AssetRequest.STATUS_APPROVED),
+            status__in=(RequestStatusChoices.PENDING, RequestStatusChoices.APPROVED),
         ).filter(request_filter).first()
         if asset_request:
-            asset_request.status = AssetRequest.STATUS_FULFILLED
+            asset_request.status = RequestStatusChoices.FULFILLED
             asset_request.response_date = timezone.now()
             asset_request.responded_by = self.request.user
             asset_request.asset = obj

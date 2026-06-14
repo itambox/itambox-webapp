@@ -1,6 +1,7 @@
 import django_filters
 from core.filters import BaseFilterSet
 from .models import Asset, AssetRole, Manufacturer, AssetType, StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence
+from assets.choices import RequestStatusChoices
 from organization.models import Location, Tenant, AssetHolder
 from extras.models import Tag
 from django import forms
@@ -295,7 +296,7 @@ class CategoryFilterSet(BaseFilterSet):
 
 class AssetRequestFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(method='search', label='Search', widget=forms.TextInput(attrs={'placeholder': 'Search...'}))
-    status = django_filters.ChoiceFilter(choices=AssetRequest.STATUS_CHOICES, widget=forms.Select(attrs={'class': 'form-select'}))
+    status = django_filters.ChoiceFilter(choices=RequestStatusChoices.choices, widget=forms.Select(attrs={'class': 'form-select'}))
 
     class Meta:
         model = AssetRequest

@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from procurement.models import PurchaseOrder, PurchaseOrderLine, FulfillmentLink
 from assets.models import Supplier, AssetRequest, AssetType, Manufacturer
+from assets.choices import RequestStatusChoices
 from organization.models import Location, Site
 from software.models import Software
 from licenses.models import License
@@ -101,7 +102,7 @@ class ProcurementStatusTransitionTests(TestCase):
             requester=self.user,
             asset_type=self.asset_type,
             qty=2,
-            status=AssetRequest.STATUS_PROCUREMENT
+            status=RequestStatusChoices.PROCUREMENT
         )
         FulfillmentLink.objects.create(
             asset_request=request,
@@ -117,7 +118,7 @@ class ProcurementStatusTransitionTests(TestCase):
         request.refresh_from_db()
         
         self.assertEqual(self.po.status, PurchaseOrder.STATUS_CANCELLED)
-        self.assertEqual(request.status, AssetRequest.STATUS_APPROVED)
+        self.assertEqual(request.status, RequestStatusChoices.APPROVED)
         self.assertFalse(FulfillmentLink.objects.filter(purchase_order_line=line).exists())
 
     def test_reopen_cancelled_purchase_order(self):

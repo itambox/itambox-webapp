@@ -65,7 +65,7 @@ class Component(AbstractInventoryItem):
     )
     tags = models.ManyToManyField(
         'extras.Tag',
-        related_name='new_components',
+        related_name='components',
         blank=True
     )
 

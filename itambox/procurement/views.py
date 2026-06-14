@@ -7,6 +7,7 @@ from django.http import HttpResponse
 from itambox.views.generic import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
 from itambox.views.generic.service_views import SimplePostView
 from .models import PurchaseOrder, PurchaseOrderLine, Contract
+from assets.choices import RequestStatusChoices
 from .tables import PurchaseOrderTable, ContractTable
 from .filters import PurchaseOrderFilterSet, ContractFilterSet
 from .forms import PurchaseOrderForm, PurchaseOrderLineForm, ContractForm
@@ -100,7 +101,7 @@ class PurchaseOrderEditView(ObjectEditView):
                 )
                 
                 # Transition request status to procurement
-                asset_request.status = AssetRequest.STATUS_PROCUREMENT
+                asset_request.status = RequestStatusChoices.PROCUREMENT
                 asset_request.save()
                 
                 messages.success(self.request, f"Linked Purchase Order to Asset Request #{asset_request.pk} and transitioned request status to Awaiting Procurement.")
