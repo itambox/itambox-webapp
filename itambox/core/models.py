@@ -14,14 +14,14 @@ from django.utils.http import urlencode
 # Local application
 from itambox.middleware import get_current_request_id, get_current_user
 from itambox.registry import registry
-from core.choices import ObjectChangeActionChoices, EventActionChoices, JobStatusChoices
+from core.choices import ObjectChangeActionChoices, JobStatusChoices
 from core.managers import TenantScopingManager, SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager, TenantScopingAllObjectsManager
 from core.mixins import (
     JournalingMixin, TaggableMixin,
     ImageAttachmentMixin, FileAttachmentMixin, ExportableMixin, CloneableMixin,
     SoftDeleteMixin
 )
-from core.utils import serialize_object
+from itambox.utils import serialize_object
 from core.validators import validate_image_attachment, validate_file_attachment
 
 

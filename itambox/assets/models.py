@@ -4,7 +4,6 @@ from django.utils.translation import gettext_lazy as _
 from django.conf import settings
 from django.urls import reverse
 from django.utils import timezone
-from software.models import Software
 from core.models import BaseModel, ChangeLoggingMixin, StandardModel, DeletableVaultModel
 from core.mixins import CustomFieldDataMixin, JournalingMixin, TaggableMixin, AutoSlugMixin, BookmarkableMixin, SubscribableMixin, SoftDeleteMixin, CloneableMixin, ExportableMixin, ImageAttachmentMixin, FileAttachmentMixin
 from extras.models import CustomFieldset

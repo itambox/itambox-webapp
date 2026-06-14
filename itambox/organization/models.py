@@ -1,6 +1,5 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from django.utils.text import slugify # For potential slug generation
 from django.urls import reverse
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -310,10 +309,6 @@ class AssetHolder(CustomFieldDataMixin, SubscribableMixin, StandardModel, SoftDe
             assigned_user=self,
             is_active=True
         )
-
-    @property
-    def checked_out_asset_count(self):
-        return self.checked_out_assets.count()
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.upn})"

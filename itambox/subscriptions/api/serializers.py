@@ -151,5 +151,3 @@ class SubscriptionAssignmentSerializer(BaseModelSerializer):
             }
         return None
 
-    def create(self, validated_data):
-        return super().create(validated_data)

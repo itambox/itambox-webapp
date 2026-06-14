@@ -4,6 +4,8 @@ from assets.models import Manufacturer, Asset
 from itambox.api.base import BaseModelSerializer
 from itambox.api.nested_serializers import NestedManufacturerSerializer, NestedAssetSerializer
 from extras.api.serializers import TagSerializer
+from organization.api.serializers import NestedTenantSerializer
+from organization.models import Tenant
 from software.models import Software, InstalledSoftware
 
 
@@ -28,6 +30,10 @@ class SoftwareSerializer(BaseModelSerializer):
         help_text="The ID of the manufacturer for this software"
     )
     tags: TagSerializer = TagSerializer(many=True, read_only=True)
+    tenant = NestedTenantSerializer(read_only=True)
+    tenant_id = serializers.PrimaryKeyRelatedField(
+        queryset=Tenant.objects.all(), source='tenant', write_only=True, required=False, allow_null=True
+    )
 
     class Meta:
         model = Software
@@ -36,6 +42,8 @@ class SoftwareSerializer(BaseModelSerializer):
             'name',
             'manufacturer',
             'manufacturer_id',
+            'tenant',
+            'tenant_id',
             'version',
             'category',
             'license_type',

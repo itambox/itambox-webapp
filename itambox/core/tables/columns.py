@@ -3,7 +3,7 @@ from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django.urls import reverse, NoReverseMatch
-from core.utils import get_model_viewname
+from itambox.utils import get_model_viewname
 
 class BooleanColumn(tables.Column):
     TRUE_MARK = mark_safe(

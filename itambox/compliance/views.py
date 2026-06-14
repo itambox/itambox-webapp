@@ -12,10 +12,6 @@ from itambox.views.generic import (
 from .models import CustodyReceipt, CustodyTemplate
 from .forms import CustodyTemplateForm
 from .tables import CustodyTemplateTable
-from assets.views.maintenance_views import (  # noqa: F401
-    AssetMaintenanceListView, AssetMaintenanceDetailView, AssetMaintenanceEditView,
-    AssetMaintenanceCloneView, AssetMaintenanceDeleteView,
-)
 
 
 def _authenticated_user_is_holder(user, holder):

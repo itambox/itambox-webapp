@@ -26,7 +26,3 @@ class RequestStatusChoices(models.TextChoices):
     DENIED = 'denied', _('Denied')
     FULFILLED = 'fulfilled', _('Fulfilled')
     CANCELLED = 'cancelled', _('Cancelled')
-
-
-# Re-exported for backwards-compat; canonical home is compliance.choices
-from compliance.choices import AuditSessionStatusChoices, AuditVerificationMethodChoices  # noqa: F401

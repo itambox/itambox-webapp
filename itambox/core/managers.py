@@ -2,7 +2,6 @@ from django.db import models
 from django.core.exceptions import FieldError, FieldDoesNotExist
 from django.db.models import QuerySet
 from typing import Any, Optional, List
-from .querysets import CustomQuerySet
 import contextvars
 
 _current_tenant = contextvars.ContextVar('current_tenant', default=None)
@@ -31,14 +30,6 @@ def set_current_membership(membership: Optional[Any]) -> None:
 def get_current_membership() -> Optional[Any]:
     return _current_membership.get()
 
-
-
-class CustomManager(models.Manager):
-    """
-    Base Manager that returns our CustomQuerySet.
-    """
-    def get_queryset(self):
-        return CustomQuerySet(self.model, using=self._db)
 
 
 class SoftDeleteQuerySet(models.QuerySet):

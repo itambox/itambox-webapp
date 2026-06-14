@@ -75,10 +75,6 @@ class ChoiceSet:
         yield from [(c[0], c[1]) for c in self.CHOICES]
 
 
-from django.contrib.contenttypes.models import ContentType
-from itambox.middleware import get_current_request_id, get_current_user
-
-
 def serialize_object(obj: Model, extra_fields=None, exclude_fields=None) -> dict:
     if not obj:
         return None
@@ -134,41 +130,6 @@ def serialize_object(obj: Model, extra_fields=None, exclude_fields=None) -> dict
     return data
 
 
-def log_change(instance, action, prechange_data=None, postchange_data=None, user=None, request_id=None):
-    from core.choices import ObjectChangeActionChoices
-    from core.models import ObjectChange
-
-    if user is None:
-        user = get_current_user()
-    if request_id is None:
-        request_id = get_current_request_id()
-
-    logger.debug("User from middleware: %s", user)
-    logger.debug("Request ID from middleware: %s", request_id)
-
-    if not request_id:
-        logger.debug("Skipping changelog for %s (%s) - no request_id found.", instance, action)
-        return
-
-    try:
-        logger.debug("Attempting ObjectChange.objects.create for %s", instance)
-        oc = ObjectChange.objects.create(
-            user=user,
-            user_name=user.username if user else 'System',
-            request_id=request_id,
-            action=action,
-            changed_object_type=ContentType.objects.get_for_model(instance),
-            changed_object_id=instance.pk,
-            object_repr=str(instance),
-            prechange_data=prechange_data,
-            postchange_data=postchange_data
-        )
-        logger.debug("ObjectChange created with PK: %s", oc.pk)
-        logger.info("Changelog: Logged %s for %s (User: %s, Request: %s)", action, instance, user, request_id)
-    except Exception as e:
-        logger.error("Error logging change for %s: %s", instance, e, exc_info=True)
-
-
 def get_content_type_by_natural_key(natural_key):
     try:
         app_label, model = natural_key.lower().split('.')
@@ -187,52 +148,6 @@ def get_table_for_model(model):
     except (ImportError, AttributeError):
         logger.warning("Could not find %s in %s.tables", table_class_name, app_label)
         return None
-
-
-def get_model_from_string(model_string):
-    try:
-        app_label, model_name = model_string.split('.')
-        return ContentType.objects.get(app_label=app_label, model=model_name.lower()).model_class()
-    except (ContentType.DoesNotExist, ValueError):
-        return None
-
-
-def build_breadcrumbs(request, obj=None):
-    breadcrumbs = [{'url': reverse('dashboard'), 'name': 'Home'}]
-    path_parts = request.path.strip('/').split('/')
-
-    if len(path_parts) > 0 and path_parts[0]:
-        app_url_name = f"{path_parts[0]}:index"
-        try:
-            if path_parts[0] == 'assets':
-                list_url = reverse('assets:asset_list')
-                breadcrumbs.append({'url': list_url, 'name': path_parts[0].capitalize()})
-        except Exception:
-            breadcrumbs.append({'url': None, 'name': path_parts[0].capitalize()})
-
-    if obj:
-        model_meta = obj._meta
-        app_label = model_meta.app_label
-        if app_label == 'components':
-            app_label = 'assets'
-        elif app_label == 'auth':
-            app_label = 'users'
-        list_view_name = f"{app_label}:{model_meta.model_name}_list"
-        try:
-            list_url = reverse(list_view_name)
-            breadcrumbs.append({'url': list_url, 'name': model_meta.verbose_name_plural.capitalize()})
-        except Exception:
-            logger.debug("List view URL not found for %s, skipping list breadcrumb", list_view_name)
-        breadcrumbs.append({'url': obj.get_absolute_url(), 'name': str(obj)})
-    elif len(path_parts) > 1:
-        page_title = path_parts[-1].replace('-', ' ').capitalize()
-        if breadcrumbs[-1]['name'].lower() != page_title.lower():
-            breadcrumbs.append({'url': request.path, 'name': page_title})
-
-    if breadcrumbs:
-        breadcrumbs[-1]['is_active'] = True
-
-    return breadcrumbs
 
 
 def get_help_url(view_instance, app_label=None, model_name=None):

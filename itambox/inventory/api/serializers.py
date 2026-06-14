@@ -297,16 +297,12 @@ class ComponentSerializer(BaseModelSerializer):
     total_allocated = serializers.IntegerField(read_only=True)
     available_stock = serializers.IntegerField(read_only=True)
 
-    # Backwards compatibility fields
-    min_stock_level = serializers.IntegerField(source='min_qty', required=False)
-    description = serializers.CharField(source='notes', required=False, allow_blank=True)
-
     class Meta:
         model = Component
         fields = [
             'id', 'name', 'slug', 'manufacturer', 'manufacturer_id',
             'category', 'category_id', 'part_number', 'specs',
-            'min_qty', 'min_stock_level', 'notes', 'description', 'allow_overallocate', 'tags',
+            'min_qty', 'notes', 'allow_overallocate', 'tags',
             'tenant', 'tenant_id',
             'total_stock', 'total_allocated', 'available_stock',
             'created_at', 'updated_at'
@@ -371,15 +367,6 @@ class ComponentAllocationSerializer(BaseModelSerializer):
     )
     tags = TagSerializer(many=True, read_only=True)
 
-    # Backwards compatibility fields
-    asset = NestedAssetSerializer(source='assigned_asset', read_only=True)
-    asset_id = serializers.PrimaryKeyRelatedField(
-        queryset=Asset.objects.all(),
-        source='assigned_asset', write_only=True, required=False, allow_null=True
-    )
-    qty_allocated = serializers.IntegerField(source='qty', required=False)
-    allocated_at = serializers.DateTimeField(source='assigned_date', required=False)
-
     class Meta:
         model = ComponentAllocation
         fields = [
@@ -387,9 +374,8 @@ class ComponentAllocationSerializer(BaseModelSerializer):
             'assigned_holder', 'assigned_holder_id',
             'assigned_location', 'assigned_location_id',
             'assigned_asset', 'assigned_asset_id',
-            'asset', 'asset_id',
             'from_location', 'from_location_id',
-            'qty', 'qty_allocated', 'assigned_date', 'allocated_at', 'notes', 'tags',
+            'qty', 'assigned_date', 'notes', 'tags',
             'created_at', 'updated_at'
         ]
         brief_fields = ['id', 'component_name', 'qty']

@@ -1,8 +1,6 @@
 import django_tables2 as tables
 from django_tables2.utils import A
 from core.tables import ActionsColumn, BaseTable, ToggleColumn
-from assets.tables import AssetMaintenanceTable  # noqa: F401
-
 from .models import CustodyTemplate, CustodyReceipt
 
 class CustodyTemplateTable(BaseTable):

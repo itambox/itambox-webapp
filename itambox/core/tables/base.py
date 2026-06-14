@@ -2,7 +2,8 @@ import logging
 import django_tables2 as tables
 from django_tables2.data import TableQuerysetData
 from django.utils.translation import gettext_lazy as _
-from core.paginator import EnhancedPaginator, get_paginate_count
+from core.paginator import EnhancedPaginator
+from itambox.utils import get_paginate_count
 
 
 logger = logging.getLogger(__name__)

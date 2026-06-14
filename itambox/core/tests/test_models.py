@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from core.utils import serialize_object
+from itambox.utils import serialize_object
 from core.models import Notification
 from extras.models import Bookmark, JournalEntry
 from assets.models import Manufacturer, AssetRole, Asset, AssetType

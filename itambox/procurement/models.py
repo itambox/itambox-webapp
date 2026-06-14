@@ -1,5 +1,3 @@
-import datetime
-
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
@@ -297,10 +295,10 @@ class Contract(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin):
         return delta.days
 
     @property
-    def is_expiring_soon(self, threshold_days: int = 30) -> bool:
-        """True if the contract expires within *threshold_days* days."""
+    def is_expiring_soon(self) -> bool:
+        """True if the contract expires within 30 days."""
         days = self.days_until_expiry
-        return 0 <= days <= threshold_days
+        return 0 <= days <= 30
 
     def clean(self):
         super().clean()

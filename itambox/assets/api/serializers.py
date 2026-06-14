@@ -56,7 +56,7 @@ class StatusLabelSerializer(BaseModelSerializer):
 class DepreciationSerializer(BaseModelSerializer):
     class Meta:
         model = Depreciation
-        fields = ['id', 'name', 'months', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'months', 'method', 'convention', 'immediate_expense_threshold', 'description', 'created_at', 'updated_at']
         brief_fields = ['id', 'name', 'months']
 
 

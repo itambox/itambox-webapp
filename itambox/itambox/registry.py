@@ -22,22 +22,11 @@ class Registry:
         self._event_rules = []
         self._webhooks = []
         self._export_templates = defaultdict(list)
-        self._counter_fields = {}
-        self._denormalized_fields = defaultdict(list)
-        self._lazy_handlers = []
         # Plugin registries
         self._plugin_template_contents = defaultdict(list)
         self._plugin_menus = []
         self._plugin_menu_items = []
         self._plugin_viewsets = defaultdict(list)
-
-    def defer_init(self, callback):
-        self._lazy_handlers.append(callback)
-
-    def execute_deferred(self):
-        for handler in self._lazy_handlers:
-            handler()
-        self._lazy_handlers.clear()
 
     @property
     def model_features(self):
@@ -118,19 +107,6 @@ class Registry:
     def get_export_templates(self, model):
         return self._export_templates.get(model, [])
 
-    def register_counter_field(self, model, field_name, source_model, source_field=None):
-        self._counter_fields[model] = {
-            'field_name': field_name,
-            'source_model': source_model,
-            'source_field': source_field,
-        }
-
-    def register_denormalized_field(self, model, field_name, source_path):
-        self._denormalized_fields[model].append({
-            'field_name': field_name,
-            'source_path': source_path,
-        })
-
     def register_plugin_template_content(self, model, content_class):
         self._plugin_template_contents[model].append(content_class)
 
@@ -164,8 +140,6 @@ class Registry:
         self._event_rules.clear()
         self._webhooks.clear()
         self._export_templates.clear()
-        self._counter_fields.clear()
-        self._denormalized_fields.clear()
         self._plugin_template_contents.clear()
         self._plugin_menus.clear()
         self._plugin_menu_items.clear()

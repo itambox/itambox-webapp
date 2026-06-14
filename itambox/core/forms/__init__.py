@@ -8,7 +8,7 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Field, HTML, Div
 from django.urls import reverse
 from core.search import SEARCH_INDEXES
-from core.utils import get_model_viewname
+from itambox.utils import get_model_viewname
 import django_filters
 from itambox.middleware import get_current_user
 from extras.models import WebhookEndpoint, EventRule, Event, LabelTemplate, ReportTemplate, ScheduledReport, AlertRule, NotificationChannel
@@ -65,14 +65,6 @@ class SearchForm(forms.Form):
         initial='icontains',
         widget=forms.Select(attrs={'class': 'form-select'})
     )
-
-class BootstrapMixin:
-    """
-    DEPRECATED: Custom styling injection is no longer needed.
-    Django Crispy Forms handles styling layout at render-time.
-    This class remains as a stub for compatibility.
-    """
-    pass
 
 class JournalEntryForm(forms.Form):
     comment = forms.CharField(widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}))

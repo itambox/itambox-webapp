@@ -15,7 +15,7 @@ from rest_framework.views import get_view_name as drf_get_view_name
 
 from itambox.api.exceptions import SerializerNotFound
 from itambox.api.fields import RelatedObjectCountField
-from core.querysets import count_related
+from django.db.models import Count
 
 logger = logging.getLogger('itambox.utilities.api')
 
@@ -108,7 +108,7 @@ def get_annotations_for_serializer(serializer_class, fields=None, omit=None):
             continue
         if field_name in fields_to_include and type(field) is RelatedObjectCountField:
             related_field = getattr(model, field.relation).field
-            annotations[field_name] = count_related(related_field.model, related_field.name)
+            annotations[field_name] = Count(related_field.name)
 
     return annotations
 

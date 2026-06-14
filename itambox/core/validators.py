@@ -76,10 +76,6 @@ class CustomValidator:
 CUSTOM_VALIDATORS = {}
 
 
-def register_validator(model_path, validator):
-    CUSTOM_VALIDATORS.setdefault(model_path, []).append(validator)
-
-
 def get_validators(model):
     model_path = f'{model._meta.app_label}.{model._meta.model_name}'
     return CUSTOM_VALIDATORS.get(model_path, [])

@@ -5,8 +5,6 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.utils.urls import remove_query_param, replace_query_param
 
-from itambox.api.exceptions import QuerySetNotOrdered
-
 
 class ITAMBoxPagination(LimitOffsetPagination):
     start_query_param = 'start'
@@ -146,10 +144,3 @@ class ITAMBoxPagination(LimitOffsetPagination):
             },
         })
         return parameters
-
-
-class StripCountAnnotationsPaginator(ITAMBoxPagination):
-    def get_queryset_count(self, queryset):
-        cloned_queryset = queryset.all()
-        cloned_queryset.query.annotations.clear()
-        return cloned_queryset.count()

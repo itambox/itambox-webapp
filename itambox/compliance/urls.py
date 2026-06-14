@@ -1,5 +1,4 @@
 from django.urls import path
-from django.views.generic import RedirectView
 from . import views
 from . import views_audit
 
@@ -17,15 +16,6 @@ urlpatterns = [
     path('audit-sessions/<int:pk>/flag-missing/', views_audit.AuditSessionFlagMissingView.as_view(), name='auditsession_flag_missing'),
     path('audit-sessions/<int:pk>/start/', views_audit.AuditSessionStartView.as_view(), name='auditsession_start'),
     path('audit-sessions/<int:pk>/delete/', views_audit.AuditSessionDeleteView.as_view(), name='auditsession_delete'),
-
-    # Asset Maintenances moved to the assets app (assets:assetmaintenance_*).
-    # Permanent redirects keep old bookmarks alive.
-    path('maintenances/', RedirectView.as_view(pattern_name='assets:assetmaintenance_list', permanent=True), name='assetmaintenance_list'),
-    path('maintenances/add/', RedirectView.as_view(pattern_name='assets:assetmaintenance_create', permanent=True), name='assetmaintenance_create'),
-    path('maintenances/<int:pk>/', RedirectView.as_view(pattern_name='assets:assetmaintenance_detail', permanent=True), name='assetmaintenance_detail'),
-    path('maintenances/<int:pk>/edit/', RedirectView.as_view(pattern_name='assets:assetmaintenance_update', permanent=True), name='assetmaintenance_update'),
-    path('maintenances/<int:pk>/clone/', RedirectView.as_view(pattern_name='assets:assetmaintenance_clone', permanent=True), name='assetmaintenance_clone'),
-    path('maintenances/<int:pk>/delete/', RedirectView.as_view(pattern_name='assets:assetmaintenance_delete', permanent=True), name='assetmaintenance_delete'),
 
     # Custody Templates
     path('custody-templates/', views.CustodyTemplateListView.as_view(), name='custodytemplate_list'),

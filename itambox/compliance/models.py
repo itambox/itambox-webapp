@@ -16,8 +16,6 @@ def generate_token():
     return secrets.token_urlsafe(48)
 
 
-from assets.models import MaintenanceStatusChoices, AssetMaintenance  # noqa: F401
-
 class CustodyTemplate(TaggableMixin, CloneableMixin, ExportableMixin, ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()

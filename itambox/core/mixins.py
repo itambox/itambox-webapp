@@ -218,7 +218,7 @@ class SoftDeleteMixin(models.Model):
                                 pks_to_soft_delete.append(instance.pk)
                                 # Cascade changelog generation to prevent audit trail blind spots
                                 if hasattr(instance, '_log_change') and callable(instance._log_change):
-                                    from core.utils import serialize_object
+                                    from itambox.utils import serialize_object
                                     excluded = getattr(instance, '_change_logging_excluded_fields', ['updated_at'])
                                     prechange_data = serialize_object(instance, exclude_fields=excluded)
                                     instance._log_change(action='delete', prechange_data=prechange_data)
@@ -251,7 +251,7 @@ class AutoSlugMixin:
 
     def save(self, *args, **kwargs):
         if not getattr(self, 'slug', None):
-            from core.utils import generate_unique_slug
+            from itambox.utils import generate_unique_slug
             generate_unique_slug(self, self.slug_source)
         super().save(*args, **kwargs)
 

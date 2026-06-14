@@ -174,10 +174,6 @@ class Accessory(AbstractInventoryItem):
         undeducted_qty = sum(a.qty for a in self.assignments.filter(from_location__isnull=True))
         return max(0, self.total_stock - undeducted_qty)
 
-    @property
-    def remaining_qty(self):
-        return self.available
-
 
 class Consumable(AbstractInventoryItem):
     objects = TenantScopingSoftDeleteManager()
@@ -215,10 +211,6 @@ class Consumable(AbstractInventoryItem):
     def available(self):
         undeducted_qty = sum(a.qty for a in self.consumptions.filter(from_location__isnull=True))
         return max(0, self.total_stock - undeducted_qty)
-
-    @property
-    def remaining_qty(self):
-        return self.available
 
 
 class ComponentStock(AbstractStock):
@@ -323,13 +315,6 @@ class ComponentAllocation(AbstractAssignment):
     def tenant(self):
         return self.component.tenant if self.component_id else None
 
-    def __init__(self, *args, **kwargs):
-        if 'qty_allocated' in kwargs:
-            kwargs['qty'] = kwargs.pop('qty_allocated')
-        if 'asset' in kwargs:
-            kwargs['assigned_asset'] = kwargs.pop('asset')
-        super().__init__(*args, **kwargs)
-
     component = models.ForeignKey(
         Component, on_delete=models.PROTECT, related_name='allocations', db_index=True
     )
@@ -388,22 +373,6 @@ class ComponentAllocation(AbstractAssignment):
         from .services import adjust_inventory_stock
         adjust_inventory_stock(self, is_delete=True)
         super().delete(*args, **kwargs)
-
-    @property
-    def qty_allocated(self):
-        return self.qty
-
-    @qty_allocated.setter
-    def qty_allocated(self, value):
-        self.qty = value
-
-    @property
-    def asset(self):
-        return self.assigned_asset
-
-    @asset.setter
-    def asset(self, value):
-        self.assigned_asset = value
 
 
 

@@ -280,14 +280,14 @@ class ComponentTrackingTestCase(TransactionTestCase):
         response = self.client.post(reverse('inventory:accessory_checkout', kwargs={'pk': acc.pk}), data=checkout_data, HTTP_HX_REQUEST='true')
         self.assertEqual(response.status_code, 204) # 204 No Content for success HTMX modal
         self.assertEqual(AccessoryAssignment.objects.filter(accessory=acc).count(), 1)
-        self.assertEqual(acc.remaining_qty, 5)
+        self.assertEqual(acc.available, 5)
 
         # 6. Check In (Checkin Assignment deletes it)
         assignment = AccessoryAssignment.objects.get(accessory=acc)
         response = self.client.post(reverse('inventory:accessory_checkin', kwargs={'pk': assignment.pk}))
         self.assertEqual(response.status_code, 302)
         self.assertEqual(AccessoryAssignment.objects.filter(accessory=acc).count(), 0)
-        self.assertEqual(acc.remaining_qty, 10)
+        self.assertEqual(acc.available, 10)
 
     def test_asset_audit_view(self):
         # GET renders the modal form.
@@ -999,7 +999,7 @@ class EnterpriseITAMTestCase(TestCase):
         self.assertEqual(asset.status, self.in_use_status)
         
         self.assertEqual(AccessoryAssignment.objects.filter(accessory=charger).count(), 1)
-        self.assertEqual(charger.remaining_qty, 4)
+        self.assertEqual(charger.available, 4)
 
         self.assertEqual(license_obj.assignments.count(), 1)
         self.assertEqual(license_obj.available_seats, 1)

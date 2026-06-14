@@ -56,7 +56,7 @@
                             {{ allocation.component.manufacturer.name }} {{ allocation.component.name }}
                         </div>
                         <div class="text-secondary small d-flex justify-content-between align-items-center mt-0.5">
-                            <span>{% translate "Qty:" %} <strong>{{ allocation.qty_allocated }}</strong></span>
+                            <span>{% translate "Qty:" %} <strong>{{ allocation.qty }}</strong></span>
                             {% if allocation.component.part_number %}
                                 <span class="badge bg-secondary-lt text-secondary px-1 py-0.5" style="font-size: 0.7rem;">
                                     {{ allocation.component.part_number }}

@@ -41,6 +41,6 @@ def get_object_or_denied(model, pk, user, tenant=None):
 def generate_slug(instance):
     logger.debug("GENERATE SLUG called for %s with current slug: %r", instance.__class__.__name__, getattr(instance, 'slug', None))
     if not getattr(instance, 'slug', None):
-        from core.utils import generate_unique_slug
+        from itambox.utils import generate_unique_slug
         generate_unique_slug(instance, getattr(instance, 'slug_source', 'name'))
 

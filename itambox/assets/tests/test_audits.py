@@ -9,7 +9,7 @@ from assets.models import (
 )
 from compliance.models import AuditSession, AssetAudit
 from organization.models import Site, Location
-from assets.reconciliation import audit_asset, close_audit_session, rehome_audit_session_mismatches
+from compliance.reconciliation import audit_asset, close_audit_session, rehome_audit_session_mismatches
 
 User = get_user_model()
 

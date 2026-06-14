@@ -1,14 +1,10 @@
 from django.core.paginator import Page, Paginator
-import logging
 
 from itambox.constants import DEFAULT_PAGINATE_COUNT
-
-logger = logging.getLogger(__name__)
 
 __all__ = (
     'EnhancedPage',
     'EnhancedPaginator',
-    'get_paginate_count',
 )
 
 
@@ -56,27 +52,3 @@ class EnhancedPage(Page):
             page_list.insert(page_list.index(i), False)
 
         return page_list
-
-
-def get_paginate_count(request):
-    from users.models import UserPreference
-
-    if 'per_page' in request.GET:
-        try:
-            per_page = int(request.GET.get('per_page'))
-            return per_page
-        except (ValueError, TypeError):
-            logger.debug("Invalid per_page URL parameter: '%s'", request.GET.get('per_page'))
-
-    if request.user.is_authenticated:
-        try:
-            if not hasattr(request, '_user_preferences_cache'):
-                request._user_preferences_cache = UserPreference.objects.filter(user=request.user).first()
-            prefs = request._user_preferences_cache
-            if prefs and prefs.data:
-                per_page = prefs.data.get('pagination', {}).get('per_page', DEFAULT_PAGINATE_COUNT)
-                return int(per_page)
-        except (ValueError, TypeError, AttributeError):
-            logger.debug("Invalid user preference pagination value")
-
-    return DEFAULT_PAGINATE_COUNT

@@ -176,11 +176,7 @@ class ContractForm(forms.ModelForm):
         tenant = get_current_tenant()
         if tenant:
             self.fields['assets'].queryset = self.fields['assets'].queryset.filter(tenant=tenant)
-            # CostCenter will be tenant-scoped once that model lands; guard with hasattr
-            # to avoid errors if the FK target doesn't exist yet (concurrent migration).
-            cc_qs = self.fields['cost_center'].queryset
-            if hasattr(cc_qs.model, 'tenant'):
-                self.fields['cost_center'].queryset = cc_qs.filter(tenant=tenant)
+            self.fields['cost_center'].queryset = self.fields['cost_center'].queryset.filter(tenant=tenant)
 
         self.helper = FormHelper()
         self.helper.layout = Layout(
@@ -314,6 +310,3 @@ class BaseAssetProvisionFormSet(forms.BaseFormSet):
                 if Asset.objects.filter(serial_number=serial).exists():
                     form.add_error('serial_number', f"An asset with serial number '{serial}' already exists.")
 
-AssetProvisionFormSet = forms.formset_factory(
-    AssetProvisionForm, formset=BaseAssetProvisionFormSet, extra=0
-)

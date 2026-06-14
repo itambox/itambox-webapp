@@ -1,4 +1,4 @@
-from .utils import ChoiceSet
+from itambox.utils import ChoiceSet
 
 
 class ObjectChangeActionChoices(ChoiceSet):
@@ -17,12 +17,6 @@ class ObjectChangeActionChoices(ChoiceSet):
         (ACTION_CHECKIN, 'Checked In', 'primary'),
         (ACTION_AUDIT, 'Audited', 'purple'),
     )
-
-    LEGACY_MAP = {
-        ACTION_CREATE: 1,
-        ACTION_UPDATE: 2,
-        ACTION_DELETE: 3,
-    }
 
 
 class EventActionChoices(ChoiceSet):

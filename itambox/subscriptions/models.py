@@ -8,7 +8,6 @@ from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelatio
 from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
-from django.utils.text import slugify
 from extras.models import Tag
 
 

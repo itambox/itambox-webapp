@@ -1,7 +1,7 @@
 import graphene
 from graphene_django import DjangoObjectType
 from .models import Provider, Subscription, SubscriptionAssignment
-from organization.models import Tenant, TenantGroup
+from organization.models import Tenant, TenantGroup, Contact, ContactRole, ContactAssignment
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import get_user_model
 from core.graphql_utils import check_permission, get_object_or_denied, generate_slug, paginate_queryset
@@ -39,8 +39,6 @@ class TenantGroupNode(DjangoObjectType):
     class Meta:
         model = TenantGroup
         fields = ("id", "name", "slug")
-
-from organization.models import Tenant, TenantGroup, Contact, ContactRole, ContactAssignment
 
 class ContactRoleNode(DjangoObjectType):
     class Meta:

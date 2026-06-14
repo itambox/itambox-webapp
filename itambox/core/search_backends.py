@@ -6,7 +6,7 @@ from django.core.exceptions import FieldError
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
-from .utils import get_content_type_by_natural_key
+from itambox.utils import get_content_type_by_natural_key
 
 from .search import SEARCH_INDEXES
 
