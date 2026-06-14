@@ -157,8 +157,8 @@ Tasks live in `core/tasks/`. Each task function should be wrapped in `TaskContex
 | `ITAMBOX_BASE_URL` | Public base URL for QR labels & outbound links (no trailing slash) | `""` (bare-tag QR used) |
 | `ITAMBOX_DEFAULT_CURRENCY` | ISO 4217 fallback for money display; `{{ value|money:obj }}` resolves tenant currency first | `EUR` |
 | `ITAMBOX_DB_*` | DB connection | `itambox`/`localhost`/`5432` |
-| `ITAMBOX_CACHE_BACKEND` | `locmem` or `redis` | `locmem` |
-| `ITAMBOX_REDIS_URL` | Redis connection when cache=redis | `redis://127.0.0.1:6379/1` |
+| `ITAMBOX_CACHE_BACKEND` | `locmem` or `redis` (Redis wire protocol — run Valkey, the BSD-licensed fork) | `locmem` |
+| `ITAMBOX_REDIS_URL` | Valkey/Redis connection (`redis://` protocol) when cache=redis | `redis://127.0.0.1:6379/1` |
 | `RATELIMIT_CACHE` | Cache alias for rate limiting | `default` |
 | `ITAMBOX_TENANT_LDAP_CONFIGS` | JSON per-tenant LDAP configs | `{}` |
 | `ITAMBOX_TENANT_SAML_CONFIGS` | JSON per-tenant SAML configs | `{}` |

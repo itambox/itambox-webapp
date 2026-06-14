@@ -33,8 +33,8 @@ All settings are loaded from a `.env` file at the repo root (or one directory ab
 | `ITAMBOX_DB_PASSWORD` | **REQUIRED in prod.** PostgreSQL password | — |
 | `ITAMBOX_DB_HOST` | PostgreSQL host | `localhost` |
 | `ITAMBOX_DB_PORT` | PostgreSQL port | `5432` |
-| `ITAMBOX_CACHE_BACKEND` | Cache backend: `locmem` or `redis` | `locmem` |
-| `ITAMBOX_REDIS_URL` | Redis connection string (used when cache=redis) | `redis://127.0.0.1:6379/1` |
+| `ITAMBOX_CACHE_BACKEND` | Cache backend: `locmem` or `redis` (Redis wire protocol; run **Valkey**, the BSD-licensed fork) | `locmem` |
+| `ITAMBOX_REDIS_URL` | Valkey/Redis connection string (`redis://` protocol; used when cache=redis) | `redis://127.0.0.1:6379/1` |
 | `RATELIMIT_CACHE` | Django cache alias used for rate limiting | `default` |
 | `ITAMBOX_TENANT_LDAP_CONFIGS` | JSON object of per-tenant LDAP configs (advanced) | `{}` |
 | `ITAMBOX_TENANT_SAML_CONFIGS` | JSON object of per-tenant SAML configs (advanced) | `{}` |
