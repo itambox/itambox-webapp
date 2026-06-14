@@ -43,6 +43,14 @@ def checkout_asset(
         # Lock the asset row to prevent concurrent overallocation or state issues
         asset = Asset.objects.select_for_update().get(pk=asset.pk)
 
+        # Lifecycle guard: assets on order or in repair are not deployable.
+        if asset.status and asset.status.type in (
+            StatusTypeChoices.IN_REPAIR, StatusTypeChoices.ON_ORDER
+        ):
+            raise ValidationError(
+                f"Cannot check out an asset that is {asset.status.get_type_display()}."
+            )
+
         if asset.active_assignment:
             checkin_asset(asset, user=user, notes='Auto-checkin for reassignment')
 

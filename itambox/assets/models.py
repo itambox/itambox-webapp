@@ -12,6 +12,7 @@ from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKe
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import get_user_model
 from assets.choices import StatusTypeChoices, RequestStatusChoices
+from core.currency import CurrencyField
 
 User = get_user_model()
 
@@ -21,11 +22,13 @@ from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingSof
 
 class AssetStateMachine:
     ALLOWED_TRANSITIONS = {
-        'pending': ['deployable', 'undeployable', 'archived'],
-        'deployable': ['pending', 'undeployable', 'archived', 'deployed'],
-        'deployed': ['deployable', 'undeployable', 'archived', 'pending'],
-        'undeployable': ['pending', 'deployable', 'archived'],
-        'archived': ['pending']
+        'pending': ['deployable', 'undeployable', 'archived', 'on_order', 'in_repair'],
+        'deployable': ['pending', 'undeployable', 'archived', 'deployed', 'in_repair'],
+        'deployed': ['deployable', 'undeployable', 'archived', 'pending', 'in_repair'],
+        'undeployable': ['pending', 'deployable', 'archived', 'in_repair'],
+        'archived': ['pending'],
+        'in_repair': ['deployable', 'undeployable', 'archived'],
+        'on_order': ['pending', 'deployable'],
     }
 
     @staticmethod
@@ -47,6 +50,8 @@ class StatusLabel(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     TYPE_PENDING = StatusTypeChoices.PENDING
     TYPE_UNDEPLOYABLE = StatusTypeChoices.UNDEPLOYABLE
     TYPE_ARCHIVED = StatusTypeChoices.ARCHIVED
+    TYPE_IN_REPAIR = StatusTypeChoices.IN_REPAIR
+    TYPE_ON_ORDER = StatusTypeChoices.ON_ORDER
     TYPE_CHOICES = StatusTypeChoices.choices
 
     name = models.CharField(max_length=100)
@@ -335,6 +340,7 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
         blank=True,
         verbose_name="Salvage Value"
     )
+    currency = CurrencyField()
     status = models.ForeignKey(StatusLabel, on_delete=models.PROTECT, related_name='assets', null=True, blank=True, db_index=True)
     location = models.ForeignKey('organization.Location', on_delete=models.SET_NULL, blank=True, null=True, related_name='assets', db_index=True)
     tenant = models.ForeignKey('organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='assets', db_index=True)
@@ -1173,6 +1179,7 @@ class AssetMaintenance(TaggableMixin, CloneableMixin, ExportableMixin,
         blank=True,
         verbose_name="Maintenance Cost"
     )
+    currency = CurrencyField()
     start_date = models.DateField(verbose_name="Start Date", db_index=True)
     completion_date = models.DateField(null=True, blank=True, verbose_name="Completion Date", db_index=True)
     notes = models.TextField(blank=True)

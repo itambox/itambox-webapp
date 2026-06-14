@@ -15,6 +15,8 @@ class StatusTypeChoices(models.TextChoices):
     DEPLOYED = 'deployed', _('Deployed')
     UNDEPLOYABLE = 'undeployable', _('Undeployable')
     ARCHIVED = 'archived', _('Archived')
+    IN_REPAIR = 'in_repair', _('In Repair')
+    ON_ORDER = 'on_order', _('On Order')
 
 
 class RequestStatusChoices(models.TextChoices):

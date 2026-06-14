@@ -33,7 +33,9 @@ class AssetCheckOutForm(forms.Form):
         label="Location"
     )
     asset_target = forms.ModelChoiceField(
-        queryset=Asset.objects.exclude(status__type='undeployable').order_by('name'),
+        queryset=Asset.objects.exclude(
+            status__type__in=['undeployable', 'in_repair', 'on_order', 'archived']
+        ).order_by('name'),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
         label="Parent Asset"
@@ -81,7 +83,9 @@ class AssetCheckOutForm(forms.Form):
         asset = kwargs.pop('asset', None)
         super().__init__(*args, **kwargs)
         if asset:
-            self.fields['asset_target'].queryset = Asset.objects.exclude(pk=asset.pk).exclude(status__type='undeployable').order_by('name')
+            self.fields['asset_target'].queryset = Asset.objects.exclude(pk=asset.pk).exclude(
+                status__type__in=['undeployable', 'in_repair', 'on_order', 'archived']
+            ).order_by('name')
             if asset.tenant:
                 self.fields['asset_holder'].queryset = AssetHolder.objects.filter(tenant=asset.tenant).order_by('last_name', 'first_name')
                 self.fields['location'].queryset = Location.objects.filter(tenant=asset.tenant).select_related('site').order_by('site__name', 'name')

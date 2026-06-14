@@ -62,7 +62,7 @@ class AssetMaintenanceSerializer(BaseModelSerializer):
         fields = [
             'id', 'asset', 'asset_id', 'supplier',
             'maintenance_type', 'maintenance_type_display',
-            'cost', 'start_date', 'completion_date',
+            'cost', 'currency', 'start_date', 'completion_date',
             'downtime_days', 'notes',
             'created_at', 'updated_at'
         ]

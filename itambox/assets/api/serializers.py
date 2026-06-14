@@ -128,8 +128,9 @@ class AssetSerializer(BaseModelSerializer):
             'asset_type', 'asset_type_id', 'asset_role', 'assetrole_id',
             'location', 'location_id', 'tenant', 'tenant_id',
             'purchase_date', 'warranty_expiration',
-            'purchase_cost', 'order_number', 'supplier', 'supplier_id',
-            'salvage_value', 'last_audited', 'last_audited_by',
+            'purchase_cost', 'salvage_value', 'currency', 'order_number',
+            'supplier', 'supplier_id',
+            'last_audited', 'last_audited_by',
             'custom_field_data', 'requestable',
             'notes', 'tags', 'assigned_to', 'created_at', 'updated_at'
         ]

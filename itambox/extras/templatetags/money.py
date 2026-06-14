@@ -4,7 +4,8 @@
 {{ value|money:context_object }}
 
 Formats a Decimal/float value with the currency symbol of *context_object*'s tenant.
-Resolution: obj.tenant.currency → obj.asset.tenant.currency → ITAMBOX_DEFAULT_CURRENCY.
+Resolution: obj.currency (per-record, if set) → obj.tenant.currency →
+obj.asset.tenant.currency → ITAMBOX_DEFAULT_CURRENCY.
 
 Symbol placement and number formatting follow the currency:
   EUR / CHF  →  1.234,56 €    (symbol after, locale-aware separators)
@@ -35,6 +36,11 @@ _SYMBOL_BEFORE = {
 def _get_currency(obj):
     if obj is None:
         return getattr(settings, 'ITAMBOX_DEFAULT_CURRENCY', 'EUR') or 'EUR'
+    # Prefer an explicit per-record currency (core.currency.CurrencyField) when
+    # the model carries one and it is set; blank falls back to the tenant.
+    own = getattr(obj, 'currency', None)
+    if own:
+        return own
     tenant = getattr(obj, 'tenant', None)
     if tenant is None:
         asset = getattr(obj, 'asset', None)
