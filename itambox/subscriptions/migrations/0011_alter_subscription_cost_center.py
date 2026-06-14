@@ -12,7 +12,17 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AlterField(
+        # cost_center was a free-text CharField; converting to an FK by dropping
+        # the old text column and adding a fresh nullable FK column. An in-place
+        # AlterField fails because Postgres cannot cast existing text values
+        # (e.g. "NW-IT-CLOUD") to a bigint FK. The app is unreleased, so the old
+        # free-text values are intentionally not preserved (they map to no
+        # CostCenter); every other column on the row is retained.
+        migrations.RemoveField(
+            model_name='subscription',
+            name='cost_center',
+        ),
+        migrations.AddField(
             model_name='subscription',
             name='cost_center',
             field=models.ForeignKey(blank=True, help_text='Financial cost center responsible for this subscription', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='subscriptions', to='organization.costcenter', verbose_name='Cost Center'),
