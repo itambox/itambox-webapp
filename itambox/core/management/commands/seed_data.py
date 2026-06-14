@@ -1225,10 +1225,15 @@ class Command(BaseCommand):
                 serial_number=f"{code}{random.randint(100000, 999999)}", purchase_cost=cost,
                 salvage_value=salvage, purchase_date=p_date, in_service_date=in_service,
                 current_book_value=book_value, depreciation_updated_at=timezone.now(),
-                warranty_expiration=warranty,
                 supplier=self._suppliers[random.choice(self.HW_SUPPLIERS)],
                 order_number=f"PO-{p_date.year}-{random.randint(1000, 9999)}", custom_field_data={})
             asset.save()
+            from assets.models import Warranty, WarrantyTypeChoices
+            Warranty.objects.create(
+                asset=asset, warranty_type=WarrantyTypeChoices.HARDWARE,
+                provider=asset.supplier.name if asset.supplier else '',
+                start_date=p_date, end_date=warranty,
+            )
             tag = asset.asset_tag
             host = f"{code.lower()}-{tag.split('-')[-1]}"
             cv = {}
@@ -1657,7 +1662,6 @@ class Command(BaseCommand):
                     name=f"{label} — {prov_name}", provider=self._providers[prov_name], type='saas',
                     start_date=start, renewal_date=renewal, renewal_cost=cost, currency=currency,
                     billing_cycle='annual', term_months=12, auto_renewal=True,
-                    cost_center=f"{self._tenant_meta[primary_slug]['code']}-CLOUD",
                     contract_reference=f"MSA-{prov_name.split()[0].upper()}-{start.year}",
                     owner=self._provisioner,
                     description=f"{prov_name} cloud subscription — group contract held by {tenant.name}.",
@@ -1825,12 +1829,12 @@ class Command(BaseCommand):
                 message=f"{lic.name} ({lic.seats} seats) is due to expire on {lic.expiration_date:%Y-%m-%d}.",
                 severity='warning', status=random.choice(['active', 'active', 'acknowledged']))
             log_count += 1
-        warranty_assets = [a for a in self._assets if a.warranty_expiration and a.warranty_expiration <= days_ahead(60)]
+        warranty_assets = [a for a in self._assets if a.current_warranty_end and a.current_warranty_end <= days_ahead(60)]
         for a in random.sample(warranty_assets, k=min(15, len(warranty_assets))):
             AlertLog.objects.create(
                 rule=rules['warranty_expiry'], content_type=ct_asset, object_id=a.pk,
-                subject=f"Warranty for {a.asset_tag} expires {a.warranty_expiration:%Y-%m-%d}",
-                message=f"{a.name} ({a.asset_tag}) warranty ends {a.warranty_expiration:%Y-%m-%d}.",
+                subject=f"Warranty for {a.asset_tag} expires {a.current_warranty_end:%Y-%m-%d}",
+                message=f"{a.name} ({a.asset_tag}) warranty ends {a.current_warranty_end:%Y-%m-%d}.",
                 severity='warning', status=random.choice(['active', 'acknowledged', 'resolved']))
             log_count += 1
 

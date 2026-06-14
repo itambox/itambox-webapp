@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Asset, AssetRole, Manufacturer, AssetType, AssetDisposal
+from .models import Asset, AssetRole, Manufacturer, AssetType, AssetDisposal, Warranty, AssetReservation
 from software.models import InstalledSoftware
 
 # Register your models here.
@@ -58,5 +58,23 @@ class AssetDisposalAdmin(admin.ModelAdmin):
     )
     date_hierarchy = 'disposal_date'
     raw_id_fields = ('asset',)
+
+@admin.register(Warranty)
+class WarrantyAdmin(admin.ModelAdmin):
+    list_display = ('asset', 'warranty_type', 'provider', 'start_date', 'end_date', 'reference')
+    list_filter = ('warranty_type',)
+    search_fields = ('asset__name', 'asset__asset_tag', 'provider', 'reference')
+    date_hierarchy = 'end_date'
+    raw_id_fields = ('asset',)
+
+
+@admin.register(AssetReservation)
+class AssetReservationAdmin(admin.ModelAdmin):
+    list_display = ('asset', 'reserved_for', 'start_date', 'end_date', 'status', 'purpose')
+    list_filter = ('status',)
+    search_fields = ('asset__name', 'asset__asset_tag', 'purpose')
+    date_hierarchy = 'start_date'
+    raw_id_fields = ('asset', 'reserved_for')
+
 
 # Registrations for Site, Region, SiteGroup, Tenant, Tag, Location moved to organization/admin.py

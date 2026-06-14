@@ -33,7 +33,9 @@ def checkout_asset(
     expected_checkin: datetime.date | None = None,
     notes: str = '',
     checkout_date: datetime.datetime | None = None,
-    status: StatusLabel | None = None
+    status: StatusLabel | None = None,
+    is_loan: bool = False,
+    due_date: datetime.date | None = None,
 ) -> AssetHolder | Location | Asset:
     target = holder or location or asset_target
     if not target:
@@ -50,6 +52,26 @@ def checkout_asset(
             raise ValidationError(
                 f"Cannot check out an asset that is {asset.status.get_type_display()}."
             )
+
+        # Reservation guard: if the asset is reserved for a *different* holder during
+        # the checkout window, block the checkout to preserve the reservation.
+        if holder:
+            from assets.models import AssetReservation, ReservationStatusChoices
+            today = datetime.date.today()
+            blocking = AssetReservation.all_objects.filter(
+                asset=asset,
+                status__in=[
+                    ReservationStatusChoices.ACTIVE,
+                    ReservationStatusChoices.PENDING,
+                ],
+                start_date__lte=today,
+                end_date__gte=today,
+            ).exclude(reserved_for=holder).first()
+            if blocking:
+                raise ValidationError(
+                    f"Asset is reserved for {blocking.reserved_for} until "
+                    f"{blocking.end_date} and cannot be checked out to a different holder."
+                )
 
         if asset.active_assignment:
             checkin_asset(asset, user=user, notes='Auto-checkin for reassignment')
@@ -81,6 +103,8 @@ def checkout_asset(
             'expected_checkin_date': expected_checkin,
             'notes': notes,
             'pre_checkout_status': original_status,
+            'is_loan': is_loan,
+            'due_date': due_date,
         }
         if holder:
             assignment_kwargs['assigned_user'] = holder
@@ -185,13 +209,19 @@ def checkin_asset(
         target = active.assigned_target
         with transaction.atomic():
             active.is_active = False
-            
+
+            today = checkin_date or datetime.date.today()
+
             if checkin_date:
                 dt = datetime.datetime.combine(checkin_date, datetime.time.min)
                 active.checked_in_at = timezone.make_aware(dt)
             else:
                 active.checked_in_at = timezone.now()
-                
+
+            # Stamp returned_at for loan assignments so is_overdue resolves correctly.
+            if active.is_loan and active.returned_at is None:
+                active.returned_at = today
+
             active.checked_in_by = user
             if notes:
                 active.notes = (active.notes + '\n' + notes).strip()

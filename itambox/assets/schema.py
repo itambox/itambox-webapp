@@ -54,9 +54,9 @@ class CategoryNode(DjangoObjectType):
 class AssetNode(DjangoObjectType):
     class Meta:
         model = Asset
-        fields = ("id", "name", "asset_tag", "serial_number", "asset_type", "asset_role", "status", "location", "tenant", "purchase_date", "warranty_expiration", "supplier", "order_number", "requestable", "created_at", "updated_at")
+        fields = ("id", "name", "asset_tag", "serial_number", "asset_type", "asset_role", "status", "location", "tenant", "purchase_date", "supplier", "order_number", "requestable", "created_at", "updated_at")
 
-ASSET_SORTABLE_FIELDS = {"name", "-name", "asset_tag", "-asset_tag", "serial_number", "-serial_number", "purchase_date", "-purchase_date", "warranty_expiration", "-warranty_expiration", "created_at", "-created_at", "updated_at", "-updated_at"}
+ASSET_SORTABLE_FIELDS = {"name", "-name", "asset_tag", "-asset_tag", "serial_number", "-serial_number", "purchase_date", "-purchase_date", "created_at", "-created_at", "updated_at", "-updated_at"}
 
 class Query(graphene.ObjectType):
     assets = graphene.List(
@@ -130,7 +130,6 @@ class CreateAsset(graphene.Mutation):
         location_id = graphene.ID()
         supplier_id = graphene.ID()
         purchase_date = graphene.Date()
-        warranty_expiration = graphene.Date()
         purchase_cost = graphene.Float()
         salvage_value = graphene.Float()
         order_number = graphene.String()
@@ -155,7 +154,7 @@ class CreateAsset(graphene.Mutation):
         if 'supplier_id' in kwargs:
             asset.supplier = get_object_or_denied(Supplier, kwargs.pop('supplier_id'), user, tenant=active_tenant)
             
-        ALLOWED_FIELDS = {'name', 'asset_tag', 'serial_number', 'purchase_date', 'warranty_expiration', 'purchase_cost', 'salvage_value', 'order_number', 'notes'}
+        ALLOWED_FIELDS = {'name', 'asset_tag', 'serial_number', 'purchase_date', 'purchase_cost', 'salvage_value', 'order_number', 'notes'}
         for key, val in kwargs.items():
             if key in ALLOWED_FIELDS:
                 setattr(asset, key, val)
@@ -182,7 +181,6 @@ class UpdateAsset(graphene.Mutation):
         location_id = graphene.ID()
         supplier_id = graphene.ID()
         purchase_date = graphene.Date()
-        warranty_expiration = graphene.Date()
         purchase_cost = graphene.Float()
         salvage_value = graphene.Float()
         order_number = graphene.String()
@@ -207,7 +205,7 @@ class UpdateAsset(graphene.Mutation):
         if 'supplier_id' in kwargs:
             asset.supplier = get_object_or_denied(Supplier, kwargs.pop('supplier_id'), user, tenant=active_tenant)
             
-        ALLOWED_FIELDS = {'name', 'asset_tag', 'serial_number', 'purchase_date', 'warranty_expiration', 'purchase_cost', 'salvage_value', 'order_number', 'notes'}
+        ALLOWED_FIELDS = {'name', 'asset_tag', 'serial_number', 'purchase_date', 'purchase_cost', 'salvage_value', 'order_number', 'notes'}
         for key, val in kwargs.items():
             if key in ALLOWED_FIELDS:
                 setattr(asset, key, val)

@@ -301,7 +301,6 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
     asset_type = models.ForeignKey(AssetType, on_delete=models.PROTECT, related_name='assets', null=True, blank=True, db_index=True)
     asset_role = models.ForeignKey(AssetRole, on_delete=models.SET_NULL, blank=True, null=True, related_name='assets', db_index=True)
     purchase_date = models.DateField(blank=True, null=True, db_index=True)
-    warranty_expiration = models.DateField(blank=True, null=True, db_index=True)
     
     # Procurement Metadata (Maturity Phase 1)
     purchase_cost = models.DecimalField(
@@ -373,6 +372,15 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
         verbose_name=_("In-service date"),
         help_text=_("Depreciation starts here; falls back to purchase date."),
     )
+    cost_center = models.ForeignKey(
+        'organization.CostCenter',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assets',
+        verbose_name=_('Cost Center'),
+        db_index=True,
+    )
     disposed_at = models.DateTimeField(null=True, blank=True, editable=False, verbose_name=_("Disposed at"))
     disposal_value = models.DecimalField(
         max_digits=10,
@@ -382,6 +390,20 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
         editable=False,
         verbose_name=_("Sign-off value"),
     )
+
+    @property
+    def current_warranty_end(self):
+        """Max end_date among all currently active warranties, or None."""
+        import datetime
+        today = datetime.date.today()
+        result = (
+            self.warranties
+            .filter(start_date__lte=today, end_date__gte=today, deleted_at__isnull=True)
+            .order_by('-end_date')
+            .values_list('end_date', flat=True)
+            .first()
+        )
+        return result
 
     @property
     def is_requestable(self):
@@ -1069,6 +1091,26 @@ class AssetAssignment(SoftDeleteMixin, JournalingMixin, TaggableMixin, ChangeLog
     notes = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', related_name='asset_assignments', blank=True)
 
+    # Loaner-specific fields
+    is_loan = models.BooleanField(
+        default=False,
+        db_index=True,
+        verbose_name=_('Is Loan'),
+        help_text=_('Mark this assignment as a temporary loan with a mandatory return date.'),
+    )
+    due_date = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name=_('Due Date'),
+        help_text=_('Mandatory return date for loaner assets.'),
+    )
+    returned_at = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name=_('Returned At'),
+        help_text=_('Date the loaned asset was physically returned.'),
+    )
+
     class Meta:
         ordering = ['-checked_out_at']
         constraints = [
@@ -1119,6 +1161,18 @@ class AssetAssignment(SoftDeleteMixin, JournalingMixin, TaggableMixin, ChangeLog
         if self.assigned_location: return 'location'
         if self.assigned_asset: return 'asset'
         return None
+
+    @property
+    def is_overdue(self) -> bool:
+        """True when this is an unreturned loan whose due date has passed."""
+        if not self.is_loan:
+            return False
+        if self.returned_at:
+            return False
+        if not self.due_date:
+            return False
+        import datetime
+        return datetime.date.today() > self.due_date
 
     def __str__(self):
         return f"{self.asset} → {self.assigned_target} ({'active' if self.is_active else 'inactive'})"
@@ -1247,6 +1301,191 @@ class AssetDisposal(FileAttachmentMixin, JournalingMixin, SoftDeleteMixin,
 
     def get_absolute_url(self):
         return reverse('assets:assetdisposal_detail', kwargs={'pk': self.pk})
+
+
+class WarrantyTypeChoices(models.TextChoices):
+    HARDWARE = 'hardware', _('Hardware')
+    PARTS_LABOR = 'parts_labor', _('Parts & Labor')
+    ONSITE = 'onsite', _('On-site')
+    ACCIDENTAL = 'accidental', _('Accidental Damage')
+    EXTENDED = 'extended', _('Extended')
+    FULL = 'full', _('Full Coverage')
+
+
+class Warranty(JournalingMixin, SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
+    """First-class warranty entity attached to an asset.
+
+    Tenant-scoped through the parent asset (same ``tenant_lookup`` pattern as
+    AssetMaintenance and AssetAssignment).
+    """
+    tenant_lookup = 'asset__tenant'
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
+
+    @property
+    def tenant(self):
+        return self.asset.tenant if self.asset_id else None
+
+    asset = models.ForeignKey(
+        'Asset',
+        on_delete=models.CASCADE,
+        related_name='warranties',
+        db_index=True,
+        verbose_name=_('Asset'),
+    )
+    warranty_type = models.CharField(
+        max_length=30,
+        choices=WarrantyTypeChoices.choices,
+        default=WarrantyTypeChoices.HARDWARE,
+        verbose_name=_('Warranty Type'),
+        db_index=True,
+    )
+    provider = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_('Provider'),
+        help_text=_('e.g. "Dell ProSupport Plus"'),
+    )
+    start_date = models.DateField(verbose_name=_('Start Date'), db_index=True)
+    end_date = models.DateField(verbose_name=_('End Date'), db_index=True)
+    cost = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name=_('Cost'),
+    )
+    currency = CurrencyField()
+    reference = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_('Reference'),
+        help_text=_('Claim number, policy reference, or contract ID.'),
+    )
+    terms = models.TextField(blank=True, verbose_name=_('Terms'))
+    notes = models.TextField(blank=True, verbose_name=_('Notes'))
+
+    class Meta:
+        ordering = ['end_date']
+        verbose_name = _('Warranty')
+        verbose_name_plural = _('Warranties')
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(end_date__gte=models.F('start_date')),
+                name='warranty_end_date_gte_start_date',
+            ),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.get_warranty_type_display()} warranty on {self.asset} "
+            f"({self.start_date} – {self.end_date})"
+        )
+
+    def get_absolute_url(self):
+        return reverse('assets:warranty_detail', kwargs={'pk': self.pk})
+
+    @property
+    def is_active(self) -> bool:
+        """True when today falls within [start_date, end_date]."""
+        import datetime
+        today = datetime.date.today()
+        return self.start_date <= today <= self.end_date
+
+
+class ReservationStatusChoices(models.TextChoices):
+    PENDING = 'pending', _('Pending')
+    ACTIVE = 'active', _('Active')
+    FULFILLED = 'fulfilled', _('Fulfilled')
+    CANCELLED = 'cancelled', _('Cancelled')
+
+
+class AssetReservation(JournalingMixin, SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
+    """Reservation of an asset for a specific holder within a date window."""
+
+    tenant_lookup = 'asset__tenant'
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
+
+    @property
+    def tenant(self):
+        return self.asset.tenant if self.asset_id else None
+
+    asset = models.ForeignKey(
+        'Asset',
+        on_delete=models.CASCADE,
+        related_name='reservations',
+        db_index=True,
+        verbose_name=_('Asset'),
+    )
+    reserved_for = models.ForeignKey(
+        'organization.AssetHolder',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='asset_reservations',
+        verbose_name=_('Reserved For'),
+    )
+    start_date = models.DateField(verbose_name=_('Start Date'), db_index=True)
+    end_date = models.DateField(verbose_name=_('End Date'), db_index=True)
+    status = models.CharField(
+        max_length=20,
+        choices=ReservationStatusChoices.choices,
+        default=ReservationStatusChoices.PENDING,
+        db_index=True,
+        verbose_name=_('Status'),
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='created_reservations',
+        verbose_name=_('Created By'),
+    )
+    purpose = models.CharField(max_length=255, blank=True, verbose_name=_('Purpose'))
+    notes = models.TextField(blank=True, verbose_name=_('Notes'))
+
+    class Meta:
+        ordering = ['start_date']
+        verbose_name = _('Asset Reservation')
+        verbose_name_plural = _('Asset Reservations')
+
+    def __str__(self):
+        holder = self.reserved_for or _('(no holder)')
+        return f"{self.asset} reserved for {holder} ({self.start_date} – {self.end_date})"
+
+    def get_absolute_url(self):
+        return reverse('assets:assetreservation_detail', kwargs={'pk': self.pk})
+
+    def _overlapping_reservations(self):
+        """Return QS of active/pending reservations for the same asset that overlap our window."""
+        qs = AssetReservation.all_objects.filter(
+            asset=self.asset,
+            status__in=[ReservationStatusChoices.ACTIVE, ReservationStatusChoices.PENDING],
+            start_date__lt=self.end_date,
+            end_date__gt=self.start_date,
+        )
+        if self.pk:
+            qs = qs.exclude(pk=self.pk)
+        return qs
+
+    def clean(self):
+        super().clean()
+        if self.start_date and self.end_date and self.end_date < self.start_date:
+            raise ValidationError(_('End date must be on or after start date.'))
+
+        if (
+            self.asset_id
+            and self.start_date
+            and self.end_date
+            and self.status in (ReservationStatusChoices.ACTIVE, ReservationStatusChoices.PENDING)
+        ):
+            if self._overlapping_reservations().exists():
+                raise ValidationError(
+                    _('An active or pending reservation already exists for this asset '
+                      'overlapping the requested date window.')
+                )
 
 
 class MaintenanceStatusChoices(models.TextChoices):

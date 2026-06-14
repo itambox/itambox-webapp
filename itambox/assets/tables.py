@@ -1,7 +1,7 @@
 # itambox/assets/tables.py
 import django_tables2 as tables
 from django_tables2.utils import A  # Alias for Accessor
-from .models import Asset, AssetRole, Manufacturer, AssetType, StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence, AssetMaintenance, AssetDisposal
+from .models import Asset, AssetRole, Manufacturer, AssetType, StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence, AssetMaintenance, AssetDisposal, Warranty, AssetReservation
 from compliance.models import AssetAudit
 from core.tables import ActionsColumn, AssigneeColumn, BaseTable, ToggleColumn
 from extras.tables import TagColumn # Import TagColumn
@@ -508,5 +508,59 @@ class AssetAuditTable(BaseTable):
         model = AssetAudit
         fields = ('pk', 'timestamp', 'session', 'auditor', 'location', 'status', 'verification_method', 'notes')
         default_columns = ('pk', 'timestamp', 'session', 'auditor', 'location', 'status', 'verification_method', 'notes')
+
+
+class WarrantyTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    asset = tables.LinkColumn('assets:asset_detail', args=[A('asset__pk')], accessor='asset', verbose_name='Asset')
+    warranty_type = tables.Column(verbose_name='Type')
+    provider = tables.Column(verbose_name='Provider')
+    start_date = tables.DateColumn(format="Y-m-d", verbose_name='Start Date')
+    end_date = tables.DateColumn(format="Y-m-d", verbose_name='End Date')
+    cost = tables.Column(verbose_name='Cost')
+    is_active = tables.BooleanColumn(verbose_name='Active', orderable=False)
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = Warranty
+        fields = ('pk', 'asset', 'warranty_type', 'provider', 'start_date', 'end_date', 'cost', 'is_active', 'actions')
+        default_columns = ('pk', 'asset', 'warranty_type', 'provider', 'start_date', 'end_date', 'cost', 'is_active', 'actions')
+
+    def render_warranty_type(self, record):
+        return record.get_warranty_type_display()
+
+    def render_cost(self, value, record):
+        if value is None:
+            return '—'
+        try:
+            from extras.templatetags.money import money
+            return money(value, record)
+        except Exception:
+            return f'{value}'
+
+    def render_is_active(self, record):
+        return record.is_active
+
+
+class AssetReservationTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    asset = tables.LinkColumn('assets:asset_detail', args=[A('asset__pk')], accessor='asset', verbose_name='Asset')
+    reserved_for = tables.Column(verbose_name='Reserved For')
+    start_date = tables.DateColumn(format="Y-m-d", verbose_name='Start Date')
+    end_date = tables.DateColumn(format="Y-m-d", verbose_name='End Date')
+    status = tables.Column(verbose_name='Status')
+    purpose = tables.Column(verbose_name='Purpose')
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = AssetReservation
+        fields = ('pk', 'asset', 'reserved_for', 'start_date', 'end_date', 'status', 'purpose', 'actions')
+        default_columns = ('pk', 'asset', 'reserved_for', 'start_date', 'end_date', 'status', 'purpose', 'actions')
+
+    def render_status(self, record):
+        return record.get_status_display()
+
+    def render_reserved_for(self, value):
+        return value or '—'
 
 

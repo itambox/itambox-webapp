@@ -126,8 +126,9 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
                 row[_('Purchase Date')] = asset.purchase_date.strftime('%Y-%m-%d') if asset.purchase_date else '-'
             if 'warranty_months' in active_cols:
                 months = getattr(asset, 'warranty_months', None)
-                if not months and asset.purchase_date and asset.warranty_expiration:
-                    delta = asset.warranty_expiration - asset.purchase_date
+                warranty_end = asset.current_warranty_end
+                if not months and asset.purchase_date and warranty_end:
+                    delta = warranty_end - asset.purchase_date
                     months = int(delta.days / 30.4)
                 row[_('Warranty (Months)')] = str(months) if months else '-'
                 
