@@ -4,7 +4,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from assets.models import Asset, AssetType, StatusLabel, AssetRole, Manufacturer
-from organization.models import AssetHolder, Site, Location, Tenant
+from organization.models import AssetHolder, Site, Location, Tenant, TenantRole, TenantMembership
 from licenses.models import License, LicenseSeatAssignment
 from software.models import Software
 
@@ -24,6 +24,20 @@ class ITAMBoxAPITestCase(APITestCase):
         # Tenants
         self.tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
         self.tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
+
+        # Give staff a proper TenantRole + TenantMembership in Tenant A so the
+        # RBAC backend (TenantMembershipBackend) grants permissions through the
+        # JSON-role system instead of the removed ModelBackend fallback.
+        self.role_staff_a = TenantRole.objects.create(
+            tenant=self.tenant_a,
+            name='Staff Role A',
+            permissions=['assets.view_asset', 'assets.add_asset', 'assets.change_asset'],
+        )
+        TenantMembership.objects.create(
+            user=self.staff,
+            tenant=self.tenant_a,
+            role=self.role_staff_a,
+        )
 
         # Associate staff with Tenant A via AssetHolder profile
         self.holder_staff = AssetHolder.objects.create(
@@ -94,17 +108,10 @@ class ITAMBoxAPITestCase(APITestCase):
             tenant=self.tenant_a
         )
 
-        # Grant view, add, and change permissions to staff user so they can pass TokenPermissions checks
-        from django.contrib.auth.models import Permission
-        from django.contrib.contenttypes.models import ContentType
-        
-        content_type = ContentType.objects.get_for_model(Asset)
-        for codename in ['view_asset', 'add_asset', 'change_asset']:
-            permission = Permission.objects.get(
-                codename=codename,
-                content_type=content_type,
-            )
-            self.staff.user_permissions.add(permission)
+        # Permissions for self.staff are granted via TenantRole.permissions (JSON)
+        # on the TenantMembership created above. The removed ModelBackend fallback
+        # means user_permissions.add(...) no longer grants access through the
+        # PasswordLoginOnlyBackend, so those calls are intentionally omitted here.
 
     def test_asset_checkout_and_checkin_actions(self):
         self.client.force_authenticate(user=self.superuser)
@@ -188,6 +195,13 @@ class ITAMBoxAPITestCase(APITestCase):
         # 4. Delete assignment with ETag concurrency check
         response = self.client.delete(assign_detail_url, HTTP_IF_MATCH=assignment_etag)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        # The API soft-deletes (sets deleted_at) the assignment but leaves the DB
+        # row in place. Django's FK Collector uses _base_manager (no soft-delete
+        # filter) when checking PROTECT relations, so the soft-deleted row would
+        # still block the license deletion with a 409 ProtectedError.
+        # Hard-delete the row here to allow the license delete to proceed cleanly.
+        LicenseSeatAssignment.all_objects.filter(pk=assignment_id).delete()
 
         # 5. Delete License with ETag concurrency check
         license_detail_url = reverse('api:licenses_api:license-detail', kwargs={'pk': license_id})

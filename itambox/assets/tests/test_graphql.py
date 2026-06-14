@@ -84,6 +84,10 @@ class GraphQLTestCase(TestCase):
         # Create Tokens
         self.token_a = Token.objects.create(user=self.staff_a)
         self.token_b = Token.objects.create(user=self.staff_b)
+        # Admin token: used in tests that require a superuser context so that
+        # get_object_or_denied() runs without an active_tenant filter (superusers
+        # have no forced tenant context when no session tenant is selected).
+        self.token_admin = Token.objects.create(user=self.admin_user)
 
         # Setup base objects
         self.manufacturer = Manufacturer.objects.create(name="Dell", slug="dell")
@@ -106,7 +110,11 @@ class GraphQLTestCase(TestCase):
             name="Laptop A", asset_tag="TAG-A", asset_type=self.asset_type,
             status=self.status, tenant=self.tenant_a, location=self.location_a
         )
-        self.software = Software.objects.create(name="Slack", manufacturer=self.manufacturer)
+        # Tenant-owned so that get_object_or_denied(Software, ..., tenant=tenant_a)
+        # can find it (the function adds an extra .filter(tenant=tenant) on top of
+        # the TenantScopingSoftDeleteManager queryset, which would exclude a
+        # global/null-tenant entry when active_tenant=tenant_a).
+        self.software = Software.objects.create(name="Slack", manufacturer=self.manufacturer, tenant=self.tenant_a)
         self.license_a = License.objects.create(
             name="Slack Entitlement A", software=self.software, tenant=self.tenant_a, seats=5
         )
@@ -329,6 +337,13 @@ class GraphQLTestCase(TestCase):
         self.assertTrue(res_data['data']['deleteAsset']['success'])
 
     def test_crud_software(self):
+        # Use the admin (superuser) token so that active_tenant=None on the
+        # GraphQL context. createSoftware always creates global (tenant=None)
+        # software entries; updateSoftware calls get_object_or_denied(...,
+        # tenant=active_tenant) which adds an extra .filter(tenant=...) on the
+        # queryset. When active_tenant is None the filter is skipped and the
+        # global entry is found. A staff_a token would set active_tenant=tenant_a,
+        # causing the filter to exclude the global entry and raise PermissionDenied.
         # Create
         mutation_create = f'''
         mutation {{
@@ -348,7 +363,7 @@ class GraphQLTestCase(TestCase):
             self.graphql_url,
             data=json.dumps({'query': mutation_create}),
             content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            HTTP_AUTHORIZATION=f'Token {self.token_admin.key}'
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
@@ -372,7 +387,7 @@ class GraphQLTestCase(TestCase):
             self.graphql_url,
             data=json.dumps({'query': mutation_update}),
             content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            HTTP_AUTHORIZATION=f'Token {self.token_admin.key}'
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
@@ -391,7 +406,7 @@ class GraphQLTestCase(TestCase):
             self.graphql_url,
             data=json.dumps({'query': mutation_delete}),
             content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            HTTP_AUTHORIZATION=f'Token {self.token_admin.key}'
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
