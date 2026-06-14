@@ -325,7 +325,12 @@ class ComponentTrackingTestCase(TransactionTestCase):
 
     def test_custody_receipt_signoff(self):
         from organization.models import AssetHolder
-        holder = AssetHolder.objects.create(first_name="Alice", last_name="Wonder", upn="alice@example.com")
+        # Link the holder to the logged-in user so the view's holder-identity
+        # check passes without weakening the security control.
+        holder = AssetHolder.objects.create(
+            first_name="Alice", last_name="Wonder", upn="alice@example.com",
+            user=self.user,
+        )
 
         receipt = CustodyReceipt.objects.create(
             asset=self.asset,
@@ -360,7 +365,12 @@ class ComponentTrackingTestCase(TransactionTestCase):
 
     def test_custody_receipt_decline(self):
         from organization.models import AssetHolder
-        holder = AssetHolder.objects.create(first_name="Bob", last_name="Builder", upn="bob@example.com")
+        # Link the holder to the logged-in user so the view's holder-identity
+        # check passes without weakening the security control.
+        holder = AssetHolder.objects.create(
+            first_name="Bob", last_name="Builder", upn="bob@example.com",
+            user=self.user,
+        )
 
         receipt = CustodyReceipt.objects.create(
             asset=self.asset,

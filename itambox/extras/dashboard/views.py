@@ -186,7 +186,9 @@ class DashboardManageModalView(LoginRequiredMixin, View):
 
     def get(self, request):
         dashboards = request.user.dashboards.all()
-        tenants = Tenant.objects.all().order_by('name')
+        # Use _base_manager to bypass TenantScopingManager's fail-close so the
+        # dropdown is populated even when the user has no active tenant context.
+        tenants = Tenant._base_manager.all().order_by('name')
         html = render_to_string('extras/dashboard/manage_dashboards.html', {
             'dashboards': dashboards,
             'tenants': tenants,
@@ -211,7 +213,8 @@ class DashboardCreateView(LoginRequiredMixin, View):
             messages.error(request, "Tenant is required.")
             return redirect('dashboard')
 
-        tenant = Tenant.objects.filter(id=tenant_id).first()
+        # Use _base_manager to bypass TenantScopingManager's fail-close.
+        tenant = Tenant._base_manager.filter(id=tenant_id).first()
         if not tenant:
             from django.contrib import messages
             if request.headers.get('HX-Request'):
