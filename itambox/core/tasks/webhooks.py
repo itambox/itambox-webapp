@@ -1,8 +1,11 @@
+import datetime
 import hmac
 import hashlib
 import json
 import logging
 import requests
+from django.utils import timezone
+from django_q.models import Schedule
 from django_q.tasks import async_task
 
 logger = logging.getLogger(__name__)
@@ -65,19 +68,38 @@ def send_webhook_task(url, method, headers, secret, event_action, event_model_ap
         logger.info("Webhook sent to %s — status %s", url, response.status_code)
 
     except requests.RequestException as exc:
-        if attempt < retry_count:
+        if attempt >= retry_count:
+            logger.error("Webhook %s: all %d attempts failed: %s", url, retry_count, exc)
+            return
+
+        retry_kwargs = dict(
+            url=url, method=method, headers=headers, secret=secret,
+            event_action=event_action, event_model_app_label=event_model_app_label,
+            event_model_name=event_model_name, event_object_id=event_object_id,
+            event_timestamp_iso=event_timestamp_iso, event_data=event_data,
+            attempt=attempt + 1, retry_count=retry_count, retry_backoff=retry_backoff,
+        )
+
+        if retry_backoff and retry_backoff > 0:
+            # django-q2's async_task has no native delay, so honour retry_backoff
+            # with a one-off Schedule row that the qcluster beat dispatches at
+            # next_run. Schedule.kwargs is parsed back with ast.literal_eval, so it
+            # must be a Python-literal repr — safe here, as every value is a string,
+            # int, or a JSONField-sourced dict of primitives. repeats defaults to
+            # -1, which makes django-q delete the schedule after it fires once.
+            logger.warning(
+                "Webhook %s failed (attempt %d/%d): %s — retrying in %ds",
+                url, attempt + 1, retry_count, exc, retry_backoff,
+            )
+            Schedule.objects.create(
+                func='core.tasks.send_webhook_task',
+                kwargs=repr(retry_kwargs),
+                schedule_type=Schedule.ONCE,
+                next_run=timezone.now() + datetime.timedelta(seconds=retry_backoff),
+            )
+        else:
             logger.warning(
                 "Webhook %s failed (attempt %d/%d): %s — retrying immediately",
                 url, attempt + 1, retry_count, exc,
             )
-            # Retry is immediate; retry_backoff is stored for future use with a scheduler.
-            async_task(
-                'core.tasks.send_webhook_task',
-                url=url, method=method, headers=headers, secret=secret,
-                event_action=event_action, event_model_app_label=event_model_app_label,
-                event_model_name=event_model_name, event_object_id=event_object_id,
-                event_timestamp_iso=event_timestamp_iso, event_data=event_data,
-                attempt=attempt + 1, retry_count=retry_count, retry_backoff=retry_backoff,
-            )
-        else:
-            logger.error("Webhook %s: all %d attempts failed: %s", url, retry_count, exc)
+            async_task('core.tasks.send_webhook_task', **retry_kwargs)

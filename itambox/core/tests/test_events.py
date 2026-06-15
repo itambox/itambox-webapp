@@ -3,6 +3,7 @@ import hmac
 import hashlib
 from unittest.mock import patch, MagicMock
 from django.test import TransactionTestCase
+from django.utils import timezone
 from django.contrib.contenttypes.models import ContentType
 from django.core import mail
 from django.db import transaction
@@ -345,3 +346,30 @@ class WebhookRetryTestCase(TransactionTestCase):
         send_webhook_task(**self.BASE_KWARGS, retry_count=3)
 
         mock_async.assert_not_called()
+
+    @patch('core.tasks.webhooks.requests.request')
+    @patch('core.tasks.webhooks.async_task')
+    @patch('core.tasks.webhooks.Schedule')
+    def test_5xx_with_backoff_schedules_delayed_retry(self, mock_schedule, mock_async, mock_request):
+        """A positive retry_backoff must defer the retry via a one-off Schedule,
+        not re-enqueue immediately. The kwargs must round-trip through the same
+        ast.literal_eval the django-q2 scheduler uses."""
+        import ast
+        from core.tasks.webhooks import send_webhook_task
+        resp = MagicMock(status_code=503)
+        resp.raise_for_status.side_effect = __import__('requests').HTTPError(response=resp)
+        mock_request.return_value = resp
+
+        send_webhook_task(**self.BASE_KWARGS, retry_count=2, retry_backoff=60)
+
+        mock_async.assert_not_called()
+        mock_schedule.objects.create.assert_called_once()
+        _, kw = mock_schedule.objects.create.call_args
+        self.assertEqual(kw['func'], 'core.tasks.send_webhook_task')
+        self.assertEqual(kw['schedule_type'], mock_schedule.ONCE)
+        self.assertGreater(kw['next_run'], timezone.now())
+        retry = ast.literal_eval(kw['kwargs'])
+        self.assertEqual(retry['attempt'], 1)
+        self.assertEqual(retry['retry_count'], 2)
+        self.assertEqual(retry['retry_backoff'], 60)
+        self.assertEqual(retry['url'], self.BASE_KWARGS['url'])
