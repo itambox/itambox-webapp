@@ -13,6 +13,76 @@ from django.utils.translation import gettext_lazy as _
 
 logger = logging.getLogger(__name__)
 
+# Fields that are never user-importable: set from request context, computed by
+# background tasks, or framework-managed. Excluded from both the dynamic field
+# enumeration and the "Field Options" help table.
+IMPORT_EXCLUDED_FIELDS = frozenset({
+    'tenant', 'deleted_at', 'created_at', 'updated_at', 'custom_field_data',
+    'current_book_value', 'depreciation_updated_at',
+    'disposed_at', 'disposal_value', 'last_audited', 'last_audited_by',
+})
+
+
+# Registry of curated BulkImportForms keyed by model, so the single
+# GenericObjectImportView (/import/<app>/<model>/) can serve domain-accurate
+# field lists without a per-app view subclass. Populated lazily on first lookup.
+_IMPORT_FORM_REGISTRY = {}
+_IMPORT_FORMS_LOADED = False
+
+
+def register_import_form(form_cls):
+    """Decorator: register a curated BulkImportForm for its model."""
+    if getattr(form_cls, 'model', None) is not None:
+        _IMPORT_FORM_REGISTRY[form_cls.model] = form_cls
+    return form_cls
+
+
+def get_registered_import_form(model):
+    """Return the curated BulkImportForm for *model*, or None for the dynamic path."""
+    global _IMPORT_FORMS_LOADED
+    if not _IMPORT_FORMS_LOADED:
+        _IMPORT_FORMS_LOADED = True
+        # Import side-effect: curated forms self-register via @register_import_form.
+        # Lazy (request-time) to avoid app-loading circular imports.
+        try:
+            import assets.forms.import_forms  # noqa: F401
+        except Exception:
+            logger.exception('Failed to load curated import forms')
+    return _IMPORT_FORM_REGISTRY.get(model)
+
+
+def _model_has_concrete_field(model, name):
+    """True only if *name* is a real (concrete) model field — guards FK lookups
+    so we never build a queryset filter on a Python property/attribute."""
+    try:
+        model._meta.get_field(name)
+        return True
+    except Exception:
+        return False
+
+
+def resolve_related(related_model, value):
+    """Resolve a raw import cell to a related-object PK by id, then slug/name/
+    model/username/upn (case-sensitive then case-insensitive). Returns the PK, or
+    the original value (so model validation surfaces a clear per-row error)."""
+    obj = None
+    if value.isdigit():
+        obj = related_model.objects.filter(pk=int(value)).first()
+    lookup_fields = ['slug', 'name', 'model', 'username', 'upn']
+    if not obj:
+        for lookup in lookup_fields:
+            if _model_has_concrete_field(related_model, lookup):
+                obj = related_model.objects.filter(**{lookup: value}).first()
+                if obj:
+                    break
+    if not obj:
+        for lookup in lookup_fields:
+            if _model_has_concrete_field(related_model, lookup):
+                obj = related_model.objects.filter(**{f"{lookup}__iexact": value}).first()
+                if obj:
+                    break
+    return obj.pk if obj else value
+
 
 class BulkImportForm(forms.Form):
     """
@@ -230,14 +300,39 @@ class BulkImportForm(forms.Form):
         return imported, errors
 
     def map_row(self, row):
-        """Map CSV row dict to model field values. Override in subclass."""
-        # Only map fields that are actually present in the row
-        mapped = {k: row[k].strip() for k in self.field_names if k in row and row[k] is not None}
-        if self.model:
-            pk_name = self.model._meta.pk.name
-            pk_val = row.get('id') or row.get(pk_name)
-            if pk_val and pk_val.strip():
-                mapped[pk_name] = pk_val.strip()
+        """Map an import row dict to model field values.
+
+        Scalar columns are passed through (stripped); ForeignKey columns are
+        resolved to a PK by id / slug / name (see ``resolve_related``). Subclasses
+        rarely need to override this — declare ``required_fields`` /
+        ``optional_fields`` and let the base handle mapping.
+        """
+        from django.db import models as _models
+
+        mapped = {}
+        if not self.model:
+            return mapped
+
+        pk_name = self.model._meta.pk.name
+        pk_val = row.get('id') or row.get(pk_name)
+        if pk_val and str(pk_val).strip():
+            mapped[pk_name] = str(pk_val).strip()
+
+        for k in self.field_names:
+            if k not in row or row[k] is None:
+                continue
+            val = str(row[k]).strip()
+            if not val:
+                continue
+            try:
+                field = self.model._meta.get_field(k)
+            except Exception:
+                # Not a real field on this model — skip rather than crash on save.
+                continue
+            if field.is_relation and field.many_to_one:
+                mapped[field.attname] = resolve_related(field.related_model, val)
+            else:
+                mapped[k] = val
         return mapped
 
     def _validate_row(self, mapped_data, row_number):

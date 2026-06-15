@@ -116,7 +116,7 @@ INVENTORY_MENU = Menu(
                             permissions=['inventory.add_accessory'],
                         ),
                         MenuItemButton(
-                            link='inventory:accessory_import',
+                            link='/import/inventory/accessory/',
                             title='Import Accessories',
                             icon_class='mdi mdi-upload',
                             permissions=['inventory.add_accessory'],
@@ -136,7 +136,7 @@ INVENTORY_MENU = Menu(
                             permissions=['inventory.add_consumable'],
                         ),
                         MenuItemButton(
-                            link='inventory:consumable_import',
+                            link='/import/inventory/consumable/',
                             title='Import Consumables',
                             icon_class='mdi mdi-upload',
                             permissions=['inventory.add_consumable'],

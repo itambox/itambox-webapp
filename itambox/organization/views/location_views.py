@@ -180,10 +180,6 @@ class LocationDeleteView(ObjectDeleteView):
         return super().post(request, *args, **kwargs)
 
 
-class LocationImportView(ObjectImportView):
-    model_form = LocationBulkImportForm
-
-
 class LocationBulkEditView(ObjectBulkEditView):
     queryset = Location.objects.all()
 

@@ -152,10 +152,6 @@ class AssetHolderDeleteView(ObjectDeleteView):
         return super().post(request, *args, **kwargs)
 
 
-class AssetHolderImportView(ObjectImportView):
-    model_form = AssetHolderBulkImportForm
-
-
 class AssetHolderBulkEditView(ObjectBulkEditView):
     queryset = AssetHolder.objects.all()
 

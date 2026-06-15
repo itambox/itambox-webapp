@@ -52,7 +52,6 @@ urlpatterns = [
     path('types/', views.AssetTypeListView.as_view(), name='assettype_list'),
     path('types/add/', views.AssetTypeEditView.as_view(), name='assettype_create'),
     path('types/<int:pk>/clone/', views.AssetTypeCloneView.as_view(), name='assettype_clone'),
-    path('types/import/', views.AssetTypeImportView.as_view(), name='assettype_import'),
     path('types/<int:pk>/', views.AssetTypeDetailView.as_view(), name='assettype_detail'),
     path('types/<int:pk>/edit/', views.AssetTypeEditView.as_view(), name='assettype_update'),
     path('types/<int:pk>/delete/', views.AssetTypeDeleteView.as_view(), name='assettype_delete'),
@@ -97,10 +96,6 @@ urlpatterns = [
     path('requests/<int:pk>/', request_views.RequestDetailView.as_view(), name='assetrequest_detail'),
     path('requests/<int:pk>/edit/', views.AssetRequestEditView.as_view(), name='assetrequest_update'),
     path('requests/<int:pk>/delete/', views.AssetRequestDeleteView.as_view(), name='assetrequest_delete'),
-
-    # Import URLs
-    path('assets/import/', views.AssetImportView.as_view(), name='asset_import'),
-    path('manufacturers/import/', views.ManufacturerImportView.as_view(), name='manufacturer_import'),
 
     path('asset-tag-sequences/', views.AssetTagSequenceListView.as_view(), name='assettagsequence_list'),
     path('asset-tag-sequences/add/', views.AssetTagSequenceEditView.as_view(), name='assettagsequence_create'),

@@ -114,10 +114,6 @@ class LicenseCloneView(ObjectEditView):
         return cloned
 
 
-class LicenseImportView(ObjectImportView):
-    model_form = LicenseBulkImportForm
-
-
 class LicenseBulkEditView(ObjectBulkEditView):
     queryset = License.objects.all()
 

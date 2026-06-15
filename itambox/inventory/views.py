@@ -479,14 +479,6 @@ class ConsumableCheckoutView(GenericTransactionView):
         return kwargs
 
 
-class AccessoryImportView(ObjectImportView):
-    model_form = AccessoryBulkImportForm
-
-
-class ConsumableImportView(ObjectImportView):
-    model_form = ConsumableBulkImportForm
-
-
 class AccessoryBulkEditView(ObjectBulkEditView):
     queryset = Accessory.objects.all()
 

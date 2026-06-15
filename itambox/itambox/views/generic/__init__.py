@@ -206,17 +206,14 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         except NoReverseMatch:
             context['create_url_name'] = None
 
+        # All models import via the single centralized route /import/<app>/<model>/.
         try:
-            import_url_name = get_model_viewname(_model, 'import')
-            context['import_url'] = reverse(import_url_name)
+            context['import_url'] = reverse('generic_import', kwargs={
+                'app_label': _model._meta.app_label,
+                'model_name': _model._meta.model_name
+            })
         except NoReverseMatch:
-            try:
-                context['import_url'] = reverse('generic_import', kwargs={
-                    'app_label': _model._meta.app_label,
-                    'model_name': _model._meta.model_name
-                })
-            except NoReverseMatch:
-                context['import_url'] = None
+            context['import_url'] = None
 
         try:
             bulk_delete_url_name = get_model_viewname(_model, 'bulk_delete')
@@ -907,89 +904,46 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
     def get_form_class(self):
         if self.model_form:
             return self.model_form
-        
+
         model = self._get_model()
         if not model:
             raise ImproperlyConfigured(f"{self.__class__.__name__} needs a model attribute or model_form.")
-            
-        from core.forms.import_forms import BulkImportForm
+
+        # A curated BulkImportForm registered for this model wins — it carries
+        # domain-accurate required/optional field lists. Otherwise fall back to
+        # a dynamic form introspected from the model's editable fields.
+        from core.forms.import_forms import (
+            BulkImportForm, IMPORT_EXCLUDED_FIELDS, get_registered_import_form,
+        )
+        registered = get_registered_import_form(model)
+        if registered is not None:
+            return registered
+
         from django.db import models
-        
+
         required_fields = []
         optional_fields = []
-        
         for field in model._meta.fields:
             if field.primary_key or field.auto_created or not field.editable:
                 continue
-            if isinstance(field, (models.ForeignKey, models.OneToOneField)):
-                if not field.blank and not field.null and field.default is models.NOT_PROVIDED:
-                    required_fields.append(field.name)
-                else:
-                    optional_fields.append(field.name)
-            elif not field.blank and not field.null and field.default is models.NOT_PROVIDED:
+            if field.name in IMPORT_EXCLUDED_FIELDS:
+                continue
+            if not field.blank and not field.null and field.default is models.NOT_PROVIDED:
                 required_fields.append(field.name)
             else:
                 optional_fields.append(field.name)
-                
+
         target_model = model
         target_required = list(required_fields)
         target_optional = list(optional_fields)
-        
+
+        # The base map_row already resolves FKs by id/slug/name and skips
+        # non-model columns, so no per-form override is needed.
         class DynamicBulkImportForm(BulkImportForm):
             model = target_model
             required_fields = target_required
             optional_fields = target_optional
-            
-            def map_row(self, row):
-                mapped = {}
-                
-                # Check for primary key in the CSV/YAML row to support UPSERT (NetBox Gold Standard)
-                pk_name = self.model._meta.pk.name
-                pk_val = row.get('id') or row.get(pk_name)
-                if pk_val and pk_val.strip():
-                    mapped[pk_name] = pk_val.strip()
 
-                for k in self.field_names:
-                    if k not in row:
-                        continue
-                    val = row.get(k, '').strip()
-                    if not val:
-                        continue
-                    field = self.model._meta.get_field(k)
-                    if field.is_relation and field.many_to_one:
-                        related_model = field.related_model
-                        obj = None
-                        
-                        # 1. Primary Key Lookup
-                        if val.isdigit():
-                            obj = related_model.objects.filter(pk=int(val)).first()
-                            
-                        # 2. Case-Sensitive Attribute Lookup
-                        if not obj:
-                            lookup_fields = ['slug', 'name', 'model', 'username', 'upn']
-                            for lookup in lookup_fields:
-                                if hasattr(related_model, lookup):
-                                    obj = related_model.objects.filter(**{lookup: val}).first()
-                                    if obj:
-                                        break
-                                        
-                        # 3. Case-Insensitive Attribute Lookup (Bilingual / Human-Friendly)
-                        if not obj:
-                            for lookup in lookup_fields:
-                                if hasattr(related_model, lookup):
-                                    obj = related_model.objects.filter(**{f"{lookup}__iexact": val}).first()
-                                    if obj:
-                                        break
-                                        
-                        if obj:
-                            mapped[field.attname] = obj.pk
-                        else:
-                            mapped[field.attname] = val  # Fallback to trigger safe model clean validation error
-                    else:
-                        mapped[k] = val
-                return mapped
-
-                
         return DynamicBulkImportForm
 
     def get(self, request, *args, **kwargs):
@@ -1079,50 +1033,57 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
         return self._render_response(request, form)
 
     def _get_fields_info(self):
+        """Field Options help table, derived from the resolved form's actual
+        required_fields/optional_fields so it always matches what is imported
+        (not every model field). FK columns advertise their match accessor."""
         model = self._get_model()
         fields_info = []
-        if model:
-            from django.db import models
-            for field in model._meta.fields:
-                if field.primary_key or field.auto_created or not field.editable:
-                    continue
-                
-                description = field.help_text or field.verbose_name or ''
-                if description:
-                    description = str(description)
-                
-                is_relation = field.is_relation and field.many_to_one
-                accessor = ''
-                choices = []
-                if is_relation:
-                    related_model = field.related_model
-                    accessor = 'slug' if hasattr(related_model, 'slug') else 'name'
-                    description = _("Relation to {model_name} (resolves by ID, Slug or Name).").format(
-                        model_name=str(related_model._meta.verbose_name)
-                    )
-                
-                if field.choices:
-                    choices = [(val, label) for val, label in field.choices]
-                
-                if isinstance(field, models.DateField):
-                    description = f"{description} Format: YYYY-MM-DD"
-                elif isinstance(field, models.BooleanField):
-                    description = f"{description} Specify true or false"
-                
-                required = False
-                if is_relation:
-                    if not field.blank and not field.null and field.default is models.NOT_PROVIDED:
-                        required = True
-                elif not field.blank and not field.null and field.default is models.NOT_PROVIDED:
-                    required = True
-                
-                fields_info.append({
-                    'name': field.name,
-                    'required': required,
-                    'accessor': accessor,
-                    'description': description,
-                    'choices': choices,
-                })
+        if not model:
+            return fields_info
+
+        from django.db import models
+        from core.forms.import_forms import IMPORT_EXCLUDED_FIELDS, _model_has_concrete_field
+
+        form_cls = self.get_form_class()
+        required = set(getattr(form_cls, 'required_fields', []) or [])
+        field_names = (list(getattr(form_cls, 'required_fields', []) or [])
+                       + list(getattr(form_cls, 'optional_fields', []) or []))
+
+        for name in field_names:
+            if name in IMPORT_EXCLUDED_FIELDS:
+                continue
+            try:
+                field = model._meta.get_field(name)
+            except Exception:
+                fields_info.append({'name': name, 'required': name in required,
+                                    'accessor': '', 'description': '', 'choices': []})
+                continue
+
+            description = field.help_text or field.verbose_name or ''
+            description = str(description) if description else ''
+            is_relation = field.is_relation and field.many_to_one
+            accessor = ''
+            choices = []
+            if is_relation:
+                related_model = field.related_model
+                accessor = 'slug' if _model_has_concrete_field(related_model, 'slug') else 'name'
+                description = _("Relation to {model_name} (resolves by ID, Slug or Name).").format(
+                    model_name=str(related_model._meta.verbose_name)
+                )
+            if field.choices:
+                choices = [(val, label) for val, label in field.choices]
+            if isinstance(field, models.DateField):
+                description = f"{description} Format: YYYY-MM-DD"
+            elif isinstance(field, models.BooleanField):
+                description = f"{description} Specify true or false"
+
+            fields_info.append({
+                'name': name,
+                'required': name in required,
+                'accessor': accessor,
+                'description': description,
+                'choices': choices,
+            })
         return fields_info
 
     def _render_response(self, request, form, **extra_context):

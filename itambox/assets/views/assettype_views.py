@@ -108,7 +108,3 @@ class AssetTypeCloneView(ObjectCloneView):
     model_form = forms.AssetTypeForm
     template_name = 'generic/object_edit.html'
     default_return_url = 'assets:assettype_list'
-
-
-class AssetTypeImportView(ObjectImportView):
-    model_form = forms.AssetTypeBulkImportForm

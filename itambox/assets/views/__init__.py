@@ -1,6 +1,6 @@
 from .asset_views import (
     AssetListView, AssetDetailView, AssetEditView, AssetDeleteView,
-    AssetCloneView, AssetImportView, AssetBulkEditView, AssetBulkDeleteView,
+    AssetCloneView, AssetBulkEditView, AssetBulkDeleteView,
     AssetCheckoutView, AssetCheckinView, AssetAuditView, asset_label_print,
     bulk_assign_assets, bulk_print_labels,
 )
@@ -10,11 +10,11 @@ from .assetrole_views import (
 )
 from .manufacturer_views import (
     ManufacturerListView, ManufacturerDetailView, ManufacturerEditView,
-    ManufacturerDeleteView, ManufacturerImportView, ManufacturerCloneView,
+    ManufacturerDeleteView, ManufacturerCloneView,
 )
 from .assettype_views import (
     AssetTypeListView, AssetTypeDetailView, AssetTypeEditView, AssetTypeDeleteView,
-    AssetTypeCloneView, AssetTypeImportView,
+    AssetTypeCloneView,
 )
 from .statuslabel_views import (
     StatusLabelListView, StatusLabelDetailView, StatusLabelEditView, StatusLabelDeleteView,

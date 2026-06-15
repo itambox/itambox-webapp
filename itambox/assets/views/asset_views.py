@@ -499,10 +499,6 @@ def bulk_assign_assets(request):
     return HttpResponseRedirect(redirect_url)
 
 
-class AssetImportView(ObjectImportView):
-    model_form = forms.AssetBulkImportForm
-
-
 class AssetBulkEditView(ObjectBulkEditView):
     queryset = Asset.objects.all()
     form_class = forms.AssetBulkEditForm

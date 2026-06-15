@@ -12,7 +12,7 @@ from .sitegroup_views import (
 )
 from .location_views import (
     LocationListView, LocationDetailView, LocationEditView, LocationDeleteView,
-    LocationImportView, LocationBulkEditView, LocationBulkDeleteView, LocationCloneView,
+    LocationBulkEditView, LocationBulkDeleteView, LocationCloneView,
 )
 from .tenantgroup_views import (
     TenantGroupListView, TenantGroupDetailView, TenantGroupEditView, TenantGroupDeleteView,
@@ -23,7 +23,7 @@ from .tenant_views import (
 )
 from .assetholder_views import (
     AssetHolderListView, AssetHolderDetailView, AssetHolderEditView, AssetHolderDeleteView,
-    AssetHolderImportView, AssetHolderBulkEditView, AssetHolderBulkDeleteView,
+    AssetHolderBulkEditView, AssetHolderBulkDeleteView,
 )
 from .contact_views import (
     ContactListView, ContactDetailView, ContactEditView, ContactDeleteView, ContactBulkEditView, ContactBulkDeleteView,

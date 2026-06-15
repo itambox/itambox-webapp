@@ -14,7 +14,4 @@ urlpatterns = [
     path('<int:pk>/clone/', views.LicenseCloneView.as_view(), name='license_clone'),
     path('<int:pk>/checkout/', views.LicenseCheckoutView.as_view(), name='license_checkout'),
     path('assignments/<int:pk>/checkin/', views.LicenseCheckinView.as_view(), name='license_seat_checkin'),
-
-    # Import
-    path('import/', views.LicenseImportView.as_view(), name='license_import'),
 ]

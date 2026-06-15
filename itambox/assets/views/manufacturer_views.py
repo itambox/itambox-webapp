@@ -135,7 +135,3 @@ class ManufacturerDeleteView(ObjectDeleteView):
             return redirect(manufacturer.get_absolute_url())
 
         return super().post(request, *args, **kwargs)
-
-
-class ManufacturerImportView(ObjectImportView):
-    model_form = forms.ManufacturerBulkImportForm

@@ -93,10 +93,6 @@ urlpatterns = [
     path('contact-assignments/add/', views.ContactAssignmentCreateView.as_view(), name='contactassignment_create'),
     path('contact-assignments/<int:pk>/delete/', views.ContactAssignmentDeleteView.as_view(), name='contactassignment_delete'),
 
-    # Import URLs
-    path('locations/import/', views.LocationImportView.as_view(), name='location_import'),
-    path('asset-holders/import/', views.AssetHolderImportView.as_view(), name='assetholder_import'),
-
     # Tenant Roles
     path('roles/', views.TenantRoleListView.as_view(), name='tenantrole_list'),
     path('roles/add/', views.TenantRoleEditView.as_view(), name='tenantrole_create'),
