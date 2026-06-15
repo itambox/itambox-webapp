@@ -76,7 +76,12 @@ class SiteForm(forms.ModelForm):
                 Column('tenant', css_class='form-group col-md-4 mb-0'),
                 css_class='mb-3'
             ),
-            'facility', 'time_zone', 'description',
+            Row(
+                Column('facility', css_class='form-group col-md-6 mb-0'),
+                Column('time_zone', css_class='form-group col-md-6 mb-0'),
+                css_class='mb-3'
+            ),
+            'description',
             'physical_address', 'shipping_address',
             Row(
                 Column('latitude', css_class='form-group col-md-6 mb-0'),

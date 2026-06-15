@@ -1,6 +1,6 @@
 from django import forms
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout
+from crispy_forms.layout import Layout, Div
 
 from core.forms import FilterForm
 from extras.models import Tag
@@ -30,7 +30,7 @@ class LocationForm(CustomFieldModelFormMixin, forms.ModelForm):
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
         required=False,
-        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
+        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
     )
 
     class Meta:
@@ -57,8 +57,24 @@ class LocationForm(CustomFieldModelFormMixin, forms.ModelForm):
         self.helper.form_method = 'post'
         self.helper.form_tag = True
         self.helper.layout = Layout(
-            'site', 'name', 'slug', 'status', 'parent', 'tenant',
-            'facility', 'description', 'tags'
+            Div(
+                Div('site', css_class='col-md-6'),
+                Div('name', css_class='col-md-6'),
+                css_class='row'
+            ),
+            Div(
+                Div('slug', css_class='col-md-4'),
+                Div('status', css_class='col-md-4'),
+                Div('parent', css_class='col-md-4'),
+                css_class='row'
+            ),
+            Div(
+                Div('tenant', css_class='col-md-6'),
+                Div('facility', css_class='col-md-6'),
+                css_class='row'
+            ),
+            'description',
+            'tags',
         )
         self.append_custom_fields_to_layout()
         from .helpers import add_standard_buttons

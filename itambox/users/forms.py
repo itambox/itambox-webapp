@@ -13,7 +13,7 @@ from django.conf import settings # Import settings
 logger = logging.getLogger(__name__)
 User = get_user_model()
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout
+from crispy_forms.layout import Layout, Row, Column, Fieldset, Submit, HTML
 
 class UserProfileForm(forms.ModelForm):
     class Meta:
@@ -60,7 +60,26 @@ class UserForm(forms.ModelForm):
         self.helper.form_method = 'post'
         self.helper.form_tag = True
         self.helper.layout = Layout(
-            'username', 'password', 'first_name', 'last_name', 'email', 'is_active', 'is_staff', 'is_superuser'
+            Row(
+                Column('username', css_class='col-md-8'),
+                Column('is_active', css_class='col-md-4'),
+                css_class='row g-3',
+            ),
+            'password',
+            Row(
+                Column('first_name', css_class='col-md-6'),
+                Column('last_name', css_class='col-md-6'),
+                css_class='row g-3',
+            ),
+            'email',
+            Fieldset(
+                _('Permissions'),
+                Row(
+                    Column('is_staff', css_class='col-md-6'),
+                    Column('is_superuser', css_class='col-md-6'),
+                    css_class='row g-3',
+                ),
+            ),
         )
         from organization.forms.helpers import add_standard_buttons
         add_standard_buttons(self.helper, self.instance, 'users:user_list')
@@ -298,6 +317,23 @@ class TokenForm(forms.ModelForm):
             'description': forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('e.g., Personal Laptop API Access')}),
             'write_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # form_tag=False because the surrounding template already provides <form> and the
+        # CSRF token; setting it here prevents a nested <form> element being rendered.
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = False
+        self.helper.layout = Layout(
+            Row(
+                Column('write_enabled', css_class='col-md-6'),
+                Column('expires', css_class='col-md-6'),
+                css_class='row g-3',
+            ),
+            'description',
+            'allowed_ips',
+        )
 
     def clean_allowed_ips(self):
         import ipaddress

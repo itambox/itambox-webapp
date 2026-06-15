@@ -1,8 +1,9 @@
 from django import forms
+from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, HTML, Div, Row, Column
+from crispy_forms.layout import Layout, Submit, HTML, Div, Row, Column, Fieldset
 from django.urls import reverse
-from core.forms import FilterForm
+from core.forms import FilterForm, CrispyFormMixin
 from organization.models import Tenant, TenantGroup, AssetHolder, Location, CostCenter
 from assets.models import Asset
 from django.db import models as db_models
@@ -12,18 +13,18 @@ from .filters import SubscriptionFilterSet, ProviderFilterSet
 
 from extras.customfields import CustomFieldModelFormMixin
 
-class ProviderForm(forms.ModelForm):
+class ProviderForm(CrispyFormMixin, forms.ModelForm):
     tenant = forms.ModelChoiceField(
         queryset=Tenant.objects.all(),
         required=False,
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Tenant"
+        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+        label=_("Tenant"),
     )
     tenant_group = forms.ModelChoiceField(
         queryset=TenantGroup.objects.all(),
         required=False,
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Tenant Group"
+        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+        label=_("Tenant Group"),
     )
 
     class Meta:
@@ -33,73 +34,97 @@ class ProviderForm(forms.ModelForm):
         )
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'slug': forms.TextInput(attrs={'class': 'form-control'}),
+            'slug': forms.TextInput(attrs={'class': 'form-control',
+                                          'data-slug-help': ''}),
             'account_id': forms.TextInput(attrs={'class': 'form-control'}),
             'portal_url': forms.URLInput(attrs={'class': 'form-control'}),
             'admin_notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
-            'tags': forms.SelectMultiple(attrs={'class': 'form-select'}),
+            'tags': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
         }
+        help_texts = {
+            'slug': _("Changing the slug may break existing import references that use it as a natural key."),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        tenant = cleaned_data.get('tenant')
+        tenant_group = cleaned_data.get('tenant_group')
+        if tenant and tenant_group:
+            raise forms.ValidationError(
+                _("A provider may be scoped to a Tenant or a Tenant Group, but not both.")
+            )
+        return cleaned_data
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.helper = FormHelper(self)
-        self.helper.form_method = 'post'
-        self.helper.form_tag = True
 
-        button_text = 'Update' if self.instance.pk else 'Create'
         cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse('subscriptions:provider_list')
 
         self.helper.layout = Layout(
-            Row(
-                Column('name', css_class='col-md-6'),
-                Column('slug', css_class='col-md-6'),
+            Fieldset(
+                _('Identity'),
+                Div(
+                    Div('name', css_class='col-md-6'),
+                    Div('slug', css_class='col-md-6'),
+                    css_class='row',
+                ),
+                Div(
+                    Div('portal_url', css_class='col-md-12'),
+                    css_class='row',
+                ),
             ),
-            Row(
-                Column('portal_url', css_class='col-md-12'),
+            Fieldset(
+                _('Scope'),
+                Div(
+                    Div('account_id', css_class='col-md-4'),
+                    Div('tenant', css_class='col-md-4'),
+                    Div('tenant_group', css_class='col-md-4'),
+                    css_class='row',
+                ),
+                Div(
+                    Div('is_active', css_class='col-md-4'),
+                    css_class='row',
+                ),
             ),
-            Row(
-                Column('account_id', css_class='col-md-3'),
-                Column('tenant', css_class='col-md-3'),
-                Column('tenant_group', css_class='col-md-3'),
-                Column('is_active', css_class='col-md-3'),
+            Fieldset(
+                _('Notes & Tags'),
+                'admin_notes',
+                'tags',
             ),
-            'admin_notes',
-            'tags',
-            HTML('<div class="mt-3 d-flex justify-content-between">'),
-            Submit('submit', button_text, css_class='btn btn-primary'),
-            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary">Cancel</a>'),
-            HTML('</div>')
+            *self.action_buttons(cancel_url),
         )
 
 
-class SubscriptionForm(CustomFieldModelFormMixin, forms.ModelForm):
+class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelForm):
     tenant = forms.ModelChoiceField(
         queryset=Tenant.objects.all(),
         required=False,
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Tenant"
+        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+        label=_("Tenant"),
     )
     cost_center = forms.ModelChoiceField(
         queryset=CostCenter.objects.all(),
         required=False,
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Cost Center",
+        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+        label=_("Cost Center"),
     )
 
     class Meta:
         model = Subscription
         fields = (
             'name', 'slug', 'provider', 'type', 'status',
-            'start_date', 'renewal_date', 'renewal_cost', 'currency',
-            'billing_cycle', 'term_months', 'auto_renewal',
+            'start_date', 'renewal_date', 'term_months',
+            'renewal_cost', 'currency', 'billing_cycle',
             'licensed_quantity', 'contract_reference', 'cost_center',
-            'cancellation_date', 'owner', 'description', 'notes',
+            'cancellation_date', 'owner',
+            'auto_renewal',
+            'description', 'notes',
             'tags', 'tenant',
         )
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'slug': forms.TextInput(attrs={'class': 'form-control'}),
-            'provider': forms.Select(attrs={'class': 'form-select'}),
+            'provider': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
             'type': forms.Select(attrs={'class': 'form-select'}),
             'status': forms.Select(attrs={'class': 'form-select'}),
             'start_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
@@ -111,59 +136,85 @@ class SubscriptionForm(CustomFieldModelFormMixin, forms.ModelForm):
             'licensed_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
             'contract_reference': forms.TextInput(attrs={'class': 'form-control'}),
             'cancellation_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'owner': forms.Select(attrs={'class': 'form-select'}),
+            'owner': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
-            'tags': forms.SelectMultiple(attrs={'class': 'form-select'}),
+            'tags': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
+        }
+        help_texts = {
+            'slug': _("Changing the slug may break existing import references that use it as a natural key."),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.helper = FormHelper(self)
-        self.helper.form_method = 'post'
-        self.helper.form_tag = True
 
-        button_text = 'Update' if self.instance.pk else 'Create'
         cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse('subscriptions:subscription_list')
 
         self.helper.layout = Layout(
-            Row(
-                Column('name', css_class='col-md-6'),
-                Column('slug', css_class='col-md-6'),
+            Fieldset(
+                _('Identity'),
+                Div(
+                    Div('name', css_class='col-md-6'),
+                    Div('slug', css_class='col-md-6'),
+                    css_class='row',
+                ),
+                Div(
+                    Div('provider', css_class='col-md-6'),
+                    Div('type', css_class='col-md-3'),
+                    Div('status', css_class='col-md-3'),
+                    css_class='row',
+                ),
             ),
-            Row(
-                Column('provider', css_class='col-md-6'),
-                Column('type', css_class='col-md-3'),
-                Column('status', css_class='col-md-3'),
+            Fieldset(
+                _('Dates & Term'),
+                Div(
+                    Div('start_date', css_class='col-md-4'),
+                    Div('renewal_date', css_class='col-md-4'),
+                    Div('term_months', css_class='col-md-4'),
+                    css_class='row',
+                ),
+                Div(
+                    Div('cancellation_date', css_class='col-md-4'),
+                    css_class='row',
+                ),
             ),
-            Row(
-                Column('start_date', css_class='col-md-4'),
-                Column('renewal_date', css_class='col-md-4'),
-                Column('term_months', css_class='col-md-4'),
+            Fieldset(
+                _('Financial'),
+                Div(
+                    Div('renewal_cost', css_class='col-md-4'),
+                    Div('currency', css_class='col-md-3'),
+                    Div('billing_cycle', css_class='col-md-5'),
+                    css_class='row',
+                ),
+                Div(
+                    Div('licensed_quantity', css_class='col-md-4'),
+                    Div('contract_reference', css_class='col-md-4'),
+                    Div('cost_center', css_class='col-md-4'),
+                    css_class='row',
+                ),
             ),
-            Row(
-                Column('renewal_cost', css_class='col-md-3'),
-                Column('currency', css_class='col-md-2'),
-                Column('billing_cycle', css_class='col-md-3'),
-                Column('auto_renewal', css_class='col-md-4'),
+            Fieldset(
+                _('Policy'),
+                Div(
+                    Div('auto_renewal', css_class='col-md-6'),
+                    css_class='row',
+                ),
             ),
-            Row(
-                Column('licensed_quantity', css_class='col-md-4'),
-                Column('contract_reference', css_class='col-md-4'),
-                Column('cost_center', css_class='col-md-4'),
+            Fieldset(
+                _('Scope'),
+                Div(
+                    Div('owner', css_class='col-md-6'),
+                    Div('tenant', css_class='col-md-6'),
+                    css_class='row',
+                ),
             ),
-            Row(
-                Column('cancellation_date', css_class='col-md-4'),
-                Column('owner', css_class='col-md-4'),
-                Column('tenant', css_class='col-md-4'),
+            Fieldset(
+                _('Notes & Tags'),
+                'description',
+                'notes',
+                'tags',
             ),
-            'description',
-            'notes',
-            'tags',
-            HTML('<div class="mt-3 d-flex justify-content-between">'),
-            Submit('submit', button_text, css_class='btn btn-primary'),
-            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary">Cancel</a>'),
-            HTML('</div>')
+            *self.action_buttons(cancel_url),
         )
         self.append_custom_fields_to_layout()
 

@@ -1,7 +1,7 @@
 from django import forms
 from django.urls import reverse
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, HTML
+from crispy_forms.layout import Layout, Submit, HTML, Div
 
 from core.forms import SlugModelForm
 from extras.models import Tag
@@ -36,8 +36,11 @@ class ManufacturerForm(SlugModelForm):
 
         button_text = 'Update' if self.instance and self.instance.pk else 'Create'
         self.helper.layout = Layout(
-            'name',
-            'slug',
+            Div(
+                Div('name', css_class='col-md-6'),
+                Div('slug', css_class='col-md-6'),
+                css_class='row',
+            ),
             'description',
             'tags',
             HTML('<div class="mt-4">'),

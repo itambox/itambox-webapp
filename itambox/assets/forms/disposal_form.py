@@ -2,7 +2,7 @@ from django import forms
 from django.urls import reverse
 
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, HTML, Row, Div
+from crispy_forms.layout import Layout, Submit, HTML, Row, Div, Fieldset
 
 from assets.models import AssetDisposal
 
@@ -56,27 +56,39 @@ class AssetDisposalForm(forms.ModelForm):
             cancel_url = '/'
 
         self.helper.layout = Layout(
-            Div(
-                Div('asset', css_class='col-md-6'),
-                Div('disposal_date', css_class='col-md-6'),
-                css_class='row',
+            Fieldset(
+                'Disposal Details',
+                Div(
+                    Div('asset', css_class='col-md-6'),
+                    Div('disposal_date', css_class='col-md-6'),
+                    css_class='row',
+                ),
+                Div(
+                    Div('disposal_method', css_class='col-md-6'),
+                    Div('recipient', css_class='col-md-6'),
+                    css_class='row',
+                ),
             ),
-            Div(
-                Div('disposal_method', css_class='col-md-6'),
-                Div('recipient', css_class='col-md-6'),
-                css_class='row',
+            Fieldset(
+                'Data Sanitization & Compliance',
+                Div(
+                    Div('data_sanitization_method', css_class='col-md-4'),
+                    Div('sanitized_by', css_class='col-md-4'),
+                    Div('sanitization_certificate', css_class='col-md-4'),
+                    css_class='row',
+                ),
+                Div(
+                    Div('weee_compliant', css_class='col-md-4 d-flex align-items-end pb-2'),
+                    css_class='row',
+                ),
             ),
-            Div(
-                Div('data_sanitization_method', css_class='col-md-4'),
-                Div('sanitized_by', css_class='col-md-4'),
-                Div('sanitization_certificate', css_class='col-md-4'),
-                css_class='row',
-            ),
-            Div(
-                Div('proceeds', css_class='col-md-4'),
-                Div('currency', css_class='col-md-2'),
-                Div('weee_compliant', css_class='col-md-3 d-flex align-items-end pb-2'),
-                css_class='row',
+            Fieldset(
+                'Financial',
+                Div(
+                    Div('proceeds', css_class='col-md-4'),
+                    Div('currency', css_class='col-md-4'),
+                    css_class='row',
+                ),
             ),
             'notes',
             HTML('<div class="mt-3">'),

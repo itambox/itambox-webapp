@@ -1,7 +1,7 @@
 from django import forms
 from django.urls import reverse
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, HTML
+from crispy_forms.layout import Layout, Submit, HTML, Div
 
 from ..models import AssetTagSequence
 
@@ -29,11 +29,17 @@ class AssetTagSequenceForm(forms.ModelForm):
         cancel_url = reverse('assets:assettagsequence_list')
 
         self.helper.layout = Layout(
-            'prefix',
-            'next_value',
-            'zero_padding',
-            'tenant',
-            'category',
+            Div(
+                Div('prefix', css_class='col-md-6'),
+                Div('next_value', css_class='col-md-3'),
+                Div('zero_padding', css_class='col-md-3'),
+                css_class='row',
+            ),
+            Div(
+                Div('tenant', css_class='col-md-6'),
+                Div('category', css_class='col-md-6'),
+                css_class='row',
+            ),
             'is_active',
             HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),

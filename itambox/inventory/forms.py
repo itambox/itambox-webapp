@@ -7,7 +7,7 @@ from crispy_forms.layout import Layout, Submit, HTML, Row, Column, Div
 from core.forms import SlugModelForm, FilterForm
 from extras.models import Tag
 from organization.models import Location, AssetHolder, Tenant
-from assets.models import Manufacturer, Category, Asset
+from assets.models import Manufacturer, Category, Asset, Supplier
 from .models import Accessory, Consumable, Kit, KitItem, AccessoryStock, ConsumableStock, Component, ComponentStock, ComponentAllocation
 
 
@@ -24,6 +24,12 @@ class AccessoryForm(CustomFieldModelFormMixin, SlugModelForm):
         widget=forms.Select(attrs={'class': 'form-select'}),
         label="Category"
     )
+    supplier = forms.ModelChoiceField(
+        queryset=Supplier.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+        label="Supplier"
+    )
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
         required=False,
@@ -33,7 +39,7 @@ class AccessoryForm(CustomFieldModelFormMixin, SlugModelForm):
 
     class Meta:
         model = Accessory
-        fields = ['manufacturer', 'name', 'slug', 'category', 'part_number', 'min_qty', 'allow_overallocate', 'notes', 'tags', 'tenant']
+        fields = ['manufacturer', 'name', 'slug', 'category', 'supplier', 'part_number', 'min_qty', 'allow_overallocate', 'notes', 'tags', 'tenant']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'slug': forms.TextInput(attrs={'class': 'form-control', 'slugify': 'name'}),
@@ -49,33 +55,34 @@ class AccessoryForm(CustomFieldModelFormMixin, SlugModelForm):
         self.helper.form_method = 'post'
         self.helper.form_tag = True
         self.fields['slug'].widget.attrs['slugify'] = 'name'
-        
+
         button_text = 'Update' if self.instance.pk else 'Create'
         cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse('inventory:accessory_list')
-        
+
         self.helper.layout = Layout(
             Row(
                 Column('manufacturer', css_class='col-md-6'),
                 Column('name', css_class='col-md-6')
             ),
             Row(
-                Column('slug', css_class='col-md-6'),
+                Column('supplier', css_class='col-md-6'),
                 Column('part_number', css_class='col-md-6')
             ),
             Row(
-                Column('category', css_class='col-md-4'),
-                Column('min_qty', css_class='col-md-4'),
-                Column('tenant', css_class='col-md-4')
+                Column('slug', css_class='col-md-6'),
+                Column('category', css_class='col-md-6')
+            ),
+            Row(
+                Column('min_qty', css_class='col-md-6'),
+                Column('tenant', css_class='col-md-6')
+            ),
+            Row(
+                Column('allow_overallocate', css_class='col-md-6')
             ),
             Row(
                 Column('tags', css_class='col-md-12')
             ),
-            Div(
-                'allow_overallocate',
-                css_class='mb-3 form-check'
-            ),
             'notes',
-            'tags',
             HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
@@ -95,6 +102,12 @@ class ConsumableForm(CustomFieldModelFormMixin, SlugModelForm):
         widget=forms.Select(attrs={'class': 'form-select'}),
         label="Category"
     )
+    supplier = forms.ModelChoiceField(
+        queryset=Supplier.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+        label="Supplier"
+    )
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
         required=False,
@@ -104,7 +117,7 @@ class ConsumableForm(CustomFieldModelFormMixin, SlugModelForm):
 
     class Meta:
         model = Consumable
-        fields = ['manufacturer', 'name', 'slug', 'category', 'part_number', 'min_qty', 'allow_overallocate', 'notes', 'tags', 'tenant']
+        fields = ['manufacturer', 'name', 'slug', 'category', 'supplier', 'part_number', 'min_qty', 'allow_overallocate', 'notes', 'tags', 'tenant']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'slug': forms.TextInput(attrs={'class': 'form-control', 'slugify': 'name'}),
@@ -120,33 +133,34 @@ class ConsumableForm(CustomFieldModelFormMixin, SlugModelForm):
         self.helper.form_method = 'post'
         self.helper.form_tag = True
         self.fields['slug'].widget.attrs['slugify'] = 'name'
-        
+
         button_text = 'Update' if self.instance.pk else 'Create'
         cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse('inventory:consumable_list')
-        
+
         self.helper.layout = Layout(
             Row(
                 Column('manufacturer', css_class='col-md-6'),
                 Column('name', css_class='col-md-6')
             ),
             Row(
-                Column('slug', css_class='col-md-6'),
+                Column('supplier', css_class='col-md-6'),
                 Column('part_number', css_class='col-md-6')
             ),
             Row(
-                Column('category', css_class='col-md-4'),
-                Column('min_qty', css_class='col-md-4'),
-                Column('tenant', css_class='col-md-4')
+                Column('slug', css_class='col-md-6'),
+                Column('category', css_class='col-md-6')
+            ),
+            Row(
+                Column('min_qty', css_class='col-md-6'),
+                Column('tenant', css_class='col-md-6')
+            ),
+            Row(
+                Column('allow_overallocate', css_class='col-md-6')
             ),
             Row(
                 Column('tags', css_class='col-md-12')
             ),
-            Div(
-                'allow_overallocate',
-                css_class='mb-3 form-check'
-            ),
             'notes',
-            'tags',
             HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
@@ -509,6 +523,12 @@ class ComponentForm(CustomFieldModelFormMixin, SlugModelForm):
         widget=forms.Select(attrs={'class': 'form-select'}),
         label="Category"
     )
+    supplier = forms.ModelChoiceField(
+        queryset=Supplier.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+        label="Supplier"
+    )
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
         required=False,
@@ -518,7 +538,7 @@ class ComponentForm(CustomFieldModelFormMixin, SlugModelForm):
 
     class Meta:
         model = Component
-        fields = ['manufacturer', 'name', 'slug', 'category', 'part_number', 'min_qty', 'allow_overallocate', 'notes', 'tags', 'tenant']
+        fields = ['manufacturer', 'name', 'slug', 'category', 'supplier', 'part_number', 'min_qty', 'allow_overallocate', 'notes', 'tags', 'tenant']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'slug': forms.TextInput(attrs={'class': 'form-control', 'slugify': 'name'}),
@@ -534,30 +554,32 @@ class ComponentForm(CustomFieldModelFormMixin, SlugModelForm):
         self.helper.form_method = 'post'
         self.helper.form_tag = True
         self.fields['slug'].widget.attrs['slugify'] = 'name'
-        
+
         button_text = 'Update' if self.instance.pk else 'Create'
         cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse('inventory:inventory_list') + '?type=components'
-        
+
         self.helper.layout = Layout(
             Row(
                 Column('manufacturer', css_class='col-md-6'),
                 Column('name', css_class='col-md-6')
             ),
             Row(
-                Column('slug', css_class='col-md-6'),
+                Column('supplier', css_class='col-md-6'),
                 Column('part_number', css_class='col-md-6')
             ),
             Row(
-                Column('category', css_class='col-md-4'),
-                Column('min_qty', css_class='col-md-4'),
-                Column('tenant', css_class='col-md-4')
+                Column('slug', css_class='col-md-6'),
+                Column('category', css_class='col-md-6')
+            ),
+            Row(
+                Column('min_qty', css_class='col-md-6'),
+                Column('tenant', css_class='col-md-6')
+            ),
+            Row(
+                Column('allow_overallocate', css_class='col-md-6')
             ),
             Row(
                 Column('tags', css_class='col-md-12')
-            ),
-            Div(
-                'allow_overallocate',
-                css_class='mb-3 form-check'
             ),
             'notes',
             HTML('<div class="mt-3">'),

@@ -2,7 +2,7 @@ from django import forms
 from django.urls import reverse
 
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, HTML, Div
+from crispy_forms.layout import Layout, Submit, HTML, Div, Fieldset
 
 from assets.models import Warranty
 
@@ -55,27 +55,33 @@ class WarrantyForm(forms.ModelForm):
             cancel_url = '/'
 
         self.helper.layout = Layout(
-            Div(
-                Div('asset', css_class='col-md-6'),
-                Div('warranty_type', css_class='col-md-6'),
-                css_class='row',
+            Fieldset(
+                'Warranty Details',
+                Div(
+                    Div('asset', css_class='col-md-6'),
+                    Div('warranty_type', css_class='col-md-6'),
+                    css_class='row',
+                ),
+                Div(
+                    Div('provider', css_class='col-md-6'),
+                    Div('reference', css_class='col-md-6'),
+                    css_class='row',
+                ),
+                Div(
+                    Div('start_date', css_class='col-md-4'),
+                    Div('end_date', css_class='col-md-4'),
+                    css_class='row',
+                ),
+                'terms',
             ),
-            Div(
-                Div('provider', css_class='col-md-6'),
-                Div('reference', css_class='col-md-6'),
-                css_class='row',
+            Fieldset(
+                'Financial',
+                Div(
+                    Div('cost', css_class='col-md-4'),
+                    Div('currency', css_class='col-md-4'),
+                    css_class='row',
+                ),
             ),
-            Div(
-                Div('start_date', css_class='col-md-4'),
-                Div('end_date', css_class='col-md-4'),
-                css_class='row',
-            ),
-            Div(
-                Div('cost', css_class='col-md-4'),
-                Div('currency', css_class='col-md-2'),
-                css_class='row',
-            ),
-            'terms',
             'notes',
             HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),

@@ -2,38 +2,54 @@ from django import forms
 from django.utils.translation import gettext_lazy as _
 from software.models import Software
 from extras.models import Tag
-from core.forms import FilterForm
+from core.forms import FilterForm, CrispyFormMixin
 from .filters import LicenseFilterSet
 from .models import License, LicenseSeatAssignment
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, HTML, Div
+from crispy_forms.layout import Layout, Fieldset, Div, Row, Column
 from django.urls import reverse
-from assets.models import Asset
+from assets.models import Asset, Supplier
 from organization.models import AssetHolder
 
 from extras.customfields import CustomFieldModelFormMixin
 
-class LicenseForm(CustomFieldModelFormMixin, forms.ModelForm):
+class LicenseForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelForm):
     """Form for creating and updating License entitlements."""
     software = forms.ModelChoiceField(
         queryset=Software.objects.all(),
-        label=_("Software Catalog Item")
+        label=_("Software Catalog Item"),
+        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+    )
+    supplier = forms.ModelChoiceField(
+        queryset=Supplier.objects.all(),
+        required=False,
+        label=_("Supplier"),
+        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
     )
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
         required=False,
-        widget=forms.SelectMultiple(attrs={'class': 'form-select'})
+        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
     )
 
     class Meta:
         model = License
-        fields = ('name', 'software', 'license_type', 'product_key', 'seats', 'purchase_date', 'purchase_cost', 'currency', 'order_number', 'version', 'subscription', 'cost_center', 'expiration_date', 'notes', 'tags', 'tenant')
+        fields = ('name', 'license_type', 'software', 'version', 'seats', 'product_key', 'order_number', 'supplier', 'purchase_date', 'purchase_cost', 'currency', 'subscription', 'cost_center', 'expiration_date', 'tenant', 'notes', 'tags')
         widgets = {
-            'product_key': forms.Textarea(attrs={'rows': 2}),
-            'purchase_date': forms.DateInput(attrs={'type': 'date'}),
-            'expiration_date': forms.DateInput(attrs={'type': 'date'}),
-            'subscription': forms.Select(attrs={'class': 'form-select'}),
-            'notes': forms.Textarea(attrs={'rows': 3}),
+            'product_key': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'purchase_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'expiration_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'subscription': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+            'cost_center': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'tenant': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+            'license_type': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'version': forms.TextInput(attrs={'class': 'form-control'}),
+            'seats': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+            'order_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'purchase_cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'currency': forms.TextInput(attrs={'class': 'form-control', 'maxlength': 3}),
         }
         help_texts = {
             'name': _("Unique renewal or purchase name (e.g., Office 365 E5 Enterprise Renewal FY26)"),
@@ -45,41 +61,76 @@ class LicenseForm(CustomFieldModelFormMixin, forms.ModelForm):
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.pk:
             self.fields['product_key'].initial = self.instance.decrypted_product_key
-        self.helper = FormHelper(self)
-        self.helper.form_method = 'post'
-        self.helper.form_tag = True
 
         if self.instance and self.instance.pk:
-            button_text = _('Update')
             cancel_url = self.instance.get_absolute_url()
         else:
-            button_text = _('Create')
             cancel_url = reverse('licenses:license_list')
 
         self.helper.layout = Layout(
-            Div(
-                'name',
-                'software',
-                'license_type',
-                'product_key',
-                'seats',
-                'purchase_date',
-                'purchase_cost',
-                'currency',
-                'order_number',
-                'version',
-                'subscription',
-                'cost_center',
-                'expiration_date',
-                'tenant',
+            Fieldset(
+                _('Identity'),
+                Div(
+                    Div('name', css_class='col-md-6'),
+                    Div('license_type', css_class='col-md-6'),
+                    css_class='row',
+                ),
+                Div(
+                    Div('software', css_class='col-md-6'),
+                    Div('version', css_class='col-md-6'),
+                    css_class='row',
+                ),
+            ),
+            Fieldset(
+                _('Entitlement'),
+                Div(
+                    Div('seats', css_class='col-md-6'),
+                    Div('product_key', css_class='col-md-6'),
+                    css_class='row',
+                ),
+            ),
+            Fieldset(
+                _('Procurement & Financial'),
+                Div(
+                    Div('order_number', css_class='col-md-4'),
+                    Div('supplier', css_class='col-md-4'),
+                    Div('purchase_date', css_class='col-md-4'),
+                    css_class='row',
+                ),
+                Div(
+                    Div('purchase_cost', css_class='col-md-4'),
+                    Div('currency', css_class='col-md-4'),
+                    css_class='row',
+                ),
+            ),
+            Fieldset(
+                _('Funding'),
+                Div(
+                    Div('subscription', css_class='col-md-6'),
+                    Div('cost_center', css_class='col-md-6'),
+                    css_class='row',
+                ),
+            ),
+            Fieldset(
+                _('Lifecycle'),
+                Div(
+                    Div('expiration_date', css_class='col-md-6'),
+                    css_class='row',
+                ),
+            ),
+            Fieldset(
+                _('Scope'),
+                Div(
+                    Div('tenant', css_class='col-md-6'),
+                    css_class='row',
+                ),
+            ),
+            Fieldset(
+                _('Notes & Tags'),
                 'notes',
                 'tags',
-                css_class='mb-3'
             ),
-            HTML('<div class="mt-3 d-flex justify-content-between">'),
-            Submit('submit', button_text, css_class='btn btn-primary'),
-            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary">{_("Cancel")}</a>'),
-            HTML('</div>')
+            *self.action_buttons(cancel_url),
         )
         self.append_custom_fields_to_layout()
 

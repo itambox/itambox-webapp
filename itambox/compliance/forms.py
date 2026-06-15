@@ -1,7 +1,7 @@
 from django import forms
 from django.urls import reverse
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, HTML, Row, Column
+from crispy_forms.layout import Layout, Submit, HTML, Row, Column, Fieldset
 from core.forms import FilterForm
 from assets.models import Asset, Supplier, Category, AssetMaintenance
 
@@ -46,7 +46,7 @@ class AssetMaintenanceForm(forms.ModelForm):
         fields = [
             'asset', 'title', 'supplier', 'maintenance_type', 'status',
             'cost', 'currency', 'start_date', 'completion_date', 'performed_by',
-            'description', 'notes'
+            'description', 'notes', 'tags'
         ]
         widgets = {
             'title': forms.TextInput(attrs={'class': 'form-control'}),
@@ -55,6 +55,7 @@ class AssetMaintenanceForm(forms.ModelForm):
             'currency': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'tags': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -89,6 +90,7 @@ class AssetMaintenanceForm(forms.ModelForm):
             ),
             'description',
             'notes',
+            'tags',
             HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
@@ -128,7 +130,7 @@ class CustodyTemplateForm(forms.ModelForm):
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
         required=False,
-        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
+        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
         label="Tags"
     )
 
@@ -165,22 +167,29 @@ class CustodyTemplateForm(forms.ModelForm):
             Row(
                 Column('tenant', css_class='col-md-4'),
                 Column('tenant_group', css_class='col-md-4'),
-                Column('name', css_class='col-md-4')
+                Column('name', css_class='col-md-4'),
+                css_class='row g-3',
             ),
             Row(
                 Column('category', css_class='col-md-6'),
                 Column('signature_provider', css_class='col-md-6'),
+                css_class='row g-3',
             ),
             Row(
-                Column('qms_reference', css_class='col-md-6')
+                Column('qms_reference', css_class='col-md-6'),
+                Column('is_active', css_class='col-md-6 mt-2'),
+                css_class='row g-3',
             ),
             'logo',
-            'eula_text',
-            'disclaimer',
+            Fieldset(
+                'Content',
+                'eula_text',
+                'disclaimer',
+            ),
             Row(
-                Column('require_acceptance', css_class='col-md-4 mt-2'),
-                Column('email_signature_request', css_class='col-md-4 mt-2'),
-                Column('is_active', css_class='col-md-4 mt-2')
+                Column('require_acceptance', css_class='col-md-6 mt-2'),
+                Column('email_signature_request', css_class='col-md-6 mt-2'),
+                css_class='row g-3',
             ),
             'tags',
             HTML('<div class="mt-3">'),

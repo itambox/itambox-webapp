@@ -1,16 +1,15 @@
-import re
 from django import forms
 from .models import Tag, CustomField, CustomFieldset, ConfigContext
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, HTML, Div, Field
+from crispy_forms.layout import Layout, Submit, HTML, Div, Field, Fieldset, Row, Column
 from django.urls import reverse
-from core.forms import FilterForm
+from core.forms import FilterForm, ColorFieldFormMixin
 from .filters import TagFilter
 
-class TagForm(forms.ModelForm):
-    # Explicitly define color field to allow '#' prefix initially
+class TagForm(ColorFieldFormMixin, forms.ModelForm):
+    # color is handled by ColorFieldFormMixin (prepends '#' on init, strips on clean)
     color = forms.CharField(
-        max_length=7, # Allow 7 chars initially (#aabbcc)
+        max_length=7,
         required=False,
         widget=forms.TextInput(attrs={'type': 'color', 'class': 'form-control form-control-color'})
     )
@@ -21,7 +20,6 @@ class TagForm(forms.ModelForm):
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'slug': forms.TextInput(attrs={'class': 'form-control'}),
-            'color': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '00ff00'}),
             'description': forms.TextInput(attrs={'class': 'form-control'}),
         }
         help_texts = {
@@ -46,27 +44,6 @@ class TagForm(forms.ModelForm):
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
             HTML('</div>')
         )
-
-    def clean_color(self):
-        color = self.cleaned_data.get('color')
-        if color and color.startswith('#'):
-            cleaned_color = color[1:]
-            if len(cleaned_color) == 6:
-                if not re.match(r'^[0-9a-fA-F]{6}$', cleaned_color):
-                    raise forms.ValidationError("Enter a valid 6-character hex color code (without '#').")
-                return cleaned_color
-            else:
-                raise forms.ValidationError("Ensure the color hex code is 6 characters long (after removing '#').")
-        elif not color:
-            return ''
-        if len(color) == 6:
-            if not re.match(r'^[0-9a-fA-F]{6}$', color):
-                raise forms.ValidationError("Enter a valid 6-character hex color code.")
-            return color
-        elif len(color) == 0:
-            return ''
-        else:
-             raise forms.ValidationError("Ensure the color hex code is 6 characters long.")
 
 # --- Tag Filter Form --- 
 class TagFilterForm(FilterForm):
@@ -180,10 +157,10 @@ class ConfigContextForm(forms.ModelForm):
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'weight': forms.NumberInput(attrs={'class': 'form-control'}),
-            'regions': forms.SelectMultiple(attrs={'class': 'form-select'}),
-            'sites': forms.SelectMultiple(attrs={'class': 'form-select'}),
-            'locations': forms.SelectMultiple(attrs={'class': 'form-select'}),
-            'tenants': forms.SelectMultiple(attrs={'class': 'form-select'}),
+            'regions': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
+            'sites': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
+            'locations': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
+            'tenants': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -202,11 +179,23 @@ class ConfigContextForm(forms.ModelForm):
             'name',
             'description',
             'weight',
-            'regions',
-            'sites',
-            'locations',
-            'tenants',
-            'data',
+            Fieldset(
+                'Scope (optional)',
+                Row(
+                    Column('regions', css_class='col-md-6'),
+                    Column('sites', css_class='col-md-6'),
+                    css_class='row g-3',
+                ),
+                Row(
+                    Column('locations', css_class='col-md-6'),
+                    Column('tenants', css_class='col-md-6'),
+                    css_class='row g-3',
+                ),
+            ),
+            Fieldset(
+                'Configuration Data',
+                'data',
+            ),
             HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),

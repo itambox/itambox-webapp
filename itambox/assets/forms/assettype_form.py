@@ -42,7 +42,7 @@ class AssetTypeForm(SlugModelForm):
             'category': forms.Select(attrs={'class': 'form-select'}),
             'custom_fieldset': forms.Select(attrs={'class': 'form-select'}),
             'depreciation': forms.Select(attrs={'class': 'form-select'}),
-            'image': forms.FileInput(attrs={'class': 'form-control'}),
+            'image': forms.FileInput(attrs={'class': 'form-control', 'style': 'max-width: 400px;'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'comments': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
         }
@@ -177,6 +177,9 @@ class AssetTypeForm(SlugModelForm):
                     Column('custom_fieldset', css_class='col-md-3'),
                     Column('depreciation', css_class='col-md-3')
                 ),
+                Row(
+                    Column('requestable', css_class='col-md-4 mt-4')
+                ),
             ),
         ]
 
@@ -212,7 +215,6 @@ class AssetTypeForm(SlugModelForm):
                 'comments',
                 Row(
                     Column('tags', css_class='col-md-8'),
-                    Column('requestable', css_class='col-md-4 mt-4')
                 )
             ),
             HTML('<div class="mt-3">'),

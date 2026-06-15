@@ -1,6 +1,6 @@
 from django import forms
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout
+from crispy_forms.layout import Layout, Div
 
 from core.forms import FilterForm
 from extras.customfields import CustomFieldModelFormMixin
@@ -23,7 +23,7 @@ class CostCenterForm(CustomFieldModelFormMixin, forms.ModelForm):
 
     class Meta:
         model = CostCenter
-        fields = ['tenant', 'name', 'slug', 'code', 'parent', 'description', 'is_active']
+        fields = ['name', 'code', 'slug', 'tenant', 'parent', 'description', 'is_active']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'slug': forms.TextInput(attrs={'class': 'form-control'}),
@@ -42,7 +42,19 @@ class CostCenterForm(CustomFieldModelFormMixin, forms.ModelForm):
         self.helper.form_method = 'post'
         self.helper.form_tag = True
         self.helper.layout = Layout(
-            'tenant', 'name', 'slug', 'code', 'parent', 'description', 'is_active',
+            Div(
+                Div('name', css_class='col-md-6'),
+                Div('code', css_class='col-md-3'),
+                Div('slug', css_class='col-md-3'),
+                css_class='row'
+            ),
+            Div(
+                Div('tenant', css_class='col-md-6'),
+                Div('parent', css_class='col-md-6'),
+                css_class='row'
+            ),
+            'description',
+            'is_active',
         )
         self.append_custom_fields_to_layout()
         from .helpers import add_standard_buttons

@@ -1,5 +1,8 @@
 from django import forms
 from django.utils.translation import gettext_lazy as _
+from django.urls import reverse
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Layout, Submit, HTML, Row, Column, Fieldset
 from assets.models import StatusLabel
 from compliance.models import AssetAudit, AuditSession
 from organization.models import Location, Tenant
@@ -81,6 +84,31 @@ class AuditSessionForm(forms.ModelForm):
             label=_("Target Location (Optional)"),
             help_text=_("Expected location to audit. Leave blank to audit globally."),
             widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''})
+        )
+
+        cancel_url = reverse('compliance:auditsession_list')
+        button_text = _('Update') if self.instance and self.instance.pk else _('Create')
+
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+        self.helper.layout = Layout(
+            Row(
+                Column('tenant', css_class='col-md-6'),
+                Column('name', css_class='col-md-6'),
+                css_class='row g-3',
+            ),
+            'location',
+            Fieldset(
+                _('Campaign Options'),
+                'start_immediately',
+            ),
+            HTML('<div class="mt-4"></div>'),
+            Submit('submit', button_text, css_class='btn btn-primary'),
+            HTML(
+                f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2"'
+                f' data-no-dirty-track="true">{_("Cancel")}</a>'
+            ),
         )
 
     def clean(self):

@@ -1,6 +1,6 @@
 from django import forms
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout
+from crispy_forms.layout import Layout, Div
 
 from core.forms import FilterForm
 from extras.models import Tag
@@ -40,15 +40,16 @@ class TenantForm(forms.ModelForm):
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
         required=False,
-        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
+        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
     )
 
     class Meta:
         model = Tenant
-        fields = ['name', 'slug', 'group', 'currency', 'description', 'comments', 'tags']
+        fields = ['name', 'slug', 'group', 'currency', 'default_depreciation', 'description', 'comments', 'tags']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'slug': forms.TextInput(attrs={'class': 'form-control'}),
+            'default_depreciation': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'comments': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
         }
@@ -67,7 +68,20 @@ class TenantForm(forms.ModelForm):
         self.helper.form_method = 'post'
         self.helper.form_tag = True
         self.helper.layout = Layout(
-            'name', 'slug', 'group', 'currency', 'description', 'comments', 'tags'
+            Div(
+                Div('name', css_class='col-md-6'),
+                Div('slug', css_class='col-md-6'),
+                css_class='row'
+            ),
+            Div(
+                Div('group', css_class='col-md-6'),
+                Div('currency', css_class='col-md-3'),
+                Div('default_depreciation', css_class='col-md-3'),
+                css_class='row'
+            ),
+            'description',
+            'comments',
+            'tags',
         )
         from .helpers import add_standard_buttons
         add_standard_buttons(self.helper, self.instance, 'organization:tenant_list')

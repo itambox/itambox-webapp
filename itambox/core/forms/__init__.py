@@ -5,7 +5,7 @@ from django import forms
 from django.utils.translation import gettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Field, HTML, Div
+from crispy_forms.layout import Layout, Field, HTML, Div, Submit, Row, Column, Fieldset
 from django.urls import reverse
 from core.search import SEARCH_INDEXES
 from itambox.utils import get_model_viewname
@@ -119,21 +119,81 @@ class WebhookEndpointForm(forms.ModelForm):
     payload_preset = forms.ChoiceField(
         choices=PAYLOAD_PRESET_CHOICES,
         required=False,
-        label='Payload Preset',
-        help_text='Select a preset to pre-fill the payload template above'
+        label=_('Payload Preset'),
+        help_text=_('Select a preset to pre-fill the payload template above'),
     )
 
     class Meta:
         model = WebhookEndpoint
-        fields = ['name', 'url', 'http_method', 'headers', 'secret', 'enabled', 'retry_count', 'retry_backoff']
+        fields = ['name', 'url', 'http_method', 'headers', 'payload_preset', 'secret', 'enabled', 'retry_count', 'retry_backoff', 'tenant']
         widgets = {
             'headers': forms.Textarea(attrs={'rows': 4}),
+            'tenant': forms.Select(attrs={'class': 'form-select'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        user = get_current_user()
+        is_admin = bool(user and (user.is_superuser or getattr(user, 'is_staff', False)))
+        if not is_admin and 'tenant' in self.fields:
+            self.fields.pop('tenant')
+
         if self.instance and self.instance.headers:
             self.initial['headers'] = json.dumps(self.instance.headers, indent=2)
+
+        # BUG FIX: show the decrypted secret on edit so we don't re-encrypt
+        # the stored "enc$..." ciphertext as if it were a plaintext value.
+        if self.instance and self.instance.pk and self.instance.secret:
+            self.initial['secret'] = self.instance.secret_decrypted
+
+        self.helper = FormHelper()
+        tenant_row = (
+            Row(
+                Column('tenant', css_class='col-md-6'),
+                css_class='row g-3',
+            )
+            if is_admin else None
+        )
+        layout_fields = [
+            Fieldset(
+                _('Identity'),
+                Row(
+                    Column('name', css_class='col-md-6'),
+                    Column('url', css_class='col-md-6'),
+                    css_class='row g-3',
+                ),
+                Row(
+                    Column('http_method', css_class='col-md-4'),
+                    Column('enabled', css_class='col-md-4'),
+                    Column('secret', css_class='col-md-4'),
+                    css_class='row g-3',
+                ),
+            ),
+            Fieldset(
+                _('Payload'),
+                'payload_preset',
+                'headers',
+            ),
+            Fieldset(
+                _('Retry'),
+                Row(
+                    Column('retry_count', css_class='col-md-6'),
+                    Column('retry_backoff', css_class='col-md-6'),
+                    css_class='row g-3',
+                ),
+            ),
+        ]
+        if tenant_row is not None:
+            layout_fields.append(tenant_row)
+        layout_fields += [
+            HTML('<div class="mt-4"></div>'),
+            Submit('submit', _('Save Webhook Endpoint'), css_class='btn btn-primary'),
+            HTML(
+                '<a href="{% url \'webhookendpoint_list\' %}" class="btn btn-outline-secondary ms-2" '
+                'data-no-dirty-track="true">' + str(_('Cancel')) + '</a>'
+            ),
+        ]
+        self.helper.layout = Layout(*layout_fields)
 
     def clean_headers(self):
         data = self.cleaned_data['headers']
@@ -141,7 +201,7 @@ class WebhookEndpointForm(forms.ModelForm):
             try:
                 return json.loads(data)
             except json.JSONDecodeError:
-                raise forms.ValidationError('Headers must be valid JSON.')
+                raise forms.ValidationError(_('Headers must be valid JSON.'))
         return data
 
 
@@ -149,32 +209,38 @@ class EventRuleForm(forms.ModelForm):
     events = forms.MultipleChoiceField(
         choices=Event.ACTION_CHOICES,
         widget=forms.CheckboxSelectMultiple,
-        label='Trigger Events',
-        help_text='Fire this rule when any of the selected change types occur on the target model.',
+        label=_('Trigger Events'),
+        help_text=_('Fire this rule when any of the selected change types occur on the target model.'),
     )
     payload_preset = forms.ChoiceField(
         choices=PAYLOAD_PRESET_CHOICES,
         required=False,
-        label='Payload Preset',
-        help_text='Select a preset to pre-fill the action config'
+        label=_('Payload Preset'),
+        help_text=_('Select a preset to pre-fill the action config'),
     )
 
     class Meta:
         model = EventRule
-        fields = ['name', 'model', 'events', 'action_type', 'webhook', 'conditions', 'action_config', 'enabled']
+        fields = ['name', 'model', 'events', 'action_type', 'webhook', 'conditions', 'action_config', 'enabled', 'tenant']
         widgets = {
             'conditions': forms.Textarea(attrs={'rows': 3}),
             'action_config': forms.Textarea(attrs={'rows': 4}),
+            'tenant': forms.Select(attrs={'class': 'form-select'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        user = get_current_user()
+        is_admin = bool(user and (user.is_superuser or getattr(user, 'is_staff', False)))
+        if not is_admin and 'tenant' in self.fields:
+            self.fields.pop('tenant')
+
         # Only models that emit Events are selectable — others would never trigger the rule.
         self.fields['model'].queryset = logged_content_types()
-        self.fields['model'].label = 'Target Model'
+        self.fields['model'].label = _('Target Model')
         self.fields['webhook'].queryset = WebhookEndpoint.objects.filter(enabled=True)
-        self.fields['webhook'].label = 'Webhook Endpoint'
-        self.fields['webhook'].help_text = (
+        self.fields['webhook'].label = _('Webhook Endpoint')
+        self.fields['webhook'].help_text = _(
             'Required for Webhook rules. Manage endpoints under Webhook Endpoints. '
             'Leave blank only if you supply a "url" in Action Configuration below.'
         )
@@ -187,6 +253,47 @@ class EventRuleForm(forms.ModelForm):
                 self.initial['conditions'] = json.dumps(self.instance.conditions, indent=2)
             if self.instance.action_config:
                 self.initial['action_config'] = json.dumps(self.instance.action_config, indent=2)
+
+        self.helper = FormHelper()
+        layout_fields = [
+            Fieldset(
+                _('Identity'),
+                Row(
+                    Column('name', css_class='col-md-6'),
+                    Column('enabled', css_class='col-md-6'),
+                    css_class='row g-3',
+                ),
+            ),
+            Fieldset(
+                _('Trigger'),
+                Row(
+                    Column('model', css_class='col-md-6'),
+                    Column('action_type', css_class='col-md-6'),
+                    css_class='row g-3',
+                ),
+                'events',
+            ),
+            Fieldset(
+                _('Action'),
+                'webhook',
+                'payload_preset',
+                'conditions',
+                'action_config',
+            ),
+        ]
+        if is_admin:
+            layout_fields.append(
+                Row(Column('tenant', css_class='col-md-6'), css_class='row g-3')
+            )
+        layout_fields += [
+            HTML('<div class="mt-4"></div>'),
+            Submit('submit', _('Save Event Rule'), css_class='btn btn-primary'),
+            HTML(
+                '<a href="{% url \'eventrule_list\' %}" class="btn btn-outline-secondary ms-2" '
+                'data-no-dirty-track="true">' + str(_('Cancel')) + '</a>'
+            ),
+        ]
+        self.helper.layout = Layout(*layout_fields)
 
     def clean_conditions(self):
         data = self.cleaned_data['conditions']
@@ -230,6 +337,39 @@ class LabelTemplateForm(forms.ModelForm):
         widgets = {
             'template_code': forms.Textarea(attrs={'rows': 10}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.layout = Layout(
+            Fieldset(
+                _('Identity'),
+                Row(
+                    Column('name', css_class='col-md-8'),
+                    Column('barcode_format', css_class='col-md-4'),
+                    css_class='row g-3',
+                ),
+                'description',
+            ),
+            Fieldset(
+                _('Page Size'),
+                Row(
+                    Column('page_width', css_class='col-md-6'),
+                    Column('page_height', css_class='col-md-6'),
+                    css_class='row g-3',
+                ),
+            ),
+            Fieldset(
+                _('Template'),
+                'template_code',
+            ),
+            HTML('<div class="mt-4"></div>'),
+            Submit('submit', _('Save Label Template'), css_class='btn btn-primary'),
+            HTML(
+                '<a href="{% url \'labeltemplate_list\' %}" class="btn btn-outline-secondary ms-2" '
+                'data-no-dirty-track="true">' + str(_('Cancel')) + '</a>'
+            ),
+        )
 
 
 class ConfirmationForm(forms.Form):
@@ -731,6 +871,59 @@ class ScheduledReportForm(forms.ModelForm):
                 self.fields['filter_tenants'].label = _("Filter Tenants (Scoping Constellation)")
                 self.fields['filter_tenants'].help_text = _("Select one or more specific tenants to filter this scheduled report's compiled data. If none are selected, aggregates data globally across all tenants.")
 
+        is_admin = bool(user and (user.is_superuser or getattr(user, 'is_staff', False)))
+        self.helper = FormHelper()
+        admin_fieldset_fields = []
+        if is_admin:
+            admin_fieldset_fields = [
+                Row(
+                    Column('tenant', css_class='col-md-6'),
+                    Column('filter_tenants', css_class='col-md-6'),
+                    css_class='row g-3',
+                ),
+            ]
+        layout_fields = [
+            Fieldset(
+                _('Identity'),
+                Row(
+                    Column('name', css_class='col-md-6'),
+                    Column('report', css_class='col-md-6'),
+                    css_class='row g-3',
+                ),
+            ),
+            Fieldset(
+                _('Schedule'),
+                Row(
+                    Column('frequency', css_class='col-md-4'),
+                    Column('cron_expression', css_class='col-md-4'),
+                    Column('start_time', css_class='col-md-4'),
+                    css_class='row g-3',
+                ),
+            ),
+            Fieldset(
+                _('Delivery'),
+                'recipients',
+                'channels',
+                Row(
+                    Column('format', css_class='col-md-4'),
+                    Column('save_to_archive', css_class='col-md-4'),
+                    Column('is_active', css_class='col-md-4'),
+                    css_class='row g-3',
+                ),
+            ),
+        ]
+        if admin_fieldset_fields:
+            layout_fields.append(Fieldset(_('Scope'), *admin_fieldset_fields))
+        layout_fields += [
+            HTML('<div class="mt-4"></div>'),
+            Submit('submit', _('Save Scheduled Report'), css_class='btn btn-primary'),
+            HTML(
+                '<a href="{% url \'scheduledreport_list\' %}" class="btn btn-outline-secondary ms-2" '
+                'data-no-dirty-track="true">' + str(_('Cancel')) + '</a>'
+            ),
+        ]
+        self.helper.layout = Layout(*layout_fields)
+
     def save(self, commit=True):
         instance = super().save(commit=False)
         user = get_current_user()
@@ -793,6 +986,51 @@ class AlertRuleForm(forms.ModelForm):
             threshold.help_text = _('Limit count or days horizon, depending on alert type.')
 
         self.fields['renotify_interval_days'].label = _('Re-notify every (days)')
+
+        is_admin = bool(user and (user.is_superuser or getattr(user, 'is_staff', False)))
+        self.helper = FormHelper()
+        layout_fields = [
+            Fieldset(
+                _('Identity'),
+                Row(
+                    Column('name', css_class='col-md-8'),
+                    Column('severity', css_class='col-md-4'),
+                    css_class='row g-3',
+                ),
+                'description',
+            ),
+            Fieldset(
+                _('Alert Configuration'),
+                Row(
+                    Column('alert_type', css_class='col-md-6'),
+                    Column('threshold_value', css_class='col-md-6'),
+                    css_class='row g-3',
+                ),
+                Row(
+                    Column('renotify_interval_days', css_class='col-md-4'),
+                    Column('is_active', css_class='col-md-4'),
+                    Column('is_muted', css_class='col-md-4'),
+                    css_class='row g-3',
+                ),
+            ),
+            Fieldset(
+                _('Notifications'),
+                'channels',
+            ),
+        ]
+        if is_admin:
+            layout_fields.append(
+                Row(Column('tenant', css_class='col-md-6'), css_class='row g-3')
+            )
+        layout_fields += [
+            HTML('<div class="mt-4"></div>'),
+            Submit('submit', _('Save Alert Rule'), css_class='btn btn-primary'),
+            HTML(
+                '<a href="{% url \'alertrule_list\' %}" class="btn btn-outline-secondary ms-2" '
+                'data-no-dirty-track="true">' + str(_('Cancel')) + '</a>'
+            ),
+        ]
+        self.helper.layout = Layout(*layout_fields)
 
     def save(self, commit=True):
         instance = super().save(commit=False)

@@ -42,8 +42,10 @@ class StatusLabelForm(ColorFieldFormMixin, forms.ModelForm):
         self.helper.layout = Layout(
             Fieldset(
                 '',
-                'name',
-                'slug',
+                Row(
+                    Column('name', css_class='col-md-6'),
+                    Column('slug', css_class='col-md-6'),
+                ),
                 'type',
                 'description',
                 'color',

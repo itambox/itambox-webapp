@@ -30,12 +30,16 @@ class AssetRoleForm(ColorFieldFormMixin, forms.ModelForm):
         self.helper.layout = Layout(
             Fieldset(
                 '',
-                'name',
-                'slug',
+                Row(
+                    Column('name', css_class='col-md-6'),
+                    Column('slug', css_class='col-md-6'),
+                ),
                 'description',
-                'color',
-                'allows_components',
-                'tags'
+                Row(
+                    Column('color', css_class='col-md-4'),
+                    Column('allows_components', css_class='col-md-4 mt-4'),
+                ),
+                'tags',
             ),
             Row(
                 Column(Submit('submit', 'Save', css_class='btn btn-primary'), css_class='col'),

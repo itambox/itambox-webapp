@@ -67,7 +67,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
             'asset_role', 'status', 'location', 'tenant',
             'purchase_date',
             'purchase_cost', 'salvage_value', 'currency', 'order_number', 'supplier',
-            'cost_center',
+            'purchase_order_line', 'cost_center',
             'in_service_date', 'depreciation_override',
             'notes', 'tags', 'requestable'
         ]
@@ -85,6 +85,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
             'tenant': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
             'tags': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
             'supplier': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+            'purchase_order_line': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
             'cost_center': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
         }
 
@@ -342,6 +343,10 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
                     Div('purchase_date', css_class='col-md-4'),
                     Div('order_number', css_class='col-md-4'),
                     Div('supplier', css_class='col-md-4'),
+                    css_class='row'
+                ),
+                Div(
+                    Div('purchase_order_line', css_class='col-md-6'),
                     css_class='row'
                 ),
                 Div(
