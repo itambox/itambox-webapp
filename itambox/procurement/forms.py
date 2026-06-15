@@ -22,6 +22,12 @@ class PurchaseOrderForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # status has a model default (draft); keep it optional in the form so a
+        # new PO can be created without explicitly choosing one, while still
+        # letting users change it. clean_status() falls back to the default.
+        if 'status' in self.fields:
+            self.fields['status'].required = False
+            self.fields['status'].initial = PurchaseOrder.STATUS_DRAFT
         self.helper = FormHelper()
         self.helper.layout = Layout(
             Row(
@@ -52,6 +58,10 @@ class PurchaseOrderForm(forms.ModelForm):
             Submit('submit', _('Save Purchase Order'), css_class='btn btn-primary'),
             HTML('<a href="{% url \'procurement:purchaseorder_list\' %}" class="btn btn-outline-secondary ms-2" data-no-dirty-track="true">' + str(_('Cancel')) + '</a>'),
         )
+
+    def clean_status(self):
+        # Empty submission falls back to the model default rather than saving ''.
+        return self.cleaned_data.get('status') or PurchaseOrder.STATUS_DRAFT
 
 
 class PurchaseOrderLineForm(forms.ModelForm):
