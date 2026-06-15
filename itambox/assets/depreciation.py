@@ -52,7 +52,7 @@ def compute_book_value(asset, on_date=None):
     """
     # Frozen sign-off value takes priority.
     if getattr(asset, 'disposed_at', None) is not None:
-        return asset.disposal_value
+        return _to_decimal(asset.disposal_value)
 
     if not asset.purchase_cost:
         return None
