@@ -23,6 +23,33 @@ IMPORT_EXCLUDED_FIELDS = frozenset({
 })
 
 
+# Models that are NOT user-importable/exportable: generated logs, system records,
+# and complex config (JSON / secrets / relations) that is managed in the UI rather
+# than via bulk CSV. Drives the import-view gate AND the nav/list import+export
+# buttons from one source so they never drift. Everything else is importable.
+IMPORT_EXCLUDED_MODELS = frozenset({
+    # Generated / log / system data
+    'core.objectchange', 'core.notification', 'core.job',
+    'extras.alertlog', 'extras.event', 'extras.journalentry',
+    # Alerting / reporting configuration
+    'extras.alertrule', 'extras.notificationchannel',
+    'extras.scheduledreport', 'extras.reporttemplate',
+    # Other config (relations / JSON / secrets)
+    'extras.eventrule', 'extras.webhookendpoint', 'extras.dashboard',
+    'extras.configcontext',
+})
+
+
+def is_model_importable(model):
+    """True unless the model is a generated log or UI-only config (see
+    IMPORT_EXCLUDED_MODELS). Single source for the import-view gate and the
+    import/export buttons in the nav and list header."""
+    if model is None:
+        return False
+    label = f'{model._meta.app_label}.{model._meta.model_name}'
+    return label not in IMPORT_EXCLUDED_MODELS
+
+
 # Registry of curated BulkImportForms keyed by model, so the single
 # GenericObjectImportView (/import/<app>/<model>/) can serve domain-accurate
 # field lists without a per-app view subclass. Populated lazily on first lookup.

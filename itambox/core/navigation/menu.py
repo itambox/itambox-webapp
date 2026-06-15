@@ -69,9 +69,9 @@ ASSETS_MENU = Menu(
         MenuGroup(
             label=_('Lifecycle'),
             items=(
-                get_model_item('assets', 'warranty', _('Warranties'), actions=('add',)),
-                get_model_item('assets', 'assetreservation', _('Reservations'), actions=('add',)),
-                get_model_item('assets', 'assetdisposal', _('Disposals'), actions=('add',)),
+                get_model_item('assets', 'warranty', _('Warranties')),
+                get_model_item('assets', 'assetreservation', _('Reservations')),
+                get_model_item('assets', 'assetdisposal', _('Disposals')),
             ),
         ),
     ),
@@ -225,14 +225,14 @@ OPERATIONS_MENU = Menu(
                     ),
                 ),
                 get_model_item('assets', 'supplier', _('Suppliers')),
-                get_model_item('procurement', 'contract', _('Contracts'), actions=('add',)),
+                get_model_item('procurement', 'contract', _('Contracts')),
             ),
         ),
         MenuGroup(
             label=_('Finance'),
             items=(
                 get_model_item('assets', 'depreciation', _('Depreciation')),
-                get_model_item('organization', 'costcenter', _('Cost Centers'), actions=('add',)),
+                get_model_item('organization', 'costcenter', _('Cost Centers')),
             ),
         ),
         MenuGroup(

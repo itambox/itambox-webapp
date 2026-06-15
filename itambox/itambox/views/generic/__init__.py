@@ -206,14 +206,21 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         except NoReverseMatch:
             context['create_url_name'] = None
 
-        # All models import via the single centralized route /import/<app>/<model>/.
-        try:
-            context['import_url'] = reverse('generic_import', kwargs={
-                'app_label': _model._meta.app_label,
-                'model_name': _model._meta.model_name
-            })
-        except NoReverseMatch:
-            context['import_url'] = None
+        # Import/export are offered only for importable models (not generated
+        # logs or UI-only config). Importable models import via the single
+        # centralized route /import/<app>/<model>/.
+        from core.forms.import_forms import is_model_importable
+        _importable = is_model_importable(_model)
+        context['can_export'] = _importable
+        context['import_url'] = None
+        if _importable:
+            try:
+                context['import_url'] = reverse('generic_import', kwargs={
+                    'app_label': _model._meta.app_label,
+                    'model_name': _model._meta.model_name
+                })
+            except NoReverseMatch:
+                context['import_url'] = None
 
         try:
             bulk_delete_url_name = get_model_viewname(_model, 'bulk_delete')
@@ -1417,9 +1424,17 @@ from itambox.views.features import ObjectExportView  # noqa: E402
 
 class GenericObjectImportView(ObjectImportView):
     def _get_model(self):
+        from core.forms.import_forms import is_model_importable
         app_label = self.kwargs.get('app_label')
         model_name = self.kwargs.get('model_name')
-        return apps.get_model(app_label, model_name)
+        try:
+            model = apps.get_model(app_label, model_name)
+        except LookupError:
+            raise Http404
+        # Generated logs and UI-only config are not importable, even by direct URL.
+        if not is_model_importable(model):
+            raise Http404
+        return model
 
 
 class ObjectRestoreView(PermissionRequiredMixin, LoginRequiredMixin, View):

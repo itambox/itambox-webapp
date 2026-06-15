@@ -105,14 +105,22 @@ def get_model_buttons(app_label, model_name, actions=('add', 'import')):
         )
 
     if 'import' in actions:
-        buttons.append(
-            MenuItemButton(
-                link=f'/import/{app_label}/{model_name}/',
-                title='Import',
-                icon_class='mdi mdi-upload',
-                permissions=[f'{app_label}.add_{model_name}'],
-                color='outline text-success'
+        from django.apps import apps
+        from core.forms.import_forms import is_model_importable
+        try:
+            model = apps.get_model(app_label, model_name)
+        except LookupError:
+            model = None
+        # Only importable models (not generated logs / UI-only config) get the button.
+        if model is not None and is_model_importable(model):
+            buttons.append(
+                MenuItemButton(
+                    link=f'/import/{app_label}/{model_name}/',
+                    title='Import',
+                    icon_class='mdi mdi-upload',
+                    permissions=[f'{app_label}.add_{model_name}'],
+                    color='outline text-success'
+                )
             )
-        )
 
     return buttons
