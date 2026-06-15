@@ -314,13 +314,27 @@ MONITORING_MENU = Menu(
                     link='scheduledreport_list',
                     link_text=_('Scheduled Reports'),
                     permissions=['extras.view_scheduledreport'],
-                    buttons=(),
+                    buttons=(
+                        MenuItemButton(
+                            link='scheduledreport_add',
+                            title='Add',
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=['extras.add_scheduledreport'],
+                        ),
+                    ),
                 ),
                 MenuItem(
                     link='reporttemplate_list',
                     link_text=_('Report Templates'),
                     permissions=['extras.view_reporttemplate'],
-                    buttons=(),
+                    buttons=(
+                        MenuItemButton(
+                            link='reporttemplate_add',
+                            title='Add',
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=['extras.add_reporttemplate'],
+                        ),
+                    ),
                 ),
             ),
         ),
@@ -394,13 +408,27 @@ EXTRAS_MENU = Menu(
                     link='export_template_list',
                     link_text=_('Export Templates'),
                     permissions=['extras.view_exporttemplate'],
-                    buttons=(),
+                    buttons=(
+                        MenuItemButton(
+                            link='export_template_add',
+                            title='Add',
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=['extras.add_exporttemplate'],
+                        ),
+                    ),
                 ),
                 MenuItem(
                     link='labeltemplate_list',
                     link_text=_('Label Templates'),
                     permissions=['extras.view_labeltemplate'],
-                    buttons=(),
+                    buttons=(
+                        MenuItemButton(
+                            link='labeltemplate_add',
+                            title='Add',
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=['extras.add_labeltemplate'],
+                        ),
+                    ),
                 ),
             ),
         ),
@@ -412,13 +440,27 @@ EXTRAS_MENU = Menu(
                     link='webhookendpoint_list',
                     link_text=_('Webhook Endpoints'),
                     permissions=['extras.view_webhookendpoint'],
-                    buttons=(),
+                    buttons=(
+                        MenuItemButton(
+                            link='webhookendpoint_add',
+                            title='Add',
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=['extras.add_webhookendpoint'],
+                        ),
+                    ),
                 ),
                 MenuItem(
                     link='eventrule_list',
                     link_text=_('Event Rules'),
                     permissions=['extras.view_eventrule'],
-                    buttons=(),
+                    buttons=(
+                        MenuItemButton(
+                            link='eventrule_add',
+                            title='Add',
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=['extras.add_eventrule'],
+                        ),
+                    ),
                 ),
             ),
         ),
