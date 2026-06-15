@@ -128,18 +128,33 @@ class SeedHistoryMixin:
                 p_date = asset.purchase_date or today - datetime.timedelta(days=400)
 
                 # ── a) provisioning create entry ──────────────────────────────
-                actor = self._pick_actor(actors)
-                engine.log_create(asset, when=p_date, user=actor)
-
-                # ── b) checkout ~7 days after purchase if actively assigned ───
+                # Assets are seeded in their final 'in-use' state, so a naive
+                # available->in-use check would never fire. To produce genuine
+                # 'checkout' history, roll a subset of actively-assigned assets
+                # back to the deployable pool *before* logging the create (no log —
+                # so the create entry records them as 'available'); they are then
+                # checked out below via a real available(deployable)->in-use(deployed)
+                # transition. The rest keep their seeded state and just get a create.
                 active = asset.assignments.filter(
                     is_active=True, assigned_user__isnull=False
                 ).first()
-                checkout_date = p_date + datetime.timedelta(days=random.randint(3, 14))
-                if checkout_date > today:
-                    checkout_date = today - datetime.timedelta(days=1)
+                checks_out = (
+                    active is not None and sl_available is not None
+                    and sl_in_use is not None and asset.status == sl_in_use
+                    and random.random() < 0.6
+                )
+                if checks_out:
+                    type(asset)._base_manager.filter(pk=asset.pk).update(status=sl_available)
+                    asset.status = sl_available
 
-                if active and sl_in_use and asset.status != sl_in_use:
+                actor = self._pick_actor(actors)
+                engine.log_create(asset, when=p_date, user=actor)
+
+                # ── b) checkout (available -> in-use) ~3-14 days after purchase ─
+                if checks_out:
+                    checkout_date = p_date + datetime.timedelta(days=random.randint(3, 14))
+                    if checkout_date > today:
+                        checkout_date = today - datetime.timedelta(days=1)
                     engine.change(
                         asset,
                         when=checkout_date,
@@ -147,9 +162,6 @@ class SeedHistoryMixin:
                         action='checkout',
                         status=sl_in_use,
                     )
-                elif active and sl_in_use:
-                    # status already in-use, just log a checkout action note
-                    pass
 
                 # ── c) ~30 % mid-life edit ────────────────────────────────────
                 if random.random() < 0.30:
