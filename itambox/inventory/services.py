@@ -63,24 +63,6 @@ def checkout_inventory_item(
     return assignment
 
 
-def checkout_accessory(
-    accessory: Any,
-    qty: int,
-    holder: Optional[Any] = None,
-    location: Optional[Any] = None,
-    asset: Optional[Any] = None,
-    user: Optional[Any] = None,
-    notes: str = "",
-    source_location: Optional[Any] = None,
-    request: Optional[Any] = None,
-    **kwargs: Any
-) -> AccessoryAssignment:
-    return checkout_inventory_item(
-        item=accessory, qty=qty, holder=holder, location=location, asset=asset,
-        user=user, notes=notes, source_location=source_location, request=request, **kwargs
-    )
-
-
 def checkin_accessory(assignment_pk: Any, user: Optional[Any] = None) -> Tuple[Any, int, Any]:
     assignment = get_object_or_404(AccessoryAssignment, pk=assignment_pk)
     accessory = assignment.accessory
@@ -99,42 +81,6 @@ def checkin_component(assignment_pk: Any, user: Optional[Any] = None) -> Tuple[A
 
     assignment.delete()
     return component, qty, recipient
-
-
-def checkout_consumable(
-    consumable: Any,
-    qty: int,
-    holder: Optional[Any] = None,
-    location: Optional[Any] = None,
-    asset: Optional[Any] = None,
-    user: Optional[Any] = None,
-    notes: str = "",
-    source_location: Optional[Any] = None,
-    request: Optional[Any] = None,
-    **kwargs: Any
-) -> ConsumableAssignment:
-    return checkout_inventory_item(
-        item=consumable, qty=qty, holder=holder, location=location, asset=asset,
-        user=user, notes=notes, source_location=source_location, request=request, **kwargs
-    )
-
-
-def checkout_component(
-    component: Any,
-    qty: int,
-    holder: Optional[Any] = None,
-    location: Optional[Any] = None,
-    asset: Optional[Any] = None,
-    user: Optional[Any] = None,
-    notes: str = "",
-    source_location: Optional[Any] = None,
-    request: Optional[Any] = None,
-    **kwargs: Any
-) -> ComponentAllocation:
-    return checkout_inventory_item(
-        item=component, qty=qty, holder=holder, location=location, asset=asset,
-        user=user, notes=notes, source_location=source_location, request=request, **kwargs
-    )
 
 
 def adjust_inventory_stock(

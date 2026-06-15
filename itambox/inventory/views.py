@@ -31,7 +31,7 @@ from .models import Accessory, Consumable, Kit, KitItem, AccessoryStock, Consuma
 from . import forms, tables, filters
 from assets.models import Asset
 from assets.services import checkout_kit
-from inventory.services import checkout_accessory, checkin_accessory, checkout_consumable, checkout_component, checkin_component
+from inventory.services import checkout_inventory_item, checkin_accessory, checkin_component
 
 
 class InventoryListView(LoginRequiredMixin, View):
@@ -416,7 +416,7 @@ class KitCheckoutView(GenericTransactionView):
 class AccessoryCheckoutView(GenericTransactionView):
     queryset = Accessory.objects.all()
     model_form = forms.AccessoryCheckoutForm
-    service_callable = checkout_accessory
+    service_callable = checkout_inventory_item
     context_object_name = 'accessory'
     template_name = 'inventory/includes/accessory_checkout_modal.html'
     error_partial = 'inventory/includes/accessory_checkout_modal.html#checkout-modal-form'
@@ -456,7 +456,7 @@ class AccessoryCheckinView(SimplePostView):
 class ConsumableCheckoutView(GenericTransactionView):
     queryset = Consumable.objects.all()
     model_form = forms.ConsumableCheckoutForm
-    service_callable = checkout_consumable
+    service_callable = checkout_inventory_item
     context_object_name = 'consumable'
     template_name = 'inventory/includes/consumable_checkout_modal.html'
     error_partial = 'inventory/includes/consumable_checkout_modal.html#checkout-modal-form'
@@ -1007,7 +1007,7 @@ class ComponentStockCreateModalView(LoginRequiredMixin, View):
 class ComponentCheckoutView(GenericTransactionView):
     queryset = Component.objects.all()
     model_form = forms.ComponentCheckoutForm
-    service_callable = checkout_component
+    service_callable = checkout_inventory_item
     context_object_name = 'component'
     template_name = 'inventory/includes/component_checkout_modal.html'
     error_partial = 'inventory/includes/component_checkout_modal.html#checkout-modal-form'
@@ -1110,20 +1110,16 @@ def bulk_checkout_inventory(request):
     elif asset_id:
         asset = get_object_or_404(Asset, pk=asset_id)
 
-    from inventory.services import checkout_accessory, checkout_consumable, checkout_component
     success_count = 0
     failure_count = 0
 
     if model_name_str in ('inventory.accessory', 'inventory.accessorystock'):
-        checkout_func = checkout_accessory
         item_model = Accessory
         stock_model = AccessoryStock
     elif model_name_str in ('inventory.consumable', 'inventory.consumablestock'):
-        checkout_func = checkout_consumable
         item_model = Consumable
         stock_model = ConsumableStock
     else:
-        checkout_func = checkout_component
         item_model = Component
         stock_model = ComponentStock
 
@@ -1139,8 +1135,8 @@ def bulk_checkout_inventory(request):
             for pk in object_pks:
                 try:
                     item = item_model.objects.get(pk=pk)
-                    checkout_func(
-                        **{item_model.__name__.lower(): item},
+                    checkout_inventory_item(
+                        item=item,
                         qty=qty,
                         holder=holder,
                         location=location,
@@ -1161,8 +1157,8 @@ def bulk_checkout_inventory(request):
                 try:
                     stock = stock_model.objects.get(pk=pk)
                     item = getattr(stock, item_model.__name__.lower())
-                    checkout_func(
-                        **{item_model.__name__.lower(): item},
+                    checkout_inventory_item(
+                        item=item,
                         qty=qty,
                         holder=holder,
                         location=location,
