@@ -1,3 +1,6 @@
+from itambox.dictutils import deep_merge
+
+
 def resolve_generic_items(rows, toggle_url_name=None):
     """
     Resolve a list of Bookmark or ObjectWatch rows to dicts suitable for templates.
@@ -49,20 +52,6 @@ def resolve_generic_items(rows, toggle_url_name=None):
                 item['toggle_url'] = '#'
         items.append(item)
     return items
-
-
-def deep_merge(dict_a: dict, dict_b: dict) -> dict:
-    """
-    Recursively merges two dictionaries.
-    Values from dict_b take precedence over dict_a in conflict resolutions.
-    """
-    result = dict_a.copy()
-    for key, val in dict_b.items():
-        if key in result and isinstance(result[key], dict) and isinstance(val, dict):
-            result[key] = deep_merge(result[key], val)
-        else:
-            result[key] = val
-    return result
 
 
 def get_context_for_asset(asset) -> dict:

@@ -1,20 +1,9 @@
-import copy
 import importlib
 import sys
 from django.core.exceptions import ImproperlyConfigured
+from itambox.dictutils import deep_merge
 from itambox.plugins import PluginConfig
 
-def deep_merge(dict1, dict2):
-    """
-    Recursively merge dict2 into dict1.
-    """
-    result = copy.deepcopy(dict1)
-    for key, value in dict2.items():
-        if isinstance(value, dict) and key in result and isinstance(result[key], dict):
-            result[key] = deep_merge(result[key], value)
-        else:
-            result[key] = copy.deepcopy(value)
-    return result
 
 def load_plugins(settings_module):
     """
