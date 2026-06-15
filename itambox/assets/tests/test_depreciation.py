@@ -220,6 +220,32 @@ class TestComputeBookValue(TestCase):
         # 6 months of 12: 1200 - (1200/12)*6 = 600
         self.assertEqual(result, Decimal('600.00'))
 
+    # --- Float coercion (defensive: callers like the seed assign plain floats) ---
+
+    def test_float_purchase_cost_no_policy(self):
+        """A float purchase_cost must not crash on .quantize."""
+        asset = SimpleNamespace(
+            purchase_cost=1000.0, purchase_date=datetime.date(2020, 1, 1),
+            salvage_value=None, depreciation_override=None, tenant=None,
+            asset_type=None, in_service_date=None, disposed_at=None, disposal_value=None,
+        )
+        result = compute_book_value(asset)
+        self.assertEqual(result, Decimal('1000.00'))
+
+    def test_float_purchase_cost_and_salvage_straight_line(self):
+        """float purchase_cost / Decimal months must not raise TypeError."""
+        policy = _policy(months=36)
+        asset_type = SimpleNamespace(depreciation_id=1, depreciation=policy)
+        asset = SimpleNamespace(
+            purchase_cost=1200.0, salvage_value=200.0,
+            purchase_date=datetime.date(2022, 1, 1), depreciation_override=None,
+            tenant=None, asset_type=asset_type, in_service_date=None,
+            disposed_at=None, disposal_value=None,
+        )
+        # Same as test_mid_life_straight_line but with raw floats → 700.00
+        result = compute_book_value(asset, on_date=datetime.date(2023, 7, 1))
+        self.assertEqual(result, Decimal('700.00'))
+
 
 class TestResolvePolicy(TestCase):
 
