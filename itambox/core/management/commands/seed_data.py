@@ -96,19 +96,6 @@ class Command(SeedFinanceMixin, SeedLifecycleMixin, SeedComplianceMixin, SeedHis
     def _clear_all_data(self):
         self.stdout.write('Clearing all existing data...')
 
-        # Truncate tables left behind by uninstalled plugins (e.g. itambox_esign,
-        # which was moved to a separate repo). Their rows still FK-reference assets
-        # but their models are no longer registered, so the ORM cannot clear them
-        # and asset deletion would fail. No-op on a fresh database.
-        from django.db import connection
-        orphan_tables = [t for t in connection.introspection.table_names()
-                         if t.startswith('itambox_esign')]
-        if orphan_tables:
-            with connection.cursor() as cur:
-                cur.execute('TRUNCATE TABLE %s CASCADE'
-                            % ', '.join('"%s"' % t for t in orphan_tables))
-            self.stdout.write(f'  Truncated orphaned plugin tables: {", ".join(orphan_tables)}')
-
         models_to_clear = [
             ('extras', 'AlertLog'), ('extras', 'AlertRule'),
             ('extras', 'ScheduledReport'), ('extras', 'ReportTemplate'),
@@ -148,34 +135,36 @@ class Command(SeedFinanceMixin, SeedLifecycleMixin, SeedComplianceMixin, SeedHis
             ('extras', 'CustomFieldset'), ('extras', 'CustomField'), ('assets', 'Depreciation'),
             ('extras', 'Tag'),
         ]
-        # Delete all rows via the unfiltered manager (bypasses tenant scoping and
-        # soft-delete filters). Retry across passes to resolve FK ordering.
-        def _unfiltered_qs(model):
-            # Prefer all_objects (AllObjectsManager) which skips every filter;
-            # fall back to _default_manager which may still scope by tenant/soft-delete.
-            mgr = getattr(model, 'all_objects', None) or model._default_manager
-            return mgr.all()
+        # Clear every domain table in a single TRUNCATE ... CASCADE. This is
+        # reliable and quiet regardless of FK ordering: CASCADE also truncates any
+        # table that references the listed ones — dependent rows (assignments,
+        # change log, m2m through tables, API tokens) and tables left behind by
+        # uninstalled plugins (e.g. itambox_esign, moved to a separate repo, whose
+        # models are no longer registered but whose rows still FK assets).
+        # The auth user table is NOT in this set and has no FK into it (default
+        # auth.User), so superuser accounts survive; regular users are removed
+        # afterwards. A previous best-effort multi-pass delete printed dozens of
+        # spurious "could not fully clear" warnings even when cascade had already
+        # emptied the rows.
+        from django.db import connection
+        existing = set(connection.introspection.table_names())
+        tables = []
+        for app_label, model_name in models_to_clear:
+            try:
+                model = apps.get_model(app_label, model_name)
+            except LookupError:
+                continue
+            db_table = model._meta.db_table
+            if db_table in existing and db_table not in tables:
+                tables.append(db_table)
+        tables += [t for t in existing
+                   if t.startswith('itambox_esign') and t not in tables]
 
-        pending = list(models_to_clear)
-        last_errors = {}
-        for _attempt in range(5):
-            failed = []
-            for app_label, model_name in pending:
-                try:
-                    model = apps.get_model(app_label, model_name)
-                    count, _ = _unfiltered_qs(model).delete()
-                    if count:
-                        self.stdout.write(f'  Deleted {count} {model_name}(s)')
-                    last_errors.pop(model_name, None)
-                except Exception as exc:
-                    failed.append((app_label, model_name))
-                    last_errors[model_name] = str(exc)
-            if not failed:
-                break
-            pending = failed
-        for app_label, model_name in pending:
-            self.stdout.write(self.style.WARNING(
-                f'  Could not fully clear {model_name}: {last_errors.get(model_name, "unknown")}'))
+        if tables:
+            with connection.cursor() as cur:
+                cur.execute('TRUNCATE TABLE %s CASCADE'
+                            % ', '.join('"%s"' % t for t in tables))
+            self.stdout.write(f'  Cleared {len(tables)} domain tables.')
 
         User.objects.filter(is_superuser=False).delete()
         ContentType.objects.clear_cache()
