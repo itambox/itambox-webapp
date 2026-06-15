@@ -4,6 +4,7 @@ from django.template.loader import render_to_string
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Row, Column, Fieldset, Div
 
+from core.forms import CrispyFormMixin
 from extras.models import Tag, CustomField
 from organization.models import Location
 from ..models import Asset, AssetType, AssetRole, StatusLabel
@@ -11,7 +12,7 @@ from ..models import Asset, AssetType, AssetRole, StatusLabel
 from .fields import StatusModelChoiceField
 
 
-class AssetForm(forms.ModelForm):
+class AssetForm(CrispyFormMixin, forms.ModelForm):
     asset_type = forms.ModelChoiceField(
         queryset=AssetType.objects.select_related('manufacturer').all(),
         label="Asset Type",
@@ -55,7 +56,7 @@ class AssetForm(forms.ModelForm):
             ('false', 'No (Force Unrequestable)'),
         ],
         required=False,
-        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+        widget=forms.Select(attrs={'class': 'form-select'}),
         label="Requestable Status"
     )
 
@@ -112,7 +113,6 @@ class AssetForm(forms.ModelForm):
         self.helper.form_method = 'post'
         self.helper.form_tag = True
 
-        button_text = 'Update' if self.instance and self.instance.pk else 'Create'
         cancel_url = reverse('assets:asset_list')
 
         asset_type_id = None
@@ -304,52 +304,64 @@ class AssetForm(forms.ModelForm):
             if form_field:
                 self.fields[field_key] = form_field
 
+        # Grouped, standardized section order: Identity -> Classification ->
+        # Assignment -> Procurement & Financial -> Lifecycle -> Custom -> Notes.
         layout_elements = [
-            Div(
-                Div('name', css_class='col-md-6'),
-                Div('asset_tag', css_class='col-md-6'),
-                css_class='row'
+            Fieldset(
+                'Identity',
+                Div(
+                    Div('name', css_class='col-md-6'),
+                    Div('asset_tag', css_class='col-md-6'),
+                    css_class='row'
+                ),
+                Div(
+                    Div('serial_number', css_class='col-md-6'),
+                    Div('status', css_class='col-md-6'),
+                    css_class='row'
+                ),
             ),
-            Div(
-                Div('asset_type', css_class='col-md-6'),
-                Div('asset_role', css_class='col-md-6'),
-                css_class='row'
+            Fieldset(
+                'Classification',
+                Div(
+                    Div('asset_type', css_class='col-md-6'),
+                    Div('asset_role', css_class='col-md-6'),
+                    css_class='row'
+                ),
             ),
-            Div(
-                Div('serial_number', css_class='col-md-6'),
-                Div('status', css_class='col-md-6'),
-                css_class='row'
+            Fieldset(
+                'Assignment',
+                Div(
+                    Div('location', css_class='col-md-6'),
+                    Div('tenant', css_class='col-md-6'),
+                    css_class='row'
+                ),
             ),
-            Div(
-                Div('location', css_class='col-md-6'),
-                Div('tenant', css_class='col-md-6'),
-                css_class='row'
+            Fieldset(
+                'Procurement & Financial',
+                Div(
+                    Div('purchase_date', css_class='col-md-4'),
+                    Div('order_number', css_class='col-md-4'),
+                    Div('supplier', css_class='col-md-4'),
+                    css_class='row'
+                ),
+                Div(
+                    Div('purchase_cost', css_class='col-md-4'),
+                    Div('currency', css_class='col-md-4'),
+                    Div('salvage_value', css_class='col-md-4'),
+                    css_class='row'
+                ),
+                Div(
+                    Div('cost_center', css_class='col-md-6'),
+                    css_class='row'
+                ),
             ),
-            Div(
-                Div('purchase_date', css_class='col-md-6'),
-                css_class='row'
-            ),
-            Div(
-                Div('tags', css_class='col-md-6'),
-                Div('requestable', css_class='col-md-6'),
-                css_class='row'
-            ),
-            Div(
-                Div('purchase_cost', css_class='col-md-3'),
-                Div('salvage_value', css_class='col-md-3'),
-                Div('currency', css_class='col-md-2'),
-                Div('order_number', css_class='col-md-2'),
-                Div('supplier', css_class='col-md-2'),
-                css_class='row'
-            ),
-            Div(
-                Div('cost_center', css_class='col-md-6'),
-                css_class='row'
-            ),
-            Div(
-                Div('in_service_date', css_class='col-md-6'),
-                Div('depreciation_override', css_class='col-md-6'),
-                css_class='row'
+            Fieldset(
+                'Lifecycle',
+                Div(
+                    Div('in_service_date', css_class='col-md-6'),
+                    Div('depreciation_override', css_class='col-md-6'),
+                    css_class='row'
+                ),
             ),
         ]
 
@@ -367,13 +379,19 @@ class AssetForm(forms.ModelForm):
                 )
             )
 
-        layout_elements.extend([
-            'notes',
-            HTML('<div class="mt-3">'),
-            Submit('submit', button_text, css_class='btn btn-primary'),
-            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
-            HTML('</div>')
-        ])
+        layout_elements.append(
+            Fieldset(
+                'Notes & Tags',
+                Div(
+                    Div('tags', css_class='col-md-6'),
+                    Div('requestable', css_class='col-md-6'),
+                    css_class='row'
+                ),
+                'notes',
+            )
+        )
+
+        layout_elements.extend(self.action_buttons(cancel_url))
 
         self.helper.layout = Layout(*layout_elements)
 
