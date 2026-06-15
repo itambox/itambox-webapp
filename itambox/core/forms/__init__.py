@@ -393,6 +393,29 @@ class CrispyFormMixin:
             self.helper.form_method = 'post'
             self.helper.form_tag = True
 
+    def action_buttons(self, cancel_url):
+        """Return the standard Submit + Cancel button row as crispy elements.
+
+        Splice into a form's Layout to avoid re-implementing the same block in
+        every form, e.g.::
+
+            self.helper.layout = Layout(..., *self.action_buttons(cancel_url))
+
+        ``cancel_url`` is a resolved URL string. The submit label reflects
+        create vs. update based on the bound instance.
+        """
+        from django.utils.translation import gettext as _
+        from crispy_forms.layout import HTML, Submit
+        label = _('Update') if getattr(self, 'instance', None) and self.instance.pk else _('Create')
+        return [
+            HTML('<div class="mt-4"></div>'),
+            Submit('submit', label, css_class='btn btn-primary'),
+            HTML(
+                f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2" '
+                f'data-no-dirty-track="true">{_("Cancel")}</a>'
+            ),
+        ]
+
 
 class SlugModelForm(CrispyFormMixin, forms.ModelForm):
     class Media:
