@@ -558,6 +558,17 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
         if self.pk:
             old = Asset._base_manager.filter(pk=self.pk).select_related('status').first()
             if old:
+                # Enforce the state machine on the save path itself (not only in
+                # clean(), which forms/imports call) so that ANY status change —
+                # services, bulk ops, scripts — is validated before mutation.
+                # Reuses the same `old` row already fetched above; no extra query.
+                if old.status_id and self.status_id and old.status_id != self.status_id:
+                    AssetStateMachine.validate_transition(
+                        old.status.type,
+                        self.status.type,
+                        self.assignments.filter(is_active=True).exists(),
+                    )
+
                 old_type = old.status.type if old.status else None
                 new_type = self.status.type if self.status else None
                 if old_type != 'archived' and new_type == 'archived':

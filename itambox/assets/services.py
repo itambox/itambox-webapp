@@ -45,9 +45,14 @@ def checkout_asset(
         # Lock the asset row to prevent concurrent overallocation or state issues
         asset = Asset.objects.select_for_update().get(pk=asset.pk)
 
-        # Lifecycle guard: assets on order or in repair are not deployable.
+        # Lifecycle guard: assets on order, in repair, or archived are not
+        # deployable. Archived assets only allow archived->pending, so a checkout
+        # (which targets a deployed status) would raise an illegal-transition
+        # error deeper in save(); reject it here with a clear message.
         if asset.status and asset.status.type in (
-            StatusTypeChoices.IN_REPAIR, StatusTypeChoices.ON_ORDER
+            StatusTypeChoices.IN_REPAIR,
+            StatusTypeChoices.ON_ORDER,
+            StatusTypeChoices.ARCHIVED,
         ):
             raise ValidationError(
                 f"Cannot check out an asset that is {asset.status.get_type_display()}."

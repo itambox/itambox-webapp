@@ -10,6 +10,8 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 
+from core.models import ChangeLoggingMixin
+
 
 def token_peppers():
     """Return the configured API-token peppers as ``{int id: secret}``.
@@ -81,7 +83,7 @@ class UserPreference(models.Model):
         verbose_name_plural = _("User Preferences")
 
 
-class Token(models.Model):
+class Token(ChangeLoggingMixin, models.Model):
     """
     An API token used for authenticating REST API requests.
 

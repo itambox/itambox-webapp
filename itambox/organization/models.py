@@ -446,7 +446,7 @@ class TenantRole(StandardModel, SoftDeleteMixin):
         return self.name
 
 
-class TenantMembership(models.Model):
+class TenantMembership(ChangeLoggingMixin, models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,

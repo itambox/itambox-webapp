@@ -7,7 +7,6 @@ from django.core.paginator import Paginator
 from django.contrib.contenttypes.models import ContentType
 from django.utils.module_loading import import_string
 from django.shortcuts import reverse
-from users.models import UserPreference
 from django.db.models import Model
 from django.forms.models import model_to_dict
 
@@ -50,6 +49,10 @@ def get_paginate_count(request):
 
     if request.user.is_authenticated:
         try:
+            # Local import: users.models imports ChangeLoggingMixin from core.models,
+            # which imports this module (itambox.utils) — a top-level import here
+            # would close that cycle at app-load time.
+            from users.models import UserPreference
             if not hasattr(request, '_user_preferences_cache'):
                 request._user_preferences_cache = UserPreference.objects.filter(user=request.user).first()
             prefs = request._user_preferences_cache

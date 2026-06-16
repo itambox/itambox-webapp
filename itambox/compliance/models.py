@@ -225,7 +225,7 @@ class AuditSession(StandardModel, SoftDeleteMixin):
         return qs.filter(location=self.location)
 
 
-class AssetAudit(models.Model):
+class AssetAudit(ChangeLoggingMixin, models.Model):
     # Tenant scoping is enforced at the API layer (AssetAuditViewSet uses
     # _scope_by_asset_tenant). The default manager is intentionally unscoped:
     # audit classification/reconciliation reads `session.audits` and must see
