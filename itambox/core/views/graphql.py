@@ -42,6 +42,70 @@ def field_count_limit_validator(max_fields=500, max_aliases=50):
     return FieldCountLimitRule
 
 
+def query_complexity_validator(max_complexity=1000, fan_out=10):
+    """Bound the estimated execution cost of a single operation.
+
+    Depth and field-count limits cap the *shape* of a query but not its *cost*:
+    a query can stay shallow and within the field cap while still triggering
+    O(N*M) database work by nesting *list*-returning fields (e.g.
+    ``assets { components { manufacturer { softwareProducts { name } } } }``).
+    Every list nesting multiplies the number of rows resolved, so a handful of
+    selections can fan out into a denial-of-service.
+
+    This rule accumulates a cost score while walking the query: each field
+    instance costs the product of the fan-out factors of the list fields that
+    enclose it. A list-returning field multiplies the cost of everything beneath
+    it by ``fan_out``; a singular object relation (e.g. ``tenant``) does not,
+    since it resolves a single row. A ``GraphQLError`` is reported when the
+    running total exceeds ``max_complexity``.
+
+    Mirrors :func:`field_count_limit_validator`: a factory returning a
+    ``ValidationRule`` subclass that uses the ``enter_field`` / ``leave_field``
+    visitor hooks and reports via ``self.report_error(GraphQLError(...))``. The
+    base ``ValidationRule`` runs under graphql-core's ``TypeInfo`` visitor, so
+    ``self.context.get_type()`` yields the live output type used to detect lists.
+    """
+    from graphql.validation import ValidationRule
+    from graphql.error import GraphQLError
+    from graphql.type import GraphQLList, GraphQLNonNull
+
+    def _returns_list(output_type):
+        """True if the field's output type is (a non-null wrapper around) a list."""
+        if isinstance(output_type, GraphQLNonNull):
+            output_type = output_type.of_type
+        return isinstance(output_type, GraphQLList)
+
+    class QueryComplexityValidator(ValidationRule):
+        def __init__(self, context):
+            super().__init__(context)
+            self._cost = 0
+            self._reported = False
+            # Stack of cost-multipliers for the enclosing field path. The root
+            # selection set has a multiplier of 1.
+            self._multipliers = [1]
+
+        def enter_field(self, node, *_args):
+            multiplier = self._multipliers[-1]
+            # Each selected field instance costs its enclosing multiplier.
+            self._cost += multiplier
+            if self._cost > max_complexity and not self._reported:
+                self._reported = True
+                self.report_error(GraphQLError(
+                    f'Query exceeds the maximum complexity of {max_complexity}.',
+                    node))
+            # A list-returning field amplifies everything nested beneath it.
+            output_type = self.context.get_type()
+            child_multiplier = multiplier
+            if _returns_list(output_type):
+                child_multiplier *= fan_out
+            self._multipliers.append(child_multiplier)
+
+        def leave_field(self, node, *_args):
+            self._multipliers.pop()
+
+    return QueryComplexityValidator
+
+
 @method_decorator(csrf_exempt, name='dispatch')
 class PrivateGraphQLView(GraphQLView):
     def __init__(self, *args, **kwargs):
@@ -52,6 +116,11 @@ class PrivateGraphQLView(GraphQLView):
         rules = list(specified_rules)
         rules.append(depth_limit_validator(max_depth=10))
         rules.append(field_count_limit_validator(max_fields=500, max_aliases=50))
+        # Budget sized to admit legitimate two-list-deep reads (e.g. the
+        # adversarial-suite query assets->...->softwareProducts->...->
+        # softwareProducts->name, cost ~1231) while still rejecting egregious
+        # fan-out such as many aliased copies of an expensive list-over-list path.
+        rules.append(query_complexity_validator(max_complexity=2000, fan_out=10))
 
         if not settings.DEBUG:
             rules.append(NoSchemaIntrospectionCustomRule)

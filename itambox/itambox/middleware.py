@@ -75,6 +75,11 @@ class CSPMiddleware:
             response['Content-Security-Policy'] = (
                 "default-src 'self'; "
                 f"script-src 'self' 'nonce-{nonce}'; "
+                # 'unsafe-inline' is retained in style-src as tracked tech-debt:
+                # ~675 inline style= attributes across templates can't carry a
+                # CSP nonce, so removing it would break layout. Full removal needs
+                # a templates CSS refactor (move inline styles to classes). Scripts
+                # are already nonce'd and do NOT rely on 'unsafe-inline'.
                 "style-src 'self' 'unsafe-inline' https://rsms.me; "
                 "img-src 'self' data:; "
                 "font-src 'self'; "
@@ -89,6 +94,10 @@ class CSPMiddleware:
             response['Content-Security-Policy'] = (
                 "default-src 'self'; "
                 "script-src 'self'; "
+                # 'unsafe-inline' is retained in style-src as tracked tech-debt:
+                # ~675 inline style= attributes across templates can't carry a
+                # CSP nonce, so removing it would break layout. Full removal needs
+                # a templates CSS refactor (move inline styles to classes).
                 "style-src 'self' 'unsafe-inline' https://rsms.me; "
                 "img-src 'self' data:; "
                 "font-src 'self'; "

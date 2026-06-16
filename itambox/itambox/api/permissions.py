@@ -74,15 +74,9 @@ class TokenPermissions(BasePermission):
                     # Superusers are global and unscoped by default
                     pass
                 else:
-                    import sys
-                    is_testing = 'test' in sys.argv or any('test' in arg or 'pytest' in arg for arg in sys.argv)
-                    if is_testing:
-                        from organization.models import Tenant
-                        first_tenant = Tenant.objects.first()
-                        if first_tenant:
-                            set_current_tenant(first_tenant)
-                    else:
-                        return False
+                    # No membership, no asset-holder profile, not a superuser:
+                    # the request has no resolvable tenant scope. Deny.
+                    return False
 
         return request.user.has_perms(perms)
 

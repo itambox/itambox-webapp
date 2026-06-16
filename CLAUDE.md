@@ -144,6 +144,10 @@ Permissions flow: `TenantMembershipBackend` (`core/auth/__init__.py`) is the fir
 
 The canonical API implementation lives in `itambox/api/`. All app-level API code (`serializers.py`, `views.py`) imports directly from `itambox.api.*`.
 
+### Content Security Policy
+
+`CSPMiddleware` (`itambox/middleware.py`) sets the CSP header. Inline scripts are nonce'd per request (`request.csp_nonce`) — `script-src` does not allow `'unsafe-inline'`. Styles still rely on `'unsafe-inline'` in `style-src`: the ~675 inline `style=` attributes across templates can't carry a nonce, so this is tracked tech-debt pending an inline-style refactor (move inline styles to CSS classes).
+
 ## Architecture: background tasks
 
 Tasks live in `core/tasks/`. Each task function should be wrapped in `TaskContext(tenant_id=..., user_id=...)` to wire up tenant scoping and change-log attribution. Tasks are enqueued with django-q2's `async_task()`, dispatched via `transaction.on_commit()` to avoid running before the triggering transaction commits.
@@ -154,6 +158,7 @@ Tasks live in `core/tasks/`. Each task function should be wrapped in `TaskContex
 |---|---|---|
 | `ITAMBOX_ENV` | `dev` or `prod` | fail-closed to `prod` when unset (dev under tests) |
 | `ITAMBOX_SECRET_KEY` | Django secret key | insecure default (dev only) |
+| `ITAMBOX_FIELD_ENCRYPTION_KEYS` | Comma-separated Fernet keys for field encryption (`License.product_key`, SMTP password, webhook secret); first key encrypts, all keys decrypt (rotation). **Unset derives the key from `SECRET_KEY` — insecure: rotating `SECRET_KEY` then makes encrypted fields unrecoverable.** Set a stable value in prod and back it up. | unset (derives from `SECRET_KEY`) |
 | `ITAMBOX_BASE_URL` | Public base URL for QR labels & outbound links (no trailing slash) | `""` (bare-tag QR used) |
 | `ITAMBOX_DEFAULT_CURRENCY` | ISO 4217 fallback for money display; `{{ value|money:obj }}` resolves tenant currency first | `EUR` |
 | `ITAMBOX_DB_*` | DB connection | `itambox`/`localhost`/`5432` |

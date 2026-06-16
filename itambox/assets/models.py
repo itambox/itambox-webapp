@@ -1,5 +1,8 @@
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Func
+from django.contrib.postgres.constraints import ExclusionConstraint
+from django.contrib.postgres.fields import RangeBoundary, RangeOperators
 from django.utils.translation import gettext_lazy as _
 from django.conf import settings
 from django.urls import reverse
@@ -1404,6 +1407,18 @@ class ReservationStatusChoices(models.TextChoices):
     CANCELLED = 'cancelled', _('Cancelled')
 
 
+class DateRange(Func):
+    """SQL ``daterange(start, end, bounds)`` expression for ExclusionConstraint.
+
+    Used to build a half-open ``[)`` daterange over the two DateField columns so
+    the overlap (``&&``) operator matches the half-open semantics in
+    ``AssetReservation.clean()`` (touching boundaries — one ends the day the next
+    starts — do NOT overlap).
+    """
+    function = 'DATERANGE'
+    output_field = models.fields.Field()  # daterange; only used inside the constraint
+
+
 class AssetReservation(JournalingMixin, SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
     """Reservation of an asset for a specific holder within a date window."""
 
@@ -1454,6 +1469,38 @@ class AssetReservation(JournalingMixin, SoftDeleteMixin, ChangeLoggingMixin, Bas
         ordering = ['start_date']
         verbose_name = _('Asset Reservation')
         verbose_name_plural = _('Asset Reservations')
+        constraints = [
+            # DB-level guard against double-booking. clean() (Python) is kept as
+            # defense-in-depth, but concurrent/programmatic .save() calls bypass
+            # it; this exclusion constraint makes overlap impossible at the row
+            # level. Requires the btree_gist extension (added in the migration)
+            # because it mixes equality (asset) with the overlap operator.
+            #
+            # Half-open '[)' daterange so touching boundaries (one reservation
+            # ends the day the next starts) are allowed, matching clean()'s
+            # start_date < other.end_date AND end_date > other.start_date test.
+            # Only ACTIVE/PENDING + non-soft-deleted rows participate.
+            ExclusionConstraint(
+                name='assetreservation_no_overlap',
+                expressions=[
+                    ('asset', RangeOperators.EQUAL),
+                    (
+                        DateRange(
+                            'start_date',
+                            'end_date',
+                            RangeBoundary(inclusive_lower=True, inclusive_upper=False),
+                        ),
+                        RangeOperators.OVERLAPS,
+                    ),
+                ],
+                condition=models.Q(
+                    status__in=[
+                        ReservationStatusChoices.ACTIVE,
+                        ReservationStatusChoices.PENDING,
+                    ],
+                ) & models.Q(deleted_at__isnull=True),
+            ),
+        ]
 
     def __str__(self):
         holder = self.reserved_for or _('(no holder)')

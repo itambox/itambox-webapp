@@ -96,3 +96,19 @@ if CACHE_BACKEND == 'locmem':
         'replay protection are per-worker. Set ITAMBOX_CACHE_BACKEND=redis '
         '(+ ITAMBOX_REDIS_URL) for multi-worker deployments.'
     )
+
+# Field encryption falls back to deriving its key from SECRET_KEY when no
+# stable ITAMBOX_FIELD_ENCRYPTION_KEYS is set. In that mode, rotating SECRET_KEY
+# silently makes every encrypted field (License.product_key, EmailSettings
+# smtp_password, WebhookEndpoint.secret) permanently unrecoverable. Warn loudly.
+from core.crypto import is_using_derived_encryption_key
+
+if is_using_derived_encryption_key():
+    import logging
+    logging.getLogger(__name__).warning(
+        'ITAMBOX_FIELD_ENCRYPTION_KEYS is not set in production: field encryption '
+        'derives its key from SECRET_KEY. Rotating SECRET_KEY will make all '
+        'encrypted fields (License.product_key, EmailSettings smtp_password, '
+        'WebhookEndpoint.secret) permanently unrecoverable. Set a stable '
+        'ITAMBOX_FIELD_ENCRYPTION_KEYS value and back it up.'
+    )

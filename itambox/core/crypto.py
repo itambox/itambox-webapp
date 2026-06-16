@@ -42,6 +42,22 @@ def get_fernet():
     fernet_key = base64.urlsafe_b64encode(key_bytes)
     return Fernet(fernet_key)
 
+def is_using_derived_encryption_key() -> bool:
+    """
+    True when no usable ITAMBOX_FIELD_ENCRYPTION_KEYS is configured, meaning
+    get_fernet() falls back to deriving the field-encryption key from SECRET_KEY.
+
+    Mirrors the key resolution in get_fernet() exactly: reads the same env var
+    (falling back to the Django setting), strips and splits on commas, and treats
+    the value as usable only if at least one non-empty key remains. When this
+    returns True, rotating SECRET_KEY makes all encrypted fields unrecoverable.
+    """
+    keys_str = os.environ.get('ITAMBOX_FIELD_ENCRYPTION_KEYS') or getattr(settings, 'ITAMBOX_FIELD_ENCRYPTION_KEYS', None)
+    if not keys_str:
+        return True
+    keys = [k.strip() for k in keys_str.split(',') if k.strip()]
+    return not keys
+
 def encrypt_string(plain_text: str) -> str:
     """
     Encrypt a plaintext string and prepend the 'enc$' prefix sentinel.

@@ -63,7 +63,7 @@ def checkout_asset(
         if holder:
             from assets.models import AssetReservation, ReservationStatusChoices
             today = datetime.date.today()
-            blocking = AssetReservation.all_objects.filter(
+            blocking = AssetReservation.all_objects.select_for_update().filter(
                 asset=asset,
                 status__in=[
                     ReservationStatusChoices.ACTIVE,
