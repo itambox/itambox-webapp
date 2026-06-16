@@ -12,7 +12,7 @@ from compliance.forms import AssetMaintenanceForm, AssetMaintenanceFilterForm
 
 
 class AssetMaintenanceListView(ObjectListView):
-    queryset = AssetMaintenance.objects.select_related('asset')
+    queryset = AssetMaintenance.objects.select_related('asset', 'supplier')
     filterset = AssetMaintenanceFilterSet
     filterset_form = AssetMaintenanceFilterForm
     table = AssetMaintenanceTable

@@ -7,6 +7,7 @@ from itambox.views.generic import (
     ObjectDetailView,
     ObjectEditView,
     ObjectDeleteView,
+    ObjectCloneView,
     ObjectImportView,
     ObjectBulkEditView,
     ObjectBulkDeleteView,
@@ -98,20 +99,14 @@ class LicenseDeleteView(ObjectDeleteView):
     default_return_url = 'licenses:license_list'
 
 
-class LicenseCloneView(ObjectEditView):
+class LicenseCloneView(ObjectCloneView):
     model = License
     model_form = forms.LicenseForm
     template_name = 'generic/object_edit.html'
     default_return_url = 'licenses:license_list'
 
-    def get_object(self, queryset=None):
-        original = get_object_or_404(License, pk=self.kwargs['pk'])
-        cloned = original.clone()
-        cloned.name = f'{original.name} (Copy)'
+    def pre_save_clone(self, original, cloned):
         cloned.product_key = ''
-        cloned.save()
-        cloned.tags.set(original.tags.all())
-        return cloned
 
 
 class LicenseBulkEditView(ObjectBulkEditView):

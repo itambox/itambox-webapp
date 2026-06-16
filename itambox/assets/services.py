@@ -283,6 +283,8 @@ def dispose_asset(
     everything succeeds or nothing is written.
     """
     from assets.models import AssetDisposal  # local import avoids circular at module load
+    from assets.depreciation import compute_book_value
+    from decimal import Decimal
 
     with transaction.atomic():
         # Lock the asset row to prevent concurrent mutations
@@ -318,9 +320,13 @@ def dispose_asset(
         disposal.save()
 
         # Update the asset: stamp disposal fields and transition status
-        asset.disposed_at = timezone.now()
         if proceeds is not None:
             asset.disposal_value = proceeds
+        else:
+            # Freeze the depreciated residual at the disposal date BEFORE setting
+            # disposed_at (compute_book_value short-circuits once disposed_at is set).
+            asset.disposal_value = compute_book_value(asset, on_date=disposal_date) or Decimal('0.00')
+        asset.disposed_at = timezone.now()
 
         if archived_label:
             asset.status = archived_label

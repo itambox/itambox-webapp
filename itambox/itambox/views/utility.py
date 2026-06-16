@@ -26,7 +26,7 @@ class SearchView(LoginRequiredMixin, BaseHTMXView, TemplateResponseMixin, View):
 
         lookup = request.GET.get('lookup', 'icontains')
 
-        allowed_lookups = {'icontains', 'iexact', 'istartswith', 'iendswith', 'iregex'}
+        allowed_lookups = {'icontains', 'iexact', 'istartswith', 'iendswith'}
         if lookup not in allowed_lookups:
             lookup = 'icontains'
 

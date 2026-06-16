@@ -933,12 +933,12 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         constraints = [
             models.UniqueConstraint(
                 fields=['tenant', 'prefix'],
-                condition=models.Q(tenant__isnull=False),
+                condition=models.Q(tenant__isnull=False) & models.Q(deleted_at__isnull=True),
                 name='unique_tenant_prefix'
             ),
             models.UniqueConstraint(
                 fields=['prefix'],
-                condition=models.Q(tenant__isnull=True),
+                condition=models.Q(tenant__isnull=True) & models.Q(deleted_at__isnull=True),
                 name='unique_global_prefix'
             )
         ]

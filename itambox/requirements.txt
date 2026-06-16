@@ -34,7 +34,7 @@ pyOpenSSL>=24.3,<27
 # API / web
 django-cors-headers>=4.4,<5.0
 requests>=2.31,<3.0
-gunicorn>=21.2,<22.0
+gunicorn>=23.0,<24.0
 whitenoise>=6.6,<7.0
 
 # Database

@@ -54,9 +54,6 @@ class RateLimitMiddleware:
                 break
                 
         if is_limited:
-            # Bypass rate limit for authenticated users
-            if hasattr(request, 'user') and request.user.is_authenticated:
-                return self.get_response(request)
             ip = self.get_client_ip(request)
             key = f"ratelimit_{ip}_{path}"
 

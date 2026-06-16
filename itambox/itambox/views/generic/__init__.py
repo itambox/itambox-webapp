@@ -286,6 +286,10 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
 class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, CachedObjectMixin, DetailView):
     template_name = 'generic/object_detail.html'
     layout = None
+    # Opt-in escape hatch: when True, skip the per-reverse-relation .count()
+    # loop entirely (10-15 COUNTs/page) and supply an empty list. Default False
+    # preserves identical behavior for every existing detail view.
+    disable_related_objects_list = False
 
     def render_to_response(self, context, **response_kwargs):
         # Tables shown in detail-view tabs opt into the shared batch-action bar
@@ -522,7 +526,9 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
                 context['is_watched'] = False
 
 
-        if 'related_objects_list' not in context:
+        if 'related_objects_list' not in context and self.disable_related_objects_list:
+            context['related_objects_list'] = []
+        elif 'related_objects_list' not in context:
             related_objects_list = []
             for relation in obj._meta.get_fields(include_parents=True):
                 if not relation.is_relation or relation.concrete:

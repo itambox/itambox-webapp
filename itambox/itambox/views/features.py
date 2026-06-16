@@ -31,8 +31,19 @@ from itambox.registry import registry
 from itambox.panels import Panel
 
 from .generic import BaseHTMXView, ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
+from itambox.views.generic.utils import safe_return_url
 
 logger = logging.getLogger(__name__)
+
+
+def _csv_safe(value):
+    """Neutralize CSV formula injection: a cell whose first character is one a
+    spreadsheet treats as a formula trigger is prefixed with a single quote so
+    it is rendered as literal text rather than evaluated."""
+    text = '' if value is None else str(value)
+    if text and text[0] in ('=', '+', '-', '@', '\t', '\r'):
+        return "'" + text
+    return text
 
 
 @method_decorator(login_required, name='dispatch')
@@ -250,9 +261,7 @@ class ObjectExportView(LoginRequiredMixin, View):
                             row.append('***')
                             continue
                         val = getattr(obj, field.name)
-                        if val is None:
-                            val = ''
-                        row.append(str(val))
+                        row.append(_csv_safe(val))
                     writer.writerow(row)
                 return response
 
@@ -326,10 +335,11 @@ class JournalEntryCreateView(LoginRequiredMixin, View):
             messages.success(request, 'Journal entry added.')
         else:
             messages.error(request, 'Could not add journal entry.')
-        redirect_url = request.POST.get('return_url') or request.META.get('HTTP_REFERER')
-        if redirect_url:
-            return HttpResponseRedirect(redirect_url)
-        return redirect(obj)
+        return HttpResponseRedirect(safe_return_url(
+            request,
+            request.POST.get('return_url') or request.META.get('HTTP_REFERER'),
+            obj.get_absolute_url(),
+        ))
 
 
 class ImageAttachmentUploadView(LoginRequiredMixin, View):
@@ -349,7 +359,7 @@ class ImageAttachmentUploadView(LoginRequiredMixin, View):
                 name=uploaded_file.name,
             )
             messages.success(request, f"Image '{uploaded_file.name}' uploaded.")
-        return redirect(request.POST.get('return_url', obj.get_absolute_url()))
+        return redirect(safe_return_url(request, request.POST.get('return_url'), obj.get_absolute_url()))
 
 
 class FileAttachmentUploadView(LoginRequiredMixin, View):
@@ -372,7 +382,7 @@ class FileAttachmentUploadView(LoginRequiredMixin, View):
                 mime_type=mime_type or '',
             )
             messages.success(request, f"File '{uploaded_file.name}' uploaded.")
-        return redirect(request.POST.get('return_url', obj.get_absolute_url()))
+        return redirect(safe_return_url(request, request.POST.get('return_url'), obj.get_absolute_url()))
 
 
 def _check_attachment_parent_access(request, content_type, object_id):
@@ -394,7 +404,7 @@ class ImageAttachmentDeleteView(LoginRequiredMixin, View):
     def post(self, request, pk):
         attachment = get_object_or_404(ImageAttachment, pk=pk)
         _check_attachment_parent_access(request, attachment.model, attachment.object_id)
-        obj_url = request.POST.get('return_url', '/')
+        obj_url = safe_return_url(request, request.POST.get('return_url'), '/')
         attachment.delete()
         messages.success(request, f"Image '{attachment.name}' deleted.")
         return redirect(obj_url)
@@ -404,7 +414,7 @@ class FileAttachmentDeleteView(LoginRequiredMixin, View):
     def post(self, request, pk):
         attachment = get_object_or_404(FileAttachment, pk=pk)
         _check_attachment_parent_access(request, attachment.model, attachment.object_id)
-        obj_url = request.POST.get('return_url', '/')
+        obj_url = safe_return_url(request, request.POST.get('return_url'), '/')
         attachment.delete()
         messages.success(request, f"File '{attachment.name}' deleted.")
         return redirect(obj_url)

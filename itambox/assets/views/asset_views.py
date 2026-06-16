@@ -48,6 +48,7 @@ class AssetListView(ObjectListView):
         'asset_role',
         'asset_type',
         'asset_type__manufacturer',
+        'asset_type__category',
         'location',
         'tenant',
         'status',

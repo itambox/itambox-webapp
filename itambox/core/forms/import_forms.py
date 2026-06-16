@@ -8,10 +8,16 @@ import logging
 import yaml
 
 from django import forms
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 logger = logging.getLogger(__name__)
+
+# Upper bound on rows accepted in a single bulk import. Beyond this, the request
+# is rejected so a single submission can't exhaust memory / hold a transaction
+# open indefinitely; large datasets should be split into batches.
+MAX_IMPORT_ROWS = getattr(settings, 'MAX_IMPORT_ROWS', 10000)
 
 # Fields that are never user-importable: set from request context, computed by
 # background tasks, or framework-managed. Excluded from both the dynamic field
@@ -219,6 +225,11 @@ class BulkImportForm(forms.Form):
             if not rows:
                 raise ValidationError(_('CSV data is empty.'))
 
+            if len(rows) > MAX_IMPORT_ROWS:
+                raise ValidationError(
+                    _('Import exceeds the maximum of {max} rows; split into smaller batches.').format(max=MAX_IMPORT_ROWS)
+                )
+
             headers = set(rows[0].keys())
             headers = {h.strip() if h else '' for h in headers}
             missing_required = [f for f in self.required_fields if f not in headers]
@@ -249,6 +260,11 @@ class BulkImportForm(forms.Form):
 
             if not parsed_yaml or not isinstance(parsed_yaml[0], dict):
                 raise ValidationError(_('YAML data elements must be mappings (key-value pairs).'))
+
+            if len(parsed_yaml) > MAX_IMPORT_ROWS:
+                raise ValidationError(
+                    _('Import exceeds the maximum of {max} rows; split into smaller batches.').format(max=MAX_IMPORT_ROWS)
+                )
 
             headers = set(parsed_yaml[0].keys())
             missing_required = [f for f in self.required_fields if f not in headers]
@@ -300,6 +316,10 @@ class BulkImportForm(forms.Form):
                 if pk_val:
                     try:
                         instance = self.model.objects.get(pk=pk_val)
+                        # Capture the pre-update state so ChangeLoggingMixin logs an
+                        # accurate diff instead of re-fetching the row per import row.
+                        if hasattr(instance, 'snapshot'):
+                            instance.snapshot()
                         # Perform in-place field updates
                         for key, val in mapped.items():
                             if key != pk_name:

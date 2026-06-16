@@ -13,7 +13,7 @@ from .filters import PurchaseOrderFilterSet, ContractFilterSet
 from .forms import PurchaseOrderForm, PurchaseOrderLineForm, ContractForm
 
 class PurchaseOrderListView(ObjectListView):
-    queryset = PurchaseOrder.objects.all()
+    queryset = PurchaseOrder.objects.select_related('supplier', 'destination_location')
     filterset_class = PurchaseOrderFilterSet
     table_class = PurchaseOrderTable
     template_name = 'procurement/purchaseorder_list.html'
@@ -480,7 +480,7 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
 # ---------------------------------------------------------------------------
 
 class ContractListView(ObjectListView):
-    queryset = Contract.objects.all()
+    queryset = Contract.objects.select_related('supplier')
     filterset_class = ContractFilterSet
     table_class = ContractTable
     template_name = 'procurement/contract_list.html'

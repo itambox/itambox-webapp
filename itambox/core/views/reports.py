@@ -106,17 +106,6 @@ class ScheduledReportListView(ObjectListView):
         return context
 
 
-@method_decorator(login_required, name='dispatch')
-class ScheduledReportCreateView(ObjectEditView):
-    queryset = ScheduledReport.objects.all()
-    model_form = ScheduledReportForm
-    template_name = 'core/reports/report_schedule_form.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['title'] = 'Schedule a Report'
-        return context
-
 def handle_report_scheduling(sched_report):
     from django_q.models import Schedule
     from django.utils import timezone

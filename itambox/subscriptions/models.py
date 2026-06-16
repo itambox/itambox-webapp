@@ -90,32 +90,32 @@ class Provider(AutoSlugMixin, StandardModel, SoftDeleteMixin):
             ),
             models.UniqueConstraint(
                 fields=['tenant', 'name'],
-                condition=models.Q(tenant__isnull=False),
+                condition=models.Q(tenant__isnull=False) & models.Q(deleted_at__isnull=True),
                 name='unique_tenant_provider_name'
             ),
             models.UniqueConstraint(
                 fields=['tenant', 'slug'],
-                condition=models.Q(tenant__isnull=False),
+                condition=models.Q(tenant__isnull=False) & models.Q(deleted_at__isnull=True),
                 name='unique_tenant_provider_slug'
             ),
             models.UniqueConstraint(
                 fields=['tenant_group', 'name'],
-                condition=models.Q(tenant_group__isnull=False),
+                condition=models.Q(tenant_group__isnull=False) & models.Q(deleted_at__isnull=True),
                 name='unique_tenant_group_provider_name'
             ),
             models.UniqueConstraint(
                 fields=['tenant_group', 'slug'],
-                condition=models.Q(tenant_group__isnull=False),
+                condition=models.Q(tenant_group__isnull=False) & models.Q(deleted_at__isnull=True),
                 name='unique_tenant_group_provider_slug'
             ),
             models.UniqueConstraint(
                 fields=['name'],
-                condition=models.Q(tenant__isnull=True) & models.Q(tenant_group__isnull=True),
+                condition=models.Q(tenant__isnull=True) & models.Q(tenant_group__isnull=True) & models.Q(deleted_at__isnull=True),
                 name='unique_global_provider_name'
             ),
             models.UniqueConstraint(
                 fields=['slug'],
-                condition=models.Q(tenant__isnull=True) & models.Q(tenant_group__isnull=True),
+                condition=models.Q(tenant__isnull=True) & models.Q(tenant_group__isnull=True) & models.Q(deleted_at__isnull=True),
                 name='unique_global_provider_slug'
             )
         ]

@@ -35,6 +35,10 @@ SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
+# Cap idle session lifetime in production (default 8h) — the 2-week Django
+# default is too long for a multi-tenant asset system. Override via env.
+SESSION_COOKIE_AGE = int(os.environ.get('ITAMBOX_SESSION_COOKIE_AGE', '28800'))
+
 # ------------------------------------------------------------------------------
 # Static files: served by WhiteNoise straight from gunicorn (compressed +
 # content-hashed). Add the middleware immediately after SecurityMiddleware.
@@ -81,3 +85,14 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
     ],
 }
+
+# Rate limiting and SAML replay protection share the 'default' cache. Under
+# multi-worker gunicorn a per-process LocMemCache makes counters per-worker
+# (login limit x workers) and weakens SAML replay protection. Warn loudly.
+if CACHE_BACKEND == 'locmem':
+    import logging
+    logging.getLogger(__name__).warning(
+        'ITAMBOX_CACHE_BACKEND=locmem in production: rate-limit counters and SAML '
+        'replay protection are per-worker. Set ITAMBOX_CACHE_BACKEND=redis '
+        '(+ ITAMBOX_REDIS_URL) for multi-worker deployments.'
+    )

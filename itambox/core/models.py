@@ -1,6 +1,8 @@
 # Standard library
 from __future__ import annotations
 
+import contextvars
+
 # Third-party / Django
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
@@ -153,6 +155,11 @@ class ObjectChange(models.Model):
         return None
 
 
+# Per-request cache of validated user pks for the changelog. Keyed on request_id
+# so it auto-invalidates when a new request/task begins (no cross-request leak).
+_user_validation_cache = contextvars.ContextVar('user_validation_cache', default=None)
+
+
 class ChangeLoggingMixin:
     _change_logging_excluded_fields = ['updated_at']
 
@@ -175,10 +182,18 @@ class ChangeLoggingMixin:
             return
 
         if user:
-            from django.contrib.auth import get_user_model
-            User = get_user_model()
-            if not User.objects.filter(pk=user.pk).exists():
-                user = None
+            cache = _user_validation_cache.get()
+            if cache is None or cache[0] != request_id:
+                cache = (request_id, set())
+                _user_validation_cache.set(cache)
+            validated = cache[1]
+            if user.pk not in validated:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                if User.objects.filter(pk=user.pk).exists():
+                    validated.add(user.pk)
+                else:
+                    user = None
 
         ct = ContentType.objects.get_for_model(self.__class__)
 
