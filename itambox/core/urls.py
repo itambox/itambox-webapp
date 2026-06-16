@@ -61,6 +61,7 @@ from core.views.reports import (
     ReportTriggerImmediateView, ReportTemplatePreviewView, ReportTemplateDownloadView
 )
 from core.auth.oidc import TenantOIDCAuthorizeView, TenantOIDCCallbackView
+from core.views.mfa import MFASetupView
 
 
 # Main URL Patterns
@@ -72,6 +73,8 @@ urlpatterns = [
 
     path('admin/', admin.site.urls),
     path('accounts/', include('django.contrib.auth.urls')),
+    # MFA gate (TOTP) for local-password logins; the OTP middleware redirects here.
+    path('accounts/mfa/', MFASetupView.as_view(), name='mfa_setup'),
     path('', dashboard_views.DashboardView.as_view(), name='dashboard'),  # Root dashboard (extras owns dashboards)
 
     # Search Path

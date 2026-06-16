@@ -1,0 +1,128 @@
+{% extends "base_public.html" %}
+{% load i18n %}
+{% load crispy_forms_tags %}
+
+{% block title %}{% translate "Two-Factor Authentication" %} {% translate "- ITAMbox" %}{% endblock %}
+
+{% block content %}
+<div class="container-tight py-4">
+    <div class="text-center mb-4">
+        <a href="." class="navbar-brand">
+             {% with brand_height="48px" %}{% include "global_includes/_brand_lockup.html" %}{% endwith %}
+        </a>
+    </div>
+    <div class="card card-md">
+        {% if mode == 'backup_codes' %}
+            {# ── One-time display of the freshly generated backup codes ── #}
+            <div class="card-body">
+                <h2 class="h2 text-center mb-2">{% translate "Save your backup codes" %}</h2>
+                <p class="text-secondary text-center mb-4">
+                    {% translate "Store these somewhere safe. Each code works once if you lose access to your authenticator app. They will not be shown again." %}
+                </p>
+                <div class="alert alert-warning" role="alert">
+                    <div class="d-flex">
+                        <div>
+                            <i class="mdi mdi-alert-outline alert-icon"></i>
+                        </div>
+                        <div>
+                            {% translate "This is the only time these codes are displayed." %}
+                        </div>
+                    </div>
+                </div>
+                <div class="card card-sm mb-4">
+                    <div class="card-body">
+                        <div class="row g-2 font-monospace text-center">
+                            {% for code in backup_codes %}
+                                <div class="col-6">{{ code }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <div class="form-footer">
+                    <a href="{{ next }}" class="btn btn-primary w-100">
+                        {% translate "I've saved my codes — continue" %}
+                    </a>
+                </div>
+            </div>
+
+        {% elif mode == 'verify' %}
+            {# ── Already enrolled: verify a TOTP or backup code ── #}
+            <div class="card-body">
+                <h2 class="h2 text-center mb-4">{% translate "Two-Factor Authentication" %}</h2>
+                <p class="text-secondary text-center mb-4">
+                    {% translate "Enter the 6-digit code from your authenticator app to continue." %}
+                </p>
+
+                {% if form.errors %}
+                    <div class="alert alert-danger" role="alert">
+                        <div class="d-flex">
+                            <div>
+                                <i class="mdi mdi-alert-circle-outline alert-icon"></i>
+                            </div>
+                            <div>
+                                {{ form.code.errors|join:" " }}
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+
+                <form method="post" action="{% url 'mfa_setup' %}">
+                    {% csrf_token %}
+                    {{ form.code|as_crispy_field }}
+                    <input type="hidden" name="next" value="{{ next }}">
+                    <div class="form-footer">
+                        <button type="submit" class="btn btn-primary w-100">{% translate "Verify" %}</button>
+                    </div>
+                </form>
+                <p class="text-secondary text-center mt-3 small mb-0">
+                    {% translate "Lost your device? Enter one of your backup codes above instead." %}
+                </p>
+            </div>
+
+        {% else %}
+            {# ── Enrollment: scan the QR / enter the secret, then confirm ── #}
+            <div class="card-body">
+                <h2 class="h2 text-center mb-2">{% translate "Set up Two-Factor Authentication" %}</h2>
+                <p class="text-secondary text-center mb-4">
+                    {% translate "Your account requires two-factor authentication. Scan the QR code with an authenticator app (such as Google Authenticator, 1Password, or Authy)." %}
+                </p>
+
+                {% if form.errors %}
+                    <div class="alert alert-danger" role="alert">
+                        <div class="d-flex">
+                            <div>
+                                <i class="mdi mdi-alert-circle-outline alert-icon"></i>
+                            </div>
+                            <div>
+                                {{ form.code.errors|join:" " }}
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+
+                <div class="text-center mb-3">
+                    <img src="{{ qr_src }}" alt="{% translate 'TOTP QR code' %}" width="200" height="200" class="img-fluid">
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label">{% translate "Or enter this key manually" %}</label>
+                    <input type="text" class="form-control font-monospace text-center" value="{{ secret }}" readonly>
+                </div>
+
+                <form method="post" action="{% url 'mfa_setup' %}">
+                    {% csrf_token %}
+                    {{ form.code|as_crispy_field }}
+                    <input type="hidden" name="next" value="{{ next }}">
+                    <div class="form-footer">
+                        <button type="submit" class="btn btn-primary w-100">{% translate "Confirm & enable" %}</button>
+                    </div>
+                </form>
+            </div>
+        {% endif %}
+    </div>
+    <div class="text-center text-muted mt-3 small">
+        <a href="{% url 'logout' %}">{% translate "Sign out" %}</a>
+    </div>
+    <div class="text-center text-muted mt-2 small">ITAMbox v{{ settings.VERSION }}</div>
+</div>
+{% endblock %}

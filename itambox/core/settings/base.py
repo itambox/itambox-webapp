@@ -55,6 +55,10 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.humanize',
+    # MFA (TOTP) for local password login — must follow django.contrib.auth.
+    'django_otp',
+    'django_otp.plugins.otp_totp',
+    'django_otp.plugins.otp_static',
     'corsheaders',
     'assets',
     'inventory',
@@ -90,6 +94,10 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    # django-otp must follow AuthenticationMiddleware; our enforcement gate runs
+    # right after so request.user.is_verified() is available to it.
+    'django_otp.middleware.OTPMiddleware',
+    'core.otp_middleware.OTPEnforcementMiddleware',
     'itambox.middleware.RateLimitMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -289,6 +297,12 @@ AUTHENTICATION_BACKENDS = [
     'core.auth.oidc.TenantOIDCBackend',
     'core.auth.PasswordLoginOnlyBackend',
 ]
+
+# Enforce TOTP MFA for local-password logins by superusers/owner/admin roles
+# (OTPEnforcementMiddleware). Off by default so dev/test behave as before; prod
+# turns it on (see prod.py). SSO/LDAP/SAML/OIDC delegate MFA to the IdP and are
+# always exempt regardless of this flag.
+MFA_ENFORCED = os.environ.get('ITAMBOX_REQUIRE_MFA', 'False').lower() in ('true', '1', 't')
 
 DEFAULT_PAGINATE_COUNT = 25
 PAGINATE_COUNT_CHOICES = (

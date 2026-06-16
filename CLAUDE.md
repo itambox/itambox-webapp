@@ -170,6 +170,7 @@ Tasks live in `core/tasks/`. Each task function should be wrapped in `TaskContex
 | `ITAMBOX_TENANT_OIDC_CONFIGS` | JSON per-tenant OIDC configs | `{}` |
 | `ITAMBOX_TENANT_INTUNE_CONFIGS` | JSON per-tenant Intune discovery configs | `{}` |
 | `ITAMBOX_DOCS_ROOT` | Filesystem path to compiled MkDocs output | `BASE_DIR/docs` |
+| `ITAMBOX_REQUIRE_MFA` | Enforce TOTP MFA (django-otp) for local-password logins by superusers/owner-admin roles. SSO/LDAP/SAML/OIDC delegate MFA to the IdP and are always exempt. | `False` (dev); `True` (prod) |
 | `ITAMBOX_REQUIRE_CUSTODY_SIGNIN` | Require digital signature on custody receipt sign-off | `True` |
 | `ITAMBOX_ALLOW_GLOBAL_CUSTODY_TEMPLATES` | Allow custody templates not scoped to a tenant | `True` |
 | `ITAMBOX_SERVER_EMAIL` | From-address for error emails (prod only) | `DEFAULT_FROM_EMAIL` |

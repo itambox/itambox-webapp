@@ -23,6 +23,7 @@ graphene-django>=3.2,<3.3
 graphene>=3.3,<4.0
 
 # Auth / SSO
+django-otp>=1.4,<1.5  # TOTP MFA for local password login (QR via segno, below)
 django-auth-ldap>=5.1,<6.0
 djangosaml2>=1.9,<2.0
 mozilla-django-oidc>=5.0.2,<6.0.0

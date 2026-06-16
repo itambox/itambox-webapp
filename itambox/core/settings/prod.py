@@ -39,6 +39,10 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 # default is too long for a multi-tenant asset system. Override via env.
 SESSION_COOKIE_AGE = int(os.environ.get('ITAMBOX_SESSION_COOKIE_AGE', '28800'))
 
+# Enforce TOTP MFA in production for superuser/owner/admin password logins.
+# Override with ITAMBOX_REQUIRE_MFA=False to temporarily disable.
+MFA_ENFORCED = os.environ.get('ITAMBOX_REQUIRE_MFA', 'True').lower() in ('true', '1', 't')
+
 # ------------------------------------------------------------------------------
 # Static files: served by WhiteNoise straight from gunicorn (compressed +
 # content-hashed). Add the middleware immediately after SecurityMiddleware.
