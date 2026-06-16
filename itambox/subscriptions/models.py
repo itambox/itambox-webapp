@@ -385,12 +385,19 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
 
 
 class SubscriptionAssignment(ChangeLoggingMixin, BaseModel):
+    tenant_lookup = 'subscription__tenant'
+    objects = TenantScopingManager()
+
     """Flexibly links a Subscription to the entity (or entities) it covers."""
     subscription = models.ForeignKey(
         to=Subscription,
         on_delete=models.CASCADE,
         related_name='assignments'
     )
+
+    @property
+    def tenant(self):
+        return self.subscription.tenant if self.subscription_id else None
     content_type = models.ForeignKey(
         to=ContentType,
         on_delete=models.CASCADE,

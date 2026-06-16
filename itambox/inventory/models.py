@@ -486,6 +486,13 @@ class Kit(JournalingMixin, TaggableMixin, CloneableMixin, ExportableMixin, SoftD
 
 
 class KitItem(ChangeLoggingMixin, BaseModel):
+    tenant_lookup = 'kit__tenant'
+    objects = TenantScopingManager()
+
+    @property
+    def tenant(self):
+        return self.kit.tenant if self.kit_id else None
+
     kit = models.ForeignKey(Kit, on_delete=models.CASCADE, related_name='items', verbose_name="Kit", db_index=True)
     asset_type = models.ForeignKey('assets.AssetType', on_delete=models.PROTECT, null=True, blank=True, related_name='kit_items', verbose_name="Asset Type / Model")
     accessory = models.ForeignKey(Accessory, on_delete=models.PROTECT, null=True, blank=True, related_name='kit_items', verbose_name="Accessory Catalog Item")

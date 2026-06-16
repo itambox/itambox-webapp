@@ -394,6 +394,17 @@ class ContactAssignment(ChangeLoggingMixin, BaseModel):
         verbose_name = _("Contact Assignment")
         verbose_name_plural = _("Contact Assignments")
 
+    @property
+    def tenant(self):
+        # Contact is NOT tenant-scoped (no `tenant` field; SoftDeleteManager),
+        # so the only tenant signal for an assignment is the generic-FK target.
+        # Exposing `tenant` lets StrictTenantPermission enforce the object-level
+        # boundary on detail/mutation: it compares obj.tenant to the request's
+        # active tenant. Targets with no tenant (global/shared catalogue rows)
+        # return None and remain accessible, matching validate_gfk_target_tenant.
+        obj = self.assigned_object
+        return getattr(obj, 'tenant', None) if obj is not None else None
+
     def __str__(self):
         return f"{self.contact} ({self.role}) assigned to {self.assigned_object}"
 

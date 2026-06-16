@@ -57,8 +57,18 @@ class SoftwareAPITests(APITestCase):
             role=self.role
         )
 
+    def _activate_tenant(self):
+        # SoftwareViewSet now enforces StrictTenantPermission, which reads
+        # request.active_tenant (resolved by TenantMiddleware from the session).
+        # force_authenticate alone does not set it, so activate the tenant the
+        # same way the security-boundary tests do.
+        session = self.client.session
+        session['active_tenant_id'] = self.tenant.pk
+        session.save()
+
     def test_software_api_list_and_detail(self):
-        self.client.force_authenticate(user=self.staff)
+        self.client.force_login(self.staff)
+        self._activate_tenant()
 
         # Test list endpoint
         list_url = reverse('api:software_api:software-list')
@@ -74,7 +84,8 @@ class SoftwareAPITests(APITestCase):
         self.assertEqual(response.data['version'], "16.0")
 
     def test_software_api_create_and_update_with_permissions(self):
-        self.client.force_authenticate(user=self.staff)
+        self.client.force_login(self.staff)
+        self._activate_tenant()
 
         # 1. Create a Software record
         list_url = reverse('api:software_api:software-list')
@@ -115,7 +126,8 @@ class SoftwareAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_software_api_delete_verifies_cascade_protection(self):
-        self.client.force_authenticate(user=self.staff)
+        self.client.force_login(self.staff)
+        self._activate_tenant()
 
         # Verify initial record
         self.assertTrue(Software.objects.filter(pk=self.software.pk).exists())

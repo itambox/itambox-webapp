@@ -43,7 +43,11 @@ class GenericObjectSerializer(serializers.Serializer):
         return {
             'object_type': f"{ct.app_label}.{ct.model}",
             'object_id': instance.pk,
-            'object': GFKSerializerField().to_representation(instance) if 'request' in self.context else None,
+            # Reuse the BOUND field (self.fields['object']) rather than a fresh
+            # GFKSerializerField(): the bound field inherits this serializer's
+            # context, so GFKSerializerField.to_representation can read
+            # context['request']. A fresh instance has empty context -> KeyError.
+            'object': self.fields['object'].to_representation(instance) if 'request' in self.context else None,
         }
 
 

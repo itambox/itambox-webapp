@@ -18,7 +18,7 @@ class LicenseTypeChoices(models.TextChoices):
     SUBSCRIPTION_SEAT = 'subscription_seat', _('Subscription Seat')
     # Add others like 'Device', 'User CAL', 'Processor', 'Core' if needed later
 
-from core.managers import SoftDeleteQuerySet, SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager
+from core.managers import AllObjectsManager, TenantScopingSoftDeleteManager
 
 from core.managers import TenantScopingSoftDeleteQuerySet
 
@@ -164,8 +164,18 @@ class License(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
         return max(0, self.seats - assigned_count)
 
 class LicenseSeatAssignment(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
-    objects = SoftDeleteManager()
+    # No direct `tenant` field: a seat derives its tenant from its license.
+    # `tenant_lookup` lets TenantScopingSoftDeleteManager scope queries through
+    # the FK, and the `tenant` property lets DRF StrictTenantPermission enforce
+    # the object-level boundary on detail/mutation endpoints.
+    tenant_lookup = 'license__tenant'
+
+    objects = TenantScopingSoftDeleteManager()
     all_objects = AllObjectsManager()
+
+    @property
+    def tenant(self):
+        return self.license.tenant if self.license_id else None
 
     """Tracks the explicit assignment of one license seat to an asset or holder."""
     license = models.ForeignKey(

@@ -270,7 +270,11 @@ class ContactAssignmentSerializer(BaseModelSerializer):
     role_id = serializers.PrimaryKeyRelatedField(
         queryset=ContactRole.objects.all(), source='role', write_only=True
     )
-    assigned_object_type = ContentTypeField(queryset=ContentType.objects.all())
+    # `source='content_type'` maps this API alias to the GFK's actual model field;
+    # without it, read serialization does getattr(obj, 'assigned_object_type') and
+    # raises AttributeError (the list/detail endpoints 500'd). validate() already
+    # accepts the value under either key.
+    assigned_object_type = ContentTypeField(queryset=ContentType.objects.all(), source='content_type')
     assigned_object = GenericObjectSerializer(read_only=True)
 
     class Meta:

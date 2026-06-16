@@ -18,10 +18,41 @@ class UserViewSet(ITAMBoxReadOnlyModelViewSet):
     queryset = User.objects.all().prefetch_related('groups')
     serializer_class = UserSerializer
 
+    def get_queryset(self):
+        # User has no `tenant` field, so StrictTenantPermission/filter_by_tenant
+        # cannot scope this set and the base queryset would expose every tenant's
+        # users (incl. is_staff/email) — cross-tenant user enumeration. Scope to
+        # users who share the requester's active tenant via the TenantMembership
+        # reverse relation (`memberships`). Superusers remain unscoped.
+        from core.managers import get_current_tenant
+
+        qs = super().get_queryset()
+        if self.request.user.is_superuser:
+            return qs
+        active_tenant = get_current_tenant()
+        if active_tenant is None:
+            return qs.none()
+        return qs.filter(memberships__tenant=active_tenant).distinct()
+
 
 class GroupViewSet(ITAMBoxReadOnlyModelViewSet):
     queryset = Group.objects.all().annotate(user_count=Count('user'))
     serializer_class = GroupSerializer
+
+    def get_queryset(self):
+        # Group has no `tenant` field either; scope to groups that have at least
+        # one member in the requester's active tenant. The path Group -> User is
+        # the default reverse `user`, then User -> TenantMembership is `memberships`.
+        # Superusers remain unscoped; no active tenant fails closed to none().
+        from core.managers import get_current_tenant
+
+        qs = super().get_queryset()
+        if self.request.user.is_superuser:
+            return qs
+        active_tenant = get_current_tenant()
+        if active_tenant is None:
+            return qs.none()
+        return qs.filter(user__memberships__tenant=active_tenant).distinct()
 
 
 class TokenViewSet(ITAMBoxModelViewSet):

@@ -1,7 +1,7 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.permissions import BasePermission
 
-from itambox.api.permissions import TokenPermissions
+from itambox.api.permissions import TokenPermissions, StrictTenantPermission
 from itambox.api.viewsets import ITAMBoxModelViewSet, ITAMBoxReadOnlyModelViewSet
 from software.filters import SoftwareFilterSet
 from software.models import Software, InstalledSoftware
@@ -9,7 +9,12 @@ from .serializers import SoftwareSerializer, InstalledSoftwareSerializer
 
 
 class SoftwareViewSet(ITAMBoxModelViewSet):
-    permission_classes: list[type[BasePermission]] = [TokenPermissions]
+    # StrictTenantPermission enforces the object-level tenant boundary so a
+    # tenant-A member cannot PATCH/DELETE a tenant-B Software (Software has a
+    # `tenant` field that the permission reads). Without it, the override to
+    # [TokenPermissions] dropped the global default and left detail mutations
+    # cross-tenant. List scoping is already handled by the model's manager.
+    permission_classes: list[type[BasePermission]] = [TokenPermissions, StrictTenantPermission]
     queryset = Software.objects.select_related('manufacturer').prefetch_related('tags').all()
     serializer_class: type[SoftwareSerializer] = SoftwareSerializer
     filter_backends: tuple = (DjangoFilterBackend,)

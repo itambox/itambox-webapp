@@ -8,7 +8,7 @@ from itambox.api.permissions import TokenPermissions, StrictTenantPermission
 
 class LicenseViewSet(ITAMBoxModelViewSet):
     permission_classes = [TokenPermissions, StrictTenantPermission]
-    queryset = License.objects.select_related(
+    queryset = License.objects.with_counts().select_related(
         'software__manufacturer'
     ).prefetch_related('tags').all()
     serializer_class = LicenseSerializer
