@@ -4,3 +4,4 @@ model-bakery>=1.23.4
 mkdocs>=1.6.1,<2.0
 mkdocs-material>=9.5
 pytest-cov
+pytest-xdist

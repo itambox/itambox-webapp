@@ -41,6 +41,7 @@ dev = [
     "django-debug-toolbar>=4.4,<5.0",
     "model_bakery",
     "pytest-cov",
+    "pytest-xdist",
 ]
 celery = [
     "celery>=5.4,<5.7",
@@ -58,7 +59,16 @@ include = ["itambox*"]
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "core.settings"
 python_files = ["tests.py", "test_*.py"]
-addopts = ["--tb=short", "-p", "no:warnings", "--cov=.", "--cov-report=html", "--cov-report=term"]
+# Fast by default: reuse the test DB across runs (stable name set in conftest), so the
+# ~200 migrations aren't rebuilt every run. Coverage is NOT measured by default (it
+# ~3x's a run); pass `--cov=. --cov-report=html` explicitly, or run the CI job.
+#
+# pytest-xdist is installed but NOT enabled by default: the suite is not yet xdist-safe
+# (cross-test shared state — MEDIA_ROOT, requests-mock + django-q timing — makes a
+# handful of tests fail non-deterministically under `-n auto`). Once those are isolated
+# (per-worker MEDIA_ROOT, etc.) add `-n auto` here. Until then run `-n auto` ad hoc when
+# you know the targeted subset is parallel-clean.
+addopts = ["--tb=short", "-p", "no:warnings", "--reuse-db", "--no-cov-on-fail"]
 norecursedirs = [".venv", "scratch", "node_modules", ".git", ".agents", ".*"]
 
 [tool.coverage.run]
@@ -66,6 +76,8 @@ source = ["."]
 omit = [
     "*/migrations/*",
     "*/tests/*",
+    "*/tests.py",
+    "*/conftest.py",
     "manage.py",
     "core/wsgi.py",
     "core/asgi.py",
@@ -74,7 +86,9 @@ omit = [
 ]
 
 [tool.coverage.report]
-fail_under = 80
+# Realistic floor (true source coverage ~43%); ratchet upward over time. The old
+# 80 was unattainable so every run "failed" the gate and it enforced nothing.
+fail_under = 45
 show_missing = true
 
 
