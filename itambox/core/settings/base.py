@@ -258,6 +258,13 @@ SPECTACULAR_SETTINGS = {
 PAGINATE_COUNT = 50
 MAX_PAGE_SIZE = 1000
 
+# Upper bound for the list-page row counter (EnhancedPaginator). A plain
+# SELECT COUNT(*) scans the whole filtered table on every list view, which is
+# slow at hundreds of thousands of rows. The paginator counts only up to this
+# many rows; below the cap the displayed total is exact (small tables and tests
+# are unaffected), above it the UI shows "<cap>+". Set 0 to disable capping.
+ITAMBOX_PAGINATOR_COUNT_CAP = int(os.environ.get('ITAMBOX_PAGINATOR_COUNT_CAP', '100000'))
+
 CACHE_BACKEND = os.environ.get('ITAMBOX_CACHE_BACKEND', 'locmem')
 if CACHE_BACKEND == 'redis':
     CACHES = {

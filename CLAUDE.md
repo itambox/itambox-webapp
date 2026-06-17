@@ -168,7 +168,7 @@ Tasks live in `core/tasks/`. Each task function should be wrapped in `TaskContex
 | `ITAMBOX_DB_*` | DB connection | `itambox`/`localhost`/`5432` |
 | `ITAMBOX_CACHE_BACKEND` | `locmem` or `redis` (Redis wire protocol — run Valkey, the BSD-licensed fork) | `locmem` |
 | `ITAMBOX_REDIS_URL` | Valkey/Redis connection (`redis://` protocol) when cache=redis | `redis://127.0.0.1:6379/1` |
-| `RATELIMIT_CACHE` | Cache alias for rate limiting | `default` |
+| `RATELIMIT_CACHE` | Cache alias for rate limiting. Under multi-worker prod this (and the SAML replay-protection cache, which uses the `default` alias) MUST resolve to a shared redis/Valkey backend — a per-process `locmem` cache makes login counters per-worker (effective limit × workers) and weakens SAML replay protection to per-process. See "Caching in production". | `default` |
 | `ITAMBOX_TENANT_LDAP_CONFIGS` | JSON per-tenant LDAP configs | `{}` |
 | `ITAMBOX_TENANT_SAML_CONFIGS` | JSON per-tenant SAML configs | `{}` |
 | `ITAMBOX_TENANT_OIDC_CONFIGS` | JSON per-tenant OIDC configs | `{}` |
@@ -179,8 +179,13 @@ Tasks live in `core/tasks/`. Each task function should be wrapped in `TaskContex
 | `ITAMBOX_ALLOW_GLOBAL_CUSTODY_TEMPLATES` | Allow custody templates not scoped to a tenant | `True` |
 | `ITAMBOX_SERVER_EMAIL` | From-address for error emails (prod only) | `DEFAULT_FROM_EMAIL` |
 | `ITAMBOX_ENABLE_EXTENDED_ORG_HIERARCHY` | Show Regions & Site Groups in sidebar nav | `False` |
+| `ITAMBOX_PAGINATOR_COUNT_CAP` | Upper bound for the list-page row counter (`EnhancedPaginator`). A plain `SELECT COUNT(*)` scans the whole filtered table on every list view (slow at NetBox scale); the paginator counts only up to this many rows. At or below the cap the total is exact (small tables and tests are unaffected); above it the UI shows "<cap>+". Set `0` to disable capping (stock unbounded count). | `100000` |
 
 Reads `.env` from `BASE_DIR` or `BASE_DIR/../` at startup (hand-rolled parser; no `python-dotenv`).
+
+### Caching in production
+
+Rate limiting (`RATELIMIT_CACHE`) and SAML replay protection both read through the Django cache. Under multi-worker gunicorn a per-process `locmem` cache silently breaks them: login/throttle counters become per-worker (so the effective limit is `RATELIMIT_LIMIT × workers`) and SAML assertion replay protection only dedupes within a single worker. Set `ITAMBOX_CACHE_BACKEND=redis` (+ `ITAMBOX_REDIS_URL`, pointing at Valkey/Redis) so all workers share one counter store. `core/settings/prod.py` logs a loud warning at startup when `CACHE_BACKEND=locmem` in production.
 
 ## Testing conventions
 

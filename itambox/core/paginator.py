@@ -1,4 +1,9 @@
+import inspect
+
+from django.conf import settings
 from django.core.paginator import Page, Paginator
+from django.utils.functional import cached_property
+from django.utils.inspect import method_has_no_args
 
 from itambox.constants import DEFAULT_PAGINATE_COUNT
 
@@ -6,6 +11,10 @@ __all__ = (
     'EnhancedPage',
     'EnhancedPaginator',
 )
+
+# Fallback used when ITAMBOX_PAGINATOR_COUNT_CAP is unset. Chosen high enough
+# that it never engages for test data or normal installs — only enormous tables.
+DEFAULT_PAGINATOR_COUNT_CAP = 100000
 
 
 class EnhancedPaginator(Paginator):
@@ -35,6 +44,74 @@ class EnhancedPaginator(Paginator):
         if self.per_page not in self.default_page_lengths:
             return sorted([*self.default_page_lengths, self.per_page])
         return self.default_page_lengths
+
+    @cached_property
+    def _count_cap(self):
+        """The configured count cap, or None to disable capping."""
+        cap = getattr(settings, 'ITAMBOX_PAGINATOR_COUNT_CAP', DEFAULT_PAGINATOR_COUNT_CAP)
+        try:
+            cap = int(cap)
+        except (TypeError, ValueError):
+            return DEFAULT_PAGINATOR_COUNT_CAP
+        # A non-positive cap disables capping (revert to stock unbounded count).
+        return cap if cap > 0 else None
+
+    @cached_property
+    def _raw_count(self):
+        """
+        Object total counted only up to ``cap + 1`` (so ``> cap`` is detectable),
+        or the exact total when capping is disabled.
+
+        A plain ``SELECT COUNT(*)`` scans the whole (filtered) table on every
+        list page, which is slow once a tenant has hundreds of thousands of
+        rows. Counting over a bounded slice lets the DB stop once it has seen
+        ``cap + 1`` rows.
+        """
+        object_list = self.object_list
+        cap = self._count_cap
+
+        # Mirror Django's own detection of a real ``.count()`` method (a
+        # QuerySet), excluding builtins like ``list.count`` that require an arg.
+        c = getattr(object_list, 'count', None)
+        if not (callable(c) and not inspect.isbuiltin(c) and method_has_no_args(c)):
+            # Lists / in-memory iterables — identical to Django's len() path.
+            # len() is O(1) here, so capping buys nothing.
+            return len(object_list)
+
+        if cap is None:
+            return c()
+
+        # QuerySets / sliceable managers: count over a bounded slice so the DB
+        # stops scanning past the cap. ``qs[:cap + 1].count()`` emits
+        # COUNT(*) over a LIMIT-ed subquery.
+        try:
+            return object_list[:cap + 1].count()
+        except TypeError:
+            # Not sliceable in the QuerySet sense — fall back to the full count.
+            return c()
+
+    @cached_property
+    def count(self):
+        """
+        Total number of objects, capped at ``ITAMBOX_PAGINATOR_COUNT_CAP``.
+
+        If the real total is at or below the cap, the returned value is *exactly*
+        the true count (identical to Django's default), so small tables and the
+        test suite are unaffected. Only when a table genuinely exceeds the cap do
+        we report the cap itself (and ``is_count_capped`` flips to True so the UI
+        can render "<cap>+").
+        """
+        cap = self._count_cap
+        raw = self._raw_count
+        if cap is not None and raw > cap:
+            return cap
+        return raw
+
+    @property
+    def is_count_capped(self):
+        """True when the real total exceeded the cap (``count`` reports the cap)."""
+        cap = self._count_cap
+        return cap is not None and self._raw_count > cap
 
 
 class EnhancedPage(Page):
