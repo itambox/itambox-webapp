@@ -3,9 +3,9 @@
 {% if tenant_spend %}
 <div class="text-muted small mb-2">{% translate "Purchase cost by tenant" %}</div>
 
-{# Per-(tenant, currency) list. Assets carry a per-record currency, so a tenant
+{% comment %}Per-(tenant, currency) list. Assets carry a per-record currency, so a tenant
    can have figures in multiple currencies; they are never summed across
-   currencies (no FX source). Each figure is formatted via the `money` filter. #}
+   currencies (no FX source). Each figure is formatted via the `money` filter.{% endcomment %}
 <div class="list-group list-group-flush" style="font-size: 0.85rem;">
     {% for t in tenant_spend %}
     <div class="list-group-item px-0 py-2">

@@ -2,9 +2,9 @@
 {% load humanize %}
 {% load money %}
 
-{# TCO headline — per currency. Costs are never summed across currencies
+{% comment %}TCO headline — per currency. Costs are never summed across currencies
    (no FX source); each currency bucket carries its own purchase + maintenance
-   TCO. The budget-currency bucket leads; other currencies are listed below. #}
+   TCO. The budget-currency bucket leads; other currencies are listed below.{% endcomment %}
 {% if currency_breakdown %}
 <div class="widget-count-list mb-3">
     {% for bucket in currency_breakdown %}
@@ -49,8 +49,8 @@
 </div>
 {% endif %}
 
-{# Metric rows — quiet label/value pairs, one set per currency bucket. A
-   single-currency install renders exactly one set, unchanged from before. #}
+{% comment %}Metric rows — quiet label/value pairs, one set per currency bucket. A
+   single-currency install renders exactly one set, unchanged from before.{% endcomment %}
 {% for bucket in currency_breakdown %}
 {% if currency_breakdown|length > 1 %}
 <div class="text-muted small fw-medium mt-2 mb-1">{{ bucket.currency_code }}</div>

@@ -1,4 +1,5 @@
 {% load i18n %}
+{% load money %}
 <div class="text-muted small mb-2">{% translate "Ongoing Repairs (Downtime):" %} <span class="h4 text-orange ms-1">{{ active_maintenance_count }}</span></div>
 {% if active_maintenances %}
 <div class="list-group list-group-flush" style="font-size: 0.85rem;">
@@ -6,7 +7,7 @@
     <div class="list-group-item px-0 py-2">
         <div class="d-flex justify-content-between mb-1">
             <a href="{% url 'assets:asset_detail' maint.asset.pk %}" class="text-reset">{{ maint.asset.name }}</a>
-            <span class="text-orange">${{ maint.cost|default:"0.00" }}</span>
+            <span class="text-orange">{{ maint.cost|default_if_none:0|money:maint }}</span>
         </div>
         <div class="d-flex justify-content-between text-muted small">
             <span>{{ maint.get_maintenance_type_display }} ({{ maint.supplier|default:"Internal" }})</span>
