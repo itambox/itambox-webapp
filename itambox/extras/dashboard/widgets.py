@@ -367,33 +367,14 @@ class FinancialWidget(DashboardWidget):
         )
 
     def get_context(self, request):
+        from types import SimpleNamespace
+
         assets = get_scoped_queryset(Asset, request, config=self.config.get("config", {}))
         maintenances = get_scoped_queryset(AssetMaintenance, request, config=self.config.get("config", {}))
 
-        asset_sums = assets.aggregate(
-            purchase_total=Sum('purchase_cost'),
-            salvage_total=Sum('salvage_value'),
-            costed_count=Count('pk', filter=Q(purchase_cost__isnull=False)),
-        )
-        total_purchase = float(asset_sums['purchase_total'] or 0.0)
-        total_salvage = float(asset_sums['salvage_total'] or 0.0)
-        total_maintenance = float(maintenances.aggregate(total=Sum('cost'))['total'] or 0.0)
-        total_tco = total_purchase + total_maintenance
-
-        budget_limit = self.get_config_value('budget_limit')
-        budget_pct = None
-        budget_exceeded = False
-        if budget_limit:
-            budget_limit = float(budget_limit)
-            budget_pct = min(100, round(total_tco / budget_limit * 100)) if budget_limit > 0 else 100
-            budget_exceeded = total_tco > budget_limit
-
-        metrics = self.get_config_value('metrics') or [k for k, _label in self.METRIC_CHOICES]
-
-        # Currency context for the `money` filter: the scoped tenant (if any)
-        # provides per-tenant currency; otherwise ITAMBOX_DEFAULT_CURRENCY.
-        # The filter resolves obj.tenant, so wrap the Tenant in a namespace.
-        from types import SimpleNamespace
+        # Resolve the scoped tenant (mirrors RenewalsWidget). Used both as the
+        # currency fallback for blank-currency records and to pick the budget
+        # bucket below.
         tenant = None
         tenant_id = self.get_config_value('tenant_id') or self.config.get('tenant_id')
         if tenant_id:
@@ -401,19 +382,101 @@ class FinancialWidget(DashboardWidget):
             tenant = Tenant.objects.filter(id=tenant_id).first()
         if tenant is None:
             tenant = getattr(request, 'active_tenant', None)
-        currency_obj = SimpleNamespace(tenant=tenant) if tenant else None
+
+        # The concrete ISO code blank-currency records fall back to (tenant
+        # currency, else ITAMBOX_DEFAULT_CURRENCY) — matches the `money` filter's
+        # resolution. Records sharing this fallback code are folded into one
+        # bucket so a single-currency install shows exactly one figure.
+        default_code = (
+            (getattr(tenant, 'currency', None) or '')
+            or getattr(settings, 'ITAMBOX_DEFAULT_CURRENCY', 'EUR')
+            or 'EUR'
+        ).upper()
+
+        def _bucket_key(raw_currency):
+            return (raw_currency or '').upper() or default_code
+
+        # Per-currency asset sums: purchase_cost + salvage_value carry the
+        # asset's single `currency` field. Maintenance cost carries its own.
+        # Costs are NOT summed across currencies (no FX source); group by code.
+        purchase_by_cur = {}      # code -> float purchase total
+        salvage_by_cur = {}       # code -> float salvage total
+        costed_count = 0
+        for row in assets.values('currency').annotate(
+            purchase_total=Sum('purchase_cost'),
+            salvage_total=Sum('salvage_value'),
+            row_costed=Count('pk', filter=Q(purchase_cost__isnull=False)),
+        ):
+            code = _bucket_key(row['currency'])
+            purchase_by_cur[code] = purchase_by_cur.get(code, 0.0) + float(row['purchase_total'] or 0.0)
+            salvage_by_cur[code] = salvage_by_cur.get(code, 0.0) + float(row['salvage_total'] or 0.0)
+            costed_count += row['row_costed'] or 0
+
+        maintenance_by_cur = {}   # code -> float maintenance total
+        for row in maintenances.values('currency').annotate(total=Sum('cost')):
+            code = _bucket_key(row['currency'])
+            maintenance_by_cur[code] = maintenance_by_cur.get(code, 0.0) + float(row['total'] or 0.0)
+
+        # TCO per currency = purchase + maintenance (salvage is informational,
+        # shown as its own metric row, never folded into TCO — matches the
+        # previous single-total behaviour: total_tco = purchase + maintenance).
+        all_codes = set(purchase_by_cur) | set(salvage_by_cur) | set(maintenance_by_cur)
+        currency_breakdown = []
+        for code in all_codes:
+            purchase = purchase_by_cur.get(code, 0.0)
+            maintenance = maintenance_by_cur.get(code, 0.0)
+            salvage = salvage_by_cur.get(code, 0.0)
+            # Per-bucket currency context for the `money` filter: an explicit
+            # ISO code (never blank — blanks were folded into default_code).
+            currency_obj = SimpleNamespace(currency=code, tenant=tenant)
+            currency_breakdown.append({
+                'currency_code': code,
+                'currency_obj': currency_obj,
+                'total_tco': purchase + maintenance,
+                'total_purchase_cost': purchase,
+                'total_maintenance_cost': maintenance,
+                'total_salvage_value': salvage,
+            })
+        currency_breakdown.sort(key=lambda b: b['total_tco'], reverse=True)
+
+        # Budget bar: budget_limit is single-currency. Compare ONLY the TCO
+        # bucket whose currency matches the budget's currency (the tenant /
+        # config currency, == default_code). Other-currency TCO figures are
+        # listed separately. If the budget currency is ambiguous we fall back to
+        # the tenant currency (default_code) and flag it for the template.
+        budget_limit = self.get_config_value('budget_limit')
+        budget_pct = None
+        budget_exceeded = False
+        budget_currency_obj = SimpleNamespace(currency=default_code, tenant=tenant)
+        budget_tco = next(
+            (b['total_tco'] for b in currency_breakdown if b['currency_code'] == default_code),
+            0.0,
+        )
+        # Buckets in any other currency than the budget's.
+        other_currency_breakdown = [
+            b for b in currency_breakdown if b['currency_code'] != default_code
+        ]
+        if budget_limit:
+            budget_limit = float(budget_limit)
+            budget_pct = min(100, round(budget_tco / budget_limit * 100)) if budget_limit > 0 else 100
+            budget_exceeded = budget_tco > budget_limit
+
+        metrics = self.get_config_value('metrics') or [k for k, _label in self.METRIC_CHOICES]
 
         return {
-            'total_tco': total_tco,
-            'total_purchase_cost': total_purchase,
-            'total_maintenance_cost': total_maintenance,
-            'total_salvage_value': total_salvage,
-            'costed_asset_count': asset_sums['costed_count'] or 0,
+            'currency_breakdown': currency_breakdown,
+            'other_currency_breakdown': other_currency_breakdown,
+            'costed_asset_count': costed_count,
             'budget_limit': budget_limit,
             'budget_pct': budget_pct,
             'budget_exceeded': budget_exceeded,
+            'budget_tco': budget_tco,
+            'budget_currency_code': default_code,
+            'budget_currency_obj': budget_currency_obj,
+            # True when more than one currency exists, so the budget bar only
+            # reflects one of them (the template can note this).
+            'budget_currency_ambiguous': bool(other_currency_breakdown),
             'metrics': metrics,
-            'currency_obj': currency_obj,
         }
 
     def get_footer_links(self, request):
@@ -1096,30 +1159,17 @@ class TenantSpendWidget(DashboardWidget):
     template_name = 'extras/dashboard/widgets/tenant_spend.html'
     admin_only = True          # Restrict in UI list
 
+    # NOTE: the former 'chart_type' and 'currency' symbol options were dropped.
+    # Assets carry a per-record currency, so each tenant bucket can mix
+    # currencies; a single-symbol bar chart cannot represent (tenant x currency)
+    # without summing across currencies (no FX source). Spend is now rendered as
+    # a per-(tenant, currency) list formatted via the `money` filter. Stale
+    # saved values for those keys are ignored.
     class ConfigForm(WidgetConfigForm):
         limit = forms.IntegerField(
             label='Max Tenants to Show',
             initial=8,
             widget=forms.NumberInput(attrs={'class': 'form-control'}),
-            required=False
-        )
-        chart_type = forms.ChoiceField(
-            label='Chart Type',
-            choices=[
-                ('bar', 'Horizontal Bar Chart'),
-                ('doughnut', 'Doughnut'),
-                ('pie', 'Pie'),
-                ('list', 'Simple List'),
-            ],
-            initial='bar',
-            widget=forms.Select(attrs={'class': 'form-select'}),
-            required=False
-        )
-        currency = forms.CharField(
-            label='Currency Symbol',
-            max_length=5,
-            initial=getattr(settings, 'ITAMBOX_DEFAULT_CURRENCY', 'EUR'),
-            widget=forms.TextInput(attrs={'class': 'form-control'}),
             required=False
         )
         exclude_unassigned = forms.BooleanField(
@@ -1131,33 +1181,66 @@ class TenantSpendWidget(DashboardWidget):
         )
 
     def get_context(self, request):
+        from types import SimpleNamespace
+
         limit = self.get_config_value('limit', 8)
-        chart_type = self.get_config_value('chart_type', 'bar')
-        currency = self.get_config_value('currency', '€')
         exclude_unassigned = self.get_config_value('exclude_unassigned', False)
-        
+
+        default_code = (getattr(settings, 'ITAMBOX_DEFAULT_CURRENCY', 'EUR') or 'EUR').upper()
+
         # Build query
         qs = Asset.objects.all()
         if exclude_unassigned:
             qs = qs.filter(tenant__isnull=False)
-            
-        spend = qs.values('tenant__name').annotate(
-            total=Sum('purchase_cost')
-        ).order_by('-total')[:limit]
-        
-        spend_list = list(spend)
-        chart_data = []
-        for t in spend_list:
-            chart_data.append({
-                'name': t['tenant__name'] or 'Unassigned',
-                'total': float(t['total'] or 0.0)
+
+        # Assets carry a per-record `currency`, so each tenant can mix
+        # currencies. Purchase cost must NOT be summed across currencies (no FX
+        # source) — group by (tenant, currency) and emit one figure per pair.
+        # A single bar chart with a single hardcoded symbol cannot represent
+        # (tenant x currency) without either mislabelling or summing mixed
+        # currencies, so this is rendered as a per-(tenant, currency) table.
+        rows = qs.values(
+            'tenant__id', 'tenant__name', 'tenant__currency', 'currency'
+        ).annotate(total=Sum('purchase_cost')).order_by('-total')
+
+        # Aggregate per tenant; rank tenants by their largest single-currency
+        # bucket (the previous ordering was by Sum(purchase_cost) desc — with
+        # one currency this preserves the same top-N tenant ordering).
+        tenants = {}  # tenant key -> {'name', 'currency_spend': [...], 'max_total'}
+        for r in rows:
+            if r['total'] is None:
+                continue
+            t_id = r['tenant__id']
+            name = r['tenant__name'] or _('Unassigned')
+            tenant_currency = r['tenant__currency'] or ''
+            code = (r['currency'] or '').upper() or (tenant_currency.upper() or default_code)
+            total = float(r['total'] or 0.0)
+            entry = tenants.setdefault(t_id, {'name': name, 'buckets': {}, 'max_total': 0.0})
+            # Fold rows that resolve to the same code (e.g. blank + explicit
+            # tenant-currency) into one bucket.
+            entry['buckets'][code] = entry['buckets'].get(code, 0.0) + total
+            entry['max_total'] = max(entry['max_total'], entry['buckets'][code])
+
+        tenant_spend = []
+        for t_id, entry in tenants.items():
+            currency_spend = []
+            for code, total in sorted(entry['buckets'].items(), key=lambda kv: kv[1], reverse=True):
+                currency_spend.append({
+                    'currency_code': code,
+                    'total': total,
+                    # Explicit ISO code (never blank) for the `money` filter.
+                    'currency_obj': SimpleNamespace(currency=code, tenant=None),
+                })
+            tenant_spend.append({
+                'name': entry['name'],
+                'currency_spend': currency_spend,
+                'max_total': entry['max_total'],
             })
+        tenant_spend.sort(key=lambda t: t['max_total'], reverse=True)
+        tenant_spend = tenant_spend[:limit]
 
         return {
-            'tenant_spend': spend_list,
-            'chart_type': chart_type,
-            'currency': currency,
-            'chart_data_json': json.dumps(chart_data),
+            'tenant_spend': tenant_spend,
         }
 
     def get_footer_links(self, request):

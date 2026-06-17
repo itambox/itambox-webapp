@@ -107,25 +107,69 @@ class DashboardWidgetsMultiTenancyTests(TestCase):
         return request
 
     def test_financial_widget_scoping(self):
+        # Costs are reported per currency (no FX summing). The fixtures use
+        # blank per-record currencies, which resolve to the tenant currency
+        # (defaults to EUR) — so each context yields a single EUR bucket.
         widget = FinancialWidget()
 
-        # Test Tenant A User
+        # Test Tenant A User — one currency bucket (EUR).
         ctx_a = widget.get_context(self.make_request(self.user_a))
-        self.assertEqual(ctx_a['total_purchase_cost'], 1000.00)
-        self.assertEqual(ctx_a['total_maintenance_cost'], 150.00)
-        self.assertEqual(ctx_a['total_tco'], 1150.00)
+        self.assertEqual(len(ctx_a['currency_breakdown']), 1)
+        bucket_a = ctx_a['currency_breakdown'][0]
+        self.assertEqual(bucket_a['currency_code'], 'EUR')
+        self.assertEqual(bucket_a['total_purchase_cost'], 1000.00)
+        self.assertEqual(bucket_a['total_maintenance_cost'], 150.00)
+        self.assertEqual(bucket_a['total_salvage_value'], 0.00)
+        self.assertEqual(bucket_a['total_tco'], 1150.00)
+        # Budget bar matches the tenant currency bucket.
+        self.assertEqual(ctx_a['budget_currency_code'], 'EUR')
+        self.assertEqual(ctx_a['budget_tco'], 1150.00)
+        self.assertEqual(ctx_a['other_currency_breakdown'], [])
+        self.assertFalse(ctx_a['budget_currency_ambiguous'])
 
         # Test Tenant B User
         ctx_b = widget.get_context(self.make_request(self.user_b))
-        self.assertEqual(ctx_b['total_purchase_cost'], 2000.00)
-        self.assertEqual(ctx_b['total_maintenance_cost'], 300.00)
-        self.assertEqual(ctx_b['total_tco'], 2300.00)
+        self.assertEqual(len(ctx_b['currency_breakdown']), 1)
+        bucket_b = ctx_b['currency_breakdown'][0]
+        self.assertEqual(bucket_b['total_purchase_cost'], 2000.00)
+        self.assertEqual(bucket_b['total_maintenance_cost'], 300.00)
+        self.assertEqual(bucket_b['total_tco'], 2300.00)
 
-        # Test Global Admin
+        # Test Global Admin — all blank-currency rows fold into one EUR bucket.
         ctx_admin = widget.get_context(self.make_request(self.admin))
-        self.assertEqual(ctx_admin['total_purchase_cost'], 3000.00)
-        self.assertEqual(ctx_admin['total_maintenance_cost'], 450.00)
-        self.assertEqual(ctx_admin['total_tco'], 3450.00)
+        self.assertEqual(len(ctx_admin['currency_breakdown']), 1)
+        bucket_admin = ctx_admin['currency_breakdown'][0]
+        self.assertEqual(bucket_admin['currency_code'], 'EUR')
+        self.assertEqual(bucket_admin['total_purchase_cost'], 3000.00)
+        self.assertEqual(bucket_admin['total_maintenance_cost'], 450.00)
+        self.assertEqual(bucket_admin['total_tco'], 3450.00)
+        self.assertEqual(ctx_admin['costed_asset_count'], 2)
+
+    def test_financial_widget_per_currency_breakdown(self):
+        # A second asset in USD for Tenant A produces a distinct currency bucket
+        # and a budget bar scoped to the tenant (EUR) currency only.
+        Asset.objects.create(
+            name="Asset A USD", asset_tag="TAG-A-USD", serial_number="SN-A-USD",
+            asset_type=self.asset_type, status=self.status, tenant=self.tenant_a,
+            purchase_cost=700.00, currency="USD",
+            purchase_date=date.today() - timedelta(days=10),
+        )
+        config = {'config': {'budget_limit': '2000'}}
+        widget = FinancialWidget(config=config)
+        ctx = widget.get_context(self.make_request(self.user_a))
+
+        codes = {b['currency_code'] for b in ctx['currency_breakdown']}
+        self.assertEqual(codes, {'EUR', 'USD'})
+        by_code = {b['currency_code']: b for b in ctx['currency_breakdown']}
+        self.assertEqual(by_code['EUR']['total_tco'], 1150.00)   # 1000 + 150 maint
+        self.assertEqual(by_code['USD']['total_tco'], 700.00)    # USD asset, no maint
+
+        # Budget bar reflects ONLY the tenant-currency (EUR) bucket.
+        self.assertEqual(ctx['budget_currency_code'], 'EUR')
+        self.assertEqual(ctx['budget_tco'], 1150.00)
+        self.assertTrue(ctx['budget_currency_ambiguous'])
+        other_codes = {b['currency_code'] for b in ctx['other_currency_breakdown']}
+        self.assertEqual(other_codes, {'USD'})
 
     def test_object_counts_widget_scoping(self):
         # Configure counts for Assets and Subscriptions
@@ -238,10 +282,21 @@ class DashboardWidgetsMultiTenancyTests(TestCase):
     def test_tenant_spend_widget_permissions(self):
         widget = TenantSpendWidget()
 
-        # Global Admin: has access
+        # Global Admin: has access. Spend is per (tenant, currency); the
+        # fixtures use blank currencies that resolve to EUR, so each tenant has
+        # a single EUR bucket.
         self.assertTrue(widget.has_permission(self.make_request(self.admin)))
         ctx_admin = widget.get_context(self.make_request(self.admin))
         self.assertEqual(len(ctx_admin['tenant_spend']), 2)
+        by_name = {t['name']: t for t in ctx_admin['tenant_spend']}
+        self.assertIn("Tenant A", by_name)
+        self.assertIn("Tenant B", by_name)
+        self.assertEqual(len(by_name["Tenant B"]['currency_spend']), 1)
+        bucket_b = by_name["Tenant B"]['currency_spend'][0]
+        self.assertEqual(bucket_b['currency_code'], 'EUR')
+        self.assertEqual(bucket_b['total'], 2000.00)
+        # Tenant B (2000) ranks above Tenant A (1000).
+        self.assertEqual(ctx_admin['tenant_spend'][0]['name'], "Tenant B")
 
         # Standard Tenant User: blocked
         self.assertFalse(widget.has_permission(self.make_request(self.user_a)))
@@ -249,6 +304,24 @@ class DashboardWidgetsMultiTenancyTests(TestCase):
         # Test widget render returns restricted block
         render_out = widget.render(self.make_request(self.user_a))
         self.assertIn("Restricted to Global Administrators", render_out)
+
+    def test_tenant_spend_widget_mixed_currencies(self):
+        # A USD asset for Tenant A creates a second currency bucket within the
+        # same tenant — spend is never summed across currencies.
+        Asset.objects.create(
+            name="Asset A USD", asset_tag="TAG-A-USD2", serial_number="SN-A-USD2",
+            asset_type=self.asset_type, status=self.status, tenant=self.tenant_a,
+            purchase_cost=3000.00, currency="USD",
+            purchase_date=date.today() - timedelta(days=5),
+        )
+        widget = TenantSpendWidget()
+        ctx = widget.get_context(self.make_request(self.admin))
+        by_name = {t['name']: t for t in ctx['tenant_spend']}
+        a_buckets = {b['currency_code']: b['total'] for b in by_name["Tenant A"]['currency_spend']}
+        self.assertEqual(a_buckets, {'EUR': 1000.00, 'USD': 3000.00})
+        # Tenant A's largest single-currency bucket (3000 USD) outranks
+        # Tenant B (2000 EUR).
+        self.assertEqual(ctx['tenant_spend'][0]['name'], "Tenant A")
 
     def test_low_stock_widget_scoping(self):
         from inventory.models import (

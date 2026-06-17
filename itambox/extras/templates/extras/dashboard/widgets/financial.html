@@ -2,20 +2,37 @@
 {% load humanize %}
 {% load money %}
 
-{# TCO headline #}
+{# TCO headline — per currency. Costs are never summed across currencies
+   (no FX source); each currency bucket carries its own purchase + maintenance
+   TCO. The budget-currency bucket leads; other currencies are listed below. #}
+{% if currency_breakdown %}
+<div class="widget-count-list mb-3">
+    {% for bucket in currency_breakdown %}
+    <div class="d-flex align-items-center {% if not forloop.last %}mb-2{% endif %}">
+        <div>
+            <div class="text-muted small">
+                {% if forloop.first and currency_breakdown|length == 1 %}{% translate "Total Cost of Ownership (TCO)" %}{% else %}{% blocktranslate with code=bucket.currency_code %}TCO ({{ code }}){% endblocktranslate %}{% endif %}
+            </div>
+            <div class="h2 mb-0" style="font-variant-numeric: tabular-nums;">{{ bucket.total_tco|money:bucket.currency_obj }}</div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
 <div class="d-flex align-items-center mb-3">
     <div>
         <div class="text-muted small">{% translate "Total Cost of Ownership (TCO)" %}</div>
-        <div class="h2 mb-0" style="font-variant-numeric: tabular-nums;">{{ total_tco|money:currency_obj }}</div>
+        <div class="h2 mb-0" style="font-variant-numeric: tabular-nums;">{{ 0|money:budget_currency_obj }}</div>
     </div>
 </div>
+{% endif %}
 
 {% if budget_limit %}
 <div class="mb-3">
     <div class="d-flex justify-content-between small text-muted mb-1">
         <span>{% translate "Budget Utilization" %}</span>
         <span style="font-variant-numeric: tabular-nums;">
-            {{ budget_pct }}% {% translate "of" %} {{ budget_limit|money:currency_obj }}
+            {{ budget_pct }}% {% translate "of" %} {{ budget_limit|money:budget_currency_obj }}
         </span>
     </div>
     <div class="progress progress-xs">
@@ -24,33 +41,47 @@
     {% if budget_exceeded %}
     <div class="small text-danger mt-1">{% translate "TCO exceeds the configured budget." %}</div>
     {% endif %}
+    {% if budget_currency_ambiguous %}
+    <div class="small text-muted mt-1">
+        {% blocktranslate with code=budget_currency_code %}Budget bar reflects {{ code }} spend only; other-currency totals are listed above.{% endblocktranslate %}
+    </div>
+    {% endif %}
 </div>
 {% endif %}
 
-{# Metric rows — quiet label/value pairs, no decorative share-of-TCO bars #}
+{# Metric rows — quiet label/value pairs, one set per currency bucket. A
+   single-currency install renders exactly one set, unchanged from before. #}
+{% for bucket in currency_breakdown %}
+{% if currency_breakdown|length > 1 %}
+<div class="text-muted small fw-medium mt-2 mb-1">{{ bucket.currency_code }}</div>
+{% endif %}
 <div class="widget-count-list">
     {% if 'purchase' in metrics %}
     <div class="widget-count-row">
         <span class="widget-count-label">{% translate "Original Purchase Cost" %}</span>
-        <span class="widget-count-value">{{ total_purchase_cost|money:currency_obj }}</span>
+        <span class="widget-count-value">{{ bucket.total_purchase_cost|money:bucket.currency_obj }}</span>
     </div>
     {% endif %}
     {% if 'maintenance' in metrics %}
     <div class="widget-count-row">
         <span class="widget-count-label">{% translate "Maintenance Expenditures" %}</span>
-        <span class="widget-count-value">{{ total_maintenance_cost|money:currency_obj }}</span>
+        <span class="widget-count-value">{{ bucket.total_maintenance_cost|money:bucket.currency_obj }}</span>
     </div>
     {% endif %}
     {% if 'salvage' in metrics %}
     <div class="widget-count-row">
         <span class="widget-count-label">{% translate "Total Salvage Book Value" %}</span>
-        <span class="widget-count-value text-success">{{ total_salvage_value|money:currency_obj }}</span>
+        <span class="widget-count-value text-success">{{ bucket.total_salvage_value|money:bucket.currency_obj }}</span>
     </div>
     {% endif %}
-    {% if 'asset_count' in metrics %}
+</div>
+{% endfor %}
+
+{% if 'asset_count' in metrics %}
+<div class="widget-count-list">
     <div class="widget-count-row">
         <span class="widget-count-label">{% translate "Costed Assets" %}</span>
         <span class="widget-count-value">{{ costed_asset_count|intcomma }}</span>
     </div>
-    {% endif %}
 </div>
+{% endif %}
