@@ -36,6 +36,12 @@ ITAMBOX_BASE_URL = os.environ.get('ITAMBOX_BASE_URL', '').rstrip('/')
 # Affects the {% money %} template filter — display only, no exchange rates.
 ITAMBOX_DEFAULT_CURRENCY = os.environ.get('ITAMBOX_DEFAULT_CURRENCY', 'EUR')
 
+# Bound outbound SMTP so a dead/unreachable mail server can't block a web request
+# or background task indefinitely. Django's SMTP EmailBackend defaults its timeout
+# to this setting; None (Django's default) means NO socket timeout — a hang risk.
+# The NotificationChannel email path (core/events.py) relies on it. Seconds.
+EMAIL_TIMEOUT = int(os.environ.get('ITAMBOX_EMAIL_TIMEOUT', '10'))
+
 SECRET_KEY = os.environ.get('ITAMBOX_SECRET_KEY', '')
 
 if not SECRET_KEY:

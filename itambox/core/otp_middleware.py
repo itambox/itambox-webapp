@@ -9,6 +9,7 @@ Runs immediately after ``django_otp.middleware.OTPMiddleware`` so that
 ``request.user.is_verified()`` is populated.
 """
 from django.conf import settings
+from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 
@@ -42,6 +43,22 @@ class OTPEnforcementMiddleware:
                 prefixes.append(url)
         return tuple(p for p in prefixes if p)
 
+    @staticmethod
+    def _is_api_request(request) -> bool:
+        """True for requests that can't meaningfully follow a 302 to the HTML MFA
+        gate: the ``/api/`` surface and XHR/HTMX/fetch navigations that expect a
+        machine-readable response rather than a full-page redirect.
+        """
+        if request.path.startswith('/api/'):
+            return True
+        if request.headers.get('HX-Request') == 'true':
+            return True
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return True
+        # A client that accepts JSON but not HTML is not a browser navigation.
+        accept = request.headers.get('Accept', '')
+        return 'application/json' in accept and 'text/html' not in accept
+
     def __call__(self, request):
         # Policy gate: enforcement is opt-in (off in dev/test, on in prod via
         # MFA_ENFORCED). When off we don't force anyone through the gate; the
@@ -61,6 +78,14 @@ class OTPEnforcementMiddleware:
                 # is_verified() is added to the user by django-otp's OTPMiddleware.
                 is_verified = getattr(user, 'is_verified', None)
                 if not (callable(is_verified) and is_verified()):
+                    # API / non-HTML clients can't follow a 302 to the HTML MFA
+                    # gate — return a 403 they can surface instead. Normal
+                    # browser navigations still get the redirect.
+                    if self._is_api_request(request):
+                        return JsonResponse(
+                            {'detail': 'MFA verification required.'},
+                            status=403,
+                        )
                     return redirect(reverse('mfa_setup'))
 
         return self.get_response(request)

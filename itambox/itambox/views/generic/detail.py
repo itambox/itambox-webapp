@@ -231,9 +231,11 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
                     continue
 
             if count > 0:
-                related_app = related_model._meta.app_label
-                related_model_name = related_model._meta.model_name
-                view_name = f"{related_app}:{related_model_name}_list"
+                # Resolve the list viewname via get_model_viewname so core-app
+                # reverse-relation targets (root-mounted, UN-namespaced) resolve
+                # too — a hardcoded '{app}:{model}_list' silently dropped them.
+                # App-namespaced targets still map to '{app}:{model}_list'.
+                view_name = get_model_viewname(related_model, 'list')
 
                 try:
                     base_url = reverse(view_name)
