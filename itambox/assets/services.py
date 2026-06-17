@@ -324,6 +324,15 @@ def dispose_asset(
         disposal.full_clean()
         disposal.save()
 
+        # Clear any prior disposal stamp before recomputing. On an idempotent
+        # re-run the old record above is deleted, but disposed_at/disposal_value
+        # are still set on the asset row — and compute_book_value() short-circuits
+        # to the STALE frozen disposal_value while disposed_at is non-null. Reset
+        # both so the residual is recomputed fresh. (First disposal: both already
+        # None, so this is a no-op and first-disposal behavior is unchanged.)
+        asset.disposed_at = None
+        asset.disposal_value = None
+
         # Update the asset: stamp disposal fields and transition status
         if proceeds is not None:
             asset.disposal_value = proceeds

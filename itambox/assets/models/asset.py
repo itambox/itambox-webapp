@@ -20,7 +20,10 @@ class AssetStateMachine:
         'undeployable': ['pending', 'deployable', 'archived', 'in_repair'],
         'archived': ['pending'],
         'in_repair': ['deployable', 'undeployable', 'archived'],
-        'on_order': ['pending', 'deployable'],
+        # 'archived' is reachable from every non-terminal state: disposal is a
+        # terminal action that may occur from any lifecycle point, including an
+        # on-order asset cancelled/written off before it ever arrives.
+        'on_order': ['pending', 'deployable', 'archived'],
     }
 
     @staticmethod

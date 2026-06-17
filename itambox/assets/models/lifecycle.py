@@ -305,8 +305,13 @@ class AssetReservation(JournalingMixin, SoftDeleteMixin, ChangeLoggingMixin, Bas
         return reverse('assets:assetreservation_detail', kwargs={'pk': self.pk})
 
     def _overlapping_reservations(self):
-        """Return QS of active/pending reservations for the same asset that overlap our window."""
-        qs = AssetReservation.all_objects.filter(
+        """Return QS of active/pending reservations for the same asset that overlap our window.
+
+        Uses the default manager (``deleted_at__isnull=True``) so a soft-deleted
+        reservation never raises a false overlap — matching the DB
+        ExclusionConstraint, whose condition already excludes deleted rows.
+        """
+        qs = AssetReservation.objects.filter(
             asset=self.asset,
             status__in=[ReservationStatusChoices.ACTIVE, ReservationStatusChoices.PENDING],
             start_date__lt=self.end_date,
