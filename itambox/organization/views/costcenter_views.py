@@ -1,4 +1,4 @@
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.urls import reverse_lazy
 
 from itambox.views.generic import (
@@ -15,7 +15,7 @@ from ..filters import CostCenterFilterSet
 
 class CostCenterListView(ObjectListView):
     queryset = CostCenter.objects.select_related('tenant', 'parent').annotate(
-        child_count=Count('children'),
+        child_count=Count('children', filter=Q(children__deleted_at__isnull=True)),
     )
     filterset = CostCenterFilterSet
     filterset_form = CostCenterFilterForm

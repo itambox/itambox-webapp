@@ -1,4 +1,4 @@
-from django.db.models import Count
+from django.db.models import Count, Q
 from django_tables2 import RequestConfig
 from itambox.views.generic import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView, ObjectCloneView
 from itambox.utils import get_paginate_count
@@ -22,7 +22,9 @@ from . import filters
 # =============================================================================
 
 class ProviderListView(ObjectListView):
-    queryset = Provider.objects.prefetch_related('tags').annotate(subscription_count=Count('subscriptions'))
+    queryset = Provider.objects.prefetch_related('tags').annotate(
+        subscription_count=Count('subscriptions', filter=Q(subscriptions__deleted_at__isnull=True))
+    )
     filterset = filters.ProviderFilterSet
     filterset_form = forms.ProviderFilterForm
     table = tables.ProviderTable

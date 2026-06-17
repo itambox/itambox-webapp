@@ -1,7 +1,7 @@
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.contrib import messages
-from django.db.models import Count
+from django.db.models import Count, Q
 
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
@@ -22,7 +22,7 @@ from django_tables2 import RequestConfig
 
 class LocationListView(ObjectListView):
     queryset = Location.objects.select_related('site', 'site__region', 'tenant').prefetch_related('tags').annotate(
-        asset_count=Count('assets'),
+        asset_count=Count('assets', filter=Q(assets__deleted_at__isnull=True)),
     )
     filterset = LocationFilterSet
     filterset_form = LocationFilterForm

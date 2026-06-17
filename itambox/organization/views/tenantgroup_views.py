@@ -1,7 +1,7 @@
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.contrib import messages
-from django.db.models import Count
+from django.db.models import Count, Q
 
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView,
@@ -18,7 +18,7 @@ from django_tables2 import RequestConfig
 
 class TenantGroupListView(ObjectListView):
     queryset = TenantGroup.objects.annotate(
-        tenant_count=Count('tenants')
+        tenant_count=Count('tenants', filter=Q(tenants__deleted_at__isnull=True))
     ).prefetch_related('tags')
     filterset = TenantGroupFilterSet
     filterset_form = TenantGroupFilterForm

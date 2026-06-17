@@ -1,7 +1,7 @@
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.contrib import messages
-from django.db.models import Count
+from django.db.models import Count, Q
 
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView, ObjectCloneView,
@@ -18,7 +18,7 @@ from django_tables2 import RequestConfig
 
 class RegionListView(ObjectListView):
     queryset = Region.objects.annotate(
-        site_count=Count('sites')
+        site_count=Count('sites', filter=Q(sites__deleted_at__isnull=True))
     ).prefetch_related('tags')
     filterset = RegionFilterSet
     filterset_form = RegionFilterForm

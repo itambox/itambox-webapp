@@ -33,7 +33,7 @@ class SiteViewSet(ITAMBoxModelViewSet):
 class RegionViewSet(ITAMBoxModelViewSet):
     permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = Region.objects.select_related('parent').prefetch_related('sites').annotate(
-        site_count=Count('sites')
+        site_count=Count('sites', filter=Q(sites__deleted_at__isnull=True))
     )
     serializer_class = RegionSerializer
     filter_backends = (DjangoFilterBackend,)
@@ -43,7 +43,7 @@ class RegionViewSet(ITAMBoxModelViewSet):
 class SiteGroupViewSet(ITAMBoxModelViewSet):
     permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = SiteGroup.objects.select_related('parent').prefetch_related('sites').annotate(
-        site_count=Count('sites')
+        site_count=Count('sites', filter=Q(sites__deleted_at__isnull=True))
     )
     serializer_class = SiteGroupSerializer
     filter_backends = (DjangoFilterBackend,)
@@ -53,7 +53,7 @@ class SiteGroupViewSet(ITAMBoxModelViewSet):
 class LocationViewSet(ITAMBoxModelViewSet):
     permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = Location.objects.select_related('site', 'parent', 'tenant').prefetch_related('assets').annotate(
-        asset_count=Count('assets')
+        asset_count=Count('assets', filter=Q(assets__deleted_at__isnull=True))
     )
     serializer_class = LocationSerializer
     filter_backends = (DjangoFilterBackend,)
@@ -63,7 +63,7 @@ class LocationViewSet(ITAMBoxModelViewSet):
 class TenantGroupViewSet(ITAMBoxModelViewSet):
     permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = TenantGroup.objects.select_related('parent').prefetch_related('tenants').annotate(
-        tenant_count=Count('tenants')
+        tenant_count=Count('tenants', filter=Q(tenants__deleted_at__isnull=True))
     )
     serializer_class = TenantGroupSerializer
     filter_backends = (DjangoFilterBackend,)
@@ -187,12 +187,21 @@ class ContactAssignmentViewSet(ITAMBoxModelViewSet):
                         Q(**{f'{tenant_lookup}__isnull': True})
                     ).values_list('pk', flat=True)
                 )
-            else:
-                # Tenant-aware only via a direct field / property on an
-                # unscoped manager: scope to the active tenant directly.
+            elif has_tenant_field:
+                # Tenant-aware via a real `tenant` DB field on an unscoped
+                # manager: scope to the active tenant directly.
                 visible_ids = list(
                     manager.filter(tenant=active_tenant).values_list('pk', flat=True)
                 )
+            else:
+                # Tenant signal comes ONLY from a `tenant` *property* (not a DB
+                # field) with no `tenant_lookup`. Filtering on `tenant=` here
+                # would raise FieldError (500). Without a queryable column we
+                # cannot scope in the DB, so fall back to the model's default
+                # manager — same resolution path the tenant-scoping branch uses
+                # — and rely on StrictTenantPermission for the object-level
+                # boundary on detail/mutation.
+                visible_ids = list(manager.values_list('pk', flat=True))
             allowed |= Q(content_type=ct, object_id__in=visible_ids)
 
         return qs.filter(allowed)
@@ -201,7 +210,7 @@ class ContactAssignmentViewSet(ITAMBoxModelViewSet):
 class CostCenterViewSet(ITAMBoxModelViewSet):
     permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = CostCenter.objects.select_related('tenant', 'parent').prefetch_related('children').annotate(
-        child_count=Count('children'),
+        child_count=Count('children', filter=Q(children__deleted_at__isnull=True)),
     )
     serializer_class = CostCenterSerializer
     filter_backends = (DjangoFilterBackend,)

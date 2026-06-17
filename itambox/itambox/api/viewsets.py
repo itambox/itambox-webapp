@@ -153,18 +153,22 @@ class ITAMBoxModelViewSet(
 
         save_kwargs = {}
         # Default a tenant-scoped create to the active tenant when the client
-        # omitted it.  Without this a tenant-bound (non-superuser) request could
-        # mint a global (tenant=None) row — e.g. a globally-visible License or
-        # Software — cross-tenant.  Superusers retain the ability to create
-        # global rows explicitly.  Only applies to single-object creates; bulk
-        # (ListSerializer) payloads carry a list of validated dicts and are left
-        # to the per-row tenant scoping enforced elsewhere.
+        # omitted it OR explicitly passed a null tenant.  Without this a
+        # tenant-bound (non-superuser) request could mint a global (tenant=None)
+        # row — e.g. a globally-visible License or Software — cross-tenant,
+        # either by omitting the field or by sending an explicit
+        # {"tenant": null} that lands as `tenant: None` in validated_data and
+        # would otherwise slip past an `'tenant' not in validated` check.
+        # Superusers retain the ability to create global rows explicitly
+        # (including via an explicit null).  Only applies to single-object
+        # creates; bulk (ListSerializer) payloads carry a list of validated
+        # dicts and are left to the per-row tenant scoping enforced elsewhere.
         validated = serializer.validated_data
         if (
             not getattr(serializer, 'many', False)
             and isinstance(validated, dict)
             and not self.request.user.is_superuser
-            and 'tenant' not in validated
+            and validated.get('tenant') is None
         ):
             from django.core.exceptions import FieldDoesNotExist
             from core.managers import get_current_tenant
