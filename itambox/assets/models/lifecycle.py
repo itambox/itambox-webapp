@@ -271,10 +271,14 @@ class AssetReservation(JournalingMixin, SoftDeleteMixin, ChangeLoggingMixin, Bas
             # level. Requires the btree_gist extension (added in the migration)
             # because it mixes equality (asset) with the overlap operator.
             #
-            # Half-open '[)' daterange so touching boundaries (one reservation
-            # ends the day the next starts) are allowed, matching clean()'s
-            # start_date < other.end_date AND end_date > other.start_date test.
-            # Only ACTIVE/PENDING + non-soft-deleted rows participate.
+            # Inclusive '[]' daterange: end_date is the LAST day the asset is
+            # held, so two reservations that share a boundary day conflict (one
+            # holder per calendar day — dates carry no time, so there is no
+            # same-day handoff; a gap is required). A one-day reservation has
+            # start_date == end_date. Matches clean()'s start_date <=
+            # other.end_date AND end_date >= other.start_date test and the
+            # end_date >= today "still active" check. Only ACTIVE/PENDING +
+            # non-soft-deleted rows participate.
             ExclusionConstraint(
                 name='assetreservation_no_overlap',
                 expressions=[
@@ -283,7 +287,7 @@ class AssetReservation(JournalingMixin, SoftDeleteMixin, ChangeLoggingMixin, Bas
                         DateRange(
                             'start_date',
                             'end_date',
-                            RangeBoundary(inclusive_lower=True, inclusive_upper=False),
+                            RangeBoundary(inclusive_lower=True, inclusive_upper=True),
                         ),
                         RangeOperators.OVERLAPS,
                     ),
@@ -314,8 +318,8 @@ class AssetReservation(JournalingMixin, SoftDeleteMixin, ChangeLoggingMixin, Bas
         qs = AssetReservation.objects.filter(
             asset=self.asset,
             status__in=[ReservationStatusChoices.ACTIVE, ReservationStatusChoices.PENDING],
-            start_date__lt=self.end_date,
-            end_date__gt=self.start_date,
+            start_date__lte=self.end_date,
+            end_date__gte=self.start_date,
         )
         if self.pk:
             qs = qs.exclude(pk=self.pk)

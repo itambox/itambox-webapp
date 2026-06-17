@@ -77,21 +77,53 @@ class AssetReservationOverlapConstraintTest(TestCase):
                 )
 
     def test_db_constraint_allows_non_overlapping_reservation(self):
-        """A reservation starting after the first ends must succeed.
+        """A reservation starting after the first one's last held day must succeed.
 
-        Half-open '[)' semantics: first covers [0, 10), second [10, 20) — they
-        touch at day 10 but do not overlap, mirroring clean()'s boundary rule.
+        Inclusive '[]' semantics: the first holds days [0, 10] (through day 10),
+        so the next reservation must start on day 11 or later. Days 10 and 11 are
+        adjacent but not shared, so there is no overlap.
         """
         self._make(
             start_offset=0, end_offset=10,
             status=ReservationStatusChoices.ACTIVE, holder=self.holder_a,
         )
-        # Should not raise.
+        # Starts the day AFTER the first ends — no shared day, must not raise.
         res2 = self._make(
-            start_offset=10, end_offset=20,
+            start_offset=11, end_offset=20,
             status=ReservationStatusChoices.PENDING, holder=self.holder_b,
         )
         self.assertIsNotNone(res2.pk)
+
+    def test_db_constraint_rejects_boundary_touching_reservation(self):
+        """Inclusive end_date: reservations sharing a boundary day conflict.
+
+        The first holds [0, 10]; a second [10, 20] both claim day 10, so the
+        exclusion constraint must reject it (one holder per day, no same-day handoff).
+        """
+        self._make(
+            start_offset=0, end_offset=10,
+            status=ReservationStatusChoices.ACTIVE, holder=self.holder_a,
+        )
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                self._make(
+                    start_offset=10, end_offset=20,
+                    status=ReservationStatusChoices.PENDING, holder=self.holder_b,
+                )
+
+    def test_db_constraint_rejects_same_day_reservations(self):
+        """A one-day reservation (start_date == end_date) is a real, exclusive
+        booking: two reservations on the same single day must conflict."""
+        self._make(
+            start_offset=5, end_offset=5,
+            status=ReservationStatusChoices.ACTIVE, holder=self.holder_a,
+        )
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                self._make(
+                    start_offset=5, end_offset=5,
+                    status=ReservationStatusChoices.PENDING, holder=self.holder_b,
+                )
 
     def test_db_constraint_ignores_soft_deleted_reservation(self):
         """A soft-deleted reservation must NOT block a new overlapping one (the
