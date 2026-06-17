@@ -373,6 +373,22 @@ import sys
 if 'test' in sys.argv or any('test' in arg or 'pytest' in arg for arg in sys.argv):
     Q_CLUSTER['sync'] = True
 
+    # --- Test-suite DB hardening (guards against an unbounded, order-dependent
+    # suite hang). Two layered fixes:
+    #   1. CONN_MAX_AGE=0 — kill persistent connections in tests. With the prod
+    #      default (300s) a connection that opened a transaction/held a lock
+    #      survives the test that created it and lingers into later tests.
+    #   2. lock_timeout — a TransactionTestCase teardown TRUNCATEs every table;
+    #      that TRUNCATE needs ACCESS EXCLUSIVE and, with no timeout, waits
+    #      FOREVER on any lock such a lingering session still holds (a hang that
+    #      blocks in libpq's C recv, so pytest --timeout can't even kill it).
+    #      30s lock_timeout turns that 1h+ deadlock into a fast, diagnosable
+    #      OperationalError. statement_timeout (10min) is a generous backstop for
+    #      any other runaway query — high enough to never trip a real test or a
+    #      migration statement during test-DB build.
+    DATABASES['default']['CONN_MAX_AGE'] = 0
+    DATABASES['default']['OPTIONS']['options'] = '-c lock_timeout=30000 -c statement_timeout=600000'
+
 
 ALLOW_GLOBAL_CUSTODY_TEMPLATES = os.environ.get('ITAMBOX_ALLOW_GLOBAL_CUSTODY_TEMPLATES', 'True') == 'True'
 REQUIRE_CUSTODY_SIGNIN = os.environ.get('ITAMBOX_REQUIRE_CUSTODY_SIGNIN', 'True') == 'True'
