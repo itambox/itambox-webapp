@@ -6,9 +6,6 @@ from itambox.views.generic import (
     ObjectEditView,
     ObjectDeleteView,
     ObjectCloneView,
-    # BulkImportView, # Add later if needed
-    # BulkEditView,  # Add later if needed
-    # BulkDeleteView # Add later if needed
 )
 from itambox.panels import Panel
 from .models import Software, InstalledSoftware

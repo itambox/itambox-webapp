@@ -15,6 +15,8 @@ urlpatterns = [
     # Tags
     path('tags/', views.TagListView.as_view(), name='tag_list'),
     path('tags/create/', views.TagCreateView.as_view(), name='tag_create'),
+    path('tags/edit/', views.TagBulkEditView.as_view(), name='tag_bulk_edit'),
+    path('tags/delete/', views.TagBulkDeleteView.as_view(), name='tag_bulk_delete'),
     path('tags/<int:pk>/', views.TagDetailView.as_view(), name='tag_detail'),
     path('tags/<int:pk>/edit/', views.TagUpdateView.as_view(), name='tag_update'),
     path('tags/<int:pk>/delete/', views.TagDeleteView.as_view(), name='tag_delete'),
@@ -23,12 +25,16 @@ urlpatterns = [
     # Custom Fields
     path('custom-fields/', views.CustomFieldListView.as_view(), name='customfield_list'),
     path('custom-fields/add/', views.CustomFieldEditView.as_view(), name='customfield_create'),
+    path('custom-fields/edit/', views.CustomFieldBulkEditView.as_view(), name='customfield_bulk_edit'),
+    path('custom-fields/delete/', views.CustomFieldBulkDeleteView.as_view(), name='customfield_bulk_delete'),
     path('custom-fields/<int:pk>/', views.CustomFieldDetailView.as_view(), name='customfield_detail'),
     path('custom-fields/<int:pk>/edit/', views.CustomFieldEditView.as_view(), name='customfield_update'),
     path('custom-fields/<int:pk>/delete/', views.CustomFieldDeleteView.as_view(), name='customfield_delete'),
     # Custom Fieldsets
     path('custom-fieldsets/', views.CustomFieldsetListView.as_view(), name='customfieldset_list'),
     path('custom-fieldsets/add/', views.CustomFieldsetEditView.as_view(), name='customfieldset_create'),
+    path('custom-fieldsets/edit/', views.CustomFieldsetBulkEditView.as_view(), name='customfieldset_bulk_edit'),
+    path('custom-fieldsets/delete/', views.CustomFieldsetBulkDeleteView.as_view(), name='customfieldset_bulk_delete'),
     path('custom-fieldsets/<int:pk>/', views.CustomFieldsetDetailView.as_view(), name='customfieldset_detail'),
     path('custom-fieldsets/<int:pk>/edit/', views.CustomFieldsetEditView.as_view(), name='customfieldset_update'),
     path('custom-fieldsets/<int:pk>/delete/', views.CustomFieldsetDeleteView.as_view(), name='customfieldset_delete'),

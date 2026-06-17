@@ -3,6 +3,7 @@ from ..filters import (
     AssetFilterSet, AssetRoleFilterSet, ManufacturerFilterSet, AssetTypeFilterSet,
     StatusLabelFilterSet, DepreciationFilterSet,
     SupplierFilterSet, CategoryFilterSet, AssetRequestFilterSet, AssetTagSequenceFilterSet,
+    AssetDisposalFilterSet, WarrantyFilterSet, AssetReservationFilterSet,
 )
 
 class AssetFilterForm(FilterForm):
@@ -88,4 +89,13 @@ class AssetTagSequenceFilterForm(FilterForm):
             'label_field': 'name',
         },
     }
+
+class AssetDisposalFilterForm(FilterForm):
+    filterset_class = AssetDisposalFilterSet
+
+class WarrantyFilterForm(FilterForm):
+    filterset_class = WarrantyFilterSet
+
+class AssetReservationFilterForm(FilterForm):
+    filterset_class = AssetReservationFilterSet
 

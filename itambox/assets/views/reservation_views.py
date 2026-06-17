@@ -7,11 +7,14 @@ from itambox.views.generic import (
 
 from assets.models import AssetReservation
 from assets.tables import AssetReservationTable
-from assets.forms import AssetReservationForm
+from assets.forms import AssetReservationForm, AssetReservationFilterForm
+from assets.filters import AssetReservationFilterSet
 
 
 class AssetReservationListView(ObjectListView):
     queryset = AssetReservation.objects.select_related('asset', 'reserved_for', 'created_by')
+    filterset = AssetReservationFilterSet
+    filterset_form = AssetReservationFilterForm
     table = AssetReservationTable
     action_buttons = ('add',)
 

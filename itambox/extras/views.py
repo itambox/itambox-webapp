@@ -13,7 +13,7 @@ from users.models import UserPreference # Import UserPreference
 from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.contrib import messages
-from itambox.views.generic import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
+from itambox.views.generic import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView
 from itambox.panels import Panel
 
 class TagDetailView(ObjectDetailView):
@@ -65,6 +65,14 @@ class TagListView(ObjectListView):
     template_name = 'generic/object_list.html' # Use base template
 
 
+class TagBulkEditView(ObjectBulkEditView):
+    queryset = Tag.objects.all()
+
+
+class TagBulkDeleteView(ObjectBulkDeleteView):
+    queryset = Tag.objects.all()
+
+
 # Custom Fields
 class CustomFieldListView(ObjectListView):
     queryset = CustomField.objects.all()
@@ -97,6 +105,14 @@ class CustomFieldDeleteView(ObjectDeleteView):
     success_url = reverse_lazy('extras:customfield_list')
 
 
+class CustomFieldBulkEditView(ObjectBulkEditView):
+    queryset = CustomField.objects.all()
+
+
+class CustomFieldBulkDeleteView(ObjectBulkDeleteView):
+    queryset = CustomField.objects.all()
+
+
 # Custom Fieldsets
 class CustomFieldsetListView(ObjectListView):
     queryset = CustomFieldset.objects.annotate(fields_count=Count('fields'))
@@ -127,6 +143,14 @@ class CustomFieldsetDeleteView(ObjectDeleteView):
     model = CustomFieldset
     template_name = 'generic/object_confirm_delete.html'
     success_url = reverse_lazy('extras:customfieldset_list')
+
+
+class CustomFieldsetBulkEditView(ObjectBulkEditView):
+    queryset = CustomFieldset.objects.all()
+
+
+class CustomFieldsetBulkDeleteView(ObjectBulkDeleteView):
+    queryset = CustomFieldset.objects.all()
 
 
 # =============================================================================

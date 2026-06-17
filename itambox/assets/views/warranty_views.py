@@ -7,11 +7,14 @@ from itambox.views.generic import (
 
 from assets.models import Warranty
 from assets.tables import WarrantyTable
-from assets.forms import WarrantyForm
+from assets.forms import WarrantyForm, WarrantyFilterForm
+from assets.filters import WarrantyFilterSet
 
 
 class WarrantyListView(ObjectListView):
     queryset = Warranty.objects.select_related('asset')
+    filterset = WarrantyFilterSet
+    filterset_form = WarrantyFilterForm
     table = WarrantyTable
     action_buttons = ('add',)
 

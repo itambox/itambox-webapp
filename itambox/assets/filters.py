@@ -1,11 +1,21 @@
 import django_filters
 from core.filters import BaseFilterSet
 from .models import Asset, AssetRole, Manufacturer, AssetType, StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence
+from .models import AssetDisposal, Warranty, AssetReservation
+from .models.choices import (
+    DisposalMethodChoices,
+    DataSanitizationMethodChoices,
+    WarrantyTypeChoices,
+    ReservationStatusChoices,
+)
 from assets.choices import RequestStatusChoices
 from organization.models import Location, Tenant, AssetHolder
 from extras.models import Tag
 from django import forms
 from django.db.models import Q
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 class AssetFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
@@ -347,3 +357,147 @@ class AssetTagSequenceFilterSet(BaseFilterSet):
 
 
 # AuditSessionFilterSet / AssetAuditFilterSet moved to compliance.filters
+
+
+class AssetDisposalFilterSet(BaseFilterSet):
+    q = django_filters.CharFilter(
+        method='search',
+        label='Search',
+        widget=forms.TextInput(attrs={'placeholder': 'Recipient, Sanitized By, Certificate, Notes, Asset Name...'})
+    )
+    asset = django_filters.ModelChoiceFilter(
+        queryset=Asset.objects.all(),
+        label='Asset',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    disposal_method = django_filters.ChoiceFilter(
+        choices=DisposalMethodChoices.choices,
+        label='Disposal Method',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    data_sanitization_method = django_filters.ChoiceFilter(
+        choices=DataSanitizationMethodChoices.choices,
+        label='Data Sanitization Method',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    disposal_date = django_filters.DateFromToRangeFilter(
+        label='Disposal Date',
+        widget=django_filters.widgets.RangeWidget(attrs={'class': 'form-control', 'type': 'date'})
+    )
+    weee_compliant = django_filters.BooleanFilter(
+        label='WEEE Compliant',
+        widget=forms.Select(choices=[('', 'Any'), ('true', 'Yes'), ('false', 'No')], attrs={'class': 'form-select'})
+    )
+
+    class Meta:
+        model = AssetDisposal
+        fields = ['asset', 'disposal_method', 'data_sanitization_method', 'disposal_date', 'weee_compliant']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(recipient__icontains=value) |
+            Q(sanitized_by__icontains=value) |
+            Q(sanitization_certificate__icontains=value) |
+            Q(notes__icontains=value) |
+            Q(asset__name__icontains=value)
+        ).distinct()
+
+
+class WarrantyFilterSet(BaseFilterSet):
+    q = django_filters.CharFilter(
+        method='search',
+        label='Search',
+        widget=forms.TextInput(attrs={'placeholder': 'Provider, Reference, Terms, Notes, Asset Name...'})
+    )
+    asset = django_filters.ModelChoiceFilter(
+        queryset=Asset.objects.all(),
+        label='Asset',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    warranty_type = django_filters.ChoiceFilter(
+        choices=WarrantyTypeChoices.choices,
+        label='Warranty Type',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    provider = django_filters.CharFilter(
+        lookup_expr='icontains',
+        label='Provider',
+        widget=forms.TextInput(attrs={'class': 'form-control'})
+    )
+    start_date = django_filters.DateFromToRangeFilter(
+        label='Start Date',
+        widget=django_filters.widgets.RangeWidget(attrs={'class': 'form-control', 'type': 'date'})
+    )
+    end_date = django_filters.DateFromToRangeFilter(
+        label='End Date',
+        widget=django_filters.widgets.RangeWidget(attrs={'class': 'form-control', 'type': 'date'})
+    )
+
+    class Meta:
+        model = Warranty
+        fields = ['asset', 'warranty_type', 'provider', 'start_date', 'end_date']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(provider__icontains=value) |
+            Q(reference__icontains=value) |
+            Q(terms__icontains=value) |
+            Q(notes__icontains=value) |
+            Q(asset__name__icontains=value)
+        ).distinct()
+
+
+class AssetReservationFilterSet(BaseFilterSet):
+    q = django_filters.CharFilter(
+        method='search',
+        label='Search',
+        widget=forms.TextInput(attrs={'placeholder': 'Purpose, Notes, Asset Name, Reserved For...'})
+    )
+    asset = django_filters.ModelChoiceFilter(
+        queryset=Asset.objects.all(),
+        label='Asset',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    reserved_for = django_filters.ModelChoiceFilter(
+        queryset=AssetHolder.objects.all(),
+        label='Reserved For',
+        null_label='(no holder)',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    status = django_filters.ChoiceFilter(
+        choices=ReservationStatusChoices.choices,
+        label='Status',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    start_date = django_filters.DateFromToRangeFilter(
+        label='Start Date',
+        widget=django_filters.widgets.RangeWidget(attrs={'class': 'form-control', 'type': 'date'})
+    )
+    end_date = django_filters.DateFromToRangeFilter(
+        label='End Date',
+        widget=django_filters.widgets.RangeWidget(attrs={'class': 'form-control', 'type': 'date'})
+    )
+    created_by = django_filters.ModelChoiceFilter(
+        queryset=User.objects.order_by('username'),
+        label='Created By',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    class Meta:
+        model = AssetReservation
+        fields = ['asset', 'reserved_for', 'status', 'start_date', 'end_date', 'created_by']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(purpose__icontains=value) |
+            Q(notes__icontains=value) |
+            Q(asset__name__icontains=value) |
+            Q(reserved_for__first_name__icontains=value) |
+            Q(reserved_for__last_name__icontains=value)
+        ).distinct()

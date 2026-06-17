@@ -9,12 +9,15 @@ from itambox.views.generic import (
 )
 
 from assets.models import AssetDisposal, Asset
-from assets.forms import AssetDisposalForm
+from assets.forms import AssetDisposalForm, AssetDisposalFilterForm
+from assets.filters import AssetDisposalFilterSet
 from assets.tables import AssetDisposalTable
 
 
 class AssetDisposalListView(ObjectListView):
     queryset = AssetDisposal.objects.select_related('asset', 'asset__asset_type__manufacturer')
+    filterset = AssetDisposalFilterSet
+    filterset_form = AssetDisposalFilterForm
     table = AssetDisposalTable
     action_buttons = ('add',)
 

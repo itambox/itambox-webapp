@@ -1,8 +1,9 @@
 import django_tables2 as tables
-from core.tables import BaseTable, ActionsColumn
+from core.tables import BaseTable, ActionsColumn, ToggleColumn
 from .models import PurchaseOrder, Contract
 
 class PurchaseOrderTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
     order_number = tables.Column(linkify=True)
     supplier = tables.Column(linkify=True)
     status = tables.Column()
@@ -12,10 +13,11 @@ class PurchaseOrderTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = PurchaseOrder
-        fields = ('order_number', 'supplier', 'status', 'expected_delivery_date', 'destination_location', 'actions')
+        fields = ('pk', 'order_number', 'supplier', 'status', 'expected_delivery_date', 'destination_location', 'actions')
 
 
 class ContractTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
     name = tables.Column(linkify=True)
     contract_number = tables.Column(linkify=True)
     contract_type = tables.Column(verbose_name='Type')
@@ -27,4 +29,4 @@ class ContractTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = Contract
-        fields = ('name', 'contract_number', 'contract_type', 'status', 'supplier', 'start_date', 'end_date', 'actions')
+        fields = ('pk', 'name', 'contract_number', 'contract_type', 'status', 'supplier', 'start_date', 'end_date', 'actions')
