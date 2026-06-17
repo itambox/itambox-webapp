@@ -14,7 +14,7 @@ from django_q.tasks import async_task
 
 from extras.models import ReportTemplate, ScheduledReport
 from core.tables import ReportTemplateTable, ScheduledReportTable
-from core.forms import ReportTemplateForm, ScheduledReportForm
+from extras.forms import ReportTemplateForm, ScheduledReportForm
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
 )

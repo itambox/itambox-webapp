@@ -6,7 +6,7 @@ recipient users) and assembles them into the model's single `config` JSON.
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 
-from core.forms import NotificationChannelForm
+from extras.forms import NotificationChannelForm
 from extras.models import NotificationChannel
 from itambox.middleware import _current_user
 

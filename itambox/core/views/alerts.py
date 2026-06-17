@@ -12,7 +12,7 @@ from django.views.generic import View
 
 from extras.models import AlertRule, AlertLog, NotificationChannel
 from core.tables import AlertRuleTable, AlertLogTable, NotificationChannelTable
-from core.forms import AlertRuleForm, NotificationChannelForm
+from extras.forms import AlertRuleForm, NotificationChannelForm
 from core.filters import AlertLogFilterSet
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView

@@ -87,3 +87,56 @@ class TableMixin:
             table.columns.show('pk')
         table.configure(request)
         return table
+
+
+class TenantScopingViewMixin:
+    """Apply ``filter_by_tenant()`` to any queryset that supports it.
+
+    Placed in the MRO before concrete view base classes so that both
+    ``get_queryset`` in the framework and any per-view override automatically
+    respect the active tenant context.
+    """
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if hasattr(queryset, 'filter_by_tenant'):
+            queryset = queryset.filter_by_tenant()
+        return queryset
+
+
+class BulkViewMixin:
+    """Shared helpers for ``ObjectBulkEditView`` and ``ObjectBulkDeleteView``.
+
+    Both bulk views need to resolve the target model from several possible
+    sources (view attribute, form class, or a ``model_name`` request param)
+    and then obtain a queryset scoped to the current tenant and a list of PKs.
+    """
+
+    def _get_model(self):
+        from django.apps import apps
+        from django.http import Http404
+
+        if getattr(self, 'queryset', None) is not None:
+            return self.queryset.model
+        if hasattr(self, 'model') and self.model:
+            return self.model
+        if getattr(self, 'form_class', None) and hasattr(self.form_class, '_meta'):
+            return self.form_class._meta.model
+        if hasattr(self, 'request') and self.request:
+            model_name = self.request.POST.get('model_name') or self.request.GET.get('model_name')
+            if model_name:
+                try:
+                    app_label, mn = model_name.split('.')
+                    model = apps.get_model(app_label, mn)
+                except (ValueError, LookupError):
+                    raise Http404
+                if not hasattr(model.objects, 'filter_by_tenant'):
+                    raise Http404
+                return model
+        return None
+
+    def _get_queryset(self, pks):
+        qs = self.queryset if getattr(self, 'queryset', None) is not None else self._get_model().objects.all()
+        if hasattr(qs, 'filter_by_tenant'):
+            qs = qs.filter_by_tenant()
+        return qs.filter(pk__in=pks)

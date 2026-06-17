@@ -22,10 +22,8 @@ from core.tables import (
     ObjectChangeTable, ExportTemplateTable, WebhookEndpointTable, 
     EventRuleTable, LabelTemplateTable
 )
-from core.forms import (
-    JournalEntryForm, WebhookEndpointForm, EventRuleForm, LabelTemplateForm,
-    ObjectChangeFilterForm
-)
+from core.forms import JournalEntryForm
+from extras.forms import WebhookEndpointForm, EventRuleForm, LabelTemplateForm, ObjectChangeFilterForm
 from core.filters import ObjectChangeFilterSet
 from itambox.registry import registry
 from itambox.panels import Panel

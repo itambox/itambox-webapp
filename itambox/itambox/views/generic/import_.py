@@ -1,0 +1,275 @@
+import logging
+
+from django.apps import apps
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib import messages
+from django.core.exceptions import ImproperlyConfigured
+from django.http import Http404
+from django.shortcuts import redirect
+from django.urls import reverse, NoReverseMatch
+from django.utils.translation import gettext as _
+from django.views.generic import TemplateView
+
+from itambox.utils import get_model_viewname
+from itambox.views.htmx import BaseHTMXView
+
+logger = logging.getLogger(__name__)
+
+
+class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, TemplateView):
+    model_form = None
+    template_name = 'generic/object_import.html'
+
+    def get_permission_required(self):
+        model = self._get_model()
+        if model:
+            return (f'{model._meta.app_label}.add_{model._meta.model_name}',)
+        return ('',)
+
+    def _get_model(self):
+        form_cls = getattr(self, 'model_form', None)
+        if form_cls and hasattr(form_cls, 'model') and form_cls.model:
+            return form_cls.model
+        if hasattr(self, 'model') and self.model:
+            return self.model
+        return None
+
+    def get_form_class(self):
+        if self.model_form:
+            return self.model_form
+
+        model = self._get_model()
+        if not model:
+            raise ImproperlyConfigured(f"{self.__class__.__name__} needs a model attribute or model_form.")
+
+        # A curated BulkImportForm registered for this model wins — it carries
+        # domain-accurate required/optional field lists. Otherwise fall back to
+        # a dynamic form introspected from the model's editable fields.
+        from core.forms.import_forms import (
+            BulkImportForm, IMPORT_EXCLUDED_FIELDS, get_registered_import_form,
+        )
+        registered = get_registered_import_form(model)
+        if registered is not None:
+            return registered
+
+        from django.db import models
+
+        required_fields = []
+        optional_fields = []
+        for field in model._meta.fields:
+            if field.primary_key or field.auto_created or not field.editable:
+                continue
+            if field.name in IMPORT_EXCLUDED_FIELDS:
+                continue
+            if not field.blank and not field.null and field.default is models.NOT_PROVIDED:
+                required_fields.append(field.name)
+            else:
+                optional_fields.append(field.name)
+
+        target_model = model
+        target_required = list(required_fields)
+        target_optional = list(optional_fields)
+
+        # The base map_row already resolves FKs by id/slug/name and skips
+        # non-model columns, so no per-form override is needed.
+        class DynamicBulkImportForm(BulkImportForm):
+            model = target_model
+            required_fields = target_required
+            optional_fields = target_optional
+
+        return DynamicBulkImportForm
+
+    def get(self, request, *args, **kwargs):
+        form = self.get_form_class()()
+        return self._render_response(request, form)
+
+    def post(self, request, *args, **kwargs):
+        form = self.get_form_class()(request.POST, request.FILES)
+
+        if '_preview' in request.POST:
+            if form.is_valid():
+                rows = form._rows_data
+                request.session['import_rows'] = rows
+                request.session['import_delimiter'] = form.cleaned_data.get('delimiter', ',')
+                context = {
+                    'form': form,
+                    'preview_rows': rows,
+                    'preview_headers': form.field_names if rows else [],
+                    'title': self._get_title(),
+                    'cancel_url': self._get_cancel_url(),
+                }
+                return self.render_to_response(context)
+            return self._render_response(request, form, errors=[str(e) for e in form.errors.values()])
+
+        if '_confirm' in request.POST:
+            rows = request.session.get('import_rows', [])
+            if rows:
+                from django.contrib.contenttypes.models import ContentType
+                from core.models import Job
+                from django_q.tasks import async_task
+
+                model = self._get_model()
+                ct = ContentType.objects.get_for_model(model)
+
+                from django.db import transaction
+                from django.conf import settings
+                from core.managers import get_current_tenant
+                current_tenant = get_current_tenant()
+                tenant_id = current_tenant.pk if current_tenant else None
+
+                # Create background Job tracker instance
+                job = Job.objects.create(
+                    name=f"Bulk Import: {str(model._meta.verbose_name_plural).title()}",
+                    tenant=current_tenant,
+                    model=ct,
+                    status=Job.STATUS_PENDING,
+                )
+
+                if getattr(settings, 'Q_CLUSTER', {}).get('sync', False):
+                    async_task(
+                        'core.tasks.import_csv_task',
+                        job.pk,
+                        rows,
+                        model._meta.app_label,
+                        model._meta.model_name,
+                        request.user.pk,
+                        tenant_id=tenant_id,
+                    )
+                else:
+                    transaction.on_commit(
+                        lambda job_pk=job.pk, r=rows, app=model._meta.app_label, name=model._meta.model_name, u_pk=request.user.pk, t_id=tenant_id: async_task(
+                            'core.tasks.import_csv_task',
+                            job_pk,
+                            r,
+                            app,
+                            name,
+                            u_pk,
+                            tenant_id=t_id,
+                        )
+                    )
+
+                messages.success(
+                    request,
+                    f"Asynchronous import job '{job.name}' enqueued successfully! Tracking progress in real-time.",
+                )
+
+                request.session.pop('import_rows', None)
+                request.session.pop('import_delimiter', None)
+
+                try:
+                    return redirect('job_detail', pk=job.pk)
+                except NoReverseMatch:
+                    return redirect(f"/jobs/{job.pk}/")
+            return self._render_response(request, form, errors=['No import data found. Please upload a file first.'])
+
+        return self._render_response(request, form)
+
+    def _get_fields_info(self):
+        """Field Options help table, derived from the resolved form's actual
+        required_fields/optional_fields so it always matches what is imported
+        (not every model field). FK columns advertise their match accessor."""
+        model = self._get_model()
+        fields_info = []
+        if not model:
+            return fields_info
+
+        from django.db import models
+        from core.forms.import_forms import IMPORT_EXCLUDED_FIELDS, _model_has_concrete_field
+
+        form_cls = self.get_form_class()
+        required = set(getattr(form_cls, 'required_fields', []) or [])
+        field_names = (list(getattr(form_cls, 'required_fields', []) or [])
+                       + list(getattr(form_cls, 'optional_fields', []) or []))
+
+        for name in field_names:
+            if name in IMPORT_EXCLUDED_FIELDS:
+                continue
+            try:
+                field = model._meta.get_field(name)
+            except Exception:
+                fields_info.append({'name': name, 'required': name in required,
+                                    'accessor': '', 'description': '', 'choices': []})
+                continue
+
+            description = field.help_text or field.verbose_name or ''
+            description = str(description) if description else ''
+            is_relation = field.is_relation and field.many_to_one
+            accessor = ''
+            choices = []
+            if is_relation:
+                related_model = field.related_model
+                accessor = 'slug' if _model_has_concrete_field(related_model, 'slug') else 'name'
+                description = _("Relation to {model_name} (resolves by ID, Slug or Name).").format(
+                    model_name=str(related_model._meta.verbose_name)
+                )
+            if field.choices:
+                choices = [(val, label) for val, label in field.choices]
+            if isinstance(field, models.DateField):
+                description = f"{description} Format: YYYY-MM-DD"
+            elif isinstance(field, models.BooleanField):
+                description = f"{description} Specify true or false"
+
+            fields_info.append({
+                'name': name,
+                'required': name in required,
+                'accessor': accessor,
+                'description': description,
+                'choices': choices,
+            })
+        return fields_info
+
+    def _render_response(self, request, form, **extra_context):
+        context = {
+            'form': form,
+            'title': self._get_title(),
+            'cancel_url': self._get_cancel_url(),
+            'fields': self._get_fields_info(),
+            **extra_context,
+        }
+        return self.render_to_response(context)
+
+    def _get_title(self):
+        model = self._get_model()
+        if model:
+            return _('Import {verbose_name_plural}').format(verbose_name_plural=model._meta.verbose_name_plural)
+        return _('Import Objects')
+
+    def _get_cancel_url(self):
+        model = self._get_model()
+        if model:
+            try:
+                list_view_name = get_model_viewname(model, 'list')
+                return reverse(list_view_name)
+            except NoReverseMatch:
+                pass
+        return reverse('dashboard')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs) if hasattr(super(), 'get_context_data') else {}
+        context['title'] = kwargs.get('title', self._get_title())
+        context['cancel_url'] = kwargs.get('cancel_url', self._get_cancel_url())
+        context['breadcrumbs'] = [
+            (reverse('dashboard'), _('Dashboard')),
+            (context['cancel_url'], self._get_model()._meta.verbose_name_plural if self._get_model() else _('List')),
+            (None, context['title']),
+        ]
+        return context
+
+    def render_to_response(self, context, **response_kwargs):
+        context['breadcrumbs'] = context.get('breadcrumbs', [])
+        return BaseHTMXView.render_to_response(self, context, **response_kwargs)
+
+
+class GenericObjectImportView(ObjectImportView):
+    def _get_model(self):
+        from core.forms.import_forms import is_model_importable
+        app_label = self.kwargs.get('app_label')
+        model_name = self.kwargs.get('model_name')
+        try:
+            model = apps.get_model(app_label, model_name)
+        except LookupError:
+            raise Http404
+        # Generated logs and UI-only config are not importable, even by direct URL.
+        if not is_model_importable(model):
+            raise Http404
+        return model
