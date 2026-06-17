@@ -774,13 +774,23 @@ class RenewalsWidget(DashboardWidget):
         limit = self.get_config_value('limit', 10)
         cutoff = today + timedelta(days=days_horizon)
         
+        # Resolve the scoped tenant for currency fallback (mirrors FinancialWidget).
+        from types import SimpleNamespace
+        tenant = None
+        tenant_id = self.get_config_value('tenant_id') or self.config.get('tenant_id')
+        if tenant_id:
+            from organization.models import Tenant
+            tenant = Tenant.objects.filter(id=tenant_id).first()
+        if tenant is None:
+            tenant = getattr(request, 'active_tenant', None)
+
         scoped_subs = get_scoped_queryset(Subscription, request, config=self.config.get("config", {}))
         subs = scoped_subs.filter(
             status='active',
             renewal_date__isnull=False,
             renewal_date__lte=cutoff,
             renewal_date__gte=today,
-        ).select_related('provider').order_by('renewal_date')[:limit]
+        ).select_related('provider', 'tenant').order_by('renewal_date')[:limit]
 
         result = []
         for sub in subs:
@@ -791,15 +801,30 @@ class RenewalsWidget(DashboardWidget):
                 'days_until_renewal': (sub.renewal_date - today).days,
                 'renewal_cost': sub.renewal_cost,
                 'currency': sub.currency,
+                # Per-row currency context for the `money` filter: the row's own
+                # currency (blank => the subscription's tenant => default).
+                'currency_obj': SimpleNamespace(currency=sub.currency or '', tenant=sub.tenant),
             })
 
-        total_spend = scoped_subs.filter(status='active').aggregate(
+        # Active-subscription spend must NOT be summed across currencies — there
+        # is no FX source. Group by the per-record currency (blank => the
+        # scoped tenant's currency at display time) and emit one total per
+        # currency; the template formats each via the `money` filter.
+        spend_rows = scoped_subs.filter(status='active').values('currency').annotate(
             total=Sum('renewal_cost')
-        )['total'] or 0
+        ).order_by('-total')
+        currency_spend = []
+        for r in spend_rows:
+            if r['total'] is None:
+                continue
+            # Wrap the row's currency so `{{ total|money:currency_obj }}` resolves
+            # it (blank currency_obj.currency falls back to the tenant currency).
+            currency_obj = SimpleNamespace(currency=r['currency'] or '', tenant=tenant)
+            currency_spend.append({'total': r['total'], 'currency_obj': currency_obj})
 
         return {
             'upcoming_renewals': result,
-            'total_subscription_spend': total_spend,
+            'currency_spend': currency_spend,
             'days_horizon': days_horizon,
         }
 

@@ -268,14 +268,29 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
             subs_qs = subs_qs.filter(tenant=active_tenant)
             
         total_active = subs_qs.count()
-        
-        total_monthly_spend = 0.0
+
+        # Subscriptions can carry differing ISO currencies and there is no FX
+        # source — never sum monthly spend into one combined number. Bucket the
+        # amortized monthly equivalent by the subscription's currency (blank =>
+        # the owning tenant's currency) and render one figure per currency.
+        from extras.templatetags.money import money as _money_fmt
+
+        def _resolve_currency(sub):
+            from django.conf import settings as _settings
+            if sub.currency:
+                return sub.currency.upper()
+            t = sub.tenant
+            if t is not None and getattr(t, 'currency', None):
+                return t.currency.upper()
+            return (getattr(_settings, 'ITAMBOX_DEFAULT_CURRENCY', 'EUR') or 'EUR').upper()
+
+        monthly_by_currency = {}
         provider_costs = {}
         for sub in subs_qs:
             if sub.renewal_cost is None:
                 continue
             cost_val = float(sub.renewal_cost)
-            
+
             # Amortize based on billing cycle to get monthly equivalent
             if sub.billing_cycle == 'monthly':
                 monthly_cost = cost_val
@@ -289,16 +304,23 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
                 monthly_cost = cost_val / 36.0
             else:
                 monthly_cost = cost_val
-                
-            total_monthly_spend += monthly_cost
-            
+
+            cur = _resolve_currency(sub)
+            monthly_by_currency[cur] = monthly_by_currency.get(cur, 0.0) + monthly_cost
+
             provider_name = sub.provider.name if sub.provider else _('Generic')
             provider_costs[provider_name] = provider_costs.get(provider_name, 0.0) + monthly_cost
 
         if template.include_summary_cards:
+            # One figure per currency; no cross-currency combined total.
+            from types import SimpleNamespace
+            spend_value = ' · '.join(
+                _money_fmt(amount, SimpleNamespace(currency=cur))
+                for cur, amount in sorted(monthly_by_currency.items(), key=lambda kv: kv[1], reverse=True)
+            ) or _money_fmt(0, None)
             summary_cards = [
                 {'label': _('Active Subscriptions'), 'value': str(total_active)},
-                {'label': _('Est. Monthly Spend'), 'value': f"${total_monthly_spend:,.2f}"}
+                {'label': _('Est. Monthly Spend'), 'value': spend_value}
             ]
             
         for sub in subs_qs[:500]:

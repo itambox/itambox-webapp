@@ -1,4 +1,5 @@
 {% load i18n %}
+{% load money %}
 <div class="text-muted small mb-2">{% blocktranslate %}Active subscriptions renewing within {{ days_horizon }} days{% endblocktranslate %}</div>
 {% if upcoming_renewals %}
 <div class="list-group list-group-flush" style="font-size: 0.85rem;">
@@ -12,14 +13,19 @@
         </div>
         <div class="d-flex justify-content-between text-muted small">
             <span>{{ sub.provider.name }}</span>
-            <span>{% if sub.renewal_cost %}{{ sub.renewal_cost|floatformat:0 }} {{ sub.currency }}{% else %}&mdash;{% endif %}</span>
+            <span>{% if sub.renewal_cost %}{{ sub.renewal_cost|money:sub.currency_obj }}{% else %}&mdash;{% endif %}</span>
         </div>
     </div>
     {% endfor %}
 </div>
+{% if currency_spend %}
 <div class="text-muted small mt-2">
-    {% translate "Active subscription spend:" %} <strong>{{ total_subscription_spend|floatformat:0 }}</strong>
+    {% translate "Active subscription spend:" %}
+    {% for cs in currency_spend %}
+    <strong>{{ cs.total|money:cs.currency_obj }}</strong>{% if not forloop.last %} &middot; {% endif %}
+    {% endfor %}
 </div>
+{% endif %}
 {% else %}
 <div class="text-muted text-center py-4">{% blocktranslate %}No upcoming renewals within {{ days_horizon }} days.{% endblocktranslate %}</div>
 {% endif %}

@@ -210,17 +210,19 @@ class DashboardWidgetsMultiTenancyTests(TestCase):
     def test_renewals_widget_scoping(self):
         widget = RenewalsWidget()
 
-        # User A renewals
+        # User A renewals — spend is grouped per currency (no combined total).
         ctx_a = widget.get_context(self.make_request(self.user_a))
         self.assertEqual(len(ctx_a['upcoming_renewals']), 1)
         self.assertEqual(ctx_a['upcoming_renewals'][0]['name'], "SaaS A")
-        self.assertEqual(ctx_a['total_subscription_spend'], 500.00)
+        self.assertEqual(len(ctx_a['currency_spend']), 1)
+        self.assertEqual(float(ctx_a['currency_spend'][0]['total']), 500.00)
 
         # User B renewals
         ctx_b = widget.get_context(self.make_request(self.user_b))
         self.assertEqual(len(ctx_b['upcoming_renewals']), 1)
         self.assertEqual(ctx_b['upcoming_renewals'][0]['name'], "SaaS B")
-        self.assertEqual(ctx_b['total_subscription_spend'], 800.00)
+        self.assertEqual(len(ctx_b['currency_spend']), 1)
+        self.assertEqual(float(ctx_b['currency_spend'][0]['total']), 800.00)
 
     def test_asset_age_widget_scoping(self):
         widget = AssetAgeWidget()

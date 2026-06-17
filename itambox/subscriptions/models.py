@@ -2,6 +2,7 @@ from django.db import models
 from django.conf import settings
 from django.urls import reverse, NoReverseMatch
 from core.models import BaseModel, ChangeLoggingMixin, StandardModel, DeletableVaultModel
+from core.currency import CurrencyField
 from core.mixins import TaggableMixin, JournalingMixin, ExportableMixin, AutoSlugMixin, ImageAttachmentMixin, FileAttachmentMixin, CloneableMixin, SoftDeleteMixin, BookmarkableMixin, CustomFieldDataMixin
 from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager, TenantScopingManager, TenantScopingAllObjectsManager
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
@@ -210,13 +211,7 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
         null=True,
         help_text="Cost per renewal period"
     )
-    currency = models.CharField(
-        max_length=3,
-        default='USD',
-        blank=True,
-        verbose_name="Currency",
-        help_text="ISO 4217 currency code (USD, EUR, GBP, AUD, etc.)"
-    )
+    currency = CurrencyField()
     billing_cycle = models.CharField(
         max_length=20,
         choices=BillingCycleChoices.choices,
