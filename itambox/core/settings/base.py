@@ -380,6 +380,10 @@ Q_CLUSTER = {
     'cpu_affinity': 1,
     'label': 'Django Q Cluster',
     'orm': 'default',        # Standard database ORM broker
+    # Don't persist successful tasks (we only fire-and-forget async_task, never
+    # fetch results); failures are always saved and never pruned by django-q2,
+    # so list_failed_tasks stays complete without the table bloating on successes.
+    'save_limit': -1,
 }
 
 import sys
@@ -473,9 +477,14 @@ LOG_LEVEL = os.environ.get('ITAMBOX_LOG_LEVEL', 'INFO').upper()
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'filters': {
+        'request_id': {
+            '()': 'itambox.logging_filters.RequestIDFilter',
+        },
+    },
     'formatters': {
         'verbose': {
-            'format': '{asctime} {levelname} {name} {message}',
+            'format': '{asctime} {levelname} [{request_id}] {name} {message}',
             'style': '{',
         },
     },
@@ -483,6 +492,7 @@ LOGGING = {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
+            'filters': ['request_id'],
         },
     },
     'root': {

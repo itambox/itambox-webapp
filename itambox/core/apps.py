@@ -1,4 +1,9 @@
+import logging
+
 from django.apps import AppConfig
+from django.db.models.signals import post_migrate
+
+logger = logging.getLogger(__name__)
 
 
 class CoreConfig(AppConfig):
@@ -56,15 +61,12 @@ class CoreConfig(AppConfig):
 
         BaseForm.__init__ = scoped_baseform_init
 
-        self._register_alert_schedule()
+        post_migrate.connect(self._register_alert_schedule, sender=self)
 
-    def _register_alert_schedule(self):
+    def _register_alert_schedule(self, sender, **kwargs):
         """Ensure the daily alert evaluation schedule exists in django-q2."""
         try:
-            from django.db import connection
-            tables = connection.introspection.table_names()
-            if 'django_q_schedule' not in tables:
-                return
+            # inline import: avoid AppRegistryNotReady at app-load time
             from django_q.models import Schedule
             Schedule.objects.get_or_create(
                 func='core.tasks.evaluate_alert_rules_task',
@@ -74,6 +76,6 @@ class CoreConfig(AppConfig):
                     'repeats': -1,
                 },
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to register alert rule evaluation schedule: %s", exc)
 

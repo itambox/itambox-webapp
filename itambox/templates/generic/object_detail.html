@@ -135,6 +135,7 @@
 {% endblock tabs %}
 
 {% block content %}
+{% if object %}{% plugin_template_content object 'alerts' object %}{% endif %}
 <div class="tab-content">
     <div class="tab-pane fade {% if not request.GET.tab or request.GET.tab == 'details' %}show active{% endif %}" id="details" role="tabpanel">
         {% block details_tab %}

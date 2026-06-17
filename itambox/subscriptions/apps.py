@@ -1,4 +1,9 @@
+import logging
+
 from django.apps import AppConfig
+from django.db.models.signals import post_migrate
+
+logger = logging.getLogger(__name__)
 
 
 class SubscriptionsConfig(AppConfig):
@@ -9,14 +14,11 @@ class SubscriptionsConfig(AppConfig):
     def ready(self):
         import subscriptions.signals  # noqa
         import subscriptions.search  # noqa
-        self._register_subscription_tasks()
+        post_migrate.connect(self._register_subscription_tasks, sender=self)
 
-    def _register_subscription_tasks(self):
+    def _register_subscription_tasks(self, sender, **kwargs):
         try:
-            from django.db import connection
-            tables = connection.introspection.table_names()
-            if 'django_q_schedule' not in tables:
-                return
+            # inline import: avoid AppRegistryNotReady at app-load time
             from django_q.models import Schedule
             Schedule.objects.get_or_create(
                 func='subscriptions.tasks.check_subscription_expiries_and_reminders',
@@ -26,5 +28,5 @@ class SubscriptionsConfig(AppConfig):
                     'repeats': -1,
                 },
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to register subscription expiry schedule: %s", exc)
