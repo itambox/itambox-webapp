@@ -148,10 +148,19 @@ class TenantScopingQuerySet(models.QuerySet):
                 # no tenant (global/shared catalogue items) remain visible.
                 tenant_lookup = getattr(self.model, 'tenant_lookup', None)
                 if tenant_lookup:
-                    qs = qs.filter(
-                        models.Q(**{f'{tenant_lookup}_id__in': allowed_tenant_ids}) |
-                        models.Q(**{f'{tenant_lookup}__isnull': True})
-                    )
+                    # Children of a global (tenant=None) parent stay visible by
+                    # default — e.g. stock/allocations of a shared-catalogue
+                    # Component, or items of a global Kit template — because a
+                    # global catalogue parent is a normal, intended pattern.
+                    # Non-catalogue derived models that must NEVER be cross-tenant
+                    # visible (e.g. LicenseSeatAssignment, where a global license
+                    # is an anomaly an attacker can mint) opt OUT via
+                    # `deny_global_tenant = True`, so a tenant=None parent does not
+                    # expose the child to every tenant.
+                    cond = models.Q(**{f'{tenant_lookup}_id__in': allowed_tenant_ids})
+                    if not getattr(self.model, 'deny_global_tenant', False):
+                        cond |= models.Q(**{f'{tenant_lookup}__isnull': True})
+                    qs = qs.filter(cond)
 
             return qs
 

@@ -27,10 +27,15 @@ class SoftwareApiCrossTenantTestCase(TestCase):
 
         # Requesting user is a member of tenant B with software view+change perms.
         self.user_b = User.objects.create_user(username='user_b', password='password123')
+        # Grant full software CRUD so a 404 on a cross-tenant / global mutation
+        # proves the StrictTenantPermission boundary, not a missing-perm 403.
         self.role_b = TenantRole.objects.create(
             tenant=self.tenant_b,
             name='Admin',
-            permissions=['software.view_software', 'software.change_software'],
+            permissions=[
+                'software.view_software', 'software.change_software',
+                'software.delete_software', 'software.add_software',
+            ],
         )
         self.membership_b = TenantMembership.objects.create(
             user=self.user_b, tenant=self.tenant_b, role=self.role_b,
@@ -74,9 +79,42 @@ class SoftwareApiCrossTenantTestCase(TestCase):
         response = self.client.patch(
             url, data={'name': 'Hacked'}, content_type='application/json',
         )
-        # StrictTenantPermission raises Http404 (and tenant-scoped queryset hides
-        # the row); either way a cross-tenant write must not succeed.
-        self.assertIn(response.status_code, (403, 404))
+        # role_b holds full software CRUD, so this is exactly the anti-enumeration
+        # 404 from tenant scoping (get_object's scoped queryset + StrictTenant),
+        # never a 403 from a missing permission.
+        self.assertEqual(response.status_code, 404)
 
         self.software_a.refresh_from_db()
         self.assertEqual(self.software_a.name, 'Visio (A)')
+
+    def test_global_software_patch_blocked_for_non_superuser(self):
+        # H1: a global (tenant=None) Software is READABLE but immutable for a
+        # tenant-bound non-superuser. StrictTenantPermission hides the mutation
+        # as a 404 (fires before the ETag precondition check).
+        self._login_b()
+        url = reverse('api:software_api:software-detail', kwargs={'pk': self.software_global.pk})
+        response = self.client.patch(
+            url, data={'name': 'Hacked'}, content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 404)
+        self.software_global.refresh_from_db()
+        self.assertEqual(self.software_global.name, 'Notepad (global)')
+
+    def test_global_software_delete_blocked_for_non_superuser(self):
+        self._login_b()
+        url = reverse('api:software_api:software-detail', kwargs={'pk': self.software_global.pk})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(Software.objects.filter(pk=self.software_global.pk).exists())
+
+    def test_global_software_delete_allowed_for_superuser(self):
+        # Sanity: superusers retain global authority over tenant=None rows.
+        superuser = User.objects.create_superuser(
+            username='root', email='root@example.com', password='password123'
+        )
+        self.client.force_login(superuser)
+        url = reverse('api:software_api:software-detail', kwargs={'pk': self.software_global.pk})
+        etag = f'W/"{self.software_global.updated_at.isoformat()}"'
+        response = self.client.delete(url, HTTP_IF_MATCH=etag)
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Software.objects.filter(pk=self.software_global.pk).exists())

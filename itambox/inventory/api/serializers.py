@@ -38,7 +38,7 @@ class AccessorySerializer(BaseModelSerializer):
     )
     tenant = NestedTenantSerializer(read_only=True)
     tenant_id = serializers.PrimaryKeyRelatedField(
-        queryset=NestedTenantSerializer.Meta.model.objects.all(),
+        queryset=NestedTenantSerializer.Meta.model.objects,
         source='tenant', write_only=True, required=False, allow_null=True
     )
     tags = TagSerializer(many=True, read_only=True)
@@ -67,12 +67,12 @@ class AccessorySerializer(BaseModelSerializer):
 class AccessoryStockSerializer(BaseModelSerializer):
     accessory = NestedAccessorySerializer(read_only=True)
     accessory_id = serializers.PrimaryKeyRelatedField(
-        queryset=Accessory.objects.all(),
+        queryset=Accessory.objects,
         source='accessory', write_only=True
     )
     location = NestedLocationSerializer(read_only=True)
     location_id = serializers.PrimaryKeyRelatedField(
-        queryset=NestedLocationSerializer.Meta.model.objects.all(),
+        queryset=NestedLocationSerializer.Meta.model.objects,
         source='location', write_only=True
     )
 
@@ -89,22 +89,22 @@ class AccessoryStockSerializer(BaseModelSerializer):
 class AccessoryAssignmentSerializer(BaseModelSerializer):
     accessory = NestedAccessorySerializer(read_only=True)
     accessory_id = serializers.PrimaryKeyRelatedField(
-        queryset=Accessory.objects.all(),
+        queryset=Accessory.objects,
         source='accessory', write_only=True
     )
     assigned_holder = AssetHolderSerializer(read_only=True)
     assigned_holder_id = serializers.PrimaryKeyRelatedField(
-        queryset=AssetHolderSerializer.Meta.model.objects.all(),
+        queryset=AssetHolderSerializer.Meta.model.objects,
         source='assigned_holder', write_only=True, required=False, allow_null=True
     )
     assigned_location = NestedLocationSerializer(read_only=True)
     assigned_location_id = serializers.PrimaryKeyRelatedField(
-        queryset=NestedLocationSerializer.Meta.model.objects.all(),
+        queryset=NestedLocationSerializer.Meta.model.objects,
         source='assigned_location', write_only=True, required=False, allow_null=True
     )
     from_location = NestedLocationSerializer(read_only=True)
     from_location_id = serializers.PrimaryKeyRelatedField(
-        queryset=NestedLocationSerializer.Meta.model.objects.all(),
+        queryset=NestedLocationSerializer.Meta.model.objects,
         source='from_location', write_only=True, required=False, allow_null=True
     )
 
@@ -141,7 +141,7 @@ class ConsumableSerializer(BaseModelSerializer):
     )
     tenant = NestedTenantSerializer(read_only=True)
     tenant_id = serializers.PrimaryKeyRelatedField(
-        queryset=NestedTenantSerializer.Meta.model.objects.all(),
+        queryset=NestedTenantSerializer.Meta.model.objects,
         source='tenant', write_only=True, required=False, allow_null=True
     )
     tags = TagSerializer(many=True, read_only=True)
@@ -170,12 +170,12 @@ class ConsumableSerializer(BaseModelSerializer):
 class ConsumableStockSerializer(BaseModelSerializer):
     consumable = NestedConsumableSerializer(read_only=True)
     consumable_id = serializers.PrimaryKeyRelatedField(
-        queryset=Consumable.objects.all(),
+        queryset=Consumable.objects,
         source='consumable', write_only=True
     )
     location = NestedLocationSerializer(read_only=True)
     location_id = serializers.PrimaryKeyRelatedField(
-        queryset=NestedLocationSerializer.Meta.model.objects.all(),
+        queryset=NestedLocationSerializer.Meta.model.objects,
         source='location', write_only=True
     )
 
@@ -192,22 +192,22 @@ class ConsumableStockSerializer(BaseModelSerializer):
 class ConsumableAssignmentSerializer(BaseModelSerializer):
     consumable = NestedConsumableSerializer(read_only=True)
     consumable_id = serializers.PrimaryKeyRelatedField(
-        queryset=Consumable.objects.all(),
+        queryset=Consumable.objects,
         source='consumable', write_only=True
     )
     assigned_holder = AssetHolderSerializer(read_only=True)
     assigned_holder_id = serializers.PrimaryKeyRelatedField(
-        queryset=AssetHolderSerializer.Meta.model.objects.all(),
+        queryset=AssetHolderSerializer.Meta.model.objects,
         source='assigned_holder', write_only=True, required=False, allow_null=True
     )
     assigned_location = NestedLocationSerializer(read_only=True)
     assigned_location_id = serializers.PrimaryKeyRelatedField(
-        queryset=NestedLocationSerializer.Meta.model.objects.all(),
+        queryset=NestedLocationSerializer.Meta.model.objects,
         source='assigned_location', write_only=True, required=False, allow_null=True
     )
     from_location = NestedLocationSerializer(read_only=True)
     from_location_id = serializers.PrimaryKeyRelatedField(
-        queryset=NestedLocationSerializer.Meta.model.objects.all(),
+        queryset=NestedLocationSerializer.Meta.model.objects,
         source='from_location', write_only=True, required=False, allow_null=True
     )
 
@@ -232,7 +232,7 @@ class KitItemSerializer(BaseModelSerializer):
     )
     accessory = NestedAccessorySerializer(read_only=True)
     accessory_id = serializers.PrimaryKeyRelatedField(
-        queryset=Accessory.objects.all(),
+        queryset=Accessory.objects,
         source='accessory', write_only=True, required=False, allow_null=True
     )
 
@@ -250,7 +250,7 @@ class KitSerializer(BaseModelSerializer):
     items = KitItemSerializer(many=True, read_only=True)
     tenant = NestedTenantSerializer(read_only=True)
     tenant_id = serializers.PrimaryKeyRelatedField(
-        queryset=NestedTenantSerializer.Meta.model.objects.all(),
+        queryset=NestedTenantSerializer.Meta.model.objects,
         source='tenant', write_only=True, required=False, allow_null=True
     )
     tags = TagSerializer(many=True, read_only=True)
@@ -289,7 +289,7 @@ class ComponentSerializer(BaseModelSerializer):
     )
     tenant = NestedTenantSerializer(read_only=True)
     tenant_id = serializers.PrimaryKeyRelatedField(
-        queryset=NestedTenantSerializer.Meta.model.objects.all(),
+        queryset=NestedTenantSerializer.Meta.model.objects,
         source='tenant', write_only=True, required=False, allow_null=True
     )
     tags = TagSerializer(many=True, read_only=True)
@@ -318,13 +318,13 @@ class ComponentSerializer(BaseModelSerializer):
 class ComponentStockSerializer(BaseModelSerializer):
     component = NestedComponentSerializer(read_only=True)
     component_id = serializers.PrimaryKeyRelatedField(
-        queryset=Component.objects.all(),
+        queryset=Component.objects,
         source='component', write_only=True
     )
     component_name = serializers.CharField(source='component.name', read_only=True)
     location = NestedLocationSerializer(read_only=True)
     location_id = serializers.PrimaryKeyRelatedField(
-        queryset=NestedLocationSerializer.Meta.model.objects.all(),
+        queryset=NestedLocationSerializer.Meta.model.objects,
         source='location', write_only=True
     )
 
@@ -340,29 +340,29 @@ class ComponentStockSerializer(BaseModelSerializer):
 class ComponentAllocationSerializer(BaseModelSerializer):
     component = NestedComponentSerializer(read_only=True)
     component_id = serializers.PrimaryKeyRelatedField(
-        queryset=Component.objects.all(),
+        queryset=Component.objects,
         source='component', write_only=True
     )
     component_name = serializers.CharField(source='component.name', read_only=True)
     
     assigned_holder = AssetHolderSerializer(read_only=True)
     assigned_holder_id = serializers.PrimaryKeyRelatedField(
-        queryset=AssetHolderSerializer.Meta.model.objects.all(),
+        queryset=AssetHolderSerializer.Meta.model.objects,
         source='assigned_holder', write_only=True, required=False, allow_null=True
     )
     assigned_location = NestedLocationSerializer(read_only=True)
     assigned_location_id = serializers.PrimaryKeyRelatedField(
-        queryset=NestedLocationSerializer.Meta.model.objects.all(),
+        queryset=NestedLocationSerializer.Meta.model.objects,
         source='assigned_location', write_only=True, required=False, allow_null=True
     )
     assigned_asset = NestedAssetSerializer(read_only=True)
     assigned_asset_id = serializers.PrimaryKeyRelatedField(
-        queryset=Asset.objects.all(),
+        queryset=Asset.objects,
         source='assigned_asset', write_only=True, required=False, allow_null=True
     )
     from_location = NestedLocationSerializer(read_only=True)
     from_location_id = serializers.PrimaryKeyRelatedField(
-        queryset=NestedLocationSerializer.Meta.model.objects.all(),
+        queryset=NestedLocationSerializer.Meta.model.objects,
         source='from_location', write_only=True, required=False, allow_null=True
     )
     tags = TagSerializer(many=True, read_only=True)

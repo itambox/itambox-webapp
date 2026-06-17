@@ -487,6 +487,10 @@ class Kit(JournalingMixin, TaggableMixin, CloneableMixin, ExportableMixin, SoftD
 
 class KitItem(ChangeLoggingMixin, BaseModel):
     tenant_lookup = 'kit__tenant'
+    # Global Kits (tenant=None) are cross-tenant templates, so their items stay
+    # READABLE by default (the manager's default behaviour for tenant_lookup
+    # models). Cross-tenant WRITE is blocked by StrictTenantPermission /
+    # perform_create tenant-defaulting.
     objects = TenantScopingManager()
 
     @property

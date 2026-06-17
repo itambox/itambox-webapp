@@ -230,6 +230,15 @@ class AssetAudit(ChangeLoggingMixin, models.Model):
     # _scope_by_asset_tenant). The default manager is intentionally unscoped:
     # audit classification/reconciliation reads `session.audits` and must see
     # every audit in a session regardless of the viewer's tenant context.
+
+    # AssetAudit carries no tenant of its own. Its owning tenant is the audited
+    # asset's tenant (`asset.tenant`), NOT the session's: a session may be a
+    # global / MSP-wide record (AuditSession.tenant is null for those), whereas
+    # the asset always belongs to exactly one tenant. Attributing the changelog
+    # to asset.tenant keeps each audit change visible to the asset's owner even
+    # in no-ambient-tenant flows (superuser global session, service audit_asset).
+    changelog_tenant_lookup = 'asset__tenant'
+
     session = models.ForeignKey(
         AuditSession,
         on_delete=models.CASCADE,

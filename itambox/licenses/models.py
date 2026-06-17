@@ -169,6 +169,10 @@ class LicenseSeatAssignment(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
     # the FK, and the `tenant` property lets DRF StrictTenantPermission enforce
     # the object-level boundary on detail/mutation endpoints.
     tenant_lookup = 'license__tenant'
+    # A seat is never shared catalogue: a global (tenant=None) license is an
+    # anomaly a tenant admin can mint, so do NOT expose its seats cross-tenant.
+    # Opt out of the default "global-parent children stay visible" behaviour.
+    deny_global_tenant = True
 
     objects = TenantScopingSoftDeleteManager()
     all_objects = AllObjectsManager()

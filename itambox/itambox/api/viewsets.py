@@ -151,9 +151,34 @@ class ITAMBoxModelViewSet(
         model = self.queryset.model
         logger.info(f"Creating new {model._meta.verbose_name}")
 
+        save_kwargs = {}
+        # Default a tenant-scoped create to the active tenant when the client
+        # omitted it.  Without this a tenant-bound (non-superuser) request could
+        # mint a global (tenant=None) row — e.g. a globally-visible License or
+        # Software — cross-tenant.  Superusers retain the ability to create
+        # global rows explicitly.  Only applies to single-object creates; bulk
+        # (ListSerializer) payloads carry a list of validated dicts and are left
+        # to the per-row tenant scoping enforced elsewhere.
+        validated = serializer.validated_data
+        if (
+            not getattr(serializer, 'many', False)
+            and isinstance(validated, dict)
+            and not self.request.user.is_superuser
+            and 'tenant' not in validated
+        ):
+            from django.core.exceptions import FieldDoesNotExist
+            from core.managers import get_current_tenant
+            try:
+                tenant_field = model._meta.get_field('tenant')
+            except FieldDoesNotExist:
+                tenant_field = None
+            if tenant_field is not None and getattr(tenant_field, 'null', False):
+                if active_tenant := get_current_tenant():
+                    save_kwargs['tenant'] = active_tenant
+
         try:
             with transaction.atomic(using=router.db_for_write(model)):
-                instance = serializer.save()
+                instance = serializer.save(**save_kwargs)
                 self._validate_objects(instance)
         except ObjectDoesNotExist:
             raise PermissionDenied()

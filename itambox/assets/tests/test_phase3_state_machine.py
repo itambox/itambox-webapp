@@ -1,8 +1,15 @@
 """Phase 3 (E1) — AssetStateMachine enforcement on the SAVE path.
 
-These tests exercise the save-level enforcement added to Asset.save() (the
-actual fix), not merely Asset.clean(). They also confirm the existing service
-flows (checkout/checkin/dispose) still pass through the state machine cleanly.
+These tests exercise state-machine enforcement on the save path. Transition
+validation lives in Asset.clean(), which the global
+`validate_custom_validators_on_save` pre_save signal (core/signals.py) runs on
+every ChangeLoggingMixin save — so a plain Asset.save() is enough to trigger it
+(no separate validation block in save() is required). They also confirm the
+existing service flows (checkout/checkin/dispose) still pass through the state
+machine cleanly.
+
+Note: bulk QuerySet.update() bypasses both clean() and the pre_save signal, so
+mass status flips are NOT validated — a pre-existing gap, not covered here.
 
 Run with:
     pytest assets/tests/test_phase3_state_machine.py

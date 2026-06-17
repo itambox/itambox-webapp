@@ -26,8 +26,11 @@ class ETagMixin:
 
     def _require_etag(self, request, instance):
         if not self._get_if_match(request):
-            from itambox.api.exceptions import PreconditionFailed
-            raise PreconditionFailed(etag='*', detail='If-Match header is required for mutating requests.')
+            from itambox.api.exceptions import PreconditionRequired
+            raise PreconditionRequired(
+                detail='If-Match header is required for mutating requests.',
+                etag=self._get_etag(instance),
+            )
 
     def _validate_etag(self, request, instance):
         self._require_etag(request, instance)
@@ -111,9 +114,13 @@ class BulkDestroyModelMixin:
 
 class ObjectValidationMixin:
     def _validate_objects(self, instance):
+        # Validate against the request-time, tenant-scoped queryset rather than
+        # the import-time `self.queryset` class attribute (which is evaluated
+        # with no tenant bound and is therefore unscoped).
+        qs = self.get_queryset()
         if type(instance) is list:
-            conforming_count = self.queryset.filter(pk__in=[obj.pk for obj in instance]).count()
+            conforming_count = qs.filter(pk__in=[obj.pk for obj in instance]).count()
             if conforming_count != len(instance):
                 raise ObjectDoesNotExist
-        elif not self.queryset.filter(pk=instance.pk).exists():
+        elif not qs.filter(pk=instance.pk).exists():
             raise ObjectDoesNotExist

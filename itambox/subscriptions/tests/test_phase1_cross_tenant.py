@@ -67,6 +67,27 @@ class SubscriptionAssignmentCrossTenantTests(TestCase):
         finally:
             set_current_tenant(None)
 
+        # Tenant-B objects so the LIST test has a positive control: tenant B must
+        # SEE its own assignment while NOT seeing tenant A's (an empty list would
+        # otherwise pass regardless of whether scoping works).
+        set_current_tenant(self.tenant_b)
+        try:
+            self.provider_b = Provider.objects.create(name='Provider B', tenant=self.tenant_b)
+            self.subscription_b = Subscription.objects.create(
+                name='Subscription B', provider=self.provider_b, tenant=self.tenant_b
+            )
+            self.asset_b = Asset.objects.create(
+                name='Asset B', asset_tag='TAG-B-001', status=self.status, tenant=self.tenant_b
+            )
+            self.assignment_b = SubscriptionAssignment.objects.create(
+                subscription=self.subscription_b,
+                content_type=ContentType.objects.get_for_model(Asset),
+                object_id=self.asset_b.pk,
+                assigned_by=self.user_b,
+            )
+        finally:
+            set_current_tenant(None)
+
     def _login_as_tenant_b(self):
         self.client.force_login(self.user_b)
         session = self.client.session
@@ -79,6 +100,9 @@ class SubscriptionAssignmentCrossTenantTests(TestCase):
         response = self.client.get(list_url)
         self.assertEqual(response.status_code, 200)
         returned_ids = {row['id'] for row in response.data['results']}
+        # Positive control: tenant B sees its OWN assignment...
+        self.assertIn(self.assignment_b.pk, returned_ids)
+        # ...but NOT tenant A's.
         self.assertNotIn(self.assignment_a.pk, returned_ids)
 
     def test_detail_get_blocked(self):

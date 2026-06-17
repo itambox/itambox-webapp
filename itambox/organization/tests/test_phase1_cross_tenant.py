@@ -16,7 +16,10 @@ from django.urls import reverse
 from organization.models import (
     Tenant, TenantRole, TenantMembership, Contact, ContactRole, ContactAssignment,
 )
-from assets.models import Asset, StatusLabel, AssetRole, Manufacturer, AssetType
+from assets.models import (
+    Asset, AssetAssignment, StatusLabel, AssetRole, Manufacturer, AssetType,
+)
+from software.models import Software
 
 User = get_user_model()
 
@@ -91,6 +94,12 @@ class ContactAssignmentCrossTenantTestCase(TestCase):
 
         self.list_url = reverse('api:organization_api:contactassignment-list')
 
+    def _login_tenant_a(self):
+        self.client.force_login(self.user_a)
+        session = self.client.session
+        session['active_tenant_id'] = self.tenant_a.pk
+        session.save()
+
     def _login_tenant_b(self):
         self.client.force_login(self.user_b)
         session = self.client.session
@@ -128,3 +137,58 @@ class ContactAssignmentCrossTenantTestCase(TestCase):
         self.assertTrue(
             ContactAssignment.objects.filter(pk=self.assignment_a.pk).exists()
         )
+
+    def test_list_excludes_other_tenant_via_tenant_lookup_target(self):
+        """H3 regression: a target with NO `tenant` column whose tenant is derived
+        through a `tenant_lookup` (AssetAssignment, `asset__tenant`) must NOT leak.
+
+        The old `get_field('tenant')` probe raised FieldDoesNotExist for such
+        models and fell through to `allowed |= Q(content_type=ct)`, exposing every
+        AssetAssignment-targeted ContactAssignment to every tenant.
+        """
+        # AssetAssignment has no `tenant` column; its tenant is asset.tenant.
+        # Created inactive (no assignee) — valid per clean()/CheckConstraint and
+        # still a tenant_lookup target carrying asset.tenant.
+        assignment_target_a = AssetAssignment.objects.create(asset=self.asset_a, is_active=False)
+        assignment_target_b = AssetAssignment.objects.create(asset=self.asset_b, is_active=False)
+        aa_ct = ContentType.objects.get_for_model(AssetAssignment)
+        ca_to_a = ContactAssignment.objects.create(
+            contact=self.contact_a, role=self.contact_role,
+            content_type=aa_ct, object_id=assignment_target_a.pk, priority='primary',
+        )
+        ca_to_b = ContactAssignment.objects.create(
+            contact=self.contact_b, role=self.contact_role,
+            content_type=aa_ct, object_id=assignment_target_b.pk, priority='primary',
+        )
+
+        self._login_tenant_b()
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, 200)
+        returned_ids = {row['id'] for row in response.json()['results']}
+        # Tenant B sees its own tenant_lookup-scoped assignment...
+        self.assertIn(ca_to_b.pk, returned_ids)
+        # ...but NOT tenant A's (this leaked before the signal-probe fix).
+        self.assertNotIn(ca_to_a.pk, returned_ids)
+
+    def test_list_includes_global_catalogue_target(self):
+        """L1: a ContactAssignment pointing at a global (tenant=None) catalogue
+        target must appear in the active tenant's list.
+
+        The old code resolved ids with `.filter(tenant=active_tenant)`, which
+        dropped legitimate global-catalogue rows. The tenant-scoping default
+        manager unions own + global rows, so they must stay visible.
+        """
+        global_software = Software.objects.create(
+            name='P1CT Global Tool', manufacturer=self.mfr, tenant=None,
+        )
+        sw_ct = ContentType.objects.get_for_model(Software)
+        ca_global = ContactAssignment.objects.create(
+            contact=self.contact_a, role=self.contact_role,
+            content_type=sw_ct, object_id=global_software.pk, priority='primary',
+        )
+
+        self._login_tenant_a()
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, 200)
+        returned_ids = {row['id'] for row in response.json()['results']}
+        self.assertIn(ca_global.pk, returned_ids)

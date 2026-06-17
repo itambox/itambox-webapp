@@ -158,3 +158,86 @@ class LicenseSeatAssignmentCrossTenantTests(TestCase):
         response = self.client.get(detail_url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['id'], self.seat_b.pk)
+
+
+class GlobalLicenseSeatResidualTests(TestCase):
+    """H1: a seat assignment hanging off a GLOBAL (tenant=None) License must not
+    leak across tenants.
+
+    LicenseSeatAssignment scopes through ``tenant_lookup = 'license__tenant'``
+    and does NOT opt into ``allow_global_tenant``, so children of a tenant=None
+    License are default-DENY: invisible to any tenant member. The tenant-B role
+    is granted the full seat CRUD permission set, so a 404 (not a 403) proves the
+    boundary is SCOPING, not a missing model permission.
+    """
+
+    def setUp(self):
+        self.tenant_b = Tenant.objects.create(name='Tenant B', slug='tenant-b')
+
+        self.user_b = User.objects.create_user(username='user_b', password='password123')
+        seat_perms = [
+            'licenses.view_licenseseatassignment',
+            'licenses.change_licenseseatassignment',
+            'licenses.delete_licenseseatassignment',
+        ]
+        self.role_b = TenantRole.objects.create(
+            tenant=self.tenant_b, name='Admin', permissions=seat_perms
+        )
+        self.membership_b = TenantMembership.objects.create(
+            user=self.user_b, tenant=self.tenant_b, role=self.role_b
+        )
+
+        self.mfr = Manufacturer.objects.create(name='Microsoft', slug='microsoft')
+
+        # GLOBAL software + license (tenant=None) and a seat on it.
+        self.software_global = Software.objects.create(
+            name='Office (global)', manufacturer=self.mfr, tenant=None
+        )
+        self.license_global = License.objects.create(
+            name='Global License', software=self.software_global,
+            license_type=LicenseTypeChoices.PERPETUAL_SEAT, seats=10, tenant=None,
+        )
+        # Holder is global too so the seat row itself has no direct tenant FK.
+        self.holder_global = AssetHolder.objects.create(
+            first_name='Gina', last_name='Global', upn='gina@global.example.com', tenant=None
+        )
+        self.seat_global = LicenseSeatAssignment.objects.create(
+            license=self.license_global, assigned_holder=self.holder_global
+        )
+
+    def _activate(self, user, tenant):
+        self.client.force_login(user)
+        session = self.client.session
+        session['active_tenant_id'] = tenant.pk
+        session.save()
+
+    def test_global_seat_excluded_from_list(self):
+        self._activate(self.user_b, self.tenant_b)
+        list_url = reverse('api:licenses_api:licenseseatassignment-list')
+        response = self.client.get(list_url)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        results = data['results'] if isinstance(data, dict) and 'results' in data else data
+        returned_ids = {row['id'] for row in results}
+        self.assertNotIn(self.seat_global.pk, returned_ids)
+
+    def test_global_seat_detail_is_404(self):
+        self._activate(self.user_b, self.tenant_b)
+        detail_url = reverse(
+            'api:licenses_api:licenseseatassignment-detail', kwargs={'pk': self.seat_global.pk}
+        )
+        response = self.client.get(detail_url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_global_seat_delete_is_404_and_row_persists(self):
+        self._activate(self.user_b, self.tenant_b)
+        detail_url = reverse(
+            'api:licenses_api:licenseseatassignment-detail', kwargs={'pk': self.seat_global.pk}
+        )
+        response = self.client.delete(detail_url)
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(
+            LicenseSeatAssignment.all_objects.filter(
+                pk=self.seat_global.pk, deleted_at__isnull=True
+            ).exists()
+        )

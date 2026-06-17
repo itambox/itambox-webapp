@@ -15,12 +15,12 @@ User = get_user_model()
 class CustodyReceiptSerializer(BaseModelSerializer):
     asset = NestedAssetSerializer(read_only=True)
     asset_id = serializers.PrimaryKeyRelatedField(
-        queryset=NestedAssetSerializer.Meta.model.objects.all(),
+        queryset=NestedAssetSerializer.Meta.model.objects,
         source='asset', write_only=True
     )
     holder = AssetHolderSerializer(read_only=True)
     holder_id = serializers.PrimaryKeyRelatedField(
-        queryset=AssetHolderSerializer.Meta.model.objects.all(),
+        queryset=AssetHolderSerializer.Meta.model.objects,
         source='holder', write_only=True
     )
     acceptance_status_display = serializers.CharField(source='get_acceptance_status_display', read_only=True)
@@ -51,7 +51,7 @@ class CustodyReceiptSerializer(BaseModelSerializer):
 class AssetMaintenanceSerializer(BaseModelSerializer):
     asset = NestedAssetSerializer(read_only=True)
     asset_id = serializers.PrimaryKeyRelatedField(
-        queryset=NestedAssetSerializer.Meta.model.objects.all(),
+        queryset=NestedAssetSerializer.Meta.model.objects,
         source='asset', write_only=True
     )
     maintenance_type_display = serializers.CharField(source='get_maintenance_type_display', read_only=True)
@@ -72,7 +72,7 @@ class AssetMaintenanceSerializer(BaseModelSerializer):
 class AuditSessionSerializer(BaseModelSerializer):
     location = NestedLocationSerializer(read_only=True)
     location_id = serializers.PrimaryKeyRelatedField(
-        queryset=Location.objects.all(), source='location', write_only=True, required=False, allow_null=True
+        queryset=Location.objects, source='location', write_only=True, required=False, allow_null=True
     )
     created_by = serializers.StringRelatedField(read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
@@ -93,16 +93,16 @@ class AuditSessionSerializer(BaseModelSerializer):
 
 class AssetAuditSerializer(serializers.ModelSerializer):
     session = serializers.PrimaryKeyRelatedField(
-        queryset=AuditSession.objects.all(), required=False, allow_null=True
+        queryset=AuditSession.objects, required=False, allow_null=True
     )
     asset = NestedAssetSerializer(read_only=True)
     asset_id = serializers.PrimaryKeyRelatedField(
-        queryset=Asset.objects.all(), source='asset'
+        queryset=Asset.objects, source='asset'
     )
     auditor = serializers.StringRelatedField(read_only=True)
     location = NestedLocationSerializer(read_only=True)
     location_id = serializers.PrimaryKeyRelatedField(
-        queryset=Location.objects.all(), source='location'
+        queryset=Location.objects, source='location'
     )
     status = StatusLabelSerializer(read_only=True)
     status_id = serializers.PrimaryKeyRelatedField(

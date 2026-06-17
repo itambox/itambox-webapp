@@ -14,24 +14,24 @@ from assets.models import Asset
 class LicenseSerializer(BaseModelSerializer):
     software = SoftwareSerializer(read_only=True)
     software_id = serializers.PrimaryKeyRelatedField(
-        queryset=Software.objects.all(), source='software', write_only=True
+        queryset=Software.objects, source='software', write_only=True
     )
     tags = TagSerializer(many=True, read_only=True)
     available_seats = serializers.IntegerField(read_only=True)
     license_type_display = serializers.CharField(source='get_license_type_display', read_only=True)
     tenant = NestedTenantSerializer(read_only=True)
     tenant_id = serializers.PrimaryKeyRelatedField(
-        queryset=Tenant.objects.all(), source='tenant', write_only=True, required=False, allow_null=True
+        queryset=Tenant.objects, source='tenant', write_only=True, required=False, allow_null=True
     )
     subscription = serializers.StringRelatedField(read_only=True)
     # Subscription.objects is tenant-scoped, so a license cannot be funded by
     # another tenant's subscription.
     subscription_id = serializers.PrimaryKeyRelatedField(
-        queryset=Subscription.objects.all(), source='subscription', write_only=True, required=False, allow_null=True
+        queryset=Subscription.objects, source='subscription', write_only=True, required=False, allow_null=True
     )
     cost_center = serializers.StringRelatedField(read_only=True)
     cost_center_id = serializers.PrimaryKeyRelatedField(
-        source='cost_center', queryset=CostCenter.objects.all(),
+        source='cost_center', queryset=CostCenter.objects,
         write_only=True, required=False, allow_null=True,
     )
 
@@ -51,21 +51,21 @@ class LicenseSerializer(BaseModelSerializer):
 class LicenseSeatAssignmentSerializer(BaseModelSerializer):
     license = LicenseSerializer(read_only=True)
     license_id = serializers.PrimaryKeyRelatedField(
-        queryset=License.objects.all(), source='license', write_only=True
+        queryset=License.objects, source='license', write_only=True
     )
     asset = NestedAssetSerializer(read_only=True)
     asset_id = serializers.PrimaryKeyRelatedField(
-        queryset=Asset.objects.all(), source='asset', write_only=True, required=False, allow_null=True
+        queryset=Asset.objects, source='asset', write_only=True, required=False, allow_null=True
     )
     assigned_holder = AssetHolderSerializer(read_only=True)
     assigned_holder_id = serializers.PrimaryKeyRelatedField(
-        queryset=AssetHolder.objects.all(), source='assigned_holder', write_only=True, required=False, allow_null=True
+        queryset=AssetHolder.objects, source='assigned_holder', write_only=True, required=False, allow_null=True
     )
     # Optional precise install link (seat-level SAM).  Read: nested string repr;
     # write: bare PK via installed_software_id.
     installed_software = serializers.StringRelatedField(read_only=True)
     installed_software_id = serializers.PrimaryKeyRelatedField(
-        queryset=InstalledSoftware.objects.all(),
+        queryset=InstalledSoftware.objects,
         source='installed_software',
         write_only=True,
         required=False,

@@ -107,18 +107,19 @@ class ContactAssignmentViewSet(ITAMBoxModelViewSet):
     def get_queryset(self):
         # ContactAssignment is a generic-FK assignment model with no direct or
         # relational `tenant` field (Contact itself is not tenant-scoped), so it
-        # uses the unscoped default manager and filter_by_tenant() is a no-op.
-        # Scope the LIST per content type: a generic FK cannot be ORM-joined to a
-        # tenant column, so for every target ContentType present we collect that
-        # model's object ids belonging to the active tenant and OR the matches
-        # together. Object-level (detail/mutation) boundary is enforced
-        # separately by StrictTenantPermission via the model's `tenant` property.
+        # uses the unscoped default manager and filter_by_tenant() is a no-op:
+        # super().get_queryset() returns every tenant's rows. This method is the
+        # SOLE list gate. A generic FK cannot be ORM-joined to a tenant column,
+        # so for every target ContentType present we collect that model's
+        # visible object ids and OR the matches together. Object-level
+        # (detail/mutation) boundary is enforced separately by
+        # StrictTenantPermission via the model's `tenant` property.
         qs = super().get_queryset()
 
         if self.request.user.is_superuser:
             return qs
 
-        from core.managers import get_current_tenant
+        from core.managers import get_current_tenant, TenantScopingQuerySet
         from django.db.models import Q
 
         active_tenant = get_current_tenant()
@@ -134,21 +135,54 @@ class ContactAssignmentViewSet(ITAMBoxModelViewSet):
             model_class = ct.model_class()
             if model_class is None:
                 continue
+
+            # Probe the tenant *signal*, not just a DB column. A model is
+            # tenant-aware if it has any of: a direct `tenant` field, a declared
+            # `tenant_lookup` (ORM path to the owning tenant for relation-scoped
+            # rows like AssetAssignment / *Stock / KitItem), or a `tenant`
+            # property/attr. Probing only `get_field('tenant')` (the old bug)
+            # missed lookup/property models and exposed every such assignment to
+            # every tenant.
+            tenant_lookup = getattr(model_class, 'tenant_lookup', None)
+            has_tenant_field = True
             try:
                 model_class._meta.get_field('tenant')
             except FieldDoesNotExist:
-                # Target model has no tenant field (global/shared catalogue,
-                # e.g. Manufacturer): such rows are not tenant-owned, so their
-                # assignments stay visible to every tenant.
+                has_tenant_field = False
+            tenant_aware = has_tenant_field or bool(tenant_lookup) or hasattr(model_class, 'tenant')
+
+            if not tenant_aware:
+                # Genuine global/shared catalogue (e.g. Manufacturer): rows are
+                # not tenant-owned, so their assignments stay visible to all.
                 allowed |= Q(content_type=ct)
                 continue
-            # Resolve visible ids through the model's default (tenant-scoped)
-            # manager so soft-deletes and tenant scoping both apply.
-            ids = list(
-                model_class._default_manager.filter(tenant=active_tenant)
-                .values_list('pk', flat=True)
-            )
-            allowed |= Q(content_type=ct, object_id__in=ids)
+
+            manager = model_class._default_manager
+            if isinstance(manager.get_queryset(), TenantScopingQuerySet):
+                # The default manager is tenant-scoping: it already unions the
+                # active tenant's own rows with global (allow_global_tenant)
+                # rows, whether scoping is by direct field or `tenant_lookup`.
+                # Letting it do the work avoids over-restricting global
+                # catalogue targets to the active tenant (L1) and applies
+                # soft-delete filtering for free. Don't add `.filter(tenant=...)`.
+                visible_ids = list(manager.values_list('pk', flat=True))
+            elif tenant_lookup:
+                # Tenant-aware via a relational lookup but the default manager is
+                # NOT tenant-scoping: scope explicitly through the lookup path,
+                # keeping rows whose parent is global (null tenant) visible.
+                visible_ids = list(
+                    manager.filter(
+                        Q(**{f'{tenant_lookup}_id': active_tenant.pk}) |
+                        Q(**{f'{tenant_lookup}__isnull': True})
+                    ).values_list('pk', flat=True)
+                )
+            else:
+                # Tenant-aware only via a direct field / property on an
+                # unscoped manager: scope to the active tenant directly.
+                visible_ids = list(
+                    manager.filter(tenant=active_tenant).values_list('pk', flat=True)
+                )
+            allowed |= Q(content_type=ct, object_id__in=visible_ids)
 
         return qs.filter(allowed)
 

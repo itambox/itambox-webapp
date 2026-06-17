@@ -57,6 +57,13 @@ class SoftwareAPITests(APITestCase):
             role=self.role
         )
 
+        # Make the catalogue row tenant-owned so this tenant's staff can mutate
+        # it. A global (tenant=None) Software is mutable only by superusers
+        # (StrictTenantPermission); a non-superuser PATCH/DELETE of one now 404s
+        # by design — see software/tests/test_phase1_cross_tenant.py.
+        self.software.tenant = self.tenant
+        self.software.save()
+
     def _activate_tenant(self):
         # SoftwareViewSet now enforces StrictTenantPermission, which reads
         # request.active_tenant (resolved by TenantMiddleware from the session).

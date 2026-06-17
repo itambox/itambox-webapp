@@ -386,6 +386,9 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
 
 class SubscriptionAssignment(ChangeLoggingMixin, BaseModel):
     tenant_lookup = 'subscription__tenant'
+    # Subscriptions are always tenant-owned; a global (tenant=None) parent would
+    # be an anomaly, so never expose its assignments cross-tenant.
+    deny_global_tenant = True
     objects = TenantScopingManager()
 
     """Flexibly links a Subscription to the entity (or entities) it covers."""

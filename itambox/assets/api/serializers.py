@@ -101,11 +101,11 @@ class AssetSerializer(BaseModelSerializer):
     )
     location = NestedLocationSerializer(read_only=True)
     location_id = serializers.PrimaryKeyRelatedField(
-        queryset=Location.objects.all(), source='location', write_only=True, required=False, allow_null=True
+        queryset=Location.objects, source='location', write_only=True, required=False, allow_null=True
     )
     tenant = NestedTenantSerializer(read_only=True)
     tenant_id = serializers.PrimaryKeyRelatedField(
-        queryset=Tenant.objects.all(), source='tenant', write_only=True, required=False, allow_null=True
+        queryset=Tenant.objects, source='tenant', write_only=True, required=False, allow_null=True
     )
     supplier = serializers.StringRelatedField(read_only=True)
     supplier_id = serializers.PrimaryKeyRelatedField(
@@ -143,7 +143,7 @@ class AssetSerializer(BaseModelSerializer):
         from organization.models import CostCenter
         fields['cost_center_id'] = serializers.PrimaryKeyRelatedField(
             source='cost_center',
-            queryset=CostCenter.objects.all(),
+            queryset=CostCenter.objects,
             allow_null=True,
             required=False,
             write_only=True,
@@ -204,7 +204,7 @@ class AssetRequestSerializer(BaseModelSerializer):
     )
     asset = NestedAssetSerializer(read_only=True)
     asset_id = serializers.PrimaryKeyRelatedField(
-        queryset=Asset.objects.all(), source='asset', write_only=True, required=False, allow_null=True
+        queryset=Asset.objects, source='asset', write_only=True, required=False, allow_null=True
     )
     asset_type = NestedAssetTypeSerializer(read_only=True)
     asset_type_id = serializers.PrimaryKeyRelatedField(
@@ -237,7 +237,7 @@ class AssetTagSequenceSerializer(BaseModelSerializer):
 class AssetAssignmentSerializer(BaseModelSerializer):
     asset = NestedAssetSerializer(read_only=True)
     asset_id = serializers.PrimaryKeyRelatedField(
-        queryset=Asset.objects.all(), source='asset', write_only=True
+        queryset=Asset.objects, source='asset', write_only=True
     )
     assigned_to_type = serializers.CharField(read_only=True)
     assigned_to_name = serializers.SerializerMethodField()
@@ -264,7 +264,7 @@ class AssetAssignmentSerializer(BaseModelSerializer):
 class AssetDisposalSerializer(BaseModelSerializer):
     asset = NestedAssetSerializer(read_only=True)
     asset_id = serializers.PrimaryKeyRelatedField(
-        queryset=Asset.objects.all(), source='asset', write_only=True,
+        queryset=Asset.objects, source='asset', write_only=True,
     )
     disposal_method_display = serializers.CharField(
         source='get_disposal_method_display', read_only=True
@@ -347,7 +347,7 @@ class AssetCheckInAPISerializer(serializers.Serializer):
         allow_null=True
     )
     location_id = serializers.PrimaryKeyRelatedField(
-        queryset=Location.objects.all(),
+        queryset=Location.objects,
         required=False,
         allow_null=True
     )

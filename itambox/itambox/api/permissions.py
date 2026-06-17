@@ -112,19 +112,30 @@ class StrictTenantPermission(BasePermission):
     def has_object_permission(self, request, view, obj):
         if request.user.is_superuser:
             return True
-            
-        user_tenant = getattr(request, 'active_tenant', None)
+
+        from core.managers import get_current_tenant
+        user_tenant = getattr(request, 'active_tenant', None) or get_current_tenant()
         if not user_tenant:
             profile = request.user.asset_holder_profiles.first()
             user_tenant = profile.tenant if profile else None
-        
+
         if not user_tenant:
             from django.http import Http404
             raise Http404()
-            
-        # Enforce boundary: Object's tenant must match user's tenant
-        if hasattr(obj, 'tenant') and obj.tenant is not None and obj.tenant != user_tenant:
-            from django.http import Http404
-            raise Http404()
-            
+
+        if hasattr(obj, 'tenant'):
+            obj_tenant = obj.tenant
+            if obj_tenant is None:
+                # Global (tenant=None) objects are READABLE but not mutable by
+                # non-superusers.  Hide the mutation as a 404 to avoid leaking
+                # the object's existence.
+                if request.method not in SAFE_METHODS:
+                    from django.http import Http404
+                    raise Http404()
+                return True
+            # Enforce boundary: Object's tenant must match user's tenant
+            if obj_tenant != user_tenant:
+                from django.http import Http404
+                raise Http404()
+
         return True

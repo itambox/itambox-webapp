@@ -7,7 +7,7 @@ import contextvars
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
@@ -163,6 +163,13 @@ _user_validation_cache = contextvars.ContextVar('user_validation_cache', default
 class ChangeLoggingMixin:
     _change_logging_excluded_fields = ['updated_at']
 
+    # Optional ORM path (e.g. 'asset__tenant') used to derive the changelog
+    # tenant for models that carry no `tenant` field/property of their own.
+    # Resolved on the instance before the ambient-request-tenant fallback so the
+    # change is attributed to the object's owning tenant rather than whichever
+    # tenant happens to be active on the request.
+    changelog_tenant_lookup = None
+
     def __init__(self, *args, **kwargs):
         self._changelog_action = None
         self._changelog_message = ''
@@ -199,13 +206,17 @@ class ChangeLoggingMixin:
 
         # Attribute the change to a tenant so the changelog can be scoped. Prefer
         # the changed object's own tenant (works for both direct `tenant` fields
-        # and relation-derived `tenant` properties); fall back to the active
-        # request tenant for objects that carry no tenant of their own.
+        # and relation-derived `tenant` properties); next follow an explicit
+        # `changelog_tenant_lookup` ORM path for objects whose owning tenant lives
+        # on a relation (e.g. AssetAudit -> asset.tenant); finally fall back to the
+        # active request tenant for objects that carry no tenant of their own.
         from core.managers import get_current_tenant
         try:
             change_tenant = getattr(self, 'tenant', None)
         except Exception:
             change_tenant = None
+        if change_tenant is None and self.changelog_tenant_lookup:
+            change_tenant = self._resolve_changelog_tenant(self.changelog_tenant_lookup)
         if change_tenant is None:
             change_tenant = get_current_tenant()
 
@@ -222,6 +233,21 @@ class ChangeLoggingMixin:
             prechange_data=prechange_data,
             postchange_data=postchange_data,
         )
+
+    def _resolve_changelog_tenant(self, lookup):
+        # Follow a double-underscore ORM path (e.g. 'asset__tenant') on the
+        # instance, walking already-loaded relations where possible. Returns None
+        # null-safely if any hop is missing so callers fall through to the next
+        # fallback rather than raising on orphaned/partial relations.
+        obj = self
+        for attr in lookup.split('__'):
+            try:
+                obj = getattr(obj, attr, None)
+            except ObjectDoesNotExist:
+                return None
+            if obj is None:
+                return None
+        return obj
 
     def save(self, *args, **kwargs):
         if not get_current_request_id():

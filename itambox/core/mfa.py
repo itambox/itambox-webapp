@@ -15,22 +15,53 @@ lazily so the module is safe to import at app-load time (settings/middleware).
 PASSWORD_BACKEND = 'core.auth.PasswordLoginOnlyBackend'
 
 
+def _role_is_privileged(role_name, permissions, privileged_names_lower) -> bool:
+    """True if a role is privileged by name or by granting any mutating perm.
+
+    Privilege in this app is the JSON ``permissions`` list on ``TenantRole``,
+    not the role name. We treat a role as privileged when either:
+    (a) its name is one of the canonical privileged names
+        (``core.auth.provisioning.PRIVILEGED_ROLE_NAMES``, case-insensitive), or
+    (b) it grants any mutating capability — a ``permissions`` entry whose
+        codename is an ``add_``/``change_``/``delete_`` permission (entries are
+        ``"<app_label>.<codename>"`` strings, e.g. ``"assets.add_asset"``).
+    """
+    if role_name and role_name.lower() in privileged_names_lower:
+        return True
+    for perm in permissions or ():
+        codename = perm.rsplit('.', 1)[-1] if isinstance(perm, str) else ''
+        if codename.startswith(('add_', 'change_', 'delete_')):
+            return True
+    return False
+
+
 def user_requires_mfa(user) -> bool:
     """True if MFA must be enforced for ``user``.
 
-    Required for superusers and for any user who is an ``admin`` or ``owner``
-    (case-insensitive role name) in at least one tenant.
+    Required for superusers and for any user holding a *privileged* role in at
+    least one tenant. Privilege keys on the role's ``permissions`` (and the
+    canonical privileged role names), never on the role name regex alone — so a
+    ``Manager``, an ``Admin``, and any custom role granting add/change/delete
+    are all covered, while a read-only ``Viewer`` is not.
     """
     if not user or not getattr(user, 'is_authenticated', False):
         return False
     if getattr(user, 'is_superuser', False):
         return True
-    # Lazy import to avoid an import cycle at app-load (settings/middleware).
+    # Lazy imports to avoid an import cycle at app-load (settings/middleware).
     from organization.models import TenantMembership
-    return TenantMembership.objects.filter(
-        user=user,
-        role__name__iregex=r'^(admin|owner)$',
-    ).exists()
+    from core.auth.provisioning import PRIVILEGED_ROLE_NAMES
+
+    privileged_names_lower = {name.lower() for name in PRIVILEGED_ROLE_NAMES}
+    # Fetch only the candidate roles' name/permissions, not whole rows; the
+    # mutating-perm check needs the JSON inspected in Python.
+    roles = TenantMembership.objects.filter(user=user).values_list(
+        'role__name', 'role__permissions',
+    )
+    return any(
+        _role_is_privileged(name, permissions, privileged_names_lower)
+        for name, permissions in roles
+    )
 
 
 def is_password_login_session(request) -> bool:
@@ -44,17 +75,14 @@ def is_password_login_session(request) -> bool:
 def request_needs_mfa(request) -> bool:
     """True if this request must present a verified second factor.
 
-    The per-user policy result is cached in the session (``mfa_required``) so the
-    membership query runs at most once per session rather than per request.
+    The per-user policy is computed fresh on every request (the membership query
+    is cheap). It is deliberately *not* cached in the session: a stale cache
+    would let a member promoted to a privileged role mid-session keep operating
+    without a second factor for the rest of the session.
     """
     user = getattr(request, 'user', None)
     if not user or not getattr(user, 'is_authenticated', False):
         return False
     if not is_password_login_session(request):
         return False
-
-    cached = request.session.get('mfa_required')
-    if cached is None:
-        cached = user_requires_mfa(user)
-        request.session['mfa_required'] = cached
-    return bool(cached)
+    return user_requires_mfa(user)

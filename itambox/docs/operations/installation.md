@@ -55,6 +55,21 @@ docker compose up -d
 docker compose exec app python manage.py migrate
 ```
 
+!!! warning "PostgreSQL `btree_gist` extension required"
+    One migration (`assets.0051`) creates an exclusion constraint that prevents
+    overlapping asset reservations, which needs the `btree_gist` extension. The
+    migration runs `CREATE EXTENSION btree_gist`, a **non-trusted** extension that
+    requires a database **superuser** (or a role with `CREATE` on the database).
+    The bundled `docker compose` Postgres role is a superuser, so the default
+    path just works. On **managed/external Postgres** (RDS, Cloud SQL, Azure)
+    with a least-privilege migration role, pre-create the extension once as an
+    admin **before** running `migrate`, otherwise migration aborts and the
+    overlap guard is not installed:
+
+    ```sql
+    CREATE EXTENSION IF NOT EXISTS btree_gist;
+    ```
+
 ## 5. Create a superuser
 
 ```bash

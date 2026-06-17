@@ -26,7 +26,13 @@ class OTPEnforcementMiddleware:
         """Path prefixes that must never be redirected (avoids redirect loops)."""
         prefixes = [
             self._mfa_path,        # the MFA gate itself
-            '/accounts/',          # login/logout/password_reset (django.contrib.auth)
+            # Specific auth-flow paths only — NOT the whole '/accounts/' prefix,
+            # which would let a password-authenticated but MFA-unverified user
+            # reach self-service pages like password_change before completing MFA.
+            '/accounts/login',
+            '/accounts/logout',
+            '/accounts/password_reset',   # password_reset/ and .../done/
+            '/accounts/reset/',           # reset/<uidb64>/<token>/ and reset/done/
             '/oidc/',              # OIDC SSO callback prefix
             '/saml2/',             # SAML SSO callback prefix
             '/health',             # health check

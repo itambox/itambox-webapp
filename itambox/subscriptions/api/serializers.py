@@ -34,7 +34,7 @@ class ProviderSerializer(BaseModelSerializer):
     slug = serializers.SlugField(required=False, allow_blank=True)
     tenant = NestedTenantSerializer(read_only=True)
     tenant_id = serializers.PrimaryKeyRelatedField(
-        queryset=Tenant.objects.all(),
+        queryset=Tenant.objects,
         source='tenant', write_only=True, required=False, allow_null=True
     )
     tenant_group = NestedTenantGroupSerializer(read_only=True)
@@ -59,11 +59,11 @@ class ProviderSerializer(BaseModelSerializer):
 class SubscriptionSerializer(BaseModelSerializer):
     provider = ProviderSerializer(read_only=True)
     provider_id = serializers.PrimaryKeyRelatedField(
-        queryset=Provider.objects.all(), source='provider', write_only=True
+        queryset=Provider.objects, source='provider', write_only=True
     )
     tenant = NestedTenantSerializer(read_only=True)
     tenant_id = serializers.PrimaryKeyRelatedField(
-        queryset=Tenant.objects.all(),
+        queryset=Tenant.objects,
         source='tenant', write_only=True, required=False, allow_null=True
     )
     owner = serializers.StringRelatedField(read_only=True)
@@ -79,7 +79,7 @@ class SubscriptionSerializer(BaseModelSerializer):
     annual_cost = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     cost_center = serializers.StringRelatedField(read_only=True)
     cost_center_id = serializers.PrimaryKeyRelatedField(
-        source='cost_center', queryset=CostCenter.objects.all(),
+        source='cost_center', queryset=CostCenter.objects,
         write_only=True, required=False, allow_null=True,
     )
 
@@ -106,7 +106,7 @@ class SubscriptionSerializer(BaseModelSerializer):
 class SubscriptionAssignmentSerializer(BaseModelSerializer):
     subscription = SubscriptionSerializer(read_only=True)
     subscription_id = serializers.PrimaryKeyRelatedField(
-        queryset=Subscription.objects.all(), source='subscription', write_only=True
+        queryset=Subscription.objects, source='subscription', write_only=True
     )
     assigned_object = serializers.SerializerMethodField(read_only=True)
     assigned_by = serializers.StringRelatedField(read_only=True)

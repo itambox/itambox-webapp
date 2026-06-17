@@ -32,7 +32,7 @@ class SoftwareSerializer(BaseModelSerializer):
     tags: TagSerializer = TagSerializer(many=True, read_only=True)
     tenant = NestedTenantSerializer(read_only=True)
     tenant_id = serializers.PrimaryKeyRelatedField(
-        queryset=Tenant.objects.all(), source='tenant', write_only=True, required=False, allow_null=True
+        queryset=Tenant.objects, source='tenant', write_only=True, required=False, allow_null=True
     )
 
     class Meta:
@@ -59,10 +59,10 @@ class SoftwareSerializer(BaseModelSerializer):
 class InstalledSoftwareSerializer(BaseModelSerializer):
     asset = NestedAssetSerializer(read_only=True)
     asset_id = serializers.PrimaryKeyRelatedField(
-        queryset=Asset.objects.all(), source='asset', write_only=True
+        queryset=Asset.objects, source='asset', write_only=True
     )
     software_id = serializers.PrimaryKeyRelatedField(
-        queryset=Software.objects.all(), source='software', write_only=True
+        queryset=Software.objects, source='software', write_only=True
     )
     software_name = serializers.CharField(source='software.name', read_only=True)
     software_manufacturer = serializers.CharField(source='software.manufacturer.name', read_only=True)

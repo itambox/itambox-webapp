@@ -77,7 +77,7 @@ class SiteSerializer(BaseModelSerializer):
     )
     tenant = NestedTenantSerializer(read_only=True)
     tenant_id = serializers.PrimaryKeyRelatedField(
-        queryset=Tenant.objects.all(), source='tenant', write_only=True, required=False, allow_null=True
+        queryset=Tenant.objects, source='tenant', write_only=True, required=False, allow_null=True
     )
 
     class Meta:
@@ -130,15 +130,15 @@ class LocationSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:location-detail')
     site = NestedSiteSerializer(read_only=True)
     site_id = serializers.PrimaryKeyRelatedField(
-        queryset=Site.objects.all(), source='site', write_only=True
+        queryset=Site.objects, source='site', write_only=True
     )
     parent = NestedLocationSerializer(read_only=True)
     parent_id = serializers.PrimaryKeyRelatedField(
-        queryset=Location.objects.all(), source='parent', write_only=True, required=False, allow_null=True
+        queryset=Location.objects, source='parent', write_only=True, required=False, allow_null=True
     )
     tenant = NestedTenantSerializer(read_only=True)
     tenant_id = serializers.PrimaryKeyRelatedField(
-        queryset=Tenant.objects.all(), source='tenant', write_only=True, required=False, allow_null=True
+        queryset=Tenant.objects, source='tenant', write_only=True, required=False, allow_null=True
     )
     asset_count = serializers.IntegerField(read_only=True)
 
@@ -190,7 +190,7 @@ class AssetHolderSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:assetholder-detail')
     tenant = NestedTenantSerializer(read_only=True)
     tenant_id = serializers.PrimaryKeyRelatedField(
-        queryset=Tenant.objects.all(), source='tenant', write_only=True, required=False, allow_null=True
+        queryset=Tenant.objects, source='tenant', write_only=True, required=False, allow_null=True
     )
     assignment_count = serializers.IntegerField(read_only=True)
 
@@ -218,11 +218,11 @@ class CostCenterSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:costcenter-detail')
     tenant = NestedTenantSerializer(read_only=True)
     tenant_id = serializers.PrimaryKeyRelatedField(
-        queryset=Tenant.objects.all(), source='tenant', write_only=True, required=False, allow_null=True,
+        queryset=Tenant.objects, source='tenant', write_only=True, required=False, allow_null=True,
     )
     parent = NestedCostCenterSerializer(read_only=True)
     parent_id = serializers.PrimaryKeyRelatedField(
-        queryset=CostCenter.objects.all(), source='parent', write_only=True, required=False, allow_null=True,
+        queryset=CostCenter.objects, source='parent', write_only=True, required=False, allow_null=True,
     )
     child_count = serializers.IntegerField(read_only=True)
 

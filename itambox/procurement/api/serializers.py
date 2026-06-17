@@ -27,7 +27,7 @@ class ContractSerializer(BaseModelSerializer):
         write_only=True,
         required=False,
         allow_null=True,
-        queryset=Tenant.objects.all(),
+        queryset=Tenant.objects,
     )
 
     supplier = NestedSupplierSerializer(read_only=True)
@@ -41,7 +41,7 @@ class ContractSerializer(BaseModelSerializer):
 
     cost_center_display = serializers.SerializerMethodField(read_only=True)
     cost_center_id = serializers.PrimaryKeyRelatedField(
-        source='cost_center', queryset=CostCenter.objects.all(),
+        source='cost_center', queryset=CostCenter.objects,
         write_only=True, required=False, allow_null=True,
     )
 
@@ -51,7 +51,7 @@ class ContractSerializer(BaseModelSerializer):
         many=True,
         write_only=True,
         required=False,
-        queryset=Asset.objects.all(),
+        queryset=Asset.objects,
     )
 
     contract_type_display = serializers.CharField(source='get_contract_type_display', read_only=True)

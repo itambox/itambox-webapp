@@ -36,7 +36,10 @@ class UserViewSet(ITAMBoxReadOnlyModelViewSet):
 
 
 class GroupViewSet(ITAMBoxReadOnlyModelViewSet):
-    queryset = Group.objects.all().annotate(user_count=Count('user'))
+    # NOTE: user_count is annotated in get_queryset() (scoped per request), not
+    # here — a class-attr Count('user') counts members across ALL tenants and
+    # leaks the cross-tenant membership size via the serialized aggregate (L2).
+    queryset = Group.objects.all()
     serializer_class = GroupSerializer
 
     def get_queryset(self):
@@ -44,15 +47,22 @@ class GroupViewSet(ITAMBoxReadOnlyModelViewSet):
         # one member in the requester's active tenant. The path Group -> User is
         # the default reverse `user`, then User -> TenantMembership is `memberships`.
         # Superusers remain unscoped; no active tenant fails closed to none().
+        from django.db.models import Q
         from core.managers import get_current_tenant
 
         qs = super().get_queryset()
         if self.request.user.is_superuser:
-            return qs
+            # Global admin: total membership count is acceptable.
+            return qs.annotate(user_count=Count('user', distinct=True))
         active_tenant = get_current_tenant()
         if active_tenant is None:
             return qs.none()
-        return qs.filter(user__memberships__tenant=active_tenant).distinct()
+        # Count ONLY same-tenant members so the aggregate cannot leak the size of
+        # a shared group's membership in other tenants.
+        same_tenant = Q(user__memberships__tenant=active_tenant)
+        return qs.filter(same_tenant).distinct().annotate(
+            user_count=Count('user', filter=same_tenant, distinct=True)
+        )
 
 
 class TokenViewSet(ITAMBoxModelViewSet):
