@@ -261,7 +261,9 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
     elif template.report_type == ReportTemplate.REPORT_TYPE_SUBSCRIPTION_RENEWALS:
         from subscriptions.models import Subscription
         
-        subs_qs = Subscription.objects.filter(deleted_at__isnull=True, status='active').select_related('provider')
+        # 'tenant' is select_related because _resolve_currency() reads sub.tenant
+        # for every blank-currency subscription — without it that is an N+1.
+        subs_qs = Subscription.objects.filter(deleted_at__isnull=True, status='active').select_related('provider', 'tenant')
         if filter_tenants:
             subs_qs = subs_qs.filter(tenant__in=filter_tenants)
         elif active_tenant:
@@ -285,7 +287,10 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
             return (getattr(_settings, 'ITAMBOX_DEFAULT_CURRENCY', 'EUR') or 'EUR').upper()
 
         monthly_by_currency = {}
-        provider_costs = {}
+        # Provider breakdown is bucketed per (provider, currency): with no FX
+        # source we must not sum a provider's spend across differing currencies
+        # into one bar. Each (provider, currency) becomes its own bar instead.
+        provider_costs = {}  # (provider_name, currency) -> monthly_cost
         for sub in subs_qs:
             if sub.renewal_cost is None:
                 continue
@@ -309,7 +314,7 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
             monthly_by_currency[cur] = monthly_by_currency.get(cur, 0.0) + monthly_cost
 
             provider_name = sub.provider.name if sub.provider else _('Generic')
-            provider_costs[provider_name] = provider_costs.get(provider_name, 0.0) + monthly_cost
+            provider_costs[(provider_name, cur)] = provider_costs.get((provider_name, cur), 0.0) + monthly_cost
 
         if template.include_summary_cards:
             # One figure per currency; no cross-currency combined total.
@@ -359,9 +364,24 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
                     {'label': _('Active Subscriptions'), 'value': '1 (Mock)'},
                     {'label': _('Est. Monthly Spend'), 'value': '$1,200.00'}
                 ]
-            provider_costs = {'Microsoft': 1200.0}
+            from django.conf import settings as _settings
+            _mock_currency = (getattr(_settings, 'ITAMBOX_DEFAULT_CURRENCY', 'EUR') or 'EUR').upper()
+            provider_costs = {('Microsoft', _mock_currency): 1200.0}
 
-        chart_data = [{'label': k, 'value': v} for k, v in provider_costs.items()]
+        # Render one bar per (provider, currency). When more than one currency is
+        # present, qualify each bar's label with its ISO code so amounts in
+        # different currencies are never shown as one undifferentiated bar
+        # (there is no FX source to combine them). With a single currency the
+        # plain provider name is kept.
+        currencies_in_play = {cur for (_provider, cur) in provider_costs.keys()}
+        multi_currency = len(currencies_in_play) > 1
+        chart_data = [
+            {
+                'label': f"{provider_name} ({cur})" if multi_currency else provider_name,
+                'value': v,
+            }
+            for (provider_name, cur), v in provider_costs.items()
+        ]
         if template.include_distribution_chart:
             chart_svg = generate_bar_chart(chart_data, title=_("Monthly Spend by Provider"))
 

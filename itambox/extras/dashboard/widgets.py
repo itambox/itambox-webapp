@@ -1188,8 +1188,14 @@ class TenantSpendWidget(DashboardWidget):
 
         default_code = (getattr(settings, 'ITAMBOX_DEFAULT_CURRENCY', 'EUR') or 'EUR').upper()
 
-        # Build query
-        qs = Asset.objects.all()
+        # Build query. This is an admin-only cross-tenant comparison (the widget
+        # is gated to superusers/staff via admin_only/has_permission), so it must
+        # see every tenant regardless of the viewer's active tenant. Asset.objects
+        # is tenant-scoped: when a superuser has an active tenant set it would
+        # silently collapse the comparison to that one tenant. Use the unscoped
+        # base manager and re-apply the soft-delete filter ourselves so the
+        # grouping is independent of the active-tenant contextvar.
+        qs = Asset._base_manager.filter(deleted_at__isnull=True)
         if exclude_unassigned:
             qs = qs.filter(tenant__isnull=False)
 
