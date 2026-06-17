@@ -5,8 +5,6 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse, reverse_lazy
 from django.http import HttpResponse
 from django.views.generic import View
-from django.db.models import Sum
-from django.db.models.functions import Coalesce
 from django.utils.translation import gettext as _
 
 from itambox.views.generic import (
@@ -22,10 +20,7 @@ from inventory.services import checkout_inventory_item, checkin_accessory
 
 
 class AccessoryListView(ObjectListView):
-    queryset = Accessory.objects.select_related('tenant', 'manufacturer').prefetch_related('tags').annotate(
-        _total_stock=Coalesce(Sum('stocks__qty'), 0),
-        _checked_out=Coalesce(Sum('assignments__qty'), 0)
-    )
+    queryset = Accessory.objects.with_counts().select_related('tenant', 'manufacturer').prefetch_related('tags')
     filterset = filters.AccessoryFilterSet
     filterset_form = forms.AccessoryFilterForm
     table = tables.AccessoryTable

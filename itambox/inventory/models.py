@@ -7,8 +7,90 @@ from django.core.exceptions import ValidationError, FieldError
 
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel, StandardModel
 from core.mixins import TaggableMixin, AutoSlugMixin, SoftDeleteMixin, JournalingMixin, ImageAttachmentMixin, CloneableMixin, ExportableMixin, SubscribableMixin
-from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingManager, TenantScopingSoftDeleteManager, TenantScopingAllObjectsManager, SoftDeleteQuerySet, TenantScopingQuerySet
+from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingManager, TenantScopingSoftDeleteManager, TenantScopingAllObjectsManager, SoftDeleteQuerySet, TenantScopingQuerySet, TenantScopingSoftDeleteQuerySet
 from .abstract_models import AbstractInventoryItem, AbstractStock, AbstractAssignment
+
+
+class AccessoryQuerySet(TenantScopingSoftDeleteQuerySet):
+    def with_counts(self):
+        from django.db.models import Sum, OuterRef, Subquery, IntegerField
+        from django.db.models.functions import Coalesce
+
+        # One independent correlated Subquery per multi-valued reverse relation.
+        # Annotating two Sum() over different relations in a single .annotate()
+        # produces a |stocks|x|assignments| cartesian JOIN that inflates BOTH
+        # sums; Subqueries keep each aggregate independent and un-inflated.
+        total_stock_subquery = AccessoryStock.objects.filter(
+            accessory=OuterRef('pk')
+        ).order_by().values('accessory').annotate(
+            total=Sum('qty')
+        ).values('total')
+
+        checked_out_subquery = AccessoryAssignment.objects.filter(
+            accessory=OuterRef('pk'),
+            deleted_at__isnull=True
+        ).order_by().values('accessory').annotate(
+            total=Sum('qty')
+        ).values('total')
+
+        return self.annotate(
+            _total_stock=Coalesce(Subquery(total_stock_subquery, output_field=IntegerField()), 0),
+            _checked_out=Coalesce(Subquery(checked_out_subquery, output_field=IntegerField()), 0)
+        )
+
+
+class TenantScopingAccessoryManager(models.Manager.from_queryset(AccessoryQuerySet)):
+    def get_queryset(self):
+        qs = super().get_queryset().filter_by_tenant()
+        try:
+            return qs.filter(deleted_at__isnull=True)
+        except FieldError:
+            return qs
+
+
+class AllObjectsAccessoryManager(models.Manager.from_queryset(AccessoryQuerySet)):
+    def get_queryset(self):
+        return super().get_queryset().filter_by_tenant()
+
+
+class ConsumableQuerySet(TenantScopingSoftDeleteQuerySet):
+    def with_counts(self):
+        from django.db.models import Sum, OuterRef, Subquery, IntegerField
+        from django.db.models.functions import Coalesce
+
+        # See AccessoryQuerySet.with_counts: independent Subqueries avoid the
+        # stocks x consumptions cartesian-product double-count.
+        total_stock_subquery = ConsumableStock.objects.filter(
+            consumable=OuterRef('pk')
+        ).order_by().values('consumable').annotate(
+            total=Sum('qty')
+        ).values('total')
+
+        consumed_subquery = ConsumableAssignment.objects.filter(
+            consumable=OuterRef('pk'),
+            deleted_at__isnull=True
+        ).order_by().values('consumable').annotate(
+            total=Sum('qty')
+        ).values('total')
+
+        return self.annotate(
+            _total_stock=Coalesce(Subquery(total_stock_subquery, output_field=IntegerField()), 0),
+            _consumed=Coalesce(Subquery(consumed_subquery, output_field=IntegerField()), 0)
+        )
+
+
+class TenantScopingConsumableManager(models.Manager.from_queryset(ConsumableQuerySet)):
+    def get_queryset(self):
+        qs = super().get_queryset().filter_by_tenant()
+        try:
+            return qs.filter(deleted_at__isnull=True)
+        except FieldError:
+            return qs
+
+
+class AllObjectsConsumableManager(models.Manager.from_queryset(ConsumableQuerySet)):
+    def get_queryset(self):
+        return super().get_queryset().filter_by_tenant()
 
 
 class ComponentQuerySet(SoftDeleteQuerySet, TenantScopingQuerySet):
@@ -107,8 +189,8 @@ class Component(AbstractInventoryItem):
 
 
 class Accessory(AbstractInventoryItem):
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = TenantScopingAccessoryManager()
+    all_objects = AllObjectsAccessoryManager()
 
     manufacturer = models.ForeignKey(
         'assets.Manufacturer',
@@ -176,8 +258,8 @@ class Accessory(AbstractInventoryItem):
 
 
 class Consumable(AbstractInventoryItem):
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = TenantScopingConsumableManager()
+    all_objects = AllObjectsConsumableManager()
 
     class Meta(AbstractInventoryItem.Meta):
         verbose_name = _("Consumable")

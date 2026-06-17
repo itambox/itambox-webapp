@@ -56,10 +56,20 @@ class KitDetailView(ObjectDetailView):
         # 2. Batch Accessory Available Qty
         accessory_avail = {}
         if accessory_ids:
-            from django.db.models import Sum, Q
+            from django.db.models import Sum, OuterRef, Subquery, IntegerField
+            from ..models import AccessoryStock, AccessoryAssignment
+            # Independent Subqueries per reverse relation: summing stocks and
+            # assignments in one .annotate() would cross-join them and inflate
+            # both totals (|stocks| x |assignments| fan-out).
+            stock_sub = AccessoryStock.objects.filter(
+                accessory=OuterRef('pk')
+            ).order_by().values('accessory').annotate(total=Sum('qty')).values('total')
+            undeducted_sub = AccessoryAssignment.objects.filter(
+                accessory=OuterRef('pk'), from_location__isnull=True
+            ).order_by().values('accessory').annotate(total=Sum('qty')).values('total')
             stocks = Accessory.objects.filter(id__in=accessory_ids).annotate(
-                total_qty=Coalesce(Sum('stocks__qty'), 0),
-                undeducted_qty=Coalesce(Sum('assignments__qty', filter=Q(assignments__from_location__isnull=True)), 0)
+                total_qty=Coalesce(Subquery(stock_sub, output_field=IntegerField()), 0),
+                undeducted_qty=Coalesce(Subquery(undeducted_sub, output_field=IntegerField()), 0)
             ).values('id', 'total_qty', 'undeducted_qty')
             for s in stocks:
                 accessory_avail[s['id']] = max(0, s['total_qty'] - s['undeducted_qty'])
@@ -78,10 +88,19 @@ class KitDetailView(ObjectDetailView):
         # 4. Batch Consumable Available Qty
         consumable_avail = {}
         if consumable_ids:
-            from django.db.models import Sum, Q
+            from django.db.models import Sum, OuterRef, Subquery, IntegerField
+            from ..models import ConsumableStock, ConsumableAssignment
+            # Independent Subqueries per reverse relation (see accessory block):
+            # avoids the stocks x consumptions cartesian-product double-count.
+            stock_sub = ConsumableStock.objects.filter(
+                consumable=OuterRef('pk')
+            ).order_by().values('consumable').annotate(total=Sum('qty')).values('total')
+            undeducted_sub = ConsumableAssignment.objects.filter(
+                consumable=OuterRef('pk'), from_location__isnull=True
+            ).order_by().values('consumable').annotate(total=Sum('qty')).values('total')
             stocks = Consumable.objects.filter(id__in=consumable_ids).annotate(
-                total_qty=Coalesce(Sum('stocks__qty'), 0),
-                undeducted_qty=Coalesce(Sum('consumptions__qty', filter=Q(consumptions__from_location__isnull=True)), 0)
+                total_qty=Coalesce(Subquery(stock_sub, output_field=IntegerField()), 0),
+                undeducted_qty=Coalesce(Subquery(undeducted_sub, output_field=IntegerField()), 0)
             ).values('id', 'total_qty', 'undeducted_qty')
             for s in stocks:
                 consumable_avail[s['id']] = max(0, s['total_qty'] - s['undeducted_qty'])

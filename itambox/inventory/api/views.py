@@ -1,6 +1,3 @@
-from django.db import models
-from django.db.models import Sum
-from django.db.models.functions import Coalesce
 from django_filters.rest_framework import DjangoFilterBackend
 from itambox.api.permissions import TokenPermissions, StrictTenantPermission
 from itambox.api.viewsets import ITAMBoxModelViewSet
@@ -25,10 +22,7 @@ from .serializers import (
 
 class AccessoryViewSet(ITAMBoxModelViewSet):
     permission_classes = [TokenPermissions, StrictTenantPermission]
-    queryset = Accessory.objects.select_related('manufacturer', 'tenant').prefetch_related('tags').annotate(
-        _total_stock=Coalesce(Sum('stocks__qty'), 0),
-        _checked_out=Coalesce(Sum('assignments__qty'), 0)
-    )
+    queryset = Accessory.objects.with_counts().select_related('manufacturer', 'tenant').prefetch_related('tags')
     serializer_class = AccessorySerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = AccessoryFilterSet
@@ -54,10 +48,7 @@ class AccessoryAssignmentViewSet(ITAMBoxModelViewSet):
 
 class ConsumableViewSet(ITAMBoxModelViewSet):
     permission_classes = [TokenPermissions, StrictTenantPermission]
-    queryset = Consumable.objects.select_related('manufacturer', 'tenant').prefetch_related('tags').annotate(
-        _total_stock=Coalesce(Sum('stocks__qty'), 0),
-        _consumed=Coalesce(Sum('consumptions__qty'), 0)
-    )
+    queryset = Consumable.objects.with_counts().select_related('manufacturer', 'tenant').prefetch_related('tags')
     serializer_class = ConsumableSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = ConsumableFilterSet
