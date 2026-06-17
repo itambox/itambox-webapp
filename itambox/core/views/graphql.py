@@ -59,12 +59,24 @@ def query_complexity_validator(max_complexity=1000, fan_out=10):
     since it resolves a single row. A ``GraphQLError`` is reported when the
     running total exceeds ``max_complexity``.
 
+    Fields reached through a *named fragment* are accounted for too: graphql-core
+    visits each fragment definition only once at the document top level, so the
+    main walk never descends into a ``...spread``. To stop a query from hiding
+    fan-out inside fragments (``a0: assets { ...F } ... fragment F on Asset {
+    <expensive list path> }``), :meth:`enter_fragment_spread` runs a sub-walk of
+    the referenced fragment's selection set, seeded with the spread site's
+    current multiplier and a ``TypeInfo`` rooted at the fragment's type
+    condition, and folds the resulting cost back in at the spread site.
+
     Mirrors :func:`field_count_limit_validator`: a factory returning a
     ``ValidationRule`` subclass that uses the ``enter_field`` / ``leave_field``
     visitor hooks and reports via ``self.report_error(GraphQLError(...))``. The
     base ``ValidationRule`` runs under graphql-core's ``TypeInfo`` visitor, so
     ``self.context.get_type()`` yields the live output type used to detect lists.
     """
+    from graphql import visit
+    from graphql.language.visitor import Visitor
+    from graphql.utilities import TypeInfo, TypeInfoVisitor, type_from_ast
     from graphql.validation import ValidationRule
     from graphql.error import GraphQLError
     from graphql.type import GraphQLList, GraphQLNonNull
@@ -83,16 +95,23 @@ def query_complexity_validator(max_complexity=1000, fan_out=10):
             # Stack of cost-multipliers for the enclosing field path. The root
             # selection set has a multiplier of 1.
             self._multipliers = [1]
+            # Fragment names on the current spread path, to avoid unbounded
+            # recursion on cyclic fragment references (which other validation
+            # rules reject, but we must not hang before they run).
+            self._fragment_path = set()
 
-        def enter_field(self, node, *_args):
-            multiplier = self._multipliers[-1]
-            # Each selected field instance costs its enclosing multiplier.
-            self._cost += multiplier
+        def _report_if_over(self, node):
             if self._cost > max_complexity and not self._reported:
                 self._reported = True
                 self.report_error(GraphQLError(
                     f'Query exceeds the maximum complexity of {max_complexity}.',
                     node))
+
+        def enter_field(self, node, *_args):
+            multiplier = self._multipliers[-1]
+            # Each selected field instance costs its enclosing multiplier.
+            self._cost += multiplier
+            self._report_if_over(node)
             # A list-returning field amplifies everything nested beneath it.
             output_type = self.context.get_type()
             child_multiplier = multiplier
@@ -102,6 +121,69 @@ def query_complexity_validator(max_complexity=1000, fan_out=10):
 
         def leave_field(self, node, *_args):
             self._multipliers.pop()
+
+        def enter_fragment_spread(self, node, *_args):
+            # The main document walk does not expand named fragments, so charge
+            # the referenced fragment's field cost here, at the spread site, using
+            # the multiplier accumulated by the enclosing field path.
+            name = node.name.value
+            if name in self._fragment_path:
+                return  # cyclic spread — bail out (other rules report the cycle)
+            fragment = self.context.get_fragment(name)
+            if fragment is None:
+                return  # undefined fragment — other rules report it
+            root_type = type_from_ast(self.context.schema, fragment.type_condition)
+            if root_type is None:
+                return  # unknown type condition — other rules report it
+
+            multiplier = self._multipliers[-1]
+            self._fragment_path.add(name)
+            self._account_for_selection_set(fragment.selection_set, root_type, multiplier)
+            self._fragment_path.discard(name)
+
+        def _account_for_selection_set(self, selection_set, root_type, base_multiplier):
+            """Walk ``selection_set`` (a fragment body) and fold its field cost
+            into the running total, treating ``base_multiplier`` as the cost of a
+            field selected directly on ``root_type``.
+
+            A fresh ``TypeInfo`` seeded at ``root_type`` resolves list-vs-singular
+            output types exactly as the main walk does, so nested list fan-out
+            inside the fragment is multiplied identically. Nested fragment spreads
+            recurse through the outer validator (shared cost/multiplier state),
+            so multi-hop fragment chains are charged too.
+            """
+            outer = self
+
+            class _FragmentCostVisitor(Visitor):
+                def __init__(self):
+                    super().__init__()
+                    # Mirror the outer multiplier stack, rooted at the spread site.
+                    self._stack = [base_multiplier]
+
+                def enter_field(self, node, *_a):
+                    multiplier = self._stack[-1]
+                    outer._cost += multiplier
+                    outer._report_if_over(node)
+                    output_type = type_info.get_type()
+                    child_multiplier = multiplier
+                    if _returns_list(output_type):
+                        child_multiplier *= fan_out
+                    self._stack.append(child_multiplier)
+
+                def leave_field(self, node, *_a):
+                    self._stack.pop()
+
+                def enter_fragment_spread(self, node, *_a):
+                    # Delegate to the outer rule so the cycle guard and the
+                    # spread-site multiplier (top of this visitor's stack) apply.
+                    outer._multipliers.append(self._stack[-1])
+                    try:
+                        outer.enter_fragment_spread(node)
+                    finally:
+                        outer._multipliers.pop()
+
+            type_info = TypeInfo(self.context.schema, initial_type=root_type)
+            visit(selection_set, TypeInfoVisitor(type_info, _FragmentCostVisitor()))
 
     return QueryComplexityValidator
 

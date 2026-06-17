@@ -1,4 +1,5 @@
 import inspect
+from math import ceil
 
 from django.conf import settings
 from django.core.paginator import Page, Paginator
@@ -112,6 +113,63 @@ class EnhancedPaginator(Paginator):
         """True when the real total exceeded the cap (``count`` reports the cap)."""
         cap = self._count_cap
         return cap is not None and self._raw_count > cap
+
+    @cached_property
+    def _real_count(self):
+        """
+        The exact, uncapped object total — used only for page *navigation*
+        (``num_pages`` / ``validate_number`` / last-page slice), never for the
+        "<cap>+" display.
+
+        When the table did not exceed the cap, ``count`` is already exact, so we
+        reuse it and emit no extra query. Only when capping actually engaged do
+        we pay for a full ``COUNT(*)`` — necessary so that rows beyond
+        ``cap * per_page`` remain reachable through pagination rather than
+        raising ``EmptyPage``.
+        """
+        if not self.is_count_capped:
+            # Cheap path: the capped count equals the true total, no extra query.
+            return self.count
+
+        object_list = self.object_list
+        c = getattr(object_list, 'count', None)
+        if callable(c) and not inspect.isbuiltin(c) and method_has_no_args(c):
+            return c()
+        return len(object_list)
+
+    @cached_property
+    def num_pages(self):
+        """
+        Total number of pages, computed from the *real* (uncapped) count.
+
+        Django derives ``num_pages`` from ``self.count``; because our ``count``
+        is capped for display, the stock implementation would make every page
+        past ``ceil(cap / per_page)`` unreachable (``validate_number`` raises
+        ``EmptyPage``). Deriving the page range from ``_real_count`` instead lets
+        navigation reach every real row, while ``count`` keeps reporting the cap.
+
+        For tables at or below the cap, ``_real_count == count``, so this returns
+        exactly the same value as Django's default.
+        """
+        if self._real_count == 0 and not self.allow_empty_first_page:
+            return 0
+        hits = max(1, self._real_count - self.orphans)
+        return ceil(hits / self.per_page)
+
+    def page(self, number):
+        """
+        Return a Page for ``number``, slicing against the *real* total.
+
+        Identical to Django's ``Paginator.page`` except the last-page orphan
+        truncation uses ``_real_count`` rather than the capped ``count`` — so the
+        final reachable page beyond the cap is not clipped to ``cap`` rows.
+        """
+        number = self.validate_number(number)
+        bottom = (number - 1) * self.per_page
+        top = bottom + self.per_page
+        if top + self.orphans >= self._real_count:
+            top = self._real_count
+        return self._get_page(self.object_list[bottom:top], number, self)
 
 
 class EnhancedPage(Page):
