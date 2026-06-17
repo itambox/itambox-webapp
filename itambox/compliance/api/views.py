@@ -2,10 +2,13 @@ from django_filters.rest_framework import DjangoFilterBackend
 from itambox.api.viewsets import ITAMBoxModelViewSet
 from core.managers import get_current_tenant
 from itambox.middleware import get_current_user
-from compliance.models import CustodyReceipt, AuditSession, AssetAudit
+from compliance.models import CustodyReceipt, CustodyTemplate, AuditSession, AssetAudit
 from assets.models import AssetMaintenance
 from compliance.filters import CustodyReceiptFilterSet, AssetMaintenanceFilterSet, AuditSessionFilterSet, AssetAuditFilterSet
-from .serializers import CustodyReceiptSerializer, AssetMaintenanceSerializer, AuditSessionSerializer, AssetAuditSerializer
+from .serializers import (
+    CustodyReceiptSerializer, CustodyTemplateSerializer, AssetMaintenanceSerializer,
+    AuditSessionSerializer, AssetAuditSerializer,
+)
 
 
 def _scope_by_asset_tenant(queryset):
@@ -28,6 +31,15 @@ def _scope_by_asset_tenant(queryset):
     if user is not None and not getattr(user, 'is_superuser', False):
         return queryset.none()
     return queryset
+
+
+class CustodyTemplateViewSet(ITAMBoxModelViewSet):
+    # CustodyTemplate has a direct (nullable) tenant FK + TenantScopingSoftDeleteManager
+    # with allow_global_tenant, so BaseViewSet.get_queryset() auto-applies
+    # filter_by_tenant() — returning the active tenant's own templates plus the
+    # shared global (tenant=None) templates. No custom get_queryset needed.
+    queryset = CustodyTemplate.objects.select_related('tenant', 'tenant_group', 'category').prefetch_related('tags').all()
+    serializer_class = CustodyTemplateSerializer
 
 
 class CustodyReceiptViewSet(ITAMBoxModelViewSet):

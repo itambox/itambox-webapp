@@ -2,7 +2,10 @@ import django_filters
 from django import forms
 from django.db.models import Q
 from core.filters import BaseFilterSet
-from .models import Tag, CustomField, CustomFieldset, AlertLog, AlertRule
+from .models import (
+    Tag, CustomField, CustomFieldset, AlertLog, AlertRule,
+    EventRule, WebhookEndpoint, NotificationChannel,
+)
 
 class TagFilter(django_filters.FilterSet):
     q = django_filters.CharFilter(
@@ -52,6 +55,64 @@ class CustomFieldsetFilterSet(django_filters.FilterSet):
             return queryset
         return queryset.filter(
             Q(name__icontains=value)
+        ).distinct()
+
+
+class EventRuleFilterSet(django_filters.FilterSet):
+    q = django_filters.CharFilter(method='search', label='Search')
+
+    class Meta:
+        model = EventRule
+        fields = ['name', 'action_type', 'enabled']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(Q(name__icontains=value)).distinct()
+
+
+class WebhookEndpointFilterSet(django_filters.FilterSet):
+    q = django_filters.CharFilter(method='search', label='Search')
+
+    class Meta:
+        model = WebhookEndpoint
+        fields = ['name', 'http_method', 'enabled']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(url__icontains=value)
+        ).distinct()
+
+
+class NotificationChannelFilterSet(django_filters.FilterSet):
+    q = django_filters.CharFilter(method='search', label='Search')
+
+    class Meta:
+        model = NotificationChannel
+        fields = ['name', 'channel_type', 'enabled']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(Q(name__icontains=value)).distinct()
+
+
+class AlertRuleFilterSet(django_filters.FilterSet):
+    q = django_filters.CharFilter(method='search', label='Search')
+
+    class Meta:
+        model = AlertRule
+        fields = ['name', 'alert_type', 'severity', 'is_active', 'is_muted']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(description__icontains=value)
         ).distinct()
 
 

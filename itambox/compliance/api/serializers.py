@@ -2,14 +2,52 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from itambox.api.base import BaseModelSerializer
 from itambox.api.nested_serializers import NestedAssetSerializer
-from compliance.models import CustodyReceipt, AuditSession, AssetAudit
+from compliance.models import CustodyReceipt, CustodyTemplate, AuditSession, AssetAudit
 from assets.models import AssetMaintenance
-from organization.api.serializers import AssetHolderSerializer, NestedLocationSerializer
-from organization.models import Location
-from assets.models import Asset, StatusLabel
-from assets.api.serializers import StatusLabelSerializer
+from organization.api.serializers import (
+    AssetHolderSerializer, NestedLocationSerializer,
+    NestedTenantSerializer, NestedTenantGroupSerializer,
+)
+from organization.models import Location, Tenant, TenantGroup
+from assets.models import Asset, Category, StatusLabel
+from assets.api.serializers import CategorySerializer, StatusLabelSerializer
+from extras.api.serializers import TagSerializer
 
 User = get_user_model()
+
+
+class CustodyTemplateSerializer(BaseModelSerializer):
+    # tenant + tenant_group are both nullable (allow_global_tenant = True):
+    # a template with tenant=None is a valid global/shared template. Expose
+    # them as optional, nullable *_id write fields so global templates can be
+    # created/edited without forcing a tenant.
+    tenant = NestedTenantSerializer(read_only=True)
+    tenant_id = serializers.PrimaryKeyRelatedField(
+        queryset=Tenant.objects,
+        source='tenant', write_only=True, required=False, allow_null=True
+    )
+    tenant_group = NestedTenantGroupSerializer(read_only=True)
+    tenant_group_id = serializers.PrimaryKeyRelatedField(
+        queryset=TenantGroup.objects.all(),
+        source='tenant_group', write_only=True, required=False, allow_null=True
+    )
+    category = CategorySerializer(read_only=True)
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects, source='category', write_only=True, required=False, allow_null=True
+    )
+    tags = TagSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = CustodyTemplate
+        fields = [
+            'id', 'name', 'tenant', 'tenant_id', 'tenant_group', 'tenant_group_id',
+            'category', 'category_id', 'signature_provider', 'logo',
+            'eula_text', 'disclaimer', 'qms_reference', 'is_active',
+            'require_acceptance', 'email_signature_request', 'tags',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+        brief_fields = ['id', 'name', 'tenant', 'is_active']
 
 
 class CustodyReceiptSerializer(BaseModelSerializer):

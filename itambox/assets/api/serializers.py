@@ -11,11 +11,14 @@ from itambox.api.nested_serializers import (
 from assets.models import (
     Asset, AssetRole, Manufacturer, AssetType,
     StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence,
-    AssetAssignment, AssetDisposal,
+    AssetAssignment, AssetDisposal, Warranty, AssetReservation,
 )
 from organization.models import Location, Tenant
 from software.models import Software
-from organization.api.serializers import NestedLocationSerializer, NestedTenantSerializer, ContactAssignmentSerializer
+from organization.api.serializers import (
+    NestedLocationSerializer, NestedTenantSerializer, ContactAssignmentSerializer,
+    AssetHolderSerializer,
+)
 from extras.api.serializers import TagSerializer
 
 User = get_user_model()
@@ -289,6 +292,67 @@ class AssetDisposalSerializer(BaseModelSerializer):
             'created_at', 'updated_at',
         ]
         brief_fields = ['id', 'asset', 'disposal_method', 'disposal_date']
+
+
+class WarrantySerializer(BaseModelSerializer):
+    asset = NestedAssetSerializer(read_only=True)
+    asset_id = serializers.PrimaryKeyRelatedField(
+        queryset=Asset.objects, source='asset', write_only=True,
+    )
+    # Tenant is derived from the parent asset (no direct field); expose it
+    # read-only via the model property. There is deliberately no writable
+    # tenant_id — the boundary follows asset.tenant.
+    tenant = NestedTenantSerializer(read_only=True)
+    warranty_type_display = serializers.CharField(
+        source='get_warranty_type_display', read_only=True
+    )
+    is_active = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = Warranty
+        fields = [
+            'id',
+            'asset', 'asset_id', 'tenant',
+            'warranty_type', 'warranty_type_display',
+            'provider', 'start_date', 'end_date', 'is_active',
+            'cost', 'currency', 'reference', 'terms', 'notes',
+            'created_at', 'updated_at',
+        ]
+        brief_fields = ['id', 'asset', 'warranty_type', 'start_date', 'end_date']
+
+
+class AssetReservationSerializer(BaseModelSerializer):
+    asset = NestedAssetSerializer(read_only=True)
+    asset_id = serializers.PrimaryKeyRelatedField(
+        queryset=Asset.objects, source='asset', write_only=True,
+    )
+    # Tenant is derived from the parent asset (no direct field); expose it
+    # read-only via the model property. There is deliberately no writable
+    # tenant_id — the boundary follows asset.tenant.
+    tenant = NestedTenantSerializer(read_only=True)
+    reserved_for = AssetHolderSerializer(read_only=True)
+    reserved_for_id = serializers.PrimaryKeyRelatedField(
+        queryset=AssetHolderSerializer.Meta.model.objects, source='reserved_for',
+        write_only=True, required=False, allow_null=True,
+    )
+    # `created_by` is forced to request.user in the viewset's perform_create;
+    # there is deliberately no writable created_by_id (it would let a client
+    # reattribute a reservation to another user on create/PATCH).
+    created_by = serializers.StringRelatedField(read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = AssetReservation
+        fields = [
+            'id',
+            'asset', 'asset_id', 'tenant',
+            'reserved_for', 'reserved_for_id',
+            'start_date', 'end_date',
+            'status', 'status_display',
+            'created_by', 'purpose', 'notes',
+            'created_at', 'updated_at',
+        ]
+        brief_fields = ['id', 'asset', 'reserved_for', 'status', 'start_date', 'end_date']
 
 
 class AssetCheckOutAPISerializer(serializers.Serializer):

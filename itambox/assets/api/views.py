@@ -11,12 +11,13 @@ from itambox.api.viewsets import ITAMBoxModelViewSet
 from assets.models import (
     Asset, AssetRole, Manufacturer, AssetType,
     StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence,
-    AssetAssignment, AssetDisposal,
+    AssetAssignment, AssetDisposal, Warranty, AssetReservation,
 )
 from assets.filters import (
     AssetFilterSet, AssetRoleFilterSet, ManufacturerFilterSet,
     AssetTypeFilterSet, StatusLabelFilterSet, DepreciationFilterSet,
     SupplierFilterSet, CategoryFilterSet, AssetRequestFilterSet, AssetTagSequenceFilterSet,
+    WarrantyFilterSet, AssetReservationFilterSet,
 )
 from .serializers import (
     AssetSerializer, AssetRoleSerializer, ManufacturerSerializer, AssetTypeSerializer,
@@ -26,6 +27,7 @@ from .serializers import (
     AssetCheckOutAPISerializer,
     AssetCheckInAPISerializer,
     AssetDisposalSerializer,
+    WarrantySerializer, AssetReservationSerializer,
 )
 from assets.services import checkout_asset, checkin_asset
 
@@ -182,6 +184,38 @@ class AssetDisposalViewSet(ITAMBoxModelViewSet):
     serializer_class = AssetDisposalSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_fields = ['asset_id', 'disposal_method', 'data_sanitization_method', 'weee_compliant']
+
+
+class WarrantyViewSet(ITAMBoxModelViewSet):
+    # Warranty has no direct `tenant` field — it derives tenant through
+    # `asset.tenant` (tenant_lookup='asset__tenant'). StrictTenantPermission
+    # therefore cannot enforce an object-level boundary on its own; the scope is
+    # applied by BaseViewSet.get_queryset re-running the manager's
+    # filter_by_tenant(), which honours tenant_lookup. Mirrors AssetDisposalViewSet.
+    permission_classes = [TokenPermissions, StrictTenantPermission]
+    queryset = Warranty.objects.select_related(
+        'asset', 'asset__asset_type__manufacturer', 'asset__tenant',
+    )
+    serializer_class = WarrantySerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = WarrantyFilterSet
+
+
+class AssetReservationViewSet(ITAMBoxModelViewSet):
+    # Like Warranty, AssetReservation derives tenant through `asset.tenant`
+    # (tenant_lookup='asset__tenant'); the boundary is enforced by the manager's
+    # filter_by_tenant() re-applied in BaseViewSet.get_queryset.
+    permission_classes = [TokenPermissions, StrictTenantPermission]
+    queryset = AssetReservation.objects.select_related(
+        'asset', 'asset__asset_type__manufacturer', 'asset__tenant',
+        'reserved_for', 'created_by',
+    )
+    serializer_class = AssetReservationSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = AssetReservationFilterSet
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
 
 
 

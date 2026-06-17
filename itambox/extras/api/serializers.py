@@ -1,6 +1,11 @@
+from django.contrib.contenttypes.models import ContentType
 from rest_framework import serializers
 from itambox.api.base import BaseModelSerializer
-from extras.models import Tag, Dashboard, CustomField, CustomFieldset
+from itambox.api.fields import ContentTypeField
+from extras.models import (
+    Tag, Dashboard, CustomField, CustomFieldset,
+    EventRule, WebhookEndpoint, NotificationChannel, AlertRule,
+)
 
 
 class TagSerializer(BaseModelSerializer):
@@ -47,3 +52,85 @@ class DashboardSerializer(serializers.ModelSerializer):
         model = Dashboard
         fields = ['id', 'user', 'layout', 'created', 'last_updated']
         brief_fields = ['id', 'user']
+
+
+class WebhookEndpointSerializer(BaseModelSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name='api:extras_api:webhookendpoint-detail')
+    # The model's own URLField is named `url`, which collides with the API
+    # self-link `url` above; expose the target endpoint as `target_url`.
+    target_url = serializers.URLField(source='url', max_length=2000)
+    http_method_display = serializers.CharField(source='get_http_method_display', read_only=True)
+    # `secret` is stored encrypted (model.save() encrypts; secret_decrypted reads).
+    # Accept it write-only and let model.save() encrypt; the ciphertext/plaintext
+    # is NEVER serialized out (mirrors License.product_key being omitted entirely).
+    secret = serializers.CharField(write_only=True, required=False, allow_blank=True)
+
+    class Meta:
+        model = WebhookEndpoint
+        fields = [
+            'id', 'url', 'name', 'target_url', 'http_method', 'http_method_display',
+            'headers', 'secret', 'enabled', 'retry_count', 'retry_backoff',
+            'created_at', 'updated_at',
+        ]
+        brief_fields = ['id', 'url', 'name', 'enabled']
+
+
+class EventRuleSerializer(BaseModelSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name='api:extras_api:eventrule-detail')
+    model = ContentTypeField(queryset=ContentType.objects.all())
+    action_type_display = serializers.CharField(source='get_action_type_display', read_only=True)
+    webhook = WebhookEndpointSerializer(read_only=True)
+    # WebhookEndpoint.objects is the tenant-scoped manager, so a rule can only
+    # point at a same-tenant (or system-wide) webhook; this mirrors
+    # EventRule.clean()'s same-tenant guard at the write boundary.
+    webhook_id = serializers.PrimaryKeyRelatedField(
+        queryset=WebhookEndpoint.objects, source='webhook', write_only=True,
+        required=False, allow_null=True,
+    )
+
+    class Meta:
+        model = EventRule
+        fields = [
+            'id', 'url', 'name', 'model', 'events', 'conditions',
+            'action_type', 'action_type_display', 'webhook', 'webhook_id',
+            'action_config', 'enabled', 'created_at', 'updated_at',
+        ]
+        brief_fields = ['id', 'url', 'name', 'action_type', 'enabled']
+
+
+class NotificationChannelSerializer(BaseModelSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name='api:extras_api:notificationchannel-detail')
+    channel_type_display = serializers.CharField(source='get_channel_type_display', read_only=True)
+
+    class Meta:
+        model = NotificationChannel
+        # `config` is an opaque JSONField (SMTP settings, webhook URL, etc.); there
+        # is no discrete secret column, so it is exposed plainly like other JSON.
+        fields = [
+            'id', 'url', 'name', 'channel_type', 'channel_type_display',
+            'enabled', 'config', 'created_at', 'updated_at',
+        ]
+        brief_fields = ['id', 'url', 'name', 'channel_type', 'enabled']
+
+
+class AlertRuleSerializer(BaseModelSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name='api:extras_api:alertrule-detail')
+    alert_type_display = serializers.CharField(source='get_alert_type_display', read_only=True)
+    severity_display = serializers.CharField(source='get_severity_display', read_only=True)
+    channels = NotificationChannelSerializer(many=True, read_only=True)
+    # NotificationChannel.objects is tenant-scoped, so a rule can only notify
+    # via same-tenant channels.
+    channel_ids = serializers.PrimaryKeyRelatedField(
+        queryset=NotificationChannel.objects, source='channels', write_only=True,
+        many=True, required=False,
+    )
+
+    class Meta:
+        model = AlertRule
+        fields = [
+            'id', 'url', 'name', 'description', 'alert_type', 'alert_type_display',
+            'threshold_value', 'severity', 'severity_display', 'is_active', 'is_muted',
+            'renotify_interval_days', 'last_fired_at', 'channels', 'channel_ids',
+            'created_at', 'updated_at',
+        ]
+        brief_fields = ['id', 'url', 'name', 'alert_type', 'severity', 'is_active']

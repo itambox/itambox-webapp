@@ -5,6 +5,7 @@ from .views import (
     DepreciationViewSet, SupplierViewSet, CategoryViewSet,
     AssetRequestViewSet, AssetTagSequenceViewSet,
     AssetAssignmentViewSet, AssetDisposalViewSet,
+    WarrantyViewSet, AssetReservationViewSet,
 )
 
 app_name = 'assets_api'
@@ -22,6 +23,8 @@ router.register(r'asset-requests', AssetRequestViewSet)
 router.register(r'asset-tag-sequences', AssetTagSequenceViewSet)
 router.register(r'asset-assignments', AssetAssignmentViewSet)
 router.register(r'asset-disposals', AssetDisposalViewSet)
+router.register(r'warranties', WarrantyViewSet)
+router.register(r'asset-reservations', AssetReservationViewSet)
 
 urlpatterns = router.urls
 
