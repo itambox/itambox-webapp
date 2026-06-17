@@ -1,15 +1,28 @@
 import logging
 
 from django.apps import apps
+from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib import messages
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
+from django.db import models, transaction
 from django.http import Http404
 from django.shortcuts import redirect
 from django.urls import reverse, NoReverseMatch
 from django.utils.translation import gettext as _
 from django.views.generic import TemplateView
+from django_q.tasks import async_task
 
+from core.forms.import_forms import (
+    BulkImportForm,
+    IMPORT_EXCLUDED_FIELDS,
+    get_registered_import_form,
+    is_model_importable,
+    _model_has_concrete_field,
+)
+from core.managers import get_current_tenant
+from core.models import Job
 from itambox.utils import get_model_viewname
 from itambox.views.htmx import BaseHTMXView
 
@@ -45,14 +58,9 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
         # A curated BulkImportForm registered for this model wins — it carries
         # domain-accurate required/optional field lists. Otherwise fall back to
         # a dynamic form introspected from the model's editable fields.
-        from core.forms.import_forms import (
-            BulkImportForm, IMPORT_EXCLUDED_FIELDS, get_registered_import_form,
-        )
         registered = get_registered_import_form(model)
         if registered is not None:
             return registered
-
-        from django.db import models
 
         required_fields = []
         optional_fields = []
@@ -104,16 +112,9 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
         if '_confirm' in request.POST:
             rows = request.session.get('import_rows', [])
             if rows:
-                from django.contrib.contenttypes.models import ContentType
-                from core.models import Job
-                from django_q.tasks import async_task
-
                 model = self._get_model()
                 ct = ContentType.objects.get_for_model(model)
 
-                from django.db import transaction
-                from django.conf import settings
-                from core.managers import get_current_tenant
                 current_tenant = get_current_tenant()
                 tenant_id = current_tenant.pk if current_tenant else None
 
@@ -172,9 +173,6 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
         fields_info = []
         if not model:
             return fields_info
-
-        from django.db import models
-        from core.forms.import_forms import IMPORT_EXCLUDED_FIELDS, _model_has_concrete_field
 
         form_cls = self.get_form_class()
         required = set(getattr(form_cls, 'required_fields', []) or [])
@@ -262,7 +260,6 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
 
 class GenericObjectImportView(ObjectImportView):
     def _get_model(self):
-        from core.forms.import_forms import is_model_importable
         app_label = self.kwargs.get('app_label')
         model_name = self.kwargs.get('model_name')
         try:

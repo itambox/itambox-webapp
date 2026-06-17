@@ -3,20 +3,27 @@ import logging
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.contenttypes.models import ContentType
 from django.http import Http404
+from django.template.loader import get_template
+from django.template import TemplateDoesNotExist
 from django.urls import reverse, NoReverseMatch
 from django.utils.http import urlencode
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _, override
 from django.views.generic import DetailView
 from django_tables2 import RequestConfig
 
 from core.models import ObjectChange
 from core.tables import ObjectChangeTable, BaseTable
 from core.forms import JournalEntryForm
-from extras.models import JournalEntry, ImageAttachment, FileAttachment
+from extras.customfields import get_custom_fields_display
+from extras.models import (
+    JournalEntry, ImageAttachment, FileAttachment, Bookmark, ObjectWatch,
+)
 from itambox.registry import registry
 from itambox.utils import get_model_viewname, get_help_url
 from itambox.views.htmx import BaseHTMXView
 from itambox.views.generic.mixins import TenantScopingViewMixin, CachedObjectMixin
+from subscriptions.models import SubscriptionAssignment
+from subscriptions.tables import SubscriptionAssignmentTable
 
 logger = logging.getLogger(__name__)
 
@@ -82,10 +89,6 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
         return super().get(request, *args, **kwargs)
 
     def get_template_names(self):
-        from django.template.loader import get_template
-        from django.template import TemplateDoesNotExist
-        from django.utils.translation import override
-
         if self.template_name and self.template_name != 'generic/object_detail.html':
             return [self.template_name]
 
@@ -210,7 +213,6 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
         context['attachment_model_name'] = model_name
 
         if registry.model_has_feature(obj.__class__, 'custom_field_data'):
-            from extras.customfields import get_custom_fields_display
             context['custom_fields_display'] = get_custom_fields_display(obj)
 
         if registry.model_has_feature(obj.__class__, 'image_attachments'):
@@ -235,9 +237,6 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
             context['has_subscriptions'] = True
             context['subscribable_content_type_id'] = obj_type.pk
 
-            from subscriptions.models import SubscriptionAssignment
-            from subscriptions.tables import SubscriptionAssignmentTable
-
             assignments_qs = SubscriptionAssignment.objects.filter(
                 content_type=obj_type,
                 object_id=obj.pk,
@@ -255,7 +254,6 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
             context['is_bookmarkable'] = True
             context['bookmark_content_type_id'] = obj_type.pk
             if self.request.user.is_authenticated:
-                from extras.models import Bookmark
                 context['is_bookmarked'] = Bookmark.objects.filter(
                     user=self.request.user,
                     model=obj_type,
@@ -270,7 +268,6 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
             context['is_watchable'] = True
             context['watch_content_type_id'] = obj_type.pk
             if self.request.user.is_authenticated:
-                from extras.models import ObjectWatch
                 context['is_watched'] = ObjectWatch.objects.filter(
                     user=self.request.user,
                     model=obj_type,

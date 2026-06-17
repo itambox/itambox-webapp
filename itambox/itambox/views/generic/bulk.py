@@ -1,7 +1,9 @@
+import inspect
 import logging
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.db import transaction
 from django.db.models import ProtectedError
 from django.http import HttpResponseRedirect
 from django.urls import reverse
@@ -29,15 +31,12 @@ class ObjectBulkEditView(BulkViewMixin, PermissionRequiredMixin, LoginRequiredMi
 
     def _get_bulk_edit_form(self, data=None, model=None):
         form_class = getattr(self, 'form_class', None) or BulkEditForm
-        import inspect
         sig = inspect.signature(form_class.__init__)
         if 'model' in sig.parameters:
             return form_class(data, model=model)
         return form_class(data)
 
     def post(self, request, *args, **kwargs):
-        from django.db import transaction
-
         pks = request.POST.getlist('pk')
         model = self._get_model()
         return_url = safe_return_url(
@@ -161,8 +160,6 @@ class ObjectBulkDeleteView(BulkViewMixin, PermissionRequiredMixin, LoginRequired
         return ('',)
 
     def post(self, request, *args, **kwargs):
-        from django.db import transaction
-
         pks = request.POST.getlist('pk')
         model = self._get_model()
         return_url = safe_return_url(

@@ -2,7 +2,7 @@ import logging
 
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from django.http import Http404
 from django.template.loader import get_template
 from django.template import TemplateDoesNotExist
@@ -10,6 +10,10 @@ from django.urls import reverse, NoReverseMatch
 from django.utils.translation import gettext as _, override
 from django.views.generic import ListView
 
+from core.features import module_maturity, BETA
+from core.forms.import_forms import is_model_importable
+from extras.customfields import apply_custom_field_filters
+from extras.models import ExportTemplate, LabelTemplate
 from itambox.registry import registry
 from itambox.utils import get_model_viewname, get_table_for_model, get_help_url
 from itambox.views.htmx import BaseHTMXView
@@ -72,7 +76,6 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
 
         show_deleted = self.request.GET.get('deleted') == 'true'
         if show_deleted and model and registry.model_has_feature(model, 'soft_delete'):
-            from django.core.exceptions import PermissionDenied
             if not self.request.user.is_superuser and not self.request.user.has_perm('core.view_recyclebin'):
                 raise PermissionDenied("You do not have permission to view the Recycle Bin.")
             manager = getattr(model, 'all_objects', model._base_manager)
@@ -100,7 +103,6 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
 
         # cf_<name>=<value> params filter on custom field data (NetBox-style).
         if model and registry.model_has_feature(model, 'custom_field_data'):
-            from extras.customfields import apply_custom_field_filters
             queryset = apply_custom_field_filters(queryset, model, self.request.GET)
 
         return queryset
@@ -150,7 +152,6 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         context['model_name'] = _model._meta.model_name
         context['object_type'] = _model._meta.verbose_name
 
-        from core.features import module_maturity, BETA
         context.setdefault('is_beta_module', module_maturity(_model._meta.app_label) == BETA)
 
         context.setdefault('title', _model._meta.verbose_name_plural)
@@ -162,7 +163,6 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
             context['export_templates'] = []
             context['label_templates'] = []
         else:
-            from extras.models import ExportTemplate, LabelTemplate
             try:
                 content_type = ContentType.objects.get_for_model(_model)
                 context['export_templates'] = list(ExportTemplate.objects.filter(content_type=content_type))
@@ -184,7 +184,6 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         # Import/export are offered only for importable models (not generated
         # logs or UI-only config). Importable models import via the single
         # centralized route /import/<app>/<model>/.
-        from core.forms.import_forms import is_model_importable
         _importable = is_model_importable(_model)
         context['can_export'] = _importable
         context['import_url'] = None

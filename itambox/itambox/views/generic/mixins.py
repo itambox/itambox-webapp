@@ -1,7 +1,13 @@
+from django.apps import apps
 from django.contrib.auth.mixins import AccessMixin
 from django.core.exceptions import ImproperlyConfigured
+from django.http import Http404
 from django.shortcuts import get_object_or_404
+from django.urls import reverse, NoReverseMatch
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.generic import View
+
+from itambox.utils import get_model_viewname
 
 
 class CachedObjectMixin:
@@ -42,10 +48,6 @@ class GetReturnURLMixin:
     default_return_url = None
 
     def get_return_url(self, request, obj=None):
-        from django.urls import reverse, NoReverseMatch
-        from django.utils.http import url_has_allowed_host_and_scheme
-        from itambox.utils import get_model_viewname
-
         return_url = request.GET.get('return_url') or request.POST.get('return_url')
         if return_url and url_has_allowed_host_and_scheme(return_url, allowed_hosts=request.get_host(), require_https=request.is_secure()):
             return return_url
@@ -113,9 +115,6 @@ class BulkViewMixin:
     """
 
     def _get_model(self):
-        from django.apps import apps
-        from django.http import Http404
-
         if getattr(self, 'queryset', None) is not None:
             return self.queryset.model
         if hasattr(self, 'model') and self.model:

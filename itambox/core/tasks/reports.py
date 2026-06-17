@@ -1,10 +1,16 @@
 import logging
 import io
 import csv
+from django.core.files.base import ContentFile
+from django.core.mail import EmailMessage
+from django.template import Template, Context
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from django.utils.translation import gettext as _
 
 from core.models import EmailSettings
+from core.events import send_notification_to_channel
+from core.tasks.context import TaskContext
 from extras.models import FileAttachment, ScheduledReport, ReportTemplate, ReportGenerationArchive
 from core.reports import compile_report_context, get_polished_system_html_template
 
@@ -16,14 +22,6 @@ def generate_scheduled_report_task(scheduled_report_id):
     render it dynamically based on Visual No-Code layout configurations (columns selection, grouping,
     styling presets) or HTML/Jinja2 custom templates, and email it to configured recipients.
     """
-    from core.models import EmailSettings
-    from extras.models import ScheduledReport, ReportTemplate
-    from django.core.mail import EmailMessage
-    from django.template import Template, Context
-    from django.utils.translation import gettext as _
-    import csv
-    import io
-
     try:
         sched = ScheduledReport.objects.get(pk=scheduled_report_id)
     except ScheduledReport.DoesNotExist:
@@ -41,7 +39,6 @@ def generate_scheduled_report_task(scheduled_report_id):
     # restores the prior context on exit.
     active_tenant = sched.tenant or (sched.report.tenant if sched.report else None)
 
-    from core.tasks.context import TaskContext
     with TaskContext(tenant_id=active_tenant.id if active_tenant else None, user_id=None):
         # Resolve multi-tenant filter scoping constellation
         filter_tenants = list(sched.filter_tenants.all())
@@ -56,7 +53,6 @@ def generate_scheduled_report_task(scheduled_report_id):
             template = sched.report
 
             # 1. Compile report data using unified compiler helper
-            from core.reports import compile_report_context, get_polished_system_html_template
             headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(
 
                 template, active_tenant=active_tenant, filter_tenants=filter_tenants
@@ -85,6 +81,8 @@ def generate_scheduled_report_task(scheduled_report_id):
             if sched.format == ScheduledReport.FORMAT_HTML:
                 if template.advanced_mode and template.template_content.strip():
                     try:
+                        # inline import: defer optional/heavy jinja2 dependency to
+                        # the advanced-mode branch that actually renders templates.
                         from jinja2.sandbox import SandboxedEnvironment
                         env = SandboxedEnvironment()
                         jinja_template = env.from_string(template.template_content)
@@ -143,7 +141,6 @@ def generate_scheduled_report_task(scheduled_report_id):
             archive_entry = None
             file_attach = None
             if getattr(sched, 'save_to_archive', True):
-                from extras.models import ReportGenerationArchive, FileAttachment
                 archive_entry = ReportGenerationArchive.objects.create(
                     scheduled_report=sched,
                     format=sched.format,
@@ -152,7 +149,6 @@ def generate_scheduled_report_task(scheduled_report_id):
                 )
 
                 # Save the compiled report stream as a FileAttachment
-                from django.core.files.base import ContentFile
                 if sched.format == ScheduledReport.FORMAT_HTML:
                     content_bytes = email_body.encode('utf-8')
                     mime = 'text/html'
@@ -198,7 +194,6 @@ def generate_scheduled_report_task(scheduled_report_id):
                     email_sent = True
 
             # 5. Dispatch to configured Notification Channels (email, in_app, Slack, Teams)
-            from core.events import send_notification_to_channel
             report_subject = f"[Scheduled Report] {sched.name}"
             report_body = (
                 f"Scheduled report '{sched.name}' was successfully generated "

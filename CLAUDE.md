@@ -136,6 +136,10 @@ Layout panels are declared as a tuple of `Panel(slot, title)` objects on the vie
 
 **URL routing convention:** URLs are pk-based; slugs are stable natural keys for import/export and filtering â€” never routing. `AutoSlugMixin` populates the slug on save; `ObjectDetailView`/`ObjectEditView` resolve edit/delete/clone URLs exclusively via `kwargs={'pk': ...}`.
 
+### Inline-import policy
+
+Imports live at module top. A function-local (inline) import is justified ONLY to (a) avoid `AppRegistryNotReady` at import time, (b) break a real circular import, or (c) defer an optional/heavy dependency. Every other inline import — plain stdlib, plain Django, and local-app imports with no cycle — must be hoisted. When an inline import is genuinely required, annotate it with a one-line reason, e.g. `# inline import: breaks <A> <-> <B> circular import`.
+
 ## Architecture: permissions & auth
 
 Permissions flow: `TenantMembershipBackend` (`core/auth/__init__.py`) is the first backend. It resolves permissions from a JSON `permissions` field on `TenantRole`; it handles the `obj=` argument by extracting `obj.tenant` and checking the user's membership in that tenant. `PasswordLoginOnlyBackend` blocks all perm checks for password-auth, ensuring all authorization goes through the membership backend.
