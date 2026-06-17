@@ -1,6 +1,7 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import FieldDoesNotExist
+from django.db.models import Count, Q
 from itambox.api.permissions import TokenPermissions, StrictTenantPermission
 from itambox.api.viewsets import ITAMBoxModelViewSet, ITAMBoxReadOnlyModelViewSet
 from organization.models import (
@@ -31,7 +32,9 @@ class SiteViewSet(ITAMBoxModelViewSet):
 
 class RegionViewSet(ITAMBoxModelViewSet):
     permission_classes = [TokenPermissions, StrictTenantPermission]
-    queryset = Region.objects.select_related('parent').prefetch_related('sites')
+    queryset = Region.objects.select_related('parent').prefetch_related('sites').annotate(
+        site_count=Count('sites')
+    )
     serializer_class = RegionSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = RegionFilterSet
@@ -39,7 +42,9 @@ class RegionViewSet(ITAMBoxModelViewSet):
 
 class SiteGroupViewSet(ITAMBoxModelViewSet):
     permission_classes = [TokenPermissions, StrictTenantPermission]
-    queryset = SiteGroup.objects.select_related('parent').prefetch_related('sites')
+    queryset = SiteGroup.objects.select_related('parent').prefetch_related('sites').annotate(
+        site_count=Count('sites')
+    )
     serializer_class = SiteGroupSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = SiteGroupFilterSet
@@ -47,7 +52,9 @@ class SiteGroupViewSet(ITAMBoxModelViewSet):
 
 class LocationViewSet(ITAMBoxModelViewSet):
     permission_classes = [TokenPermissions, StrictTenantPermission]
-    queryset = Location.objects.select_related('site', 'parent', 'tenant').prefetch_related('assets')
+    queryset = Location.objects.select_related('site', 'parent', 'tenant').prefetch_related('assets').annotate(
+        asset_count=Count('assets')
+    )
     serializer_class = LocationSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = LocationFilterSet
@@ -55,7 +62,9 @@ class LocationViewSet(ITAMBoxModelViewSet):
 
 class TenantGroupViewSet(ITAMBoxModelViewSet):
     permission_classes = [TokenPermissions, StrictTenantPermission]
-    queryset = TenantGroup.objects.select_related('parent').prefetch_related('tenants')
+    queryset = TenantGroup.objects.select_related('parent').prefetch_related('tenants').annotate(
+        tenant_count=Count('tenants')
+    )
     serializer_class = TenantGroupSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = TenantGroupFilterSet
@@ -71,7 +80,9 @@ class TenantViewSet(ITAMBoxModelViewSet):
 
 class AssetHolderViewSet(ITAMBoxModelViewSet):
     permission_classes = [TokenPermissions, StrictTenantPermission]
-    queryset = AssetHolder.objects.select_related('tenant').prefetch_related('asset_assignments')
+    queryset = AssetHolder.objects.select_related('tenant').prefetch_related('asset_assignments').annotate(
+        assignment_count=Count('asset_assignments', filter=Q(asset_assignments__is_active=True)),
+    )
     serializer_class = AssetHolderSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = AssetHolderFilterSet
@@ -189,7 +200,9 @@ class ContactAssignmentViewSet(ITAMBoxModelViewSet):
 
 class CostCenterViewSet(ITAMBoxModelViewSet):
     permission_classes = [TokenPermissions, StrictTenantPermission]
-    queryset = CostCenter.objects.select_related('tenant', 'parent').prefetch_related('children')
+    queryset = CostCenter.objects.select_related('tenant', 'parent').prefetch_related('children').annotate(
+        child_count=Count('children'),
+    )
     serializer_class = CostCenterSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = CostCenterFilterSet

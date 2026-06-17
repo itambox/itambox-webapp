@@ -1,4 +1,5 @@
 from django_filters.rest_framework import DjangoFilterBackend
+from django.db.models import Count
 from rest_framework import serializers as drf_serializers, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -25,7 +26,9 @@ class ProviderViewSet(ITAMBoxModelViewSet):
     """API ViewSet for managing subscription Providers."""
 
     permission_classes = [TokenPermissions, StrictTenantPermission]
-    queryset = Provider.objects.prefetch_related('tags').all()
+    queryset = Provider.objects.prefetch_related('tags').annotate(
+        subscription_count=Count('subscriptions')
+    )
     serializer_class = ProviderSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = ProviderFilterSet

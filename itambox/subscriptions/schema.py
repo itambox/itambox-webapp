@@ -144,7 +144,7 @@ class Query(graphene.ObjectType):
     def resolve_providers(self, info, limit=None, offset=None, sort_by=None, **kwargs):
         check_permission(info, 'subscriptions.view_provider')
         # TenantScopingManager automatically handles thread-local active tenant/group and global fallback scoping.
-        qs = Provider.objects.all()
+        qs = Provider.objects.prefetch_related('contacts__contact', 'contacts__role').all()
         for key, val in kwargs.items():
             if val is not None:
                 qs = qs.filter(**{key: val})
@@ -155,7 +155,7 @@ class Query(graphene.ObjectType):
     def resolve_provider(self, info, id):
         check_permission(info, 'subscriptions.view_provider')
         try:
-            return Provider.objects.get(pk=id)
+            return Provider.objects.prefetch_related('contacts__contact', 'contacts__role').get(pk=id)
         except Provider.DoesNotExist:
             return None
 

@@ -114,7 +114,9 @@ class SubscriptionDetailView(ObjectDetailView):
 
         context['assignments_table'] = tables.SubscriptionAssignmentTable(assignments_qs, request=self.request)
         context['assignments_table'].configure(self.request)
-        context['assignment_count'] = assignments_qs.count()
+        # assignments_qs is already fully materialized by the loops above, so
+        # len() reuses the result cache instead of issuing a second COUNT query.
+        context['assignment_count'] = len(assignments_qs)
         return context
 
 
