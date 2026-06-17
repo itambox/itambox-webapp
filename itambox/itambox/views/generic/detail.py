@@ -2,6 +2,8 @@ import logging
 
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Count, OuterRef, Subquery
+from django.db.models.functions import Coalesce
 from django.http import Http404
 from django.template.loader import get_template
 from django.template import TemplateDoesNotExist
@@ -113,6 +115,143 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
                     continue
 
         return ['generic/object_detail.html']
+
+    @staticmethod
+    def _related_count_uses_distinct(related_model):
+        """Return True when the related model's default-manager queryset applies
+        ``.distinct()`` — i.e. it has a ``filter_tenants`` M2M, so tenant scoping
+        joins that table and de-duplicates rows (see
+        ``TenantScopingQuerySet.filter_by_tenant``). For such models a
+        ``.values().annotate(Count('pk'))`` subquery would count the M2M-join
+        fan-out instead of distinct rows, miscounting. We keep the legacy
+        ``.count()`` (which counts distinct rows) for these relations.
+        """
+        from django.core.exceptions import FieldDoesNotExist
+        try:
+            related_model._meta.get_field('filter_tenants')
+            return True
+        except FieldDoesNotExist:
+            return False
+
+    def _build_related_objects_list(self, obj):
+        """Build the "Related Objects" sidebar list (label/count/url per reverse
+        relation) for ``obj``.
+
+        H4 batching: the legacy implementation issued one ``.count()`` query per
+        auto-created reverse relation (~10-15 separate COUNTs per detail GET).
+        Each of those counts went through the related model's *default* manager
+        (``_default_manager.get_queryset()``) — i.e. tenant scoping + soft-delete
+        filtering — because Django's reverse related manager subclasses the
+        related model's default manager and calls ``super().get_queryset()``
+        before applying the FK filter.
+
+        We reproduce the *identical* counts with far fewer queries by annotating
+        the single object's row with one correlated ``Subquery`` COUNT per
+        reverse FK / one-to-one relation. Each subquery is built from the related
+        model's ``_default_manager`` and filtered ``<fk>=OuterRef(<target>)``, so
+        it carries exactly the same WHERE clauses (tenant + soft-delete) the old
+        ``.count()`` applied. Independent per-relation subqueries (not one
+        multi-join aggregate) avoid the cartesian fan-out that would inflate
+        counts. The outer query uses ``_base_manager`` purely to fetch the single
+        pk row — the subqueries do their own default-manager scoping, so the
+        outer manager's filtering does not affect any displayed count.
+
+        Reverse many-to-many relations are NOT batched: their count needs a
+        through-table join, which a plain FK subquery cannot reproduce, so we
+        keep the per-relation ``.count()`` for those (a handful at most). Any
+        relation whose subquery can't be built safely also falls back to
+        ``.count()``. Labels, URLs, ordering, and count VALUES are unchanged.
+        """
+        # First pass: collect metadata for every relation the legacy loop would
+        # have considered, and stage a Subquery annotation for each batchable
+        # (reverse FK / O2O) relation. ``meta`` preserves iteration order so the
+        # assembled list matches the legacy pre-sort order exactly (the final
+        # sort by label makes order deterministic regardless).
+        meta = []  # list of (relation, related_model, accessor_name, count_key|None)
+        annotations = {}
+        for relation in obj._meta.get_fields(include_parents=True):
+            if not relation.is_relation or relation.concrete:
+                continue
+            if relation.auto_created and not relation.concrete:
+                related_model = relation.related_model
+                if not related_model:
+                    continue
+
+                accessor_name = relation.get_accessor_name()
+                if not accessor_name or not hasattr(obj, accessor_name):
+                    continue
+
+                count_key = None
+                if not relation.many_to_many and not self._related_count_uses_distinct(related_model):
+                    # Reverse FK / one-to-one: batch via a correlated subquery
+                    # through the related model's DEFAULT manager so the exact
+                    # tenant + soft-delete filtering of the old .count() is kept.
+                    try:
+                        fk_name = relation.field.name
+                        target = getattr(relation, 'field_name', None) or 'pk'
+                        subquery = Subquery(
+                            related_model._default_manager
+                            .filter(**{fk_name: OuterRef(target)})
+                            .order_by()
+                            .values(fk_name)
+                            .annotate(c=Count('pk'))
+                            .values('c')[:1]
+                        )
+                        count_key = f'_relcount_{len(annotations)}'
+                        annotations[count_key] = Coalesce(subquery, 0)
+                    except Exception:
+                        # Couldn't stage the subquery — fall back to .count().
+                        count_key = None
+
+                meta.append((relation, related_model, accessor_name, count_key))
+
+        # Single query: annotate the one object row with every staged subquery
+        # COUNT. _base_manager guarantees the pk row is returned irrespective of
+        # the model's own scoping; the subqueries scope themselves independently.
+        annotated = None
+        if annotations:
+            try:
+                annotated = type(obj)._base_manager.filter(pk=obj.pk).annotate(**annotations).first()
+            except Exception:
+                annotated = None
+
+        # Second pass: resolve each relation's count (from the annotated row when
+        # available, else a direct .count()) and assemble the list identically.
+        related_objects_list = []
+        for relation, related_model, accessor_name, count_key in meta:
+            count = None
+            if count_key is not None and annotated is not None:
+                count = getattr(annotated, count_key, None)
+            if count is None:
+                # M2M relations, un-batchable relations, or a failed batch query
+                # keep the legacy per-relation count (identical to before).
+                try:
+                    count = getattr(obj, accessor_name).count()
+                except Exception:
+                    continue
+
+            if count > 0:
+                related_app = related_model._meta.app_label
+                related_model_name = related_model._meta.model_name
+                view_name = f"{related_app}:{related_model_name}_list"
+
+                try:
+                    base_url = reverse(view_name)
+                    filter_field_name = relation.remote_field.name if relation.remote_field else obj._meta.model_name
+                    filter_val = getattr(obj, 'slug', obj.pk)
+                    url = f"{base_url}?{filter_field_name}={filter_val}"
+                    label = str(related_model._meta.verbose_name_plural).title()
+
+                    related_objects_list.append({
+                        'label': label,
+                        'count': count,
+                        'url': url,
+                    })
+                except NoReverseMatch:
+                    continue
+
+        related_objects_list.sort(key=lambda x: x['label'])
+        return related_objects_list
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -279,47 +418,7 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
         if 'related_objects_list' not in context and self.disable_related_objects_list:
             context['related_objects_list'] = []
         elif 'related_objects_list' not in context:
-            related_objects_list = []
-            for relation in obj._meta.get_fields(include_parents=True):
-                if not relation.is_relation or relation.concrete:
-                    continue
-                if relation.auto_created and not relation.concrete:
-                    related_model = relation.related_model
-                    if not related_model:
-                        continue
-
-                    accessor_name = relation.get_accessor_name()
-                    if not accessor_name or not hasattr(obj, accessor_name):
-                        continue
-
-                    try:
-                        manager = getattr(obj, accessor_name)
-                        count = manager.count()
-                    except Exception:
-                        continue
-
-                    if count > 0:
-                        related_app = related_model._meta.app_label
-                        related_model_name = related_model._meta.model_name
-                        view_name = f"{related_app}:{related_model_name}_list"
-
-                        try:
-                            base_url = reverse(view_name)
-                            filter_field_name = relation.remote_field.name if relation.remote_field else obj._meta.model_name
-                            filter_val = getattr(obj, 'slug', obj.pk)
-                            url = f"{base_url}?{filter_field_name}={filter_val}"
-                            label = str(related_model._meta.verbose_name_plural).title()
-
-                            related_objects_list.append({
-                                'label': label,
-                                'count': count,
-                                'url': url,
-                            })
-                        except NoReverseMatch:
-                            continue
-
-            related_objects_list.sort(key=lambda x: x['label'])
-            context['related_objects_list'] = related_objects_list
+            context['related_objects_list'] = self._build_related_objects_list(obj)
 
         context['help_url'] = get_help_url(self, app_label, model_name)
         return context
