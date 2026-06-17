@@ -63,7 +63,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
     def test_schedule_creation_in_view(self):
         """Test that Schedule is created or updated in ScheduledReport form_valid views."""
         self.client.force_login(self.user)
-        url = reverse('scheduledreport_add')
+        url = reverse('extras:scheduledreport_create')
         data = {
             'name': 'Active Weekly Report',
             'report': self.template.pk,
@@ -160,7 +160,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         
         # Test preview view POST endpoint
         self.client.force_login(self.user)
-        url = reverse('reporttemplate_preview')
+        url = reverse('extras:reporttemplate_preview')
         data = {
             'report_type': self.template.report_type,
             'name': self.template.name,

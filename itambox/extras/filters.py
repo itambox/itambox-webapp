@@ -1,7 +1,8 @@
 import django_filters
 from django import forms
 from django.db.models import Q
-from .models import Tag, CustomField, CustomFieldset
+from core.filters import BaseFilterSet
+from .models import Tag, CustomField, CustomFieldset, AlertLog, AlertRule
 
 class TagFilter(django_filters.FilterSet):
     q = django_filters.CharFilter(
@@ -53,4 +54,36 @@ class CustomFieldsetFilterSet(django_filters.FilterSet):
             Q(name__icontains=value)
         ).distinct()
 
- 
+
+class AlertLogFilterSet(BaseFilterSet):
+    status = django_filters.MultipleChoiceFilter(
+        choices=AlertLog.STATUS_CHOICES,
+        label='Status',
+        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
+    )
+    severity = django_filters.MultipleChoiceFilter(
+        choices=AlertRule.SEVERITY_CHOICES,
+        label='Severity',
+        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
+    )
+    rule = django_filters.ModelChoiceFilter(
+        queryset=AlertRule.objects.all(),
+        label='Rule',
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+    created_after = django_filters.DateFilter(
+        field_name='created_at',
+        lookup_expr='gte',
+        label='Created after',
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+    )
+    created_before = django_filters.DateFilter(
+        field_name='created_at',
+        lookup_expr='lte',
+        label='Created before',
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+    )
+
+    class Meta:
+        model = AlertLog
+        fields = ['status', 'severity', 'rule', 'created_after', 'created_before']

@@ -10,23 +10,23 @@
 
 {% block page_actions %}
     <div class="btn-list">
-        <a href="{% url 'reporttemplate_download' object.pk %}?print=true" target="_blank" class="btn btn-outline-secondary d-none d-sm-inline-block">
+        <a href="{% url 'extras:reporttemplate_download' object.pk %}?print=true" target="_blank" class="btn btn-outline-secondary d-none d-sm-inline-block">
             <i class="mdi mdi-printer"></i>
             {% translate "Print Report" %}
         </a>
-        <a href="{% url 'reporttemplate_download' object.pk %}?format=html" class="btn btn-outline-info d-none d-sm-inline-block" hx-boost="false">
+        <a href="{% url 'extras:reporttemplate_download' object.pk %}?format=html" class="btn btn-outline-info d-none d-sm-inline-block" hx-boost="false">
             <i class="mdi mdi-download me-1"></i>
             {% translate "Export HTML" %}
         </a>
-        <a href="{% url 'reporttemplate_download' object.pk %}?format=csv" class="btn btn-outline-success d-none d-sm-inline-block" hx-boost="false">
+        <a href="{% url 'extras:reporttemplate_download' object.pk %}?format=csv" class="btn btn-outline-success d-none d-sm-inline-block" hx-boost="false">
             <i class="mdi mdi-download me-1"></i>
             {% translate "Export CSV" %}
         </a>
-        <a href="{% url 'reporttemplate_edit' object.pk %}" class="btn btn-primary d-none d-sm-inline-block">
+        <a href="{% url 'extras:reporttemplate_update' object.pk %}" class="btn btn-primary d-none d-sm-inline-block">
             <i class="mdi mdi-pencil-outline"></i>
             {% translate "Edit Template" %}
         </a>
-        <a href="{% url 'reporttemplate_delete' object.pk %}" class="btn btn-outline-danger d-none d-sm-inline-block">
+        <a href="{% url 'extras:reporttemplate_delete' object.pk %}" class="btn btn-outline-danger d-none d-sm-inline-block">
             <i class="mdi mdi-trash-can-outline"></i>
             {% translate "Delete" %}
         </a>
@@ -83,7 +83,7 @@
                         {% for sched in schedules %}
                         <tr>
                             <td class="text-wrap text-break">
-                                <a href="{% url 'scheduledreport_list' %}">{{ sched.name }}</a>
+                                <a href="{% url 'extras:scheduledreport_list' %}">{{ sched.name }}</a>
                             </td>
                             <td class="text-wrap text-break">{{ sched.get_format_display }}</td>
                             <td>

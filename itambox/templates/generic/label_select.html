@@ -35,7 +35,7 @@
                     {% endfor %}
                 </div>
                 {% else %}
-                <p class="text-muted">{% translate "No label templates configured." %} <a href="{% url 'labeltemplate_add' %}">{% translate "Create one" %}</a>.</p>
+                <p class="text-muted">{% translate "No label templates configured." %} <a href="{% url 'extras:labeltemplate_create' %}">{% translate "Create one" %}</a>.</p>
                 {% endif %}
             </div>
         </div>

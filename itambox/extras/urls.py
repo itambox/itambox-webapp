@@ -1,5 +1,13 @@
 from django.urls import path, include
 from . import views
+from itambox.views.features import (
+    ExportTemplateListView, ExportTemplateEditView, ExportTemplateDetailView,
+    ExportTemplateDeleteView, WebhookEndpointListView, WebhookEndpointEditView,
+    WebhookEndpointDetailView, WebhookEndpointDeleteView, EventRuleListView,
+    EventRuleEditView, EventRuleDetailView, EventRuleDeleteView,
+    LabelTemplateListView, LabelTemplateEditView, LabelTemplateDetailView,
+    LabelTemplateDeleteView,
+)
 
 app_name = 'extras'
 
@@ -26,4 +34,68 @@ urlpatterns = [
     path('custom-fieldsets/<int:pk>/delete/', views.CustomFieldsetDeleteView.as_view(), name='customfieldset_delete'),
     # Config Contexts
     path('config-contexts/', include('extras.urls_contexts')),
+
+    # Scheduled Reporting & Alerts UI
+    path('alerts/', views.AlertLogListView.as_view(), name='alertlog_list'),
+    path('alerts/logs/<int:pk>/acknowledge/', views.AlertAcknowledgeView.as_view(), name='alertlog_acknowledge'),
+    path('alerts/logs/<int:pk>/resolve/', views.AlertResolveView.as_view(), name='alertlog_resolve'),
+    path('alerts/logs/bulk-acknowledge/', views.AlertBulkAcknowledgeView.as_view(), name='alertlog_bulk_acknowledge'),
+    path('alerts/logs/bulk-resolve/', views.AlertBulkResolveView.as_view(), name='alertlog_bulk_resolve'),
+    path('alerts/rules/', views.AlertRuleListView.as_view(), name='alertrule_list'),
+    path('alerts/rules/add/', views.AlertRuleCreateView.as_view(), name='alertrule_create'),
+    path('alerts/rules/<int:pk>/', views.AlertRuleDetailView.as_view(), name='alertrule_detail'),
+    path('alerts/rules/<int:pk>/edit/', views.AlertRuleUpdateView.as_view(), name='alertrule_update'),
+    path('alerts/rules/<int:pk>/delete/', views.AlertRuleDeleteView.as_view(), name='alertrule_delete'),
+    path('alerts/rules/<int:pk>/run/', views.AlertRuleRunNowView.as_view(), name='alertrule_run'),
+
+    # Notification Channels
+    path('alerts/channels/', views.NotificationChannelListView.as_view(), name='notificationchannel_list'),
+    path('alerts/channels/add/', views.NotificationChannelCreateView.as_view(), name='notificationchannel_create'),
+    path('alerts/channels/<int:pk>/edit/', views.NotificationChannelUpdateView.as_view(), name='notificationchannel_update'),
+    path('alerts/channels/<int:pk>/delete/', views.NotificationChannelDeleteView.as_view(), name='notificationchannel_delete'),
+    path('alerts/channels/<int:pk>/test/', views.NotificationChannelTestView.as_view(), name='notificationchannel_test'),
+
+    # Report Templates
+    path('reports/templates/', views.ReportTemplateListView.as_view(), name='reporttemplate_list'),
+    path('reports/templates/preview/', views.ReportTemplatePreviewView.as_view(), name='reporttemplate_preview'),
+    path('reports/templates/add/', views.ReportTemplateCreateView.as_view(), name='reporttemplate_create'),
+    path('reports/templates/<int:pk>/', views.ReportTemplateDetailView.as_view(), name='reporttemplate_detail'),
+    path('reports/templates/<int:pk>/edit/', views.ReportTemplateUpdateView.as_view(), name='reporttemplate_update'),
+    path('reports/templates/<int:pk>/delete/', views.ReportTemplateDeleteView.as_view(), name='reporttemplate_delete'),
+    path('reports/templates/<int:pk>/download/', views.ReportTemplateDownloadView.as_view(), name='reporttemplate_download'),
+
+    # Scheduled Reports
+    path('reports/schedules/', views.ScheduledReportListView.as_view(), name='scheduledreport_list'),
+    path('reports/schedules/add/', views.ScheduledReportCreateView.as_view(), name='scheduledreport_create'),
+    path('reports/schedules/<int:pk>/edit/', views.ScheduledReportUpdateView.as_view(), name='scheduledreport_update'),
+    path('reports/schedules/<int:pk>/delete/', views.ScheduledReportDeleteView.as_view(), name='scheduledreport_delete'),
+    path('reports/schedules/<int:pk>/trigger/', views.ReportTriggerImmediateView.as_view(), name='scheduledreport_trigger'),
+
+    # Export Templates
+    path('export-templates/', ExportTemplateListView.as_view(), name='exporttemplate_list'),
+    path('export-templates/add/', ExportTemplateEditView.as_view(), name='exporttemplate_create'),
+    path('export-templates/<int:pk>/', ExportTemplateDetailView.as_view(), name='exporttemplate_detail'),
+    path('export-templates/<int:pk>/edit/', ExportTemplateEditView.as_view(), name='exporttemplate_update'),
+    path('export-templates/<int:pk>/delete/', ExportTemplateDeleteView.as_view(), name='exporttemplate_delete'),
+
+    # Webhook Endpoints
+    path('webhooks/', WebhookEndpointListView.as_view(), name='webhookendpoint_list'),
+    path('webhooks/add/', WebhookEndpointEditView.as_view(), name='webhookendpoint_create'),
+    path('webhooks/<int:pk>/', WebhookEndpointDetailView.as_view(), name='webhookendpoint_detail'),
+    path('webhooks/<int:pk>/edit/', WebhookEndpointEditView.as_view(), name='webhookendpoint_update'),
+    path('webhooks/<int:pk>/delete/', WebhookEndpointDeleteView.as_view(), name='webhookendpoint_delete'),
+
+    # Event Rules
+    path('event-rules/', EventRuleListView.as_view(), name='eventrule_list'),
+    path('event-rules/add/', EventRuleEditView.as_view(), name='eventrule_create'),
+    path('event-rules/<int:pk>/', EventRuleDetailView.as_view(), name='eventrule_detail'),
+    path('event-rules/<int:pk>/edit/', EventRuleEditView.as_view(), name='eventrule_update'),
+    path('event-rules/<int:pk>/delete/', EventRuleDeleteView.as_view(), name='eventrule_delete'),
+
+    # Label Templates
+    path('label-templates/', LabelTemplateListView.as_view(), name='labeltemplate_list'),
+    path('label-templates/add/', LabelTemplateEditView.as_view(), name='labeltemplate_create'),
+    path('label-templates/<int:pk>/', LabelTemplateDetailView.as_view(), name='labeltemplate_detail'),
+    path('label-templates/<int:pk>/edit/', LabelTemplateEditView.as_view(), name='labeltemplate_update'),
+    path('label-templates/<int:pk>/delete/', LabelTemplateDeleteView.as_view(), name='labeltemplate_delete'),
 ]

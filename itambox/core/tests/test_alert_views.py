@@ -31,7 +31,7 @@ class AlertBulkActionViewTests(TestCase):
     def test_bulk_acknowledge_transitions_active_logs(self):
         l1, l2 = self._log(1), self._log(2)
         resp = self.client.post(
-            reverse('alertlog_bulk_acknowledge'), {'pk': [l1.pk, l2.pk]}
+            reverse('extras:alertlog_bulk_acknowledge'), {'pk': [l1.pk, l2.pk]}
         )
         self.assertEqual(resp.status_code, 302)
         l1.refresh_from_db(); l2.refresh_from_db()
@@ -43,7 +43,7 @@ class AlertBulkActionViewTests(TestCase):
         active = self._log(1, status=AlertLog.STATUS_ACTIVE)
         ack = self._log(2, status=AlertLog.STATUS_ACKNOWLEDGED)
         resp = self.client.post(
-            reverse('alertlog_bulk_resolve'), {'pk': [active.pk, ack.pk]}
+            reverse('extras:alertlog_bulk_resolve'), {'pk': [active.pk, ack.pk]}
         )
         self.assertEqual(resp.status_code, 302)
         active.refresh_from_db(); ack.refresh_from_db()
@@ -54,19 +54,19 @@ class AlertBulkActionViewTests(TestCase):
 
     def test_bulk_acknowledge_skips_resolved(self):
         resolved = self._log(1, status=AlertLog.STATUS_RESOLVED)
-        self.client.post(reverse('alertlog_bulk_acknowledge'), {'pk': [resolved.pk]})
+        self.client.post(reverse('extras:alertlog_bulk_acknowledge'), {'pk': [resolved.pk]})
         resolved.refresh_from_db()
         # Resolved alerts are not eligible for acknowledgement.
         self.assertEqual(resolved.status, AlertLog.STATUS_RESOLVED)
 
     def test_bulk_action_with_no_selection_redirects(self):
-        resp = self.client.post(reverse('alertlog_bulk_resolve'), {})
+        resp = self.client.post(reverse('extras:alertlog_bulk_resolve'), {})
         self.assertEqual(resp.status_code, 302)
 
     def test_bulk_acknowledge_htmx_returns_trigger(self):
         l1 = self._log(1)
         resp = self.client.post(
-            reverse('alertlog_bulk_acknowledge'), {'pk': [l1.pk]},
+            reverse('extras:alertlog_bulk_acknowledge'), {'pk': [l1.pk]},
             HTTP_HX_REQUEST='true',
         )
         self.assertEqual(resp.status_code, 204)

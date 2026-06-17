@@ -283,7 +283,7 @@ class EventRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         return self.name
 
     def get_absolute_url(self):
-        return reverse('eventrule_detail', kwargs={'pk': self.pk})
+        return reverse('extras:eventrule_detail', kwargs={'pk': self.pk})
 
     def clean(self):
         super().clean()
@@ -349,7 +349,7 @@ class WebhookEndpoint(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         return self.name
 
     def get_absolute_url(self):
-        return reverse('webhookendpoint_detail', kwargs={'pk': self.pk})
+        return reverse('extras:webhookendpoint_detail', kwargs={'pk': self.pk})
 
     def save(self, *args, **kwargs):
         if self.secret and not self.secret.startswith("enc$"):
@@ -527,7 +527,7 @@ class ExportTemplate(BaseModel):
         return f"{self.content_type.model} - {self.name}"
 
     def get_absolute_url(self):
-        return reverse('export_template_detail', kwargs={'pk': self.pk})
+        return reverse('extras:exporttemplate_detail', kwargs={'pk': self.pk})
 
     def render(self, obj):
         from jinja2.sandbox import SandboxedEnvironment
@@ -567,7 +567,7 @@ class LabelTemplate(ChangeLoggingMixin, BaseModel):
         return self.name
 
     def get_absolute_url(self):
-        return reverse('labeltemplate_detail', kwargs={'pk': self.pk})
+        return reverse('extras:labeltemplate_detail', kwargs={'pk': self.pk})
 
 
 class ConfigContext(ChangeLoggingMixin, BaseModel):
@@ -661,7 +661,7 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         return f"{self.name} ({self.get_report_type_display()})"
 
     def get_absolute_url(self):
-        return reverse('report_template_detail', kwargs={'pk': self.pk})
+        return reverse('extras:reporttemplate_detail', kwargs={'pk': self.pk})
 
     def clean(self):
         super().clean()
@@ -923,7 +923,7 @@ class AlertRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
 
     def get_absolute_url(self):
         from django.urls import reverse
-        return reverse('alert_rule_detail', kwargs={'pk': self.pk})
+        return reverse('extras:alertrule_detail', kwargs={'pk': self.pk})
 
 
 class AlertLog(BaseModel):

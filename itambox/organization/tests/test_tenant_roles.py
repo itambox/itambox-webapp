@@ -345,7 +345,7 @@ class TenantRoleSecurityTests(TestCase):
         session['active_tenant_id'] = self.tenant_a.pk
         session.save()
         
-        url = reverse('alertlog_acknowledge', kwargs={'pk': alert.pk})
+        url = reverse('extras:alertlog_acknowledge', kwargs={'pk': alert.pk})
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302) # Redirects on success
         alert.refresh_from_db()
@@ -409,8 +409,8 @@ class TenantRoleSecurityTests(TestCase):
         session['active_tenant_id'] = self.tenant_a.pk
         session.save()
         
-        download_url = reverse('reporttemplate_download', kwargs={'pk': template.pk})
-        trigger_url = reverse('scheduledreport_trigger', kwargs={'pk': sched.pk})
+        download_url = reverse('extras:reporttemplate_download', kwargs={'pk': template.pk})
+        trigger_url = reverse('extras:scheduledreport_trigger', kwargs={'pk': sched.pk})
         
         response = self.client.get(download_url)
         self.assertEqual(response.status_code, 200) # Succeeds

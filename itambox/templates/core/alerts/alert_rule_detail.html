@@ -10,7 +10,7 @@
 
 {% block page_actions %}
     <div class="btn-list">
-        <form method="post" action="{% url 'alertrule_run' object.pk %}" class="d-inline">
+        <form method="post" action="{% url 'extras:alertrule_run' object.pk %}" class="d-inline">
             {% csrf_token %}
             <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
             <button type="submit" class="btn btn-outline-primary" title="{% translate 'Evaluate this rule now' %}">
@@ -18,11 +18,11 @@
                 {% translate "Run now" %}
             </button>
         </form>
-        <a href="{% url 'alertrule_edit' object.pk %}" class="btn btn-primary d-none d-sm-inline-block">
+        <a href="{% url 'extras:alertrule_update' object.pk %}" class="btn btn-primary d-none d-sm-inline-block">
             <i class="mdi mdi-pencil-outline"></i>
             {% translate "Edit Rule" %}
         </a>
-        <a href="{% url 'alertrule_delete' object.pk %}" class="btn btn-outline-danger d-none d-sm-inline-block">
+        <a href="{% url 'extras:alertrule_delete' object.pk %}" class="btn btn-outline-danger d-none d-sm-inline-block">
             <i class="mdi mdi-trash-can-outline"></i>
             {% translate "Delete" %}
         </a>
@@ -218,14 +218,14 @@
                                 <td class="text-end">
                                     <div class="d-flex gap-1 justify-content-end">
                                         {% if log.status == 'active' %}
-                                            <form method="post" action="{% url 'alertlog_acknowledge' log.pk %}">
+                                            <form method="post" action="{% url 'extras:alertlog_acknowledge' log.pk %}">
                                                 {% csrf_token %}
                                                 <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
                                                 <button type="submit" class="btn btn-sm btn-outline-warning" title="{% translate 'Acknowledge' %}">{% translate "Acknowledge" %}</button>
                                             </form>
                                         {% endif %}
                                         {% if log.status != 'resolved' %}
-                                            <form method="post" action="{% url 'alertlog_resolve' log.pk %}">
+                                            <form method="post" action="{% url 'extras:alertlog_resolve' log.pk %}">
                                                 {% csrf_token %}
                                                 <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
                                                 <button type="submit" class="btn btn-sm btn-outline-success" title="{% translate 'Resolve' %}">{% translate "Resolve" %}</button>

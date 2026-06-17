@@ -273,18 +273,18 @@ MONITORING_MENU = Menu(
             label=_('Alerting'),
             items=(
                 MenuItem(
-                    link='alertlog_list',
+                    link='extras:alertlog_list',
                     link_text=_('Alerts Center'),
                     permissions=['extras.view_alertlog'],
                     buttons=(),
                 ),
                 MenuItem(
-                    link='alertrule_list',
+                    link='extras:alertrule_list',
                     link_text=_('Alert Rules'),
                     permissions=['extras.view_alertrule'],
                     buttons=(
                         MenuItemButton(
-                            link='alertrule_add',
+                            link='extras:alertrule_create',
                             title='Add',
                             icon_class='mdi mdi-plus-thick',
                             permissions=['extras.add_alertrule'],
@@ -292,12 +292,12 @@ MONITORING_MENU = Menu(
                     ),
                 ),
                 MenuItem(
-                    link='notificationchannel_list',
+                    link='extras:notificationchannel_list',
                     link_text=_('Notification Channels'),
                     permissions=['extras.view_notificationchannel'],
                     buttons=(
                         MenuItemButton(
-                            link='notificationchannel_add',
+                            link='extras:notificationchannel_create',
                             title='Add',
                             icon_class='mdi mdi-plus-thick',
                             permissions=['extras.add_notificationchannel'],
@@ -311,12 +311,12 @@ MONITORING_MENU = Menu(
             beta=True,
             items=(
                 MenuItem(
-                    link='scheduledreport_list',
+                    link='extras:scheduledreport_list',
                     link_text=_('Scheduled Reports'),
                     permissions=['extras.view_scheduledreport'],
                     buttons=(
                         MenuItemButton(
-                            link='scheduledreport_add',
+                            link='extras:scheduledreport_create',
                             title='Add',
                             icon_class='mdi mdi-plus-thick',
                             permissions=['extras.add_scheduledreport'],
@@ -324,12 +324,12 @@ MONITORING_MENU = Menu(
                     ),
                 ),
                 MenuItem(
-                    link='reporttemplate_list',
+                    link='extras:reporttemplate_list',
                     link_text=_('Report Templates'),
                     permissions=['extras.view_reporttemplate'],
                     buttons=(
                         MenuItemButton(
-                            link='reporttemplate_add',
+                            link='extras:reporttemplate_create',
                             title='Add',
                             icon_class='mdi mdi-plus-thick',
                             permissions=['extras.add_reporttemplate'],
@@ -405,12 +405,12 @@ EXTRAS_MENU = Menu(
             label=_('Templates'),
             items=(
                 MenuItem(
-                    link='export_template_list',
+                    link='extras:exporttemplate_list',
                     link_text=_('Export Templates'),
                     permissions=['extras.view_exporttemplate'],
                     buttons=(
                         MenuItemButton(
-                            link='export_template_add',
+                            link='extras:exporttemplate_create',
                             title='Add',
                             icon_class='mdi mdi-plus-thick',
                             permissions=['extras.add_exporttemplate'],
@@ -418,12 +418,12 @@ EXTRAS_MENU = Menu(
                     ),
                 ),
                 MenuItem(
-                    link='labeltemplate_list',
+                    link='extras:labeltemplate_list',
                     link_text=_('Label Templates'),
                     permissions=['extras.view_labeltemplate'],
                     buttons=(
                         MenuItemButton(
-                            link='labeltemplate_add',
+                            link='extras:labeltemplate_create',
                             title='Add',
                             icon_class='mdi mdi-plus-thick',
                             permissions=['extras.add_labeltemplate'],
@@ -437,12 +437,12 @@ EXTRAS_MENU = Menu(
             beta=True,
             items=(
                 MenuItem(
-                    link='webhookendpoint_list',
+                    link='extras:webhookendpoint_list',
                     link_text=_('Webhook Endpoints'),
                     permissions=['extras.view_webhookendpoint'],
                     buttons=(
                         MenuItemButton(
-                            link='webhookendpoint_add',
+                            link='extras:webhookendpoint_create',
                             title='Add',
                             icon_class='mdi mdi-plus-thick',
                             permissions=['extras.add_webhookendpoint'],
@@ -450,12 +450,12 @@ EXTRAS_MENU = Menu(
                     ),
                 ),
                 MenuItem(
-                    link='eventrule_list',
+                    link='extras:eventrule_list',
                     link_text=_('Event Rules'),
                     permissions=['extras.view_eventrule'],
                     buttons=(
                         MenuItemButton(
-                            link='eventrule_add',
+                            link='extras:eventrule_create',
                             title='Add',
                             icon_class='mdi mdi-plus-thick',
                             permissions=['extras.add_eventrule'],

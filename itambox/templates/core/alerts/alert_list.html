@@ -2,7 +2,7 @@
 {% load i18n %}
 
 {% block extra_controls %}
-    <a href="{% url 'alertrule_list' %}" class="btn btn-outline-secondary">
+    <a href="{% url 'extras:alertrule_list' %}" class="btn btn-outline-secondary">
         <i class="mdi mdi-tune me-1"></i>
         {% translate "Manage Alert Rules" %}
     </a>
@@ -68,7 +68,7 @@
                     </div>
                     <div class="col">
                         <div class="font-weight-medium">
-                            <a href="{% url 'alertrule_list' %}" class="text-primary fw-bold">
+                            <a href="{% url 'extras:alertrule_list' %}" class="text-primary fw-bold">
                                 {% translate "Configure Threshold Rules" %}
                             </a>
                         </div>

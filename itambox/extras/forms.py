@@ -405,7 +405,7 @@ class WebhookEndpointForm(forms.ModelForm):
             HTML('<div class="mt-4"></div>'),
             Submit('submit', _('Save Webhook Endpoint'), css_class='btn btn-primary'),
             HTML(
-                '<a href="{% url \'webhookendpoint_list\' %}" class="btn btn-outline-secondary ms-2" '
+                '<a href="{% url \'extras:webhookendpoint_list\' %}" class="btn btn-outline-secondary ms-2" '
                 'data-no-dirty-track="true">' + str(_('Cancel')) + '</a>'
             ),
         ]
@@ -505,7 +505,7 @@ class EventRuleForm(forms.ModelForm):
             HTML('<div class="mt-4"></div>'),
             Submit('submit', _('Save Event Rule'), css_class='btn btn-primary'),
             HTML(
-                '<a href="{% url \'eventrule_list\' %}" class="btn btn-outline-secondary ms-2" '
+                '<a href="{% url \'extras:eventrule_list\' %}" class="btn btn-outline-secondary ms-2" '
                 'data-no-dirty-track="true">' + str(_('Cancel')) + '</a>'
             ),
         ]
@@ -582,7 +582,7 @@ class LabelTemplateForm(forms.ModelForm):
             HTML('<div class="mt-4"></div>'),
             Submit('submit', _('Save Label Template'), css_class='btn btn-primary'),
             HTML(
-                '<a href="{% url \'labeltemplate_list\' %}" class="btn btn-outline-secondary ms-2" '
+                '<a href="{% url \'extras:labeltemplate_list\' %}" class="btn btn-outline-secondary ms-2" '
                 'data-no-dirty-track="true">' + str(_('Cancel')) + '</a>'
             ),
         )
@@ -774,7 +774,7 @@ class ScheduledReportForm(forms.ModelForm):
             HTML('<div class="mt-4"></div>'),
             Submit('submit', _('Save Scheduled Report'), css_class='btn btn-primary'),
             HTML(
-                '<a href="{% url \'scheduledreport_list\' %}" class="btn btn-outline-secondary ms-2" '
+                '<a href="{% url \'extras:scheduledreport_list\' %}" class="btn btn-outline-secondary ms-2" '
                 'data-no-dirty-track="true">' + str(_('Cancel')) + '</a>'
             ),
         ]
@@ -881,7 +881,7 @@ class AlertRuleForm(forms.ModelForm):
             HTML('<div class="mt-4"></div>'),
             Submit('submit', _('Save Alert Rule'), css_class='btn btn-primary'),
             HTML(
-                '<a href="{% url \'alertrule_list\' %}" class="btn btn-outline-secondary ms-2" '
+                '<a href="{% url \'extras:alertrule_list\' %}" class="btn btn-outline-secondary ms-2" '
                 'data-no-dirty-track="true">' + str(_('Cancel')) + '</a>'
             ),
         ]

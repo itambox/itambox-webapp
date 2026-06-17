@@ -5,7 +5,6 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import get_user_model
 
 from core.models import ObjectChange
-from extras.models import AlertLog, AlertRule
 from core.choices import ObjectChangeActionChoices
 
 User = get_user_model()
@@ -157,37 +156,3 @@ class ObjectChangeFilterSet(BaseFilterSet):
             if noise_q is not None:
                 queryset = queryset.exclude(noise_q)
         return queryset
-
-
-class AlertLogFilterSet(BaseFilterSet):
-    status = django_filters.MultipleChoiceFilter(
-        choices=AlertLog.STATUS_CHOICES,
-        label='Status',
-        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
-    )
-    severity = django_filters.MultipleChoiceFilter(
-        choices=AlertRule.SEVERITY_CHOICES,
-        label='Severity',
-        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
-    )
-    rule = django_filters.ModelChoiceFilter(
-        queryset=AlertRule.objects.all(),
-        label='Rule',
-        widget=forms.Select(attrs={'class': 'form-select'}),
-    )
-    created_after = django_filters.DateFilter(
-        field_name='created_at',
-        lookup_expr='gte',
-        label='Created after',
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-    )
-    created_before = django_filters.DateFilter(
-        field_name='created_at',
-        lookup_expr='lte',
-        label='Created before',
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-    )
-
-    class Meta:
-        model = AlertLog
-        fields = ['status', 'severity', 'rule', 'created_after', 'created_before']
