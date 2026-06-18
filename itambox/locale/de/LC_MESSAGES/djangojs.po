@@ -1,0 +1,237 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+# 
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-06-18 21:56+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+msgid "%(count)s selected"
+msgstr ""
+
+msgid "No items selected."
+msgstr ""
+
+msgid ""
+"Are you sure you want to PERMANENTLY delete the selected items? This cannot "
+"be undone!"
+msgstr ""
+
+msgid "Saved"
+msgstr ""
+
+msgid "No assets assigned to active status labels."
+msgstr ""
+
+msgid "%(count)s assets"
+msgstr ""
+
+msgid "Assets"
+msgstr ""
+
+msgid "Total"
+msgstr ""
+
+msgid "Spend"
+msgstr ""
+
+msgid "You have unsaved changes. Leave this page?"
+msgstr ""
+
+msgid "Saving..."
+msgstr ""
+
+msgid "Are you sure?"
+msgstr ""
+
+msgid "Copied!"
+msgstr ""
+
+msgid "This action is disabled in preview mode."
+msgstr ""
+
+msgid "No results found"
+msgstr ""
+
+msgid "Visual inventory compilation."
+msgstr ""
+
+msgid "Asset Tag"
+msgstr ""
+
+msgid "Asset Name"
+msgstr ""
+
+msgid "Manufacturer"
+msgstr ""
+
+msgid "Model"
+msgstr ""
+
+msgid "Serial Number"
+msgstr ""
+
+msgid "Status Label"
+msgstr ""
+
+msgid "Location"
+msgstr ""
+
+msgid "Asset Holder"
+msgstr ""
+
+msgid "Purchase Cost"
+msgstr ""
+
+msgid "Purchase Date"
+msgstr ""
+
+msgid "Warranty (Months)"
+msgstr ""
+
+msgid "License Name"
+msgstr ""
+
+msgid "Software"
+msgstr ""
+
+msgid "Total Seats"
+msgstr ""
+
+msgid "Assigned Seats"
+msgstr ""
+
+msgid "Available Seats"
+msgstr ""
+
+msgid "Utilization Rate"
+msgstr ""
+
+msgid "Subscription Name"
+msgstr ""
+
+msgid "Provider"
+msgstr ""
+
+msgid "Billing Cycle"
+msgstr ""
+
+msgid "Cost"
+msgstr ""
+
+msgid "End Date"
+msgstr ""
+
+msgid "Salvage Value"
+msgstr ""
+
+msgid "Depreciation Lifespan (Months)"
+msgstr ""
+
+msgid "Depreciated Value"
+msgstr ""
+
+msgid "Software Product"
+msgstr ""
+
+msgid "Installed Count"
+msgstr ""
+
+msgid "License Count"
+msgstr ""
+
+msgid "Maintenance Title"
+msgstr ""
+
+msgid "Asset"
+msgstr ""
+
+msgid "Type"
+msgstr ""
+
+msgid "Status"
+msgstr ""
+
+msgid "No records found."
+msgstr ""
+
+msgid "Sent automatically by ITAMbox — IT Asset Management Console."
+msgstr ""
+
+msgid "Selected Sequence (Orderable)"
+msgstr ""
+
+msgid "No columns selected. Click available columns to add them."
+msgstr ""
+
+msgid "Available Columns"
+msgstr ""
+
+msgid "Move Up"
+msgstr ""
+
+msgid "Move Down"
+msgstr ""
+
+msgid "Remove"
+msgstr ""
+
+msgid "Bootstrap from Visual Builder"
+msgstr ""
+
+msgid ""
+"Are you sure you want to overwrite the current custom template with the "
+"selections from the Visual Builder?"
+msgstr ""
+
+msgid "Preview Report"
+msgstr ""
+
+msgid "Template rendering failed."
+msgstr ""
+
+msgid "Preview Render Error"
+msgstr ""
+
+msgid ""
+"Camera unavailable. On iPhone/iPad, scanning requires HTTPS. Please use a "
+"hardware scanner or type the asset tag."
+msgstr ""
+
+msgid ""
+"Camera permission denied. On iPhone/iPad check Settings › Safari › Camera, "
+"or use a hardware scanner / type the tag."
+msgstr ""
+
+msgid ""
+"Camera unavailable. Please use a hardware scanner or type the asset tag."
+msgstr ""
+
+msgid "No asset matches: %(code)s"
+msgstr ""
+
+msgid "Generate from name"
+msgstr ""
+
+msgid "Failed to save configuration"
+msgstr ""
+
+msgid "Error saving configuration: "
+msgstr ""
+
+msgid "Error resetting configuration: "
+msgstr ""
+
+msgid "Close"
+msgstr ""
