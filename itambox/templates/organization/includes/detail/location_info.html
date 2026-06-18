@@ -42,10 +42,10 @@
     </dd>
 
     <dt class="col-sm-3">{% translate "Facility:" %}</dt>
-    <dd class="col-sm-9">{% if object.facility %}{{object.facility}}{% else %}<span class='text-muted'><i>Not Set</i></span>{% endif %}</dd>
+    <dd class="col-sm-9">{% if object.facility %}{{object.facility}}{% else %}<span class='text-muted'><i>{% translate "Not Set" %}</i></span>{% endif %}</dd>
 
     <dt class="col-sm-3">{% translate "Description:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{% if object.description %}{{object.description|linebreaksbr}}{% else %}<span class='text-muted'><i>No description provided.</i></span>{% endif %}</dd>
+    <dd class="col-sm-9 text-secondary">{% if object.description %}{{object.description|linebreaksbr}}{% else %}<span class='text-muted'><i>{% translate "No description provided." %}</i></span>{% endif %}</dd>
 
     {% if object.tags.all %}
     <dt class="col-sm-3">{% translate "Tags:" %}</dt>

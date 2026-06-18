@@ -31,7 +31,7 @@
     <div class="tab-pane fade {% if not request.GET.tab or request.GET.tab == 'assets' %}show active{% endif %}" id="assets" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
-                <h3 class="card-title">{% translate 'Assets / Devices with status "' %}{{ object.name }}"</h3>
+                <h3 class="card-title">{% blocktranslate with name=object.name %}Assets / Devices with status "{{ name }}"{% endblocktranslate %}</h3>
             </div>
             {% if assets_table.rows %}
                 <div class="table-responsive">

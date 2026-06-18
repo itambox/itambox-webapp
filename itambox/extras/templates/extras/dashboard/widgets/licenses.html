@@ -4,7 +4,7 @@
 <div class="mb-2">
     <div class="d-flex justify-content-between small mb-1">
         <a href="{% url 'licenses:license_detail' item.license.pk %}" class="text-reset">{{ item.license.name }}</a>
-        <span class="text-muted">{{ item.allocated }}/{{ item.total }} {% translate "seats (" %}{{ item.util_pct }}%)</span>
+        <span class="text-muted">{% blocktranslate with allocated=item.allocated total=item.total pct=item.util_pct %}{{ allocated }}/{{ total }} seats ({{ pct }}%){% endblocktranslate %}</span>
     </div>
     <div class="progress progress-xs">
         <div class="progress-bar {% if item.util_pct >= 90 %}bg-danger{% elif item.util_pct >= 70 %}bg-warning{% else %}bg-green{% endif %}" style="width: {{ item.util_pct }}%"></div>

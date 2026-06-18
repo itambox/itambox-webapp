@@ -22,15 +22,15 @@
                     <p>{% translate "You are approving the request from" %} <strong>{{ object.requester }}</strong> {% translate "for" %} 
                     <strong>
                         {% if object.component %}
-                            {{ object.component }} (Component, Qty: {{ object.qty }})
+                            {{ object.component }} {% blocktranslate with qty=object.qty %}(Component, Qty: {{ qty }}){% endblocktranslate %}
                         {% elif object.accessory %}
-                            {{ object.accessory }} (Accessory, Qty: {{ object.qty }})
+                            {{ object.accessory }} {% blocktranslate with qty=object.qty %}(Accessory, Qty: {{ qty }}){% endblocktranslate %}
                         {% elif object.consumable %}
-                            {{ object.consumable }} (Consumable, Qty: {{ object.qty }})
+                            {{ object.consumable }} {% blocktranslate with qty=object.qty %}(Consumable, Qty: {{ qty }}){% endblocktranslate %}
                         {% elif object.asset %}
-                            {{ object.asset }} (Asset)
+                            {{ object.asset }} {% translate "(Asset)" %}
                         {% elif object.asset_type %}
-                            {{ object.asset_type }} (Asset Type)
+                            {{ object.asset_type }} {% translate "(Asset Type)" %}
                         {% else %}
                             {% translate "Any Asset" %}
                         {% endif %}

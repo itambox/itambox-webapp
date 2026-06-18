@@ -6,7 +6,7 @@
     <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
         <div>
             <div><a href="{% url 'assets:asset_detail' alert.asset.pk %}" class="text-reset">{{ alert.asset.name }}</a></div>
-            <div class="text-muted small">{{ alert.asset.asset_type }} &middot; EOL: {{ alert.eol_date|date:"Y-m-d" }}</div>
+            <div class="text-muted small">{% blocktranslate with asset_type=alert.asset.asset_type eol_date=alert.eol_date|date:"Y-m-d" %}{{ asset_type }} &middot; EOL: {{ eol_date }}{% endblocktranslate %}</div>
         </div>
         <div>
             {% if alert.days_left < 0 %}

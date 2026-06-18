@@ -1,11 +1,11 @@
 {% extends base_template|default:"layout.html" %}
 {% load i18n %}
 
-{% block title %}{{ title|default:"Select Label Template" }} {% translate "- ITAMbox" %}{% endblock %}
+{% block title %}{{ title|default:_("Select Label Template") }} {% translate "- ITAMbox" %}{% endblock %}
 
 {% block page_header %}
 <div class="page-pretitle">{% translate "Label Printing" %}</div>
-<h2 class="page-title">{{ title|default:"Select Label Template" }}</h2>
+<h2 class="page-title">{{ title|default:_("Select Label Template") }}</h2>
 {% endblock %}
 
 {% block content %}

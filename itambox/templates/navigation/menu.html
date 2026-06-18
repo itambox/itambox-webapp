@@ -24,7 +24,7 @@
         <div class="dropdown-menu-columns">
           <div class="dropdown-menu-column">
             {% for group, items in groups %}
-              <span class="dropdown-header text-info">{{ group.label }}{% if group.beta %} <span class="badge bg-yellow-lt ms-1">Beta</span>{% endif %}</span>
+              <span class="dropdown-header text-info">{{ group.label }}{% if group.beta %} <span class="badge bg-yellow-lt ms-1">{% translate "Beta" %}</span>{% endif %}</span>
               {% for item, buttons in items %}
                 <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 text-wrap" style="white-space: normal; min-height: 2.25rem;">
                   <a href="{{ item.url }}" class="py-1 text-reset text-decoration-none flex-fill text-wrap lh-sm"

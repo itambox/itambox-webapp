@@ -1,16 +1,16 @@
 {% load i18n %}
 {# --- OOB Block: Page Title --- #}
 <span id="page-title-block" hx-swap-oob="true">
-    {{ title|default:"List View" }} {% translate "- ITAMbox" %}
+    {{ title|default:_("List View") }} {% translate "- ITAMbox" %}
 </span>
 
 {# --- OOB Block: Page Header --- #}
 <div id="page-header-block" hx-swap-oob="true">
     <div class="page-pretitle">
-        {{ pretitle|default:"Manage" }}
+        {{ pretitle|default:_("Manage") }}
     </div>
     <h2 class="page-title">
-        {{ title|default:"Objects" }}
+        {{ title|default:_("Objects") }}
     </h2>
 </div>
 
@@ -28,7 +28,7 @@
             {% if create_url_name and can_add %}
             <a href="{% url create_url_name %}" class="btn btn-primary">
                 <i class="mdi mdi-plus"></i>
-                {% translate "Create" %} {{ object_type|default:"Object" }}
+                {% translate "Create" %} {{ object_type|default:_("Object") }}
             </a>
             {% endif %}
             {% if export_url_name %}

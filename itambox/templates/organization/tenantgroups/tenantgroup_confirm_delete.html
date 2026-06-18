@@ -22,7 +22,7 @@
                 <p class="text-warning">
                     {% translate "Warning: This group has" %} {{ tenantgroup.tenants.count }} {% translate "assigned tenant" %}{{ tenantgroup.tenants.count|pluralize }}
                     {% translate "and" %} {{ tenantgroup.children.count }} {% translate "child group" %}{{ tenantgroup.children.count|pluralize }}.
-                    Deleting it may affect related objects depending on your setup.
+                    {% translate "Deleting it may affect related objects depending on your setup." %}
                 </p>
             {% endif %}
 

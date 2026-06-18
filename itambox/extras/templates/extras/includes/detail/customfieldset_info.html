@@ -3,7 +3,7 @@
     <dt class="col-sm-3">{% translate "Fieldset Name:" %}</dt>
     <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
 
-    <dt class="col-sm-3">{% translate "Custom Fields (" %}{{ object.fields.count }}):</dt>
+    <dt class="col-sm-3">{% blocktranslate with count=object.fields.count %}Custom Fields ({{ count }}):{% endblocktranslate %}</dt>
     <dd class="col-sm-9">
         {% if object.fields.all %}
             <ul class="list-unstyled mb-0 mt-1">

@@ -2,7 +2,7 @@
 {# templates/assets/includes/asset_audit_badge.html #}
 <div id="asset-audit-badge-container" class="d-inline-block animate-bounce-spring">
     {% if asset.last_audited %}
-        <span class="badge bg-success-lt text-success font-weight-bold p-2" data-bs-toggle="tooltip" title="Audited by {{ asset.last_audited_by.username }}">
+        <span class="badge bg-success-lt text-success font-weight-bold p-2" data-bs-toggle="tooltip" title="{% blocktranslate with auditor=asset.last_audited_by.username %}Audited by {{ auditor }}{% endblocktranslate %}">
             <i class="mdi mdi-checkbox-outline"></i>
             {% translate "Audited" %} {{ asset.last_audited|timesince }} {% translate "ago by" %} {{ asset.last_audited_by.username }}
         </span>

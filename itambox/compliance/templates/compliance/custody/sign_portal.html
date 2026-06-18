@@ -52,7 +52,7 @@
                 </p>
             </div>
             {% if receipt.custody_template and receipt.custody_template.logo %}
-                <img src="{{ receipt.custody_template.logo.url }}" alt="Logo" style="max-height: 40px; border-radius: 4px; background: white; padding: 2px;"/>
+                <img src="{{ receipt.custody_template.logo.url }}" alt="{% translate 'Logo' %}" style="max-height: 40px; border-radius: 4px; background: white; padding: 2px;"/>
             {% endif %}
         </div>
         <div class="card-body">
@@ -84,7 +84,7 @@
                 <div class="bg-light p-3 rounded d-flex justify-content-between align-items-center">
                     <div>
                         <h4 class="mb-1 text-dark">{{ asset.name }}</h4>
-                        <span class="text-muted small">S/N: {{ asset.serial_number|default:"N/A" }}</span>
+                        <span class="text-muted small">{% blocktranslate with sn=asset.serial_number|default:"N/A" %}S/N: {{ sn }}{% endblocktranslate %}</span>
                     </div>
                     <span class="badge bg-purple-lt font-weight-bold">{{ asset.asset_tag }}</span>
                 </div>
@@ -94,7 +94,7 @@
                 <label class="form-label text-muted">{% translate "Custodian / Asset Holder" %}</label>
                 <div class="bg-light p-3 rounded">
                     <h4 class="mb-1 text-dark">{{ holder.first_name }} {{ holder.last_name }}</h4>
-                    <span class="text-muted small">{{ holder.upn }} | {{ holder.email|default:"No Email" }}</span>
+                    <span class="text-muted small">{{ holder.upn }} | {{ holder.email|default:_("No Email") }}</span>
                 </div>
             </div>
 

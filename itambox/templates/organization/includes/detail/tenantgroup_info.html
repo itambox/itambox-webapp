@@ -16,7 +16,7 @@
     </dd>
 
     <dt class="col-sm-3">{% translate "Description:" %}</dt>
-    <dd class="col-sm-9">{% if object.description %}{{object.description}}{% else %}<i>None</i>{% endif %}</dd>
+    <dd class="col-sm-9">{% if object.description %}{{object.description}}{% else %}<i>{% translate "None" %}</i>{% endif %}</dd>
 
     {% if object.tags.all %}
     <dt class="col-sm-3">{% translate "Tags:" %}</dt>

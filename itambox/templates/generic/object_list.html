@@ -314,14 +314,14 @@
     {% endif %}
 {% endblock page_modals %}
 
-{% block title %}{{ title|default:"List View" }} {% translate "- ITAMbox" %}{% endblock %}
+{% block title %}{{ title|default:_("List View") }} {% translate "- ITAMbox" %}{% endblock %}
 
 {% block page_header %}
     <div class="page-pretitle">
-        {{ pretitle|default:"Manage" }}
+        {{ pretitle|default:_("Manage") }}
     </div>
     <h2 class="page-title">
-        {{ title|default:"Objects" }}
+        {{ title|default:_("Objects") }}
     </h2>
 {% endblock %}
 

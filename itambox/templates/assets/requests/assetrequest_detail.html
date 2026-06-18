@@ -251,7 +251,7 @@
         {% if object.notes %}
         <div class="card shadow-sm border-0 mb-3">
             <div class="card-header border-0 bg-transparent pb-0">
-                <h3 class="card-title text-secondary">Notes &amp; Justification</h3>
+                <h3 class="card-title text-secondary">{% translate "Notes & Justification" %}</h3>
             </div>
             <div class="card-body">
                 <p class="text-secondary mb-0">{{ object.notes|linebreaksbr }}</p>
@@ -262,7 +262,7 @@
         {% if object.is_group %}
         <div class="card shadow-sm border-0 mb-3">
             <div class="card-header border-0 bg-transparent pb-0">
-                <h3 class="card-title text-secondary">Sub-Requests</h3>
+                <h3 class="card-title text-secondary">{% translate "Sub-Requests" %}</h3>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -303,7 +303,7 @@
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="4" class="text-muted text-center py-3">No sub-requests found.</td>
+                                <td colspan="4" class="text-muted text-center py-3">{% translate "No sub-requests found." %}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -322,8 +322,9 @@
                 <div class="datagrid mb-3">
                     <div class="datagrid-item">
                         <div class="datagrid-title">{% translate "Responded By" %}</div>
+                        {% translate "System / Automated" as default_responder %}
                         <div class="datagrid-content">
-                            <strong>{{ object.responded_by|default:"System / Automated" }}</strong>
+                            <strong>{{ object.responded_by|default:default_responder }}</strong>
                         </div>
                     </div>
                     <div class="datagrid-item">

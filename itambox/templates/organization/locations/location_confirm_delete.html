@@ -22,7 +22,7 @@
                 <p class="text-warning">
                     {% translate "Warning: This location has" %} {{ location.assets.count }} {% translate "assigned asset" %}{{ location.assets.count|pluralize }}
                     {% translate "and" %} {{ location.children.count }} {% translate "child location" %}{{ location.children.count|pluralize }}.
-                    Deleting it may affect related objects depending on your setup.
+                    {% translate "Deleting it may affect related objects depending on your setup." %}
                 </p>
             {% endif %}
 

@@ -21,7 +21,7 @@
                   hx-swap="outerHTML">
                 {% csrf_token %}
                 <div class="modal-header">
-                    <h5 class="modal-title" id="htmxModalLabel">{{ modal_title|default:"Action" }}</h5>
+                    <h5 class="modal-title" id="htmxModalLabel">{{ modal_title|default:_("Action") }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
                 </div>
                 <div class="modal-body">

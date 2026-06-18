@@ -1,4 +1,5 @@
 {% load utility_tags %}
+{% load i18n %}
 <html>
 <head>
     <meta charset="utf-8">
@@ -211,16 +212,16 @@
     <div class="container">
         <div class="header">
             <h2>{{ report_name }}</h2>
-            <p>{{ description|default:"Visual inventory compilation." }}</p>
+            <p>{% blocktranslate with desc=description|default:_("Visual inventory compilation.") %}{{ desc }}{% endblocktranslate %}</p>
         </div>
         <div class="content">
             <div class="meta">
                 <div>
-                    GENERATED: {{ generated_at|date:"Y-m-d H:i:s" }} UTC | STYLE: {{ style_preset|upper }}
+                    {% blocktranslate with gen=generated_at|date:"Y-m-d H:i:s" style=style_preset|upper %}GENERATED: {{ gen }} UTC | STYLE: {{ style }}{% endblocktranslate %}
                 </div>
                 <button type="button" class="no-print" data-action="print" style="cursor: pointer; display: inline-flex; align-items: center; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 12px; font-size: 11px; font-weight: 600; color: #334155; transition: all 0.15s ease;">
                     <i class="mdi mdi-content-copy"></i>
-                    Print Report
+                    {% translate "Print Report" %}
                 </button>
             </div>
             
@@ -263,7 +264,7 @@
                         {% empty %}
                         <tr>
                             <td colspan="{{ headers|length }}" style="text-align: center; color: #64748b; padding: 20px;">
-                                No records found.
+                                {% translate "No records found." %}
                             </td>
                         </tr>
                         {% endfor %}
@@ -272,7 +273,7 @@
             {% endfor %}
         </div>
         <div class="footer">
-            Sent automatically by ITAMbox — IT Asset Management Console.
+            {% translate "Sent automatically by ITAMbox — IT Asset Management Console." %}
         </div>
     </div>
     <script nonce="{{ request.csp_nonce }}">

@@ -4,11 +4,11 @@
 {% load utility_tags %}
 {% load plugins %}
 
-{% block title %}{{ object }} - {{ title|default:"Detail View" }} {% translate "- ITAMbox" %}{% endblock %}
+{% block title %}{{ object }} - {{ title|default:_("Detail View") }} {% translate "- ITAMbox" %}{% endblock %}
 
 {% block page_header %}
     <div class="page-pretitle">
-        {{ object_type|default:"Object" }} {% translate "Details" %}
+        {{ object_type|default:_("Object") }} {% translate "Details" %}
     </div>
     <h2 class="page-title">
         {{ object }}
@@ -163,7 +163,7 @@
                     {# --- Default Object Details Card --- #}
                     <div class="card mb-3 shadow-sm">
                         <div class="card-header">
-                            <h3 class="card-title">{{ object_type|default:"Object" }} {% translate "Information" %}</h3>
+                            <h3 class="card-title">{{ object_type|default:_("Object") }} {% translate "Information" %}</h3>
                         </div>
                         <div class="card-body">
                             {% block object_details %}

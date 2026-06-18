@@ -74,7 +74,7 @@
         <button type="button" class="btn btn-outline-warning"
                 hx-post="{% url 'subscriptions:subscription_suspend' pk=object.pk %}"
                 hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                hx-confirm="Are you sure you want to suspend this subscription?">
+                hx-confirm="{% translate 'Are you sure you want to suspend this subscription?' %}">
             <i class="mdi mdi-view-column-outline me-1"></i>
             {% translate "Suspend" %}
         </button>

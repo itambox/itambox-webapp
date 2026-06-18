@@ -21,7 +21,7 @@
                 {% if related_assets_count > 0 %}
                     <div class="alert alert-danger" role="alert">
                         <h4 class="alert-title">{% translate "Warning!" %}</h4>
-                        <div class="text-secondary">{% translate "This manufacturer is associated with" %} {{ related_assets_count }} {% translate "asset" %}{{ related_assets_count|pluralize }}. Deleting it might cause issues.</div>
+                        <div class="text-secondary">{% translate "This manufacturer is associated with" %} {{ related_assets_count }} {% translate "asset" %}{{ related_assets_count|pluralize }}. {% translate "Deleting it might cause issues." %}</div>
                     </div>
                 {% endif %}
                 <form method="post">

@@ -24,9 +24,9 @@
             <dt class="col-4">{% translate "Tenant / Scope:" %}</dt>
             <dd class="col-8">
                 {% if object.tenant %}
-                    {{ object.tenant.name }} (Tenant)
+                    {% blocktranslate with name=object.tenant.name %}{{ name }} (Tenant){% endblocktranslate %}
                 {% elif object.tenant_group %}
-                    {{ object.tenant_group.name }} (Tenant Group)
+                    {% blocktranslate with name=object.tenant_group.name %}{{ name }} (Tenant Group){% endblocktranslate %}
                 {% else %}
                     {% translate "Global (All Tenants)" %}
                 {% endif %}
@@ -72,7 +72,7 @@
     <div class="col-md-6 text-center text-md-end">
         {% if object.logo %}
             <div class="mb-2 text-secondary small">{% translate "Custom Acceptance Logo" %}</div>
-            <img src="{{ object.logo.url }}" alt="Logo" style="max-height: 80px; border: 1px solid #ddd; padding: 5px; border-radius: 4px; background: white;" />
+            <img src="{{ object.logo.url }}" alt="{% translate 'Logo' %}" style="max-height: 80px; border: 1px solid #ddd; padding: 5px; border-radius: 4px; background: white;" />
         {% else %}
             <div class="text-muted italic small py-4">{% translate "No custom logo uploaded. Standard global branding will apply." %}</div>
         {% endif %}

@@ -195,7 +195,7 @@
                                             {% elif link.asset_request.accessory %}{{ link.asset_request.accessory }}
                                             {% elif link.asset_request.consumable %}{{ link.asset_request.consumable }}
                                             {% endif %}
-                                            <div class="text-muted small">Qty: {{ link.qty_allocated }}</div>
+                                            <div class="text-muted small">{% blocktranslate with qty=link.qty_allocated %}Qty: {{ qty }}{% endblocktranslate %}</div>
                                         </td>
                                         <td>
                                             <span class="badge bg-primary-lt">{{ link.asset_request.get_status_display }}</span>

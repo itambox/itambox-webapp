@@ -22,7 +22,7 @@
                 <p class="text-warning">
                     {% translate "Warning: This tenant is associated with" %} {{ tenant.sites.count }} {% translate "site" %}{{ tenant.sites.count|pluralize }}
                     {% translate "and" %} {{ tenant.locations.count }} {% translate "location" %}{{ tenant.locations.count|pluralize }}.
-                    Deleting it may affect related objects depending on your setup.
+                    {% translate "Deleting it may affect related objects depending on your setup." %}
                 </p>
             {% endif %}
 

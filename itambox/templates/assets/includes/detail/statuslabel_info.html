@@ -19,5 +19,5 @@
     </dd>
 
     <dt class="col-sm-3">{% translate "Description:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{% if object.description %}{{object.description|linebreaksbr}}{% else %}<i>No description provided.</i>{% endif %}</dd>
+    <dd class="col-sm-9 text-secondary">{% if object.description %}{{object.description|linebreaksbr}}{% else %}<i>{% translate "No description provided." %}</i>{% endif %}</dd>
 </dl>

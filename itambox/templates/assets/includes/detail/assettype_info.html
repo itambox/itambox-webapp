@@ -16,7 +16,7 @@
     <dd class="col-sm-9"><code>{{ object.slug }}</code></dd>
 
     <dt class="col-sm-3">{% translate "Part Number:" %}</dt>
-    <dd class="col-sm-9">{% if object.part_number %}{{object.part_number}}{% else %}<span class='text-muted'><i>Not Set</i></span>{% endif %}</dd>
+    <dd class="col-sm-9">{% if object.part_number %}{{object.part_number}}{% else %}<span class='text-muted'><i>{% translate "Not Set" %}</i></span>{% endif %}</dd>
 
     <dt class="col-sm-3">{% translate "Category:" %}</dt>
     <dd class="col-sm-9">

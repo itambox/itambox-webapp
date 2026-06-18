@@ -1,3 +1,4 @@
+{% load i18n %}
 {% comment %}
 Quick-Add button for FK/M2M select fields.
 
@@ -13,9 +14,9 @@ the modal closes and the new object is prepended to the target select.
 {% endcomment %}
 <button type="button"
         class="btn btn-outline-secondary btn-sm btn-icon ms-1"
-        title="Add new {{ model_label }}"
+        title="{% blocktranslate %}Add new {{ model_label }}{% endblocktranslate %}"
         hx-get="{% url quick_add_url %}{% if quick_add_url_params %}?{{ quick_add_url_params }}{% endif %}"
         hx-target="#modal-placeholder"
-        aria-label="Quick-add {{ model_label }}">
+        aria-label="{% blocktranslate %}Quick-add {{ model_label }}{% endblocktranslate %}">
     <i class="mdi mdi-plus"></i>
 </button>

@@ -106,7 +106,7 @@
                                         {% if temp.tenant %}
                                             <span class="badge bg-blue-lt">{{ temp.tenant.name }}</span>
                                         {% elif temp.tenant_group %}
-                                            <span class="badge bg-purple-lt">Group: {{ temp.tenant_group.name }}</span>
+                                            <span class="badge bg-purple-lt">{% blocktranslate with group=temp.tenant_group.name %}Group: {{ group }}{% endblocktranslate %}</span>
                                         {% else %}
                                             <span class="badge bg-secondary-lt">{% translate "Global Default" %}</span>
                                         {% endif %}

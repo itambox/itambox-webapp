@@ -33,7 +33,7 @@
             </span>
             
             <h2 class="text-danger mb-2">{% translate "Custody Signoff Failed" %}</h2>
-            <p class="text-muted">{{ error|default:"The EULA checkout link is invalid or has expired." }}</p>
+            <p class="text-muted">{{ error|default:_("The EULA checkout link is invalid or has expired.") }}</p>
 
             <div class="mt-4">
                 <p class="text-muted small">{% translate "EULA custody links expire automatically after 7 days to preserve organizational security. Please contact your IT administrator to request a fresh transfer link." %}</p>

@@ -21,8 +21,8 @@
             {% if sitegroup.sites.count > 0 or sitegroup.children.count > 0 %}
                 <p class="text-warning">
                     {% translate "Warning: This group has" %} {{ sitegroup.sites.count }} {% translate "assigned site" %}{{ sitegroup.sites.count|pluralize }} 
-                    {% translate "and" %} {{ sitegroup.children.count }} {% translate "child group" %}{{ sitegroup.children.count|pluralize }}. 
-                    Deleting it may affect related objects depending on your setup.
+                    {% translate "and" %} {{ sitegroup.children.count }} {% translate "child group" %}{{ sitegroup.children.count|pluralize }}.
+                    {% translate "Deleting it may affect related objects depending on your setup." %}
                 </p>
             {% endif %}
 
