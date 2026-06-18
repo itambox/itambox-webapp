@@ -135,7 +135,10 @@ def generate_scheduled_report_task(scheduled_report_id):
                 attachment_content = csv_buffer.getvalue()
                 attachment_filename = f"{template.name.lower().replace(' ', '_')}_{timezone.now():%Y%m%d}.csv"
                 attachment_mime = "text/csv"
-                email_body = f"Please find attached the scheduled CSV report for '{template.name}' generated on {timezone.now():%Y-%m-%d %H:%M:%S} UTC."
+                email_body = _("Please find attached the scheduled CSV report for '%(name)s' generated on %(timestamp)s UTC.") % {
+                    'name': template.name,
+                    'timestamp': f"{timezone.now():%Y-%m-%d %H:%M:%S}",
+                }
 
             # 3. Local In-App File Archive saving
             archive_entry = None
@@ -179,7 +182,7 @@ def generate_scheduled_report_task(scheduled_report_id):
                 recipient_list = [r.strip() for r in sched.recipients.split(',') if r.strip()]
                 if recipient_list:
                     email = EmailMessage(
-                        subject=f"[Scheduled Report] {sched.name}",
+                        subject=_("[Scheduled Report] %(name)s") % {'name': sched.name},
                         body=email_body,
                         from_email=email_config.from_address,
                         to=recipient_list,
@@ -194,14 +197,20 @@ def generate_scheduled_report_task(scheduled_report_id):
                     email_sent = True
 
             # 5. Dispatch to configured Notification Channels (email, in_app, Slack, Teams)
-            report_subject = f"[Scheduled Report] {sched.name}"
-            report_body = (
-                f"Scheduled report '{sched.name}' was successfully generated "
-                f"on {timezone.now():%Y-%m-%d %H:%M:%S} UTC.\n"
-                f"Format: {sched.format.upper()}\n"
-                f"Total Assets: {total_assets}\n"
-                f"Acquisition Sum: ${acquisition_sum:,.2f}"
-            )
+            report_subject = _("[Scheduled Report] %(name)s") % {'name': sched.name}
+            report_body = _(
+                "Scheduled report '%(name)s' was successfully generated "
+                "on %(timestamp)s UTC.\n"
+                "Format: %(format)s\n"
+                "Total Assets: %(total_assets)s\n"
+                "Acquisition Sum: $%(acquisition_sum)s"
+            ) % {
+                'name': sched.name,
+                'timestamp': f"{timezone.now():%Y-%m-%d %H:%M:%S}",
+                'format': sched.format.upper(),
+                'total_assets': total_assets,
+                'acquisition_sum': f"{acquisition_sum:,.2f}",
+            }
             for channel in sched.channels.all():
                 if not channel.enabled:
                     continue

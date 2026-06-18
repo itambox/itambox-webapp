@@ -5,6 +5,7 @@ import logging
 
 import requests
 from django.contrib.contenttypes.models import ContentType
+from django.utils.translation import gettext_lazy as _
 
 from core.models import ChangeLoggingMixin
 from extras.models import Event, EventRule, NotificationChannel, WebhookEndpoint
@@ -226,7 +227,9 @@ def _send_notification(rule, event):
 
     config = rule.action_config or {}
     level = config.get('level', 'info')
-    subject = config.get('subject', f"Event: {event.action} on {event.model.model}")
+    subject = config.get('subject', _("Event: %(action)s on %(model)s") % {
+        'action': event.action, 'model': event.model.model,
+    })
     body = config.get('body', str(event.data))
 
     # Render against a sanitized namespace (see _render_template) so an
@@ -300,7 +303,7 @@ def _send_teams_notification(webhook_url, message_text, title=None):
         '@context': 'https://schema.org/extensions',
         'summary': title or message_text[:80],
         'themeColor': '0076D7',
-        'title': title or 'ITAMbox Notification',
+        'title': title or str(_('ITAMbox Notification')),
         'text': message_text,
     }
     try:

@@ -628,8 +628,11 @@ class NotificationChannelTestView(SimplePostView):
         from core.events import send_notification_to_channel
         ok = send_notification_to_channel(
             channel,
-            subject="ITAMbox Test Notification",
-            body=f"This is a test message sent to channel '{channel.name}' ({channel.get_channel_type_display()}).",
+            subject=str(_("ITAMbox Test Notification")),
+            body=_("This is a test message sent to channel '%(name)s' (%(type)s).") % {
+                'name': channel.name,
+                'type': channel.get_channel_type_display(),
+            },
         )
         if ok:
             return {'message': f"Test notification sent successfully via '{channel.name}'."}

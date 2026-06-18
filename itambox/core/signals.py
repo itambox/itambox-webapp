@@ -3,6 +3,7 @@ import logging
 from django.db import transaction, DatabaseError
 from django.db.models.signals import post_save, post_delete, pre_save
 from django.dispatch import receiver
+from django.utils.translation import gettext_lazy as _
 
 from core.models import ChangeLoggingMixin
 from extras.models import Event as EventModel
@@ -118,8 +119,10 @@ def _notify_watchers(sender, instance, action):
         except Exception:
             pass
 
-    subject = f"Watched item {action}: {instance}"
-    message = f"The item '{instance}' you are watching has been {action}."
+    subject = _("Watched item %(action)s: %(instance)s") % {'action': action, 'instance': instance}
+    message = _("The item '%(instance)s' you are watching has been %(action)s.") % {
+        'instance': instance, 'action': action,
+    }
 
     app_label = ct.app_label
     model_name = ct.model

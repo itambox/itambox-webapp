@@ -1,5 +1,6 @@
 import logging
 from django.contrib.auth import get_user_model
+from django.utils.translation import gettext_lazy as _
 from core.models import Notification
 
 logger = logging.getLogger(__name__)
@@ -17,8 +18,8 @@ def notify_new_request_task(request_id):
         notifications = [
             Notification(
                 user=admin,
-                subject=f"New Asset Request from {instance.requester}",
-                message=f"{instance.requester} has requested {instance}.",
+                subject=_("New Asset Request from %(requester)s") % {"requester": instance.requester},
+                message=_("%(requester)s has requested %(item)s.") % {"requester": instance.requester, "item": instance},
                 level=Notification.LEVEL_INFO,
                 target_url=instance.get_absolute_url()
             )

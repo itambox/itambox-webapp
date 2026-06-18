@@ -61,8 +61,9 @@ def import_csv_task(job_id, rows_data, app_label, model_name, user_id, tenant_id
                         job.mark_failed("All records failed to import due to validation errors.")
                         Notification.objects.create(
                             user=ctx.user,
-                            subject=f"Bulk Import Failed",
-                            message=f"Failed to import CSV/YAML data to {model._meta.verbose_name_plural}. View job logs for details.",
+                            subject=_("Bulk Import Failed"),
+                            message=_("Failed to import CSV/YAML data to %(model)s. View job logs for details.")
+                            % {'model': model._meta.verbose_name_plural},
                             level=Notification.LEVEL_DANGER,
                             target_url=reverse_job_detail(job.pk)
                         )
@@ -76,8 +77,9 @@ def import_csv_task(job_id, rows_data, app_label, model_name, user_id, tenant_id
 
                 Notification.objects.create(
                     user=ctx.user,
-                    subject=f"Bulk Import Complete",
-                    message=f"Successfully imported {imported_count} record(s) to {model._meta.verbose_name_plural}.",
+                    subject=_("Bulk Import Complete"),
+                    message=_("Successfully imported %(count)s record(s) to %(model)s.")
+                    % {'count': imported_count, 'model': model._meta.verbose_name_plural},
                     level=Notification.LEVEL_SUCCESS,
                     target_url=reverse_job_detail(job.pk)
                 )
@@ -87,8 +89,8 @@ def import_csv_task(job_id, rows_data, app_label, model_name, user_id, tenant_id
                 job.mark_failed(str(e))
                 Notification.objects.create(
                     user=ctx.user,
-                    subject=f"Bulk Import Error",
-                    message=f"A system exception occurred during the import: {str(e)}",
+                    subject=_("Bulk Import Error"),
+                    message=_("A system exception occurred during the import: %(error)s") % {'error': str(e)},
                     level=Notification.LEVEL_DANGER,
                     target_url=reverse_job_detail(job.pk)
                 )

@@ -183,15 +183,22 @@ def checkout_asset(
                                 provider = signature_providers.get(receipt.signature_provider or 'local')
                                 sign_url = provider.initiate_signature(receipt, request)
                                 send_mail(
-                                    subject=f'Asset Acceptance Required: {asset.name} ({asset.asset_tag})',
-                                    message=(
-                                        f'You have been assigned custody of:\n\n'
-                                        f'  Asset: {asset.name}\n'
-                                        f'  Asset Tag: {asset.asset_tag}\n'
-                                        f'  Serial: {asset.serial_number or "N/A"}\n\n'
-                                        f'Please accept custody at the following link:\n{sign_url}\n\n'
-                                        f'This link expires in 7 days.'
-                                    ),
+                                    subject=_('Asset Acceptance Required: %(name)s (%(tag)s)') % {
+                                        "name": asset.name, "tag": asset.asset_tag,
+                                    },
+                                    message=_(
+                                        'You have been assigned custody of:\n\n'
+                                        '  Asset: %(name)s\n'
+                                        '  Asset Tag: %(tag)s\n'
+                                        '  Serial: %(serial)s\n\n'
+                                        'Please accept custody at the following link:\n%(url)s\n\n'
+                                        'This link expires in 7 days.'
+                                    ) % {
+                                        "name": asset.name,
+                                        "tag": asset.asset_tag,
+                                        "serial": asset.serial_number or "N/A",
+                                        "url": sign_url,
+                                    },
                                     from_email=email_config.from_address,
                                     recipient_list=[recipient],
                                     fail_silently=True,

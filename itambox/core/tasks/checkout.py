@@ -1,6 +1,7 @@
 import logging
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
+from django.utils.translation import gettext_lazy as _
 
 from core.models import Job, Notification
 from .context import TaskContext
@@ -79,8 +80,8 @@ def bulk_checkout_task(job_id, asset_pks, target_type_str, target_pk, user_id, n
                     job.mark_failed("All asset checkouts failed.")
                     Notification.objects.create(
                         user=ctx.user,
-                        subject="Bulk Checkout Failed",
-                        message="All hardware checkouts failed. View logs for error tracebacks.",
+                        subject=_("Bulk Checkout Failed"),
+                        message=_("All hardware checkouts failed. View logs for error tracebacks."),
                         level=Notification.LEVEL_DANGER,
                         target_url=reverse_job_detail(job.pk)
                     )
@@ -94,8 +95,8 @@ def bulk_checkout_task(job_id, asset_pks, target_type_str, target_pk, user_id, n
 
                 Notification.objects.create(
                     user=ctx.user,
-                    subject="Bulk Checkout Complete",
-                    message=f"Successfully checked out {success_count} asset(s).",
+                    subject=_("Bulk Checkout Complete"),
+                    message=_("Successfully checked out %(count)s asset(s).") % {'count': success_count},
                     level=Notification.LEVEL_SUCCESS,
                     target_url=reverse_job_detail(job.pk)
                 )
@@ -105,8 +106,8 @@ def bulk_checkout_task(job_id, asset_pks, target_type_str, target_pk, user_id, n
                 job.mark_failed(str(e))
                 Notification.objects.create(
                     user=ctx.user,
-                    subject="Bulk Checkout Error",
-                    message=f"A system exception occurred during the checkout: {str(e)}",
+                    subject=_("Bulk Checkout Error"),
+                    message=_("A system exception occurred during the checkout: %(error)s") % {'error': str(e)},
                     level=Notification.LEVEL_DANGER,
                     target_url=reverse_job_detail(job.pk)
                 )

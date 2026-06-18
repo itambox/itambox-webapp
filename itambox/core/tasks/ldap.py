@@ -1,5 +1,6 @@
 import logging
 from django.core.management import call_command
+from django.utils.translation import gettext_lazy as _
 from core.models import Job, Notification
 from .context import TaskContext
 from .utils import reverse_job_detail
@@ -56,8 +57,9 @@ def sync_tenant_ldap_task(job_id, tenant_slug, user_id, tenant_id=None):
 
                 Notification.objects.create(
                     user=ctx.user,
-                    subject="LDAP Sync Complete",
-                    message=f"LDAP directory sync for tenant '{tenant_slug}' completed successfully.",
+                    subject=_("LDAP Sync Complete"),
+                    message=_("LDAP directory sync for tenant '%(tenant)s' completed successfully.")
+                    % {'tenant': tenant_slug},
                     level=Notification.LEVEL_SUCCESS,
                     target_url=reverse_job_detail(job.pk)
                 )
@@ -68,8 +70,9 @@ def sync_tenant_ldap_task(job_id, tenant_slug, user_id, tenant_id=None):
                 job.mark_failed(str(e))
                 Notification.objects.create(
                     user=ctx.user,
-                    subject="LDAP Sync Failed",
-                    message=f"LDAP directory sync for tenant '{tenant_slug}' failed: {str(e)}",
+                    subject=_("LDAP Sync Failed"),
+                    message=_("LDAP directory sync for tenant '%(tenant)s' failed: %(error)s")
+                    % {'tenant': tenant_slug, 'error': str(e)},
                     level=Notification.LEVEL_DANGER,
                     target_url=reverse_job_detail(job.pk)
                 )

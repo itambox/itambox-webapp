@@ -104,8 +104,8 @@ class AssetRequestEditView(ObjectEditView):
             dispatch_event(AssetRequest, self.object, action='update')
             Notification.objects.create(
                 user=self.object.requester,
-                subject=f"Asset Request {self.object.get_status_display()}",
-                message=f"Your request for {self.object} has been {self.object.get_status_display().lower()}.",
+                subject=_("Asset Request %(status)s") % {"status": self.object.get_status_display()},
+                message=_("Your request for %(item)s has been %(status)s.") % {"item": self.object, "status": self.object.get_status_display().lower()},
                 level=Notification.LEVEL_INFO,
                 target_url=self.object.get_absolute_url(),
             )

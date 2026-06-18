@@ -1,5 +1,6 @@
 import logging
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import get_user_model
 from core.models import Notification
 from core.tasks.context import TaskContext
@@ -42,8 +43,15 @@ def check_subscription_expiries_and_reminders():
             for user in recipients:
                 Notification.objects.create(
                     user=user,
-                    subject=f"Subscription Expired: {sub.name}",
-                    message=f"The subscription '{sub.name}' from provider '{sub.provider}' has expired as of {sub.renewal_date}.",
+                    subject=_("Subscription Expired: %(name)s") % {"name": sub.name},
+                    message=_(
+                        "The subscription '%(name)s' from provider '%(provider)s' "
+                        "has expired as of %(date)s."
+                    ) % {
+                        "name": sub.name,
+                        "provider": sub.provider,
+                        "date": sub.renewal_date,
+                    },
                     level=Notification.LEVEL_WARNING,
                     target_url=sub.get_absolute_url()
                 )
@@ -68,8 +76,21 @@ def check_subscription_expiries_and_reminders():
                 for user in recipients:
                     Notification.objects.create(
                         user=user,
-                        subject=f"Subscription Renewal Warning: {sub.name} in {days} Days",
-                        message=f"The subscription '{sub.name}' from provider '{sub.provider}' is due for renewal on {sub.renewal_date} ({days} days remaining). Cost: {sub.renewal_cost} {sub.currency}.",
+                        subject=_(
+                            "Subscription Renewal Warning: %(name)s in %(days)s Days"
+                        ) % {"name": sub.name, "days": days},
+                        message=_(
+                            "The subscription '%(name)s' from provider '%(provider)s' "
+                            "is due for renewal on %(date)s (%(days)s days remaining). "
+                            "Cost: %(cost)s %(currency)s."
+                        ) % {
+                            "name": sub.name,
+                            "provider": sub.provider,
+                            "date": sub.renewal_date,
+                            "days": days,
+                            "cost": sub.renewal_cost,
+                            "currency": sub.currency,
+                        },
                         level=Notification.LEVEL_WARNING,
                         target_url=sub.get_absolute_url()
                     )

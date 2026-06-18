@@ -1,6 +1,7 @@
 import logging
 from django.utils import timezone
 from django.db import IntegrityError, transaction
+from django.utils.translation import gettext_lazy as _
 
 from extras.models import AlertRule, AlertLog, NotificationChannel
 from core.events import send_notification_to_channel
@@ -311,11 +312,11 @@ def _match_low_stock(rule):
         if available <= threshold:
             matches.append({
                 'obj': acc, 'tenant': acc.tenant,
-                'subject': f"Low Stock: {acc.name}",
-                'message': (
-                    f"Accessory '{acc.name}' available stock is {available}, "
-                    f"at or below the safety limit of {threshold} units."
-                ),
+                'subject': _("Low Stock: %(name)s") % {'name': acc.name},
+                'message': _(
+                    "Accessory '%(name)s' available stock is %(available)s, "
+                    "at or below the safety limit of %(threshold)s units."
+                ) % {'name': acc.name, 'available': available, 'threshold': threshold},
             })
 
     # --- Consumables ---
@@ -342,11 +343,11 @@ def _match_low_stock(rule):
         if available <= threshold:
             matches.append({
                 'obj': con, 'tenant': con.tenant,
-                'subject': f"Low Stock: {con.name}",
-                'message': (
-                    f"Consumable '{con.name}' available stock is {available}, "
-                    f"at or below the safety limit of {threshold} units."
-                ),
+                'subject': _("Low Stock: %(name)s") % {'name': con.name},
+                'message': _(
+                    "Consumable '%(name)s' available stock is %(available)s, "
+                    "at or below the safety limit of %(threshold)s units."
+                ) % {'name': con.name, 'available': available, 'threshold': threshold},
             })
 
     # --- Components ---
@@ -375,11 +376,11 @@ def _match_low_stock(rule):
         if available <= threshold:
             matches.append({
                 'obj': comp, 'tenant': rule.tenant,
-                'subject': f"Low Stock: {comp.name}",
-                'message': (
-                    f"Component '{comp.name}' available stock is {available}, "
-                    f"at or below the safety limit of {threshold} units."
-                ),
+                'subject': _("Low Stock: %(name)s") % {'name': comp.name},
+                'message': _(
+                    "Component '%(name)s' available stock is %(available)s, "
+                    "at or below the safety limit of %(threshold)s units."
+                ) % {'name': comp.name, 'available': available, 'threshold': threshold},
             })
 
     return matches
@@ -404,11 +405,14 @@ def _match_upcoming_eol(rule, today):
             days_left = (eol - today).days
             matches.append({
                 'obj': asset, 'tenant': asset.tenant,
-                'subject': f"Upcoming Hardware EOL: {asset.asset_tag}",
-                'message': (
-                    f"Asset {asset.asset_tag} ({asset.name}) reaches EOL on "
-                    f"{eol:%Y-%m-%d} ({days_left} day(s) remaining)."
-                ),
+                'subject': _("Upcoming Hardware EOL: %(tag)s") % {'tag': asset.asset_tag},
+                'message': _(
+                    "Asset %(tag)s (%(name)s) reaches EOL on "
+                    "%(eol)s (%(days)s day(s) remaining)."
+                ) % {
+                    'tag': asset.asset_tag, 'name': asset.name,
+                    'eol': f"{eol:%Y-%m-%d}", 'days': days_left,
+                },
             })
     return matches
 
@@ -430,11 +434,11 @@ def _match_license_expiry(rule, today):
         days_left = (lic.expiration_date - today).days
         matches.append({
             'obj': lic, 'tenant': lic.tenant,
-            'subject': f"License Expiring: {lic.name}",
-            'message': (
-                f"License '{lic.name}' expires on {lic.expiration_date} "
-                f"({days_left} day(s) remaining)."
-            ),
+            'subject': _("License Expiring: %(name)s") % {'name': lic.name},
+            'message': _(
+                "License '%(name)s' expires on %(date)s "
+                "(%(days)s day(s) remaining)."
+            ) % {'name': lic.name, 'date': lic.expiration_date, 'days': days_left},
         })
     return matches
 
@@ -457,11 +461,11 @@ def _match_renewal_due(rule, today):
         days_left = (sub.renewal_date - today).days
         matches.append({
             'obj': sub, 'tenant': sub.tenant,
-            'subject': f"Subscription Renewal Due: {sub.name}",
-            'message': (
-                f"Subscription '{sub.name}' ends on {sub.renewal_date} "
-                f"({days_left} day(s) remaining) and requires renewal validation."
-            ),
+            'subject': _("Subscription Renewal Due: %(name)s") % {'name': sub.name},
+            'message': _(
+                "Subscription '%(name)s' ends on %(date)s "
+                "(%(days)s day(s) remaining) and requires renewal validation."
+            ) % {'name': sub.name, 'date': sub.renewal_date, 'days': days_left},
         })
     return matches
 
@@ -485,11 +489,15 @@ def _match_warranty_expiry(rule, today):
         days_left = (warranty.end_date - today).days
         matches.append({
             'obj': asset, 'tenant': asset.tenant,
-            'subject': f"Warranty Expiring: {asset.asset_tag}",
-            'message': (
-                f"Asset {asset.asset_tag} ({asset.name}) {warranty.get_warranty_type_display()} "
-                f"warranty expires on {warranty.end_date:%Y-%m-%d} ({days_left} day(s) remaining)."
-            ),
+            'subject': _("Warranty Expiring: %(tag)s") % {'tag': asset.asset_tag},
+            'message': _(
+                "Asset %(tag)s (%(name)s) %(wtype)s "
+                "warranty expires on %(date)s (%(days)s day(s) remaining)."
+            ) % {
+                'tag': asset.asset_tag, 'name': asset.name,
+                'wtype': warranty.get_warranty_type_display(),
+                'date': f"{warranty.end_date:%Y-%m-%d}", 'days': days_left,
+            },
         })
     return matches
 
@@ -535,21 +543,28 @@ def _match_audit_overdue(rule, today):
             due_date = (base + timezone.timedelta(days=interval_days)).date()
             if due_date > today:
                 continue  # category cadence says not yet overdue
-            threshold_desc = f"every {category.audit_interval_months} month(s) per category"
+            threshold_desc = _("every %(months)s month(s) per category") % {
+                'months': category.audit_interval_months,
+            }
         else:
-            threshold_desc = f"every {rule.threshold_value} day(s)"
+            threshold_desc = _("every %(days)s day(s)") % {'days': rule.threshold_value}
 
         if asset.last_audited:
             days_overdue = (today - asset.last_audited.date()).days
-            detail = f"last audited {days_overdue} day(s) ago ({asset.last_audited:%Y-%m-%d})"
+            detail = _("last audited %(days)s day(s) ago (%(date)s)") % {
+                'days': days_overdue, 'date': f"{asset.last_audited:%Y-%m-%d}",
+            }
         else:
-            detail = "never audited"
+            detail = _("never audited")
         matches.append({
             'obj': asset, 'tenant': asset.tenant,
-            'subject': f"Audit Overdue: {asset.asset_tag}",
-            'message': (
-                f"Asset {asset.asset_tag} ({asset.name}) is overdue for an audit "
-                f"({detail}; threshold: {threshold_desc})."
-            ),
+            'subject': _("Audit Overdue: %(tag)s") % {'tag': asset.asset_tag},
+            'message': _(
+                "Asset %(tag)s (%(name)s) is overdue for an audit "
+                "(%(detail)s; threshold: %(threshold)s)."
+            ) % {
+                'tag': asset.asset_tag, 'name': asset.name,
+                'detail': detail, 'threshold': threshold_desc,
+            },
         })
     return matches

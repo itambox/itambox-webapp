@@ -4,6 +4,7 @@ import zipfile
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.base import ContentFile
 from django.utils.html import escape
+from django.utils.translation import gettext_lazy as _
 
 from core.models import Job, Notification
 from extras.models import FileAttachment
@@ -90,8 +91,9 @@ def generate_label_batch_task(job_id, asset_pks, label_format, user_id, tenant_i
 
                 Notification.objects.create(
                     user=ctx.user,
-                    subject="Label Generation Complete",
-                    message=f"Successfully generated label batch zip for {assets.count()} asset(s). Click to download.",
+                    subject=_("Label Generation Complete"),
+                    message=_("Successfully generated label batch zip for %(count)s asset(s). Click to download.")
+                    % {'count': assets.count()},
                     level=Notification.LEVEL_SUCCESS,
                     target_url=attachment.get_download_url()
                 )
@@ -101,8 +103,8 @@ def generate_label_batch_task(job_id, asset_pks, label_format, user_id, tenant_i
                 job.mark_failed(str(e))
                 Notification.objects.create(
                     user=ctx.user,
-                    subject="Label Generation Failed",
-                    message=f"An error occurred during barcode rendering: {str(e)}",
+                    subject=_("Label Generation Failed"),
+                    message=_("An error occurred during barcode rendering: %(error)s") % {'error': str(e)},
                     level=Notification.LEVEL_DANGER,
                     target_url=reverse_job_detail(job.pk)
                 )
@@ -457,8 +459,9 @@ def generate_label_pdf_batch_task(job_id, asset_pks, template_id, layout_mode, u
 
             Notification.objects.create(
                 user=ctx.user,
-                subject="Label Generation Complete",
-                message=f"Successfully generated label PDF for {len(assets)} asset(s). Click to download.",
+                subject=_("Label Generation Complete"),
+                message=_("Successfully generated label PDF for %(count)s asset(s). Click to download.")
+                % {'count': len(assets)},
                 level=Notification.LEVEL_SUCCESS,
                 target_url=attachment.get_download_url()
             )
@@ -469,8 +472,8 @@ def generate_label_pdf_batch_task(job_id, asset_pks, template_id, layout_mode, u
                 job.mark_failed(str(e))
             Notification.objects.create(
                 user=ctx.user,
-                subject="Label Generation Failed",
-                message=f"An error occurred during PDF rendering: {str(e)}",
+                subject=_("Label Generation Failed"),
+                message=_("An error occurred during PDF rendering: %(error)s") % {'error': str(e)},
                 level=Notification.LEVEL_DANGER,
                 target_url=reverse_job_detail(job.pk) if 'job' in locals() else None
             )

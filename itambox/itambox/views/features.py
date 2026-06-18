@@ -619,13 +619,14 @@ class WebhookEndpointEditView(ObjectEditView):
 
         success = False
         try:
-            test_payload = "Test notification from ITAMbox"
+            test_payload = str(_("Test notification from ITAMbox"))
+            test_title = str(_("ITAMbox Test"))
             if 'hooks.slack.com' in url:
                 from core.events import _send_slack_notification
-                success = _send_slack_notification(url, test_payload, "ITAMbox Test")
+                success = _send_slack_notification(url, test_payload, test_title)
             elif 'webhook.office.com' in url or 'outlook.office.com/webhook' in url:
                 from core.events import _send_teams_notification
-                success = _send_teams_notification(url, test_payload, "ITAMbox Test")
+                success = _send_teams_notification(url, test_payload, test_title)
             else:
                 import requests
                 resp = requests.post(url, json={'test': True, 'message': test_payload}, timeout=10)
