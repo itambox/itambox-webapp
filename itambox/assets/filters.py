@@ -14,41 +14,42 @@ from extras.models import Tag
 from django import forms
 from django.db.models import Q
 from django.contrib.auth import get_user_model
+from django.utils.translation import gettext_lazy as _
 
 User = get_user_model()
 
 class AssetFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
         widget=forms.TextInput(attrs={'placeholder': 'Name, Tag, Serial...'})
     )
 
     status = django_filters.ModelChoiceFilter(
         queryset=StatusLabel.objects.all(),
-        label='Status',
+        label=_('Status'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     asset_role = django_filters.ModelChoiceFilter(
         queryset=AssetRole.objects.all(),
-        label='Asset Role',
+        label=_('Asset Role'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     asset_type = django_filters.ModelChoiceFilter(
         queryset=AssetType.objects.all().select_related('manufacturer'),
-        label='Asset Type',
+        label=_('Asset Type'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     manufacturer = django_filters.ModelChoiceFilter(
         field_name='asset_type__manufacturer',
         queryset=Manufacturer.objects.all(),
-        label='Manufacturer',
+        label=_('Manufacturer'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     category = django_filters.ModelChoiceFilter(
         field_name='asset_type__category',
         queryset=Category.objects.all(),
-        label='Category',
+        label=_('Category'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     location = django_filters.ModelChoiceFilter(
@@ -58,48 +59,48 @@ class AssetFilterSet(BaseFilterSet):
     tenant = django_filters.ModelChoiceFilter(
         queryset=Tenant.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label='Tenant'
+        label=_('Tenant')
     )
     assigned_to = django_filters.ModelChoiceFilter(
         field_name='assignments__assigned_user',
         queryset=AssetHolder.objects.all(),
-        label='Assigned To',
+        label=_('Assigned To'),
         widget=forms.Select(attrs={'class': 'form-select'}),
         method='filter_assigned_to'
     )
     supplier = django_filters.ModelChoiceFilter(
         queryset=Supplier.objects.all(),
-        label='Supplier',
+        label=_('Supplier'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     tags = django_filters.ModelMultipleChoiceFilter(
         field_name='tags__slug',
         queryset=Tag.objects.all(),
         to_field_name='slug',
-        label='Tags',
+        label=_('Tags'),
         conjoined=True,
         widget=forms.SelectMultiple(attrs={'class': 'form-select'})
     )
     purchase_date_after = django_filters.DateFilter(
         field_name='purchase_date',
         lookup_expr='gte',
-        label='Purchased After',
+        label=_('Purchased After'),
         widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
     )
     purchase_date_before = django_filters.DateFilter(
         field_name='purchase_date',
         lookup_expr='lte',
-        label='Purchased Before',
+        label=_('Purchased Before'),
         widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
     )
     requestable = django_filters.BooleanFilter(
         method='filter_requestable',
-        label='Requestable',
+        label=_('Requestable'),
         widget=forms.Select(choices=[('', 'Any'), ('true', 'Yes'), ('false', 'No')], attrs={'class': 'form-select'})
     )
     audit_due = django_filters.BooleanFilter(
         method='filter_audit_due',
-        label='Audit Due',
+        label=_('Audit Due'),
         widget=forms.Select(choices=[('', 'Any'), ('true', 'Overdue'), ('false', 'Up to date')], attrs={'class': 'form-select'})
     )
 
@@ -169,7 +170,7 @@ class AssetFilterSet(BaseFilterSet):
 class AssetRoleFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
         widget=forms.TextInput(attrs={'placeholder': 'Name, Description...'})
     )
 
@@ -189,7 +190,7 @@ class AssetRoleFilterSet(BaseFilterSet):
 class ManufacturerFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
         widget=forms.TextInput(attrs={'placeholder': 'Name, Description...'})
     )
 
@@ -208,15 +209,15 @@ class ManufacturerFilterSet(BaseFilterSet):
 class AssetTypeFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
     )
     manufacturer = django_filters.ModelChoiceFilter(
         queryset=Manufacturer.objects.all(),
         field_name='manufacturer',
-        label='Manufacturer'
+        label=_('Manufacturer')
     )
     requestable = django_filters.BooleanFilter(
-        label='Requestable',
+        label=_('Requestable'),
         widget=forms.Select(choices=[('', 'Any'), ('true', 'Yes'), ('false', 'No')], attrs={'class': 'form-select'})
     )
 
@@ -238,7 +239,7 @@ class AssetTypeFilterSet(BaseFilterSet):
 class StatusLabelFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
         widget=forms.TextInput(attrs={'placeholder': 'Name, Description...'})
     )
     type = django_filters.MultipleChoiceFilter(
@@ -260,7 +261,7 @@ class StatusLabelFilterSet(BaseFilterSet):
 
 
 class DepreciationFilterSet(BaseFilterSet):
-    q = django_filters.CharFilter(method='search', label='Search')
+    q = django_filters.CharFilter(method='search', label=_('Search'))
     method = django_filters.ChoiceFilter(choices=Depreciation.Method.choices)
     convention = django_filters.ChoiceFilter(choices=Depreciation.Convention.choices)
 
@@ -275,7 +276,7 @@ class DepreciationFilterSet(BaseFilterSet):
             Q(name__icontains=value) | Q(description__icontains=value)
         ).distinct()
 class SupplierFilterSet(BaseFilterSet):
-    q = django_filters.CharFilter(method='search', label='Search', widget=forms.TextInput(attrs={'placeholder': 'Name...'}))
+    q = django_filters.CharFilter(method='search', label=_('Search'), widget=forms.TextInput(attrs={'placeholder': 'Name...'}))
 
     class Meta:
         model = Supplier
@@ -290,7 +291,7 @@ class SupplierFilterSet(BaseFilterSet):
 
 
 class CategoryFilterSet(BaseFilterSet):
-    q = django_filters.CharFilter(method='search', label='Search', widget=forms.TextInput(attrs={'placeholder': 'Name...'}))
+    q = django_filters.CharFilter(method='search', label=_('Search'), widget=forms.TextInput(attrs={'placeholder': 'Name...'}))
 
     class Meta:
         model = Category
@@ -305,7 +306,7 @@ class CategoryFilterSet(BaseFilterSet):
 
 
 class AssetRequestFilterSet(BaseFilterSet):
-    q = django_filters.CharFilter(method='search', label='Search', widget=forms.TextInput(attrs={'placeholder': 'Search...'}))
+    q = django_filters.CharFilter(method='search', label=_('Search'), widget=forms.TextInput(attrs={'placeholder': 'Search...'}))
     status = django_filters.ChoiceFilter(choices=RequestStatusChoices.choices, widget=forms.Select(attrs={'class': 'form-select'}))
 
     class Meta:
@@ -326,22 +327,22 @@ class AssetRequestFilterSet(BaseFilterSet):
 class AssetTagSequenceFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
         widget=forms.TextInput(attrs={'placeholder': 'Prefix...'})
     )
     tenant = django_filters.ModelChoiceFilter(
         queryset=Tenant.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label='Tenant'
+        label=_('Tenant')
     )
     category = django_filters.ModelChoiceFilter(
         queryset=Category.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label='Category'
+        label=_('Category')
     )
     is_active = django_filters.BooleanFilter(
         widget=forms.Select(choices=[('', 'All'), ('True', 'Active'), ('False', 'Inactive')], attrs={'class': 'form-select'}),
-        label='Active'
+        label=_('Active')
     )
 
     class Meta:
@@ -362,30 +363,30 @@ class AssetTagSequenceFilterSet(BaseFilterSet):
 class AssetDisposalFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
         widget=forms.TextInput(attrs={'placeholder': 'Recipient, Sanitized By, Certificate, Notes, Asset Name...'})
     )
     asset = django_filters.ModelChoiceFilter(
         queryset=Asset.objects.all(),
-        label='Asset',
+        label=_('Asset'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     disposal_method = django_filters.ChoiceFilter(
         choices=DisposalMethodChoices.choices,
-        label='Disposal Method',
+        label=_('Disposal Method'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     data_sanitization_method = django_filters.ChoiceFilter(
         choices=DataSanitizationMethodChoices.choices,
-        label='Data Sanitization Method',
+        label=_('Data Sanitization Method'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     disposal_date = django_filters.DateFromToRangeFilter(
-        label='Disposal Date',
+        label=_('Disposal Date'),
         widget=django_filters.widgets.RangeWidget(attrs={'class': 'form-control', 'type': 'date'})
     )
     weee_compliant = django_filters.BooleanFilter(
-        label='WEEE Compliant',
+        label=_('WEEE Compliant'),
         widget=forms.Select(choices=[('', 'Any'), ('true', 'Yes'), ('false', 'No')], attrs={'class': 'form-select'})
     )
 
@@ -408,30 +409,30 @@ class AssetDisposalFilterSet(BaseFilterSet):
 class WarrantyFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
         widget=forms.TextInput(attrs={'placeholder': 'Provider, Reference, Terms, Notes, Asset Name...'})
     )
     asset = django_filters.ModelChoiceFilter(
         queryset=Asset.objects.all(),
-        label='Asset',
+        label=_('Asset'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     warranty_type = django_filters.ChoiceFilter(
         choices=WarrantyTypeChoices.choices,
-        label='Warranty Type',
+        label=_('Warranty Type'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     provider = django_filters.CharFilter(
         lookup_expr='icontains',
-        label='Provider',
+        label=_('Provider'),
         widget=forms.TextInput(attrs={'class': 'form-control'})
     )
     start_date = django_filters.DateFromToRangeFilter(
-        label='Start Date',
+        label=_('Start Date'),
         widget=django_filters.widgets.RangeWidget(attrs={'class': 'form-control', 'type': 'date'})
     )
     end_date = django_filters.DateFromToRangeFilter(
-        label='End Date',
+        label=_('End Date'),
         widget=django_filters.widgets.RangeWidget(attrs={'class': 'form-control', 'type': 'date'})
     )
 
@@ -454,36 +455,36 @@ class WarrantyFilterSet(BaseFilterSet):
 class AssetReservationFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
         widget=forms.TextInput(attrs={'placeholder': 'Purpose, Notes, Asset Name, Reserved For...'})
     )
     asset = django_filters.ModelChoiceFilter(
         queryset=Asset.objects.all(),
-        label='Asset',
+        label=_('Asset'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     reserved_for = django_filters.ModelChoiceFilter(
         queryset=AssetHolder.objects.all(),
-        label='Reserved For',
+        label=_('Reserved For'),
         null_label='(no holder)',
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     status = django_filters.ChoiceFilter(
         choices=ReservationStatusChoices.choices,
-        label='Status',
+        label=_('Status'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     start_date = django_filters.DateFromToRangeFilter(
-        label='Start Date',
+        label=_('Start Date'),
         widget=django_filters.widgets.RangeWidget(attrs={'class': 'form-control', 'type': 'date'})
     )
     end_date = django_filters.DateFromToRangeFilter(
-        label='End Date',
+        label=_('End Date'),
         widget=django_filters.widgets.RangeWidget(attrs={'class': 'form-control', 'type': 'date'})
     )
     created_by = django_filters.ModelChoiceFilter(
         queryset=User.objects.order_by('username'),
-        label='Created By',
+        label=_('Created By'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 

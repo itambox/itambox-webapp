@@ -1,6 +1,7 @@
 import django_filters
 from django import forms
 from django.db.models import Q
+from django.utils.translation import gettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import get_user_model
 
@@ -81,45 +82,45 @@ class ObjectChangeFilterSet(BaseFilterSet):
 
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
         widget=forms.TextInput(attrs={'placeholder': 'Search Username, Object, type...'})
     )
 
     show_system_events = django_filters.BooleanFilter(
         method='_noop',
-        label='Show system events',
+        label=_('Show system events'),
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
     )
 
     action = django_filters.MultipleChoiceFilter(
         choices=[(c[0], c[1]) for c in ObjectChangeActionChoices().CHOICES],
-        label='Action',
+        label=_('Action'),
         widget=forms.SelectMultiple(attrs={'class': 'form-select'})
     )
     
     changed_object_type = django_filters.ModelMultipleChoiceFilter(
         queryset=ContentType.objects.order_by('app_label', 'model'),
-        label='Object Type',
+        label=_('Object Type'),
         widget=forms.SelectMultiple(attrs={'class': 'form-select'})
     )
     
     user = django_filters.ModelChoiceFilter(
         queryset=User.objects.order_by('username'),
-        label='User',
+        label=_('User'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     
     time_after = django_filters.DateTimeFilter(
         field_name='time',
         lookup_expr='gte',
-        label='After',
+        label=_('After'),
         widget=forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'})
     )
     
     time_before = django_filters.DateTimeFilter(
         field_name='time',
         lookup_expr='lte',
-        label='Before',
+        label=_('Before'),
         widget=forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'})
     )
 

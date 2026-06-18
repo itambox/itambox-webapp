@@ -26,11 +26,11 @@ OBJ_TYPE_CHOICES = [
 
 class SearchForm(forms.Form):
     q = forms.CharField(
-        label='Search',
+        label=_('Search'),
         widget=forms.TextInput(attrs={'placeholder': 'Search ITAMbox', 'class': 'form-control'})
     )
     obj_type = forms.MultipleChoiceField(
-        label='Object type(s)',
+        label=_('Object type(s)'),
         choices=OBJ_TYPE_CHOICES,
         required=False,
         widget=forms.SelectMultiple(attrs={'class': 'form-select', 'id': 'id_obj_type_select', 'data-tom-select': ''})
@@ -43,7 +43,7 @@ class SearchForm(forms.Form):
         ('iregex', 'Regex'),
     )
     lookup = forms.ChoiceField(
-        label='Lookup',
+        label=_('Lookup'),
         choices=lookup_choices,
         required=False,
         initial='icontains',
@@ -109,13 +109,13 @@ class BulkEditForm(forms.Form):
     add_tags = forms.ModelMultipleChoiceField(
         queryset=None,
         required=False,
-        label="Add Tags",
+        label=_("Add Tags"),
         widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''})
     )
     remove_tags = forms.ModelMultipleChoiceField(
         queryset=None,
         required=False,
-        label="Remove Tags",
+        label=_("Remove Tags"),
         widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''})
     )
 

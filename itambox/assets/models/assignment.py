@@ -40,7 +40,7 @@ class AssetAssignment(SoftDeleteMixin, JournalingMixin, TaggableMixin, ChangeLog
         null=True,
         blank=True,
         related_name='assignment_pre_checkouts',
-        help_text="Preserved status label to revert to upon checkin."
+        help_text=_("Preserved status label to revert to upon checkin.")
     )
 
     checked_out_by = models.ForeignKey(

@@ -2,6 +2,7 @@ import django_filters
 from core.filters import BaseFilterSet
 from django.db.models import Q
 from django import forms
+from django.utils.translation import gettext_lazy as _
 from extras.filters import TagFilter # Assuming TagFilter exists for M2M
 from assets.models import Manufacturer
 from extras.models import Tag
@@ -11,19 +12,19 @@ class SoftwareFilterSet(BaseFilterSet):
     """FilterSet for querying Software instances."""
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
         widget=forms.TextInput(attrs={'placeholder': 'Name, Description...'})
     )
     manufacturer = django_filters.ModelChoiceFilter(
         field_name='manufacturer',
         queryset=Manufacturer.objects.all(),
-        label='Manufacturer',
+        label=_('Manufacturer'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     tags = django_filters.ModelMultipleChoiceFilter(
         field_name='tags',
         queryset=Tag.objects.all(),
-        label='Tags',
+        label=_('Tags'),
         widget=forms.SelectMultiple(attrs={'class': 'form-select'})
     )
 

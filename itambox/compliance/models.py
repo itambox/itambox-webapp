@@ -34,46 +34,46 @@ class CustodyTemplate(TaggableMixin, CloneableMixin, ExportableMixin, ChangeLogg
         blank=True,
         null=True,
         related_name='custody_templates',
-        help_text="Target Tenant Group this template applies to (conglomerate/divisional scope)."
+        help_text=_("Target Tenant Group this template applies to (conglomerate/divisional scope).")
     )
     name = models.CharField(
         max_length=255,
-        help_text="Template Name (e.g. Standard Laptop EULA)"
+        help_text=_("Template Name (e.g. Standard Laptop EULA)")
     )
     signature_provider = models.CharField(
         max_length=50,
         default='local',
-        help_text="E-Signature workflow provider module"
+        help_text=_("E-Signature workflow provider module")
     )
     logo = models.ImageField(
         upload_to='custody_logos/',
         blank=True,
         null=True,
-        help_text="Custom EULA / signoff logo image"
+        help_text=_("Custom EULA / signoff logo image")
     )
     eula_text = models.TextField(
-        help_text="Terms of Service / EULA guidelines"
+        help_text=_("Terms of Service / EULA guidelines")
     )
     disclaimer = models.TextField(
         blank=True,
-        help_text="Disclaimer statement printed at signoff"
+        help_text=_("Disclaimer statement printed at signoff")
     )
     qms_reference = models.CharField(
         max_length=100,
         blank=True,
-        help_text="Quality Management System document reference key"
+        help_text=_("Quality Management System document reference key")
     )
     is_active = models.BooleanField(
         default=True,
-        help_text="Deactivate to hide from choices"
+        help_text=_("Deactivate to hide from choices")
     )
     require_acceptance = models.BooleanField(
         default=True,
-        help_text="Require digital signature / EULA acceptance on checkout."
+        help_text=_("Require digital signature / EULA acceptance on checkout.")
     )
     email_signature_request = models.BooleanField(
         default=True,
-        help_text="Send email signature request link to the holder on checkout."
+        help_text=_("Send email signature request link to the holder on checkout.")
     )
     category = models.ForeignKey(
         to='assets.Category',
@@ -81,7 +81,7 @@ class CustodyTemplate(TaggableMixin, CloneableMixin, ExportableMixin, ChangeLogg
         blank=True,
         null=True,
         related_name='custody_templates',
-        help_text="Target Category this template overrides for the selected Tenant scope."
+        help_text=_("Target Category this template overrides for the selected Tenant scope.")
     )
     tags = models.ManyToManyField(
         to='extras.Tag',
@@ -137,7 +137,7 @@ class CustodyReceipt(ChangeLoggingMixin, BaseModel):
     signature_data = models.TextField(blank=True)
     signature_hash = models.CharField(max_length=64, blank=True)
     verification_hash = models.CharField(max_length=64, unique=True, blank=True, null=True)  # null=True intentional: unique constraint allows multiple unsigned (NULL) receipts
-    signature_canvas = models.TextField(blank=True, help_text="Base64 canvas stroke vector string representation")
+    signature_canvas = models.TextField(blank=True, help_text=_("Base64 canvas stroke vector string representation"))
     signed_at = models.DateTimeField(default=timezone.now)
     eula_version = models.CharField(max_length=10, default='1.0')
     created_date = models.DateTimeField(auto_now_add=True, null=True)
@@ -168,14 +168,14 @@ class AuditSession(StandardModel, SoftDeleteMixin):
         blank=True,
         null=True,
         related_name='audit_sessions',
-        help_text='Tenant this campaign belongs to. Leave blank for MSP-wide / global sessions.',
+        help_text=_('Tenant this campaign belongs to. Leave blank for MSP-wide / global sessions.'),
     )
     location = models.ForeignKey(
         'organization.Location',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        help_text="Target location expected to be audited. If omitted, applies globally."
+        help_text=_("Target location expected to be audited. If omitted, applies globally.")
     )
     status = models.CharField(
         max_length=20,
@@ -187,7 +187,7 @@ class AuditSession(StandardModel, SoftDeleteMixin):
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='audit_sessions')
     reconciliation_report = models.JSONField(
         null=True, blank=True, editable=False,
-        help_text="Frozen reconciliation report written at close time. Denormalized for long-term readability."
+        help_text=_("Frozen reconciliation report written at close time. Denormalized for long-term readability.")
     )
 
     class Meta:
@@ -260,12 +260,12 @@ class AssetAudit(ChangeLoggingMixin, models.Model):
     location = models.ForeignKey(
         'organization.Location',
         on_delete=models.PROTECT,
-        help_text="The observed physical location of the asset during audit."
+        help_text=_("The observed physical location of the asset during audit.")
     )
     status = models.ForeignKey(
         'assets.StatusLabel',
         on_delete=models.PROTECT,
-        help_text="The observed physical status of the asset during audit."
+        help_text=_("The observed physical status of the asset during audit.")
     )
     notes = models.TextField(blank=True)
     verification_method = models.CharField(

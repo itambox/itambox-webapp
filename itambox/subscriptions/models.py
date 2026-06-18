@@ -20,35 +20,35 @@ class Provider(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     """Represents the vendor/supplier of a subscription or service."""
     name = models.CharField(
         max_length=255,
-        help_text="Unique name of the provider (e.g., Adobe Inc.)"
+        help_text=_("Unique name of the provider (e.g., Adobe Inc.)")
     )
     slug = models.SlugField(
         max_length=255,
         null=True,
         blank=True,
-        help_text="URL-friendly identifier (auto-generated from name if left blank)"
+        help_text=_("URL-friendly identifier (auto-generated from name if left blank)")
     )
     account_id = models.CharField(
         max_length=100,
         blank=True,
-        verbose_name="Account ID",
-        help_text="Optional customer account number with the provider"
+        verbose_name=_("Account ID"),
+        help_text=_("Optional customer account number with the provider")
     )
     portal_url = models.URLField(
         blank=True,
-        verbose_name="Admin Portal URL",
-        help_text="URL for the provider's management/administration portal"
+        verbose_name=_("Admin Portal URL"),
+        help_text=_("URL for the provider's management/administration portal")
     )
     admin_notes = models.TextField(
         blank=True,
-        verbose_name="Admin Notes",
-        help_text="Optional internal administrative notes"
+        verbose_name=_("Admin Notes"),
+        help_text=_("Optional internal administrative notes")
     )
     is_active = models.BooleanField(
         default=True,
-        verbose_name="Active",
+        verbose_name=_("Active"),
         db_index=True,
-        help_text="Deactivate to hide from selection lists without deleting"
+        help_text=_("Deactivate to hide from selection lists without deleting")
     )
     tags = models.ManyToManyField(
         to=Tag,
@@ -62,7 +62,7 @@ class Provider(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         null=True,
         related_name='subscription_providers',
         db_index=True,
-        help_text="The tenant owning this provider. Null represents system-wide/global providers."
+        help_text=_("The tenant owning this provider. Null represents system-wide/global providers.")
     )
     tenant_group = models.ForeignKey(
         'organization.TenantGroup',
@@ -71,7 +71,7 @@ class Provider(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         null=True,
         related_name='subscription_providers',
         db_index=True,
-        help_text="The tenant group owning this provider."
+        help_text=_("The tenant group owning this provider.")
     )
     contacts = GenericRelation('organization.ContactAssignment')
 
@@ -165,13 +165,13 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
     """Represents a recurring service agreement (SaaS, Support, etc.)."""
     name = models.CharField(
         max_length=255,
-        help_text="Descriptive name (e.g., Adobe Creative Cloud - All Apps (Team))"
+        help_text=_("Descriptive name (e.g., Adobe Creative Cloud - All Apps (Team))")
     )
     slug = models.SlugField(
         max_length=255,
         null=True,
         blank=True,
-        help_text="URL-friendly identifier (auto-generated from name if left blank)"
+        help_text=_("URL-friendly identifier (auto-generated from name if left blank)")
     )
     provider = models.ForeignKey(
         to=Provider,
@@ -182,26 +182,26 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
         max_length=50,
         choices=SubscriptionTypeChoices.choices,
         default=SubscriptionTypeChoices.SAAS,
-        verbose_name="Subscription Type",
+        verbose_name=_("Subscription Type"),
         db_index=True
     )
     status = models.CharField(
         max_length=20,
         choices=SubscriptionStatusChoices.choices,
         default=SubscriptionStatusChoices.ACTIVE,
-        verbose_name="Status",
+        verbose_name=_("Status"),
         db_index=True,
     )
     start_date = models.DateField(
         blank=True,
         null=True,
-        verbose_name="Start Date",
+        verbose_name=_("Start Date"),
         db_index=True,
     )
     renewal_date = models.DateField(
         blank=True,
         null=True,
-        verbose_name="Next Renewal Date",
+        verbose_name=_("Next Renewal Date"),
         db_index=True,
     )
     renewal_cost = models.DecimalField(
@@ -209,7 +209,7 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
         decimal_places=2,
         blank=True,
         null=True,
-        help_text="Cost per renewal period"
+        help_text=_("Cost per renewal period")
     )
     currency = CurrencyField()
     billing_cycle = models.CharField(
@@ -217,30 +217,30 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
         choices=BillingCycleChoices.choices,
         default=BillingCycleChoices.ANNUAL,
         blank=True,
-        verbose_name="Billing Cycle",
+        verbose_name=_("Billing Cycle"),
     )
     term_months = models.PositiveIntegerField(
         blank=True,
         null=True,
-        verbose_name="Term (Months)",
-        help_text="Duration of the subscription term in months"
+        verbose_name=_("Term (Months)"),
+        help_text=_("Duration of the subscription term in months")
     )
     auto_renewal = models.BooleanField(
         default=True,
-        verbose_name="Auto-Renewal",
-        help_text="Whether this subscription renews automatically"
+        verbose_name=_("Auto-Renewal"),
+        help_text=_("Whether this subscription renews automatically")
     )
     licensed_quantity = models.PositiveIntegerField(
         blank=True,
         null=True,
-        verbose_name="Licensed Quantity",
-        help_text="Number of seats/users/devices covered (for SaaS/support)"
+        verbose_name=_("Licensed Quantity"),
+        help_text=_("Number of seats/users/devices covered (for SaaS/support)")
     )
     contract_reference = models.CharField(
         max_length=100,
         blank=True,
-        verbose_name="Contract Reference",
-        help_text="Contract number, PO reference, or quote ID"
+        verbose_name=_("Contract Reference"),
+        help_text=_("Contract number, PO reference, or quote ID")
     )
     cost_center = models.ForeignKey(
         'organization.CostCenter',
@@ -248,14 +248,14 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
         null=True,
         blank=True,
         related_name='subscriptions',
-        verbose_name="Cost Center",
-        help_text="Financial cost center responsible for this subscription",
+        verbose_name=_("Cost Center"),
+        help_text=_("Financial cost center responsible for this subscription"),
         db_index=True,
     )
     cancellation_date = models.DateField(
         blank=True,
         null=True,
-        verbose_name="Cancellation Date",
+        verbose_name=_("Cancellation Date"),
         db_index=True,
     )
     owner = models.ForeignKey(
@@ -264,16 +264,16 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
         null=True,
         blank=True,
         related_name='owned_subscriptions',
-        verbose_name="Owner",
-        help_text="Person responsible for this subscription"
+        verbose_name=_("Owner"),
+        help_text=_("Person responsible for this subscription")
     )
     description = models.TextField(
         blank=True,
-        help_text="Optional text detailing coverage or terms"
+        help_text=_("Optional text detailing coverage or terms")
     )
     notes = models.TextField(
         blank=True,
-        help_text="Optional internal notes"
+        help_text=_("Optional internal notes")
     )
     tags = models.ManyToManyField(
         to=Tag,
@@ -418,7 +418,7 @@ class SubscriptionAssignment(ChangeLoggingMixin, BaseModel):
         null=True,
         blank=True,
         related_name='subscription_assignments_created',
-        verbose_name="Assigned By",
+        verbose_name=_("Assigned By"),
     )
     notes = models.TextField(blank=True)
 

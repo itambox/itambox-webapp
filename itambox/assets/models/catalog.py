@@ -30,7 +30,7 @@ class StatusLabel(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     slug = models.SlugField(max_length=100)
     type = models.CharField(max_length=50, choices=StatusTypeChoices.choices, default=StatusTypeChoices.DEPLOYABLE, db_index=True)
     description = models.TextField(blank=True)
-    color = models.CharField(max_length=6, blank=True, help_text="RGB color in hexadecimal (e.g. 00ff00)")
+    color = models.CharField(max_length=6, blank=True, help_text=_("RGB color in hexadecimal (e.g. 00ff00)"))
     tags = models.ManyToManyField('extras.Tag', related_name='status_labels_tagged', blank=True)
 
     class Meta:
@@ -56,7 +56,7 @@ class AssetRole(StandardModel, SoftDeleteMixin):
     name = models.CharField(max_length=100)
     slug = models.SlugField(max_length=100)
     description = models.TextField(blank=True)
-    color = models.CharField(max_length=6, blank=True, help_text="RGB color in hexadecimal (e.g. 00ff00)")
+    color = models.CharField(max_length=6, blank=True, help_text=_("RGB color in hexadecimal (e.g. 00ff00)"))
     allows_components = models.BooleanField(
         default=False,
         help_text=_("Assets with this role can have components allocated (servers, workstations, …)"),
@@ -187,13 +187,13 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
     manufacturer = models.ForeignKey('assets.Manufacturer', on_delete=models.PROTECT, related_name='asset_types')
     model = models.CharField(max_length=255, db_index=True)
     slug = models.SlugField(max_length=255)
-    part_number = models.CharField(max_length=100, blank=True, db_index=True, help_text="Manufacturer part number or SKU")
+    part_number = models.CharField(max_length=100, blank=True, db_index=True, help_text=_("Manufacturer part number or SKU"))
 
     eol_months = models.PositiveIntegerField(
         null=True,
         blank=True,
-        verbose_name="EOL (Months)",
-        help_text="Lifespan in months before EOL replacement"
+        verbose_name=_("EOL (Months)"),
+        help_text=_("Lifespan in months before EOL replacement")
     )
     custom_fieldset = models.ForeignKey(
         CustomFieldset,
@@ -201,7 +201,7 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
         null=True,
         blank=True,
         related_name='asset_types',
-        verbose_name="Custom Fieldset"
+        verbose_name=_("Custom Fieldset")
     )
     # custom_field_data JSONField comes from CustomFieldDataMixin
     depreciation = models.ForeignKey(
@@ -210,7 +210,7 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
         null=True,
         blank=True,
         related_name='asset_types',
-        verbose_name="Depreciation"
+        verbose_name=_("Depreciation")
     )
 
     category = models.ForeignKey(
@@ -219,7 +219,7 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
         null=True,
         blank=True,
         related_name='asset_types',
-        verbose_name="Category",
+        verbose_name=_("Category"),
         db_index=True
     )
     asset_role = models.ForeignKey(
@@ -228,16 +228,16 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
         null=True,
         blank=True,
         related_name='asset_types',
-        verbose_name="Asset Role",
+        verbose_name=_("Asset Role"),
         db_index=True
     )
-    image = models.ImageField(upload_to='asset_types/', blank=True, null=True, verbose_name="Model Image")
+    image = models.ImageField(upload_to='asset_types/', blank=True, null=True, verbose_name=_("Model Image"))
 
     # Other
     description = models.TextField(blank=True)
     comments = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', related_name="asset_types", blank=True)
-    requestable = models.BooleanField(default=False, db_index=True, help_text="Allow users to request assets of this type")
+    requestable = models.BooleanField(default=False, db_index=True, help_text=_("Allow users to request assets of this type"))
 
     class Meta:
         constraints = [
@@ -295,12 +295,12 @@ class Category(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     all_objects = AllObjectsManager()
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255)
-    color = models.CharField(max_length=6, blank=True, help_text="RGB color in hexadecimal (e.g. 00ff00)")
+    color = models.CharField(max_length=6, blank=True, help_text=_("RGB color in hexadecimal (e.g. 00ff00)"))
     description = models.TextField(blank=True)
-    applies_to = models.JSONField(default=dict, blank=True, help_text="Applies to: {'asset': True, 'accessory': True, 'component': True}")
+    applies_to = models.JSONField(default=dict, blank=True, help_text=_("Applies to: {'asset': True, 'accessory': True, 'component': True}"))
     audit_interval_months = models.PositiveIntegerField(
         null=True, blank=True,
-        help_text="How often assets in this category must be physically audited, in months. Leave blank for no required cadence."
+        help_text=_("How often assets in this category must be physically audited, in months. Leave blank for no required cadence.")
     )
     tags = models.ManyToManyField('extras.Tag', related_name='categories', blank=True)
 

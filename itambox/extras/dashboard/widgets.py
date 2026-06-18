@@ -159,12 +159,12 @@ class DashboardWidget:
                 tenants = Tenant.objects.all().order_by('name')
                 choices = [('', 'All Tenants')] + [(str(t.id), t.name) for t in tenants]
                 form.fields['tenant_id'] = forms.ChoiceField(
-                    label='Target Tenant Context',
+                    label=_('Target Tenant Context'),
                     choices=choices,
                     required=False,
                     initial=initial.get('tenant_id', ''),
                     widget=forms.Select(attrs={'class': 'form-select'}),
-                    help_text='Scope this widget to a specific tenant.'
+                    help_text=_('Scope this widget to a specific tenant.')
                 )
         return form
 
@@ -212,10 +212,10 @@ class NoteWidget(DashboardWidget):
 
     class ConfigForm(WidgetConfigForm):
         content = forms.CharField(
-            label='Content',
+            label=_('Content'),
             widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 6}),
             required=False,
-            help_text='Markdown is supported (headings, bold, lists, links, tables, code).'
+            help_text=_('Markdown is supported (headings, bold, lists, links, tables, code).')
         )
 
     def get_context(self, request):
@@ -270,7 +270,7 @@ class ObjectCountsWidget(DashboardWidget):
         # always renders the quiet label/number row list. Stale values in
         # saved configs are simply ignored.
         models = forms.MultipleChoiceField(
-            label='Models',
+            label=_('Models'),
             choices=OBJECT_COUNT_MODEL_CHOICES,
             widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
             required=False
@@ -346,15 +346,15 @@ class FinancialWidget(DashboardWidget):
     # ITAMBOX_DEFAULT_CURRENCY. Stale saved values are ignored.
     class ConfigForm(WidgetConfigForm):
         budget_limit = forms.DecimalField(
-            label='Budget Limit',
+            label=_('Budget Limit'),
             max_digits=12,
             decimal_places=2,
             widget=forms.NumberInput(attrs={'class': 'form-control'}),
             required=False,
-            help_text='If set, a budget utilization bar compares TCO against this limit.'
+            help_text=_('If set, a budget utilization bar compares TCO against this limit.')
         )
         metrics = forms.MultipleChoiceField(
-            label='Metrics to Display',
+            label=_('Metrics to Display'),
             choices=[
                 ('purchase', 'Original Purchase Cost'),
                 ('maintenance', 'Maintenance Expenditures'),
@@ -363,7 +363,7 @@ class FinancialWidget(DashboardWidget):
             ],
             widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
             required=False,
-            help_text='Rows shown below the TCO headline. If none selected, all are shown.'
+            help_text=_('Rows shown below the TCO headline. If none selected, all are shown.')
         )
 
     def get_context(self, request):
@@ -493,7 +493,7 @@ class StatusLabelsWidget(DashboardWidget):
 
     class ConfigForm(WidgetConfigForm):
         chart_type = forms.ChoiceField(
-            label='Chart Type',
+            label=_('Chart Type'),
             choices=[
                 ('doughnut', 'Doughnut'),
                 ('pie', 'Pie'),
@@ -562,17 +562,17 @@ class LicenseWidget(DashboardWidget):
 
     class ConfigForm(WidgetConfigForm):
         limit = forms.IntegerField(
-            label='Limit to Top N',
+            label=_('Limit to Top N'),
             initial=5,
             widget=forms.NumberInput(attrs={'class': 'form-control'}),
             required=False
         )
         warning_threshold = forms.DecimalField(
-            label='Warning Threshold (%)',
+            label=_('Warning Threshold (%)'),
             initial=85.0,
             widget=forms.NumberInput(attrs={'class': 'form-control'}),
             required=False,
-            help_text='Threshold percentage to flag high utilization.'
+            help_text=_('Threshold percentage to flag high utilization.')
         )
 
     def get_context(self, request):
@@ -607,20 +607,20 @@ class MaintenanceWidget(DashboardWidget):
 
     class ConfigForm(WidgetConfigForm):
         limit = forms.IntegerField(
-            label='Limit to Top N',
+            label=_('Limit to Top N'),
             initial=10,
             widget=forms.NumberInput(attrs={'class': 'form-control'}),
             required=False
         )
         highlight_overdue = forms.BooleanField(
-            label='Highlight Long-Running Repairs',
+            label=_('Highlight Long-Running Repairs'),
             initial=True,
             widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             required=False,
-            help_text='Flag repairs running longer than the threshold below.'
+            help_text=_('Flag repairs running longer than the threshold below.')
         )
         overdue_days = forms.IntegerField(
-            label='Long-Running Threshold (days)',
+            label=_('Long-Running Threshold (days)'),
             initial=30,
             min_value=1,
             widget=forms.NumberInput(attrs={'class': 'form-control'}),
@@ -663,7 +663,7 @@ class EOLAlertsWidget(DashboardWidget):
 
     class ConfigForm(WidgetConfigForm):
         days_horizon = forms.ChoiceField(
-            label='Planning Horizon',
+            label=_('Planning Horizon'),
             choices=[
                 ('30', '30 Days'),
                 ('90', '90 Days (Default)'),
@@ -727,13 +727,13 @@ class ChangelogWidget(DashboardWidget):
 
     class ConfigForm(WidgetConfigForm):
         limit = forms.IntegerField(
-            label='Max Items to Display',
+            label=_('Max Items to Display'),
             initial=10,
             widget=forms.NumberInput(attrs={'class': 'form-control'}),
             required=False
         )
         action_filter = forms.ChoiceField(
-            label='Filter by Action',
+            label=_('Filter by Action'),
             choices=[
                 ('', 'All Actions'),
                 ('create', 'Creations Only'),
@@ -745,18 +745,18 @@ class ChangelogWidget(DashboardWidget):
             required=False
         )
         models = forms.MultipleChoiceField(
-            label='Filter by Object Types',
+            label=_('Filter by Object Types'),
             choices=OBJECT_COUNT_MODEL_CHOICES,
             widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
             required=False,
-            help_text='If none selected, changes for all object types will be shown.'
+            help_text=_('If none selected, changes for all object types will be shown.')
         )
         hide_event_noise = forms.BooleanField(
-            label='Hide Internal Event Entries',
+            label=_('Hide Internal Event Entries'),
             initial=True,
             widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             required=False,
-            help_text='Each change also writes an internal Event row — showing both duplicates the feed.'
+            help_text=_('Each change also writes an internal Event row — showing both duplicates the feed.')
         )
 
     def get_context(self, request):
@@ -813,7 +813,7 @@ class RenewalsWidget(DashboardWidget):
 
     class ConfigForm(WidgetConfigForm):
         days_horizon = forms.ChoiceField(
-            label='Planning Horizon',
+            label=_('Planning Horizon'),
             choices=[
                 ('30', '30 Days'),
                 ('60', '60 Days'),
@@ -825,7 +825,7 @@ class RenewalsWidget(DashboardWidget):
             required=False
         )
         limit = forms.IntegerField(
-            label='Max Items to Display',
+            label=_('Max Items to Display'),
             initial=10,
             widget=forms.NumberInput(attrs={'class': 'form-control'}),
             required=False
@@ -905,19 +905,19 @@ class LowStockWidget(DashboardWidget):
 
     class ConfigForm(WidgetConfigForm):
         include_accessories = forms.BooleanField(
-            label='Include Accessories',
+            label=_('Include Accessories'),
             initial=True,
             widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             required=False
         )
         include_consumables = forms.BooleanField(
-            label='Include Consumables',
+            label=_('Include Consumables'),
             initial=True,
             widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             required=False
         )
         include_components = forms.BooleanField(
-            label='Include Components',
+            label=_('Include Components'),
             initial=True,
             widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             required=False
@@ -1065,7 +1065,7 @@ class BookmarksWidget(DashboardWidget):
 
     class ConfigForm(WidgetConfigForm):
         limit = forms.IntegerField(
-            label='Max Items to Display',
+            label=_('Max Items to Display'),
             initial=10,
             min_value=1,
             max_value=50,
@@ -1095,7 +1095,7 @@ class AssetAgeWidget(DashboardWidget):
 
     class ConfigForm(WidgetConfigForm):
         chart_format = forms.ChoiceField(
-            label='Chart Format',
+            label=_('Chart Format'),
             choices=[
                 ('bar', 'Bar Chart'),
                 ('pie', 'Pie Chart'),
@@ -1167,17 +1167,17 @@ class TenantSpendWidget(DashboardWidget):
     # saved values for those keys are ignored.
     class ConfigForm(WidgetConfigForm):
         limit = forms.IntegerField(
-            label='Max Tenants to Show',
+            label=_('Max Tenants to Show'),
             initial=8,
             widget=forms.NumberInput(attrs={'class': 'form-control'}),
             required=False
         )
         exclude_unassigned = forms.BooleanField(
-            label='Exclude Unassigned Assets',
+            label=_('Exclude Unassigned Assets'),
             initial=False,
             widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             required=False,
-            help_text='Do not display spending for assets with no tenant.'
+            help_text=_('Do not display spending for assets with no tenant.')
         )
 
     def get_context(self, request):

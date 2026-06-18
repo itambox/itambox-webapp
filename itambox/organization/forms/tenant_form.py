@@ -1,4 +1,5 @@
 from django import forms
+from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Div
 
@@ -35,7 +36,7 @@ class TenantForm(forms.ModelForm):
         choices=CURRENCY_CHOICES,
         initial='EUR',
         widget=forms.Select(attrs={'class': 'form-select'}),
-        help_text='ISO 4217 code used when displaying this tenant\'s monetary values (display only, no conversion).',
+        help_text=_('ISO 4217 code used when displaying this tenant\'s monetary values (display only, no conversion).'),
     )
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),

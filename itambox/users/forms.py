@@ -114,7 +114,7 @@ class UserPreferencesForm(forms.Form):
     # Define fields explicitly
     pagination_per_page = forms.ChoiceField(
         choices=settings.PAGINATE_COUNT_CHOICES,
-        label='Items Per Page',
+        label=_('Items Per Page'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     theme = forms.ChoiceField(

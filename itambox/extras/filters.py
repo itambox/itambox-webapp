@@ -1,6 +1,7 @@
 import django_filters
 from django import forms
 from django.db.models import Q
+from django.utils.translation import gettext_lazy as _
 from core.filters import BaseFilterSet
 from django.contrib.contenttypes.models import ContentType
 from .models import (
@@ -11,7 +12,7 @@ from .models import (
 class TagFilter(django_filters.FilterSet):
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
     )
     
     class Meta:
@@ -29,7 +30,7 @@ class TagFilter(django_filters.FilterSet):
 
 
 class CustomFieldFilterSet(django_filters.FilterSet):
-    q = django_filters.CharFilter(method='search', label='Search')
+    q = django_filters.CharFilter(method='search', label=_('Search'))
 
     class Meta:
         model = CustomField
@@ -45,7 +46,7 @@ class CustomFieldFilterSet(django_filters.FilterSet):
 
 
 class CustomFieldsetFilterSet(django_filters.FilterSet):
-    q = django_filters.CharFilter(method='search', label='Search')
+    q = django_filters.CharFilter(method='search', label=_('Search'))
 
     class Meta:
         model = CustomFieldset
@@ -60,18 +61,18 @@ class CustomFieldsetFilterSet(django_filters.FilterSet):
 
 
 class SavedFilterFilterSet(BaseFilterSet):
-    q = django_filters.CharFilter(method='search', label='Search')
+    q = django_filters.CharFilter(method='search', label=_('Search'))
     content_type = django_filters.ModelChoiceFilter(
         queryset=ContentType.objects.order_by('app_label', 'model'),
-        label='Object Type',
+        label=_('Object Type'),
         widget=forms.Select(attrs={'class': 'form-select'}),
     )
     shared = django_filters.BooleanFilter(
-        label='Shared',
+        label=_('Shared'),
         widget=forms.Select(choices=[('', '---------'), (True, 'Yes'), (False, 'No')], attrs={'class': 'form-select'}),
     )
     enabled = django_filters.BooleanFilter(
-        label='Enabled',
+        label=_('Enabled'),
         widget=forms.Select(choices=[('', '---------'), (True, 'Yes'), (False, 'No')], attrs={'class': 'form-select'}),
     )
 
@@ -89,7 +90,7 @@ class SavedFilterFilterSet(BaseFilterSet):
 
 
 class EventRuleFilterSet(django_filters.FilterSet):
-    q = django_filters.CharFilter(method='search', label='Search')
+    q = django_filters.CharFilter(method='search', label=_('Search'))
 
     class Meta:
         model = EventRule
@@ -102,7 +103,7 @@ class EventRuleFilterSet(django_filters.FilterSet):
 
 
 class WebhookEndpointFilterSet(django_filters.FilterSet):
-    q = django_filters.CharFilter(method='search', label='Search')
+    q = django_filters.CharFilter(method='search', label=_('Search'))
 
     class Meta:
         model = WebhookEndpoint
@@ -118,7 +119,7 @@ class WebhookEndpointFilterSet(django_filters.FilterSet):
 
 
 class NotificationChannelFilterSet(django_filters.FilterSet):
-    q = django_filters.CharFilter(method='search', label='Search')
+    q = django_filters.CharFilter(method='search', label=_('Search'))
 
     class Meta:
         model = NotificationChannel
@@ -131,7 +132,7 @@ class NotificationChannelFilterSet(django_filters.FilterSet):
 
 
 class AlertRuleFilterSet(django_filters.FilterSet):
-    q = django_filters.CharFilter(method='search', label='Search')
+    q = django_filters.CharFilter(method='search', label=_('Search'))
 
     class Meta:
         model = AlertRule
@@ -149,29 +150,29 @@ class AlertRuleFilterSet(django_filters.FilterSet):
 class AlertLogFilterSet(BaseFilterSet):
     status = django_filters.MultipleChoiceFilter(
         choices=AlertLog.STATUS_CHOICES,
-        label='Status',
+        label=_('Status'),
         widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
     )
     severity = django_filters.MultipleChoiceFilter(
         choices=AlertRule.SEVERITY_CHOICES,
-        label='Severity',
+        label=_('Severity'),
         widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
     )
     rule = django_filters.ModelChoiceFilter(
         queryset=AlertRule.objects.all(),
-        label='Rule',
+        label=_('Rule'),
         widget=forms.Select(attrs={'class': 'form-select'}),
     )
     created_after = django_filters.DateFilter(
         field_name='created_at',
         lookup_expr='gte',
-        label='Created after',
+        label=_('Created after'),
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
     )
     created_before = django_filters.DateFilter(
         field_name='created_at',
         lookup_expr='lte',
-        label='Created before',
+        label=_('Created before'),
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
     )
 

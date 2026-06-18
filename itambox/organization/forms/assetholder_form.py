@@ -2,6 +2,7 @@ from django import forms
 from django.urls import reverse
 from django.db.models import Q
 from django.contrib.auth import get_user_model
+from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Row, Column
 
@@ -24,7 +25,7 @@ class AssetHolderForm(CustomFieldModelFormMixin, forms.ModelForm):
     user = forms.ModelChoiceField(
         queryset=get_user_model().objects.all(),
         required=False,
-        label="Linked User account",
+        label=_("Linked User account"),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     tags = forms.ModelMultipleChoiceField(

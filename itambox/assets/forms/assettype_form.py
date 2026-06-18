@@ -1,5 +1,6 @@
 from django import forms
 from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Div, Row, Column, Fieldset
 
@@ -17,13 +18,13 @@ class AssetTypeForm(SlugModelForm):
         queryset=AssetRole.objects.all(),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Asset Role"
+        label=_("Asset Role")
     )
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
         required=False,
         widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tomselect-tags': 'true'}),
-        label="Tags"
+        label=_("Tags")
     )
 
     class Meta:

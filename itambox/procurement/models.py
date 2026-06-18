@@ -1,6 +1,7 @@
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from core.models import BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin
 from core.managers import TenantScopingSoftDeleteManager
 from core.currency import CurrencyField
@@ -170,7 +171,7 @@ class Contract(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin):
         max_length=20,
         choices=ContractTypeChoices.choices,
         default=ContractTypeChoices.SUPPORT,
-        verbose_name='Contract Type',
+        verbose_name=_('Contract Type'),
     )
     status = models.CharField(
         max_length=20,
@@ -191,8 +192,8 @@ class Contract(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin):
         decimal_places=2,
         null=True,
         blank=True,
-        verbose_name='Contract Cost',
-        help_text='Total or per-cycle cost',
+        verbose_name=_('Contract Cost'),
+        help_text=_('Total or per-cycle cost'),
     )
     currency = CurrencyField()
     billing_cycle = models.CharField(
@@ -200,7 +201,7 @@ class Contract(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin):
         choices=ContractBillingCycleChoices.choices,
         default=ContractBillingCycleChoices.ANNUAL,
         blank=True,
-        verbose_name='Billing Cycle',
+        verbose_name=_('Billing Cycle'),
     )
 
     # --- Dates ---
@@ -209,33 +210,33 @@ class Contract(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin):
     renewal_date = models.DateField(null=True, blank=True)
     auto_renew = models.BooleanField(
         default=False,
-        verbose_name='Auto-Renew',
-        help_text='Whether this contract renews automatically',
+        verbose_name=_('Auto-Renew'),
+        help_text=_('Whether this contract renews automatically'),
     )
 
     # --- SLA ---
     sla_response_time = models.CharField(
         max_length=100,
         blank=True,
-        verbose_name='SLA Response Time',
-        help_text='e.g. "4 business hours", "Next business day"',
+        verbose_name=_('SLA Response Time'),
+        help_text=_('e.g. "4 business hours", "Next business day"'),
     )
     sla_resolution_time = models.CharField(
         max_length=100,
         blank=True,
-        verbose_name='SLA Resolution Time',
-        help_text='e.g. "8 business hours", "3 business days"',
+        verbose_name=_('SLA Resolution Time'),
+        help_text=_('e.g. "8 business hours", "3 business days"'),
     )
     coverage_hours = models.CharField(
         max_length=50,
         blank=True,
-        verbose_name='Coverage Hours',
-        help_text='e.g. "24x7", "9-5 Mon-Fri"',
+        verbose_name=_('Coverage Hours'),
+        help_text=_('e.g. "24x7", "9-5 Mon-Fri"'),
     )
     sla_terms = models.TextField(
         blank=True,
-        verbose_name='SLA Terms',
-        help_text='Full SLA terms or summary text',
+        verbose_name=_('SLA Terms'),
+        help_text=_('Full SLA terms or summary text'),
     )
 
     # --- Coverage ---
@@ -243,7 +244,7 @@ class Contract(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin):
         'assets.Asset',
         blank=True,
         related_name='contracts',
-        verbose_name='Covered Assets',
+        verbose_name=_('Covered Assets'),
     )
     purchase_order = models.ForeignKey(
         PurchaseOrder,
@@ -251,8 +252,8 @@ class Contract(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin):
         null=True,
         blank=True,
         related_name='contracts',
-        verbose_name='Purchase Order',
-        help_text='The PO this contract originated from, if any',
+        verbose_name=_('Purchase Order'),
+        help_text=_('The PO this contract originated from, if any'),
     )
 
     # --- Cost center ---
@@ -262,7 +263,7 @@ class Contract(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin):
         null=True,
         blank=True,
         related_name='contracts',
-        verbose_name='Cost Center',
+        verbose_name=_('Cost Center'),
     )
 
     # --- Notes ---

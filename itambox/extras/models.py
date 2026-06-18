@@ -63,12 +63,12 @@ class Dashboard(models.Model):
         null=True,
         blank=True,
         related_name='dashboards',
-        help_text='Scope all widgets on this dashboard to this specific tenant context.'
+        help_text=_('Scope all widgets on this dashboard to this specific tenant context.')
     )
     layout = models.JSONField(
         default=list,
         blank=True,
-        help_text='Ordered list of widget config dicts'
+        help_text=_('Ordered list of widget config dicts')
     )
     created = models.DateTimeField(auto_now_add=True)
     last_updated = models.DateTimeField(auto_now=True)
@@ -135,19 +135,19 @@ class CustomField(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         (FIELD_TYPE_SELECT, 'Select / Dropdown'),
     ]
 
-    name = models.SlugField(max_length=50, verbose_name="Field Name", help_text="Slug-like name (e.g. sim_card_number)")
-    label = models.CharField(max_length=100, db_index=True, verbose_name="Display Label")
-    field_type = models.CharField(max_length=50, choices=FIELD_TYPE_CHOICES, default=FIELD_TYPE_TEXT, db_index=True, verbose_name="Field Type")
-    choices = models.TextField(blank=True, help_text="New-line separated list of choices (only for 'select' type)")
-    required = models.BooleanField(default=False, db_index=True, verbose_name="Required")
+    name = models.SlugField(max_length=50, verbose_name=_("Field Name"), help_text=_("Slug-like name (e.g. sim_card_number)"))
+    label = models.CharField(max_length=100, db_index=True, verbose_name=_("Display Label"))
+    field_type = models.CharField(max_length=50, choices=FIELD_TYPE_CHOICES, default=FIELD_TYPE_TEXT, db_index=True, verbose_name=_("Field Type"))
+    choices = models.TextField(blank=True, help_text=_("New-line separated list of choices (only for 'select' type)"))
+    required = models.BooleanField(default=False, db_index=True, verbose_name=_("Required"))
     object_types = models.ManyToManyField(
         'contenttypes.ContentType',
         related_name='custom_fields',
         blank=True,
-        verbose_name="Object Types",
-        help_text="The model(s) this field applies to. A field applying to Asset Type "
+        verbose_name=_("Object Types"),
+        help_text=_("The model(s) this field applies to. A field applying to Asset Type "
                   "describes a hardware specification; one applying to Asset describes "
-                  "a per-device detail.",
+                  "a per-device detail."),
     )
 
     class Meta:
@@ -174,8 +174,8 @@ class CustomField(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
 class CustomFieldset(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    name = models.CharField(max_length=100, verbose_name="Fieldset Name")
-    fields = models.ManyToManyField(CustomField, related_name='fieldsets', blank=True, verbose_name="Custom Fields")
+    name = models.CharField(max_length=100, verbose_name=_("Fieldset Name"))
+    fields = models.ManyToManyField(CustomField, related_name='fieldsets', blank=True, verbose_name=_("Custom Fields"))
 
     class Meta:
         ordering = ['name']
@@ -241,12 +241,12 @@ class EventRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='event_rules')
     events = models.JSONField(
         default=list,
-        help_text="List of event action types, e.g. ['create', 'update']"
+        help_text=_("List of event action types, e.g. ['create', 'update']")
     )
     conditions = models.JSONField(
         default=dict,
         blank=True,
-        help_text="Optional conditions for rule matching"
+        help_text=_("Optional conditions for rule matching")
     )
     action_type = models.CharField(max_length=20, choices=ACTION_TYPE_CHOICES)
     webhook = models.ForeignKey(
@@ -255,13 +255,13 @@ class EventRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         null=True,
         blank=True,
         related_name='event_rules',
-        help_text="Endpoint to call when the action type is Webhook. "
-                  "Takes precedence over any 'url' in action_config.",
+        help_text=_("Endpoint to call when the action type is Webhook. "
+                  "Takes precedence over any 'url' in action_config."),
     )
     action_config = models.JSONField(
         default=dict,
         blank=True,
-        help_text="Advanced/optional JSON config (notification body, header overrides, etc.)"
+        help_text=_("Advanced/optional JSON config (notification body, header overrides, etc.)")
     )
     enabled = models.BooleanField(default=True)
     tenant = models.ForeignKey(
@@ -319,10 +319,10 @@ class WebhookEndpoint(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     url = models.URLField(max_length=2000)
     http_method = models.CharField(max_length=10, choices=METHOD_CHOICES, default=HTTP_POST)
     headers = models.JSONField(default=dict, blank=True)
-    secret = models.CharField(max_length=255, blank=True, help_text="Shared secret for HMAC payload signing")
+    secret = models.CharField(max_length=255, blank=True, help_text=_("Shared secret for HMAC payload signing"))
     enabled = models.BooleanField(default=True)
-    retry_count = models.PositiveSmallIntegerField(default=3, help_text="Max retry attempts on failure")
-    retry_backoff = models.PositiveSmallIntegerField(default=60, help_text="Backoff in seconds between retries")
+    retry_count = models.PositiveSmallIntegerField(default=3, help_text=_("Max retry attempts on failure"))
+    retry_backoff = models.PositiveSmallIntegerField(default=60, help_text=_("Backoff in seconds between retries"))
     tenant = models.ForeignKey(
         'organization.Tenant',
         on_delete=models.CASCADE,
@@ -508,8 +508,8 @@ class ExportTemplate(BaseModel):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='export_templates')
-    template_code = models.TextField(help_text="Jinja2 or Django template code for export")
-    mime_type = models.CharField(max_length=50, default='text/csv', help_text="MIME type for the exported file")
+    template_code = models.TextField(help_text=_("Jinja2 or Django template code for export"))
+    mime_type = models.CharField(max_length=50, default='text/csv', help_text=_("MIME type for the exported file"))
     file_extension = models.CharField(max_length=10, default='csv')
 
     class Meta:
@@ -548,15 +548,15 @@ class ExportTemplate(BaseModel):
 class LabelTemplate(ChangeLoggingMixin, BaseModel):
     name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True)
-    page_width = models.FloatField(default=2.25, help_text="Label width in inches")
-    page_height = models.FloatField(default=1.25, help_text="Label height in inches")
+    page_width = models.FloatField(default=2.25, help_text=_("Label width in inches"))
+    page_height = models.FloatField(default=1.25, help_text=_("Label height in inches"))
     barcode_format = models.CharField(max_length=20, default='code128', choices=[
         ('code128', 'Code 128'),
         ('code39', 'Code 39'),
         ('qr', 'QR Code'),
         ('datamatrix', 'Data Matrix'),
     ])
-    template_code = models.TextField(blank=True, help_text="Jinja2/HTML template for label layout")
+    template_code = models.TextField(blank=True, help_text=_("Jinja2/HTML template for label layout"))
 
     class Meta:
         ordering = ['name']
@@ -575,13 +575,13 @@ class ConfigContext(ChangeLoggingMixin, BaseModel):
     description = models.TextField(blank=True)
     weight = models.PositiveSmallIntegerField(
         default=100,
-        help_text="Priority weight for dictionary merging conflict resolution"
+        help_text=_("Priority weight for dictionary merging conflict resolution")
     )
     regions = models.ManyToManyField('organization.Region', blank=True, related_name='config_contexts')
     sites = models.ManyToManyField('organization.Site', blank=True, related_name='config_contexts')
     locations = models.ManyToManyField('organization.Location', blank=True, related_name='config_contexts')
     tenants = models.ManyToManyField('organization.Tenant', blank=True, related_name='config_contexts')
-    data = models.JSONField(help_text="Serialized configuration dictionary")
+    data = models.JSONField(help_text=_("Serialized configuration dictionary"))
 
     class Meta:
         ordering = ['weight', 'name']
@@ -625,28 +625,28 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         null=True,
         related_name='report_templates',
         db_index=True,
-        help_text="The tenant owning this report template. Null represents system-wide templates."
+        help_text=_("The tenant owning this report template. Null represents system-wide templates.")
     )
     filter_tenants = models.ManyToManyField(
         'organization.Tenant',
         blank=True,
         related_name='filtered_templates',
-        help_text="Filter compiled data to only include these selected tenants. If none are selected, aggregates data globally."
+        help_text=_("Filter compiled data to only include these selected tenants. If none are selected, aggregates data globally.")
     )
     report_type = models.CharField(max_length=50, choices=REPORT_TYPE_CHOICES)
-    included_columns = models.JSONField(default=list, blank=True, help_text="Checked columns to render in the report data grid.")
-    include_summary_cards = models.BooleanField(default=True, help_text="Toggle displaying top card widgets (totals, counts, financial sums).")
-    include_distribution_chart = models.BooleanField(default=False, help_text="Toggle embedding spend or status distribution charts in the HTML report.")
-    group_by_field = models.CharField(max_length=100, blank=True, help_text="Optional column key to group grid records under (e.g. location, status).")
+    included_columns = models.JSONField(default=list, blank=True, help_text=_("Checked columns to render in the report data grid."))
+    include_summary_cards = models.BooleanField(default=True, help_text=_("Toggle displaying top card widgets (totals, counts, financial sums)."))
+    include_distribution_chart = models.BooleanField(default=False, help_text=_("Toggle embedding spend or status distribution charts in the HTML report."))
+    group_by_field = models.CharField(max_length=100, blank=True, help_text=_("Optional column key to group grid records under (e.g. location, status)."))
     style_preset = models.CharField(max_length=50, default='default', choices=[
         ('default', 'Professional Layout'),
         ('compact', 'Compact Audit Sheet'),
         ('financial', 'Financial Spend Summary')
     ])
-    advanced_mode = models.BooleanField(default=False, help_text="Enable custom Jinja2/HTML template code override.")
+    advanced_mode = models.BooleanField(default=False, help_text=_("Enable custom Jinja2/HTML template code override."))
     template_content = models.TextField(
         blank=True,
-        help_text="Optional Jinja2 custom HTML override template"
+        help_text=_("Optional Jinja2 custom HTML override template")
     )
 
     class Meta:
@@ -714,13 +714,13 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
         null=True,
         related_name='scheduled_reports',
         db_index=True,
-        help_text="The tenant owning this scheduled report. Null represents system-wide schedules."
+        help_text=_("The tenant owning this scheduled report. Null represents system-wide schedules.")
     )
     filter_tenants = models.ManyToManyField(
         'organization.Tenant',
         blank=True,
         related_name='filtered_schedules',
-        help_text="Filter compiled data to only include these selected tenants. If none are selected, aggregates data globally."
+        help_text=_("Filter compiled data to only include these selected tenants. If none are selected, aggregates data globally.")
     )
     report = models.ForeignKey(ReportTemplate, on_delete=models.CASCADE, related_name='schedules')
     schedule = models.ForeignKey(
@@ -729,15 +729,15 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
         null=True,
         blank=True,
         related_name='scheduled_reports',
-        help_text="Linked Django-Q Schedule"
+        help_text=_("Linked Django-Q Schedule")
     )
-    recipients = models.TextField(blank=True, default='', help_text="Comma-separated email addresses")
+    recipients = models.TextField(blank=True, default='', help_text=_("Comma-separated email addresses"))
     frequency = models.CharField(max_length=50, default='weekly', choices=FREQUENCY_CHOICES)
     format = models.CharField(max_length=20, choices=FORMAT_CHOICES, default=FORMAT_HTML)
-    cron_expression = models.CharField(max_length=100, blank=True, help_text="Custom Cron Expression (e.g. '0 8 * * 1-5')")
-    start_time = models.TimeField(null=True, blank=True, help_text="Time of day to run the schedule (e.g. 08:00:00)")
+    cron_expression = models.CharField(max_length=100, blank=True, help_text=_("Custom Cron Expression (e.g. '0 8 * * 1-5')"))
+    start_time = models.TimeField(null=True, blank=True, help_text=_("Time of day to run the schedule (e.g. 08:00:00)"))
     channels = models.ManyToManyField('extras.NotificationChannel', blank=True, related_name='scheduled_reports')
-    save_to_archive = models.BooleanField(default=True, help_text="Store a copy of generated reports in the local file archive")
+    save_to_archive = models.BooleanField(default=True, help_text=_("Store a copy of generated reports in the local file archive"))
     is_active = models.BooleanField(default=True)
     last_run = models.DateTimeField(null=True, blank=True)
     last_status = models.CharField(max_length=50, blank=True)
@@ -827,7 +827,7 @@ class NotificationChannel(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     name = models.CharField(max_length=255)
     channel_type = models.CharField(max_length=20, choices=CHANNEL_TYPE_CHOICES)
     enabled = models.BooleanField(default=True)
-    config = models.JSONField(default=dict, blank=True, help_text="Channel-specific config (SMTP settings, webhook URL, etc.)")
+    config = models.JSONField(default=dict, blank=True, help_text=_("Channel-specific config (SMTP settings, webhook URL, etc.)"))
     tenant = models.ForeignKey(
         'organization.Tenant',
         on_delete=models.CASCADE,
@@ -835,7 +835,7 @@ class NotificationChannel(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         null=True,
         related_name='notification_channels',
         db_index=True,
-        help_text="The tenant owning this channel. Null represents system-wide channels."
+        help_text=_("The tenant owning this channel. Null represents system-wide channels.")
     )
 
     class Meta:
@@ -884,20 +884,20 @@ class AlertRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     alert_type = models.CharField(max_length=50, choices=ALERT_TYPE_CHOICES)
-    threshold_value = models.PositiveIntegerField(help_text="Limit count or days horizon")
+    threshold_value = models.PositiveIntegerField(help_text=_("Limit count or days horizon"))
     severity = models.CharField(max_length=20, choices=SEVERITY_CHOICES, default=SEVERITY_WARNING)
-    is_active = models.BooleanField(default=True, help_text="Inactive rules are not evaluated at all.")
+    is_active = models.BooleanField(default=True, help_text=_("Inactive rules are not evaluated at all."))
     is_muted = models.BooleanField(
         default=False,
-        help_text="Muted rules still track alerts in the Alert Center but send no channel notifications.",
+        help_text=_("Muted rules still track alerts in the Alert Center but send no channel notifications."),
     )
     renotify_interval_days = models.PositiveIntegerField(
         default=0,
-        help_text="0 = notify once. N = re-send channel notifications every N days while an alert stays unresolved.",
+        help_text=_("0 = notify once. N = re-send channel notifications every N days while an alert stays unresolved."),
     )
     last_fired_at = models.DateTimeField(
         null=True, blank=True, editable=False,
-        help_text="When this rule was last evaluated by the engine.",
+        help_text=_("When this rule was last evaluated by the engine."),
     )
     channels = models.ManyToManyField(NotificationChannel, blank=True, related_name='alert_rules')
     tenant = models.ForeignKey(
@@ -907,7 +907,7 @@ class AlertRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         null=True,
         related_name='alert_rules',
         db_index=True,
-        help_text="The tenant owning this rule. Null represents system-wide rules."
+        help_text=_("The tenant owning this rule. Null represents system-wide rules.")
     )
 
     class Meta:
@@ -955,11 +955,11 @@ class AlertLog(BaseModel):
     delivery_status = models.JSONField(
         default=dict,
         blank=True,
-        help_text="Per-channel delivery result: {channel_pk: 'ok'|'failed'|'error: ...'}"
+        help_text=_("Per-channel delivery result: {channel_pk: 'ok'|'failed'|'error: ...'}")
     )
     last_notified_at = models.DateTimeField(
         null=True, blank=True,
-        help_text="When channel notifications were last dispatched for this alert (drives re-notify).",
+        help_text=_("When channel notifications were last dispatched for this alert (drives re-notify)."),
     )
     acknowledged_by = models.ForeignKey(
         to=settings.AUTH_USER_MODEL,
@@ -984,7 +984,7 @@ class AlertLog(BaseModel):
         null=True,
         related_name='alert_logs',
         db_index=True,
-        help_text="The tenant owning this log. Null represents system-wide logs."
+        help_text=_("The tenant owning this log. Null represents system-wide logs.")
     )
 
     @property

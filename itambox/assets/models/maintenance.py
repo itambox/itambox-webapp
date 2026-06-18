@@ -36,13 +36,13 @@ class AssetMaintenance(TaggableMixin, CloneableMixin, ExportableMixin,
     asset = models.ForeignKey('assets.Asset', on_delete=models.PROTECT, related_name='maintenances', db_index=True)
     title = models.CharField(max_length=200, default='Maintenance')
     description = models.TextField(blank=True)
-    supplier = models.ForeignKey('assets.Supplier', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Supplier/Vendor")
+    supplier = models.ForeignKey('assets.Supplier', on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Supplier/Vendor"))
     performed_by = models.CharField(max_length=200, blank=True)
     maintenance_type = models.CharField(
         max_length=50,
         choices=MAINTENANCE_TYPE_CHOICES,
         default=MAINTENANCE_TYPE_REPAIR,
-        verbose_name="Maintenance Type",
+        verbose_name=_("Maintenance Type"),
         db_index=True
     )
     status = models.CharField(
@@ -56,11 +56,11 @@ class AssetMaintenance(TaggableMixin, CloneableMixin, ExportableMixin,
         decimal_places=2,
         null=True,
         blank=True,
-        verbose_name="Maintenance Cost"
+        verbose_name=_("Maintenance Cost")
     )
     currency = CurrencyField()
-    start_date = models.DateField(verbose_name="Start Date", db_index=True)
-    completion_date = models.DateField(null=True, blank=True, verbose_name="Completion Date", db_index=True)
+    start_date = models.DateField(verbose_name=_("Start Date"), db_index=True)
+    completion_date = models.DateField(null=True, blank=True, verbose_name=_("Completion Date"), db_index=True)
     notes = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', related_name='asset_maintenances', blank=True)
 

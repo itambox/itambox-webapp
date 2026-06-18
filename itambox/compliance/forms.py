@@ -1,5 +1,6 @@
 from django import forms
 from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Row, Column, Fieldset
 from core.forms import FilterForm
@@ -13,32 +14,32 @@ class AssetMaintenanceForm(forms.ModelForm):
     asset = forms.ModelChoiceField(
         queryset=Asset.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Asset"
+        label=_("Asset")
     )
     supplier = forms.ModelChoiceField(
         queryset=Supplier.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'}),
         required=False,
-        label="Supplier"
+        label=_("Supplier")
     )
     maintenance_type = forms.ChoiceField(
         choices=AssetMaintenance.MAINTENANCE_TYPE_CHOICES,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Maintenance Type"
+        label=_("Maintenance Type")
     )
     status = forms.ChoiceField(
         choices=AssetMaintenance._meta.get_field('status').choices,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Status"
+        label=_("Status")
     )
     start_date = forms.DateField(
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-        label="Start Date"
+        label=_("Start Date")
     )
     completion_date = forms.DateField(
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
         required=False,
-        label="Completion Date"
+        label=_("Completion Date")
     )
 
     class Meta:
@@ -108,30 +109,30 @@ class CustodyTemplateForm(forms.ModelForm):
         queryset=Tenant.objects.all(),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Tenant"
+        label=_("Tenant")
     )
     tenant_group = forms.ModelChoiceField(
         queryset=TenantGroup.objects.all(),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Tenant Group"
+        label=_("Tenant Group")
     )
     category = forms.ModelChoiceField(
         queryset=Category.objects.all(),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Target Category"
+        label=_("Target Category")
     )
     signature_provider = forms.ChoiceField(
         choices=[],
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Signature Provider"
+        label=_("Signature Provider")
     )
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
         required=False,
         widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
-        label="Tags"
+        label=_("Tags")
     )
 
     class Meta:

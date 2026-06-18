@@ -1,12 +1,13 @@
 import django_filters
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 from core.filters import BaseFilterSet
 from .models import PurchaseOrder, Contract
 
 class PurchaseOrderFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
     )
 
     class Meta:
@@ -22,7 +23,7 @@ class PurchaseOrderFilterSet(BaseFilterSet):
 class ContractFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
     )
 
     class Meta:

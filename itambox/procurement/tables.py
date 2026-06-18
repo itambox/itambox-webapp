@@ -1,4 +1,5 @@
 import django_tables2 as tables
+from django.utils.translation import gettext_lazy as _
 from core.tables import BaseTable, ActionsColumn, ToggleColumn
 from .models import PurchaseOrder, Contract
 
@@ -20,7 +21,7 @@ class ContractTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.Column(linkify=True)
     contract_number = tables.Column(linkify=True)
-    contract_type = tables.Column(verbose_name='Type')
+    contract_type = tables.Column(verbose_name=_('Type'))
     status = tables.Column()
     supplier = tables.Column(linkify=True)
     start_date = tables.Column()

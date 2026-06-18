@@ -1,13 +1,14 @@
 import django_tables2 as tables
 from django.contrib.contenttypes.models import ContentType
+from django.utils.translation import gettext_lazy as _
 from extras.models import WebhookEndpoint, EventRule, ExportTemplate, LabelTemplate
 from .base import BaseTable
 from .columns import BooleanColumn
 
 class ExportTemplateTable(BaseTable):
     name = tables.Column(linkify=True)
-    content_type = tables.Column(verbose_name='Model')
-    file_extension = tables.Column(verbose_name='File Type')
+    content_type = tables.Column(verbose_name=_('Model'))
+    file_extension = tables.Column(verbose_name=_('File Type'))
     mime_type = tables.Column()
 
     class Meta(BaseTable.Meta):
@@ -22,13 +23,13 @@ class ExportTemplateTable(BaseTable):
 class SearchResultTable(tables.Table):
     object_type = tables.Column(
         accessor='_object_type_id',
-        verbose_name='Type',
+        verbose_name=_('Type'),
         orderable=False
     )
     object = tables.Column(
         accessor='object',
         linkify=True,
-        verbose_name='Result',
+        verbose_name=_('Result'),
         orderable=False
     )
 
@@ -49,9 +50,9 @@ class SearchResultTable(tables.Table):
 class WebhookEndpointTable(BaseTable):
     name = tables.Column(linkify=True)
     url = tables.Column()
-    http_method = tables.Column(verbose_name='Method')
+    http_method = tables.Column(verbose_name=_('Method'))
     enabled = BooleanColumn()
-    retry_count = tables.Column(verbose_name='Retries')
+    retry_count = tables.Column(verbose_name=_('Retries'))
 
     class Meta(BaseTable.Meta):
         model = WebhookEndpoint
@@ -61,8 +62,8 @@ class WebhookEndpointTable(BaseTable):
 
 class EventRuleTable(BaseTable):
     name = tables.Column(linkify=True)
-    model = tables.Column(verbose_name='Model')
-    action_type = tables.Column(verbose_name='Action')
+    model = tables.Column(verbose_name=_('Model'))
+    action_type = tables.Column(verbose_name=_('Action'))
     enabled = BooleanColumn()
 
     class Meta(BaseTable.Meta):
@@ -81,9 +82,9 @@ class EventRuleTable(BaseTable):
 class LabelTemplateTable(BaseTable):
     name = tables.Column(linkify=True)
     description = tables.Column()
-    page_width = tables.Column(verbose_name='Width (in)')
-    page_height = tables.Column(verbose_name='Height (in)')
-    barcode_format = tables.Column(verbose_name='Barcode')
+    page_width = tables.Column(verbose_name=_('Width (in)'))
+    page_height = tables.Column(verbose_name=_('Height (in)'))
+    barcode_format = tables.Column(verbose_name=_('Barcode'))
 
     class Meta(BaseTable.Meta):
         model = LabelTemplate

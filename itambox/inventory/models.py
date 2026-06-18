@@ -543,8 +543,8 @@ class Kit(JournalingMixin, TaggableMixin, CloneableMixin, ExportableMixin, SoftD
     all_objects = TenantScopingAllObjectsManager()
     allow_global_tenant = True
 
-    name = models.CharField(max_length=100, verbose_name="Kit Name")
-    description = models.TextField(blank=True, verbose_name="Description")
+    name = models.CharField(max_length=100, verbose_name=_("Kit Name"))
+    description = models.TextField(blank=True, verbose_name=_("Description"))
     tenant = models.ForeignKey('organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='kits', db_index=True)
     tags = models.ManyToManyField('extras.Tag', related_name='kits', blank=True)
 
@@ -579,13 +579,13 @@ class KitItem(ChangeLoggingMixin, BaseModel):
     def tenant(self):
         return self.kit.tenant if self.kit_id else None
 
-    kit = models.ForeignKey(Kit, on_delete=models.CASCADE, related_name='items', verbose_name="Kit", db_index=True)
-    asset_type = models.ForeignKey('assets.AssetType', on_delete=models.PROTECT, null=True, blank=True, related_name='kit_items', verbose_name="Asset Type / Model")
-    accessory = models.ForeignKey(Accessory, on_delete=models.PROTECT, null=True, blank=True, related_name='kit_items', verbose_name="Accessory Catalog Item")
-    license = models.ForeignKey('licenses.License', on_delete=models.PROTECT, null=True, blank=True, related_name='kit_items', verbose_name="Software License")
-    consumable = models.ForeignKey(Consumable, on_delete=models.PROTECT, null=True, blank=True, related_name='kit_items', verbose_name="Consumable Catalog Item")
-    component = models.ForeignKey(Component, on_delete=models.PROTECT, null=True, blank=True, related_name='kit_items', verbose_name="Component Catalog Item")
-    qty = models.PositiveIntegerField(default=1, verbose_name="Quantity", help_text="Quantity to checkout (applies to Accessories, Consumables, and Components)")
+    kit = models.ForeignKey(Kit, on_delete=models.CASCADE, related_name='items', verbose_name=_("Kit"), db_index=True)
+    asset_type = models.ForeignKey('assets.AssetType', on_delete=models.PROTECT, null=True, blank=True, related_name='kit_items', verbose_name=_("Asset Type / Model"))
+    accessory = models.ForeignKey(Accessory, on_delete=models.PROTECT, null=True, blank=True, related_name='kit_items', verbose_name=_("Accessory Catalog Item"))
+    license = models.ForeignKey('licenses.License', on_delete=models.PROTECT, null=True, blank=True, related_name='kit_items', verbose_name=_("Software License"))
+    consumable = models.ForeignKey(Consumable, on_delete=models.PROTECT, null=True, blank=True, related_name='kit_items', verbose_name=_("Consumable Catalog Item"))
+    component = models.ForeignKey(Component, on_delete=models.PROTECT, null=True, blank=True, related_name='kit_items', verbose_name=_("Component Catalog Item"))
+    qty = models.PositiveIntegerField(default=1, verbose_name=_("Quantity"), help_text=_("Quantity to checkout (applies to Accessories, Consumables, and Components)"))
 
     class Meta:
         verbose_name = _("Kit Item")

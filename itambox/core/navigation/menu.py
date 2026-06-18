@@ -636,9 +636,9 @@ def get_menus():
                 break
         if not plugins_menu:
             plugins_menu = Menu(
-                label='Plugins',
+                label=_('Plugins'),
                 icon_class='mdi mdi-puzzle',
-                groups=[MenuGroup(label='Plugin List', items=[])]
+                groups=[MenuGroup(label=_('Plugin List'), items=[])]
             )
             menus.append(plugins_menu)
 

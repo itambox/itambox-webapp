@@ -49,7 +49,7 @@ class License(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
 
     name = models.CharField(
         max_length=255,
-        help_text="Descriptive name for the license (e.g., Visio Pro 2021 - EA Renewal FY24)"
+        help_text=_("Descriptive name for the license (e.g., Visio Pro 2021 - EA Renewal FY24)")
     )
     software = models.ForeignKey(
         to=Software,
@@ -64,11 +64,11 @@ class License(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
     )
     product_key = models.TextField(
         blank=True,
-        help_text="Product key or activation code. Consider security implications."
+        help_text=_("Product key or activation code. Consider security implications.")
     )
     seats = models.PositiveIntegerField(
         default=1,
-        help_text="Total number of seats purchased or entitled"
+        help_text=_("Total number of seats purchased or entitled")
     )
     purchase_date = models.DateField(blank=True, null=True, db_index=True)
     purchase_cost = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
@@ -77,10 +77,10 @@ class License(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
     version = models.CharField(
         max_length=100,
         blank=True,
-        help_text="Optional version constraint for this license entitlement (e.g. '2021', '16.x'). "
-                  "Informational only — reconciliation is performed at the Software level (version-agnostic).",
+        help_text=_("Optional version constraint for this license entitlement (e.g. '2021', '16.x'). "
+                  "Informational only — reconciliation is performed at the Software level (version-agnostic)."),
     )
-    expiration_date = models.DateField(blank=True, null=True, db_index=True, help_text="For term licenses or maintenance")
+    expiration_date = models.DateField(blank=True, null=True, db_index=True, help_text=_("For term licenses or maintenance"))
     notes = models.TextField(blank=True)
     tags = models.ManyToManyField(Tag, blank=True, related_name='licenses')
     supplier = models.ForeignKey('assets.Supplier', on_delete=models.SET_NULL, blank=True, null=True, related_name='licenses', db_index=True)
@@ -99,7 +99,7 @@ class License(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
         null=True,
         related_name='licenses',
         db_index=True,
-        help_text="Optional subscription (billing agreement) that funds this license; seats roll up to it.",
+        help_text=_("Optional subscription (billing agreement) that funds this license; seats roll up to it."),
     )
     tenant = models.ForeignKey('organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='licenses', db_index=True)
 

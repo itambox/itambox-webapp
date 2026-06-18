@@ -1,5 +1,6 @@
 from django import forms
 from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
 
 from organization.models import Location, AssetHolder
 from assets.models import Asset
@@ -10,24 +11,24 @@ class BaseCheckoutForm(forms.Form):
         queryset=AssetHolder.objects.all().order_by('last_name', 'first_name'),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Assign to Asset Holder"
+        label=_("Assign to Asset Holder")
     )
     assigned_location = forms.ModelChoiceField(
         queryset=Location.objects.all().select_related('site').order_by('site__name', 'name'),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Assign to Location"
+        label=_("Assign to Location")
     )
     assigned_asset = forms.ModelChoiceField(
         queryset=Asset.objects.all().order_by('asset_tag'),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Assign to Asset"
+        label=_("Assign to Asset")
     )
     notes = forms.CharField(
         required=False,
         widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-        label="Notes"
+        label=_("Notes")
     )
 
     def __init__(self, *args, **kwargs):

@@ -1,5 +1,6 @@
 from django import forms
 from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset, AssetType, AssetRequest
 
@@ -15,7 +16,7 @@ class AssetRequestForm(forms.ModelForm):
     request_category = forms.ChoiceField(
         choices=CATEGORY_CHOICES,
         widget=forms.Select(attrs={'class': 'form-select', 'id': 'id_request_category'}),
-        label="Request Category",
+        label=_("Request Category"),
         required=False,
         initial='asset_type'
     )
@@ -31,7 +32,7 @@ class AssetRequestForm(forms.ModelForm):
         choices=TARGET_CHOICES,
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Request For"
+        label=_("Request For")
     )
 
     class Meta:
@@ -232,23 +233,23 @@ class AssetRequestActionForm(forms.Form):
         queryset=Asset.objects.none(),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
-        label="Allocate Specific Asset"
+        label=_("Allocate Specific Asset")
     )
     allocated_location = forms.ModelChoiceField(
         queryset=Asset.objects.none(),  # Populated dynamically in __init__
         required=False,
         widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
-        label="Stock Location"
+        label=_("Stock Location")
     )
     qty = forms.IntegerField(
         required=False,
         widget=forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
-        label="Approved Quantity"
+        label=_("Approved Quantity")
     )
     response_notes = forms.CharField(
         widget=forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
         required=False,
-        label="Response/Decision Notes"
+        label=_("Response/Decision Notes")
     )
 
     def __init__(self, *args, **kwargs):

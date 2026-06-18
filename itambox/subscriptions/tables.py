@@ -1,5 +1,6 @@
 import django_tables2 as tables
 from django.utils.html import format_html
+from django.utils.translation import gettext_lazy as _
 from django_tables2.utils import A
 from core.tables import ActionsColumn, BaseTable, ToggleColumn
 from extras.tables import TagColumn
@@ -8,10 +9,10 @@ from .models import Provider, Subscription, SubscriptionAssignment, Subscription
 
 class ProviderTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('subscriptions:provider_detail', args=[A('pk')], verbose_name='Name')
-    is_active = tables.BooleanColumn(verbose_name='Active', yesno='✓,✗')
-    contact_email = tables.Column(accessor='primary_contact.email', verbose_name='Contact Email')
-    subscription_count = tables.Column(accessor='subscription_count', verbose_name='Subscriptions', orderable=False)
+    name = tables.LinkColumn('subscriptions:provider_detail', args=[A('pk')], verbose_name=_('Name'))
+    is_active = tables.BooleanColumn(verbose_name=_('Active'), yesno='✓,✗')
+    contact_email = tables.Column(accessor='primary_contact.email', verbose_name=_('Contact Email'))
+    subscription_count = tables.Column(accessor='subscription_count', verbose_name=_('Subscriptions'), orderable=False)
     tags = TagColumn(url_name='subscriptions:provider_list')
     actions = ActionsColumn()
 
@@ -23,19 +24,19 @@ class ProviderTable(BaseTable):
 
 class SubscriptionTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('subscriptions:subscription_detail', args=[A('pk')], verbose_name='Name')
-    provider = tables.Column(linkify=True, verbose_name='Provider')
-    status = tables.Column(verbose_name='Status')
-    type = tables.Column(verbose_name='Type')
-    tenant = tables.Column(accessor='tenant.name', verbose_name='Tenant', orderable=True)
-    start_date = tables.DateColumn(format="Y-m-d", verbose_name='Start')
-    renewal_date = tables.DateColumn(format="Y-m-d", verbose_name='Next Renewal')
-    renewal_cost = tables.Column(verbose_name='Renewal Cost')
-    currency = tables.Column(verbose_name='Currency')
-    auto_renewal = tables.BooleanColumn(verbose_name='Auto-Renew', yesno='✓,')
+    name = tables.LinkColumn('subscriptions:subscription_detail', args=[A('pk')], verbose_name=_('Name'))
+    provider = tables.Column(linkify=True, verbose_name=_('Provider'))
+    status = tables.Column(verbose_name=_('Status'))
+    type = tables.Column(verbose_name=_('Type'))
+    tenant = tables.Column(accessor='tenant.name', verbose_name=_('Tenant'), orderable=True)
+    start_date = tables.DateColumn(format="Y-m-d", verbose_name=_('Start'))
+    renewal_date = tables.DateColumn(format="Y-m-d", verbose_name=_('Next Renewal'))
+    renewal_cost = tables.Column(verbose_name=_('Renewal Cost'))
+    currency = tables.Column(verbose_name=_('Currency'))
+    auto_renewal = tables.BooleanColumn(verbose_name=_('Auto-Renew'), yesno='✓,')
     tags = TagColumn(url_name='subscriptions:subscription_list')
 
-    days_until_renewal = tables.Column(accessor='days_until_renewal', verbose_name='Due In', orderable=False)
+    days_until_renewal = tables.Column(accessor='days_until_renewal', verbose_name=_('Due In'), orderable=False)
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
@@ -86,12 +87,12 @@ class SubscriptionAssignmentTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     subscription = tables.LinkColumn(
         'subscriptions:subscription_detail', args=[A('subscription.pk')],
-        accessor='subscription.name', verbose_name='Subscription'
+        accessor='subscription.name', verbose_name=_('Subscription')
     )
-    assigned_object = tables.Column(verbose_name='Assigned To', orderable=False)
-    assigned_date = tables.DateColumn(format='Y-m-d H:i', verbose_name='Assigned')
-    assigned_by = tables.Column(accessor='assigned_by.username', verbose_name='By', default='—')
-    notes = tables.Column(verbose_name='Notes')
+    assigned_object = tables.Column(verbose_name=_('Assigned To'), orderable=False)
+    assigned_date = tables.DateColumn(format='Y-m-d H:i', verbose_name=_('Assigned'))
+    assigned_by = tables.Column(accessor='assigned_by.username', verbose_name=_('By'), default='—')
+    notes = tables.Column(verbose_name=_('Notes'))
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):

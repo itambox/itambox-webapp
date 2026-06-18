@@ -125,7 +125,7 @@ class AuditSessionForm(forms.ModelForm):
 
 class AuditBarcodeScanForm(forms.Form):
     barcode = forms.CharField(
-        label="Scan Asset Tag or Serial Number",
+        label=_("Scan Asset Tag or Serial Number"),
         widget=forms.TextInput(attrs={
             'placeholder': 'Scan serial or tag...',
             'autofocus': 'autofocus',

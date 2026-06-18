@@ -8,25 +8,26 @@ from extras.tables import TagColumn # Import TagColumn
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django.utils.html import format_html
+from django.utils.translation import gettext_lazy as _
 
 class AssetTable(BaseTable): # Inherit from BaseTable
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('assets:asset_detail', args=[A('pk')], verbose_name='Name')
-    manufacturer = tables.Column(accessor='asset_type.manufacturer', linkify=True, verbose_name='Manufacturer')
-    model = tables.Column(accessor='asset_type.model', linkify=True, verbose_name='Model')
-    asset_type = tables.LinkColumn('assets:assettype_detail', args=[A('asset_type_id')], verbose_name='Asset Type')
+    name = tables.LinkColumn('assets:asset_detail', args=[A('pk')], verbose_name=_('Name'))
+    manufacturer = tables.Column(accessor='asset_type.manufacturer', linkify=True, verbose_name=_('Manufacturer'))
+    model = tables.Column(accessor='asset_type.model', linkify=True, verbose_name=_('Model'))
+    asset_type = tables.LinkColumn('assets:assettype_detail', args=[A('asset_type_id')], verbose_name=_('Asset Type'))
     assignee = AssigneeColumn(
         location_field='location',
         assignment_model_path='assets.AssetAssignment',
     )
-    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant.name', verbose_name='Tenant')
-    location = tables.LinkColumn('organization:location_detail', args=[A('location_id')], accessor='location.name', verbose_name='Location')
-    supplier = tables.LinkColumn('assets:supplier_detail', args=[A('supplier_id')], accessor='supplier.name', verbose_name='Supplier')
+    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant.name', verbose_name=_('Tenant'))
+    location = tables.LinkColumn('organization:location_detail', args=[A('location_id')], accessor='location.name', verbose_name=_('Location'))
+    supplier = tables.LinkColumn('assets:supplier_detail', args=[A('supplier_id')], accessor='supplier.name', verbose_name=_('Supplier'))
 
     tags = TagColumn(url_name='assets:asset_list')
-    requestable = tables.BooleanColumn(verbose_name='Requestable', yesno='Yes,No')
+    requestable = tables.BooleanColumn(verbose_name=_('Requestable'), yesno='Yes,No')
     audit_due_date = tables.Column(
-        verbose_name='Audit Due',
+        verbose_name=_('Audit Due'),
         orderable=False,
         empty_values=(),
     )
@@ -201,10 +202,10 @@ class AssetTable(BaseTable): # Inherit from BaseTable
 
 class StatusLabelTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('assets:statuslabel_detail', args=[A('pk')], verbose_name='Name')
-    type = tables.Column(verbose_name='Meta Type')
-    color = tables.Column(verbose_name='Color', orderable=False)
-    asset_count = tables.Column(verbose_name='Asset Count', orderable=False)
+    name = tables.LinkColumn('assets:statuslabel_detail', args=[A('pk')], verbose_name=_('Name'))
+    type = tables.Column(verbose_name=_('Meta Type'))
+    color = tables.Column(verbose_name=_('Color'), orderable=False)
+    asset_count = tables.Column(verbose_name=_('Asset Count'), orderable=False)
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
@@ -228,9 +229,9 @@ class StatusLabelTable(BaseTable):
 
 class AssetRoleTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('assets:assetrole_detail', args=[A('pk')], verbose_name='Name')
-    color = tables.Column(verbose_name='Color', orderable=False)
-    asset_count = tables.Column(verbose_name='Asset Count', orderable=False)
+    name = tables.LinkColumn('assets:assetrole_detail', args=[A('pk')], verbose_name=_('Name'))
+    color = tables.Column(verbose_name=_('Color'), orderable=False)
+    asset_count = tables.Column(verbose_name=_('Asset Count'), orderable=False)
     tags = TagColumn(url_name='assets:assetrole_list')
     actions = ActionsColumn()
 
@@ -251,12 +252,12 @@ class ManufacturerTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn()
     asset_type_count = tables.Column(
-        verbose_name='Asset Types',
+        verbose_name=_('Asset Types'),
         linkify=True,
         accessor='asset_type_count'
     )
     asset_count = tables.Column(
-        verbose_name='Assets'
+        verbose_name=_('Assets')
     )
     tags = TagColumn(url_name='assets:manufacturer_list')
     actions = ActionsColumn()
@@ -281,12 +282,12 @@ class ManufacturerTable(BaseTable):
 class AssetTypeTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     manufacturer = tables.Column(linkify=True) # Linkify using default get_absolute_url
-    model = tables.LinkColumn('assets:assettype_detail', args=[A('pk')], verbose_name='Model')
-    eol_months = tables.Column(verbose_name='EOL (Months)')
+    model = tables.LinkColumn('assets:assettype_detail', args=[A('pk')], verbose_name=_('Model'))
+    eol_months = tables.Column(verbose_name=_('EOL (Months)'))
     created_at = tables.DateTimeColumn(format="Y-m-d")
     updated_at = tables.DateTimeColumn(format="Y-m-d H:i")
     tags = TagColumn(url_name='assets:assettype_list')
-    requestable = tables.BooleanColumn(verbose_name='Requestable', yesno='Yes,No')
+    requestable = tables.BooleanColumn(verbose_name=_('Requestable'), yesno='Yes,No')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
@@ -301,15 +302,15 @@ class AssetTypeTable(BaseTable):
         return "—"
 class AssetMaintenanceTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    asset = tables.LinkColumn('assets:asset_detail', args=[A('asset__pk')], accessor='asset', verbose_name='Asset')
-    title = tables.LinkColumn('assets:assetmaintenance_detail', args=[A('pk')], verbose_name='Title')
-    maintenance_type = tables.Column(verbose_name='Type')
-    status = tables.Column(verbose_name='Status')
-    supplier = tables.Column(accessor='supplier__name', verbose_name='Supplier')
-    cost = tables.Column(verbose_name='Cost')
-    start_date = tables.DateColumn(format="Y-m-d", verbose_name='Start Date')
-    completion_date = tables.DateColumn(format="Y-m-d", verbose_name='Completion Date')
-    downtime_days = tables.Column(accessor='downtime_days', verbose_name='Downtime (Days)', orderable=False)
+    asset = tables.LinkColumn('assets:asset_detail', args=[A('asset__pk')], accessor='asset', verbose_name=_('Asset'))
+    title = tables.LinkColumn('assets:assetmaintenance_detail', args=[A('pk')], verbose_name=_('Title'))
+    maintenance_type = tables.Column(verbose_name=_('Type'))
+    status = tables.Column(verbose_name=_('Status'))
+    supplier = tables.Column(accessor='supplier__name', verbose_name=_('Supplier'))
+    cost = tables.Column(verbose_name=_('Cost'))
+    start_date = tables.DateColumn(format="Y-m-d", verbose_name=_('Start Date'))
+    completion_date = tables.DateColumn(format="Y-m-d", verbose_name=_('Completion Date'))
+    downtime_days = tables.Column(accessor='downtime_days', verbose_name=_('Downtime (Days)'), orderable=False)
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
@@ -341,12 +342,12 @@ class AssetMaintenanceTable(BaseTable):
 
 class AssetDisposalTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    asset = tables.LinkColumn('assets:asset_detail', args=[A('asset__pk')], accessor='asset', verbose_name='Asset')
-    disposal_method = tables.Column(verbose_name='Method')
-    disposal_date = tables.DateColumn(format="Y-m-d", verbose_name='Disposal Date')
-    data_sanitization_method = tables.Column(verbose_name='Sanitization')
-    recipient = tables.Column(verbose_name='Recipient')
-    proceeds = tables.Column(verbose_name='Proceeds')
+    asset = tables.LinkColumn('assets:asset_detail', args=[A('asset__pk')], accessor='asset', verbose_name=_('Asset'))
+    disposal_method = tables.Column(verbose_name=_('Method'))
+    disposal_date = tables.DateColumn(format="Y-m-d", verbose_name=_('Disposal Date'))
+    data_sanitization_method = tables.Column(verbose_name=_('Sanitization'))
+    recipient = tables.Column(verbose_name=_('Recipient'))
+    proceeds = tables.Column(verbose_name=_('Proceeds'))
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
@@ -375,10 +376,10 @@ from inventory.tables import AccessoryTable, ConsumableTable, KitTable, Componen
 
 class DepreciationTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('assets:depreciation_detail', args=[A('pk')], verbose_name='Name')
-    months = tables.Column(verbose_name='Lifespan (Months)')
-    method = tables.Column(verbose_name='Method')
-    convention = tables.Column(verbose_name='Convention')
+    name = tables.LinkColumn('assets:depreciation_detail', args=[A('pk')], verbose_name=_('Name'))
+    months = tables.Column(verbose_name=_('Lifespan (Months)'))
+    method = tables.Column(verbose_name=_('Method'))
+    convention = tables.Column(verbose_name=_('Convention'))
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
@@ -392,7 +393,7 @@ class DepreciationTable(BaseTable):
 
 class SupplierTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('assets:supplier_detail', args=[A('pk')], verbose_name='Name')
+    name = tables.LinkColumn('assets:supplier_detail', args=[A('pk')], verbose_name=_('Name'))
     tags = TagColumn(url_name='assets:supplier_list')
     actions = ActionsColumn()
 
@@ -404,8 +405,8 @@ class SupplierTable(BaseTable):
 
 class CategoryTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('assets:category_detail', args=[A('pk')], verbose_name='Name')
-    color = tables.Column(verbose_name='Color', orderable=False)
+    name = tables.LinkColumn('assets:category_detail', args=[A('pk')], verbose_name=_('Name'))
+    color = tables.Column(verbose_name=_('Color'), orderable=False)
     tags = TagColumn(url_name='assets:category_list')
     actions = ActionsColumn()
 
@@ -422,12 +423,12 @@ class CategoryTable(BaseTable):
 
 class AssetRequestTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    request_id = tables.LinkColumn('assets:assetrequest_detail', args=[A('pk')], accessor='pk', verbose_name='Req #')
-    requester = tables.Column(accessor='requester.username', verbose_name='Requester')
-    item = tables.Column(verbose_name='Requested Item', empty_values=(), orderable=False)
-    requested_for = tables.Column(verbose_name='Request For', orderable=False, empty_values=())
-    status = tables.Column(verbose_name='Status')
-    request_date = tables.Column(verbose_name='Request Date')
+    request_id = tables.LinkColumn('assets:assetrequest_detail', args=[A('pk')], accessor='pk', verbose_name=_('Req #'))
+    requester = tables.Column(accessor='requester.username', verbose_name=_('Requester'))
+    item = tables.Column(verbose_name=_('Requested Item'), empty_values=(), orderable=False)
+    requested_for = tables.Column(verbose_name=_('Request For'), orderable=False, empty_values=())
+    status = tables.Column(verbose_name=_('Status'))
+    request_date = tables.Column(verbose_name=_('Request Date'))
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
@@ -476,12 +477,12 @@ class AssetRequestTable(BaseTable):
 
 class AssetTagSequenceTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    prefix = tables.LinkColumn('assets:assettagsequence_detail', args=[A('pk')], verbose_name='Prefix')
-    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant.name', verbose_name='Tenant')
-    category = tables.LinkColumn('assets:category_detail', args=[A('category_id')], accessor='category.name', verbose_name='Category')
-    next_value = tables.Column(verbose_name='Next Value')
-    zero_padding = tables.Column(verbose_name='Zero Padding')
-    is_active = tables.BooleanColumn(verbose_name='Active')
+    prefix = tables.LinkColumn('assets:assettagsequence_detail', args=[A('pk')], verbose_name=_('Prefix'))
+    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant.name', verbose_name=_('Tenant'))
+    category = tables.LinkColumn('assets:category_detail', args=[A('category_id')], accessor='category.name', verbose_name=_('Category'))
+    next_value = tables.Column(verbose_name=_('Next Value'))
+    zero_padding = tables.Column(verbose_name=_('Zero Padding'))
+    is_active = tables.BooleanColumn(verbose_name=_('Active'))
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
@@ -492,13 +493,13 @@ class AssetTagSequenceTable(BaseTable):
 
 class AssetAuditTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    timestamp = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name="Timestamp")
-    session = tables.LinkColumn('compliance:auditsession_detail', args=[A('session_id')], verbose_name='Campaign')
-    auditor = tables.Column(accessor='auditor.username', verbose_name='Auditor')
-    location = tables.LinkColumn('organization:location_detail', args=[A('location_id')], accessor='location.name', verbose_name='Location')
-    status = tables.Column(verbose_name='Status')
-    verification_method = tables.Column(verbose_name='Method')
-    notes = tables.Column(verbose_name='Notes')
+    timestamp = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name=_("Timestamp"))
+    session = tables.LinkColumn('compliance:auditsession_detail', args=[A('session_id')], verbose_name=_('Campaign'))
+    auditor = tables.Column(accessor='auditor.username', verbose_name=_('Auditor'))
+    location = tables.LinkColumn('organization:location_detail', args=[A('location_id')], accessor='location.name', verbose_name=_('Location'))
+    status = tables.Column(verbose_name=_('Status'))
+    verification_method = tables.Column(verbose_name=_('Method'))
+    notes = tables.Column(verbose_name=_('Notes'))
 
     class Meta(BaseTable.Meta):
         model = AssetAudit
@@ -508,13 +509,13 @@ class AssetAuditTable(BaseTable):
 
 class WarrantyTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    asset = tables.LinkColumn('assets:asset_detail', args=[A('asset__pk')], accessor='asset', verbose_name='Asset')
-    warranty_type = tables.Column(verbose_name='Type')
-    provider = tables.Column(verbose_name='Provider')
-    start_date = tables.DateColumn(format="Y-m-d", verbose_name='Start Date')
-    end_date = tables.DateColumn(format="Y-m-d", verbose_name='End Date')
-    cost = tables.Column(verbose_name='Cost')
-    is_active = tables.BooleanColumn(verbose_name='Active', orderable=False)
+    asset = tables.LinkColumn('assets:asset_detail', args=[A('asset__pk')], accessor='asset', verbose_name=_('Asset'))
+    warranty_type = tables.Column(verbose_name=_('Type'))
+    provider = tables.Column(verbose_name=_('Provider'))
+    start_date = tables.DateColumn(format="Y-m-d", verbose_name=_('Start Date'))
+    end_date = tables.DateColumn(format="Y-m-d", verbose_name=_('End Date'))
+    cost = tables.Column(verbose_name=_('Cost'))
+    is_active = tables.BooleanColumn(verbose_name=_('Active'), orderable=False)
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
@@ -540,12 +541,12 @@ class WarrantyTable(BaseTable):
 
 class AssetReservationTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    asset = tables.LinkColumn('assets:asset_detail', args=[A('asset__pk')], accessor='asset', verbose_name='Asset')
-    reserved_for = tables.Column(verbose_name='Reserved For')
-    start_date = tables.DateColumn(format="Y-m-d", verbose_name='Start Date')
-    end_date = tables.DateColumn(format="Y-m-d", verbose_name='End Date')
-    status = tables.Column(verbose_name='Status')
-    purpose = tables.Column(verbose_name='Purpose')
+    asset = tables.LinkColumn('assets:asset_detail', args=[A('asset__pk')], accessor='asset', verbose_name=_('Asset'))
+    reserved_for = tables.Column(verbose_name=_('Reserved For'))
+    start_date = tables.DateColumn(format="Y-m-d", verbose_name=_('Start Date'))
+    end_date = tables.DateColumn(format="Y-m-d", verbose_name=_('End Date'))
+    status = tables.Column(verbose_name=_('Status'))
+    purpose = tables.Column(verbose_name=_('Purpose'))
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):

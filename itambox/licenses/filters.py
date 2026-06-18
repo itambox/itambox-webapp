@@ -2,6 +2,7 @@ import django_filters
 from core.filters import BaseFilterSet
 from django.db.models import Q
 from django import forms
+from django.utils.translation import gettext_lazy as _
 from extras.models import Tag
 from software.models import Software
 from organization.models import Tenant, AssetHolder
@@ -13,31 +14,31 @@ class LicenseFilterSet(BaseFilterSet):
     """FilterSet for querying License entitlements."""
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
         widget=forms.TextInput(attrs={'placeholder': 'Name, Key, Order Number...'})
     )
     software = django_filters.ModelChoiceFilter(
         field_name='software',
         queryset=Software.objects.all(),
-        label='Software Catalog',
+        label=_('Software Catalog'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     license_type = django_filters.ChoiceFilter(
         field_name='license_type',
         choices=LicenseTypeChoices.choices,
-        label='License Type',
+        label=_('License Type'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     tags = django_filters.ModelMultipleChoiceFilter(
         field_name='tags',
         queryset=Tag.objects.all(),
-        label='Tags',
+        label=_('Tags'),
         widget=forms.SelectMultiple(attrs={'class': 'form-select'})
     )
     tenant = django_filters.ModelChoiceFilter(
         queryset=Tenant.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label='Tenant'
+        label=_('Tenant')
     )
 
     class Meta:
@@ -57,20 +58,20 @@ class LicenseFilterSet(BaseFilterSet):
 
 
 class LicenseSeatAssignmentFilterSet(BaseFilterSet):
-    q = django_filters.CharFilter(method='search', label='Search')
+    q = django_filters.CharFilter(method='search', label=_('Search'))
     license = django_filters.ModelChoiceFilter(
         queryset=License.objects.all(),
-        label='License',
+        label=_('License'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     asset = django_filters.ModelChoiceFilter(
         queryset=Asset.objects.all(),
-        label='Asset',
+        label=_('Asset'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     assigned_holder = django_filters.ModelChoiceFilter(
         queryset=AssetHolder.objects.all(),
-        label='Assigned Holder',
+        label=_('Assigned Holder'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 

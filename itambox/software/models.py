@@ -42,11 +42,11 @@ class Software(CustomFieldDataMixin, DeletableVaultModel):
         blank=True,
         related_name='software',
         db_index=True,
-        help_text="Owning tenant. Null denotes a shared/global catalogue entry visible to all tenants.",
+        help_text=_("Owning tenant. Null denotes a shared/global catalogue entry visible to all tenants."),
     )
     name = models.CharField(
         max_length=255,
-        help_text="Name of the software product (e.g., Microsoft Visio Professional 2021). Unique per tenant."
+        help_text=_("Name of the software product (e.g., Microsoft Visio Professional 2021). Unique per tenant.")
     )
     manufacturer = models.ForeignKey(
         to='assets.Manufacturer',
@@ -56,28 +56,28 @@ class Software(CustomFieldDataMixin, DeletableVaultModel):
     version = models.CharField(
         max_length=50,
         blank=True,
-        help_text="Current version (e.g., 2021, 16.0)"
+        help_text=_("Current version (e.g., 2021, 16.0)")
     )
     category = models.CharField(
         max_length=50,
         choices=SoftwareCategoryChoices.choices,
         blank=True,
         db_index=True,
-        help_text="Functional category"
+        help_text=_("Functional category")
     )
     license_type = models.CharField(
         max_length=50,
         choices=SoftwareLicenseTypeChoices.choices,
         blank=True,
-        help_text="Default license type"
+        help_text=_("Default license type")
     )
     website = models.URLField(
         blank=True,
-        help_text="Product homepage or vendor URL"
+        help_text=_("Product homepage or vendor URL")
     )
     description = models.TextField(
         blank=True,
-        help_text="Optional description of the software product."
+        help_text=_("Optional description of the software product.")
     )
     tags = models.ManyToManyField(
         to=Tag,
@@ -167,29 +167,29 @@ class InstalledSoftware(ChangeLoggingMixin, BaseModel):
     version_detected = models.CharField(
         max_length=100,
         blank=True,
-        help_text="Specific version discovered on the asset (e.g., 16.78.1)"
+        help_text=_("Specific version discovered on the asset (e.g., 16.78.1)")
     )
     install_date = models.DateField(
         blank=True,
         null=True,
         db_index=True,
-        help_text="Estimated or known installation date"
+        help_text=_("Estimated or known installation date")
     )
     discovered_by_agent = models.CharField(
         max_length=100,
         blank=True,
-        verbose_name="Discovered By",
-        help_text="Identifier for the discovery source or agent (e.g., SCCM, Intune, Lansweeper)"
+        verbose_name=_("Discovered By"),
+        help_text=_("Identifier for the discovery source or agent (e.g., SCCM, Intune, Lansweeper)")
     )
     last_seen_date = models.DateTimeField(
         blank=True,
         null=True,
         db_index=True,
-        help_text="Timestamp when this software was last detected on the asset"
+        help_text=_("Timestamp when this software was last detected on the asset")
     )
     notes = models.TextField(
         blank=True,
-        help_text="Optional notes specific to this installation"
+        help_text=_("Optional notes specific to this installation")
     )
 
     class Meta:

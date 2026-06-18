@@ -1,5 +1,6 @@
 from django import forms
 from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Row, Column
 
@@ -19,7 +20,7 @@ class SiteForm(forms.ModelForm):
     group = forms.ModelChoiceField(
         queryset=SiteGroup.objects.all(),
         required=False,
-        label="Site Group",
+        label=_("Site Group"),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     tenant = forms.ModelChoiceField(

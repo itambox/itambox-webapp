@@ -1,4 +1,5 @@
 from django import forms
+from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Field
 from organization.models import Location
@@ -10,19 +11,19 @@ class AssetAuditConfirmForm(forms.Form):
     location = forms.ModelChoiceField(
         queryset=Location.objects.all().order_by('name'),
         required=True,
-        label="Observed Location",
-        help_text="Where did you physically find this asset right now?",
+        label=_("Observed Location"),
+        help_text=_("Where did you physically find this asset right now?"),
         widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
     )
     status = forms.ModelChoiceField(
         queryset=StatusLabel.objects.exclude(type=StatusLabel.TYPE_ARCHIVED).order_by('name'),
         required=True,
-        label="Observed Status",
+        label=_("Observed Status"),
         widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
     )
     notes = forms.CharField(
         required=False,
-        label="Notes (optional)",
+        label=_("Notes (optional)"),
         widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
     )
 

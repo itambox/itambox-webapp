@@ -1,6 +1,7 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Row, Column
 
@@ -23,19 +24,19 @@ class ComponentForm(CustomFieldModelFormMixin, SlugModelForm):
         queryset=Category.objects.filter(applies_to__component=True),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Category"
+        label=_("Category")
     )
     supplier = forms.ModelChoiceField(
         queryset=Supplier.objects.all(),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
-        label="Supplier"
+        label=_("Supplier")
     )
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
         required=False,
         widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tomselect-tags': 'true'}),
-        label="Tags"
+        label=_("Tags")
     )
 
     class Meta:
@@ -139,36 +140,36 @@ class ComponentAllocationForm(forms.ModelForm):
         queryset=AssetHolder.objects.all().order_by('last_name', 'first_name'),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Assign to Asset Holder"
+        label=_("Assign to Asset Holder")
     )
     assigned_location = forms.ModelChoiceField(
         queryset=Location.objects.all().select_related('site').order_by('site__name', 'name'),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Assign to Location"
+        label=_("Assign to Location")
     )
     assigned_asset = forms.ModelChoiceField(
         queryset=Asset.objects.all().order_by('asset_tag'),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Assign to Asset"
+        label=_("Assign to Asset")
     )
     from_location = forms.ModelChoiceField(
         queryset=Location.objects.all().select_related('site').order_by('name'),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="From Location"
+        label=_("From Location")
     )
     qty = forms.IntegerField(
         initial=1,
         min_value=1,
         widget=forms.NumberInput(attrs={'class': 'form-control'}),
-        label="Quantity"
+        label=_("Quantity")
     )
     notes = forms.CharField(
         required=False,
         widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-        label="Notes"
+        label=_("Notes")
     )
 
     class Meta:
@@ -229,13 +230,13 @@ class ComponentCheckoutForm(BaseCheckoutForm):
         initial=1,
         min_value=1,
         widget=forms.NumberInput(attrs={'class': 'form-control'}),
-        label="Quantity"
+        label=_("Quantity")
     )
     from_location = forms.ModelChoiceField(
         queryset=Location.objects.all().order_by('name'),
         required=True,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="From Location"
+        label=_("From Location")
     )
 
     def __init__(self, *args, **kwargs):

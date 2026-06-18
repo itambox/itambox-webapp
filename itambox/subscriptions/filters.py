@@ -2,6 +2,7 @@ import django_filters
 from core.filters import BaseFilterSet
 from django.db.models import Q
 from django import forms
+from django.utils.translation import gettext_lazy as _
 from organization.models import Tenant, CostCenter
 from .models import Provider, Subscription, SubscriptionAssignment, SubscriptionStatusChoices, SubscriptionTypeChoices
 
@@ -9,39 +10,39 @@ from .models import Provider, Subscription, SubscriptionAssignment, Subscription
 class SubscriptionFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
         widget=forms.TextInput(attrs={'placeholder': 'Name, Description, Contract...'})
     )
     type = django_filters.ChoiceFilter(
         field_name='type',
         choices=SubscriptionTypeChoices.choices,
-        label='Type',
+        label=_('Type'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     status = django_filters.ChoiceFilter(
         field_name='status',
         choices=SubscriptionStatusChoices.choices,
-        label='Status',
+        label=_('Status'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     tenant = django_filters.ModelChoiceFilter(
         queryset=Tenant.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label='Tenant'
+        label=_('Tenant')
     )
     provider = django_filters.ModelChoiceFilter(
         queryset=Provider.objects.filter(is_active=True),
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label='Provider'
+        label=_('Provider')
     )
     cost_center = django_filters.ModelChoiceFilter(
         queryset=CostCenter.objects.filter(is_active=True),
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label='Cost Center'
+        label=_('Cost Center')
     )
     renewal_within = django_filters.NumberFilter(
         method='filter_renewal_within',
-        label='Renews Within (Days)',
+        label=_('Renews Within (Days)'),
         widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'e.g. 30'})
     )
 
@@ -71,13 +72,13 @@ class SubscriptionFilterSet(BaseFilterSet):
 class ProviderFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
         widget=forms.TextInput(attrs={'placeholder': 'Name, Account ID...'})
     )
     is_active = django_filters.BooleanFilter(
         method='filter_is_active',
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-        label='Active'
+        label=_('Active')
     )
 
     class Meta:

@@ -279,7 +279,7 @@ class AssetHolder(CustomFieldDataMixin, SubscribableMixin, StandardModel, SoftDe
     )
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
-    upn = models.CharField(max_length=255, verbose_name='User Principal Name')
+    upn = models.CharField(max_length=255, verbose_name=_('User Principal Name'))
     email = models.EmailField(blank=True)
     tenant = models.ForeignKey(
         Tenant,
@@ -349,7 +349,7 @@ class Contact(CustomFieldDataMixin, StandardModel, SoftDeleteMixin):
     title = models.CharField(max_length=100, blank=True)
     phone = models.CharField(max_length=50, blank=True)
     email = models.EmailField(blank=True)
-    web_url = models.URLField(blank=True, verbose_name="Web URL")
+    web_url = models.URLField(blank=True, verbose_name=_("Web URL"))
     description = models.TextField(blank=True)
     comments = models.TextField(blank=True)
     tags = models.ManyToManyField('extras.Tag', blank=True, related_name='organization_contacts')
@@ -528,7 +528,7 @@ class CostCenter(AutoSlugMixin, CustomFieldDataMixin, StandardModel, SoftDeleteM
     code = models.CharField(
         max_length=50,
         db_index=True,
-        help_text='Short identifier for this cost center (e.g. "CC-100").',
+        help_text=_('Short identifier for this cost center (e.g. "CC-100").'),
     )
     parent = models.ForeignKey(
         'self',

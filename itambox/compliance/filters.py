@@ -2,6 +2,7 @@ import django_filters
 from core.filters import BaseFilterSet
 from django import forms
 from django.db.models import Q
+from django.utils.translation import gettext_lazy as _
 from assets.models import Asset, StatusLabel
 from organization.models import AssetHolder, Location
 from .models import CustodyReceipt, AuditSession, AssetAudit
@@ -10,26 +11,26 @@ from assets.models import AssetMaintenance
 class CustodyReceiptFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
         widget=forms.TextInput(attrs={'placeholder': 'Asset, Holder, Token...'})
     )
     asset = django_filters.ModelChoiceFilter(
         queryset=Asset.objects.all(),
-        label='Asset',
+        label=_('Asset'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     holder = django_filters.ModelChoiceFilter(
         queryset=AssetHolder.objects.all(),
-        label='Holder',
+        label=_('Holder'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     acceptance_status = django_filters.ChoiceFilter(
         choices=CustodyReceipt.ACCEPTANCE_STATUS_CHOICES,
-        label='Acceptance Status',
+        label=_('Acceptance Status'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     accepted = django_filters.BooleanFilter(
-        label='Accepted',
+        label=_('Accepted'),
         widget=forms.Select(choices=[('', 'Any'), ('true', 'Yes'), ('false', 'No')], attrs={'class': 'form-select'})
     )
 
@@ -53,17 +54,17 @@ class CustodyReceiptFilterSet(BaseFilterSet):
 class AssetMaintenanceFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
         widget=forms.TextInput(attrs={'placeholder': 'Supplier, Notes, Asset Name...'})
     )
     asset = django_filters.ModelChoiceFilter(
         queryset=Asset.objects.all(),
-        label='Asset',
+        label=_('Asset'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     maintenance_type = django_filters.ChoiceFilter(
         choices=AssetMaintenance.MAINTENANCE_TYPE_CHOICES,
-        label='Type',
+        label=_('Type'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
@@ -82,7 +83,7 @@ class AssetMaintenanceFilterSet(BaseFilterSet):
 
 
 class AuditSessionFilterSet(BaseFilterSet):
-    q = django_filters.CharFilter(method='search', label='Search', widget=forms.TextInput(attrs={'placeholder': 'Name...'}))
+    q = django_filters.CharFilter(method='search', label=_('Search'), widget=forms.TextInput(attrs={'placeholder': 'Name...'}))
     status = django_filters.ChoiceFilter(
         choices=[
             ('planned', 'Planned'),
@@ -94,7 +95,7 @@ class AuditSessionFilterSet(BaseFilterSet):
     location = django_filters.ModelChoiceFilter(
         queryset=Location.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label='Location'
+        label=_('Location')
     )
 
     class Meta:
@@ -108,26 +109,26 @@ class AuditSessionFilterSet(BaseFilterSet):
 
 
 class AssetAuditFilterSet(BaseFilterSet):
-    q = django_filters.CharFilter(method='search', label='Search', widget=forms.TextInput(attrs={'placeholder': 'Notes...'}))
+    q = django_filters.CharFilter(method='search', label=_('Search'), widget=forms.TextInput(attrs={'placeholder': 'Notes...'}))
     session = django_filters.ModelChoiceFilter(
         queryset=AuditSession.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label='Audit Session'
+        label=_('Audit Session')
     )
     asset = django_filters.ModelChoiceFilter(
         queryset=Asset.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label='Asset'
+        label=_('Asset')
     )
     location = django_filters.ModelChoiceFilter(
         queryset=Location.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label='Observed Location'
+        label=_('Observed Location')
     )
     status = django_filters.ModelChoiceFilter(
         queryset=StatusLabel.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label='Observed Status'
+        label=_('Observed Status')
     )
 
     class Meta:

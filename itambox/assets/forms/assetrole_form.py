@@ -1,5 +1,6 @@
 from django import forms
 from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Row, Column, Fieldset
 
@@ -19,7 +20,7 @@ class AssetRoleForm(ColorFieldFormMixin, forms.ModelForm):
             'type': 'color',
             'class': 'form-control form-control-color'
         }),
-        help_text="Choose a color for this Asset Role"
+        help_text=_("Choose a color for this Asset Role")
     )
 
     def __init__(self, *args, **kwargs):

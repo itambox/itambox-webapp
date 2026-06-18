@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.contenttypes.fields import GenericRelation
+from django.utils.translation import gettext_lazy as _
 
 from itambox.registry import registry
 
@@ -52,7 +53,7 @@ class CustomFieldDataMixin(models.Model):
     custom_field_data = models.JSONField(
         default=dict,
         blank=True,
-        verbose_name="Custom Field Data",
+        verbose_name=_("Custom Field Data"),
     )
 
     class Meta:

@@ -1,6 +1,7 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML
 
@@ -104,7 +105,7 @@ class KitCheckoutForm(BaseCheckoutForm):
         queryset=Location.objects.all().order_by('name'),
         required=True,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Source Location (stock deduction)"
+        label=_("Source Location (stock deduction)")
     )
 
     def __init__(self, *args, **kwargs):

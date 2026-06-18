@@ -1,4 +1,5 @@
 from django import forms
+from django.utils.translation import gettext_lazy as _
 from core.forms import SlugModelForm, ColorFieldFormMixin
 from ..models import Category
 
@@ -15,7 +16,7 @@ class CategoryForm(ColorFieldFormMixin, SlugModelForm):
         choices=APPLIES_TO_CHOICES,
         widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
         required=False,
-        label="Applies to"
+        label=_("Applies to")
     )
 
     color = forms.CharField(
@@ -25,8 +26,8 @@ class CategoryForm(ColorFieldFormMixin, SlugModelForm):
             'type': 'color',
             'class': 'form-control form-control-color'
         }),
-        label="Category Color",
-        help_text="Choose a color for this Category"
+        label=_("Category Color"),
+        help_text=_("Choose a color for this Category")
     )
 
     class Meta:
@@ -78,7 +79,7 @@ class CategoryForm(ColorFieldFormMixin, SlugModelForm):
     def clean(self):
         cleaned_data = super().clean()
         flags = cleaned_data.get('applies_to_flags', [])
-        cleaned_data['applies_to'] = {choice: (choice in flags) for choice, _ in self.APPLIES_TO_CHOICES}
+        cleaned_data['applies_to'] = {choice: (choice in flags) for choice, _label in self.APPLIES_TO_CHOICES}
         return cleaned_data
 
     def save(self, commit=True):

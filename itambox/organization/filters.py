@@ -3,6 +3,7 @@ from core.filters import BaseFilterSet
 from django import forms
 from django.db.models import Q
 from django.contrib.contenttypes.models import ContentType
+from django.utils.translation import gettext_lazy as _
 from assets.models import Manufacturer, AssetType
 from organization.models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, Contact, ContactRole, ContactAssignment, TenantRole, TenantMembership, CostCenter
 
@@ -14,7 +15,7 @@ from crispy_forms.layout import Layout, Submit, HTML # Import Helper, Layout, Su
 class BaseOrgFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
         widget=forms.TextInput(attrs={'placeholder': 'Search...'})
     )
     # Common tag filter
@@ -22,7 +23,7 @@ class BaseOrgFilterSet(BaseFilterSet):
         field_name='tags__slug',
         queryset=Tag.objects.all(),
         to_field_name='slug',
-        label='Tags',
+        label=_('Tags'),
         conjoined=True, # Use AND logic for tags
         widget=forms.SelectMultiple(attrs={'class': 'form-select'})
     )
@@ -67,7 +68,7 @@ class RegionFilterSet(BaseOrgFilterSet):
 class SiteGroupFilterSet(BaseOrgFilterSet):
     parent = django_filters.ModelChoiceFilter(
         queryset=SiteGroup.objects.all(),
-        label="Parent Group",
+        label=_("Parent Group"),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     class Meta:
@@ -86,7 +87,7 @@ class SiteFilterSet(BaseOrgFilterSet):
     )
     group = django_filters.ModelChoiceFilter(
         queryset=SiteGroup.objects.all(),
-        label="Site Group",
+        label=_("Site Group"),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     tenant = django_filters.ModelChoiceFilter(
@@ -284,17 +285,17 @@ class TenantMembershipFilterSet(BaseOrgFilterSet):
     tag = None  # TenantMembership has no tags field
     tenant = django_filters.ModelChoiceFilter(
         queryset=Tenant.objects.all(),
-        label="Tenant",
+        label=_("Tenant"),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     role = django_filters.ModelChoiceFilter(
         queryset=TenantRole.objects.all(),
-        label="Role",
+        label=_("Role"),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     user = django_filters.ModelChoiceFilter(
         queryset=_user_queryset,
-        label="User",
+        label=_("User"),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
@@ -349,17 +350,17 @@ class ContactAssignmentFilterSet(BaseOrgFilterSet):
     tag = None  # ContactAssignment has no tags field
     contact = django_filters.ModelChoiceFilter(
         queryset=Contact.objects.all(),
-        label="Contact",
+        label=_("Contact"),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     role = django_filters.ModelChoiceFilter(
         queryset=ContactRole.objects.all(),
-        label="Role",
+        label=_("Role"),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     content_type = django_filters.ModelChoiceFilter(
         queryset=ContentType.objects.all(),
-        label="Object Type",
+        label=_("Object Type"),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 

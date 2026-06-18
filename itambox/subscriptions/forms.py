@@ -231,12 +231,12 @@ class SubscriptionAssignmentForm(forms.ModelForm):
     subscription = forms.ModelChoiceField(
         queryset=Subscription.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Subscription"
+        label=_("Subscription")
     )
     notes = forms.CharField(
         required=False,
         widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-        label="Notes"
+        label=_("Notes")
     )
 
     class Meta:
@@ -308,14 +308,14 @@ class SubscriptionAssignmentForm(forms.ModelForm):
 class SubscriptionRenewForm(forms.Form):
     renewal_date = forms.DateField(
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-        label="Next Renewal Date",
+        label=_("Next Renewal Date"),
         required=True
     )
     renewal_cost = forms.DecimalField(
         max_digits=10,
         decimal_places=2,
         widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-        label="Renewal Cost",
+        label=_("Renewal Cost"),
         required=False
     )
 
@@ -351,14 +351,14 @@ class SubscriptionRenewForm(forms.Form):
 class SubscriptionCancelForm(forms.Form):
     cancellation_date = forms.DateField(
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-        label="Cancellation Date",
+        label=_("Cancellation Date"),
         required=True
     )
     reason = forms.CharField(
         widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-        label="Cancellation Reason",
+        label=_("Cancellation Reason"),
         required=False,
-        help_text="Optional reason notes to log on the subscription."
+        help_text=_("Optional reason notes to log on the subscription.")
     )
 
     def __init__(self, *args, **kwargs):
@@ -384,30 +384,30 @@ class SubscriptionCheckoutForm(forms.Form):
     target_type = forms.ChoiceField(
         choices=TARGET_CHOICES,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Assign to"
+        label=_("Assign to")
     )
     assigned_holder = forms.ModelChoiceField(
         queryset=AssetHolder.objects.all().order_by('last_name', 'first_name'),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Asset Holder"
+        label=_("Asset Holder")
     )
     asset = forms.ModelChoiceField(
         queryset=Asset.objects.exclude(status__type='undeployable').order_by('name'),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Hardware Asset"
+        label=_("Hardware Asset")
     )
     location = forms.ModelChoiceField(
         queryset=Location.objects.all().order_by('name'),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Location"
+        label=_("Location")
     )
     notes = forms.CharField(
         widget=forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
         required=False,
-        label="Notes"
+        label=_("Notes")
     )
 
     def clean(self):

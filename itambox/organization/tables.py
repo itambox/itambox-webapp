@@ -9,12 +9,13 @@ from assets.models import Asset, AssetAssignment
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
+from django.utils.translation import gettext_lazy as _
 
 
 class RegionTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('organization:region_detail', args=[A('pk')], verbose_name='Name')
-    site_count = tables.Column(verbose_name='Sites', orderable=False)
+    name = tables.LinkColumn('organization:region_detail', args=[A('pk')], verbose_name=_('Name'))
+    site_count = tables.Column(verbose_name=_('Sites'), orderable=False)
     tags = TagColumn(url_name='organization:region_list')
     actions = ActionsColumn()
 
@@ -28,8 +29,8 @@ class RegionTable(BaseTable):
 
 class SiteGroupTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('organization:sitegroup_detail', args=[A('pk')], verbose_name='Name')
-    site_count = tables.Column(verbose_name='Sites', orderable=False)
+    name = tables.LinkColumn('organization:sitegroup_detail', args=[A('pk')], verbose_name=_('Name'))
+    site_count = tables.Column(verbose_name=_('Sites'), orderable=False)
     tags = TagColumn(url_name='organization:sitegroup_list')
     actions = ActionsColumn()
 
@@ -43,12 +44,12 @@ class SiteGroupTable(BaseTable):
 
 class SiteTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('organization:site_detail', args=[A('pk')], verbose_name='Name')
+    name = tables.LinkColumn('organization:site_detail', args=[A('pk')], verbose_name=_('Name'))
     region = tables.LinkColumn('organization:region_detail', args=[A('region_id')], accessor='region')
     group = tables.LinkColumn('organization:sitegroup_detail', args=[A('group_id')], accessor='group')
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant')
-    location_count = tables.Column(verbose_name='Locations', orderable=False)
-    asset_count = tables.Column(verbose_name='Assets', orderable=False)
+    location_count = tables.Column(verbose_name=_('Locations'), orderable=False)
+    asset_count = tables.Column(verbose_name=_('Assets'), orderable=False)
     tags = TagColumn(url_name='organization:site_list')
     actions = ActionsColumn()
 
@@ -77,10 +78,10 @@ class SiteTable(BaseTable):
 
 class LocationTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('organization:location_detail', args=[A('pk')], verbose_name='Name')
+    name = tables.LinkColumn('organization:location_detail', args=[A('pk')], verbose_name=_('Name'))
     site = tables.LinkColumn('organization:site_detail', args=[A('site_id')], accessor='site')
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant')
-    asset_count = tables.Column(verbose_name='Assets', orderable=False)
+    asset_count = tables.Column(verbose_name=_('Assets'), orderable=False)
     tags = TagColumn(url_name='organization:location_list')
     actions = ActionsColumn()
 
@@ -106,8 +107,8 @@ class LocationTable(BaseTable):
 
 class TenantGroupTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('organization:tenantgroup_detail', args=[A('pk')], verbose_name='Name')
-    tenant_count = tables.Column(verbose_name='Tenants', orderable=False)
+    name = tables.LinkColumn('organization:tenantgroup_detail', args=[A('pk')], verbose_name=_('Name'))
+    tenant_count = tables.Column(verbose_name=_('Tenants'), orderable=False)
     tags = TagColumn(url_name='organization:tenantgroup_list')
     actions = ActionsColumn()
 
@@ -121,10 +122,10 @@ class TenantGroupTable(BaseTable):
 
 class TenantTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('organization:tenant_detail', args=[A('pk')], verbose_name='Name')
+    name = tables.LinkColumn('organization:tenant_detail', args=[A('pk')], verbose_name=_('Name'))
     group = tables.LinkColumn('organization:tenantgroup_detail', args=[A('group_id')], accessor='group')
-    site_count = tables.Column(verbose_name='Sites', orderable=False)
-    location_count = tables.Column(verbose_name='Locations', orderable=False)
+    site_count = tables.Column(verbose_name=_('Sites'), orderable=False)
+    location_count = tables.Column(verbose_name=_('Locations'), orderable=False)
     tags = TagColumn(url_name='organization:tenant_list')
     actions = ActionsColumn()
 
@@ -143,11 +144,11 @@ class TenantTable(BaseTable):
 # --- AssetHolder Table ---
 class AssetHolderTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    upn = tables.LinkColumn('organization:assetholder_detail', args=[A('pk')], verbose_name='UPN')
+    upn = tables.LinkColumn('organization:assetholder_detail', args=[A('pk')], verbose_name=_('UPN'))
     first_name = tables.Column()
     last_name = tables.Column()
-    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant', verbose_name='Tenant')
-    assignment_count = tables.Column(verbose_name='Assignments', orderable=False, accessor='assignment_count')
+    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant', verbose_name=_('Tenant'))
+    assignment_count = tables.Column(verbose_name=_('Assignments'), orderable=False, accessor='assignment_count')
     tags = TagColumn(url_name='organization:assetholder_list')
     actions = ActionsColumn()
 
@@ -158,12 +159,12 @@ class AssetHolderTable(BaseTable):
 
 # --- AssetAssignment Table ---
 class AssetAssignmentTable(BaseTable):
-    asset = tables.LinkColumn('assets:asset_detail', args=[A('asset_id')], verbose_name='Asset')
+    asset = tables.LinkColumn('assets:asset_detail', args=[A('asset_id')], verbose_name=_('Asset'))
 
-    asset_tag = tables.Column(accessor='asset.asset_tag', verbose_name='Asset Tag')
-    asset_role = tables.Column(accessor='asset.asset_role', verbose_name='Role')
-    checked_out_at = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name='Checked Out')
-    expected_checkin_date = tables.DateColumn(format="Y-m-d", verbose_name='Expected Check-in')
+    asset_tag = tables.Column(accessor='asset.asset_tag', verbose_name=_('Asset Tag'))
+    asset_role = tables.Column(accessor='asset.asset_role', verbose_name=_('Role'))
+    checked_out_at = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name=_('Checked Out'))
+    expected_checkin_date = tables.DateColumn(format="Y-m-d", verbose_name=_('Expected Check-in'))
     checkin_btn = tables.Column(
         verbose_name='',
         orderable=False,
@@ -197,7 +198,7 @@ class AssetAssignmentTable(BaseTable):
 # --- Contact Table ---
 class ContactTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('organization:contact_detail', args=[A('pk')], verbose_name='Name')
+    name = tables.LinkColumn('organization:contact_detail', args=[A('pk')], verbose_name=_('Name'))
     title = tables.Column()
     phone = tables.Column()
     email = tables.EmailColumn()
@@ -213,7 +214,7 @@ class ContactTable(BaseTable):
 # --- ContactRole Table ---
 class ContactRoleTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('organization:contactrole_detail', args=[A('pk')], verbose_name='Name')
+    name = tables.LinkColumn('organization:contactrole_detail', args=[A('pk')], verbose_name=_('Name'))
     slug = tables.Column()
     description = tables.Column()
     actions = ActionsColumn()
@@ -228,8 +229,8 @@ class ContactRoleTable(BaseTable):
 class ContactAssignmentTable(BaseTable):
     contact = tables.LinkColumn('organization:contact_detail', args=[A('contact.pk')], accessor='contact')
     role = tables.Column()
-    assigned_object_type = tables.Column(accessor='content_type', verbose_name='Object Type')
-    assigned_object = tables.Column(linkify=True, verbose_name='Assigned Object')
+    assigned_object_type = tables.Column(accessor='content_type', verbose_name=_('Object Type'))
+    assigned_object = tables.Column(linkify=True, verbose_name=_('Assigned Object'))
     priority = tables.Column()
     actions = tables.TemplateColumn(
         template_code='''
@@ -237,7 +238,7 @@ class ContactAssignmentTable(BaseTable):
             <i class="mdi mdi-trash-can-outline m-0"></i>
         </a>
         ''',
-        verbose_name='Actions',
+        verbose_name=_('Actions'),
         orderable=False
     )
 
@@ -252,10 +253,10 @@ class ContactAssignmentTable(BaseTable):
 
 class TenantRoleTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('organization:tenantrole_detail', args=[A('pk')], verbose_name='Name')
+    name = tables.LinkColumn('organization:tenantrole_detail', args=[A('pk')], verbose_name=_('Name'))
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant')
     description = tables.Column()
-    member_count = tables.Column(verbose_name='Members', orderable=True, empty_values=[])
+    member_count = tables.Column(verbose_name=_('Members'), orderable=True, empty_values=[])
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
@@ -271,10 +272,10 @@ class TenantRoleTable(BaseTable):
 
 class TenantMembershipTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    user = tables.LinkColumn('users:user_detail', args=[A('user.pk')], verbose_name='User')
-    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant', verbose_name='Tenant')
-    role = tables.LinkColumn('organization:tenantrole_detail', args=[A('role_id')], accessor='role', verbose_name='Role')
-    joined_at = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name='Joined')
+    user = tables.LinkColumn('users:user_detail', args=[A('user.pk')], verbose_name=_('User'))
+    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant', verbose_name=_('Tenant'))
+    role = tables.LinkColumn('organization:tenantrole_detail', args=[A('role_id')], accessor='role', verbose_name=_('Role'))
+    joined_at = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name=_('Joined'))
     actions = ActionsColumn(actions=('edit', 'delete'))
 
     class Meta(BaseTable.Meta):
@@ -285,12 +286,12 @@ class TenantMembershipTable(BaseTable):
 
 class CostCenterTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('organization:costcenter_detail', args=[A('pk')], verbose_name='Name')
-    code = tables.Column(verbose_name='Code')
-    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant', verbose_name='Tenant')
-    parent = tables.LinkColumn('organization:costcenter_detail', args=[A('parent_id')], accessor='parent', verbose_name='Parent')
-    child_count = tables.Column(verbose_name='Sub-units', orderable=False)
-    is_active = tables.BooleanColumn(verbose_name='Active')
+    name = tables.LinkColumn('organization:costcenter_detail', args=[A('pk')], verbose_name=_('Name'))
+    code = tables.Column(verbose_name=_('Code'))
+    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant', verbose_name=_('Tenant'))
+    parent = tables.LinkColumn('organization:costcenter_detail', args=[A('parent_id')], accessor='parent', verbose_name=_('Parent'))
+    child_count = tables.Column(verbose_name=_('Sub-units'), orderable=False)
+    is_active = tables.BooleanColumn(verbose_name=_('Active'))
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):

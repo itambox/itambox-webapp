@@ -1,6 +1,7 @@
 from django import forms
 from django.urls import reverse
 from django.template.loader import render_to_string
+from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Row, Column, Fieldset, Div
 
@@ -15,7 +16,7 @@ from .fields import StatusModelChoiceField
 class AssetForm(CrispyFormMixin, forms.ModelForm):
     asset_type = forms.ModelChoiceField(
         queryset=AssetType.objects.select_related('manufacturer').all(),
-        label="Asset Type",
+        label=_("Asset Type"),
         required=True,
         widget=forms.Select(attrs={
             'class': 'form-select',
@@ -30,13 +31,13 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
     )
     asset_role = forms.ModelChoiceField(
         queryset=AssetRole.objects.all(),
-        label="Asset Role",
+        label=_("Asset Role"),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''})
     )
     status = StatusModelChoiceField(
         queryset=StatusLabel.objects.all(),
-        label="Status",
+        label=_("Status"),
         required=True,
         widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''})
     )
@@ -57,7 +58,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         ],
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Requestable Status"
+        label=_("Requestable Status")
     )
 
     class Meta:

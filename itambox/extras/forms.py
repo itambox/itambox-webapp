@@ -194,7 +194,7 @@ class SavedFilterFilterForm(FilterForm):
 class ConfigContextForm(forms.ModelForm):
     data = forms.CharField(
         widget=forms.Textarea(attrs={'class': 'form-control font-monospace', 'rows': 10}),
-        help_text="Enter configuration data in valid JSON format."
+        help_text=_("Enter configuration data in valid JSON format.")
     )
 
     class Meta:
@@ -262,7 +262,7 @@ import django_filters
 from django.db.models import Q
 
 class ConfigContextFilterSet(django_filters.FilterSet):
-    q = django_filters.CharFilter(method='search', label='Search')
+    q = django_filters.CharFilter(method='search', label=_('Search'))
 
     class Meta:
         model = ConfigContext
@@ -287,9 +287,9 @@ from core.tables import ActionsColumn, BaseTable, ToggleColumn
 
 class ConfigContextTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('extras:configcontext_edit', args=[A('pk')], verbose_name='Name')
-    weight = tables.Column(verbose_name='Weight')
-    description = tables.Column(verbose_name='Description')
+    name = tables.LinkColumn('extras:configcontext_edit', args=[A('pk')], verbose_name=_('Name'))
+    weight = tables.Column(verbose_name=_('Weight'))
+    description = tables.Column(verbose_name=_('Description'))
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):

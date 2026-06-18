@@ -2,6 +2,7 @@ import django_filters
 from django import forms
 from django.db.models import Q
 from django.contrib.auth import get_user_model
+from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML
 
@@ -10,7 +11,7 @@ User = get_user_model()
 class UserFilterSet(django_filters.FilterSet):
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
         widget=forms.TextInput(attrs={'placeholder': 'Search...'})
     )
     is_active = django_filters.BooleanFilter(

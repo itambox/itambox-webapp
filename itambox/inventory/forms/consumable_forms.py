@@ -1,6 +1,7 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Row, Column
 
@@ -23,19 +24,19 @@ class ConsumableForm(CustomFieldModelFormMixin, SlugModelForm):
         queryset=Category.objects.filter(applies_to__consumable=True),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Category"
+        label=_("Category")
     )
     supplier = forms.ModelChoiceField(
         queryset=Supplier.objects.all(),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
-        label="Supplier"
+        label=_("Supplier")
     )
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
         required=False,
         widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tomselect-tags': 'true'}),
-        label="Tags"
+        label=_("Tags")
     )
 
     class Meta:
@@ -123,13 +124,13 @@ class ConsumableCheckoutForm(BaseCheckoutForm):
         initial=1,
         min_value=1,
         widget=forms.NumberInput(attrs={'class': 'form-control'}),
-        label="Quantity"
+        label=_("Quantity")
     )
     from_location = forms.ModelChoiceField(
         queryset=Location.objects.all().order_by('name'),
         required=True,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="From Location"
+        label=_("From Location")
     )
 
     def __init__(self, *args, **kwargs):

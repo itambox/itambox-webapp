@@ -15,14 +15,14 @@ from .mixins import CheckableInventoryTableMixin
 
 class AccessoryTable(CheckableInventoryTableMixin, BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('inventory:accessory_detail', args=[A('pk')], verbose_name='Name')
+    name = tables.LinkColumn('inventory:accessory_detail', args=[A('pk')], verbose_name=_('Name'))
     manufacturer = tables.Column(linkify=True)
-    category = tables.Column(verbose_name='Category')
-    part_number = tables.Column(verbose_name='Part Number')
-    total_stock = tables.Column(accessor='total_stock', verbose_name='Total Stock')
-    checked_out_qty = tables.Column(accessor='checked_out_qty', verbose_name='Checked Out')
-    available = tables.Column(accessor='available', verbose_name='Available')
-    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name='Tenant')
+    category = tables.Column(verbose_name=_('Category'))
+    part_number = tables.Column(verbose_name=_('Part Number'))
+    total_stock = tables.Column(accessor='total_stock', verbose_name=_('Total Stock'))
+    checked_out_qty = tables.Column(accessor='checked_out_qty', verbose_name=_('Checked Out'))
+    available = tables.Column(accessor='available', verbose_name=_('Available'))
+    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name=_('Tenant'))
     tags = TagColumn(url_name='inventory:accessory_list')
 
     class Meta(BaseTable.Meta):
@@ -40,9 +40,9 @@ class AccessoryTable(CheckableInventoryTableMixin, BaseTable):
 
 class AccessoryStockTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    accessory = tables.LinkColumn('inventory:accessory_detail', args=[A('accessory.pk')], verbose_name='Accessory')
-    location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], verbose_name='Location')
-    qty = tables.Column(verbose_name='Quantity')
+    accessory = tables.LinkColumn('inventory:accessory_detail', args=[A('accessory.pk')], verbose_name=_('Accessory'))
+    location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], verbose_name=_('Location'))
+    qty = tables.Column(verbose_name=_('Quantity'))
     actions = tables.Column(
         verbose_name='',
         orderable=False,
@@ -84,7 +84,7 @@ class AccessoryStockTable(BaseTable):
             '  {}'
             '  <a class="btn btn-sm btn-soft-success check-action d-flex align-items-center" role="button" style="cursor: pointer" '
             '     hx-get="{}?from_location={}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
-            '     title="{}" aria-label="{}">'
+            '     title="{}" aria-label=_("{}")>'
             '    <i class="mdi mdi-logout me-1"></i> {}'
             '  </a>'
             '  <a class="btn btn-sm btn-action btn-action-danger px-2 d-flex align-items-center" href="{}" title="Delete">'
@@ -109,10 +109,10 @@ class AccessoryStockTable(BaseTable):
 
 class AccessoryAssignmentTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    accessory = tables.LinkColumn('inventory:accessory_detail', args=[A('accessory__pk')], verbose_name='Accessory')
-    assigned_to = tables.Column(verbose_name='Assigned To', orderable=False, empty_values=())
-    qty = tables.Column(verbose_name='Qty')
-    assigned_date = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name='Date')
+    accessory = tables.LinkColumn('inventory:accessory_detail', args=[A('accessory__pk')], verbose_name=_('Accessory'))
+    assigned_to = tables.Column(verbose_name=_('Assigned To'), orderable=False, empty_values=())
+    qty = tables.Column(verbose_name=_('Qty'))
+    assigned_date = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name=_('Date'))
     actions = tables.Column(
         verbose_name='',
         orderable=False,
@@ -162,14 +162,14 @@ class AccessoryAssignmentTable(BaseTable):
 
 class ConsumableTable(CheckableInventoryTableMixin, BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('inventory:consumable_detail', args=[A('pk')], verbose_name='Name')
+    name = tables.LinkColumn('inventory:consumable_detail', args=[A('pk')], verbose_name=_('Name'))
     manufacturer = tables.Column(linkify=True)
-    category = tables.Column(verbose_name='Category')
-    part_number = tables.Column(verbose_name='Part Number')
-    total_stock = tables.Column(accessor='total_stock', verbose_name='Total Qty')
-    consumed_qty = tables.Column(accessor='consumed_qty', verbose_name='Consumed')
-    available = tables.Column(accessor='available', verbose_name='Available')
-    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name='Tenant')
+    category = tables.Column(verbose_name=_('Category'))
+    part_number = tables.Column(verbose_name=_('Part Number'))
+    total_stock = tables.Column(accessor='total_stock', verbose_name=_('Total Qty'))
+    consumed_qty = tables.Column(accessor='consumed_qty', verbose_name=_('Consumed'))
+    available = tables.Column(accessor='available', verbose_name=_('Available'))
+    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name=_('Tenant'))
     tags = TagColumn(url_name='inventory:consumable_list')
 
     class Meta(BaseTable.Meta):
@@ -187,9 +187,9 @@ class ConsumableTable(CheckableInventoryTableMixin, BaseTable):
 
 class ConsumableStockTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    consumable = tables.LinkColumn('inventory:consumable_detail', args=[A('consumable.pk')], verbose_name='Consumable')
-    location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], verbose_name='Location')
-    qty = tables.Column(verbose_name='Quantity')
+    consumable = tables.LinkColumn('inventory:consumable_detail', args=[A('consumable.pk')], verbose_name=_('Consumable'))
+    location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], verbose_name=_('Location'))
+    qty = tables.Column(verbose_name=_('Quantity'))
     actions = tables.Column(
         verbose_name='',
         orderable=False,
@@ -231,7 +231,7 @@ class ConsumableStockTable(BaseTable):
             '  {}'
             '  <a class="btn btn-sm btn-soft-success check-action d-flex align-items-center" role="button" style="cursor: pointer" '
             '     hx-get="{}?from_location={}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
-            '     title="{}" aria-label="{}">'
+            '     title="{}" aria-label=_("{}")>'
             '    <i class="mdi mdi-logout me-1"></i> {}'
             '  </a>'
             '  <a class="btn btn-sm btn-action btn-action-danger px-2 d-flex align-items-center" href="{}" title="Delete">'
@@ -256,10 +256,10 @@ class ConsumableStockTable(BaseTable):
 
 class ConsumableAssignmentTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    consumable = tables.LinkColumn('inventory:consumable_detail', args=[A('consumable__pk')], verbose_name='Consumable')
-    assigned_to = tables.Column(verbose_name='Consumed By', orderable=False, empty_values=())
-    qty = tables.Column(verbose_name='Qty')
-    assigned_date = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name='Date')
+    consumable = tables.LinkColumn('inventory:consumable_detail', args=[A('consumable__pk')], verbose_name=_('Consumable'))
+    assigned_to = tables.Column(verbose_name=_('Consumed By'), orderable=False, empty_values=())
+    qty = tables.Column(verbose_name=_('Qty'))
+    assigned_date = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name=_('Date'))
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
@@ -282,10 +282,10 @@ class ConsumableAssignmentTable(BaseTable):
 
 class KitTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('inventory:kit_detail', args=[A('pk')], verbose_name='Name')
-    description = tables.Column(verbose_name='Description')
-    item_count = tables.Column(accessor='item_count', verbose_name='Items Count', orderable=False)
-    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name='Tenant')
+    name = tables.LinkColumn('inventory:kit_detail', args=[A('pk')], verbose_name=_('Name'))
+    description = tables.Column(verbose_name=_('Description'))
+    item_count = tables.Column(accessor='item_count', verbose_name=_('Items Count'), orderable=False)
+    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name=_('Tenant'))
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
@@ -296,13 +296,13 @@ class KitTable(BaseTable):
 
 class ComponentTable(CheckableInventoryTableMixin, BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('inventory:component_detail', args=[A('pk')], verbose_name='Name')
+    name = tables.LinkColumn('inventory:component_detail', args=[A('pk')], verbose_name=_('Name'))
     manufacturer = tables.Column(linkify=True)
-    category = tables.Column(accessor='category.name', verbose_name='Category')
-    part_number = tables.Column(verbose_name='Part Number')
-    total_stock = tables.Column(verbose_name='Total Stock', orderable=False)
-    available_stock = tables.Column(verbose_name='Available', orderable=False)
-    min_qty = tables.Column(verbose_name='Safety Threshold')
+    category = tables.Column(accessor='category.name', verbose_name=_('Category'))
+    part_number = tables.Column(verbose_name=_('Part Number'))
+    total_stock = tables.Column(verbose_name=_('Total Stock'), orderable=False)
+    available_stock = tables.Column(verbose_name=_('Available'), orderable=False)
+    min_qty = tables.Column(verbose_name=_('Safety Threshold'))
     tenant = tables.Column(linkify=True)
     tags = TagColumn(url_name='inventory:component_list')
 
@@ -314,9 +314,9 @@ class ComponentTable(CheckableInventoryTableMixin, BaseTable):
 
 class ComponentStockTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    component = tables.LinkColumn('inventory:component_detail', args=[A('component.pk')], verbose_name='Component')
-    location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], verbose_name='Location')
-    qty = tables.Column(verbose_name='Quantity')
+    component = tables.LinkColumn('inventory:component_detail', args=[A('component.pk')], verbose_name=_('Component'))
+    location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], verbose_name=_('Location'))
+    qty = tables.Column(verbose_name=_('Quantity'))
     actions = tables.Column(
         verbose_name='',
         orderable=False,
@@ -358,7 +358,7 @@ class ComponentStockTable(BaseTable):
             '  {}'
             '  <a class="btn btn-sm btn-soft-success check-action d-flex align-items-center" role="button" style="cursor: pointer" '
             '     hx-get="{}?from_location={}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
-            '     title="{}" aria-label="{}">'
+            '     title="{}" aria-label=_("{}")>'
             '    <i class="mdi mdi-logout me-1"></i> {}'
             '  </a>'
             '  <a class="btn btn-sm btn-action btn-action-danger px-2 d-flex align-items-center" href="{}" title="Delete">'
@@ -383,10 +383,10 @@ class ComponentStockTable(BaseTable):
 
 class ComponentAllocationTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    component = tables.LinkColumn('inventory:component_detail', args=[A('component__pk')], verbose_name='Component')
-    assigned_to = tables.Column(verbose_name='Assigned To', orderable=False, empty_values=())
-    qty = tables.Column(verbose_name='Qty')
-    assigned_date = tables.DateTimeColumn(format='Y-m-d H:i', verbose_name='Date')
+    component = tables.LinkColumn('inventory:component_detail', args=[A('component__pk')], verbose_name=_('Component'))
+    assigned_to = tables.Column(verbose_name=_('Assigned To'), orderable=False, empty_values=())
+    qty = tables.Column(verbose_name=_('Qty'))
+    assigned_date = tables.DateTimeColumn(format='Y-m-d H:i', verbose_name=_('Date'))
     actions = tables.Column(
         verbose_name='',
         orderable=False,

@@ -21,7 +21,7 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         null=True,
         related_name='tag_sequences',
         db_index=True,
-        help_text="The tenant owning this sequence. Null represents system-wide/global sequences."
+        help_text=_("The tenant owning this sequence. Null represents system-wide/global sequences.")
     )
     category = models.ForeignKey(
         'assets.Category',
@@ -30,9 +30,9 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         null=True,
         related_name='tag_sequences',
         db_index=True,
-        help_text="The asset category this sequence applies to. Null represents default sequences."
+        help_text=_("The asset category this sequence applies to. Null represents default sequences.")
     )
-    prefix = models.CharField(max_length=20, default='ASSET-', help_text="Prefix for generated asset tags (e.g. ASSET-)")
+    prefix = models.CharField(max_length=20, default='ASSET-', help_text=_("Prefix for generated asset tags (e.g. ASSET-)"))
     next_value = models.PositiveIntegerField(default=1)
     zero_padding = models.PositiveSmallIntegerField(default=6)
     is_active = models.BooleanField(default=True)

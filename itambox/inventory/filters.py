@@ -2,6 +2,7 @@ import django_filters
 from core.filters import BaseFilterSet
 from django import forms
 from django.db.models import Q
+from django.utils.translation import gettext_lazy as _
 
 from organization.models import Tenant, Location, AssetHolder
 from assets.models import Manufacturer, AssetType, Category, Asset
@@ -17,18 +18,18 @@ from .models import (
 class AccessoryFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
         widget=forms.TextInput(attrs={'placeholder': 'Name, Part Number...'})
     )
     manufacturer = django_filters.ModelChoiceFilter(
         queryset=Manufacturer.objects.all(),
-        label='Manufacturer',
+        label=_('Manufacturer'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     tenant = django_filters.ModelChoiceFilter(
         queryset=Tenant.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label='Tenant'
+        label=_('Tenant')
     )
 
     class Meta:
@@ -48,18 +49,18 @@ class AccessoryFilterSet(BaseFilterSet):
 class ConsumableFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
         widget=forms.TextInput(attrs={'placeholder': 'Name, Part Number...'})
     )
     manufacturer = django_filters.ModelChoiceFilter(
         queryset=Manufacturer.objects.all(),
-        label='Manufacturer',
+        label=_('Manufacturer'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     tenant = django_filters.ModelChoiceFilter(
         queryset=Tenant.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label='Tenant'
+        label=_('Tenant')
     )
 
     class Meta:
@@ -77,11 +78,11 @@ class ConsumableFilterSet(BaseFilterSet):
 
 
 class KitFilterSet(BaseFilterSet):
-    q = django_filters.CharFilter(method='search', label='Search')
+    q = django_filters.CharFilter(method='search', label=_('Search'))
     tenant = django_filters.ModelChoiceFilter(
         queryset=Tenant.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label='Tenant'
+        label=_('Tenant')
     )
 
     class Meta:
@@ -100,17 +101,17 @@ class KitFilterSet(BaseFilterSet):
 class AccessoryStockFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
         widget=forms.TextInput(attrs={'placeholder': 'Accessory or Location...'})
     )
     accessory = django_filters.ModelChoiceFilter(
         queryset=Accessory.objects.all(),
-        label='Accessory',
+        label=_('Accessory'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     location = django_filters.ModelChoiceFilter(
         queryset=Location.objects.all(),
-        label='Location',
+        label=_('Location'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
@@ -130,17 +131,17 @@ class AccessoryStockFilterSet(BaseFilterSet):
 class ConsumableStockFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
         widget=forms.TextInput(attrs={'placeholder': 'Consumable or Location...'})
     )
     consumable = django_filters.ModelChoiceFilter(
         queryset=Consumable.objects.all(),
-        label='Consumable',
+        label=_('Consumable'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     location = django_filters.ModelChoiceFilter(
         queryset=Location.objects.all(),
-        label='Location',
+        label=_('Location'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
@@ -158,25 +159,25 @@ class ConsumableStockFilterSet(BaseFilterSet):
 
 
 class AccessoryAssignmentFilterSet(BaseFilterSet):
-    q = django_filters.CharFilter(method='search', label='Search')
+    q = django_filters.CharFilter(method='search', label=_('Search'))
     accessory = django_filters.ModelChoiceFilter(
         queryset=Accessory.objects.all(),
-        label='Accessory',
+        label=_('Accessory'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     assigned_holder = django_filters.ModelChoiceFilter(
         queryset=AssetHolder.objects.all(),
-        label='Assigned Holder',
+        label=_('Assigned Holder'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     assigned_location = django_filters.ModelChoiceFilter(
         queryset=Location.objects.all(),
-        label='Assigned Location',
+        label=_('Assigned Location'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     from_location = django_filters.ModelChoiceFilter(
         queryset=Location.objects.all(),
-        label='From Location',
+        label=_('From Location'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
@@ -196,25 +197,25 @@ class AccessoryAssignmentFilterSet(BaseFilterSet):
 
 
 class ConsumableAssignmentFilterSet(BaseFilterSet):
-    q = django_filters.CharFilter(method='search', label='Search')
+    q = django_filters.CharFilter(method='search', label=_('Search'))
     consumable = django_filters.ModelChoiceFilter(
         queryset=Consumable.objects.all(),
-        label='Consumable',
+        label=_('Consumable'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     assigned_holder = django_filters.ModelChoiceFilter(
         queryset=AssetHolder.objects.all(),
-        label='Assigned Holder',
+        label=_('Assigned Holder'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     assigned_location = django_filters.ModelChoiceFilter(
         queryset=Location.objects.all(),
-        label='Assigned Location',
+        label=_('Assigned Location'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     from_location = django_filters.ModelChoiceFilter(
         queryset=Location.objects.all(),
-        label='From Location',
+        label=_('From Location'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
@@ -236,27 +237,27 @@ class ConsumableAssignmentFilterSet(BaseFilterSet):
 class KitItemFilterSet(BaseFilterSet):
     kit = django_filters.ModelChoiceFilter(
         queryset=Kit.objects.all(),
-        label='Kit',
+        label=_('Kit'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     asset_type = django_filters.ModelChoiceFilter(
         queryset=AssetType.objects.all(),
-        label='Asset Type',
+        label=_('Asset Type'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     accessory = django_filters.ModelChoiceFilter(
         queryset=Accessory.objects.all(),
-        label='Accessory',
+        label=_('Accessory'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     license = django_filters.ModelChoiceFilter(
         queryset=License.objects.all(),
-        label='License',
+        label=_('License'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     consumable = django_filters.ModelChoiceFilter(
         queryset=Consumable.objects.all(),
-        label='Consumable',
+        label=_('Consumable'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
@@ -268,22 +269,22 @@ class KitItemFilterSet(BaseFilterSet):
 class ComponentFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
         widget=forms.TextInput(attrs={'placeholder': 'Name, Part Number...'})
     )
     manufacturer = django_filters.ModelChoiceFilter(
         queryset=Manufacturer.objects.all(),
-        label='Manufacturer',
+        label=_('Manufacturer'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     category = django_filters.ModelChoiceFilter(
         queryset=Category.objects.filter(applies_to__component=True),
-        label='Category',
+        label=_('Category'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     tenant = django_filters.ModelChoiceFilter(
         queryset=Tenant.objects.all(),
-        label='Tenant',
+        label=_('Tenant'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
@@ -304,17 +305,17 @@ class ComponentFilterSet(BaseFilterSet):
 class ComponentStockFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
-        label='Search',
+        label=_('Search'),
         widget=forms.TextInput(attrs={'placeholder': 'Component or Location...'})
     )
     component = django_filters.ModelChoiceFilter(
         queryset=Component.objects.all(),
-        label='Component',
+        label=_('Component'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     location = django_filters.ModelChoiceFilter(
         queryset=Location.objects.all().select_related('site'),
-        label='Location',
+        label=_('Location'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
@@ -332,30 +333,30 @@ class ComponentStockFilterSet(BaseFilterSet):
 
 
 class ComponentAllocationFilterSet(BaseFilterSet):
-    q = django_filters.CharFilter(method='search', label='Search')
+    q = django_filters.CharFilter(method='search', label=_('Search'))
     component = django_filters.ModelChoiceFilter(
         queryset=Component.objects.all(),
-        label='Component',
+        label=_('Component'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     assigned_holder = django_filters.ModelChoiceFilter(
         queryset=AssetHolder.objects.all(),
-        label='Assigned Holder',
+        label=_('Assigned Holder'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     assigned_location = django_filters.ModelChoiceFilter(
         queryset=Location.objects.all(),
-        label='Assigned Location',
+        label=_('Assigned Location'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     assigned_asset = django_filters.ModelChoiceFilter(
         queryset=Asset.objects.all(),
-        label='Assigned Asset',
+        label=_('Assigned Asset'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     from_location = django_filters.ModelChoiceFilter(
         queryset=Location.objects.all(),
-        label='From Location',
+        label=_('From Location'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 

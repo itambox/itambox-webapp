@@ -1,6 +1,7 @@
 import datetime
 from django import forms
 from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, HTML
 
@@ -18,19 +19,19 @@ class AssetCheckOutForm(forms.Form):
     target_type = forms.ChoiceField(
         choices=TARGET_CHOICES,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Assign to"
+        label=_("Assign to")
     )
     asset_holder = forms.ModelChoiceField(
         queryset=AssetHolder.objects.all().order_by('last_name', 'first_name'),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Asset Holder"
+        label=_("Asset Holder")
     )
     location = forms.ModelChoiceField(
         queryset=Location.objects.all().select_related('site').order_by('site__name', 'name'),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Location"
+        label=_("Location")
     )
     asset_target = forms.ModelChoiceField(
         queryset=Asset.objects.exclude(
@@ -38,28 +39,28 @@ class AssetCheckOutForm(forms.Form):
         ).order_by('name'),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Parent Asset"
+        label=_("Parent Asset")
     )
     status = forms.ModelChoiceField(
         queryset=StatusLabel.objects.filter(type='deployed').order_by('name'),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Status"
+        label=_("Status")
     )
     checkout_date = forms.DateField(
         required=False,
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-        label="Checkout Date"
+        label=_("Checkout Date")
     )
     expected_checkin = forms.DateField(
         required=False,
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-        label="Expected Checkin Date"
+        label=_("Expected Checkin Date")
     )
     notes = forms.CharField(
         widget=forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
         required=False,
-        label="Notes"
+        label=_("Notes")
     )
  
     def clean(self):
@@ -113,23 +114,23 @@ class AssetCheckInForm(forms.Form):
         queryset=StatusLabel.objects.exclude(type='deployed').order_by('name'),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Status"
+        label=_("Status")
     )
     location = forms.ModelChoiceField(
         queryset=Location.objects.all().select_related('site').order_by('site__name', 'name'),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
-        label="Location"
+        label=_("Location")
     )
     checkin_date = forms.DateField(
         required=False,
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-        label="Checkin Date"
+        label=_("Checkin Date")
     )
     notes = forms.CharField(
         widget=forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
         required=False,
-        label="Notes"
+        label=_("Notes")
     )
 
     def __init__(self, *args, **kwargs):

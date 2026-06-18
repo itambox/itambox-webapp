@@ -70,12 +70,12 @@ class TagColumn(tables.ManyToManyColumn):
 
 class TagTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('extras:tag_detail', args=[A('pk')], verbose_name='Name')
+    name = tables.LinkColumn('extras:tag_detail', args=[A('pk')], verbose_name=_('Name'))
     # You might want a column to show count of items tagged with this tag.
     # This can be complex depending on how Tags are related (GenericForeignKey?).
     # For now, let's omit the count.
     # item_count = tables.Column(verbose_name='Tagged Items', orderable=False, empty_values=())
-    color = tables.Column(verbose_name='Color', orderable=True)
+    color = tables.Column(verbose_name=_('Color'), orderable=True)
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
@@ -91,12 +91,12 @@ class TagTable(BaseTable):
 
 class CustomFieldTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('extras:customfield_detail', args=[A('pk')], verbose_name='Name')
-    label = tables.Column(verbose_name='Label')
-    field_type = tables.Column(verbose_name='Field Type')
-    required = tables.BooleanColumn(verbose_name='Required')
+    name = tables.LinkColumn('extras:customfield_detail', args=[A('pk')], verbose_name=_('Name'))
+    label = tables.Column(verbose_name=_('Label'))
+    field_type = tables.Column(verbose_name=_('Field Type'))
+    required = tables.BooleanColumn(verbose_name=_('Required'))
     object_types = tables.ManyToManyColumn(
-        verbose_name='Applies To',
+        verbose_name=_('Applies To'),
         transform=lambda ct: ct.model_class()._meta.verbose_name.title() if ct.model_class() else ct.model,
         orderable=False,
     )
@@ -110,8 +110,8 @@ class CustomFieldTable(BaseTable):
 
 class CustomFieldsetTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('extras:customfieldset_detail', args=[A('pk')], verbose_name='Name')
-    fields_count = tables.Column(verbose_name='Fields Count', orderable=False)
+    name = tables.LinkColumn('extras:customfieldset_detail', args=[A('pk')], verbose_name=_('Name'))
+    fields_count = tables.Column(verbose_name=_('Fields Count'), orderable=False)
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
@@ -125,12 +125,12 @@ class CustomFieldsetTable(BaseTable):
 
 class SavedFilterTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('extras:savedfilter_detail', args=[A('pk')], verbose_name='Name')
-    content_type = tables.Column(verbose_name='Object Type', accessor='content_type')
-    shared = BooleanColumn(verbose_name='Shared')
-    enabled = BooleanColumn(verbose_name='Enabled')
-    tenant = tables.Column(verbose_name='Tenant', accessor='tenant.name', linkify=False)
-    created_by = tables.Column(verbose_name='Created By', accessor='created_by')
+    name = tables.LinkColumn('extras:savedfilter_detail', args=[A('pk')], verbose_name=_('Name'))
+    content_type = tables.Column(verbose_name=_('Object Type'), accessor='content_type')
+    shared = BooleanColumn(verbose_name=_('Shared'))
+    enabled = BooleanColumn(verbose_name=_('Enabled'))
+    tenant = tables.Column(verbose_name=_('Tenant'), accessor='tenant.name', linkify=False)
+    created_by = tables.Column(verbose_name=_('Created By'), accessor='created_by')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
@@ -152,12 +152,12 @@ class SavedFilterTable(BaseTable):
 
 class AlertRuleTable(BaseTable):
     name = tables.Column(linkify=True)
-    alert_type = tables.Column(verbose_name='Alert Type')
-    threshold_value = tables.Column(verbose_name='Threshold')
+    alert_type = tables.Column(verbose_name=_('Alert Type'))
+    threshold_value = tables.Column(verbose_name=_('Threshold'))
     severity = tables.Column()
     is_active = BooleanColumn()
-    is_muted = BooleanColumn(verbose_name='Muted')
-    tenant = tables.Column(verbose_name='Tenant', accessor='tenant.name', linkify=False)
+    is_muted = BooleanColumn(verbose_name=_('Muted'))
+    tenant = tables.Column(verbose_name=_('Tenant'), accessor='tenant.name', linkify=False)
     actions = tables.TemplateColumn(
         template_code="""
         <div class="d-flex gap-1 justify-content-end">
@@ -173,7 +173,7 @@ class AlertRuleTable(BaseTable):
             </a>
         </div>
         """,
-        verbose_name="Actions",
+        verbose_name=_("Actions"),
         orderable=False,
         attrs={
             'th': {'class': 'col-actions text-nowrap'},
@@ -199,9 +199,9 @@ class AlertRuleTable(BaseTable):
 
 class NotificationChannelTable(BaseTable):
     name = tables.Column(linkify=False)
-    channel_type = tables.Column(verbose_name='Channel Type')
+    channel_type = tables.Column(verbose_name=_('Channel Type'))
     enabled = BooleanColumn()
-    tenant = tables.Column(verbose_name='Tenant', accessor='tenant.name', linkify=False)
+    tenant = tables.Column(verbose_name=_('Tenant'), accessor='tenant.name', linkify=False)
     actions = tables.TemplateColumn(
         template_code="""
         <div class="d-flex gap-1 justify-content-end">
@@ -219,7 +219,7 @@ class NotificationChannelTable(BaseTable):
             </a>
         </div>
         """,
-        verbose_name="Actions",
+        verbose_name=_("Actions"),
         orderable=False,
         attrs={
             'th': {
@@ -239,13 +239,13 @@ class NotificationChannelTable(BaseTable):
 
 class AlertLogTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    created_at = tables.DateTimeColumn(verbose_name='Date', format='Y-m-d H:i:s')
+    created_at = tables.DateTimeColumn(verbose_name=_('Date'), format='Y-m-d H:i:s')
     rule = tables.Column(linkify=True)
     subject = tables.Column(linkify=False)
     severity = tables.Column()
     status = tables.Column()
     delivery = tables.Column(
-        verbose_name='Delivery', orderable=False, empty_values=(), accessor='delivery_status'
+        verbose_name=_('Delivery'), orderable=False, empty_values=(), accessor='delivery_status'
     )
     actions = tables.TemplateColumn(
         template_code="""
@@ -272,7 +272,7 @@ class AlertLogTable(BaseTable):
             {% endif %}
         </div>
         """,
-        verbose_name="Actions",
+        verbose_name=_("Actions"),
         orderable=False,
         attrs={
             'th': {
@@ -334,7 +334,7 @@ class AlertLogTable(BaseTable):
 
 class ReportTemplateTable(BaseTable):
     name = tables.Column(linkify=True)
-    report_type = tables.Column(verbose_name='Type')
+    report_type = tables.Column(verbose_name=_('Type'))
 
     class Meta(BaseTable.Meta):
         model = ReportTemplate
@@ -369,7 +369,7 @@ class ScheduledReportTable(BaseTable):
             </a>
         </div>
         """,
-        verbose_name="Actions",
+        verbose_name=_("Actions"),
         orderable=False,
         attrs={
             'th': {

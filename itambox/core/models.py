@@ -12,6 +12,7 @@ from django.db import models
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import urlencode
+from django.utils.translation import gettext_lazy as _
 
 # Local application
 from itambox.middleware import get_current_request_id, get_current_user
@@ -340,13 +341,13 @@ class Notification(models.Model):
         related_name='notifications',
         null=True,
         blank=True,
-        help_text="Target user for the notification. Null represents global broadcast alert."
+        help_text=_("Target user for the notification. Null represents global broadcast alert.")
     )
     subject = models.CharField(max_length=255)
     message = models.TextField()
     level = models.CharField(max_length=20, choices=LEVEL_CHOICES, default=LEVEL_INFO)
     is_read = models.BooleanField(default=False)
-    target_url = models.CharField(max_length=500, blank=True, help_text="Optional destination URL when clicked.")
+    target_url = models.CharField(max_length=500, blank=True, help_text=_("Optional destination URL when clicked."))
     created_at = models.DateTimeField(auto_now_add=True)
 
 
@@ -475,7 +476,7 @@ class EmailSettings(ChangeLoggingMixin, BaseModel):
     from_address = models.EmailField(max_length=255, default='itambox@localhost')
     from_name = models.CharField(max_length=255, default='ITAMbox Notifications')
     enabled = models.BooleanField(default=False)
-    test_recipient = models.EmailField(max_length=255, blank=True, help_text="Email address for test notifications")
+    test_recipient = models.EmailField(max_length=255, blank=True, help_text=_("Email address for test notifications"))
 
     class Meta:
         verbose_name = "Email Settings"

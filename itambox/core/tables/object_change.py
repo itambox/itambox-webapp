@@ -1,19 +1,20 @@
 import django_tables2 as tables
 from django.utils.html import format_html
+from django.utils.translation import gettext_lazy as _
 from core.models import ObjectChange
 from .base import BaseTable
 
 class ObjectChangeTable(BaseTable):
     time = tables.DateTimeColumn(linkify=True, format='Y-m-d H:i:s')
-    user_name = tables.Column(verbose_name='User')
-    action = tables.Column(verbose_name='Action')
-    changed_object_type = tables.Column(linkify=False, verbose_name='Type')
-    object_repr = tables.Column(linkify=False, verbose_name='Object')
-    request_id = tables.Column(linkify=False, verbose_name='Request ID')
+    user_name = tables.Column(verbose_name=_('User'))
+    action = tables.Column(verbose_name=_('Action'))
+    changed_object_type = tables.Column(linkify=False, verbose_name=_('Type'))
+    object_repr = tables.Column(linkify=False, verbose_name=_('Object'))
+    request_id = tables.Column(linkify=False, verbose_name=_('Request ID'))
 
     changed_object = tables.Column(
         linkify=lambda record: record.get_changed_object_url(),
-        verbose_name='Changed Object',
+        verbose_name=_('Changed Object'),
         accessor='object_repr'
     )
 
