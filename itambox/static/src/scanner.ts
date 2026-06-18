@@ -75,8 +75,7 @@ class AssetScanner {
     // Detect this before calling .start() so the user sees a clear message.
     if (!window.isSecureContext) {
       this.showError(
-        'Camera unavailable. On iPhone/iPad, scanning requires HTTPS. ' +
-        'Please use a hardware scanner or type the asset tag.'
+        gettext('Camera unavailable. On iPhone/iPad, scanning requires HTTPS. Please use a hardware scanner or type the asset tag.')
       );
       return;
     }
@@ -146,8 +145,8 @@ class AssetScanner {
         err?.name === 'NotAllowedError' ||
         (typeof err?.message === 'string' && err.message.toLowerCase().includes('permission'));
       const msg = isPermissionDenied
-        ? 'Camera permission denied. On iPhone/iPad check Settings › Safari › Camera, or use a hardware scanner / type the tag.'
-        : 'Camera unavailable. Please use a hardware scanner or type the asset tag.';
+        ? gettext('Camera permission denied. On iPhone/iPad check Settings › Safari › Camera, or use a hardware scanner / type the tag.')
+        : gettext('Camera unavailable. Please use a hardware scanner or type the asset tag.');
       this.showError(msg);
       // Keep modal open so user sees the error and can cancel
     }
@@ -246,12 +245,12 @@ function initGlobalScanner(): void {
             window.location.href = data.url;
           } else {
             document.dispatchEvent(new Event('playAuditFailSound'));
-            showGlobalScanToast('No asset matches: ' + code);
+            showGlobalScanToast(interpolate(gettext('No asset matches: %(code)s'), { code }, true));
           }
         })
         .catch(() => {
           document.dispatchEvent(new Event('playAuditFailSound'));
-          showGlobalScanToast('No asset matches: ' + code);
+          showGlobalScanToast(interpolate(gettext('No asset matches: %(code)s'), { code }, true));
         });
     },
   });

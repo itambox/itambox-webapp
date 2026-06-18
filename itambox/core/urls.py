@@ -17,6 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import TemplateView, RedirectView
+from django.views.i18n import JavaScriptCatalog
 from assets import views as asset_views # Import the assets views
 from extras.dashboard import views as dashboard_views
 from itambox.views.generic import (
@@ -130,6 +131,8 @@ urlpatterns = [
 
     # i18n
     path('i18n/', include('django.conf.urls.i18n')),
+    # JS translation catalog (djangojs domain) consumed by static/src/*.ts via gettext()
+    path('jsi18n/', JavaScriptCatalog.as_view(), name='javascript-catalog'),
 
     # SAML SSO
     path('saml2/', include('djangosaml2.urls')),

@@ -6,7 +6,7 @@
     const descInput = document.querySelector('textarea[name="description"]') as HTMLTextAreaElement | null;
     const typeSelect = document.querySelector('select[name="report_type"]') as HTMLSelectElement | null;
 
-    const description = descInput ? descInput.value || 'Visual inventory compilation.' : 'Visual inventory compilation.';
+    const description = descInput ? descInput.value || gettext('Visual inventory compilation.') : gettext('Visual inventory compilation.');
     const reportType = typeSelect ? typeSelect.value : 'asset_summary';
     
     // Get selected checkboxes
@@ -32,39 +32,39 @@
     
     // Header display names map
     const headersMap: Record<string, string> = {
-      'asset_tag': 'Asset Tag',
-      'name': 'Asset Name',
-      'manufacturer': 'Manufacturer',
-      'model': 'Model',
-      'serial_number': 'Serial Number',
-      'status': 'Status Label',
-      'location': 'Location',
-      'assigned_to': 'Asset Holder',
-      'purchase_cost': 'Purchase Cost',
-      'purchase_date': 'Purchase Date',
-      'warranty_months': 'Warranty (Months)',
-      'license_name': 'License Name',
-      'software': 'Software',
-      'seats': 'Total Seats',
-      'assigned_seats': 'Assigned Seats',
-      'available_seats': 'Available Seats',
-      'utilization_rate': 'Utilization Rate',
-      'subscription_name': 'Subscription Name',
-      'provider': 'Provider',
-      'billing_cycle': 'Billing Cycle',
-      'cost': 'Cost',
-      'end_date': 'End Date',
-      'salvage_value': 'Salvage Value',
-      'depreciation_months': 'Depreciation Lifespan (Months)',
-      'current_value': 'Depreciated Value',
-      'software_name': 'Software Product',
-      'installed_count': 'Installed Count',
-      'license_count': 'License Count',
-      'maintenance_title': 'Maintenance Title',
-      'maintenance_asset': 'Asset',
-      'maintenance_type': 'Type',
-      'maintenance_status': 'Status',
-      'maintenance_cost': 'Cost'
+      'asset_tag': gettext('Asset Tag'),
+      'name': gettext('Asset Name'),
+      'manufacturer': gettext('Manufacturer'),
+      'model': gettext('Model'),
+      'serial_number': gettext('Serial Number'),
+      'status': gettext('Status Label'),
+      'location': gettext('Location'),
+      'assigned_to': gettext('Asset Holder'),
+      'purchase_cost': gettext('Purchase Cost'),
+      'purchase_date': gettext('Purchase Date'),
+      'warranty_months': gettext('Warranty (Months)'),
+      'license_name': gettext('License Name'),
+      'software': gettext('Software'),
+      'seats': gettext('Total Seats'),
+      'assigned_seats': gettext('Assigned Seats'),
+      'available_seats': gettext('Available Seats'),
+      'utilization_rate': gettext('Utilization Rate'),
+      'subscription_name': gettext('Subscription Name'),
+      'provider': gettext('Provider'),
+      'billing_cycle': gettext('Billing Cycle'),
+      'cost': gettext('Cost'),
+      'end_date': gettext('End Date'),
+      'salvage_value': gettext('Salvage Value'),
+      'depreciation_months': gettext('Depreciation Lifespan (Months)'),
+      'current_value': gettext('Depreciated Value'),
+      'software_name': gettext('Software Product'),
+      'installed_count': gettext('Installed Count'),
+      'license_count': gettext('License Count'),
+      'maintenance_title': gettext('Maintenance Title'),
+      'maintenance_asset': gettext('Asset'),
+      'maintenance_type': gettext('Type'),
+      'maintenance_status': gettext('Status'),
+      'maintenance_cost': gettext('Cost')
     };
     
     const headers = selectedCols.map(col => headersMap[col] || col);
@@ -246,7 +246,7 @@
                         {% empty %}
                         <tr>
                             <td colspan="${headers.length}" style="text-align: center; color: #64748b; padding: 20px;">
-                                No records found.
+                                ${gettext('No records found.')}
                             </td>
                         </tr>
                         {% endfor %}
@@ -255,7 +255,7 @@
             {% endfor %}
         </div>
         <div class="footer">
-            Sent automatically by ITAMbox — IT Asset Management Console.
+            ${gettext('Sent automatically by ITAMbox — IT Asset Management Console.')}
         </div>
     </div>
 </body>
@@ -332,15 +332,15 @@
                   <div class="col-md-6 mb-3 mb-md-0">
                       <div class="text-secondary small fw-bold mb-2 uppercase text-uppercase d-flex align-items-center">
                           <i class="mdi mdi-sort me-1 text-primary"></i>
-                          Selected Sequence (Orderable)
+                          ${gettext('Selected Sequence (Orderable)')}
                       </div>
                       <div id="active-cols-list" class="d-flex flex-column gap-2 p-2 bg-body rounded border" style="min-height: 120px; max-height: 280px; overflow-y: auto;">
-                          <span class="text-muted small text-center my-auto py-3 italic">No columns selected. Click available columns to add them.</span>
+                          <span class="text-muted small text-center my-auto py-3 italic">${gettext('No columns selected. Click available columns to add them.')}</span>
                       </div>
                   </div>
                   <div class="col-md-6">
                       <div class="text-secondary small fw-bold mb-2 uppercase text-uppercase">
-                          Available Columns
+                          ${gettext('Available Columns')}
                       </div>
                       <div id="available-cols-list" class="d-flex flex-wrap gap-2 p-2 bg-body rounded border" style="min-height: 120px; align-content: flex-start; max-height: 280px; overflow-y: auto;">
                       </div>
@@ -416,13 +416,13 @@
                       <span class="small fw-semibold text-primary">${labelText.trim()}</span>
                   </div>
                   <div class="d-flex align-items-center gap-1">
-                      <button type="button" class="btn btn-sm btn-icon btn-outline-primary py-0 px-1 border-0 btn-move-up" title="Move Up">
+                      <button type="button" class="btn btn-sm btn-icon btn-outline-primary py-0 px-1 border-0 btn-move-up" title="${gettext('Move Up')}">
                           <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="14" height="14" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M18 11l-6 -6" /><path d="M6 11l6 -6" /></svg>
                       </button>
-                      <button type="button" class="btn btn-sm btn-icon btn-outline-primary py-0 px-1 border-0 btn-move-down" title="Move Down">
+                      <button type="button" class="btn btn-sm btn-icon btn-outline-primary py-0 px-1 border-0 btn-move-down" title="${gettext('Move Down')}">
                           <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="14" height="14" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M18 13l-6 6" /><path d="M6 13l6 6" /></svg>
                       </button>
-                      <button type="button" class="btn btn-sm btn-icon btn-outline-danger py-0 px-1 border-0 btn-remove-col" title="Remove">
+                      <button type="button" class="btn btn-sm btn-icon btn-outline-danger py-0 px-1 border-0 btn-remove-col" title="${gettext('Remove')}">
                           <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="14" height="14" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
                       </button>
                   </div>
@@ -474,7 +474,7 @@
           });
           
           if (activeCount === 0) {
-            activeList.innerHTML = '<span class="text-muted small text-center my-auto py-3 italic">No columns selected. Click available columns to add them.</span>';
+            activeList.innerHTML = '<span class="text-muted small text-center my-auto py-3 italic">' + gettext('No columns selected. Click available columns to add them.') + '</span>';
           }
         }
         
@@ -505,7 +505,7 @@
       newBtn.type = 'button';
       newBtn.className = 'btn btn-sm btn-outline-primary mb-2';
       newBtn.style.fontSize = '12px';
-      newBtn.innerHTML = '<i class="mdi mdi-refresh"></i> Bootstrap from Visual Builder';
+      newBtn.innerHTML = '<i class="mdi mdi-refresh"></i> ' + gettext('Bootstrap from Visual Builder');
       regenBtn = newBtn;
       
       if (templateGroup && templateContentDiv) {
@@ -514,7 +514,7 @@
       
       regenBtn.addEventListener('click', function(e) {
         e.preventDefault();
-        if (confirm('Are you sure you want to overwrite the current custom template with the selections from the Visual Builder?')) {
+        if (confirm(gettext('Are you sure you want to overwrite the current custom template with the selections from the Visual Builder?'))) {
           if (templateContentDiv) {
             templateContentDiv.value = generateJinja2FromForm();
           }
@@ -551,7 +551,7 @@
       previewBtn.className = 'btn btn-outline-info ms-2';
       previewBtn.style.borderRadius = '6px';
       previewBtn.style.fontWeight = '600';
-      previewBtn.innerHTML = '<i class="mdi mdi-eye-outline me-1"></i> Preview Report';
+      previewBtn.innerHTML = '<i class="mdi mdi-eye-outline me-1"></i> ' + gettext('Preview Report');
       
       submitBtn.parentNode!.insertBefore(previewBtn, submitBtn.nextSibling);
       
@@ -600,7 +600,7 @@
     .then(response => {
       if (!response.ok) {
         return response.text().then(text => {
-          throw new Error(text || 'Template rendering failed.');
+          throw new Error(text || gettext('Template rendering failed.'));
         });
       }
       return response.text();
@@ -628,7 +628,7 @@
           frame.srcdoc = cleanErr;
         } else {
           frame.srcdoc = `<div style="padding: 20px; font-family: sans-serif; color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px;">
-              <h4 style="margin-top: 0;">Preview Render Error</h4>
+              <h4 style="margin-top: 0;">${gettext('Preview Render Error')}</h4>
               <pre style="white-space: pre-wrap; font-family: monospace;">${cleanErr}</pre>
           </div>`;
         }

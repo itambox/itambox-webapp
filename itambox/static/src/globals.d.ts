@@ -1,5 +1,16 @@
 // Global type declarations for ITAMbox
 
+// Django JS i18n catalog (django.views.i18n.JavaScriptCatalog) — loaded before the
+// app bundle in base.html / base_public.html, so these are defined globally.
+declare function gettext(msgid: string): string;
+declare function ngettext(singular: string, plural: string, count: number): string;
+declare function interpolate(fmt: string, obj: Record<string, unknown> | unknown[], named?: boolean): string;
+declare function gettext_noop(msgid: string): string;
+declare function pgettext(context: string, msgid: string): string;
+declare function npgettext(context: string, singular: string, plural: string, count: number): string;
+declare function pluralidx(count: number): number;
+declare function get_format(formatType: string): string;
+
 // HTMX
 declare const htmx: {
   boost: () => void;

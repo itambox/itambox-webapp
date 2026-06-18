@@ -163,7 +163,7 @@
       btn.dataset['_saving'] = 'true';
       const origHTML = btn.innerHTML;
       btn.innerHTML =
-        '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check me-1" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l5 5l10 -10"/></svg>Saved';
+        '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check me-1" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l5 5l10 -10"/></svg>' + gettext('Saved');
       btn.classList.add('btn-success');
       btn.classList.remove('btn-primary');
       setTimeout(function () {
@@ -209,7 +209,7 @@
       }
 
       if (data.length === 0) {
-        container.innerHTML = '<div class="text-muted text-center py-4">No assets assigned to active status labels.</div>';
+        container.innerHTML = '<div class="text-muted text-center py-4">' + gettext('No assets assigned to active status labels.') + '</div>';
         return;
       }
 
@@ -264,7 +264,7 @@
         tooltip: {
           theme: getThemeMode(),
           y: {
-            formatter: function(val: any) { return val + " assets"; }
+            formatter: function(val: any) { return interpolate(gettext("%(count)s assets"), { count: val }, true); }
           }
         }
       };
@@ -272,7 +272,7 @@
       if (chartType === 'bar') {
         options = {
           ...options,
-          series: [{ name: "Assets", data: series }],
+          series: [{ name: gettext("Assets"), data: series }],
           chart: {
             ...options.chart,
             type: 'bar',
@@ -333,7 +333,7 @@
                   },
                   total: {
                     show: true,
-                    label: "Total",
+                    label: gettext("Total"),
                     color: getThemeMode() === 'dark' ? '#94a3b8' : '#64748b',
                     formatter: function(w: any) {
                       return w.globals.seriesTotals.reduce((a: number, b: number) => a + b, 0);
@@ -434,7 +434,7 @@
         tooltip: {
           theme: getThemeMode(),
           y: {
-            formatter: function(val: any) { return val + " assets"; }
+            formatter: function(val: any) { return interpolate(gettext("%(count)s assets"), { count: val }, true); }
           }
         }
       };
@@ -442,7 +442,7 @@
       if (chartFormat === 'bar') {
         options = {
           ...options,
-          series: [{ name: "Assets", data: series }],
+          series: [{ name: gettext("Assets"), data: series }],
           chart: {
             ...options.chart,
             type: 'bar',
@@ -585,7 +585,7 @@
         options = {
           ...options,
           series: [{
-            name: "Spend",
+            name: gettext("Spend"),
             data: seriesData
           }],
           plotOptions: {
@@ -643,7 +643,7 @@
                   },
                   total: {
                     show: true,
-                    label: "Total",
+                    label: gettext("Total"),
                     color: getThemeMode() === 'dark' ? '#94a3b8' : '#64748b',
                     formatter: function(w: any) {
                       const sum = w.globals.seriesTotals.reduce((a: number, b: number) => a + b, 0);

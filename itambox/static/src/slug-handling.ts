@@ -69,7 +69,7 @@ function addRefreshButton(slugField: SlugInput, nameField: HTMLInputElement): vo
   refreshButton.setAttribute('type', 'button');
   refreshButton.classList.add('btn', 'btn-outline-secondary');
   refreshButton.innerHTML = '<i class="mdi mdi-refresh"></i>';
-  refreshButton.title = 'Generate from name';
+  refreshButton.title = gettext('Generate from name');
 
   inputGroup.appendChild(refreshButton);
 

@@ -77,7 +77,7 @@
         },
         body: JSON.stringify(buildPayload(configRoot, selectedColumns)),
       }).then(function (resp) {
-        if (!resp.ok) throw new Error('Failed to save configuration');
+        if (!resp.ok) throw new Error(gettext('Failed to save configuration'));
         return resp.json();
       });
     }
@@ -117,7 +117,7 @@
             }
           })
           .catch(function (err: Error) {
-            alert('Error saving configuration: ' + err.message);
+            alert(gettext('Error saving configuration: ') + err.message);
           });
       });
 
@@ -141,7 +141,7 @@
             }
           })
           .catch(function (err: Error) {
-            alert('Error resetting configuration: ' + err.message);
+            alert(gettext('Error resetting configuration: ') + err.message);
           });
       });
   }

@@ -26,14 +26,14 @@
     scope.querySelectorAll<HTMLElement>('.batch-actions-bar').forEach(function (bar) {
       bar.classList.toggle('d-none', none);
       bar.querySelectorAll<HTMLElement>('.fw-bold').forEach(function (el) {
-        el.textContent = count + ' selected';
+        el.textContent = interpolate(gettext('%(count)s selected'), { count }, true);
       });
     });
 
     // Persistent NetBox-style toolbar — always visible; buttons disabled until
     // a selection exists, and a live count label.
     scope.querySelectorAll<HTMLElement>('.bulk-selected-count').forEach(function (el) {
-      el.textContent = count + ' selected';
+      el.textContent = interpolate(gettext('%(count)s selected'), { count }, true);
     });
     scope.querySelectorAll<HTMLElement>('.bulk-action-btn').forEach(function (btn) {
       (btn as HTMLButtonElement).disabled = none;
@@ -68,7 +68,7 @@
   function gatherPks(form: HTMLFormElement, scope: HTMLElement): boolean {
     const checked = checkedPks(scope);
     if (checked.length === 0) {
-      alert('No items selected.');
+      alert(gettext('No items selected.'));
       return false;
     }
     let container = form.querySelector<HTMLElement>('.bulk-pks-container');
@@ -149,7 +149,7 @@
 
     if (pks.length === 0) {
       event.preventDefault();
-      alert('No items selected.');
+      alert(gettext('No items selected.'));
       return;
     }
 
@@ -185,7 +185,7 @@
     {
       trigger: '.btn-bulk-purge',
       form: '.bulk-purge-form',
-      confirm: 'Are you sure you want to PERMANENTLY delete the selected items? This cannot be undone!',
+      confirm: gettext('Are you sure you want to PERMANENTLY delete the selected items? This cannot be undone!'),
     },
   ];
 

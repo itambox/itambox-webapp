@@ -40,7 +40,7 @@
       ],
       render: {
         no_results: function () {
-          return '<div class="no-results">No results found</div>';
+          return '<div class="no-results">' + gettext('No results found') + '</div>';
         } as unknown as () => { wrapper: string },
       },
     };

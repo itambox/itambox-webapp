@@ -32,7 +32,7 @@
 
     // Inject spinner based on element type
     if (submitBtn instanceof HTMLInputElement) {
-      submitBtn.value = 'Saving...';
+      submitBtn.value = gettext('Saving...');
     } else {
       const spinnerHtml = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>';
       submitBtn.innerHTML = spinnerHtml + submitBtn.textContent?.trim();

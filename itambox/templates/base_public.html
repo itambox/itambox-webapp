@@ -18,6 +18,7 @@
     <link rel="stylesheet" href="{% static 'dist/itambox.css' %}?v=1.1.0">
   </head>
   <body class="d-flex flex-column">
+    <script src="{% url 'javascript-catalog' %}"></script>
     <script src="{% static 'dist/itambox.js' %}?v=1.1.0"></script>
     <div class="page page-center">
       {% block content %}

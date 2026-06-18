@@ -119,7 +119,7 @@
     closeBtn.type = 'button';
     closeBtn.className = 'btn-close btn-close-white me-2 m-auto';
     closeBtn.setAttribute('data-bs-dismiss', 'toast');
-    closeBtn.setAttribute('aria-label', 'Close');
+    closeBtn.setAttribute('aria-label', gettext('Close'));
     flex.appendChild(body);
     flex.appendChild(closeBtn);
     toastEl.appendChild(flex);

@@ -13,7 +13,7 @@
 (function () {
   function handleConfirm(evt: Event): void {
     const btn = evt.currentTarget as HTMLButtonElement;
-    const msg = btn.getAttribute('data-confirm') || 'Are you sure?';
+    const msg = btn.getAttribute('data-confirm') || gettext('Are you sure?');
     if (!confirm(msg)) {
       evt.preventDefault();
     }
@@ -34,7 +34,7 @@
     if (!text) return;
 
     navigator.clipboard.writeText(text).then(function () {
-      const feedback = btn.getAttribute('data-copy-feedback') || 'Copied!';
+      const feedback = btn.getAttribute('data-copy-feedback') || gettext('Copied!');
       const original = btn.textContent || '';
       btn.textContent = feedback;
       setTimeout(function () {
@@ -79,7 +79,7 @@
   function handlePreviewBlock(evt: Event): void {
     evt.preventDefault();
     const form = evt.currentTarget as HTMLElement;
-    const msg = form.getAttribute('data-preview-block') || 'This action is disabled in preview mode.';
+    const msg = form.getAttribute('data-preview-block') || gettext('This action is disabled in preview mode.');
     alert(msg);
   }
 

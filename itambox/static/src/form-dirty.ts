@@ -149,7 +149,7 @@
   // Intercept HTMX history navigation (Back/Forward browser buttons) when forms are dirty
   document.body.addEventListener('htmx:historyCacheHit', function (evt) {
     if (hasAnyDirtyForm()) {
-      if (!confirm('You have unsaved changes. Leave this page?')) {
+      if (!confirm(gettext('You have unsaved changes. Leave this page?'))) {
         evt.preventDefault();
         restoreHistoryUrl();
       }
@@ -158,7 +158,7 @@
 
   document.body.addEventListener('htmx:historyCacheMiss', function (evt) {
     if (hasAnyDirtyForm()) {
-      if (!confirm('You have unsaved changes. Leave this page?')) {
+      if (!confirm(gettext('You have unsaved changes. Leave this page?'))) {
         evt.preventDefault();
         restoreHistoryUrl();
       }
@@ -192,7 +192,7 @@
 
     if (!hasAnyDirtyForm()) return;
 
-    if (!confirm('You have unsaved changes. Leave this page?')) {
+    if (!confirm(gettext('You have unsaved changes. Leave this page?'))) {
       evt.preventDefault();
     }
   });
