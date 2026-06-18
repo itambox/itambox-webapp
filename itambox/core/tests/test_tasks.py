@@ -183,3 +183,200 @@ class TasksTestCase(TransactionTestCase):
         self.assertEqual(AlertLog.objects.filter(rule=rule).count(), 1)
         log.refresh_from_db()
         self.assertGreater(log.last_notified_at, old)
+
+
+class AlertDedupRegressionTests(TransactionTestCase):
+    """Regression coverage for the duplicate-AlertLog bug.
+
+    Covers the three layers of the fix: context-independent dedup via the
+    cross-tenant ``unscoped`` manager, the partial unique constraint
+    (uniq_open_alert_per_object), and the IntegrityError-guarded defensive
+    create that adopts an existing open row on a prefetch miss.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.ct = ContentType.objects.get_for_model(AlertRule)
+
+    def _low_stock_rule(self, name="Dedup Rule"):
+        return AlertRule.objects.create(
+            name=name, alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5, is_active=True,
+        )
+
+    def _make_low_stock_accessory(self, slug="dedup-acc", min_qty=3, qty=1):
+        from assets.models import Manufacturer
+        from inventory.models import Accessory, AccessoryStock
+        from organization.models import Location, Site
+        mfr = Manufacturer.objects.create(name=f"M-{slug}", slug=f"m-{slug}")
+        acc = Accessory.objects.create(name=f"A-{slug}", slug=slug, manufacturer=mfr, min_qty=min_qty)
+        site = Site.objects.create(name=f"S-{slug}", slug=f"s-{slug}")
+        loc = Location.objects.create(name=f"L-{slug}", slug=f"l-{slug}", site=site)
+        AccessoryStock.objects.create(accessory=acc, location=loc, qty=qty)
+        return acc
+
+    def test_prefetch_open_logs_spans_logs_under_nonsuperuser_context(self):
+        # The tenant-scoping default manager fails closed under a non-superuser
+        # context with no active tenant; the prefetch must use the unscoped manager and
+        # still see the open log (otherwise dedup re-creates it every pass).
+        from core.tasks.alerts import _prefetch_open_logs
+        from itambox.middleware import _current_user
+
+        rule = self._low_stock_rule()
+        log = AlertLog.objects.create(
+            rule=rule, subject='s', message='m', content_type=self.ct,
+            object_id=12345, status=AlertLog.STATUS_ACTIVE,
+        )
+        member = User.objects.create_user(username='member_prefetch', password='x')
+        token = _current_user.set(member)
+        try:
+            # Sanity: the scoping manager really does fail closed here.
+            self.assertEqual(AlertLog.objects.count(), 0)
+            prefetched = _prefetch_open_logs()
+        finally:
+            _current_user.reset(token)
+
+        key = (rule.id, self.ct.id, 12345)
+        self.assertIn(key, prefetched)
+        self.assertEqual(prefetched[key].pk, log.pk)
+
+    def test_consecutive_evaluations_under_user_context_create_one_log(self):
+        # Pre-fix, a bound non-superuser with no active tenant makes BOTH
+        # AlertRule.objects and AlertLog.objects fail closed, so the task must
+        # clear _current_user to a system context (the 4th fix part) to evaluate
+        # at all. With that in place, the second pass is deduped (fresh_count
+        # == 0) and only one open log exists.
+        from itambox.middleware import _current_user
+
+        rule = self._low_stock_rule()
+        self._make_low_stock_accessory()
+        member = User.objects.create_user(username='member_eval', password='x')
+        token = _current_user.set(member)
+        try:
+            first = evaluate_alert_rules_task()
+            second = evaluate_alert_rules_task()
+        finally:
+            _current_user.reset(token)
+
+        self.assertEqual(first, 1)
+        self.assertEqual(second, 0)  # second pass deduped — no fresh log
+        self.assertEqual(
+            AlertLog.unscoped.filter(rule=rule, status=AlertLog.STATUS_ACTIVE).count(),
+            1,
+        )
+
+    def test_unique_constraint_blocks_second_open_alert(self):
+        from django.db import IntegrityError, transaction
+
+        rule = self._low_stock_rule()
+        AlertLog.objects.create(
+            rule=rule, subject='s', message='m', content_type=self.ct,
+            object_id=999, status=AlertLog.STATUS_ACTIVE,
+        )
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                AlertLog.objects.create(
+                    rule=rule, subject='s2', message='m2', content_type=self.ct,
+                    object_id=999, status=AlertLog.STATUS_ACKNOWLEDGED,
+                )
+
+    def test_resolved_alert_does_not_block_new_open_alert(self):
+        # Guards the PARTIAL nature of the constraint (resolved rows are exempt
+        # so a cleared condition can re-fire) — not the original duplicate bug.
+        rule = self._low_stock_rule()
+        AlertLog.objects.create(
+            rule=rule, subject='s', message='m', content_type=self.ct,
+            object_id=999, status=AlertLog.STATUS_RESOLVED,
+        )
+        # Partial constraint: a resolved row must not block a fresh open one.
+        AlertLog.objects.create(
+            rule=rule, subject='s2', message='m2', content_type=self.ct,
+            object_id=999, status=AlertLog.STATUS_ACTIVE,
+        )
+        self.assertEqual(AlertLog.unscoped.filter(rule=rule).count(), 2)
+        # ...but still at most one OPEN row for the key.
+        self.assertEqual(
+            AlertLog.unscoped.filter(
+                rule=rule,
+                status__in=[AlertLog.STATUS_ACTIVE, AlertLog.STATUS_ACKNOWLEDGED],
+            ).count(),
+            1,
+        )
+
+    def test_evaluate_rule_tolerates_prefetch_miss(self):
+        # A prefetch miss (empty map) must not crash or create a duplicate; the
+        # defensive create adopts the existing open row via the unscoped manager.
+        from core.tasks.alerts import _evaluate_rule
+        from core.tasks.context import TaskContext
+
+        rule = self._low_stock_rule()
+        self._make_low_stock_accessory()
+        evaluate_alert_rules_task()
+        self.assertEqual(AlertLog.unscoped.filter(rule=rule).count(), 1)
+
+        today = timezone.now().date()
+        with TaskContext(tenant_id=rule.tenant_id):
+            fresh = _evaluate_rule(rule, today, {})
+        self.assertEqual(fresh, 0)
+        self.assertEqual(
+            AlertLog.unscoped.filter(rule=rule, status=AlertLog.STATUS_ACTIVE).count(),
+            1,
+        )
+
+    def test_auto_resolve_cleared_spans_logs_under_nonsuperuser_context(self):
+        # _auto_resolve_cleared must use the unscoped manager so it sees open
+        # logs even under a bound non-superuser with no active tenant (the
+        # scoping manager fails closed to .none()). Call it directly to exercise
+        # that context: a reverted unscoped->objects would leave the log ACTIVE.
+        from core.tasks.alerts import _auto_resolve_cleared
+        from itambox.middleware import _current_user
+
+        rule = self._low_stock_rule()
+        stale = AlertLog.objects.create(
+            rule=rule, subject='s', message='m', content_type=self.ct,
+            object_id=4242, status=AlertLog.STATUS_ACTIVE,
+        )
+        member = User.objects.create_user(username='member_resolve', password='x')
+        token = _current_user.set(member)
+        try:
+            self.assertEqual(AlertLog.objects.count(), 0)  # fail-closed sanity
+            # Empty matched_keys -> the stale open log no longer matches and must
+            # be auto-resolved.
+            _auto_resolve_cleared(rule, set())
+        finally:
+            _current_user.reset(token)
+
+        stale.refresh_from_db()
+        self.assertEqual(stale.status, AlertLog.STATUS_RESOLVED)
+        self.assertIsNotNone(stale.resolved_at)
+
+    def test_acknowledged_log_is_treated_as_open_and_not_recreated(self):
+        # An ACKNOWLEDGED log counts as open: the engine must dedup against it
+        # (the existing_logs.get path), not create a new ACTIVE row.
+        rule = self._low_stock_rule()
+        self._make_low_stock_accessory()
+        evaluate_alert_rules_task()
+        log = AlertLog.unscoped.get(rule=rule)
+        log.status = AlertLog.STATUS_ACKNOWLEDGED
+        log.save(update_fields=['status'])
+
+        evaluate_alert_rules_task()
+        self.assertEqual(AlertLog.unscoped.filter(rule=rule).count(), 1)
+        log.refresh_from_db()
+        self.assertEqual(log.status, AlertLog.STATUS_ACKNOWLEDGED)
+
+    def test_muted_rule_dedups_across_passes_without_dispatch(self):
+        rule = AlertRule.objects.create(
+            name='Muted Dedup', alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5, is_active=True, is_muted=True,
+        )
+        self._make_low_stock_accessory()
+        evaluate_alert_rules_task()
+        evaluate_alert_rules_task()
+
+        logs = AlertLog.unscoped.filter(rule=rule)
+        self.assertEqual(logs.count(), 1)
+        log = logs.first()
+        self.assertEqual(log.status, AlertLog.STATUS_ACTIVE)
+        self.assertIsNone(log.last_notified_at)  # muted: never dispatched
+        self.assertEqual(log.delivery_status, {})

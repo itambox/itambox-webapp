@@ -415,9 +415,10 @@ class AlertRuleRunNowView(SimplePostView):
     """Evaluate a single alert rule immediately, on demand.
 
     The evaluation is enqueued as a background task rather than run inline:
-    run_alert_rule_now() deliberately clears tenant/user contextvars (it is
-    designed to run standalone in a worker), so running it inside the request
-    would contaminate the request's context for the remainder of the response.
+    run_alert_rule_now() deliberately clears the tenant, membership and current-
+    user contextvars without restoring them (it is designed to run standalone in
+    a worker), so running it inside the request would contaminate the request's
+    context for the remainder of the response.
     """
     queryset = AlertRule.objects.all()
     permission_required = ('extras.change_alertrule',)

@@ -1,5 +1,6 @@
 import logging
 from django.utils import timezone
+from django.db import IntegrityError, transaction
 
 from extras.models import AlertRule, AlertLog, NotificationChannel
 from core.events import send_notification_to_channel
@@ -16,10 +17,17 @@ def evaluate_alert_rules_task():
     notifications (unless the rule is muted).
     """
     from core.managers import set_current_tenant, set_current_membership
+    # inline import: matches the existing inline manager-setter style in this
+    # module and avoids importing the middleware contextvar at module load.
+    from itambox.middleware import _current_user
 
-    # Clear any ambient tenant from a calling request context.
+    # Run as a true system context: clear any ambient tenant/membership AND the
+    # current user. A non-superuser principal left bound here makes the tenant-
+    # scoping managers fail closed (both the rule query and the open-log
+    # prefetch return nothing), silently breaking evaluation and dedup.
     set_current_tenant(None)
     set_current_membership(None)
+    _current_user.set(None)
 
     active_rules = AlertRule.objects.filter(is_active=True).select_related('tenant')
     logger.info("Evaluating %d active alert rules...", active_rules.count())
@@ -48,13 +56,22 @@ def evaluate_alert_rules_task():
 def run_alert_rule_now(rule_id):
     """Evaluate a single AlertRule immediately (used by the 'Run now' UI action).
 
-    Returns the number of fresh alerts triggered. Runs inline; the caller is
-    responsible for any threading/queueing decision.
+    Runs as a system context: the tenant, membership and current-user
+    contextvars are cleared (and NOT restored) so rule selection and open-log
+    dedup are not constrained by an ambient (possibly non-superuser) principal.
+    Because the contextvars are not restored, callers must run this standalone
+    in a worker (the 'Run now' view enqueues it via async_task) rather than
+    inline inside a request.
+
+    Returns the number of fresh alerts triggered.
     """
     from core.managers import set_current_tenant, set_current_membership
+    # inline import: see evaluate_alert_rules_task.
+    from itambox.middleware import _current_user
 
     set_current_tenant(None)
     set_current_membership(None)
+    _current_user.set(None)
 
     rule = AlertRule.objects.filter(pk=rule_id, is_active=True).select_related('tenant').first()
     if not rule:
@@ -71,9 +88,13 @@ def run_alert_rule_now(rule_id):
 def _prefetch_open_logs(rule_id=None):
     """Map of (rule_id, content_type_id, object_id) -> AlertLog for open alerts.
 
-    Built with no active tenant so it spans all tenants for cross-tenant dedup.
+    Uses ``unscoped`` (the cross-tenant manager) so the dedup map always spans
+    every tenant's open logs regardless of the ambient tenant/user context. The
+    tenant-scoping default manager would fail closed to an empty queryset when a
+    non-superuser principal is bound with no active tenant, causing a fresh log
+    to be created on every evaluation (the duplicate-AlertLog bug).
     """
-    qs = AlertLog.objects.filter(
+    qs = AlertLog.unscoped.filter(
         status__in=[AlertLog.STATUS_ACTIVE, AlertLog.STATUS_ACKNOWLEDGED]
     )
     if rule_id is not None:
@@ -110,25 +131,56 @@ def _evaluate_rule(rule, today, existing_logs):
         existing = existing_logs.get(key)
 
         if existing is None:
-            # New alert.
-            alert_log = AlertLog.objects.create(
-                rule=rule,
-                subject=match['subject'],
-                message=match['message'],
-                severity=rule.severity,
-                content_type=ct,
-                object_id=obj.pk,
-                tenant=match.get('tenant'),
-            )
-            if not rule.is_muted:
-                alert_log.delivery_status = _dispatch_channels(rule, match, alert_log)
-                alert_log.last_notified_at = now
-                alert_log.save(update_fields=['delivery_status', 'last_notified_at'])
-            existing_logs[key] = alert_log
-            fresh_count += 1
-            logger.info("Triggered AlertLog %s for '%s' on '%s'.", alert_log.pk, match['subject'], obj)
+            # New alert. Guard the create with a savepoint: the partial unique
+            # constraint (one open alert per rule+object) can fire if the
+            # prefetch missed an open row (a concurrent evaluation, or a context
+            # that scoped the prefetch out). On conflict, adopt the existing open
+            # row instead of crashing the task and poisoning the transaction.
+            try:
+                with transaction.atomic():
+                    alert_log = AlertLog.objects.create(
+                        rule=rule,
+                        subject=match['subject'],
+                        message=match['message'],
+                        severity=rule.severity,
+                        content_type=ct,
+                        object_id=obj.pk,
+                        tenant=match.get('tenant'),
+                    )
+            except IntegrityError:
+                # The partial unique constraint fired (or, rarely, another
+                # integrity error). Adopt the existing open row so the task does
+                # not crash; log so a non-constraint conflict is never silent.
+                logger.warning(
+                    "AlertLog create conflicted for rule '%s' on '%s'; adopting existing open row.",
+                    rule.name, obj,
+                )
+                alert_log = AlertLog.unscoped.filter(
+                    rule=rule, content_type=ct, object_id=obj.pk,
+                    status__in=[AlertLog.STATUS_ACTIVE, AlertLog.STATUS_ACKNOWLEDGED],
+                ).order_by('created_at').first()
+                if alert_log is None:
+                    # No open row to adopt: the conflict was not the expected
+                    # open-alert constraint (or the row vanished). Skip this
+                    # match rather than mask the cause silently.
+                    logger.error(
+                        "AlertLog create failed for rule '%s' on '%s' with no open row to adopt; skipping.",
+                        rule.name, obj,
+                    )
+                    continue
+                existing_logs[key] = alert_log
+                # Treat the adopted row as the existing alert (re-notify below).
+                existing = alert_log
+            else:
+                if not rule.is_muted:
+                    alert_log.delivery_status = _dispatch_channels(rule, match, alert_log)
+                    alert_log.last_notified_at = now
+                    alert_log.save(update_fields=['delivery_status', 'last_notified_at'])
+                existing_logs[key] = alert_log
+                fresh_count += 1
+                logger.info("Triggered AlertLog %s for '%s' on '%s'.", alert_log.pk, match['subject'], obj)
 
-        elif not rule.is_muted and rule.renotify_interval_days > 0:
+        if existing is not None and not rule.is_muted and rule.renotify_interval_days > 0:
             # Existing unresolved alert — re-notify on cadence.
             ref = existing.last_notified_at or existing.created_at
             if ref and (now - ref) >= timezone.timedelta(days=rule.renotify_interval_days):
@@ -180,7 +232,7 @@ def _auto_resolve_cleared(rule, matched_keys):
     Flip active/acknowledged logs to resolved when their condition no longer
     matches, so the rule can re-fire if the object dips below threshold again.
     """
-    stale_qs = AlertLog.objects.filter(
+    stale_qs = AlertLog.unscoped.filter(
         rule=rule,
         status__in=[AlertLog.STATUS_ACTIVE, AlertLog.STATUS_ACKNOWLEDGED],
     )

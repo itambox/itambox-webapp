@@ -928,6 +928,14 @@ class AlertRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
 
 class AlertLog(BaseModel):
     objects = TenantScopingManager()
+    # Deliberately cross-tenant / unscoped manager for context-independent
+    # dedup/auto-resolve in the alert engine ONLY: the tenant-scoping default
+    # manager fails closed to an empty queryset under a non-superuser context
+    # with no active tenant, which otherwise re-creates a duplicate log on every
+    # evaluation. NOT named ``all_objects`` on purpose — that name carries a
+    # tenant-scoped contract here (the Recycle Bin relies on it); this one spans
+    # all tenants and must never back a tenant-facing view/API.
+    unscoped = AllObjectsManager()
 
     STATUS_ACTIVE = 'active'
     STATUS_ACKNOWLEDGED = 'acknowledged'
@@ -1010,6 +1018,17 @@ class AlertLog(BaseModel):
             models.Index(fields=['content_type', 'object_id'], name='core_alertl_content_706751_idx'),
             models.Index(fields=['severity'], name='core_alertl_severit_f0ec11_idx'),
             models.Index(fields=['status'], name='core_alertl_status_b2f47a_idx'),
+        ]
+        constraints = [
+            # At most one OPEN (active/acknowledged) alert per rule+object.
+            # Resolved rows are exempt so a cleared condition can legitimately
+            # re-fire later. Literal status strings: the class constants are not
+            # in scope inside Meta.
+            models.UniqueConstraint(
+                fields=['rule', 'content_type', 'object_id'],
+                condition=models.Q(status__in=['active', 'acknowledged']),
+                name='uniq_open_alert_per_object',
+            ),
         ]
 
     def __str__(self):
