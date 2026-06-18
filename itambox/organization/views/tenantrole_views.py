@@ -152,11 +152,11 @@ class TenantRoleBulkDeleteView(ObjectBulkDeleteView):
                 'objects': objects_to_delete,
                 'object_pks': pks,
                 'return_url': return_url,
-                'title': 'Confirm Bulk Deletion',
+                'title': _('Confirm Bulk Deletion'),
                 'breadcrumbs': [
-                    (reverse('dashboard'), 'Dashboard'),
-                    (return_url, 'Tenant Roles'),
-                    (None, f'Delete ({len(objects_to_delete)})'),
+                    (reverse('dashboard'), _('Dashboard')),
+                    (return_url, _('Tenant Roles')),
+                    (None, _('Delete (%(count)d)') % {'count': len(objects_to_delete)}),
                 ],
             }
             return self.render_to_response(context)

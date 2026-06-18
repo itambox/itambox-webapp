@@ -167,11 +167,11 @@ class TenantMembershipBulkEditView(ObjectBulkEditView):
             'selected_fields': ['role'],
             'verbose_name': model._meta.verbose_name,
             'verbose_name_plural': model._meta.verbose_name_plural,
-            'title': 'Bulk Reassign Role',
+            'title': _('Bulk Reassign Role'),
             'breadcrumbs': [
-                (reverse('dashboard'), 'Dashboard'),
-                (return_url, 'Memberships'),
-                (None, f'Bulk Edit ({len(pks)})'),
+                (reverse('dashboard'), _('Dashboard')),
+                (return_url, _('Memberships')),
+                (None, _('Bulk Edit (%(count)d)') % {'count': len(pks)}),
             ],
         }
         return self.render_to_response(context)

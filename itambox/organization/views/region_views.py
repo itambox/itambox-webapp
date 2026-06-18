@@ -33,7 +33,7 @@ class RegionDetailView(ObjectDetailView):
     )
 
     layout = (
-        ((Panel('info', 'Region Details'),),),
+        ((Panel('info', _('Region Details')),),),
     )
 
     def get_context_data(self, **kwargs):
@@ -47,14 +47,14 @@ class RegionDetailView(ObjectDetailView):
         site_count = region.sites.count()
         if site_count:
             related_objects_list.append({
-                'label': 'Sites',
+                'label': _('Sites'),
                 'count': site_count,
                 'url': f"{reverse('organization:site_list')}?region={region.slug}"
             })
         child_count = region.children.count()
         if child_count:
             related_objects_list.append({
-                'label': 'Child Regions',
+                'label': _('Child Regions'),
                 'count': child_count,
                 'url': f"{reverse('organization:region_list')}?parent={region.slug}"
             })

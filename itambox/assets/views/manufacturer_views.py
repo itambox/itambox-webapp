@@ -33,7 +33,7 @@ class ManufacturerDetailView(ObjectDetailView):
     )
 
     layout = (
-        ((Panel('info', 'Manufacturer Details'),),),
+        ((Panel('info', _('Manufacturer Details')),),),
     )
 
     def get_context_data(self, **kwargs):

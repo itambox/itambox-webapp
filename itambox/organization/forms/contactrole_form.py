@@ -1,4 +1,5 @@
 from django import forms
+from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML
 
@@ -44,10 +45,10 @@ class ContactAssignmentForm(forms.ModelForm):
     priority = forms.ChoiceField(
         choices=[
             ('', '---------'),
-            ('primary', 'Primary'),
-            ('secondary', 'Secondary'),
-            ('tertiary', 'Tertiary'),
-            ('inactive', 'Inactive'),
+            ('primary', _('Primary')),
+            ('secondary', _('Secondary')),
+            ('tertiary', _('Tertiary')),
+            ('inactive', _('Inactive')),
         ],
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'})

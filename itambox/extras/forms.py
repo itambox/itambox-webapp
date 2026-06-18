@@ -25,8 +25,8 @@ class TagForm(ColorFieldFormMixin, forms.ModelForm):
             'description': forms.TextInput(attrs={'class': 'form-control'}),
         }
         help_texts = {
-            'slug': 'URL-friendly identifier.',
-            'color': 'Hexadecimal color code (e.g., 00ff00 for green).'
+            'slug': _('URL-friendly identifier.'),
+            'color': _('Hexadecimal color code (e.g., 00ff00 for green).')
         }
 
     def __init__(self, *args, **kwargs):
@@ -34,7 +34,7 @@ class TagForm(ColorFieldFormMixin, forms.ModelForm):
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
         self.helper.form_tag = True
-        button_text = 'Update' if self.instance.pk else 'Create'
+        button_text = _('Update') if self.instance.pk else _('Create')
         cancel_url = reverse('extras:tag_list')
         self.helper.layout = Layout(
             'name',
@@ -43,7 +43,7 @@ class TagForm(ColorFieldFormMixin, forms.ModelForm):
             'description',
             HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),
-            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">{_("Cancel")}</a>'),
             HTML('</div>')
         )
 
@@ -83,12 +83,12 @@ class CustomFieldForm(forms.ModelForm):
         self.fields['object_types'].queryset = (
             ContentType.objects.filter(pk__in=supported).order_by('app_label', 'model')
         )
-        self.fields['object_types'].help_text = (
+        self.fields['object_types'].help_text = _(
             "Models this field applies to. Fields applying to Asset Type act as "
             "hardware specifications; fields applying to Asset are per-device details."
         )
 
-        button_text = 'Update' if self.instance.pk else 'Create'
+        button_text = _('Update') if self.instance.pk else _('Create')
         cancel_url = reverse('extras:customfield_list')
 
         self.helper.layout = Layout(
@@ -100,7 +100,7 @@ class CustomFieldForm(forms.ModelForm):
             'object_types',
             HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),
-            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">{_("Cancel")}</a>'),
             HTML('</div>')
         )
 
@@ -119,15 +119,15 @@ class CustomFieldsetForm(forms.ModelForm):
         self.helper.form_method = 'post'
         self.helper.form_tag = True
         
-        button_text = 'Update' if self.instance.pk else 'Create'
+        button_text = _('Update') if self.instance.pk else _('Create')
         cancel_url = reverse('extras:customfieldset_list')
-        
+
         self.helper.layout = Layout(
             'name',
             'fields',
             HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),
-            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">{_("Cancel")}</a>'),
             HTML('</div>')
         )
 
@@ -166,7 +166,7 @@ class SavedFilterForm(forms.ModelForm):
             ContentType.objects.order_by('app_label', 'model')
         )
 
-        button_text = 'Update' if self.instance.pk else 'Create'
+        button_text = _('Update') if self.instance.pk else _('Create')
         cancel_url = reverse('extras:savedfilter_list')
 
         self.helper.layout = Layout(
@@ -177,7 +177,7 @@ class SavedFilterForm(forms.ModelForm):
             Div('enabled', css_class='mb-3 form-check'),
             HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),
-            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">{_("Cancel")}</a>'),
             HTML('</div>')
         )
 
@@ -220,14 +220,14 @@ class ConfigContextForm(forms.ModelForm):
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
         self.helper.form_tag = True
-        button_text = 'Update' if self.instance.pk else 'Create'
+        button_text = _('Update') if self.instance.pk else _('Create')
         cancel_url = reverse('extras:configcontext_list')
         self.helper.layout = Layout(
             'name',
             'description',
             'weight',
             Fieldset(
-                'Scope (optional)',
+                _('Scope (optional)'),
                 Row(
                     Column('regions', css_class='col-md-6'),
                     Column('sites', css_class='col-md-6'),
@@ -240,12 +240,12 @@ class ConfigContextForm(forms.ModelForm):
                 ),
             ),
             Fieldset(
-                'Configuration Data',
+                _('Configuration Data'),
                 'data',
             ),
             HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),
-            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">{_("Cancel")}</a>'),
             HTML('</div>')
         )
 
@@ -366,9 +366,9 @@ TEAMS_PAYLOAD_PRESET = _json.dumps({
 }, indent=2)
 
 PAYLOAD_PRESET_CHOICES = [
-    ('', 'Custom'),
-    ('slack', 'Slack Block Kit'),
-    ('teams', 'Microsoft Teams (Adaptive Card)'),
+    ('', _('Custom')),
+    ('slack', _('Slack Block Kit')),
+    ('teams', _('Microsoft Teams (Adaptive Card)')),
 ]
 
 PRESET_PAYLOADS = {

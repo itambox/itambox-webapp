@@ -32,7 +32,7 @@ class ContactRoleDetailView(ObjectDetailView):
     queryset = ContactRole.objects.prefetch_related('assignments')
 
     layout = (
-        ((Panel('info', 'Contact Role Details'),),),
+        ((Panel('info', _('Contact Role Details')),),),
     )
 
     def get_context_data(self, **kwargs):

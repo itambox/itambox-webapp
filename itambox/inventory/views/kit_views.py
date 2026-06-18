@@ -1,5 +1,6 @@
 from django.urls import reverse, reverse_lazy
 from django.db.models.functions import Coalesce
+from django.utils.translation import gettext_lazy as _
 
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
@@ -28,7 +29,7 @@ class KitDetailView(ObjectDetailView):
     template_name = 'assets/kits/kit_detail.html'
 
     layout = (
-        ((Panel('info', 'Kit Details'),),),
+        ((Panel('info', _('Kit Details')),),),
     )
 
     def get_context_data(self, **kwargs):
@@ -191,7 +192,7 @@ class KitCheckoutView(GenericTransactionView):
     context_object_name = 'kit'
     template_name = 'inventory/includes/kit_checkout_modal.html'
     error_partial = 'inventory/includes/kit_checkout_modal.html#checkout-modal-form'
-    success_message = "Kit checked out successfully."
+    success_message = _("Kit checked out successfully.")
     hx_trigger = "kitListUpdated"
     form_field_map = {
         'assigned_holder': 'holder',

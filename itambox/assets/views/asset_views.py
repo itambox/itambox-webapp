@@ -103,10 +103,10 @@ class AssetDetailView(ObjectDetailView):
     )
 
     layout = (
-        ((Panel('metrics', 'Asset Overview'),),),
+        ((Panel('metrics', _('Asset Overview')),),),
         (
-            (Panel('asset_info', 'Asset Details'), Panel('specs', 'Hardware Specifications'), Panel('custom_fields', 'Custom Fields')),
-            (Panel('assignment', 'Deployment & Custody'), Panel('financial', 'Financial & Lifecycle'), Panel('audit', 'Audit & Compliance'), Panel('support', 'Support & Warranty Details')),
+            (Panel('asset_info', _('Asset Details')), Panel('specs', _('Hardware Specifications')), Panel('custom_fields', _('Custom Fields'))),
+            (Panel('assignment', _('Deployment & Custody')), Panel('financial', _('Financial & Lifecycle')), Panel('audit', _('Audit & Compliance')), Panel('support', _('Support & Warranty Details'))),
         ),
     )
 
@@ -382,7 +382,7 @@ class AssetAuditView(GenericTransactionView):
             "closeModalEvent": None,
             "playAuditSound": None,
             "showMessage": {
-                "message": self.get_success_message(result),
+                "message": str(self.get_success_message(result)),
                 "level": "success",
             },
         })

@@ -1,4 +1,5 @@
 from django.urls import reverse_lazy
+from django.utils.translation import gettext_lazy as _
 
 from itambox.panels import Panel
 from itambox.views.generic import (
@@ -24,7 +25,7 @@ class AssetReservationDetailView(ObjectDetailView):
     template_name = 'generic/object_detail.html'
 
     layout = (
-        ((Panel('info', 'Reservation Details'),),),
+        ((Panel('info', _('Reservation Details')),),),
     )
 
 

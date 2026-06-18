@@ -26,9 +26,9 @@ User = get_user_model()
 
 class AuditSessionTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('compliance:auditsession_detail', args=[A('pk')], verbose_name='Name')
-    location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], accessor='location.name', verbose_name='Location')
-    status = tables.Column(verbose_name='Status')
+    name = tables.LinkColumn('compliance:auditsession_detail', args=[A('pk')], verbose_name=_('Name'))
+    location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], accessor='location.name', verbose_name=_('Location'))
+    status = tables.Column(verbose_name=_('Status'))
     started_at = tables.DateTimeColumn(format="Y-m-d H:i")
     completed_at = tables.DateTimeColumn(format="Y-m-d H:i")
     actions = ActionsColumn()

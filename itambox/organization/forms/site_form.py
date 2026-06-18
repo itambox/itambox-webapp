@@ -55,9 +55,9 @@ class SiteForm(forms.ModelForm):
             'comments': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
         }
         help_texts = {
-            'slug': 'URL-friendly identifier.',
-            'latitude': 'GPS coordinate (decimal format xx.yyyyyy)',
-            'longitude': 'GPS coordinate (decimal format xx.yyyyyy)',
+            'slug': _('URL-friendly identifier.'),
+            'latitude': _('GPS coordinate (decimal format xx.yyyyyy)'),
+            'longitude': _('GPS coordinate (decimal format xx.yyyyyy)'),
         }
 
     def __init__(self, *args, **kwargs):

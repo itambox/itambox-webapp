@@ -395,8 +395,8 @@ class Job(ChangeLoggingMixin, BaseModel):
 
     class Meta:
         ordering = ['-created']
-        verbose_name = "Job"
-        verbose_name_plural = "Jobs"
+        verbose_name = _("Job")
+        verbose_name_plural = _("Jobs")
         indexes = [
             models.Index(fields=['status', 'scheduled_for']),
         ]
@@ -532,9 +532,9 @@ class RecycleBin(models.Model):
         managed = False
         default_permissions = ()
         permissions = [
-            ('view_recyclebin', 'Can view Recycle Bin'),
-            ('change_recyclebin', 'Can restore from Recycle Bin'),
-            ('delete_recyclebin', 'Can purge from Recycle Bin'),
+            ('view_recyclebin', _('Can view Recycle Bin')),
+            ('change_recyclebin', _('Can restore from Recycle Bin')),
+            ('delete_recyclebin', _('Can purge from Recycle Bin')),
         ]
 
 

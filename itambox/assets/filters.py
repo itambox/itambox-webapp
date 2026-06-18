@@ -96,12 +96,12 @@ class AssetFilterSet(BaseFilterSet):
     requestable = django_filters.BooleanFilter(
         method='filter_requestable',
         label=_('Requestable'),
-        widget=forms.Select(choices=[('', 'Any'), ('true', 'Yes'), ('false', 'No')], attrs={'class': 'form-select'})
+        widget=forms.Select(choices=[('', _('Any')), ('true', _('Yes')), ('false', _('No'))], attrs={'class': 'form-select'})
     )
     audit_due = django_filters.BooleanFilter(
         method='filter_audit_due',
         label=_('Audit Due'),
-        widget=forms.Select(choices=[('', 'Any'), ('true', 'Overdue'), ('false', 'Up to date')], attrs={'class': 'form-select'})
+        widget=forms.Select(choices=[('', _('Any')), ('true', _('Overdue')), ('false', _('Up to date'))], attrs={'class': 'form-select'})
     )
 
     class Meta:
@@ -218,7 +218,7 @@ class AssetTypeFilterSet(BaseFilterSet):
     )
     requestable = django_filters.BooleanFilter(
         label=_('Requestable'),
-        widget=forms.Select(choices=[('', 'Any'), ('true', 'Yes'), ('false', 'No')], attrs={'class': 'form-select'})
+        widget=forms.Select(choices=[('', _('Any')), ('true', _('Yes')), ('false', _('No'))], attrs={'class': 'form-select'})
     )
 
     class Meta:
@@ -341,7 +341,7 @@ class AssetTagSequenceFilterSet(BaseFilterSet):
         label=_('Category')
     )
     is_active = django_filters.BooleanFilter(
-        widget=forms.Select(choices=[('', 'All'), ('True', 'Active'), ('False', 'Inactive')], attrs={'class': 'form-select'}),
+        widget=forms.Select(choices=[('', _('All')), ('True', _('Active')), ('False', _('Inactive'))], attrs={'class': 'form-select'}),
         label=_('Active')
     )
 
@@ -387,7 +387,7 @@ class AssetDisposalFilterSet(BaseFilterSet):
     )
     weee_compliant = django_filters.BooleanFilter(
         label=_('WEEE Compliant'),
-        widget=forms.Select(choices=[('', 'Any'), ('true', 'Yes'), ('false', 'No')], attrs={'class': 'form-select'})
+        widget=forms.Select(choices=[('', _('Any')), ('true', _('Yes')), ('false', _('No'))], attrs={'class': 'form-select'})
     )
 
     class Meta:
@@ -466,7 +466,7 @@ class AssetReservationFilterSet(BaseFilterSet):
     reserved_for = django_filters.ModelChoiceFilter(
         queryset=AssetHolder.objects.all(),
         label=_('Reserved For'),
-        null_label='(no holder)',
+        null_label=_('(no holder)'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     status = django_filters.ChoiceFilter(

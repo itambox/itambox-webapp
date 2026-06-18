@@ -48,8 +48,8 @@ class AccessoryDetailView(ObjectDetailView):
     template_name = 'assets/accessories/accessory_detail.html'
 
     layout = (
-        ((Panel('metrics', 'Metrics Overview'),),),
-        ((Panel('info', 'Accessory Details'),),),
+        ((Panel('metrics', _('Metrics Overview')),),),
+        ((Panel('info', _('Accessory Details')),),),
     )
 
     def get_context_data(self, **kwargs):
@@ -114,7 +114,7 @@ class AccessoryCheckoutView(GenericTransactionView):
     context_object_name = 'accessory'
     template_name = 'inventory/includes/accessory_checkout_modal.html'
     error_partial = 'inventory/includes/accessory_checkout_modal.html#checkout-modal-form'
-    success_message = "Accessory checked out successfully."
+    success_message = _("Accessory checked out successfully.")
     form_field_map = {
         'assigned_holder': 'holder',
         'assigned_location': 'location',

@@ -33,7 +33,7 @@ class SiteGroupDetailView(ObjectDetailView):
     )
 
     layout = (
-        ((Panel('info', 'Site Group Details'),),),
+        ((Panel('info', _('Site Group Details')),),),
     )
 
     def get_context_data(self, **kwargs):
@@ -47,14 +47,14 @@ class SiteGroupDetailView(ObjectDetailView):
         site_count = sitegroup.sites.count()
         if site_count:
             related_objects_list.append({
-                'label': 'Sites',
+                'label': _('Sites'),
                 'count': site_count,
                 'url': f"{reverse('organization:site_list')}?group={sitegroup.slug}"
             })
         child_count = sitegroup.children.count()
         if child_count:
             related_objects_list.append({
-                'label': 'Child Groups',
+                'label': _('Child Groups'),
                 'count': child_count,
                 'url': f"{reverse('organization:sitegroup_list')}?parent={sitegroup.slug}"
             })

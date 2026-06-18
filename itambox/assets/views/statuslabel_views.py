@@ -27,7 +27,7 @@ class StatusLabelDetailView(ObjectDetailView):
     queryset = StatusLabel.objects.prefetch_related('assets')
 
     layout = (
-        ((Panel('info', 'Status Label Details'),),),
+        ((Panel('info', _('Status Label Details')),),),
     )
 
     def get_context_data(self, **kwargs):

@@ -26,11 +26,11 @@ class AssetMaintenance(TaggableMixin, CloneableMixin, ExportableMixin,
     MAINTENANCE_TYPE_SOFTWARE_SUPPORT = 'software_support'
     MAINTENANCE_TYPE_HARDWARE_SUPPORT = 'hardware_support'
     MAINTENANCE_TYPE_CHOICES = [
-        (MAINTENANCE_TYPE_UPGRADE, 'Upgrade'),
-        (MAINTENANCE_TYPE_REPAIR, 'Repair'),
-        (MAINTENANCE_TYPE_CALIBRATION, 'Calibration'),
-        (MAINTENANCE_TYPE_SOFTWARE_SUPPORT, 'Software Support'),
-        (MAINTENANCE_TYPE_HARDWARE_SUPPORT, 'Hardware Support'),
+        (MAINTENANCE_TYPE_UPGRADE, _('Upgrade')),
+        (MAINTENANCE_TYPE_REPAIR, _('Repair')),
+        (MAINTENANCE_TYPE_CALIBRATION, _('Calibration')),
+        (MAINTENANCE_TYPE_SOFTWARE_SUPPORT, _('Software Support')),
+        (MAINTENANCE_TYPE_HARDWARE_SUPPORT, _('Hardware Support')),
     ]
 
     asset = models.ForeignKey('assets.Asset', on_delete=models.PROTECT, related_name='maintenances', db_index=True)

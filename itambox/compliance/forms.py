@@ -65,7 +65,7 @@ class AssetMaintenanceForm(forms.ModelForm):
         self.helper.form_method = 'post'
         self.helper.form_tag = True
 
-        button_text = 'Update' if self.instance and self.instance.pk else 'Create'
+        button_text = _('Update') if self.instance and self.instance.pk else _('Create')
         cancel_url = reverse('assets:assetmaintenance_list')
 
         self.helper.layout = Layout(
@@ -94,7 +94,7 @@ class AssetMaintenanceForm(forms.ModelForm):
             'tags',
             HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),
-            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">{_("Cancel")}</a>'),
             HTML('</div>')
         )
 
@@ -161,7 +161,7 @@ class CustodyTemplateForm(forms.ModelForm):
         self.helper.form_method = 'post'
         self.helper.form_tag = True
 
-        button_text = 'Update' if self.instance and self.instance.pk else 'Create'
+        button_text = _('Update') if self.instance and self.instance.pk else _('Create')
         cancel_url = reverse('compliance:custodytemplate_list')
 
         self.helper.layout = Layout(
@@ -183,7 +183,7 @@ class CustodyTemplateForm(forms.ModelForm):
             ),
             'logo',
             Fieldset(
-                'Content',
+                _('Content'),
                 'eula_text',
                 'disclaimer',
             ),
@@ -195,7 +195,7 @@ class CustodyTemplateForm(forms.ModelForm):
             'tags',
             HTML('<div class="mt-3">'),
             Submit('submit', button_text, css_class='btn btn-primary'),
-            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">{_("Cancel")}</a>'),
             HTML('</div>')
         )
 

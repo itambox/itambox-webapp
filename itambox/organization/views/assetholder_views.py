@@ -41,7 +41,7 @@ class AssetHolderDetailView(ObjectDetailView):
     )
 
     layout = (
-        ((Panel('info', 'Asset Holder Details'),),),
+        ((Panel('info', _('Asset Holder Details')),),),
     )
 
     def get_context_data(self, **kwargs):
@@ -88,35 +88,35 @@ class AssetHolderDetailView(ObjectDetailView):
         asset_count = assetholder.checked_out_assets.count()
         if asset_count:
             related_objects_list.append({
-                'label': 'Assets',
+                'label': _('Assets'),
                 'count': asset_count,
                 'url': f"{reverse('assets:asset_list')}?holder={assetholder.pk}"
             })
         accessory_count = acc_assign_qs.count()
         if accessory_count:
             related_objects_list.append({
-                'label': 'Accessories',
+                'label': _('Accessories'),
                 'count': accessory_count,
                 'url': f"{reverse('inventory:accessoryassignment_list')}?assigned_holder={assetholder.pk}"
             })
         consumable_count = con_assign_qs.count()
         if consumable_count:
             related_objects_list.append({
-                'label': 'Consumables',
+                'label': _('Consumables'),
                 'count': consumable_count,
                 'url': f"{reverse('inventory:consumableassignment_list')}?assigned_holder={assetholder.pk}"
             })
         license_count = lic_assign_qs.count()
         if license_count:
             related_objects_list.append({
-                'label': 'Licenses',
+                'label': _('Licenses'),
                 'count': license_count,
                 'url': f"{reverse('organization:assetholder_detail', kwargs={'pk': assetholder.pk})}#licenses"
             })
         custody_count = custody_receipts_qs.count()
         if custody_count:
             related_objects_list.append({
-                'label': 'Custody EULAs',
+                'label': _('Custody EULAs'),
                 'count': custody_count,
                 'url': f"{reverse('organization:assetholder_detail', kwargs={'pk': assetholder.pk})}#custody"
             })

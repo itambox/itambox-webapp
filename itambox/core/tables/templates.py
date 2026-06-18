@@ -44,7 +44,7 @@ class SearchResultTable(tables.Table):
             ct = ContentType.objects.get_for_id(value)
             return ct.name.capitalize()
         except ContentType.DoesNotExist:
-            return "Unknown Type"
+            return _("Unknown Type")
 
 
 class WebhookEndpointTable(BaseTable):

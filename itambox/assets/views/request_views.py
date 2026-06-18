@@ -422,7 +422,7 @@ class RequestBulkReceiveView(PermissionRequiredMixin, View):
                     requests_data.append((None, form))
                     
             context = {
-                'title': 'Bulk Stock Receipt & Allocation',
+                'title': _('Bulk Stock Receipt & Allocation'),
                 'formset': formset,
                 'requests_data': requests_data,
             }
@@ -475,7 +475,7 @@ class RequestBulkReceiveView(PermissionRequiredMixin, View):
             requests_data = list(zip(requests_qs, formset))
             
             context = {
-                'title': 'Bulk Stock Receipt & Allocation',
+                'title': _('Bulk Stock Receipt & Allocation'),
                 'formset': formset,
                 'requests_data': requests_data,
             }

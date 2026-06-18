@@ -38,7 +38,7 @@ class TenantDetailView(ObjectDetailView):
     queryset = Tenant.objects.select_related('group').prefetch_related('tags')
 
     layout = (
-        ((Panel('info', 'Tenant Details'),),),
+        ((Panel('info', _('Tenant Details')),),),
     )
 
     def get_context_data(self, **kwargs):
@@ -70,9 +70,9 @@ class TenantDetailView(ObjectDetailView):
         table.configure(request)
         return render(request, "generic/tab_table.html", {
             'table': table,
-            'title': 'Associated Sites',
+            'title': _('Associated Sites'),
             'empty_icon': 'mdi-office-building',
-            'empty_text': 'No sites found for this tenant.',
+            'empty_text': _('No sites found for this tenant.'),
         })
 
     def get_tab_locations(self, request):
@@ -81,9 +81,9 @@ class TenantDetailView(ObjectDetailView):
         table.configure(request)
         return render(request, "generic/tab_table.html", {
             'table': table,
-            'title': 'Associated Locations',
+            'title': _('Associated Locations'),
             'empty_icon': 'mdi-map-marker-outline',
-            'empty_text': 'No locations found for this tenant.',
+            'empty_text': _('No locations found for this tenant.'),
         })
 
     def get_tab_assetholders(self, request):
@@ -92,9 +92,9 @@ class TenantDetailView(ObjectDetailView):
         table.configure(request)
         return render(request, "generic/tab_table.html", {
             'table': table,
-            'title': 'Associated Asset Holders',
+            'title': _('Associated Asset Holders'),
             'empty_icon': 'mdi-account-group-outline',
-            'empty_text': 'No asset holders found for this tenant.',
+            'empty_text': _('No asset holders found for this tenant.'),
         })
 
     def get_tab_assets(self, request):
@@ -103,9 +103,9 @@ class TenantDetailView(ObjectDetailView):
         table.configure(request)
         return render(request, "generic/tab_table.html", {
             'table': table,
-            'title': 'Associated Assets',
+            'title': _('Associated Assets'),
             'empty_icon': 'mdi-laptop',
-            'empty_text': 'No assets found for this tenant.',
+            'empty_text': _('No assets found for this tenant.'),
         })
 
     def get_tab_accessories(self, request):
@@ -114,9 +114,9 @@ class TenantDetailView(ObjectDetailView):
         table.configure(request)
         return render(request, "generic/tab_table.html", {
             'table': table,
-            'title': 'Associated Accessories',
+            'title': _('Associated Accessories'),
             'empty_icon': 'mdi-keyboard-outline',
-            'empty_text': 'No accessories found for this tenant.',
+            'empty_text': _('No accessories found for this tenant.'),
         })
 
     def get_tab_consumables(self, request):
@@ -125,9 +125,9 @@ class TenantDetailView(ObjectDetailView):
         table.configure(request)
         return render(request, "generic/tab_table.html", {
             'table': table,
-            'title': 'Associated Consumables',
+            'title': _('Associated Consumables'),
             'empty_icon': 'mdi-water-outline',
-            'empty_text': 'No consumables found for this tenant.',
+            'empty_text': _('No consumables found for this tenant.'),
         })
 
     def get_tab_components(self, request):
@@ -137,8 +137,8 @@ class TenantDetailView(ObjectDetailView):
         table.configure(request)
         return render(request, "generic/tab_table.html", {
             'table': table,
-            'title': 'Associated Component Catalog',
-            'empty_text': 'No components found for this tenant.',
+            'title': _('Associated Component Catalog'),
+            'empty_text': _('No components found for this tenant.'),
         })
 
     def get_tab_custody_policies(self, request):
@@ -150,8 +150,8 @@ class TenantDetailView(ObjectDetailView):
         table.configure(request)
         return render(request, "generic/tab_table.html", {
             'table': table,
-            'title': 'Associated Custody Policies & EULAs',
-            'empty_text': 'No custody policies found for this tenant.',
+            'title': _('Associated Custody Policies & EULAs'),
+            'empty_text': _('No custody policies found for this tenant.'),
         })
 
     def get_tab_licenses(self, request):
@@ -160,9 +160,9 @@ class TenantDetailView(ObjectDetailView):
         table.configure(request)
         return render(request, "generic/tab_table.html", {
             'table': table,
-            'title': 'Associated Licenses',
+            'title': _('Associated Licenses'),
             'empty_icon': 'mdi-key-outline',
-            'empty_text': 'No licenses found for this tenant.',
+            'empty_text': _('No licenses found for this tenant.'),
         })
 
     def get_tab_kits(self, request):
@@ -171,9 +171,9 @@ class TenantDetailView(ObjectDetailView):
         table.configure(request)
         return render(request, "generic/tab_table.html", {
             'table': table,
-            'title': 'Associated Kits',
+            'title': _('Associated Kits'),
             'empty_icon': 'mdi-package-variant',
-            'empty_text': 'No kits found for this tenant.',
+            'empty_text': _('No kits found for this tenant.'),
         })
 
     def get_tab_subscriptions(self, request):
@@ -182,9 +182,9 @@ class TenantDetailView(ObjectDetailView):
         table.configure(request)
         return render(request, "generic/tab_table.html", {
             'table': table,
-            'title': 'Associated Subscriptions',
+            'title': _('Associated Subscriptions'),
             'empty_icon': 'mdi-file-document-outline',
-            'empty_text': 'No subscriptions found for this tenant.',
+            'empty_text': _('No subscriptions found for this tenant.'),
         })
 
 

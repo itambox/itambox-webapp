@@ -2,6 +2,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from django.urls import reverse_lazy
+from django.utils.translation import gettext_lazy as _
 
 __all__ = (
     'Menu',
@@ -98,7 +99,7 @@ def get_model_buttons(app_label, model_name, actions=('add', 'import')):
         buttons.append(
             MenuItemButton(
                 link=f'{app_label}:{model_name}_create',
-                title='Add',
+                title=_('Add'),
                 icon_class='mdi mdi-plus-thick',
                 permissions=[f'{app_label}.add_{model_name}']
             )
@@ -116,7 +117,7 @@ def get_model_buttons(app_label, model_name, actions=('add', 'import')):
             buttons.append(
                 MenuItemButton(
                     link=f'/import/{app_label}/{model_name}/',
-                    title='Import',
+                    title=_('Import'),
                     icon_class='mdi mdi-upload',
                     permissions=[f'{app_label}.add_{model_name}'],
                     color='outline text-success'

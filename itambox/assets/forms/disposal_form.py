@@ -1,5 +1,6 @@
 from django import forms
 from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
 
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Row, Div, Fieldset
@@ -49,7 +50,7 @@ class AssetDisposalForm(forms.ModelForm):
         self.helper.form_method = 'post'
         self.helper.form_tag = True
 
-        button_text = 'Update' if self.instance and self.instance.pk else 'Record Disposal'
+        button_text = _('Update') if self.instance and self.instance.pk else _('Record Disposal')
         try:
             cancel_url = reverse('assets:assetdisposal_list')
         except Exception:
@@ -57,7 +58,7 @@ class AssetDisposalForm(forms.ModelForm):
 
         self.helper.layout = Layout(
             Fieldset(
-                'Disposal Details',
+                _('Disposal Details'),
                 Div(
                     Div('asset', css_class='col-md-6'),
                     Div('disposal_date', css_class='col-md-6'),
@@ -70,7 +71,7 @@ class AssetDisposalForm(forms.ModelForm):
                 ),
             ),
             Fieldset(
-                'Data Sanitization & Compliance',
+                _('Data Sanitization & Compliance'),
                 Div(
                     Div('data_sanitization_method', css_class='col-md-4'),
                     Div('sanitized_by', css_class='col-md-4'),
@@ -83,7 +84,7 @@ class AssetDisposalForm(forms.ModelForm):
                 ),
             ),
             Fieldset(
-                'Financial',
+                _('Financial'),
                 Div(
                     Div('proceeds', css_class='col-md-4'),
                     Div('currency', css_class='col-md-4'),

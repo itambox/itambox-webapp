@@ -128,11 +128,11 @@ class CustomField(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
     FIELD_TYPE_BOOLEAN = 'boolean'
     FIELD_TYPE_SELECT = 'select'
     FIELD_TYPE_CHOICES = [
-        (FIELD_TYPE_TEXT, 'Text'),
-        (FIELD_TYPE_NUMBER, 'Number'),
-        (FIELD_TYPE_DATE, 'Date'),
-        (FIELD_TYPE_BOOLEAN, 'Boolean'),
-        (FIELD_TYPE_SELECT, 'Select / Dropdown'),
+        (FIELD_TYPE_TEXT, _('Text')),
+        (FIELD_TYPE_NUMBER, _('Number')),
+        (FIELD_TYPE_DATE, _('Date')),
+        (FIELD_TYPE_BOOLEAN, _('Boolean')),
+        (FIELD_TYPE_SELECT, _('Select / Dropdown')),
     ]
 
     name = models.SlugField(max_length=50, verbose_name=_("Field Name"), help_text=_("Slug-like name (e.g. sim_card_number)"))
@@ -198,9 +198,9 @@ class Event(ChangeLoggingMixin, BaseModel):
     ACTION_DELETE = 'delete'
 
     ACTION_CHOICES = [
-        (ACTION_CREATE, 'Create'),
-        (ACTION_UPDATE, 'Update'),
-        (ACTION_DELETE, 'Delete'),
+        (ACTION_CREATE, _('Create')),
+        (ACTION_UPDATE, _('Update')),
+        (ACTION_DELETE, _('Delete')),
     ]
 
     model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='events')
@@ -213,8 +213,8 @@ class Event(ChangeLoggingMixin, BaseModel):
 
     class Meta:
         ordering = ['-timestamp']
-        verbose_name = "Event"
-        verbose_name_plural = "Events"
+        verbose_name = _("Event")
+        verbose_name_plural = _("Events")
         indexes = [
             models.Index(fields=['model', 'object_id'], name='core_event_model_i_6d722d_idx'),
             models.Index(fields=['processed', 'timestamp'], name='core_event_process_17ef77_idx'),
@@ -233,8 +233,8 @@ class EventRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     ACTION_NOTIFICATION = 'notification'
 
     ACTION_TYPE_CHOICES = [
-        (ACTION_WEBHOOK, 'Webhook'),
-        (ACTION_NOTIFICATION, 'Notification'),
+        (ACTION_WEBHOOK, _('Webhook')),
+        (ACTION_NOTIFICATION, _('Notification')),
     ]
 
     name = models.CharField(max_length=255)
@@ -276,8 +276,8 @@ class EventRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
 
     class Meta:
         ordering = ['name']
-        verbose_name = "Event Rule"
-        verbose_name_plural = "Event Rules"
+        verbose_name = _("Event Rule")
+        verbose_name_plural = _("Event Rules")
 
     def __str__(self):
         return self.name
@@ -335,8 +335,8 @@ class WebhookEndpoint(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
 
     class Meta:
         ordering = ['name']
-        verbose_name = "Webhook Endpoint"
-        verbose_name_plural = "Webhook Endpoints"
+        verbose_name = _("Webhook Endpoint")
+        verbose_name_plural = _("Webhook Endpoints")
         constraints = [
             models.UniqueConstraint(
                 fields=['tenant', 'name'],
@@ -400,8 +400,8 @@ class JournalEntry(ChangeLoggingMixin, BaseModel):
 
     class Meta:
         ordering = ['-created']
-        verbose_name = "Journal Entry"
-        verbose_name_plural = "Journal Entries"
+        verbose_name = _("Journal Entry")
+        verbose_name_plural = _("Journal Entries")
         indexes = [
             models.Index(fields=['model', 'object_id'], name='core_journa_model_i_3f2f97_idx'),
         ]
@@ -433,8 +433,8 @@ class Bookmark(ChangeLoggingMixin, BaseModel):
 
     class Meta:
         ordering = ['-created']
-        verbose_name = "Bookmark"
-        verbose_name_plural = "Bookmarks"
+        verbose_name = _("Bookmark")
+        verbose_name_plural = _("Bookmarks")
         indexes = [
             models.Index(fields=['user', 'model', 'object_id'], name='core_bookma_user_id_69a2d6_idx'),
         ]
@@ -463,8 +463,8 @@ class ObjectWatch(ChangeLoggingMixin, BaseModel):
 
     class Meta:
         ordering = ['-created']
-        verbose_name = "Object Watch"
-        verbose_name_plural = "Object Watches"
+        verbose_name = _("Object Watch")
+        verbose_name_plural = _("Object Watches")
         indexes = [
             models.Index(fields=['user', 'model', 'object_id'], name='extras_watch_user_id_idx'),
         ]
@@ -489,8 +489,8 @@ class ImageAttachment(ChangeLoggingMixin, BaseModel):
 
     class Meta:
         ordering = ['-created']
-        verbose_name = "Image Attachment"
-        verbose_name_plural = "Image Attachments"
+        verbose_name = _("Image Attachment")
+        verbose_name_plural = _("Image Attachments")
         indexes = [
             models.Index(fields=['model', 'object_id'], name='core_imagea_model_i_684849_idx'),
         ]
@@ -515,8 +515,8 @@ class FileAttachment(ChangeLoggingMixin, BaseModel):
 
     class Meta:
         ordering = ['-created']
-        verbose_name = "File Attachment"
-        verbose_name_plural = "File Attachments"
+        verbose_name = _("File Attachment")
+        verbose_name_plural = _("File Attachments")
         indexes = [
             models.Index(fields=['model', 'object_id'], name='core_fileat_model_i_c8edb4_idx'),
         ]
@@ -540,8 +540,8 @@ class ExportTemplate(BaseModel):
 
     class Meta:
         ordering = ['content_type', 'name']
-        verbose_name = "Export Template"
-        verbose_name_plural = "Export Templates"
+        verbose_name = _("Export Template")
+        verbose_name_plural = _("Export Templates")
         constraints = [
             models.UniqueConstraint(
                 fields=['content_type', 'name'],
@@ -577,17 +577,17 @@ class LabelTemplate(ChangeLoggingMixin, BaseModel):
     page_width = models.FloatField(default=2.25, help_text=_("Label width in inches"))
     page_height = models.FloatField(default=1.25, help_text=_("Label height in inches"))
     barcode_format = models.CharField(max_length=20, default='code128', choices=[
-        ('code128', 'Code 128'),
-        ('code39', 'Code 39'),
-        ('qr', 'QR Code'),
-        ('datamatrix', 'Data Matrix'),
+        ('code128', _('Code 128')),
+        ('code39', _('Code 39')),
+        ('qr', _('QR Code')),
+        ('datamatrix', _('Data Matrix')),
     ])
     template_code = models.TextField(blank=True, help_text=_("Jinja2/HTML template for label layout"))
 
     class Meta:
         ordering = ['name']
-        verbose_name = "Label Template"
-        verbose_name_plural = "Label Templates"
+        verbose_name = _("Label Template")
+        verbose_name_plural = _("Label Templates")
 
     def __str__(self):
         return self.name
@@ -634,12 +634,12 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     REPORT_TYPE_SOFTWARE_INVENTORY = 'software_inventory'
 
     REPORT_TYPE_CHOICES = [
-        (REPORT_TYPE_ASSET_SUMMARY, 'Asset Inventory Summary'),
-        (REPORT_TYPE_LICENSE_UTILIZATION, 'License Utilization'),
-        (REPORT_TYPE_SUBSCRIPTION_RENEWALS, 'Subscription Renewals'),
-        (REPORT_TYPE_ASSET_MAINTENANCE, 'Asset Maintenance & Repairs'),
-        (REPORT_TYPE_ASSET_DEPRECIATION, 'Asset Depreciation Summary'),
-        (REPORT_TYPE_SOFTWARE_INVENTORY, 'Software Catalog & Installations'),
+        (REPORT_TYPE_ASSET_SUMMARY, _('Asset Inventory Summary')),
+        (REPORT_TYPE_LICENSE_UTILIZATION, _('License Utilization')),
+        (REPORT_TYPE_SUBSCRIPTION_RENEWALS, _('Subscription Renewals')),
+        (REPORT_TYPE_ASSET_MAINTENANCE, _('Asset Maintenance & Repairs')),
+        (REPORT_TYPE_ASSET_DEPRECIATION, _('Asset Depreciation Summary')),
+        (REPORT_TYPE_SOFTWARE_INVENTORY, _('Software Catalog & Installations')),
     ]
 
     name = models.CharField(max_length=255)
@@ -665,9 +665,9 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     include_distribution_chart = models.BooleanField(default=False, help_text=_("Toggle embedding spend or status distribution charts in the HTML report."))
     group_by_field = models.CharField(max_length=100, blank=True, help_text=_("Optional column key to group grid records under (e.g. location, status)."))
     style_preset = models.CharField(max_length=50, default='default', choices=[
-        ('default', 'Professional Layout'),
-        ('compact', 'Compact Audit Sheet'),
-        ('financial', 'Financial Spend Summary')
+        ('default', _('Professional Layout')),
+        ('compact', _('Compact Audit Sheet')),
+        ('financial', _('Financial Spend Summary'))
     ])
     advanced_mode = models.BooleanField(default=False, help_text=_("Enable custom Jinja2/HTML template code override."))
     template_content = models.TextField(
@@ -677,8 +677,8 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
 
     class Meta:
         ordering = ['name']
-        verbose_name = "Report Template"
-        verbose_name_plural = "Report Templates"
+        verbose_name = _("Report Template")
+        verbose_name_plural = _("Report Templates")
         constraints = [
             models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_reporttemplate_name_active'),
         ]
@@ -706,8 +706,8 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
     FORMAT_HTML = 'html'
     FORMAT_CSV = 'csv'
     FORMAT_CHOICES = [
-        (FORMAT_HTML, 'HTML Email'),
-        (FORMAT_CSV, 'CSV Attachment'),
+        (FORMAT_HTML, _('HTML Email')),
+        (FORMAT_CSV, _('CSV Attachment')),
     ]
 
     FREQUENCY_ONCE = 'once'
@@ -721,15 +721,15 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
     FREQUENCY_CRON = 'cron'
 
     FREQUENCY_CHOICES = [
-        (FREQUENCY_ONCE, 'Once'),
-        (FREQUENCY_HOURLY, 'Hourly'),
-        (FREQUENCY_DAILY, 'Daily'),
-        (FREQUENCY_WEEKLY, 'Weekly'),
-        (FREQUENCY_BIWEEKLY, 'Biweekly'),
-        (FREQUENCY_MONTHLY, 'Monthly'),
-        (FREQUENCY_QUARTERLY, 'Quarterly'),
-        (FREQUENCY_YEARLY, 'Yearly'),
-        (FREQUENCY_CRON, 'Custom Cron Expression'),
+        (FREQUENCY_ONCE, _('Once')),
+        (FREQUENCY_HOURLY, _('Hourly')),
+        (FREQUENCY_DAILY, _('Daily')),
+        (FREQUENCY_WEEKLY, _('Weekly')),
+        (FREQUENCY_BIWEEKLY, _('Biweekly')),
+        (FREQUENCY_MONTHLY, _('Monthly')),
+        (FREQUENCY_QUARTERLY, _('Quarterly')),
+        (FREQUENCY_YEARLY, _('Yearly')),
+        (FREQUENCY_CRON, _('Custom Cron Expression')),
     ]
 
     name = models.CharField(max_length=255)
@@ -770,8 +770,8 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
 
     class Meta:
         ordering = ['name']
-        verbose_name = "Scheduled Report"
-        verbose_name_plural = "Scheduled Reports"
+        verbose_name = _("Scheduled Report")
+        verbose_name_plural = _("Scheduled Reports")
 
     def __str__(self):
         return f"{self.name} -> {self.report.name}"
@@ -827,8 +827,8 @@ class ReportGenerationArchive(ChangeLoggingMixin, BaseModel):
 
     class Meta:
         ordering = ['-generated_at']
-        verbose_name = "Report Generation Archive"
-        verbose_name_plural = "Report Generation Archives"
+        verbose_name = _("Report Generation Archive")
+        verbose_name_plural = _("Report Generation Archives")
 
     def __str__(self):
         return f"{self.scheduled_report.name} - {self.generated_at:%Y-%m-%d %H:%M:%S}"
@@ -844,10 +844,10 @@ class NotificationChannel(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     TYPE_TEAMS = 'teams'
 
     CHANNEL_TYPE_CHOICES = [
-        (TYPE_EMAIL, 'Email'),
-        (TYPE_IN_APP, 'In-App'),
-        (TYPE_SLACK, 'Slack'),
-        (TYPE_TEAMS, 'Microsoft Teams'),
+        (TYPE_EMAIL, _('Email')),
+        (TYPE_IN_APP, _('In-App')),
+        (TYPE_SLACK, _('Slack')),
+        (TYPE_TEAMS, _('Microsoft Teams')),
     ]
 
     name = models.CharField(max_length=255)
@@ -866,8 +866,8 @@ class NotificationChannel(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
 
     class Meta:
         ordering = ['name']
-        verbose_name = "Notification Channel"
-        verbose_name_plural = "Notification Channels"
+        verbose_name = _("Notification Channel")
+        verbose_name_plural = _("Notification Channels")
         constraints = [
             models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_notificationchannel_name_active'),
         ]
@@ -889,12 +889,12 @@ class AlertRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     ALERT_TYPE_AUDIT_OVERDUE = 'audit_overdue'
 
     ALERT_TYPE_CHOICES = [
-        (ALERT_TYPE_LOW_STOCK, 'Low Stock Alert'),
-        (ALERT_TYPE_UPCOMING_EOL, 'Upcoming EOL Planning'),
-        (ALERT_TYPE_LICENSE_EXPIRY, 'License Expiry Alert'),
-        (ALERT_TYPE_RENEWAL_DUE, 'Renewal Due Alert'),
-        (ALERT_TYPE_WARRANTY_EXPIRY, 'Warranty Expiry Alert'),
-        (ALERT_TYPE_AUDIT_OVERDUE, 'Audit Overdue'),
+        (ALERT_TYPE_LOW_STOCK, _('Low Stock Alert')),
+        (ALERT_TYPE_UPCOMING_EOL, _('Upcoming EOL Planning')),
+        (ALERT_TYPE_LICENSE_EXPIRY, _('License Expiry Alert')),
+        (ALERT_TYPE_RENEWAL_DUE, _('Renewal Due Alert')),
+        (ALERT_TYPE_WARRANTY_EXPIRY, _('Warranty Expiry Alert')),
+        (ALERT_TYPE_AUDIT_OVERDUE, _('Audit Overdue')),
     ]
 
     SEVERITY_INFO = 'info'
@@ -902,9 +902,9 @@ class AlertRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     SEVERITY_CRITICAL = 'critical'
 
     SEVERITY_CHOICES = [
-        (SEVERITY_INFO, 'Info'),
-        (SEVERITY_WARNING, 'Warning'),
-        (SEVERITY_CRITICAL, 'Critical'),
+        (SEVERITY_INFO, _('Info')),
+        (SEVERITY_WARNING, _('Warning')),
+        (SEVERITY_CRITICAL, _('Critical')),
     ]
 
     name = models.CharField(max_length=255)
@@ -938,8 +938,8 @@ class AlertRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
 
     class Meta:
         ordering = ['name']
-        verbose_name = "Alert Rule"
-        verbose_name_plural = "Alert Rules"
+        verbose_name = _("Alert Rule")
+        verbose_name_plural = _("Alert Rules")
         constraints = [
             models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_alertrule_name_active'),
         ]
@@ -968,9 +968,9 @@ class AlertLog(BaseModel):
     STATUS_RESOLVED = 'resolved'
 
     STATUS_CHOICES = [
-        (STATUS_ACTIVE, 'Active'),
-        (STATUS_ACKNOWLEDGED, 'Acknowledged'),
-        (STATUS_RESOLVED, 'Resolved'),
+        (STATUS_ACTIVE, _('Active')),
+        (STATUS_ACKNOWLEDGED, _('Acknowledged')),
+        (STATUS_RESOLVED, _('Resolved')),
     ]
 
     rule = models.ForeignKey(AlertRule, on_delete=models.CASCADE, related_name='logs')
@@ -1038,8 +1038,8 @@ class AlertLog(BaseModel):
 
     class Meta:
         ordering = ['-created_at']
-        verbose_name = "Alert Log"
-        verbose_name_plural = "Alert Logs"
+        verbose_name = _("Alert Log")
+        verbose_name_plural = _("Alert Logs")
         indexes = [
             models.Index(fields=['content_type', 'object_id'], name='core_alertl_content_706751_idx'),
             models.Index(fields=['severity'], name='core_alertl_severit_f0ec11_idx'),

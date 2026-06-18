@@ -28,7 +28,7 @@ class ContactDetailView(ObjectDetailView):
     queryset = Contact.objects.prefetch_related('tags', 'assignments')
 
     layout = (
-        ((Panel('info', 'Contact Details'),),),
+        ((Panel('info', _('Contact Details')),),),
     )
 
     def get_context_data(self, **kwargs):

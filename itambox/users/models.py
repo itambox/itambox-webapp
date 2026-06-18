@@ -61,8 +61,8 @@ class UserPreference(models.Model):
     THEME_DARK = 'dark'
     THEME_LIGHT = 'light'
     THEME_CHOICES = (
-        (THEME_LIGHT, 'Light'),
-        (THEME_DARK, 'Dark'),
+        (THEME_LIGHT, _('Light')),
+        (THEME_DARK, _('Dark')),
     )
 
     user = models.OneToOneField(

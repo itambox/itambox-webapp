@@ -5,6 +5,7 @@ from django.views.generic.base import TemplateResponseMixin
 from django.urls import reverse
 from django.conf import settings
 from django.utils.module_loading import import_string
+from django.utils.translation import gettext as _
 from django.http import JsonResponse
 
 from core.forms import SearchForm
@@ -59,10 +60,10 @@ class SearchView(LoginRequiredMixin, BaseHTMXView, TemplateResponseMixin, View):
             'lookup': lookup,
             'results': results_data,
             'results_count': results_count,
-            'title': 'Search Results',
+            'title': _('Search Results'),
             'breadcrumbs': [
-                 (reverse('dashboard'), 'Dashboard'),
-                 (None, 'Search')
+                 (reverse('dashboard'), _('Dashboard')),
+                 (None, _('Search'))
             ]
         }
         context['content_template_name'] = self.template_name

@@ -39,7 +39,7 @@ class LocationDetailView(ObjectDetailView):
     )
 
     layout = (
-        ((Panel('info', 'Location Details'),),),
+        ((Panel('info', _('Location Details')),),),
     )
 
     def get_context_data(self, **kwargs):
@@ -94,49 +94,49 @@ class LocationDetailView(ObjectDetailView):
         asset_count = location.assets.count()
         if asset_count:
             related_objects_list.append({
-                'label': 'Assets',
+                'label': _('Assets'),
                 'count': asset_count,
                 'url': f"{reverse('assets:asset_list')}?location={location.slug}"
             })
         child_count = location.children.count()
         if child_count:
             related_objects_list.append({
-                'label': 'Child Locations',
+                'label': _('Child Locations'),
                 'count': child_count,
                 'url': f"{reverse('organization:location_list')}?parent={location.slug}"
             })
         accessory_count = acc_stock_qs.count()
         if accessory_count:
             related_objects_list.append({
-                'label': 'Accessory Stocks',
+                'label': _('Accessory Stocks'),
                 'count': accessory_count,
                 'url': f"{reverse('inventory:accessorystock_list')}?location={location.slug}"
             })
         consumable_count = con_stock_qs.count()
         if consumable_count:
             related_objects_list.append({
-                'label': 'Consumable Stocks',
+                'label': _('Consumable Stocks'),
                 'count': consumable_count,
                 'url': f"{reverse('inventory:consumablestock_list')}?location={location.slug}"
             })
         component_count = comp_stock_qs.count()
         if component_count:
             related_objects_list.append({
-                'label': 'Component Stocks',
+                'label': _('Component Stocks'),
                 'count': component_count,
                 'url': f"{reverse('inventory:componentstock_list')}?location={location.slug}"
             })
         checkout_count = asset_assignments_qs.count()
         if checkout_count:
             related_objects_list.append({
-                'label': 'Checkout Log',
+                'label': _('Checkout Log'),
                 'count': checkout_count,
                 'url': f"{reverse('organization:location_detail', kwargs={'pk': location.pk})}#checkout-log"
             })
         audit_count = audits_qs.count()
         if audit_count:
             related_objects_list.append({
-                'label': 'Audit Campaigns',
+                'label': _('Audit Campaigns'),
                 'count': audit_count,
                 'url': f"{reverse('compliance:auditsession_list')}?location={location.slug}"
             })

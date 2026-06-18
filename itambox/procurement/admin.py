@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils.translation import gettext_lazy as _
 from .models import PurchaseOrder, PurchaseOrderLine, FulfillmentLink, Contract
 
 class PurchaseOrderLineInline(admin.TabularInline):
@@ -33,22 +34,22 @@ class ContractAdmin(admin.ModelAdmin):
     search_fields = ('contract_number', 'name', 'notes', 'sla_terms')
     filter_horizontal = ('assets',)
     fieldsets = (
-        ('Identity', {
+        (_('Identity'), {
             'fields': ('name', 'contract_number', 'contract_type', 'status', 'tenant'),
         }),
-        ('Vendor / Commercial', {
+        (_('Vendor / Commercial'), {
             'fields': ('supplier', 'cost', 'currency', 'billing_cycle', 'purchase_order'),
         }),
-        ('Dates', {
+        (_('Dates'), {
             'fields': ('start_date', 'end_date', 'renewal_date', 'auto_renew'),
         }),
-        ('SLA', {
+        (_('SLA'), {
             'fields': ('sla_response_time', 'sla_resolution_time', 'coverage_hours', 'sla_terms'),
         }),
-        ('Coverage', {
+        (_('Coverage'), {
             'fields': ('assets',),
         }),
-        ('Notes', {
+        (_('Notes'), {
             'fields': ('notes',),
         }),
     )

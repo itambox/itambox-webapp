@@ -30,9 +30,9 @@ class AssetDisposalDetailView(ObjectDetailView):
     template_name = 'assets/assetdisposal_detail.html'
 
     layout = (
-        ((Panel('overview', 'Disposal Overview'),),),
-        ((Panel('sanitization', 'Data Sanitization'),),),
-        ((Panel('financial', 'Financial / Proceeds'),),),
+        ((Panel('overview', _('Disposal Overview')),),),
+        ((Panel('sanitization', _('Data Sanitization')),),),
+        ((Panel('financial', _('Financial / Proceeds')),),),
     )
 
 

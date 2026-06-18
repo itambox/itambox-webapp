@@ -48,8 +48,8 @@ class ConsumableDetailView(ObjectDetailView):
     template_name = 'assets/consumables/consumable_detail.html'
 
     layout = (
-        ((Panel('metrics', 'Metrics Overview'),),),
-        ((Panel('info', 'Consumable Details'),),),
+        ((Panel('metrics', _('Metrics Overview')),),),
+        ((Panel('info', _('Consumable Details')),),),
     )
 
     def get_context_data(self, **kwargs):
@@ -114,7 +114,7 @@ class ConsumableCheckoutView(GenericTransactionView):
     context_object_name = 'consumable'
     template_name = 'inventory/includes/consumable_checkout_modal.html'
     error_partial = 'inventory/includes/consumable_checkout_modal.html#checkout-modal-form'
-    success_message = "Consumable consumed successfully."
+    success_message = _("Consumable consumed successfully.")
     form_field_map = {
         'assigned_holder': 'holder',
         'assigned_location': 'location',

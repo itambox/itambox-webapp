@@ -73,8 +73,8 @@ class ActionsColumn(tables.Column):
     orderable = False
 
     actions = {
-        'edit': {'title': 'Edit', 'icon': 'pencil', 'css_class': 'primary'},
-        'delete': {'title': 'Delete', 'icon': 'trash', 'css_class': 'danger'},
+        'edit': {'title': _('Edit'), 'icon': 'pencil', 'css_class': 'primary'},
+        'delete': {'title': _('Delete'), 'icon': 'trash', 'css_class': 'danger'},
     }
 
     def __init__(self, *args, actions=('edit', 'delete'), extra_buttons='', split_actions=True, **kwargs):
@@ -267,7 +267,7 @@ class AssigneeColumn(tables.Column):
         assignment_model_path='assets.AssetAssignment',
         **kwargs,
     ):
-        kwargs.setdefault('verbose_name', 'Assignee')
+        kwargs.setdefault('verbose_name', _('Assignee'))
         kwargs.setdefault('orderable', False)
         kwargs.setdefault('accessor', 'pk')
         self.location_field = location_field

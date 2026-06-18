@@ -40,8 +40,8 @@ class LicenseDetailView(ObjectDetailView):
     template_name = 'licenses/license_detail.html'
 
     layout = (
-        ((Panel('metrics', 'License Overview'),),),
-        ((Panel('info', 'License Details'),),),
+        ((Panel('metrics', _('License Overview')),),),
+        ((Panel('info', _('License Details')),),),
     )
 
     def get_context_data(self, **kwargs):
@@ -73,14 +73,14 @@ class LicenseDetailView(ObjectDetailView):
         assignment_count = assignments_qs.count()
         if assignment_count:
             related_objects_list.append({
-                'label': 'Seat Assignments',
+                'label': _('Seat Assignments'),
                 'count': assignment_count,
                 'url': f"{reverse('licenses:license_detail', kwargs={'pk': license_obj.pk})}#assignments"
             })
         kit_count = kits_qs.count()
         if kit_count:
             related_objects_list.append({
-                'label': 'Kits',
+                'label': _('Kits'),
                 'count': kit_count,
                 'url': f"{reverse('inventory:kit_list')}?license={license_obj.pk}"
             })

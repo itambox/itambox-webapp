@@ -1,4 +1,5 @@
 from django.urls import reverse_lazy
+from django.utils.translation import gettext_lazy as _
 
 from itambox.panels import Panel
 from itambox.views.generic import (
@@ -24,8 +25,8 @@ class AssetMaintenanceDetailView(ObjectDetailView):
     template_name = 'compliance/assetmaintenances/assetmaintenance_detail.html'
 
     layout = (
-        ((Panel('metrics', 'Maintenance Overview'),),),
-        ((Panel('info', 'Maintenance Details'),),),
+        ((Panel('metrics', _('Maintenance Overview')),),),
+        ((Panel('info', _('Maintenance Details')),),),
     )
 
 

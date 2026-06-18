@@ -7,6 +7,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.views import PasswordChangeView as DjangoPasswordChangeView
 from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _lazy
 from django.views.generic.base import TemplateResponseMixin
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
@@ -280,7 +281,7 @@ def notification_poll(request):
 
 class UserBookmarksView(UserGenericTabView):
     active_tab = 'bookmarks'
-    tab_title = 'Bookmarks'
+    tab_title = _lazy('Bookmarks')
     template_name = 'users/bookmarks.html'
 
     def get_context_data(self, **kwargs):
@@ -295,7 +296,7 @@ class UserBookmarksView(UserGenericTabView):
 
 class UserSubscriptionsView(UserGenericTabView):
     active_tab = 'watching'
-    tab_title = 'Watching'
+    tab_title = _lazy('Watching')
     template_name = 'users/watching.html'
 
     def get_context_data(self, **kwargs):
@@ -361,7 +362,7 @@ class BookmarkToggleView(LoginRequiredMixin, View):
             csrf_token = get_token(request)
             btn_class = 'btn-soft-warning' if is_bookmarked else 'btn-ghost-secondary'
             star_icon = 'mdi-star' if is_bookmarked else 'mdi-star-outline'
-            title = 'Remove Bookmark' if is_bookmarked else 'Bookmark'
+            title = _('Remove Bookmark') if is_bookmarked else _('Bookmark')
             button_html = (
                 f'<button type="button" class="btn btn-icon {btn_class}"'
                 f' hx-post="{reverse("users:bookmark_toggle", kwargs={"content_type_id": content_type_id, "object_id": object_id})}"'
@@ -427,7 +428,7 @@ class WatchToggleView(LoginRequiredMixin, View):
             csrf_token = get_token(request)
             btn_class = 'btn-soft-info' if is_watched else 'btn-ghost-secondary'
             bell_icon = 'mdi-bell' if is_watched else 'mdi-bell-outline'
-            title = 'Stop Watching' if is_watched else 'Watch (notify me on changes)'
+            title = _('Stop Watching') if is_watched else _('Watch (notify me on changes)')
             button_html = (
                 f'<button type="button" class="btn btn-icon {btn_class}"'
                 f' hx-post="{reverse("users:watch_toggle", kwargs={"content_type_id": content_type_id, "object_id": object_id})}"'

@@ -1,5 +1,6 @@
 from django.db.models import Count, Q
 from django.urls import reverse_lazy
+from django.utils.translation import gettext_lazy as _
 
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
@@ -27,7 +28,7 @@ class CostCenterDetailView(ObjectDetailView):
     queryset = CostCenter.objects.select_related('tenant', 'parent').prefetch_related('children')
 
     layout = (
-        ((Panel('info', 'Cost Center Details'),),),
+        ((Panel('info', _('Cost Center Details')),),),
     )
 
     def get_context_data(self, **kwargs):
@@ -42,7 +43,7 @@ class CostCenterDetailView(ObjectDetailView):
         child_count = children.count()
         if child_count:
             related_objects_list.append({
-                'label': 'Sub-units',
+                'label': _('Sub-units'),
                 'count': child_count,
                 'url': f"{cost_center.get_absolute_url()}",
             })

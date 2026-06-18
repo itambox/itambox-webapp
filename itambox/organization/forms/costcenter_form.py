@@ -33,8 +33,8 @@ class CostCenterForm(CustomFieldModelFormMixin, forms.ModelForm):
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
         help_texts = {
-            'slug': 'URL-friendly identifier.',
-            'code': 'Short unique code within this tenant (e.g. "CC-100").',
+            'slug': _('URL-friendly identifier.'),
+            'code': _('Short unique code within this tenant (e.g. "CC-100").'),
         }
 
     def __init__(self, *args, **kwargs):

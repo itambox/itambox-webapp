@@ -49,7 +49,7 @@ class AssetHolderForm(CustomFieldModelFormMixin, forms.ModelForm):
             'comments': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
         }
         help_texts = {
-            'upn': 'User Principal Name — the login identity in Active Directory / Entra ID (e.g. jdoe@corp.com). Used to match this holder to directory sync sources.',
+            'upn': _('User Principal Name — the login identity in Active Directory / Entra ID (e.g. jdoe@corp.com). Used to match this holder to directory sync sources.'),
         }
 
     def __init__(self, *args, **kwargs):

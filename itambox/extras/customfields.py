@@ -11,6 +11,7 @@ spec sheets) on top of this base — see assets/forms/asset_form.py.
 """
 from django import forms
 from django.contrib.contenttypes.models import ContentType
+from django.utils.translation import gettext_lazy as _
 
 
 def build_custom_field_form_field(cf, initial_value=None):
@@ -102,7 +103,7 @@ class CustomFieldModelFormMixin:
     using the generic auto-helper need nothing else.
     """
 
-    custom_fields_fieldset_label = 'Custom Fields'
+    custom_fields_fieldset_label = _('Custom Fields')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

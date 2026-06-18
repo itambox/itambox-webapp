@@ -111,9 +111,9 @@ class CustodyReceipt(ChangeLoggingMixin, BaseModel):
     STATUS_ACCEPTED = 'accepted'
     STATUS_DECLINED = 'declined'
     ACCEPTANCE_STATUS_CHOICES = [
-        (STATUS_PENDING, 'Pending'),
-        (STATUS_ACCEPTED, 'Accepted'),
-        (STATUS_DECLINED, 'Declined'),
+        (STATUS_PENDING, _('Pending')),
+        (STATUS_ACCEPTED, _('Accepted')),
+        (STATUS_DECLINED, _('Declined')),
     ]
 
     asset = models.ForeignKey('assets.Asset', on_delete=models.PROTECT, related_name='custody_receipts', db_index=True)

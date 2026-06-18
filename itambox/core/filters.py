@@ -83,7 +83,7 @@ class ObjectChangeFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
         label=_('Search'),
-        widget=forms.TextInput(attrs={'placeholder': 'Search Username, Object, type...'})
+        widget=forms.TextInput(attrs={'placeholder': _('Search Username, Object, type...')})
     )
 
     show_system_events = django_filters.BooleanFilter(

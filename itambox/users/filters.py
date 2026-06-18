@@ -12,20 +12,20 @@ class UserFilterSet(django_filters.FilterSet):
     q = django_filters.CharFilter(
         method='search',
         label=_('Search'),
-        widget=forms.TextInput(attrs={'placeholder': 'Search...'})
+        widget=forms.TextInput(attrs={'placeholder': _('Search...')})
     )
     is_active = django_filters.BooleanFilter(
         widget=forms.Select(choices=(
-            ('', 'All'),
-            ('true', 'Active'),
-            ('false', 'Inactive'),
+            ('', _('All')),
+            ('true', _('Active')),
+            ('false', _('Inactive')),
         ), attrs={'class': 'form-select'})
     )
     is_staff = django_filters.BooleanFilter(
         widget=forms.Select(choices=(
-            ('', 'All'),
-            ('true', 'Staff'),
-            ('false', 'Non-Staff'),
+            ('', _('All')),
+            ('true', _('Staff')),
+            ('false', _('Non-Staff')),
         ), attrs={'class': 'form-select'})
     )
 
@@ -41,8 +41,8 @@ class UserFilterSet(django_filters.FilterSet):
         self.form.helper.layout = Layout(
             'q', 'is_active', 'is_staff',
             HTML('<div class="mt-3">'),
-            Submit('submit', 'Apply Filter', css_class='btn btn-primary'),
-            HTML('<a href="{{ request.path }}" class="btn btn-secondary ms-2">Clear Filters</a>'),
+            Submit('submit', _('Apply Filter'), css_class='btn btn-primary'),
+            HTML('<a href="{{ request.path }}" class="btn btn-secondary ms-2">%s</a>' % _('Clear Filters')),
             HTML('</div>')
         )
 

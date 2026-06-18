@@ -48,7 +48,7 @@ class AssetTypeForm(SlugModelForm):
             'comments': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
         }
         help_texts = {
-            'slug': 'URL-friendly identifier. Leave blank to auto-generate.',
+            'slug': _('URL-friendly identifier. Leave blank to auto-generate.'),
         }
 
     def __init__(self, *args, **kwargs):
@@ -68,7 +68,7 @@ class AssetTypeForm(SlugModelForm):
             'hx-include': 'closest form',
         })
 
-        button_text = 'Update' if self.instance.pk else 'Create'
+        button_text = _('Update') if self.instance.pk else _('Create')
         cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse('assets:assettype_list')
 
         # Determine the selected custom fieldset
@@ -155,7 +155,7 @@ class AssetTypeForm(SlugModelForm):
         # Build dynamic form layout
         layout_elements = [
             Fieldset(
-                'General Information',
+                _('General Information'),
                 Row(
                     Column('manufacturer', css_class='col-md-6'),
                     Column('model', css_class='col-md-6')
@@ -171,7 +171,7 @@ class AssetTypeForm(SlugModelForm):
                 ),
             ),
             Fieldset(
-                'Classification & Financial',
+                _('Classification & Financial'),
                 Row(
                     Column('category', css_class='col-md-3'),
                     Column('asset_role', css_class='col-md-3'),
@@ -193,14 +193,14 @@ class AssetTypeForm(SlugModelForm):
             
             layout_elements.append(
                 Fieldset(
-                    'Specifications',
+                    _('Specifications'),
                     *cf_divs
                 )
             )
         else:
             layout_elements.append(
                 Fieldset(
-                    'Specifications',
+                    _('Specifications'),
                     HTML(
                         '<div class="alert alert-info d-flex align-items-center mb-0" role="alert">'
                         '  <i class="mdi mdi-information-outline me-2"></i>'
@@ -212,7 +212,7 @@ class AssetTypeForm(SlugModelForm):
 
         layout_elements.extend([
             Fieldset(
-                'Additional Information',
+                _('Additional Information'),
                 'comments',
                 Row(
                     Column('tags', css_class='col-md-8'),

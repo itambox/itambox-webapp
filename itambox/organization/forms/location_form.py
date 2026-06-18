@@ -48,8 +48,8 @@ class LocationForm(CustomFieldModelFormMixin, forms.ModelForm):
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
         help_texts = {
-            'slug': 'URL-friendly identifier.',
-            'facility': 'Building, Floor, Room, Rack, etc.'
+            'slug': _('URL-friendly identifier.'),
+            'facility': _('Building, Floor, Room, Rack, etc.')
         }
 
     def __init__(self, *args, **kwargs):

@@ -31,7 +31,7 @@ class RegionForm(forms.ModelForm):
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
         help_texts = {
-            'slug': 'URL-friendly identifier.',
+            'slug': _('URL-friendly identifier.'),
         }
 
     def __init__(self, *args, **kwargs):

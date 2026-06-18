@@ -1,4 +1,5 @@
 from django.urls import reverse, reverse_lazy
+from django.utils.translation import gettext_lazy as _
 from django_tables2 import RequestConfig
 
 from ..models import Category, AssetType
@@ -26,7 +27,7 @@ class CategoryDetailView(ObjectDetailView):
     queryset = Category.objects.all()
 
     layout = (
-        ((Panel('info', 'Category Details'),),),
+        ((Panel('info', _('Category Details')),),),
     )
 
     def get_context_data(self, **kwargs):

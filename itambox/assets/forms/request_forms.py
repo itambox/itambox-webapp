@@ -134,7 +134,7 @@ class AssetRequestForm(forms.ModelForm):
             from django.urls import reverse
             cancel_url = reverse('assets:assetrequest_list')
 
-        button_text = 'Update' if self.instance and self.instance.pk else 'Create'
+        button_text = _('Update') if self.instance and self.instance.pk else _('Create')
         
         self.helper.layout = Layout(
             'request_category',

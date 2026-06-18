@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils.translation import gettext_lazy as _
 from .models import Asset, AssetRole, Manufacturer, AssetType, AssetDisposal, Warranty, AssetReservation
 from software.models import InstalledSoftware
 
@@ -11,7 +12,7 @@ class AssetRoleAdmin(admin.ModelAdmin):
 
     def asset_count(self, obj):
         return obj.assets.count()
-    asset_count.short_description = 'Assets'
+    asset_count.short_description = _('Assets')
 
 @admin.register(Manufacturer)
 class ManufacturerAdmin(admin.ModelAdmin):
@@ -21,7 +22,7 @@ class ManufacturerAdmin(admin.ModelAdmin):
 
     def asset_count(self, obj):
         return obj.assets.count()
-    asset_count.short_description = 'Assets'
+    asset_count.short_description = _('Assets')
 
 @admin.register(AssetType)
 class AssetTypeAdmin(admin.ModelAdmin):

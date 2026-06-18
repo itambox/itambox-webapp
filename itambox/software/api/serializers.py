@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from django.utils.translation import gettext_lazy as _
 from assets.models import Manufacturer, Asset
 from itambox.api.base import BaseModelSerializer
 from itambox.api.nested_serializers import NestedManufacturerSerializer, NestedAssetSerializer
@@ -27,7 +28,7 @@ class SoftwareSerializer(BaseModelSerializer):
         queryset=Manufacturer.objects.all(),
         source='manufacturer',
         write_only=True,
-        help_text="The ID of the manufacturer for this software"
+        help_text=_("The ID of the manufacturer for this software")
     )
     tags: TagSerializer = TagSerializer(many=True, read_only=True)
     tenant = NestedTenantSerializer(read_only=True)

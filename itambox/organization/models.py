@@ -23,11 +23,11 @@ class Location(CustomFieldDataMixin, SubscribableMixin, StandardModel, SoftDelet
     STATUS_DECOMMISSIONING = 'decommissioning'
     STATUS_RETIRED = 'retired'
     STATUS_CHOICES = [
-        (STATUS_PLANNED, 'Planned'),
-        (STATUS_STAGING, 'Staging'),
-        (STATUS_ACTIVE, 'Active'),
-        (STATUS_DECOMMISSIONING, 'Decommissioning'),
-        (STATUS_RETIRED, 'Retired'),
+        (STATUS_PLANNED, _('Planned')),
+        (STATUS_STAGING, _('Staging')),
+        (STATUS_ACTIVE, _('Active')),
+        (STATUS_DECOMMISSIONING, _('Decommissioning')),
+        (STATUS_RETIRED, _('Retired')),
     ]
 
     site = models.ForeignKey(
@@ -227,11 +227,11 @@ class Site(DeletableVaultModel, BookmarkableMixin):
     STATUS_DECOMMISSIONING = 'decommissioning'
     STATUS_RETIRED = 'retired'
     STATUS_CHOICES = [
-        (STATUS_PLANNED, 'Planned'),
-        (STATUS_STAGING, 'Staging'),
-        (STATUS_ACTIVE, 'Active'),
-        (STATUS_DECOMMISSIONING, 'Decommissioning'),
-        (STATUS_RETIRED, 'Retired'),
+        (STATUS_PLANNED, _('Planned')),
+        (STATUS_STAGING, _('Staging')),
+        (STATUS_ACTIVE, _('Active')),
+        (STATUS_DECOMMISSIONING, _('Decommissioning')),
+        (STATUS_RETIRED, _('Retired')),
     ]
 
     name = models.CharField(max_length=100)
@@ -375,10 +375,10 @@ class ContactAssignment(ChangeLoggingMixin, BaseModel):
     priority = models.CharField(
         max_length=50,
         choices=[
-            ('primary', 'Primary'),
-            ('secondary', 'Secondary'),
-            ('tertiary', 'Tertiary'),
-            ('inactive', 'Inactive'),
+            ('primary', _('Primary')),
+            ('secondary', _('Secondary')),
+            ('tertiary', _('Tertiary')),
+            ('inactive', _('Inactive')),
         ],
         blank=True,
     )
@@ -428,8 +428,8 @@ class TenantRole(StandardModel, SoftDeleteMixin):
 
     class Meta:
         ordering = ['name']
-        verbose_name = "Tenant Role"
-        verbose_name_plural = "Tenant Roles"
+        verbose_name = _("Tenant Role")
+        verbose_name_plural = _("Tenant Roles")
         constraints = [
             models.UniqueConstraint(
                 fields=['tenant', 'name'],

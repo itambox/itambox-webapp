@@ -10,6 +10,7 @@ from django.utils.safestring import mark_safe
 from django.template.loader import render_to_string
 from django.core.exceptions import PermissionDenied
 from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _lazy
 
 from assets.models import Asset, StatusLabel, AssetMaintenance
 from inventory.models import Accessory, Consumable
@@ -157,7 +158,7 @@ class DashboardWidget:
             if self.widget_id != 'tenant-spend': # exclude tenant-spend widget which is global
                 from organization.models import Tenant
                 tenants = Tenant.objects.all().order_by('name')
-                choices = [('', 'All Tenants')] + [(str(t.id), t.name) for t in tenants]
+                choices = [('', _('All Tenants'))] + [(str(t.id), t.name) for t in tenants]
                 form.fields['tenant_id'] = forms.ChoiceField(
                     label=_('Target Tenant Context'),
                     choices=choices,
@@ -188,7 +189,7 @@ class DashboardWidget:
     def render(self, request):
         """Render the widget body HTML."""
         if not self.has_permission(request):
-            return mark_safe(f'<div class="text-danger text-center py-4">Restricted to Global Administrators.</div>')
+            return mark_safe(f'<div class="text-danger text-center py-4">{_("Restricted to Global Administrators.")}</div>')
         ctx = self.get_context(request)
         ctx['widget'] = self
         return render_to_string(self.get_template_name(), ctx, request=request)
@@ -206,8 +207,8 @@ class DashboardWidget:
 class NoteWidget(DashboardWidget):
     widget_id = 'note'
     icon = 'note-text-outline'
-    title = 'Note'
-    description = 'Display arbitrary custom content. Markdown is supported.'
+    title = _lazy('Note')
+    description = _lazy('Display arbitrary custom content. Markdown is supported.')
     template_name = 'extras/dashboard/widgets/note.html'
 
     class ConfigForm(WidgetConfigForm):
@@ -241,19 +242,19 @@ class NoteWidget(DashboardWidget):
 
 
 OBJECT_COUNT_MODEL_CHOICES = [
-    ('assets.asset', 'Assets'),
-    ('assets.assettype', 'Asset Types'),
-    ('assets.manufacturer', 'Manufacturers'),
-    ('assets.statuslabel', 'Status Labels'),
-    ('inventory.component', 'Components'),
-    ('inventory.accessory', 'Accessories'),
-    ('inventory.consumable', 'Consumables'),
-    ('organization.site', 'Sites'),
-    ('organization.tenant', 'Tenants'),
-    ('organization.location', 'Locations'),
-    ('licenses.license', 'Licenses'),
-    ('subscriptions.subscription', 'Subscriptions'),
-    ('software.software', 'Software'),
+    ('assets.asset', _lazy('Assets')),
+    ('assets.assettype', _lazy('Asset Types')),
+    ('assets.manufacturer', _lazy('Manufacturers')),
+    ('assets.statuslabel', _lazy('Status Labels')),
+    ('inventory.component', _lazy('Components')),
+    ('inventory.accessory', _lazy('Accessories')),
+    ('inventory.consumable', _lazy('Consumables')),
+    ('organization.site', _lazy('Sites')),
+    ('organization.tenant', _lazy('Tenants')),
+    ('organization.location', _lazy('Locations')),
+    ('licenses.license', _lazy('Licenses')),
+    ('subscriptions.subscription', _lazy('Subscriptions')),
+    ('software.software', _lazy('Software')),
 ]
 
 
@@ -261,8 +262,8 @@ OBJECT_COUNT_MODEL_CHOICES = [
 class ObjectCountsWidget(DashboardWidget):
     widget_id = 'object-counts'
     icon = 'counter'
-    title = 'Object Counts'
-    description = 'Display counts of object types with links to their list views.'
+    title = _lazy('Object Counts')
+    description = _lazy('Display counts of object types with links to their list views.')
     template_name = 'extras/dashboard/widgets/object_counts.html'
 
     class ConfigForm(WidgetConfigForm):
@@ -329,15 +330,15 @@ class ObjectCountsWidget(DashboardWidget):
 class FinancialWidget(DashboardWidget):
     widget_id = 'financial-overview'
     icon = 'wallet-outline'
-    title = 'Financial Overview'
-    description = 'Total cost of ownership, purchase costs, maintenance, and salvage values'
+    title = _lazy('Financial Overview')
+    description = _lazy('Total cost of ownership, purchase costs, maintenance, and salvage values')
     template_name = 'extras/dashboard/widgets/financial.html'
 
     METRIC_CHOICES = [
-        ('purchase', 'Original Purchase Cost'),
-        ('maintenance', 'Maintenance Expenditures'),
-        ('salvage', 'Total Salvage Book Value'),
-        ('asset_count', 'Costed Asset Count'),
+        ('purchase', _lazy('Original Purchase Cost')),
+        ('maintenance', _lazy('Maintenance Expenditures')),
+        ('salvage', _lazy('Total Salvage Book Value')),
+        ('asset_count', _lazy('Costed Asset Count')),
     ]
 
     # NOTE: the former per-widget 'currency' symbol option was dropped —
@@ -356,10 +357,10 @@ class FinancialWidget(DashboardWidget):
         metrics = forms.MultipleChoiceField(
             label=_('Metrics to Display'),
             choices=[
-                ('purchase', 'Original Purchase Cost'),
-                ('maintenance', 'Maintenance Expenditures'),
-                ('salvage', 'Total Salvage Book Value'),
-                ('asset_count', 'Costed Asset Count'),
+                ('purchase', _lazy('Original Purchase Cost')),
+                ('maintenance', _lazy('Maintenance Expenditures')),
+                ('salvage', _lazy('Total Salvage Book Value')),
+                ('asset_count', _lazy('Costed Asset Count')),
             ],
             widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
             required=False,
@@ -487,18 +488,18 @@ class FinancialWidget(DashboardWidget):
 class StatusLabelsWidget(DashboardWidget):
     widget_id = 'status-labels'
     icon = 'label-multiple-outline'
-    title = 'Asset Status Labels'
-    description = 'Donut chart showing asset distribution by status label'
+    title = _lazy('Asset Status Labels')
+    description = _lazy('Donut chart showing asset distribution by status label')
     template_name = 'extras/dashboard/widgets/status_labels.html'
 
     class ConfigForm(WidgetConfigForm):
         chart_type = forms.ChoiceField(
             label=_('Chart Type'),
             choices=[
-                ('doughnut', 'Doughnut'),
-                ('pie', 'Pie'),
-                ('bar', 'Bar'),
-                ('list', 'Simple List'),
+                ('doughnut', _lazy('Doughnut')),
+                ('pie', _lazy('Pie')),
+                ('bar', _lazy('Bar')),
+                ('list', _lazy('Simple List')),
             ],
             initial='doughnut',
             widget=forms.Select(attrs={'class': 'form-select'}),
@@ -556,8 +557,8 @@ class StatusLabelsWidget(DashboardWidget):
 class LicenseWidget(DashboardWidget):
     widget_id = 'license-utilization'
     icon = 'certificate-outline'
-    title = 'Software License Seats'
-    description = 'Top 5 licenses by seat utilization percentage'
+    title = _lazy('Software License Seats')
+    description = _lazy('Top 5 licenses by seat utilization percentage')
     template_name = 'extras/dashboard/widgets/licenses.html'
 
     class ConfigForm(WidgetConfigForm):
@@ -601,8 +602,8 @@ class LicenseWidget(DashboardWidget):
 class MaintenanceWidget(DashboardWidget):
     widget_id = 'active-maintenances'
     icon = 'wrench-outline'
-    title = 'Active Repairs & Maintenances'
-    description = 'Ongoing repairs and maintenance tasks with associated costs'
+    title = _lazy('Active Repairs & Maintenances')
+    description = _lazy('Ongoing repairs and maintenance tasks with associated costs')
     template_name = 'extras/dashboard/widgets/maintenances.html'
 
     class ConfigForm(WidgetConfigForm):
@@ -657,18 +658,18 @@ class MaintenanceWidget(DashboardWidget):
 class EOLAlertsWidget(DashboardWidget):
     widget_id = 'eol-alerts'
     icon = 'calendar-alert'
-    title = 'EOL Planning Alerts'
-    description = 'Hardware expiring within 90 days or already past EOL'
+    title = _lazy('EOL Planning Alerts')
+    description = _lazy('Hardware expiring within 90 days or already past EOL')
     template_name = 'extras/dashboard/widgets/eol_alerts.html'
 
     class ConfigForm(WidgetConfigForm):
         days_horizon = forms.ChoiceField(
             label=_('Planning Horizon'),
             choices=[
-                ('30', '30 Days'),
-                ('90', '90 Days (Default)'),
-                ('180', '180 Days'),
-                ('365', '365 Days'),
+                ('30', _lazy('30 Days')),
+                ('90', _lazy('90 Days (Default)')),
+                ('180', _lazy('180 Days')),
+                ('365', _lazy('365 Days')),
             ],
             initial='90',
             widget=forms.Select(attrs={'class': 'form-select'}),
@@ -721,8 +722,8 @@ class EOLAlertsWidget(DashboardWidget):
 class ChangelogWidget(DashboardWidget):
     widget_id = 'recent-activity'
     icon = 'history'
-    title = 'Change Log'
-    description = 'Recent object changes across the system (create, update, delete)'
+    title = _lazy('Change Log')
+    description = _lazy('Recent object changes across the system (create, update, delete)')
     template_name = 'extras/dashboard/widgets/activity.html'
 
     class ConfigForm(WidgetConfigForm):
@@ -735,10 +736,10 @@ class ChangelogWidget(DashboardWidget):
         action_filter = forms.ChoiceField(
             label=_('Filter by Action'),
             choices=[
-                ('', 'All Actions'),
-                ('create', 'Creations Only'),
-                ('update', 'Updates Only'),
-                ('delete', 'Deletions Only'),
+                ('', _lazy('All Actions')),
+                ('create', _lazy('Creations Only')),
+                ('update', _lazy('Updates Only')),
+                ('delete', _lazy('Deletions Only')),
             ],
             initial='',
             widget=forms.Select(attrs={'class': 'form-select'}),
@@ -807,18 +808,18 @@ class ChangelogWidget(DashboardWidget):
 class RenewalsWidget(DashboardWidget):
     widget_id = 'upcoming-renewals'
     icon = 'autorenew'
-    title = 'Upcoming Renewals'
-    description = 'Active subscriptions renewing within 90 days'
+    title = _lazy('Upcoming Renewals')
+    description = _lazy('Active subscriptions renewing within 90 days')
     template_name = 'extras/dashboard/widgets/renewals.html'
 
     class ConfigForm(WidgetConfigForm):
         days_horizon = forms.ChoiceField(
             label=_('Planning Horizon'),
             choices=[
-                ('30', '30 Days'),
-                ('60', '60 Days'),
-                ('90', '90 Days (Default)'),
-                ('180', '180 Days'),
+                ('30', _lazy('30 Days')),
+                ('60', _lazy('60 Days')),
+                ('90', _lazy('90 Days (Default)')),
+                ('180', _lazy('180 Days')),
             ],
             initial='90',
             widget=forms.Select(attrs={'class': 'form-select'}),
@@ -899,8 +900,8 @@ class RenewalsWidget(DashboardWidget):
 class LowStockWidget(DashboardWidget):
     widget_id = 'low-stock'
     icon = 'package-variant-closed'
-    title = 'Low Stock Alerts'
-    description = 'Accessories, consumables, and components below minimum quantity'
+    title = _lazy('Low Stock Alerts')
+    description = _lazy('Accessories, consumables, and components below minimum quantity')
     template_name = 'extras/dashboard/widgets/low_stock.html'
 
     class ConfigForm(WidgetConfigForm):
@@ -1059,8 +1060,8 @@ class LowStockWidget(DashboardWidget):
 class BookmarksWidget(DashboardWidget):
     widget_id = 'my-bookmarks'
     icon = 'star-outline'
-    title = 'My Bookmarks'
-    description = 'Quick-access list of objects you have starred (personal, per-user)'
+    title = _lazy('My Bookmarks')
+    description = _lazy('Quick-access list of objects you have starred (personal, per-user)')
     template_name = 'extras/dashboard/widgets/bookmarks.html'
 
     class ConfigForm(WidgetConfigForm):
@@ -1089,17 +1090,17 @@ class BookmarksWidget(DashboardWidget):
 class AssetAgeWidget(DashboardWidget):
     widget_id = 'asset-age'
     icon = 'chart-bar'
-    title = 'Asset Age Distribution'
-    description = 'Breakdown of assets by age bucket and average age'
+    title = _lazy('Asset Age Distribution')
+    description = _lazy('Breakdown of assets by age bucket and average age')
     template_name = 'extras/dashboard/widgets/asset_age.html'
 
     class ConfigForm(WidgetConfigForm):
         chart_format = forms.ChoiceField(
             label=_('Chart Format'),
             choices=[
-                ('bar', 'Bar Chart'),
-                ('pie', 'Pie Chart'),
-                ('list', 'List Format'),
+                ('bar', _lazy('Bar Chart')),
+                ('pie', _lazy('Pie Chart')),
+                ('list', _lazy('List Format')),
             ],
             initial='bar',
             widget=forms.Select(attrs={'class': 'form-select'}),
@@ -1154,8 +1155,8 @@ class AssetAgeWidget(DashboardWidget):
 class TenantSpendWidget(DashboardWidget):
     widget_id = 'tenant-spend'
     icon = 'cash-multiple'
-    title = 'Tenant Spend'
-    description = 'Purchase cost grouped by tenant (top 8)'
+    title = _lazy('Tenant Spend')
+    description = _lazy('Purchase cost grouped by tenant (top 8)')
     template_name = 'extras/dashboard/widgets/tenant_spend.html'
     admin_only = True          # Restrict in UI list
 

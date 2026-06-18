@@ -19,12 +19,12 @@ class PurchaseOrder(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixi
     STATUS_CANCELLED = 'cancelled'
 
     STATUS_CHOICES = [
-        (STATUS_DRAFT, 'Draft'),
-        (STATUS_APPROVED, 'Approved'),
-        (STATUS_ORDERED, 'Ordered'),
-        (STATUS_PARTIAL, 'Partially Received'),
-        (STATUS_RECEIVED, 'Received'),
-        (STATUS_CANCELLED, 'Cancelled'),
+        (STATUS_DRAFT, _('Draft')),
+        (STATUS_APPROVED, _('Approved')),
+        (STATUS_ORDERED, _('Ordered')),
+        (STATUS_PARTIAL, _('Partially Received')),
+        (STATUS_RECEIVED, _('Received')),
+        (STATUS_CANCELLED, _('Cancelled')),
     ]
 
     objects = TenantScopingSoftDeleteManager()
@@ -50,8 +50,8 @@ class PurchaseOrder(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixi
 
     class Meta:
         permissions = [
-            ("receive_purchaseorder", "Can receive stock from a purchase order"),
-            ("approve_purchaseorder", "Can approve/submit a purchase order"),
+            ("receive_purchaseorder", _("Can receive stock from a purchase order")),
+            ("approve_purchaseorder", _("Can approve/submit a purchase order")),
         ]
         constraints = [
             models.UniqueConstraint(fields=['order_number'], condition=models.Q(deleted_at__isnull=True), name='unique_purchaseorder_number_active'),
@@ -128,28 +128,28 @@ class PurchaseOrderLine(BaseModel, ChangeLoggingMixin, SoftDeleteMixin):
 
 
 class ContractTypeChoices(models.TextChoices):
-    SUPPORT = 'support', 'Support'
-    MAINTENANCE = 'maintenance', 'Maintenance'
-    LEASE = 'lease', 'Lease'
-    WARRANTY = 'warranty', 'Warranty'
-    SERVICE = 'service', 'Service'
-    OTHER = 'other', 'Other'
+    SUPPORT = 'support', _('Support')
+    MAINTENANCE = 'maintenance', _('Maintenance')
+    LEASE = 'lease', _('Lease')
+    WARRANTY = 'warranty', _('Warranty')
+    SERVICE = 'service', _('Service')
+    OTHER = 'other', _('Other')
 
 
 class ContractStatusChoices(models.TextChoices):
-    DRAFT = 'draft', 'Draft'
-    ACTIVE = 'active', 'Active'
-    EXPIRED = 'expired', 'Expired'
-    CANCELLED = 'cancelled', 'Cancelled'
+    DRAFT = 'draft', _('Draft')
+    ACTIVE = 'active', _('Active')
+    EXPIRED = 'expired', _('Expired')
+    CANCELLED = 'cancelled', _('Cancelled')
 
 
 class ContractBillingCycleChoices(models.TextChoices):
-    MONTHLY = 'monthly', 'Monthly'
-    QUARTERLY = 'quarterly', 'Quarterly'
-    ANNUAL = 'annual', 'Annual'
-    BIANNUAL = 'biannual', 'Biannual'
-    MULTI_YEAR = 'multi_year', 'Multi-Year'
-    ONETIME = 'onetime', 'One-Time'
+    MONTHLY = 'monthly', _('Monthly')
+    QUARTERLY = 'quarterly', _('Quarterly')
+    ANNUAL = 'annual', _('Annual')
+    BIANNUAL = 'biannual', _('Biannual')
+    MULTI_YEAR = 'multi_year', _('Multi-Year')
+    ONETIME = 'onetime', _('One-Time')
 
 
 class Contract(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin):

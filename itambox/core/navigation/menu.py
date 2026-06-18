@@ -91,13 +91,13 @@ INVENTORY_MENU = Menu(
                     buttons=(
                         MenuItemButton(
                             link='inventory:component_create',
-                            title='Add Component',
+                            title=_('Add Component'),
                             icon_class='mdi mdi-plus-thick',
                             permissions=['inventory.add_component'],
                         ),
                         MenuItemButton(
                             link='/import/inventory/component/',
-                            title='Import Components',
+                            title=_('Import Components'),
                             icon_class='mdi mdi-upload',
                             permissions=['inventory.add_component'],
                             color='outline text-success',
@@ -111,13 +111,13 @@ INVENTORY_MENU = Menu(
                     buttons=(
                         MenuItemButton(
                             link='inventory:accessory_create',
-                            title='Add Accessory',
+                            title=_('Add Accessory'),
                             icon_class='mdi mdi-plus-thick',
                             permissions=['inventory.add_accessory'],
                         ),
                         MenuItemButton(
                             link='/import/inventory/accessory/',
-                            title='Import Accessories',
+                            title=_('Import Accessories'),
                             icon_class='mdi mdi-upload',
                             permissions=['inventory.add_accessory'],
                             color='outline text-success',
@@ -131,13 +131,13 @@ INVENTORY_MENU = Menu(
                     buttons=(
                         MenuItemButton(
                             link='inventory:consumable_create',
-                            title='Add Consumable',
+                            title=_('Add Consumable'),
                             icon_class='mdi mdi-plus-thick',
                             permissions=['inventory.add_consumable'],
                         ),
                         MenuItemButton(
                             link='/import/inventory/consumable/',
-                            title='Import Consumables',
+                            title=_('Import Consumables'),
                             icon_class='mdi mdi-upload',
                             permissions=['inventory.add_consumable'],
                             color='outline text-success',
@@ -191,13 +191,13 @@ OPERATIONS_MENU = Menu(
                     buttons=(
                         MenuItemButton(
                             link='procurement:purchaseorder_create',
-                            title='Add',
+                            title=_('Add'),
                             icon_class='mdi mdi-plus-thick',
                             permissions=['procurement.add_purchaseorder'],
                         ),
                         MenuItemButton(
                             link='/import/procurement/purchaseorder/',
-                            title='Import',
+                            title=_('Import'),
                             icon_class='mdi mdi-upload',
                             permissions=['procurement.add_purchaseorder'],
                             color='outline text-success',
@@ -211,13 +211,13 @@ OPERATIONS_MENU = Menu(
                     buttons=(
                         MenuItemButton(
                             link='assets:request_create',
-                            title='Add',
+                            title=_('Add'),
                             icon_class='mdi mdi-plus-thick',
                             permissions=['assets.add_assetrequest'],
                         ),
                         MenuItemButton(
                             link='/import/assets/assetrequest/',
-                            title='Import',
+                            title=_('Import'),
                             icon_class='mdi mdi-upload',
                             permissions=['assets.add_assetrequest'],
                             color='outline text-success',
@@ -245,13 +245,13 @@ OPERATIONS_MENU = Menu(
                     buttons=(
                         MenuItemButton(
                             link='compliance:auditsession_create',
-                            title='Add',
+                            title=_('Add'),
                             icon_class='mdi mdi-plus-thick',
                             permissions=['compliance.add_auditsession'],
                         ),
                         MenuItemButton(
                             link='/import/compliance/auditsession/',
-                            title='Import',
+                            title=_('Import'),
                             icon_class='mdi mdi-upload',
                             permissions=['compliance.add_auditsession'],
                             color='outline text-success',
@@ -285,7 +285,7 @@ MONITORING_MENU = Menu(
                     buttons=(
                         MenuItemButton(
                             link='extras:alertrule_create',
-                            title='Add',
+                            title=_('Add'),
                             icon_class='mdi mdi-plus-thick',
                             permissions=['extras.add_alertrule'],
                         ),
@@ -298,7 +298,7 @@ MONITORING_MENU = Menu(
                     buttons=(
                         MenuItemButton(
                             link='extras:notificationchannel_create',
-                            title='Add',
+                            title=_('Add'),
                             icon_class='mdi mdi-plus-thick',
                             permissions=['extras.add_notificationchannel'],
                         ),
@@ -317,7 +317,7 @@ MONITORING_MENU = Menu(
                     buttons=(
                         MenuItemButton(
                             link='extras:scheduledreport_create',
-                            title='Add',
+                            title=_('Add'),
                             icon_class='mdi mdi-plus-thick',
                             permissions=['extras.add_scheduledreport'],
                         ),
@@ -330,7 +330,7 @@ MONITORING_MENU = Menu(
                     buttons=(
                         MenuItemButton(
                             link='extras:reporttemplate_create',
-                            title='Add',
+                            title=_('Add'),
                             icon_class='mdi mdi-plus-thick',
                             permissions=['extras.add_reporttemplate'],
                         ),
@@ -387,13 +387,13 @@ EXTRAS_MENU = Menu(
                     buttons=(
                         MenuItemButton(
                             link='assets:assettagsequence_create',
-                            title='Add',
+                            title=_('Add'),
                             icon_class='mdi mdi-plus-thick',
                             permissions=['assets.add_assettagsequence'],
                         ),
                         MenuItemButton(
                             link='/import/assets/assettagsequence/',
-                            title='Import',
+                            title=_('Import'),
                             icon_class='mdi mdi-upload',
                             permissions=['assets.add_assettagsequence'],
                             color='outline text-success',
@@ -412,7 +412,7 @@ EXTRAS_MENU = Menu(
                     buttons=(
                         MenuItemButton(
                             link='extras:exporttemplate_create',
-                            title='Add',
+                            title=_('Add'),
                             icon_class='mdi mdi-plus-thick',
                             permissions=['extras.add_exporttemplate'],
                         ),
@@ -425,7 +425,7 @@ EXTRAS_MENU = Menu(
                     buttons=(
                         MenuItemButton(
                             link='extras:labeltemplate_create',
-                            title='Add',
+                            title=_('Add'),
                             icon_class='mdi mdi-plus-thick',
                             permissions=['extras.add_labeltemplate'],
                         ),
@@ -444,7 +444,7 @@ EXTRAS_MENU = Menu(
                     buttons=(
                         MenuItemButton(
                             link='extras:webhookendpoint_create',
-                            title='Add',
+                            title=_('Add'),
                             icon_class='mdi mdi-plus-thick',
                             permissions=['extras.add_webhookendpoint'],
                         ),
@@ -457,7 +457,7 @@ EXTRAS_MENU = Menu(
                     buttons=(
                         MenuItemButton(
                             link='extras:eventrule_create',
-                            title='Add',
+                            title=_('Add'),
                             icon_class='mdi mdi-plus-thick',
                             permissions=['extras.add_eventrule'],
                         ),
@@ -482,7 +482,7 @@ ADMIN_MENU = Menu(
                     buttons=(
                         MenuItemButton(
                             link='users:user_create',
-                            title='Add',
+                            title=_('Add'),
                             icon_class='mdi mdi-plus-thick',
                             permissions=['auth.add_user'],
                         ),
@@ -495,7 +495,7 @@ ADMIN_MENU = Menu(
                     buttons=(
                         MenuItemButton(
                             link='organization:tenantrole_create',
-                            title='Add',
+                            title=_('Add'),
                             icon_class='mdi mdi-plus-thick',
                             permissions=['organization.add_tenantrole'],
                         ),
@@ -508,7 +508,7 @@ ADMIN_MENU = Menu(
                     buttons=(
                         MenuItemButton(
                             link='organization:tenantmembership_create',
-                            title='Add',
+                            title=_('Add'),
                             icon_class='mdi mdi-plus-thick',
                             permissions=['organization.add_tenantmembership'],
                         ),

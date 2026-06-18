@@ -13,16 +13,16 @@ from ..filters import TenantFilterSet
 # Codes the `money` template filter renders with a proper symbol/placement;
 # anything else falls back to an ISO-code suffix.
 CURRENCY_CHOICES = [
-    ('EUR', 'EUR — Euro (€)'),
-    ('USD', 'USD — US Dollar ($)'),
-    ('GBP', 'GBP — British Pound (£)'),
-    ('CHF', 'CHF — Swiss Franc'),
-    ('SEK', 'SEK — Swedish Krona'),
-    ('NOK', 'NOK — Norwegian Krone'),
-    ('DKK', 'DKK — Danish Krone'),
-    ('CAD', 'CAD — Canadian Dollar'),
-    ('AUD', 'AUD — Australian Dollar'),
-    ('JPY', 'JPY — Japanese Yen (¥)'),
+    ('EUR', _('EUR — Euro (€)')),
+    ('USD', _('USD — US Dollar ($)')),
+    ('GBP', _('GBP — British Pound (£)')),
+    ('CHF', _('CHF — Swiss Franc')),
+    ('SEK', _('SEK — Swedish Krona')),
+    ('NOK', _('NOK — Norwegian Krone')),
+    ('DKK', _('DKK — Danish Krone')),
+    ('CAD', _('CAD — Canadian Dollar')),
+    ('AUD', _('AUD — Australian Dollar')),
+    ('JPY', _('JPY — Japanese Yen (¥)')),
 ]
 
 
@@ -55,7 +55,7 @@ class TenantForm(forms.ModelForm):
             'comments': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
         }
         help_texts = {
-            'slug': 'URL-friendly identifier.',
+            'slug': _('URL-friendly identifier.'),
         }
 
     def __init__(self, *args, **kwargs):

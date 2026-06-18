@@ -79,11 +79,11 @@ class ObjectBulkEditView(BulkViewMixin, PermissionRequiredMixin, LoginRequiredMi
                                 'selected_fields': selected_fields,
                                 'verbose_name': model._meta.verbose_name,
                                 'verbose_name_plural': model._meta.verbose_name_plural,
-                                'title': f'Bulk Edit {str(model._meta.verbose_name_plural).title()}',
+                                'title': _('Bulk Edit %(objects)s') % {'objects': str(model._meta.verbose_name_plural).title()},
                                 'breadcrumbs': [
-                                    (reverse('dashboard'), 'Dashboard'),
+                                    (reverse('dashboard'), _('Dashboard')),
                                     (return_url, str(model._meta.verbose_name_plural).title()),
-                                    (None, f'Bulk Edit ({len(pks)})'),
+                                    (None, _('Bulk Edit (%(count)s)') % {'count': len(pks)}),
                                 ],
                             }
                             return self.render_to_response(context)
@@ -140,11 +140,11 @@ class ObjectBulkEditView(BulkViewMixin, PermissionRequiredMixin, LoginRequiredMi
             'selected_fields': selected_fields,
             'verbose_name': model._meta.verbose_name,
             'verbose_name_plural': model._meta.verbose_name_plural,
-            'title': f'Bulk Edit {str(model._meta.verbose_name_plural).title()}',
+            'title': _('Bulk Edit %(objects)s') % {'objects': str(model._meta.verbose_name_plural).title()},
             'breadcrumbs': [
-                (reverse('dashboard'), 'Dashboard'),
+                (reverse('dashboard'), _('Dashboard')),
                 (return_url, str(model._meta.verbose_name_plural).title()),
-                (None, f'Bulk Edit ({len(pks)})'),
+                (None, _('Bulk Edit (%(count)s)') % {'count': len(pks)}),
             ],
         }
         return self.render_to_response(context)
@@ -210,11 +210,11 @@ class ObjectBulkDeleteView(BulkViewMixin, PermissionRequiredMixin, LoginRequired
                 'objects': objects_to_delete,
                 'object_pks': pks,
                 'return_url': return_url,
-                'title': 'Confirm Bulk Deletion',
+                'title': _('Confirm Bulk Deletion'),
                 'breadcrumbs': [
-                    (reverse('dashboard'), 'Dashboard'),
+                    (reverse('dashboard'), _('Dashboard')),
                     (return_url, str(model._meta.verbose_name_plural).title()),
-                    (None, f'Delete ({len(objects_to_delete)})'),
+                    (None, _('Delete (%(count)s)') % {'count': len(objects_to_delete)}),
                 ],
             }
             return self.render_to_response(context)

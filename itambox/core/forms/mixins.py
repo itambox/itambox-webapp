@@ -27,7 +27,7 @@ OBJ_TYPE_CHOICES = [
 class SearchForm(forms.Form):
     q = forms.CharField(
         label=_('Search'),
-        widget=forms.TextInput(attrs={'placeholder': 'Search ITAMbox', 'class': 'form-control'})
+        widget=forms.TextInput(attrs={'placeholder': _('Search ITAMbox'), 'class': 'form-control'})
     )
     obj_type = forms.MultipleChoiceField(
         label=_('Object type(s)'),
@@ -36,11 +36,11 @@ class SearchForm(forms.Form):
         widget=forms.SelectMultiple(attrs={'class': 'form-select', 'id': 'id_obj_type_select', 'data-tom-select': ''})
     )
     lookup_choices = (
-        ('icontains', 'Partial match'),
-        ('iexact', 'Exact match'),
-        ('istartswith', 'Starts with'),
-        ('iendswith', 'Ends with'),
-        ('iregex', 'Regex'),
+        ('icontains', _('Partial match')),
+        ('iexact', _('Exact match')),
+        ('istartswith', _('Starts with')),
+        ('iendswith', _('Ends with')),
+        ('iregex', _('Regex')),
     )
     lookup = forms.ChoiceField(
         label=_('Lookup'),

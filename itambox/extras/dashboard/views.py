@@ -38,7 +38,10 @@ class DashboardWidgetAddView(LoginRequiredMixin, View):
             widget_cls = get_widget(widget_id)
             if widget_cls:
                 dashboard = get_dashboard(request.user, dashboard_id=dashboard_id, for_update=True)
-                dashboard.add_widget(widget_id, title=title or widget_cls.title)
+                # widget_cls.title is a gettext_lazy proxy; it is stored into the
+                # Dashboard.layout JSONField, so resolve it to a plain str at this
+                # JSON boundary (a lazy proxy is not json.dumps-serializable).
+                dashboard.add_widget(widget_id, title=title or str(widget_cls.title))
             if request.headers.get('HX-Request'):
                 response = HttpResponse()
                 response['HX-Redirect'] = reverse('dashboard')
@@ -321,8 +324,8 @@ class DashboardView(LoginRequiredMixin, BaseHTMXView, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Dashboard'
-        context['breadcrumbs'] = [(None, 'Dashboard')]
+        context['title'] = _('Dashboard')
+        context['breadcrumbs'] = [(None, _('Dashboard'))]
 
         from itambox.utils import get_help_url
         context['help_url'] = get_help_url(self)

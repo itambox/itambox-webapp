@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils.translation import gettext_lazy as _
 from .models import Provider, Subscription, SubscriptionAssignment
 
 
@@ -34,19 +35,19 @@ class SubscriptionAdmin(admin.ModelAdmin):
     list_editable = ('status',)
 
     fieldsets = (
-        ('Identity', {'fields': ('name', 'slug', 'provider', 'type', 'status', 'tenant')}),
-        ('Dates & Terms', {'fields': ('start_date', 'renewal_date', 'term_months', 'auto_renewal', 'cancellation_date')}),
-        ('Costs', {'fields': ('renewal_cost', 'currency', 'billing_cycle', 'cost_center')}),
-        ('Details', {'fields': ('licensed_quantity', 'contract_reference', 'owner')}),
-        ('Notes', {'fields': ('description', 'notes', 'tags')}),
-        ('Computed', {'fields': ('created_at', 'updated_at', 'is_expired_display', 'days_until_renewal_display')}),
+        (_('Identity'), {'fields': ('name', 'slug', 'provider', 'type', 'status', 'tenant')}),
+        (_('Dates & Terms'), {'fields': ('start_date', 'renewal_date', 'term_months', 'auto_renewal', 'cancellation_date')}),
+        (_('Costs'), {'fields': ('renewal_cost', 'currency', 'billing_cycle', 'cost_center')}),
+        (_('Details'), {'fields': ('licensed_quantity', 'contract_reference', 'owner')}),
+        (_('Notes'), {'fields': ('description', 'notes', 'tags')}),
+        (_('Computed'), {'fields': ('created_at', 'updated_at', 'is_expired_display', 'days_until_renewal_display')}),
     )
 
-    @admin.display(description='Expired?', boolean=True, ordering='renewal_date')
+    @admin.display(description=_('Expired?'), boolean=True, ordering='renewal_date')
     def is_expired_display(self, obj):
         return obj.is_expired
 
-    @admin.display(description='Days Until Renewal')
+    @admin.display(description=_('Days Until Renewal'))
     def days_until_renewal_display(self, obj):
         days = obj.days_until_renewal
         if days is None:
@@ -57,12 +58,12 @@ class SubscriptionAdmin(admin.ModelAdmin):
         actions = super().get_actions(request)
         return actions
 
-    @admin.action(description='Mark selected as Expired')
+    @admin.action(description=_('Mark selected as Expired'))
     def mark_expired(self, request, queryset):
         updated = queryset.update(status='expired')
         self.message_user(request, f'{updated} subscription(s) marked as expired.')
 
-    @admin.action(description='Mark selected as Cancelled')
+    @admin.action(description=_('Mark selected as Cancelled'))
     def mark_cancelled(self, request, queryset):
         from django.utils import timezone
         updated = queryset.update(status='cancelled', cancellation_date=timezone.now().date())

@@ -33,7 +33,7 @@ class TenantGroupDetailView(ObjectDetailView):
     )
 
     layout = (
-        ((Panel('info', 'Tenant Group Details'),),),
+        ((Panel('info', _('Tenant Group Details')),),),
     )
 
     def get_context_data(self, **kwargs):
@@ -55,21 +55,21 @@ class TenantGroupDetailView(ObjectDetailView):
         tenant_count = tenantgroup.tenants.count()
         if tenant_count:
             related_objects_list.append({
-                'label': 'Tenants',
+                'label': _('Tenants'),
                 'count': tenant_count,
                 'url': f"{reverse('organization:tenant_list')}?group={tenantgroup.slug}"
             })
         child_count = tenantgroup.children.count()
         if child_count:
             related_objects_list.append({
-                'label': 'Child Groups',
+                'label': _('Child Groups'),
                 'count': child_count,
                 'url': f"{reverse('organization:tenantgroup_list')}?parent={tenantgroup.slug}"
             })
         custody_count = custody_templates_qs.count()
         if custody_count:
             related_objects_list.append({
-                'label': 'Custody EULAs',
+                'label': _('Custody EULAs'),
                 'count': custody_count,
                 'url': f"{reverse('compliance:custodytemplate_list')}?tenant_group={tenantgroup.slug}"
             })

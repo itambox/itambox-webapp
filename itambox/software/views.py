@@ -1,5 +1,6 @@
 from django.shortcuts import render
 from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
 from itambox.views.generic import (
     ObjectListView,
     ObjectDetailView,
@@ -31,7 +32,7 @@ class SoftwareDetailView(ObjectDetailView):
     template_name = 'software/software_detail.html' # Use a specific template or generic one
 
     layout = (
-        ((Panel('info', 'Software Details'),),),
+        ((Panel('info', _('Software Details')),),),
     )
 
     def get_context_data(self, **kwargs):
@@ -58,14 +59,14 @@ class SoftwareDetailView(ObjectDetailView):
         instance_count = instances_qs.count()
         if instance_count:
             related_objects_list.append({
-                'label': 'Installed Instances',
+                'label': _('Installed Instances'),
                 'count': instance_count,
                 'url': f"{reverse('software:software_detail', kwargs={'pk': software.pk})}#instances"
             })
         license_count = license_qs.count()
         if license_count:
             related_objects_list.append({
-                'label': 'Licenses',
+                'label': _('Licenses'),
                 'count': license_count,
                 'url': f"{reverse('licenses:license_list')}?software={software.pk}"
             })

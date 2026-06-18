@@ -56,7 +56,7 @@ class CategoryForm(ColorFieldFormMixin, SlugModelForm):
         self.helper.form_method = 'post'
         self.helper.form_tag = True
         
-        button_text = 'Update' if self.instance and self.instance.pk else 'Create'
+        button_text = _('Update') if self.instance and self.instance.pk else _('Create')
         cancel_url = reverse('assets:category_list')
         
         self.helper.layout = Layout(

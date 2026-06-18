@@ -1,5 +1,6 @@
 from django import forms
 from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Div
 
@@ -24,7 +25,7 @@ class ManufacturerForm(SlugModelForm):
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
         help_texts = {
-            'slug': 'URL-friendly identifier.',
+            'slug': _('URL-friendly identifier.'),
         }
 
     def __init__(self, *args, **kwargs):
@@ -34,7 +35,7 @@ class ManufacturerForm(SlugModelForm):
         self.helper.form_tag = True
         self.fields['slug'].widget.attrs['slugify'] = 'name'
 
-        button_text = 'Update' if self.instance and self.instance.pk else 'Create'
+        button_text = _('Update') if self.instance and self.instance.pk else _('Create')
         self.helper.layout = Layout(
             Div(
                 Div('name', css_class='col-md-6'),

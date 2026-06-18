@@ -28,7 +28,7 @@ class AssetTypeDetailView(ObjectDetailView):
     queryset = AssetType.objects.select_related('manufacturer').prefetch_related('tags', 'assets')
 
     layout = (
-        ((Panel('info', 'Asset Type Details'), Panel('specs', 'Hardware Specifications')),),
+        ((Panel('info', _('Asset Type Details')), Panel('specs', _('Hardware Specifications'))),),
     )
 
     def get_context_data(self, **kwargs):

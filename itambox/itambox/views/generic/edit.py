@@ -84,7 +84,7 @@ class ObjectEditView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
             helper.form_tag = True
 
             is_editing = self.object is not None and self.object.pk is not None
-            button_text = 'Update' if is_editing else 'Create'
+            button_text = _('Update') if is_editing else _('Create')
 
             cancel_url = '#'
             if self.object and hasattr(self.object, 'get_absolute_url'):
@@ -105,7 +105,7 @@ class ObjectEditView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
             layout_elements.extend([
                 HTML('<div class="mt-4"></div>'),
                 Submit('submit', button_text, css_class='btn btn-primary'),
-                HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+                HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">{_("Cancel")}</a>'),
             ])
             helper.layout = Layout(*layout_elements)
             form.helper = helper

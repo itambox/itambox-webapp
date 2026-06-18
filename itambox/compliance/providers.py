@@ -1,4 +1,5 @@
 from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
 
 class BaseSignatureProvider:
     name = None
@@ -13,7 +14,7 @@ class BaseSignatureProvider:
 
 class LocalSignatureProvider(BaseSignatureProvider):
     name = 'local'
-    verbose_name = 'Local Canvas Signature Pad'
+    verbose_name = _('Local Canvas Signature Pad')
 
     def initiate_signature(self, receipt, request=None):
         if request:

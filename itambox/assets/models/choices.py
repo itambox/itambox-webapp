@@ -47,7 +47,7 @@ class ReservationStatusChoices(models.TextChoices):
 
 
 class MaintenanceStatusChoices(models.TextChoices):
-    SCHEDULED = 'scheduled', 'Scheduled'
-    IN_PROGRESS = 'in_progress', 'In Progress'
-    COMPLETED = 'completed', 'Completed'
-    CANCELLED = 'cancelled', 'Cancelled'
+    SCHEDULED = 'scheduled', _('Scheduled')
+    IN_PROGRESS = 'in_progress', _('In Progress')
+    COMPLETED = 'completed', _('Completed')
+    CANCELLED = 'cancelled', _('Cancelled')

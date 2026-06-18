@@ -1,5 +1,6 @@
 from django import forms
 from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
 
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Div
@@ -42,7 +43,7 @@ class AssetReservationForm(forms.ModelForm):
         self.helper.form_method = 'post'
         self.helper.form_tag = True
 
-        button_text = 'Update' if self.instance and self.instance.pk else 'Create Reservation'
+        button_text = _('Update') if self.instance and self.instance.pk else _('Create Reservation')
         try:
             cancel_url = reverse('assets:assetreservation_list')
         except Exception:

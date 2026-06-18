@@ -1,5 +1,6 @@
 from django.utils import timezone
 from django.urls import reverse, reverse_lazy
+from django.utils.translation import gettext_lazy as _
 
 from ..models import AssetRequest
 from assets.choices import RequestStatusChoices
@@ -28,8 +29,8 @@ class AssetRequestDetailView(ObjectDetailView):
 
     layout = (
         (
-            (Panel('info', 'Asset Request Details'),),
-            (Panel('response', 'Decision & Response Details'),),
+            (Panel('info', _('Asset Request Details')),),
+            (Panel('response', _('Decision & Response Details')),),
         ),
     )
 
@@ -56,7 +57,7 @@ class AssetRequestCreateView(ObjectEditView):
             response = super().form_valid(form)
             
             # Create the individual child requests
-            for _ in range(qty):
+            for _i in range(qty):
                 req = AssetRequest(
                     tenant=form.instance.tenant,
                     requester=self.request.user,

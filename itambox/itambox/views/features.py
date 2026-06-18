@@ -58,13 +58,13 @@ class ObjectChangeListView(ObjectListView):
 
     def get_breadcrumbs(self):
         return [
-            (reverse('dashboard'), 'Dashboard'),
-            (None, 'Changelog')
+            (reverse('dashboard'), _('Dashboard')),
+            (None, _('Changelog'))
         ]
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Changelog'
+        context['title'] = _('Changelog')
         return context
 
 
@@ -160,10 +160,10 @@ class ObjectChangeView(BaseHTMXView, DetailView):
         context['diff_added_json'] = json.dumps(diff_added, cls=DjangoJSONEncoder, indent=2)
         context['diff_removed_json'] = json.dumps(diff_removed, cls=DjangoJSONEncoder, indent=2)
 
-        context['title'] = f"Change #{obj.pk}"
+        context['title'] = _("Change #%(pk)s") % {'pk': obj.pk}
         base_breadcrumbs = [
-            (reverse('dashboard'), 'Dashboard'),
-            (reverse('objectchange_list'), 'Changelog'),
+            (reverse('dashboard'), _('Dashboard')),
+            (reverse('objectchange_list'), _('Changelog')),
             (None, context['title'])
         ]
         context['breadcrumbs'] = getattr(self, 'get_breadcrumbs', lambda: base_breadcrumbs)()
@@ -282,7 +282,7 @@ class ExportTemplateListView(ObjectListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Export Templates'
+        context['title'] = _('Export Templates')
         return context
 
 
@@ -290,7 +290,7 @@ class ExportTemplateListView(ObjectListView):
 class ExportTemplateDetailView(ObjectDetailView):
     queryset = ExportTemplate.objects.select_related('content_type')
     layout = (
-        ((Panel('info', 'Export Template Details'),),),
+        ((Panel('info', _('Export Template Details')),),),
     )
 
     def get_context_data(self, **kwargs):
@@ -306,7 +306,7 @@ class ExportTemplateEditView(ObjectEditView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Edit Export Template' if self.object else 'Create Export Template'
+        context['title'] = _('Edit Export Template') if self.object else _('Create Export Template')
         return context
 
 
@@ -481,7 +481,7 @@ class LabelSelectView(LoginRequiredMixin, View):
             'object_id': object_id,
             'app_label': app_label,
             'model_name': model_name,
-            'title': 'Select Label Template',
+            'title': _('Select Label Template'),
         }
         return render(request, 'generic/label_select.html', context)
 
@@ -529,7 +529,7 @@ class WebhookEndpointListView(WorkerStatusContextMixin, ObjectListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Webhook Endpoints'
+        context['title'] = _('Webhook Endpoints')
         context['is_beta_module'] = True
         return context
 
@@ -538,7 +538,7 @@ class WebhookEndpointListView(WorkerStatusContextMixin, ObjectListView):
 class WebhookEndpointDetailView(WorkerStatusContextMixin, ObjectDetailView):
     queryset = WebhookEndpoint.objects.all()
     layout = (
-        ((Panel('info', 'Webhook Endpoint Details'),),),
+        ((Panel('info', _('Webhook Endpoint Details')),),),
     )
 
     def get_context_data(self, **kwargs):
@@ -640,7 +640,7 @@ class WebhookEndpointEditView(ObjectEditView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Edit Webhook Endpoint' if self.object else 'Create Webhook Endpoint'
+        context['title'] = _('Edit Webhook Endpoint') if self.object else _('Create Webhook Endpoint')
         return context
 
 
@@ -658,7 +658,7 @@ class EventRuleListView(WorkerStatusContextMixin, ObjectListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Event Rules'
+        context['title'] = _('Event Rules')
         context['is_beta_module'] = True
         return context
 
@@ -667,7 +667,7 @@ class EventRuleListView(WorkerStatusContextMixin, ObjectListView):
 class EventRuleDetailView(WorkerStatusContextMixin, ObjectDetailView):
     queryset = EventRule.objects.select_related('model', 'webhook')
     layout = (
-        ((Panel('info', 'Event Rule Details'),),),
+        ((Panel('info', _('Event Rule Details')),),),
     )
 
     def get_context_data(self, **kwargs):
@@ -683,7 +683,7 @@ class EventRuleEditView(ObjectEditView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Edit Event Rule' if self.object else 'Create Event Rule'
+        context['title'] = _('Edit Event Rule') if self.object else _('Create Event Rule')
         return context
 
 
@@ -701,7 +701,7 @@ class LabelTemplateListView(ObjectListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Label Templates'
+        context['title'] = _('Label Templates')
         return context
 
 
@@ -709,7 +709,7 @@ class LabelTemplateListView(ObjectListView):
 class LabelTemplateDetailView(ObjectDetailView):
     queryset = LabelTemplate.objects.all()
     layout = (
-        ((Panel('info', 'Label Template Details'),),),
+        ((Panel('info', _('Label Template Details')),),),
     )
 
     def get_context_data(self, **kwargs):
@@ -727,7 +727,7 @@ class LabelTemplateEditView(ObjectEditView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Edit Label Template' if self.object else 'Create Label Template'
+        context['title'] = _('Edit Label Template') if self.object else _('Create Label Template')
         return context
 
 

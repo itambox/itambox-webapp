@@ -1,6 +1,7 @@
 from django.core.exceptions import ImproperlyConfigured
 from django.shortcuts import render
 from django.urls import reverse
+from django.utils.translation import gettext as _
 
 
 class BaseHTMXView:
@@ -38,7 +39,7 @@ class BaseHTMXView:
             if self._is_boosted_main_swap():
                 context['base_template'] = 'base_htmx.html'
                 context.setdefault('title', 'ITAMbox')
-                context.setdefault('breadcrumbs', [(reverse('dashboard'), 'Dashboard'), (None, context['title'])])
+                context.setdefault('breadcrumbs', [(reverse('dashboard'), _('Dashboard')), (None, context['title'])])
                 context.setdefault('page_actions', None)
             elif self.content_partial_name:
                 return render(request, self.content_partial_name, context)

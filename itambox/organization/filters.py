@@ -327,7 +327,7 @@ class CostCenterFilterSet(BaseOrgFilterSet):
     )
     is_active = django_filters.BooleanFilter(
         widget=forms.Select(
-            choices=[('', 'Any'), ('true', 'Yes'), ('false', 'No')],
+            choices=[('', _('Any')), ('true', _('Yes')), ('false', _('No'))],
             attrs={'class': 'form-select'},
         ),
     )

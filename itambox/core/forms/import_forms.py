@@ -162,7 +162,7 @@ class BulkImportForm(forms.Form):
     )
     delimiter = forms.ChoiceField(
         label=_('CSV Delimiter'),
-        choices=[(',', 'Comma (,)'), ('\t', 'Tab'), (';', 'Semicolon (;)')],
+        choices=[(',', _('Comma (,)')), ('\t', _('Tab')), (';', _('Semicolon (;)'))],
         initial=',',
         widget=forms.Select(attrs={'class': 'form-select'}),
         required=False
@@ -299,7 +299,7 @@ class BulkImportForm(forms.Form):
             raise NotImplementedError('BulkImportForm subclass must define a `model` attribute.')
 
         if not self._rows_data:
-            return 0, ['No data to import.']
+            return 0, [_('No data to import.')]
 
         imported = 0
         errors = []

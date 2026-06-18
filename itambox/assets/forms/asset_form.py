@@ -310,7 +310,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         # Assignment -> Procurement & Financial -> Lifecycle -> Custom -> Notes.
         layout_elements = [
             Fieldset(
-                'Identity',
+                _('Identity'),
                 Div(
                     Div('name', css_class='col-md-6'),
                     Div('asset_tag', css_class='col-md-6'),
@@ -323,7 +323,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
                 ),
             ),
             Fieldset(
-                'Classification',
+                _('Classification'),
                 Div(
                     Div('asset_type', css_class='col-md-6'),
                     Div('asset_role', css_class='col-md-6'),
@@ -331,7 +331,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
                 ),
             ),
             Fieldset(
-                'Assignment',
+                _('Assignment'),
                 Div(
                     Div('location', css_class='col-md-6'),
                     Div('tenant', css_class='col-md-6'),
@@ -339,7 +339,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
                 ),
             ),
             Fieldset(
-                'Procurement & Financial',
+                _('Procurement & Financial'),
                 Div(
                     Div('purchase_date', css_class='col-md-4'),
                     Div('order_number', css_class='col-md-4'),
@@ -362,7 +362,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
                 ),
             ),
             Fieldset(
-                'Lifecycle',
+                _('Lifecycle'),
                 Div(
                     Div('in_service_date', css_class='col-md-6'),
                     Div('depreciation_override', css_class='col-md-6'),
@@ -379,7 +379,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
                 cf_divs.append(Div(*row_cols, css_class='row'))
             layout_elements.append(
                 Fieldset(
-                    'Custom Specifications',
+                    _('Custom Specifications'),
                     *cf_divs,
                     css_class='mb-4 border p-3 rounded'
                 )
@@ -387,7 +387,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
 
         layout_elements.append(
             Fieldset(
-                'Notes & Tags',
+                _('Notes & Tags'),
                 Div(
                     Div('tags', css_class='col-md-6'),
                     Div('requestable', css_class='col-md-6'),

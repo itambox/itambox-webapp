@@ -29,7 +29,7 @@ class TagDetailView(ObjectDetailView):
     template_name = 'extras/tags/tag_detail.html'
 
     layout = (
-        ((Panel('info', 'Tag Details'),),),
+        ((Panel('info', _('Tag Details')),),),
     )
 
     def get_context_data(self, **kwargs):
@@ -94,7 +94,7 @@ class CustomFieldDetailView(ObjectDetailView):
     queryset = CustomField.objects.all()
 
     layout = (
-        ((Panel('info', 'Custom Field Details'),),),
+        ((Panel('info', _('Custom Field Details')),),),
     )
 
 
@@ -134,7 +134,7 @@ class CustomFieldsetDetailView(ObjectDetailView):
     queryset = CustomFieldset.objects.all().prefetch_related('fields', 'asset_types')
 
     layout = (
-        ((Panel('info', 'Custom Field Set Details'),),),
+        ((Panel('info', _('Custom Field Set Details')),),),
     )
 
 
@@ -178,7 +178,7 @@ class SavedFilterDetailView(ObjectDetailView):
     queryset = SavedFilter.objects.all()
 
     layout = (
-        ((Panel('info', 'Saved Filter Details'),),),
+        ((Panel('info', _('Saved Filter Details')),),),
     )
 
 
@@ -358,13 +358,13 @@ class AlertRuleListView(ObjectListView):
 
     def get_breadcrumbs(self):
         return [
-            (reverse('dashboard'), 'Dashboard'),
-            (None, 'Alert Rules')
+            (reverse('dashboard'), _('Dashboard')),
+            (None, _('Alert Rules'))
         ]
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Alert Rules'
+        context['title'] = _('Alert Rules')
         return context
 
 
@@ -376,7 +376,7 @@ class AlertRuleDetailView(ObjectDetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         obj = self.get_object()
-        context['title'] = f"Alert Rule: {obj.name}"
+        context['title'] = _("Alert Rule: %(name)s") % {'name': obj.name}
         context['logs_count'] = obj.logs.count()
         context['active_logs_count'] = obj.logs.filter(status='active').count()
         return context
@@ -390,7 +390,7 @@ class AlertRuleCreateView(ObjectEditView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Create Alert Rule'
+        context['title'] = _('Create Alert Rule')
         return context
 
 
@@ -402,7 +402,7 @@ class AlertRuleUpdateView(ObjectEditView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = f"Edit Alert Rule: {self.object.name}"
+        context['title'] = _("Edit Alert Rule: %(name)s") % {'name': self.object.name}
         return context
 
 
@@ -446,13 +446,13 @@ class AlertLogListView(ObjectListView):
 
     def get_breadcrumbs(self):
         return [
-            (reverse('dashboard'), 'Dashboard'),
-            (None, 'Alerts Center')
+            (reverse('dashboard'), _('Dashboard')),
+            (None, _('Alerts Center'))
         ]
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Alerts Center'
+        context['title'] = _('Alerts Center')
 
         from core.managers import get_current_tenant
         current_tenant = get_current_tenant()
@@ -579,13 +579,13 @@ class NotificationChannelListView(ObjectListView):
 
     def get_breadcrumbs(self):
         return [
-            (reverse('dashboard'), 'Dashboard'),
-            (None, 'Notification Channels')
+            (reverse('dashboard'), _('Dashboard')),
+            (None, _('Notification Channels'))
         ]
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Notification Channels'
+        context['title'] = _('Notification Channels')
         return context
 
 
@@ -597,7 +597,7 @@ class NotificationChannelCreateView(ObjectEditView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Create Notification Channel'
+        context['title'] = _('Create Notification Channel')
         return context
 
 
@@ -609,7 +609,7 @@ class NotificationChannelUpdateView(ObjectEditView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = f"Edit Notification Channel: {self.object.name}"
+        context['title'] = _("Edit Notification Channel: %(name)s") % {'name': self.object.name}
         return context
 
 
@@ -652,13 +652,13 @@ class ReportTemplateListView(ObjectListView):
 
     def get_breadcrumbs(self):
         return [
-            (reverse('dashboard'), 'Dashboard'),
-            (None, 'Report Templates')
+            (reverse('dashboard'), _('Dashboard')),
+            (None, _('Report Templates'))
         ]
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Report Templates'
+        context['title'] = _('Report Templates')
         context['is_beta_module'] = True
         return context
 
@@ -671,7 +671,7 @@ class ReportTemplateDetailView(ObjectDetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         obj = self.get_object()
-        context['title'] = f"Report Template: {obj.name}"
+        context['title'] = _("Report Template: %(name)s") % {'name': obj.name}
         context['schedules'] = obj.schedules.all()
         return context
 
@@ -684,7 +684,7 @@ class ReportTemplateCreateView(ObjectEditView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Create Report Template'
+        context['title'] = _('Create Report Template')
         return context
 
 
@@ -696,7 +696,7 @@ class ReportTemplateUpdateView(ObjectEditView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = f"Edit Report Template: {self.object.name}"
+        context['title'] = _("Edit Report Template: %(name)s") % {'name': self.object.name}
         return context
 
 
@@ -715,13 +715,13 @@ class ScheduledReportListView(ObjectListView):
 
     def get_breadcrumbs(self):
         return [
-            (reverse('dashboard'), 'Dashboard'),
-            (None, 'Scheduled Reports')
+            (reverse('dashboard'), _('Dashboard')),
+            (None, _('Scheduled Reports'))
         ]
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Scheduled Reports'
+        context['title'] = _('Scheduled Reports')
         context['templates'] = ReportTemplate.objects.all()
         context['is_beta_module'] = True
         return context
@@ -795,7 +795,7 @@ class ScheduledReportCreateView(ObjectEditView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Schedule a Report'
+        context['title'] = _('Schedule a Report')
         return context
 
     def form_valid(self, form):
@@ -812,7 +812,7 @@ class ScheduledReportUpdateView(ObjectEditView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = f"Edit Schedule: {self.object.name}"
+        context['title'] = _("Edit Schedule: %(name)s") % {'name': self.object.name}
         return context
 
     def form_valid(self, form):

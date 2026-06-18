@@ -37,7 +37,7 @@ class ProviderDetailView(ObjectDetailView):
     template_name = 'subscriptions/provider_detail.html'
 
     layout = (
-        ((Panel('info', 'Provider Details'),),),
+        ((Panel('info', _('Provider Details')),),),
     )
 
     def get_context_data(self, **kwargs):
@@ -85,7 +85,7 @@ class SubscriptionDetailView(ObjectDetailView):
     template_name = 'subscriptions/subscription_detail.html'
 
     layout = (
-        ((Panel('info', 'Subscription Details'),),),
+        ((Panel('info', _('Subscription Details')),),),
     )
 
     def get_context_data(self, **kwargs):
@@ -367,7 +367,7 @@ class SubscriptionAssignmentCreateView(LoginRequiredMixin, PermissionRequiredMix
             'target_obj': target_obj,
             'content_type': content_type,
             'object_id': object_id,
-            'title': f"Assign Subscription to {target_obj}",
+            'title': _("Assign Subscription to %(target)s") % {"target": target_obj},
         }
         return render(request, self.template_name, context)
 
@@ -394,7 +394,7 @@ class SubscriptionAssignmentCreateView(LoginRequiredMixin, PermissionRequiredMix
             'target_obj': target_obj,
             'content_type': content_type,
             'object_id': object_id,
-            'title': f"Assign Subscription to {target_obj}",
+            'title': _("Assign Subscription to %(target)s") % {"target": target_obj},
         }
         return render(request, self.template_name, context)
 

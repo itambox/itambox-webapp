@@ -120,7 +120,7 @@ class AssetDisposal(FileAttachmentMixin, JournalingMixin, SoftDeleteMixin,
         verbose_name = _('Asset Disposal')
         verbose_name_plural = _('Asset Disposals')
         permissions = [
-            ('dispose_asset', 'Can record asset disposal / end-of-life'),
+            ('dispose_asset', _('Can record asset disposal / end-of-life')),
         ]
 
     def __str__(self):

@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils.translation import gettext_lazy as _
 from .models import License, LicenseSeatAssignment
 
 @admin.register(License)
@@ -9,7 +10,7 @@ class LicenseAdmin(admin.ModelAdmin):
     readonly_fields = ('available_seats',)
     filter_horizontal = ('tags',)
 
-    @admin.display(description='Renewal Date', ordering='renewal_date')
+    @admin.display(description=_('Renewal Date'), ordering='renewal_date')
     def get_renewal_date(self, obj):
         return obj.renewal_date
 

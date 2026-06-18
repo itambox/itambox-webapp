@@ -47,8 +47,8 @@ class ComponentDetailView(ObjectDetailView):
     template_name = 'inventory/components/component_detail.html'
 
     layout = (
-        ((Panel('metrics', 'Metrics Overview'),),),
-        ((Panel('info', 'Component Details'),),),
+        ((Panel('metrics', _('Metrics Overview')),),),
+        ((Panel('info', _('Component Details')),),),
     )
 
     def get_context_data(self, **kwargs):
@@ -249,7 +249,7 @@ class ComponentCheckoutView(GenericTransactionView):
     context_object_name = 'component'
     template_name = 'inventory/includes/component_checkout_modal.html'
     error_partial = 'inventory/includes/component_checkout_modal.html#checkout-modal-form'
-    success_message = "Component checked out successfully."
+    success_message = _("Component checked out successfully.")
     form_field_map = {
         'assigned_holder': 'holder',
         'assigned_location': 'location',

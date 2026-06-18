@@ -216,9 +216,9 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
         verbose_name = _("Asset Request")
         verbose_name_plural = _("Asset Requests")
         permissions = [
-            ("add_delegated_assetrequest", "Can request assets on behalf of others"),
-            ("approve_assetrequest", "Can approve asset requests"),
-            ("fulfill_assetrequest", "Can fulfill/claim asset requests"),
+            ("add_delegated_assetrequest", _("Can request assets on behalf of others")),
+            ("approve_assetrequest", _("Can approve asset requests")),
+            ("fulfill_assetrequest", _("Can fulfill/claim asset requests")),
         ]
         constraints = [
             models.CheckConstraint(

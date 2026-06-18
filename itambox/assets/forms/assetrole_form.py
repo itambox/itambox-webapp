@@ -43,7 +43,7 @@ class AssetRoleForm(ColorFieldFormMixin, forms.ModelForm):
                 'tags',
             ),
             Row(
-                Column(Submit('submit', 'Save', css_class='btn btn-primary'), css_class='col'),
+                Column(Submit('submit', _('Save'), css_class='btn btn-primary'), css_class='col'),
                 Column(HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2" data-no-dirty-track="true">Cancel</a>'), css_class='col text-end')
             )
         )

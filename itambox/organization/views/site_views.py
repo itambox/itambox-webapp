@@ -36,7 +36,7 @@ class SiteDetailView(ObjectDetailView):
     )
 
     layout = (
-        ((Panel('info', 'Site Details'),),),
+        ((Panel('info', _('Site Details')),),),
     )
 
     def get_context_data(self, **kwargs):
@@ -55,14 +55,14 @@ class SiteDetailView(ObjectDetailView):
         location_count = site.locations.count()
         if location_count:
             related_objects_list.append({
-                'label': 'Locations',
+                'label': _('Locations'),
                 'count': location_count,
                 'url': f"{reverse('organization:location_list')}?site={site.slug}"
             })
         asset_count = site_assets.count()
         if asset_count:
             related_objects_list.append({
-                'label': 'Assets',
+                'label': _('Assets'),
                 'count': asset_count,
                 'url': f"{reverse('assets:asset_list')}?site={site.slug}"
             })

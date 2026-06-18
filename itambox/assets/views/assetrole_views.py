@@ -28,7 +28,7 @@ class AssetRoleDetailView(ObjectDetailView):
     queryset = AssetRole.objects.prefetch_related('tags', 'assets')
 
     layout = (
-        ((Panel('info', 'Asset Role Details'),),),
+        ((Panel('info', _('Asset Role Details')),),),
     )
 
     def get_context_data(self, **kwargs):

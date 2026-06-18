@@ -9,7 +9,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count
 from django.shortcuts import get_object_or_404, redirect
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _, gettext_lazy
 from django.views.generic import View
 
 from core.managers import get_current_tenant
@@ -38,7 +38,7 @@ class JobListView(ObjectListView):
     model = Job
     table = JobTable
     template_name = 'core/jobs/job_list.html'
-    title = 'Jobs'
+    title = gettext_lazy('Jobs')
 
     def get_permission_required(self):
         return ('core.view_job',)
