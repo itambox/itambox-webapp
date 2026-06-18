@@ -16,12 +16,21 @@
       return !initial.every(val => current.includes(val));
     }
     
-    if (el.type === 'checkbox' || el.type === 'radio') {
+    if (el instanceof HTMLInputElement && (el.type === 'checkbox' || el.type === 'radio')) {
       const initial = '_initialChecked' in el ? (el as any)._initialChecked : el.defaultChecked;
       return el.checked !== initial;
     }
-    
-    const initial = '_initialValue' in el ? (el as any)._initialValue : el.defaultValue;
+
+    let fallback: string;
+    if (el instanceof HTMLSelectElement) {
+      // HTMLSelectElement has no defaultValue; the initial value is the option
+      // whose `defaultSelected` (selected attribute) is set.
+      const defaultOption = Array.from(el.options).find(opt => opt.defaultSelected);
+      fallback = defaultOption ? defaultOption.value : el.value;
+    } else {
+      fallback = el.defaultValue;
+    }
+    const initial = '_initialValue' in el ? (el as any)._initialValue : fallback;
     return el.value !== initial;
   }
 
@@ -77,7 +86,7 @@
       // Store initial value
       if (el instanceof HTMLSelectElement && el.multiple) {
         (el as any)._initialValue = Array.from(el.options).filter(opt => opt.selected).map(opt => opt.value);
-      } else if (el.type === 'checkbox' || el.type === 'radio') {
+      } else if (el instanceof HTMLInputElement && (el.type === 'checkbox' || el.type === 'radio')) {
         (el as any)._initialChecked = el.checked;
       } else {
         (el as any)._initialValue = el.value;

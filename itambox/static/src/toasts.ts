@@ -57,7 +57,7 @@
     }
   });
 
-  (window as unknown as Record<string, unknown>).refreshCurrentPage = function () {
+  window.refreshCurrentPage = function () {
     htmx.ajax('GET', window.location.pathname + window.location.search, {
       target: '#page-content-wrapper',
       swap: 'innerHTML',
@@ -71,22 +71,22 @@
       
       // Defer page refresh until the modal's transition and backdrop cleanup are fully done
       openModalEl.addEventListener('hidden.bs.modal', function () {
-        (window as unknown as Record<string, unknown>).refreshCurrentPage();
+        window.refreshCurrentPage?.();
       }, { once: true });
-      
+
       modalInstance.hide();
     } else {
       // Fallback if no modal is visible
-      (window as unknown as Record<string, unknown>).refreshCurrentPage();
+      window.refreshCurrentPage?.();
     }
   });
 
   document.body.addEventListener('assetListUpdated', function () {
-    (window as unknown as Record<string, unknown>).refreshCurrentPage();
+    window.refreshCurrentPage?.();
   });
 
   document.body.addEventListener('kitListUpdated', function () {
-    (window as unknown as Record<string, unknown>).refreshCurrentPage();
+    window.refreshCurrentPage?.();
   });
 
   document.body.addEventListener('showMessage', function (evt: Event) {

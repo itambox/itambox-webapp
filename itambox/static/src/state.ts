@@ -6,19 +6,9 @@
  *  - ITAMboxState.getUser() — reads data-itambox-user-id from <html>
  *  - ITAMboxState.getCSRFToken() — single-source CSRF token lookup
  */
-interface ITAMboxUser {
-  id: string | null;
-  name: string | null;
-}
-
-interface ITAMboxStateType {
-  get: <T>(key: string, defaultValue?: T) => T | undefined;
-  set: (key: string, value: unknown) => void;
-  getUser: () => ITAMboxUser;
-  getCSRFToken: () => string;
-}
-
-const ITAMboxState: ITAMboxStateType = (function () {
+// The ITAMboxUser / ITAMboxStateType interfaces and the ambient `ITAMboxState`
+// global are declared in globals.d.ts; this module is the runtime implementation.
+const ITAMboxStateImpl: ITAMboxStateType = (function () {
   function get<T>(key: string, defaultValue?: T): T | undefined {
     try {
       const raw = localStorage.getItem('itambox.' + key);
@@ -56,7 +46,7 @@ const ITAMboxState: ITAMboxStateType = (function () {
   return { get, set, getUser, getCSRFToken };
 })();
 
-(window as unknown as Record<string, unknown>).ITAMboxState = ITAMboxState;
+(window as unknown as Record<string, unknown>).ITAMboxState = ITAMboxStateImpl;
 
 // Global HTMX CSRF Token Integration
 document.addEventListener('htmx:configRequest', (event: any) => {

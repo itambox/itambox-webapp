@@ -62,11 +62,14 @@
       },
     );
 
-    if (bestMatch) {
-      const dropdownItem = bestMatch.closest('.dropdown-item');
+    // `bestMatch` is only assigned inside the forEach closure above; TS's
+    // control-flow analysis narrows it to `never` here, so cast it back.
+    const matchedLink = bestMatch as Element | null;
+    if (matchedLink) {
+      const dropdownItem = matchedLink.closest('.dropdown-item');
       if (dropdownItem) dropdownItem.classList.add('active');
 
-      const navItem = bestMatch.closest('.nav-item');
+      const navItem = matchedLink.closest('.nav-item');
       if (navItem) {
         navItem.classList.add('active');
         const navLink = navItem.querySelector<HTMLElement>(':scope > .nav-link');

@@ -15,7 +15,7 @@
     if (!submitBtn || submitBtn === form) {
       submitBtn = form.querySelector<HTMLButtonElement | HTMLInputElement>(
         'button[type="submit"], input[type="submit"], .btn-primary'
-      ) as HTMLElement | null;
+      ) ?? undefined;
     }
 
     if (!submitBtn) return;

@@ -1,8 +1,9 @@
 {% comment %}Self-contained on purpose: a 500 may fire when the DB, tenant context, or a
    context processor is unavailable, so this page must not depend on extends/url tags,
    static files, or any view/context-processor output.{% endcomment %}
+{% load i18n %}{% get_current_language as LANGUAGE_CODE %}
 <!doctype html>
-<html lang="en">
+<html lang="{{ LANGUAGE_CODE }}">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>

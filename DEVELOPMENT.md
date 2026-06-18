@@ -156,17 +156,23 @@ PATCH  /api/subscriptions/subscriptions/{id}/status/  # Status-only update
 
 ## Testing
 
+The suite uses `pytest` (pytest-django). Run all commands from `itambox/`.
+
+> **PostgreSQL is required.** Tests need a running PostgreSQL instance on port
+> `5433` — the project uses a disposable Postgres container for local testing.
+> SQLite is rejected at settings load, so the suite will not run without it.
+
 ```bash
-# Run all tests (82 tests across all apps)
-python manage.py test
+# Run all tests
+pytest
 
 # Run specific app
-python manage.py test subscriptions
-python manage.py test assets
-python manage.py test core
+pytest subscriptions/tests/
+pytest assets/tests/
+pytest core/tests/
 
 # Run with verbose output
-python manage.py test --verbosity=2
+pytest -v
 ```
 
-Tests use Django's `TestCase` with `Client` for views. Model tests verify field constraints, properties, and signals. FilterSet tests verify individual filter parameters. View tests cover HTTP 200/302 for all CRUD operations.
+Tests run under pytest-django (with `model_bakery` for fixtures) and use the Django test `Client` for views. Model tests verify field constraints, properties, and signals. FilterSet tests verify individual filter parameters. View tests cover HTTP 200/302 for all CRUD operations.

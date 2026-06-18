@@ -1,7 +1,7 @@
 {% load i18n %}
 {# templates/assets/assets/asset_label.html #}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ LANGUAGE_CODE }}">
 <head>
     <meta charset="UTF-8">
     <title>{% translate "Print Asset Label:" %} {{ asset.asset_tag }}</title>

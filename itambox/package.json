@@ -8,10 +8,13 @@
     "build:vendor": "node copy-vendor.mjs",
     "build": "node bundle.mjs",
     "build:all": "npm run build:scss && npm run build:vendor && npm run build",
+    "typecheck": "tsc --noEmit",
     "watch": "node bundle.mjs --watch",
     "watch:css": "sass --watch static/src/styles/itambox.scss:static/dist/itambox.css"
   },
   "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.61.1",
+    "@typescript-eslint/parser": "^8.61.1",
     "autoprefixer": "^10.5.0",
     "cssnano": "^8.0.1",
     "esbuild": "^0.25.0",
@@ -19,7 +22,9 @@
     "globals": "^15.0.0",
     "postcss": "^8.5.15",
     "postcss-cli": "^11.0.1",
-    "sass": "^1.80.0"
+    "sass": "^1.80.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.61.1"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",

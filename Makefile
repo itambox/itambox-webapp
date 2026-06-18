@@ -34,7 +34,7 @@ seed:
 	.venv/bin/python itambox/manage.py seed_data
 
 test:
-	.venv/bin/python itambox/manage.py test
+	cd itambox && ../.venv/bin/pytest
 
 lint:
 	.venv/bin/pre-commit run --all-files

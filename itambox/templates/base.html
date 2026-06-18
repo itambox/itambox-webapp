@@ -6,7 +6,7 @@
 {% load django_htmx %}
 {% load plugins %}
 <!doctype html>
-<html lang="en" data-itambox-user-id="{{ request.user.pk }}" data-itambox-user-name="{{ request.user.get_full_name|default:request.user.username }}" data-itambox-url-name="{{ request.resolver_match.url_name }}" data-itambox-version="{{ settings.VERSION }}">
+<html lang="{{ LANGUAGE_CODE }}" data-itambox-user-id="{{ request.user.pk }}" data-itambox-user-name="{{ request.user.get_full_name|default:request.user.username }}" data-itambox-url-name="{{ request.resolver_match.url_name }}" data-itambox-version="{{ settings.VERSION }}">
 <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
@@ -41,6 +41,18 @@
     <link href="{% static 'dist/vendor/mdi/css/materialdesignicons.min.css' %}" rel="stylesheet"/>
     <link href="{% static 'dist/vendor/gridstack/gridstack.min.css' %}" rel="stylesheet"/>
     <link href="{% static 'dist/itambox.css' %}?v=1.1.0" rel="stylesheet"/>
+    {# Skip-nav: fixed + off-screen until keyboard focus, then slides in. Self-contained because #}
+    {# Tabler's CSS does not ship Bootstrap's .visually-hidden-focusable utility. #}
+    <style>
+        .skip-link {
+            position: fixed;
+            top: -100px;
+            left: 0.75rem;
+            z-index: 10010;
+            transition: top 0.15s ease-in-out;
+        }
+        .skip-link:focus { top: 0.75rem; }
+    </style>
     {# HTMX (in head for early hx-* processing) #}
     <script src="{% static 'dist/vendor/htmx.min.js' %}"></script>
     <script src="{% static 'dist/vendor/apexcharts.min.js' %}"></script>
@@ -52,6 +64,9 @@
     {% endif %}
 </head>
 <body class="layout-fluid layout-combo" hx-boost="true" hx-target="#page-content-wrapper" hx-indicator="#htmx-loading-indicator">
+
+    {# Skip-nav: off-screen until keyboard focus (see .skip-link CSS in <head>), jumps to the main landmark #}
+    <a href="#page-body-main" class="skip-link btn btn-primary">{% translate "Skip to main content" %}</a>
 
     {# Global loading indicator #}
     <div id="htmx-loading-indicator" class="htmx-indicator" style="position:fixed;top:0;left:0;width:100%;z-index:9999;pointer-events:none;">

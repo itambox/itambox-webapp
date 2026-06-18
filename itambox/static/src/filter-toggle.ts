@@ -127,7 +127,7 @@
   }
 
   // Re-initialize after HTMX settles (DOM fully updated, OOB swaps complete)
-  document.body.addEventListener('htmx:afterSettle', function (event: Event) {
+  document.body.addEventListener('htmx:afterSettle', function () {
     scheduleFilterInit();
   });
 

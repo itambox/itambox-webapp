@@ -87,3 +87,31 @@ jobs:
         run: |
           flake8 itambox/ --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=migrations,.venv,__pycache__
           flake8 itambox/ --count --exit-zero --max-complexity=10 --statistics --exclude=migrations,.venv,__pycache__
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: 'npm'
+          cache-dependency-path: itambox/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./itambox
+        run: npm ci
+
+      - name: Build frontend assets
+        working-directory: ./itambox
+        run: npm run build:all
+
+      - name: Type-check (tsc)
+        working-directory: ./itambox
+        run: npx tsc --noEmit
+
+      - name: Lint (ESLint)
+        working-directory: ./itambox
+        run: npx eslint static/src

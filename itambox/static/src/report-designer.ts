@@ -3,11 +3,9 @@
  */
 (function () {
   function generateJinja2FromForm(): string {
-    const nameInput = document.querySelector('input[name="name"]') as HTMLInputElement | null;
     const descInput = document.querySelector('textarea[name="description"]') as HTMLTextAreaElement | null;
     const typeSelect = document.querySelector('select[name="report_type"]') as HTMLSelectElement | null;
-    
-    const reportName = nameInput ? nameInput.value || 'Report' : 'Report';
+
     const description = descInput ? descInput.value || 'Visual inventory compilation.' : 'Visual inventory compilation.';
     const reportType = typeSelect ? typeSelect.value : 'asset_summary';
     
@@ -271,7 +269,7 @@
     
     if (!advancedModeCheckbox || !templateContentDiv) return;
     
-    const templateGroup = templateContentDiv.closest('.mb-3') || templateContentDiv.closest('.form-group') as HTMLElement | null;
+    const templateGroup = (templateContentDiv.closest('.mb-3') || templateContentDiv.closest('.form-group')) as HTMLElement | null;
     
     const visualControls: HTMLElement[] = [
       'included_columns',
@@ -500,14 +498,15 @@
 
     // Create the "Re-generate" button if it doesn't already exist
     const regenBtnId = 'btn-regen-from-visual';
-    let regenBtn = document.getElementById(regenBtnId);
+    let regenBtn: HTMLElement | null = document.getElementById(regenBtnId);
     if (!regenBtn) {
-      regenBtn = document.createElement('button');
-      regenBtn.id = regenBtnId;
-      regenBtn.type = 'button';
-      regenBtn.className = 'btn btn-sm btn-outline-primary mb-2';
-      regenBtn.style.fontSize = '12px';
-      regenBtn.innerHTML = '<i class="mdi mdi-refresh"></i> Bootstrap from Visual Builder';
+      const newBtn = document.createElement('button');
+      newBtn.id = regenBtnId;
+      newBtn.type = 'button';
+      newBtn.className = 'btn btn-sm btn-outline-primary mb-2';
+      newBtn.style.fontSize = '12px';
+      newBtn.innerHTML = '<i class="mdi mdi-refresh"></i> Bootstrap from Visual Builder';
+      regenBtn = newBtn;
       
       if (templateGroup && templateContentDiv) {
         templateGroup.insertBefore(regenBtn, templateContentDiv);

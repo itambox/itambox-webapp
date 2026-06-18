@@ -136,6 +136,8 @@ declare class Html5Qrcode {
   stop(): Promise<any>;
   clear(): void;
   isScanning: boolean;
+  getRunningTrackCapabilities(): Record<string, any>;
+  applyVideoConstraints(constraints: MediaTrackConstraints): Promise<void>;
 }
 
 // Window extensions

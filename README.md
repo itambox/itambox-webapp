@@ -118,16 +118,18 @@ ITAMBOX_DEBUG=true python manage.py runserver
 
 ## Running Tests
 
-Automated unit and integration tests cover model signals, validation constraints, FilterSets, and CRUD APIs:
+Automated unit and integration tests cover model signals, validation constraints, FilterSets, and CRUD APIs. The suite uses `pytest` (pytest-django) and runs from the `itambox/` directory. Tests require a running PostgreSQL instance on port `5433` (the project uses a disposable Postgres container for local testing; SQLite is rejected by settings):
 
 ```bash
+cd itambox
+
 # Run all tests
-python manage.py test
+pytest
 
 # Test specific applications
-python manage.py test assets
-python manage.py test subscriptions
-python manage.py test core
+pytest assets/tests/
+pytest subscriptions/tests/
+pytest core/tests/
 ```
 
 ---

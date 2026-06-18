@@ -66,10 +66,10 @@
                 {% endif %}
 
                 {# Language selection moved to user Preferences (applies app-wide). #}
-                <button class="nav-link px-0 color-mode-toggle hide-theme-dark" title="{% translate 'Enable dark mode' %}" data-bs-toggle="tooltip" data-bs-placement="bottom">
+                <button class="nav-link px-0 color-mode-toggle hide-theme-dark" title="{% translate 'Enable dark mode' %}" aria-label="{% translate 'Enable dark mode' %}" data-bs-toggle="tooltip" data-bs-placement="bottom">
                     <i class="mdi mdi-weather-night fs-2"></i>
                 </button>
-                <button class="nav-link px-0 color-mode-toggle hide-theme-light" title="{% translate 'Enable light mode' %}" data-bs-toggle="tooltip" data-bs-placement="bottom">
+                <button class="nav-link px-0 color-mode-toggle hide-theme-light" title="{% translate 'Enable light mode' %}" aria-label="{% translate 'Enable light mode' %}" data-bs-toggle="tooltip" data-bs-placement="bottom">
                     <i class="mdi mdi-weather-sunny fs-2"></i>
                 </button>
                 <div class="nav-item dropdown d-none d-md-flex me-3"

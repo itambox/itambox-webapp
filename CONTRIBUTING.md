@@ -64,15 +64,21 @@ Every time you run `git commit`, standard formatters and linters will run automa
 
 ## Testing
 
-Any bug fixes or new features must include appropriate tests.
+Any bug fixes or new features must include appropriate tests. The suite uses
+`pytest` (pytest-django); run all commands from the `itambox/` directory.
+
+> **PostgreSQL is required.** Tests need a running PostgreSQL instance on port
+> `5433` — the project uses a disposable Postgres container for local testing.
+> SQLite is rejected at settings load, so the suite will not run without it.
 
 *   Run the entire test suite:
     ```bash
-    python manage.py test
+    cd itambox
+    pytest
     ```
 *   Run tests for a single application module (e.g., assets):
     ```bash
-    python manage.py test assets
+    pytest assets/tests/
     ```
 
 ---
