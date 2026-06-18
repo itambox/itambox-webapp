@@ -175,6 +175,17 @@ DATABASES = {
         'CONN_MAX_AGE': int(os.environ.get('ITAMBOX_DB_CONN_MAX_AGE', '300')),
         'OPTIONS': {
             'sslmode': os.environ.get('ITAMBOX_DB_SSLMODE', 'require'),
+            # TCP keepalives: detect a dead/dropped Postgres connection (e.g. a
+            # backend killed under load) so a libpq recv() blocked waiting for a
+            # response fails fast with OperationalError (~25s) instead of hanging
+            # the client forever. The lock_timeout/statement_timeout below are
+            # SERVER-side and useless once the server has closed the socket; this
+            # is the missing client-side guard for the suite hang that pytest
+            # --timeout cannot interrupt on Windows (it blocks in C).
+            'keepalives': 1,
+            'keepalives_idle': 10,
+            'keepalives_interval': 5,
+            'keepalives_count': 3,
         },
         'TEST': {
             'NAME': 'oidc_test_db',
