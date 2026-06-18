@@ -3,7 +3,8 @@ import logging
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
-from django.http import Http404
+from django.db.models import Q
+from django.http import Http404, QueryDict
 from django.template.loader import get_template
 from django.template import TemplateDoesNotExist
 from django.urls import reverse, NoReverseMatch
@@ -13,7 +14,7 @@ from django.views.generic import ListView
 from core.features import module_maturity, BETA
 from core.forms.import_forms import is_model_importable
 from extras.customfields import apply_custom_field_filters
-from extras.models import ExportTemplate, LabelTemplate
+from extras.models import ExportTemplate, LabelTemplate, SavedFilter
 from itambox.registry import registry
 from itambox.utils import get_model_viewname, get_table_for_model, get_help_url
 from itambox.views.htmx import BaseHTMXView
@@ -69,6 +70,19 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
 
         return ['generic/object_list.html']
 
+    def get_visible_saved_filters(self, model):
+        """SavedFilters this user may apply to ``model``'s list.
+
+        ``SavedFilter.objects`` is tenant-scoped with ``allow_global_tenant``, so
+        it already returns current-tenant rows plus global (tenant-null) rows
+        only; the extra ``Q`` drops other members' private (shared=False,
+        not-mine) tenant filters.
+        """
+        ct = ContentType.objects.get_for_model(model)
+        return SavedFilter.objects.filter(content_type=ct, enabled=True).filter(
+            Q(tenant__isnull=True) | Q(shared=True) | Q(created_by=self.request.user)
+        )
+
     def get_queryset(self):
         model = getattr(self, 'model', None)
         if model is None and hasattr(self, 'queryset') and self.queryset is not None:
@@ -93,8 +107,35 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         else:
             queryset = super().get_queryset()
 
+        # ?filter=<pk> applies a saved filter's stored parameters in place of the
+        # raw request.GET. Falls back to request.GET if the pk is missing,
+        # non-numeric, not visible to this user, or for a different model.
+        self._active_saved_filter_id = None
+        filter_params = self.request.GET
+        if model:
+            raw_filter_pk = self.request.GET.get('filter')
+            if raw_filter_pk:
+                try:
+                    filter_pk = int(raw_filter_pk)
+                except (TypeError, ValueError):
+                    filter_pk = None
+                if filter_pk is not None:
+                    saved = self.get_visible_saved_filters(model).filter(pk=filter_pk).first()
+                    if saved is not None:
+                        saved_params = QueryDict(mutable=True)
+                        # Stored parameters are a dict; multi-valued filter params
+                        # (e.g. status=[...]) arrive as lists and need setlist so
+                        # the filterset sees every value, not one list object.
+                        for key, value in (saved.parameters or {}).items():
+                            if isinstance(value, (list, tuple)):
+                                saved_params.setlist(key, list(value))
+                            else:
+                                saved_params[key] = value
+                        filter_params = saved_params
+                        self._active_saved_filter_id = saved.pk
+
         if self.filterset:
-            self.filter = self.filterset(self.request.GET, queryset)
+            self.filter = self.filterset(filter_params, queryset)
             if not self.filter.is_valid():
                 logger.warning('Invalid filter params for %s: %s', self.__class__.__name__, self.filter.errors)
                 self.filter = None
@@ -102,8 +143,10 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
                 queryset = self.filter.qs
 
         # cf_<name>=<value> params filter on custom field data (NetBox-style).
+        # filter_params is request.GET unless a saved filter was applied above,
+        # in which case its stored cf_* params drive the custom-field filtering.
         if model and registry.model_has_feature(model, 'custom_field_data'):
-            queryset = apply_custom_field_filters(queryset, model, self.request.GET)
+            queryset = apply_custom_field_filters(queryset, model, filter_params)
 
         return queryset
 
@@ -173,6 +216,20 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
                 context['label_templates'] = list(LabelTemplate.objects.all())
             except Exception:
                 context['label_templates'] = []
+
+        # Saved filters feed the offcanvas filter dropdown, which IS re-rendered
+        # on HTMX partials (the #filters-sidebar-content OOB swap), so populate it
+        # unconditionally — unlike the export/label catalogs above, which only
+        # appear on the full page and would otherwise vanish from the offcanvas
+        # after every table refresh/filter/pagination.
+        try:
+            context['saved_filters'] = list(self.get_visible_saved_filters(_model))
+        except Exception:
+            context['saved_filters'] = []
+
+        # Mark which saved filter (if any) is currently applied so the UI can
+        # highlight it. Resolved in get_queryset; None when no ?filter= applied.
+        context['active_saved_filter_id'] = getattr(self, '_active_saved_filter_id', None)
 
         try:
             create_url_name = get_model_viewname(_model, 'create')

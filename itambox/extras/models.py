@@ -1015,3 +1015,70 @@ class AlertLog(BaseModel):
     def __str__(self):
         return f"[{self.get_status_display()}] {self.subject}"
 
+
+class SavedFilter(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
+    """A named, reusable set of list-view filter parameters.
+
+    Scoped to one ``content_type`` (the model whose list it filters). Owned by a
+    tenant (visible only to that tenant) or system-wide when ``tenant`` is null
+    (``allow_global_tenant`` — only superusers create global filters). Within a
+    tenant a filter is visible to every member when ``shared`` (the default), or
+    only to its ``created_by`` owner otherwise.
+    """
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
+    allow_global_tenant = True
+
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    content_type = models.ForeignKey(
+        ContentType,
+        on_delete=models.CASCADE,
+        related_name='saved_filters',
+        help_text=_("The model whose list view this filter applies to."),
+    )
+    parameters = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=_("Stored list-view filter querystring parameters."),
+    )
+    shared = models.BooleanField(
+        default=True,
+        help_text=_("Visible to all members of the owning tenant. If unset, only the creator can use it."),
+    )
+    enabled = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='saved_filters',
+    )
+    tenant = models.ForeignKey(
+        'organization.Tenant',
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name='saved_filters',
+        db_index=True,
+        help_text=_("The tenant owning this filter. Null represents system-wide filters."),
+    )
+
+    class Meta:
+        ordering = ['content_type', 'name']
+        verbose_name = _("Saved Filter")
+        verbose_name_plural = _("Saved Filters")
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tenant', 'content_type', 'name'],
+                condition=models.Q(deleted_at__isnull=True),
+                name='unique_savedfilter_name_active',
+            ),
+        ]
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse('extras:savedfilter_detail', kwargs={'pk': self.pk})
+

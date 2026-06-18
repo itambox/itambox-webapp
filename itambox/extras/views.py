@@ -1,12 +1,19 @@
+import json
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count
-from .models import Tag, CustomField, CustomFieldset, ConfigContext
-from .forms import TagForm, TagFilterForm, CustomFieldForm, CustomFieldFilterForm, CustomFieldsetForm, CustomFieldsetFilterForm, ConfigContextForm, ConfigContextFilterSet, ConfigContextFilterForm, ConfigContextTable
+from django.http import HttpResponse, QueryDict
+from django.utils.http import urlencode
+from django.views.generic import View
+from core.managers import get_current_tenant
+from .models import Tag, CustomField, CustomFieldset, SavedFilter, ConfigContext
+from .forms import TagForm, TagFilterForm, CustomFieldForm, CustomFieldFilterForm, CustomFieldsetForm, CustomFieldsetFilterForm, SavedFilterForm, SavedFilterFilterForm, ConfigContextForm, ConfigContextFilterSet, ConfigContextFilterForm, ConfigContextTable
 from django_tables2 import RequestConfig
-from .tables import TagTable, CustomFieldTable, CustomFieldsetTable
-from .filters import TagFilter, CustomFieldFilterSet, CustomFieldsetFilterSet
+from .tables import TagTable, CustomFieldTable, CustomFieldsetTable, SavedFilterTable
+from .filters import TagFilter, CustomFieldFilterSet, CustomFieldsetFilterSet, SavedFilterFilterSet
 from itambox.utils import get_paginate_count, get_model_viewname # Import the utility function
 from assets.tables import AssetTable # Import AssetTable
 from users.models import UserPreference # Import UserPreference
@@ -154,6 +161,140 @@ class CustomFieldsetBulkDeleteView(ObjectBulkDeleteView):
 
 
 # =============================================================================
+# Saved Filters
+# =============================================================================
+
+class SavedFilterListView(ObjectListView):
+    queryset = SavedFilter.objects.select_related('content_type', 'tenant', 'created_by')
+    filterset = SavedFilterFilterSet
+    filterset_form = SavedFilterFilterForm
+    table = SavedFilterTable
+    action_buttons = ('add',)
+    template_name = 'generic/object_list.html'
+
+
+class SavedFilterDetailView(ObjectDetailView):
+    queryset = SavedFilter.objects.all()
+
+    layout = (
+        ((Panel('info', 'Saved Filter Details'),),),
+    )
+
+
+class SavedFilterEditView(ObjectEditView):
+    queryset = SavedFilter.objects.all()
+    model = SavedFilter
+    model_form = SavedFilterForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'extras:savedfilter_list'
+
+
+class SavedFilterDeleteView(ObjectDeleteView):
+    queryset = SavedFilter.objects.all()
+    model = SavedFilter
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('extras:savedfilter_list')
+
+
+class SavedFilterSaveView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    """Quick-save the current list-view filter as a named SavedFilter.
+
+    POST-only. The list view's filter offcanvas hx-includes the filter form
+    (``.filter-form-sidebar``), so the POST carries the filter fields' CURRENT
+    values (whether or not "Apply" was clicked) alongside the save controls.
+    We persist those filter params and redirect back to the list with
+    ``?filter=<new pk>`` so the freshly saved filter applies immediately.
+
+    Save-control fields use an ``sf_`` prefix so they never collide with a
+    filterset field of the same name (e.g. a model whose filter has ``name``).
+    """
+    permission_required = ('extras.add_savedfilter',)
+
+    # POST keys that are save-form controls or list chrome, NOT filter params.
+    NON_FILTER_PARAMS = frozenset({
+        'sf_name', 'sf_shared', 'sf_is_global', 'model', 'return_url',
+        'csrfmiddlewaretoken', 'page', 'per_page', 'sort', 'deleted', 'filter',
+    })
+
+    def post(self, request, *args, **kwargs):
+        name = (request.POST.get('sf_name') or '').strip()
+        model_str = (request.POST.get('model') or '').strip()
+        is_global = request.POST.get('sf_is_global') in ('1', 'true', 'on', 'yes')
+        shared = request.POST.get('sf_shared') in ('1', 'true', 'on', 'yes')
+
+        content_type = self._resolve_content_type(model_str)
+        if not name or content_type is None:
+            return self._respond(request, model_str, None,
+                                  "Provide a name and a valid model to save the filter.")
+
+        parameters = self._parse_parameters(request.POST)
+
+        tenant = get_current_tenant()
+        if is_global and request.user.is_superuser:
+            tenant = None
+
+        saved = SavedFilter.objects.create(
+            name=name,
+            content_type=content_type,
+            parameters=parameters,
+            shared=shared,
+            created_by=request.user,
+            tenant=tenant,
+        )
+
+        return self._respond(request, model_str, saved.pk, None)
+
+    def _resolve_content_type(self, model_str):
+        if '.' not in model_str:
+            return None
+        app_label, model_name = model_str.split('.', 1)
+        try:
+            return ContentType.objects.get_by_natural_key(app_label, model_name)
+        except ContentType.DoesNotExist:
+            return None
+
+    def _parse_parameters(self, post):
+        """Filter params = POST minus control/chrome keys and empty values."""
+        params = {}
+        for key in post.keys():
+            if key in self.NON_FILTER_PARAMS:
+                continue
+            values = [v for v in post.getlist(key) if v not in (None, '')]
+            if not values:
+                continue
+            params[key] = values if len(values) > 1 else values[0]
+        return params
+
+    def _list_url(self, request, model_str):
+        return_url = request.POST.get('return_url')
+        if return_url:
+            return return_url.split('?', 1)[0]
+        content_type = self._resolve_content_type(model_str)
+        if content_type is not None:
+            model = content_type.model_class()
+            if model is not None:
+                try:
+                    return reverse(get_model_viewname(model, 'list'))
+                except Exception:
+                    pass
+        return reverse('extras:savedfilter_list')
+
+    def _respond(self, request, model_str, pk, error):
+        """Redirect to the list (with ?filter=<pk> on success). HTMX submissions
+        get a 204 + HX-Redirect so the browser performs a full navigation and the
+        list's ?filter load hook re-applies the saved filter."""
+        list_url = self._list_url(request, model_str)
+        target = f"{list_url}?{urlencode({'filter': pk})}" if pk else list_url
+        if error:
+            messages.error(request, error)
+        if request.headers.get('HX-Request') == 'true':
+            response = HttpResponse(status=204)
+            response['HX-Redirect'] = target
+            return response
+        return redirect(target)
+
+
+# =============================================================================
 # Config Context Views
 # =============================================================================
 
@@ -188,14 +329,10 @@ class ConfigContextDeleteView(ObjectDeleteView):
 # =============================================================================
 # Alerting Views
 # =============================================================================
-import json
 import logging
 
-from django.http import HttpResponse
 from django.utils import timezone
-from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.utils.decorators import method_decorator
-from django.views.generic import View
 
 from .models import AlertRule, AlertLog, NotificationChannel, ReportTemplate, ScheduledReport
 from .tables import (

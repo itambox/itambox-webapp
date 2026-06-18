@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.utils.html import escape, format_html
 from django.utils.translation import gettext_lazy as _
 from .models import (
-    Tag, CustomField, CustomFieldset,
+    Tag, CustomField, CustomFieldset, SavedFilter,
     AlertRule, AlertLog, NotificationChannel, ReportTemplate, ScheduledReport,
 )
 from core.tables import ActionsColumn, BaseTable, ToggleColumn, BooleanColumn
@@ -121,6 +121,29 @@ class CustomFieldsetTable(BaseTable):
 
     def render_fields_count(self, value, record=None):
         return value or 0
+
+
+class SavedFilterTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    name = tables.LinkColumn('extras:savedfilter_detail', args=[A('pk')], verbose_name='Name')
+    content_type = tables.Column(verbose_name='Object Type', accessor='content_type')
+    shared = BooleanColumn(verbose_name='Shared')
+    enabled = BooleanColumn(verbose_name='Enabled')
+    tenant = tables.Column(verbose_name='Tenant', accessor='tenant.name', linkify=False)
+    created_by = tables.Column(verbose_name='Created By', accessor='created_by')
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = SavedFilter
+        fields = ('pk', 'name', 'content_type', 'shared', 'enabled', 'tenant', 'created_by', 'actions')
+        default_columns = ('pk', 'name', 'content_type', 'shared', 'enabled', 'tenant', 'created_by', 'actions')
+
+    def render_content_type(self, value):
+        model = value.model_class()
+        return model._meta.verbose_name.title() if model else value.model
+
+    def render_tenant(self, value):
+        return value or mark_safe('<span class="badge bg-secondary">Global</span>')
 
 
 # =============================================================================

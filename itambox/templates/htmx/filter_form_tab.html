@@ -2,6 +2,58 @@
 {% load crispy_forms_tags %}
 {% load utility_tags %}
 
+{# --- Saved filters (load) --- #}
+{# Picking a saved filter GETs the list with ?filter=<pk> so ObjectListView's #}
+{# load hook binds the filterset from the saved parameters instead of request.GET. #}
+{% if saved_filters %}
+<div class="mb-3">
+    <label class="form-label d-flex align-items-center text-muted small text-uppercase mb-2">
+        <i class="mdi mdi-content-save-outline me-1"></i>
+        {% translate "Saved filters" %}
+    </label>
+    <div class="dropdown w-100">
+        <button type="button" class="btn btn-outline-secondary w-100 d-flex align-items-center justify-content-between dropdown-toggle"
+                data-bs-toggle="dropdown" aria-expanded="false">
+            <span class="text-truncate">
+                {% if active_saved_filter_id %}
+                    {% for sf in saved_filters %}{% if sf.pk == active_saved_filter_id %}{{ sf.name }}{% endif %}{% endfor %}
+                {% else %}{% translate "Select a saved filter…" %}{% endif %}
+            </span>
+        </button>
+        <div class="dropdown-menu dropdown-menu-end w-100">
+            {% for sf in saved_filters %}
+            <a class="dropdown-item d-flex align-items-center justify-content-between {% if sf.pk == active_saved_filter_id %}active{% endif %}"
+               href="{{ request.path }}?filter={{ sf.pk }}"
+               hx-get="{{ request.path }}?filter={{ sf.pk }}"
+               hx-target="#object-list-dynamic-content"
+               hx-swap="innerHTML"
+               hx-push-url="true">
+                <span class="text-truncate me-2">{{ sf.name }}</span>
+                {% if sf.tenant_id is None %}
+                    <span class="badge bg-purple-lt">{% translate "Global" %}</span>
+                {% elif sf.shared %}
+                    <span class="badge bg-blue-lt">{% translate "Shared" %}</span>
+                {% else %}
+                    <span class="badge bg-secondary-lt">{% translate "Private" %}</span>
+                {% endif %}
+            </a>
+            {% endfor %}
+            {% if active_saved_filter_id %}
+            <div class="dropdown-divider"></div>
+            <a class="dropdown-item text-muted"
+               href="{{ request.path }}"
+               hx-get="{{ request.path }}"
+               hx-target="#object-list-dynamic-content"
+               hx-swap="innerHTML"
+               hx-push-url="true">
+                <i class="mdi mdi-close me-2"></i>{% translate "Clear saved filter" %}
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <form method="get" action="{{ request.path }}" class="filter-form-sidebar"
       hx-get="{{ request.path }}"
       hx-target="#object-list-dynamic-content"
@@ -24,3 +76,48 @@
             hx-push-url="true">{% translate "Reset" %}</a>
      </div>
 </form>
+
+{# --- Save current filter --- #}
+{# The Save button hx-includes the filter form (.filter-form-sidebar) so it    #}
+{# captures the CURRENT filter field values — whether or not "Apply" was        #}
+{# clicked — instead of only request.GET. The save view persists a SavedFilter  #}
+{# and HX-Redirects back to the list with ?filter=<new pk> applied. Save        #}
+{# controls use an sf_ prefix so they can't collide with a filterset field.     #}
+<div class="mt-4 pt-3 border-top">
+    <a href="#save-filter-form" class="d-flex align-items-center text-muted small text-uppercase text-decoration-none mb-2"
+       data-bs-toggle="collapse" role="button" aria-expanded="false" aria-controls="save-filter-form">
+        <i class="mdi mdi-plus me-1"></i>
+        {% translate "Save current filter" %}
+    </a>
+    <div class="collapse" id="save-filter-form">
+        <form>
+            {% csrf_token %}
+            <input type="hidden" name="model" value="{{ model_name_str }}">
+            <input type="hidden" name="return_url" value="{{ request.path }}">
+
+            <div class="mb-2">
+                <label for="save-filter-name" class="form-label">{% translate "Name" %}</label>
+                <input type="text" name="sf_name" id="save-filter-name" class="form-control" required
+                       placeholder="{% translate 'e.g. Active laptops' %}">
+            </div>
+
+            <label class="form-check mb-2">
+                <input type="checkbox" name="sf_shared" class="form-check-input" checked>
+                <span class="form-check-label">{% translate "Share with my tenant" %}</span>
+            </label>
+
+            {% if request.user.is_superuser %}
+            <label class="form-check mb-2">
+                <input type="checkbox" name="sf_is_global" class="form-check-input">
+                <span class="form-check-label">{% translate "Make global (all tenants)" %}</span>
+            </label>
+            {% endif %}
+
+            <button type="button" class="btn btn-primary btn-sm w-100"
+                    hx-post="{% url 'extras:savedfilter_save' %}"
+                    hx-include="closest form, .filter-form-sidebar">
+                <i class="mdi mdi-content-save-outline me-1"></i>{% translate "Save filter" %}
+            </button>
+        </form>
+    </div>
+</div>

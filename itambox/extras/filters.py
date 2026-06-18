@@ -2,8 +2,9 @@ import django_filters
 from django import forms
 from django.db.models import Q
 from core.filters import BaseFilterSet
+from django.contrib.contenttypes.models import ContentType
 from .models import (
-    Tag, CustomField, CustomFieldset, AlertLog, AlertRule,
+    Tag, CustomField, CustomFieldset, SavedFilter, AlertLog, AlertRule,
     EventRule, WebhookEndpoint, NotificationChannel,
 )
 
@@ -55,6 +56,35 @@ class CustomFieldsetFilterSet(django_filters.FilterSet):
             return queryset
         return queryset.filter(
             Q(name__icontains=value)
+        ).distinct()
+
+
+class SavedFilterFilterSet(BaseFilterSet):
+    q = django_filters.CharFilter(method='search', label='Search')
+    content_type = django_filters.ModelChoiceFilter(
+        queryset=ContentType.objects.order_by('app_label', 'model'),
+        label='Object Type',
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+    shared = django_filters.BooleanFilter(
+        label='Shared',
+        widget=forms.Select(choices=[('', '---------'), (True, 'Yes'), (False, 'No')], attrs={'class': 'form-select'}),
+    )
+    enabled = django_filters.BooleanFilter(
+        label='Enabled',
+        widget=forms.Select(choices=[('', '---------'), (True, 'Yes'), (False, 'No')], attrs={'class': 'form-select'}),
+    )
+
+    class Meta:
+        model = SavedFilter
+        fields = ['content_type', 'shared', 'enabled']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(description__icontains=value)
         ).distinct()
 
 

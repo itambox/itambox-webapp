@@ -38,6 +38,13 @@ urlpatterns = [
     path('custom-fieldsets/<int:pk>/', views.CustomFieldsetDetailView.as_view(), name='customfieldset_detail'),
     path('custom-fieldsets/<int:pk>/edit/', views.CustomFieldsetEditView.as_view(), name='customfieldset_update'),
     path('custom-fieldsets/<int:pk>/delete/', views.CustomFieldsetDeleteView.as_view(), name='customfieldset_delete'),
+    # Saved Filters
+    path('saved-filters/', views.SavedFilterListView.as_view(), name='savedfilter_list'),
+    path('saved-filters/add/', views.SavedFilterEditView.as_view(), name='savedfilter_create'),
+    path('saved-filters/save/', views.SavedFilterSaveView.as_view(), name='savedfilter_save'),
+    path('saved-filters/<int:pk>/', views.SavedFilterDetailView.as_view(), name='savedfilter_detail'),
+    path('saved-filters/<int:pk>/edit/', views.SavedFilterEditView.as_view(), name='savedfilter_update'),
+    path('saved-filters/<int:pk>/delete/', views.SavedFilterDeleteView.as_view(), name='savedfilter_delete'),
     # Config Contexts
     path('config-contexts/', include('extras.urls_contexts')),
 

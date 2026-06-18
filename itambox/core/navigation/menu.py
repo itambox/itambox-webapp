@@ -373,6 +373,7 @@ EXTRAS_MENU = Menu(
                     permissions=['extras.view_configcontext'],
                     buttons=(),
                 ),
+                get_model_item('extras', 'savedfilter', _('Saved Filters')),
             ),
         ),
         MenuGroup(

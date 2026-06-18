@@ -1,6 +1,7 @@
 from django import forms
 from django.utils.translation import gettext_lazy as _
-from .models import Tag, CustomField, CustomFieldset, ConfigContext
+from django.contrib.contenttypes.models import ContentType
+from .models import Tag, CustomField, CustomFieldset, SavedFilter, ConfigContext
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Div, Field, Fieldset, Row, Column
 from django.urls import reverse
@@ -139,6 +140,51 @@ class CustomFieldFilterForm(FilterForm):
 class CustomFieldsetFilterForm(FilterForm):
     from .filters import CustomFieldsetFilterSet
     filterset_class = CustomFieldsetFilterSet
+
+
+class SavedFilterForm(forms.ModelForm):
+    # ``parameters`` is captured from the list view (the quick-save endpoint), not
+    # edited here. ``tenant``/``created_by`` are set by the view, not the user.
+    class Meta:
+        model = SavedFilter
+        fields = ['name', 'description', 'content_type', 'shared', 'enabled']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'content_type': forms.Select(attrs={'class': 'form-select'}),
+            'shared': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+
+        self.fields['content_type'].queryset = (
+            ContentType.objects.order_by('app_label', 'model')
+        )
+
+        button_text = 'Update' if self.instance.pk else 'Create'
+        cancel_url = reverse('extras:savedfilter_list')
+
+        self.helper.layout = Layout(
+            'name',
+            'description',
+            'content_type',
+            Div('shared', css_class='mb-3 form-check'),
+            Div('enabled', css_class='mb-3 form-check'),
+            HTML('<div class="mt-3">'),
+            Submit('submit', button_text, css_class='btn btn-primary'),
+            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+            HTML('</div>')
+        )
+
+
+class SavedFilterFilterForm(FilterForm):
+    from .filters import SavedFilterFilterSet
+    filterset_class = SavedFilterFilterSet
 
 
 # =============================================================================
