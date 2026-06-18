@@ -2,17 +2,17 @@ from django_filters.rest_framework import DjangoFilterBackend
 from itambox.api.viewsets import ITAMBoxModelViewSet
 from extras.models import (
     Tag, Dashboard, CustomField, CustomFieldset,
-    EventRule, WebhookEndpoint, NotificationChannel, AlertRule,
+    EventRule, WebhookEndpoint, NotificationChannel, AlertRule, JournalEntry,
 )
 from extras.filters import (
     TagFilter, CustomFieldFilterSet, CustomFieldsetFilterSet,
     EventRuleFilterSet, WebhookEndpointFilterSet, NotificationChannelFilterSet,
-    AlertRuleFilterSet,
+    AlertRuleFilterSet, JournalEntryFilterSet,
 )
 from .serializers import (
     TagSerializer, DashboardSerializer, CustomFieldSerializer, CustomFieldsetSerializer,
     EventRuleSerializer, WebhookEndpointSerializer, NotificationChannelSerializer,
-    AlertRuleSerializer,
+    AlertRuleSerializer, JournalEntrySerializer,
 )
 
 
@@ -70,4 +70,11 @@ class AlertRuleViewSet(ITAMBoxModelViewSet):
     serializer_class = AlertRuleSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = AlertRuleFilterSet
+
+
+class JournalEntryViewSet(ITAMBoxModelViewSet):
+    queryset = JournalEntry.objects.select_related('model', 'user', 'tenant').all()
+    serializer_class = JournalEntrySerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = JournalEntryFilterSet
 

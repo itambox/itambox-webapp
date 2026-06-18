@@ -6,7 +6,7 @@ from core.filters import BaseFilterSet
 from django.contrib.contenttypes.models import ContentType
 from .models import (
     Tag, CustomField, CustomFieldset, SavedFilter, AlertLog, AlertRule,
-    EventRule, WebhookEndpoint, NotificationChannel,
+    EventRule, WebhookEndpoint, NotificationChannel, JournalEntry,
 )
 
 class TagFilter(django_filters.FilterSet):
@@ -179,3 +179,16 @@ class AlertLogFilterSet(BaseFilterSet):
     class Meta:
         model = AlertLog
         fields = ['status', 'severity', 'rule', 'created_after', 'created_before']
+
+
+class JournalEntryFilterSet(django_filters.FilterSet):
+    q = django_filters.CharFilter(method='search', label=_('Search'))
+
+    class Meta:
+        model = JournalEntry
+        fields = ['model', 'user', 'object_id']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(Q(comment__icontains=value)).distinct()

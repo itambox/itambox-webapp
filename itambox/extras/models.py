@@ -370,6 +370,13 @@ class WebhookEndpoint(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
 
 
 class JournalEntry(ChangeLoggingMixin, BaseModel):
+    objects = TenantScopingManager()
+    # Journal entries are scoped to the tenant that owns the journaled object
+    # (denormalised in the `tenant` field below). allow_global_tenant keeps
+    # entries on global/shared objects (tenant=None) visible to any tenant that
+    # can see the object — mirrors the shared-catalogue pattern.
+    allow_global_tenant = True
+
     model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='journal_entries')
     object_id = models.PositiveBigIntegerField(db_index=True)
     content_object = GenericForeignKey('model', 'object_id')
@@ -381,6 +388,15 @@ class JournalEntry(ChangeLoggingMixin, BaseModel):
     )
     created = models.DateTimeField(auto_now_add=True, db_index=True)
     comment = models.TextField()
+    tenant = models.ForeignKey(
+        'organization.Tenant',
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name='journal_entries',
+        db_index=True,
+        help_text=_("Denormalised owning tenant, derived from the journaled object on save. Null = system/global object."),
+    )
 
     class Meta:
         ordering = ['-created']
@@ -392,6 +408,16 @@ class JournalEntry(ChangeLoggingMixin, BaseModel):
 
     def __str__(self):
         return f"Journal entry on {self.content_object} by {self.user}"
+
+    def save(self, *args, **kwargs):
+        # Denormalise the owning tenant from the journaled object so entries can
+        # be tenant-scoped (a GFK alone can't be filtered in the ORM). The
+        # object's tenant is authoritative — derive it on every save so the UI,
+        # REST and seed create paths all agree regardless of ambient context.
+        parent = self.content_object
+        if parent is not None:
+            self.tenant = getattr(parent, 'tenant', None)
+        super().save(*args, **kwargs)
 
 
 class Bookmark(ChangeLoggingMixin, BaseModel):

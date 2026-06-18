@@ -1,10 +1,10 @@
 from django.contrib.contenttypes.models import ContentType
 from rest_framework import serializers
 from itambox.api.base import BaseModelSerializer
-from itambox.api.fields import ContentTypeField
+from itambox.api.fields import ContentTypeField, validate_gfk_target_tenant
 from extras.models import (
     Tag, Dashboard, CustomField, CustomFieldset,
-    EventRule, WebhookEndpoint, NotificationChannel, AlertRule,
+    EventRule, WebhookEndpoint, NotificationChannel, AlertRule, JournalEntry,
 )
 
 
@@ -134,3 +134,40 @@ class AlertRuleSerializer(BaseModelSerializer):
             'created_at', 'updated_at',
         ]
         brief_fields = ['id', 'url', 'name', 'alert_type', 'severity', 'is_active']
+
+
+class JournalEntrySerializer(BaseModelSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name='api:extras_api:journalentry-detail')
+    model = ContentTypeField(queryset=ContentType.objects.all())
+    # Author is read-only: stamped from the request on create (see validate) and
+    # immutable thereafter — journal entries are an audit trail.
+    user_display = serializers.StringRelatedField(source='user', read_only=True)
+
+    class Meta:
+        model = JournalEntry
+        fields = [
+            'id', 'url', 'model', 'object_id', 'user_display',
+            'comment', 'created', 'created_at', 'updated_at',
+        ]
+        brief_fields = ['id', 'url', 'model', 'object_id']
+
+    def validate(self, attrs):
+        if self.instance is None:
+            # Create: stamp the author and verify the journaled object is visible
+            # within the active tenant. validate_gfk_target_tenant resolves via
+            # the target's default manager AND compares obj.tenant to the active
+            # tenant, so it also guards tenant-owned models whose default manager
+            # is NOT tenant-scoping (Dashboard, Job, Token, TenantMembership) — a
+            # plain .exists() check would let those through cross-tenant.
+            request = self.context.get('request')
+            if request is not None and request.user.is_authenticated:
+                attrs['user'] = request.user
+            validate_gfk_target_tenant(attrs.get('model'), attrs.get('object_id'))
+        else:
+            # Update: the journaled object (model/object_id) and the author are
+            # immutable — an entry stays attached to its original subject and
+            # author. Drop any attempt to change them.
+            attrs.pop('model', None)
+            attrs.pop('object_id', None)
+            attrs.pop('user', None)
+        return attrs
