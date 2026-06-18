@@ -2,6 +2,7 @@ from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 from django.shortcuts import redirect
 from django.db.models import Count
+from django.utils.translation import gettext_lazy as _
 from django_tables2 import RequestConfig
 
 from ..models import Manufacturer, Asset
@@ -130,7 +131,11 @@ class ManufacturerDeleteView(ObjectDeleteView):
         if asset_type_count > 0:
             messages.error(
                 request,
-                f"Cannot delete manufacturer '{manufacturer.name}': It is associated with {asset_type_count} asset type{'s' if asset_type_count != 1 else ''}."
+                _("Cannot delete manufacturer '%(name)s': It is associated with %(count)s asset type%(suffix)s.") % {
+                    "name": manufacturer.name,
+                    "count": asset_type_count,
+                    "suffix": 's' if asset_type_count != 1 else '',
+                }
             )
             return redirect(manufacturer.get_absolute_url())
 

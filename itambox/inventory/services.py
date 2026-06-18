@@ -2,6 +2,7 @@ from django.db import transaction
 from django.db.models import Sum
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
+from django.utils.translation import gettext_lazy as _
 from typing import Tuple, Any, Optional
 from .models import AccessoryAssignment, ConsumableAssignment, ComponentAllocation, AccessoryStock, ConsumableStock, ComponentStock
 
@@ -19,7 +20,7 @@ def checkout_inventory_item(
     **kwargs: Any
 ) -> Any:
     if not holder and not location and not asset:
-        raise ValidationError("Either holder, location, or asset must be specified.")
+        raise ValidationError(_("Either holder, location, or asset must be specified."))
 
     item_class_name = item.__class__.__name__
     if item_class_name == 'Accessory':
@@ -40,7 +41,7 @@ def checkout_inventory_item(
         item = type(item).objects.select_for_update().get(pk=item.pk)
 
         if not item.allow_overallocate and item.available < qty:
-            raise ValidationError("No stock available for checkout.")
+            raise ValidationError(_("No stock available for checkout."))
             
         if source_location:
             loc_stock = stock_model.objects.filter(
@@ -48,7 +49,7 @@ def checkout_inventory_item(
             ).aggregate(qty=Sum('qty'))['qty'] or 0
             if not item.allow_overallocate and loc_stock < qty:
                 raise ValidationError(
-                    f"Insufficient stock at {source_location}. Available: {loc_stock}, Requested: {qty}"
+                    _("Insufficient stock at %(location)s. Available: %(available)s, Requested: %(requested)s") % {"location": source_location, "available": loc_stock, "requested": qty}
                 )
 
         assignment = assignment_model.objects.create(
@@ -109,7 +110,7 @@ def adjust_inventory_stock(
     item = getattr(assignment_instance, item_field)
     
     def update_stock(item_val, location, qty_diff, allow_overallocate):
-        stock, _ = StockModel.objects.select_for_update().get_or_create(
+        stock, _created = StockModel.objects.select_for_update().get_or_create(
             location=location,
             **{item_field: item_val},
             defaults={'qty': 0}
@@ -117,7 +118,7 @@ def adjust_inventory_stock(
         if qty_diff < 0: # Deducting stock
             if not allow_overallocate and stock.qty < abs(qty_diff):
                 raise ValidationError(
-                    f"Insufficient stock at {location}. Available: {stock.qty}, Requested: {abs(qty_diff)}"
+                    _("Insufficient stock at %(location)s. Available: %(available)s, Requested: %(requested)s") % {"location": location, "available": stock.qty, "requested": abs(qty_diff)}
                 )
         # No max(0, ...) clamp: clamping the deduction while restoring the full qty
         # on check-in materialises stock out of nothing. The signed `qty` field lets

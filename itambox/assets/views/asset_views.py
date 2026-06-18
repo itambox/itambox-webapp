@@ -10,6 +10,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse, reverse_lazy, NoReverseMatch
 from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.utils.translation import gettext_lazy as _
 from django_tables2 import RequestConfig
 from django.db.models import Count, Prefetch
 from django.db import transaction
@@ -390,8 +391,8 @@ class AssetAuditView(GenericTransactionView):
     def get_success_message(self, result=None):
         asset = self.get_object()
         if result and result.get('session'):
-            return f"'{asset.name}' verified inside campaign '{result['session'].name}'."
-        return f"'{asset.name}' standalone verification recorded."
+            return _("'%(asset)s' verified inside campaign '%(campaign)s'.") % {"asset": asset.name, "campaign": result['session'].name}
+        return _("'%(asset)s' standalone verification recorded.") % {"asset": asset.name}
 
     service_callable = audit_asset_from_form
 
@@ -432,7 +433,7 @@ def bulk_assign_assets(request):
     holder_id = request.POST.get('holder_id')
 
     if not object_pks or not holder_id:
-        messages.error(request, "No assets selected or no holder specified.")
+        messages.error(request, _("No assets selected or no holder specified."))
         return HttpResponseRedirect(safe_return_url(request, request.META.get('HTTP_REFERER'), reverse('assets:asset_list')))
 
     holder = get_object_or_404(AssetHolder, pk=holder_id)
@@ -489,7 +490,7 @@ def bulk_assign_assets(request):
 
     messages.success(
         request,
-        f"Asynchronous checkout job '{job.name}' enqueued successfully! Tracking progress in real-time."
+        _("Asynchronous checkout job '%(job)s' enqueued successfully! Tracking progress in real-time.") % {"job": job.name}
     )
 
     if request.htmx:
@@ -521,13 +522,13 @@ def bulk_print_labels(request):
     layout_mode = request.POST.get('layout_mode', 'roll')
 
     if not object_pks:
-        messages.error(request, "No assets selected for label printing.")
+        messages.error(request, _("No assets selected for label printing."))
         return HttpResponseRedirect(safe_return_url(request, request.META.get('HTTP_REFERER'), reverse('assets:asset_list')))
 
     try:
         template_id = int(template_id)
     except (TypeError, ValueError):
-        messages.error(request, "No valid label template specified.")
+        messages.error(request, _("No valid label template specified."))
         return HttpResponseRedirect(safe_return_url(request, request.META.get('HTTP_REFERER'), reverse('assets:asset_list')))
 
     from django_q.tasks import async_task
@@ -578,7 +579,7 @@ def bulk_print_labels(request):
 
     messages.success(
         request,
-        f"Asynchronous label generation job '{job.name}' enqueued successfully! Tracking progress in real-time."
+        _("Asynchronous label generation job '%(job)s' enqueued successfully! Tracking progress in real-time.") % {"job": job.name}
     )
 
     if request.htmx:

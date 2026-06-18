@@ -5,7 +5,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse, reverse_lazy
 from django.http import HttpResponse
 from django.views.generic import View
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
@@ -94,7 +94,7 @@ class ConsumableDeleteView(ObjectDeleteView):
         if consumption_count > 0:
             messages.error(
                 request,
-                f"Cannot delete consumable '{consumable}': It has {consumption_count} historical consumption records."
+                _("Cannot delete consumable '%(consumable)s': It has %(count)s historical consumption records.") % {"consumable": consumable, "count": consumption_count}
             )
             return redirect(consumable.get_absolute_url())
         return super().post(request, *args, **kwargs)
@@ -208,7 +208,7 @@ class ConsumableStockAdjustView(LoginRequiredMixin, View):
 
         stock = get_object_or_404(ConsumableStock, pk=pk)
         if not request.user.has_perm('inventory.change_consumablestock', obj=stock.consumable):
-            return HttpResponseForbidden("Permission denied.")
+            return HttpResponseForbidden(_("Permission denied."))
         action = request.GET.get('action')
 
         if action == 'increment':
@@ -266,7 +266,7 @@ class ConsumableStockCreateModalView(LoginRequiredMixin, View):
                     "closeModalEvent": None,
                     "tableRefreshRequired": None,
                     "showMessage": {
-                        "message": f"Added stock pool for {stock.location}.",
+                        "message": str(_("Added stock pool for %(location)s.") % {"location": stock.location}),
                         "level": "success"
                     }
                 })

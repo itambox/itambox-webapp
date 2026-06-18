@@ -696,7 +696,7 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
                 from jinja2 import Environment
                 Environment().parse(self.template_content)
             except Exception as e:
-                raise ValidationError({'template_content': f"Jinja2 template compilation failed: {str(e)}"})
+                raise ValidationError({'template_content': _("Jinja2 template compilation failed: %(error)s") % {'error': str(e)}})
 
 
 class ScheduledReport(ChangeLoggingMixin, BaseModel):
@@ -788,23 +788,23 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
         super().clean()
         if self.frequency == 'cron':
             if not self.cron_expression:
-                raise ValidationError({'cron_expression': "Cron expression is required when frequency is set to Custom Cron."})
+                raise ValidationError({'cron_expression': _("Cron expression is required when frequency is set to Custom Cron.")})
             try:
                 from croniter import croniter
                 from django.utils import timezone
                 croniter(self.cron_expression, timezone.now())
             except Exception as e:
-                raise ValidationError({'cron_expression': f"Invalid Cron expression: {str(e)}"})
+                raise ValidationError({'cron_expression': _("Invalid Cron expression: %(error)s") % {'error': str(e)}})
         if self.recipients:
             from django.core.validators import validate_email
             emails = [e.strip() for e in self.recipients.split(',') if e.strip()]
             if not emails:
-                raise ValidationError({'recipients': "No recipient email addresses entered."})
+                raise ValidationError({'recipients': _("No recipient email addresses entered.")})
             for email in emails:
                 try:
                     validate_email(email)
                 except ValidationError:
-                    raise ValidationError({'recipients': f"'{email}' is not a valid email address."})
+                    raise ValidationError({'recipients': _("'%(email)s' is not a valid email address.") % {'email': email}})
 
 
 class ReportGenerationArchive(ChangeLoggingMixin, BaseModel):

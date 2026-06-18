@@ -122,9 +122,9 @@ class PurchaseOrderLine(BaseModel, ChangeLoggingMixin, SoftDeleteMixin):
             1 if self.license else 0,
         ])
         if filled == 0:
-            raise ValidationError("You must specify what item you are ordering.")
+            raise ValidationError(_("You must specify what item you are ordering."))
         if filled > 1:
-            raise ValidationError("A line item can only refer to one type of item.")
+            raise ValidationError(_("A line item can only refer to one type of item."))
 
 
 class ContractTypeChoices(models.TextChoices):
@@ -304,7 +304,7 @@ class Contract(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin):
     def clean(self):
         super().clean()
         if self.start_date and self.end_date and self.end_date < self.start_date:
-            raise ValidationError({'end_date': 'End date must be on or after the start date.'})
+            raise ValidationError({'end_date': _('End date must be on or after the start date.')})
 
 
 class FulfillmentLink(BaseModel, ChangeLoggingMixin, SoftDeleteMixin):

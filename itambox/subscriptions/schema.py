@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from core.graphql_utils import check_permission, get_object_or_denied, generate_slug, paginate_queryset
 from graphql import GraphQLError
 from django.core.exceptions import ValidationError, PermissionDenied
+from django.utils.translation import gettext_lazy as _
 
 
 def _resolve_owner(owner_id, user, active_tenant):
@@ -24,7 +25,7 @@ def _resolve_owner(owner_id, user, active_tenant):
     if active_tenant is not None:
         from organization.models import TenantMembership
         if not TenantMembership.objects.filter(user=owner, tenant=active_tenant).exists():
-            raise PermissionDenied("Owner must be a member of the active tenant.")
+            raise PermissionDenied(_("Owner must be a member of the active tenant."))
     return owner
 
 
@@ -245,7 +246,7 @@ class CreateProvider(graphene.Mutation):
 
         # Global object restriction for non-superusers
         if provider.tenant is None and provider.tenant_group is None and not user.is_superuser:
-            raise PermissionDenied("Only superusers can create global providers.")
+            raise PermissionDenied(_("Only superusers can create global providers."))
 
         ALLOWED_FIELDS = {
             'name', 'slug', 'account_id', 'portal_url', 'admin_notes', 'is_active'
@@ -290,7 +291,7 @@ class UpdateProvider(graphene.Mutation):
 
         # Global object restriction for non-superusers
         if provider.tenant is None and provider.tenant_group is None and not user.is_superuser:
-            raise PermissionDenied("Only superusers can modify global providers.")
+            raise PermissionDenied(_("Only superusers can modify global providers."))
 
         if 'tenant_id' in kwargs:
             tenant_id = kwargs.pop('tenant_id')
@@ -310,7 +311,7 @@ class UpdateProvider(graphene.Mutation):
 
         # Double check post-update status
         if provider.tenant is None and provider.tenant_group is None and not user.is_superuser:
-            raise PermissionDenied("Only superusers can make providers global.")
+            raise PermissionDenied(_("Only superusers can make providers global."))
 
         ALLOWED_FIELDS = {
             'name', 'slug', 'account_id', 'portal_url', 'admin_notes', 'is_active'
@@ -345,7 +346,7 @@ class DeleteProvider(graphene.Mutation):
 
         # Global object restriction for non-superusers
         if provider.tenant is None and provider.tenant_group is None and not user.is_superuser:
-            raise PermissionDenied("Only superusers can delete global providers.")
+            raise PermissionDenied(_("Only superusers can delete global providers."))
 
         provider.delete()
         return DeleteProvider(success=True)
@@ -363,7 +364,7 @@ def _resolve_cost_center(cost_center_id, user):
         from django.apps import apps
         CostCenter = apps.get_model('organization', 'CostCenter')
     except LookupError:
-        raise GraphQLError("CostCenter model is not yet available.")
+        raise GraphQLError(str(_("CostCenter model is not yet available.")))
     return get_object_or_denied(CostCenter, cost_center_id, user)
 
 
@@ -525,7 +526,7 @@ class CreateSubscriptionAssignment(graphene.Mutation):
         # Verify the target object exists and is scoped to the tenant
         model_class = content_type.model_class()
         if not model_class:
-            raise ValidationError("Invalid content type.")
+            raise ValidationError(_("Invalid content type."))
         get_object_or_denied(model_class, object_id, user, tenant=active_tenant)
 
         assignment = SubscriptionAssignment(
@@ -565,7 +566,7 @@ class UpdateSubscriptionAssignment(graphene.Mutation):
                 subscription__tenant=active_tenant
             ).get(pk=id)
         except SubscriptionAssignment.DoesNotExist:
-            raise PermissionDenied("Permission denied.")
+            raise PermissionDenied(_("Permission denied."))
 
         check_permission(info, 'subscriptions.change_subscriptionassignment', obj=assignment)
 
@@ -598,7 +599,7 @@ class DeleteSubscriptionAssignment(graphene.Mutation):
                 subscription__tenant=active_tenant
             ).get(pk=id)
         except SubscriptionAssignment.DoesNotExist:
-            raise PermissionDenied("Permission denied.")
+            raise PermissionDenied(_("Permission denied."))
 
         check_permission(info, 'subscriptions.delete_subscriptionassignment', obj=assignment)
 

@@ -1,6 +1,7 @@
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from assets.models import Asset, StatusLabel, AssetRequest
 from assets.choices import RequestStatusChoices
 from inventory.models import ComponentStock, AccessoryStock, ConsumableStock
@@ -13,14 +14,14 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
     asset_details: list of dicts [{'line_id': int, 'serial_number': str, 'asset_tag': str, 'name': str}]
     """
     if po.status not in [PurchaseOrder.STATUS_ORDERED, PurchaseOrder.STATUS_PARTIAL]:
-        raise ValidationError(f"Cannot receive stock on a purchase order in '{po.get_status_display()}' status. It must be Ordered or Partially Received.")
+        raise ValidationError(_("Cannot receive stock on a purchase order in '%(status)s' status. It must be Ordered or Partially Received.") % {'status': po.get_status_display()})
 
     any_outstanding = False
     
     # Pre-fetch deployable status label
     deployable_status = StatusLabel.objects.filter(type='deployable').first()
     if not deployable_status:
-        raise ValidationError("Deployable status label does not exist in the database.")
+        raise ValidationError(_("Deployable status label does not exist in the database."))
 
     # Group asset details by line_id for quick lookup
     details_by_line = {}
@@ -39,7 +40,7 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
             continue
             
         if qty > line.qty_outstanding:
-            raise ValidationError(f"Cannot receive {qty} for line {line.pk} — only {line.qty_outstanding} outstanding.")
+            raise ValidationError(_("Cannot receive %(qty)s for line %(line)s — only %(outstanding)s outstanding.") % {'qty': qty, 'line': line.pk, 'outstanding': line.qty_outstanding})
         
         if line.asset_type:
             # Get details for this line
@@ -89,7 +90,7 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
                     req_idx += 1
                     
         elif line.component:
-            stock, _ = ComponentStock.objects.get_or_create(
+            stock, _created = ComponentStock.objects.get_or_create(
                 component=line.component,
                 location=po.destination_location,
                 defaults={'qty': 0}
@@ -109,7 +110,7 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
                 req.save()
                 
         elif line.accessory:
-            stock, _ = AccessoryStock.objects.get_or_create(
+            stock, _created = AccessoryStock.objects.get_or_create(
                 accessory=line.accessory,
                 location=po.destination_location,
                 defaults={'qty': 0}
@@ -129,7 +130,7 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
                 req.save()
                 
         elif line.consumable:
-            stock, _ = ConsumableStock.objects.get_or_create(
+            stock, _created = ConsumableStock.objects.get_or_create(
                 consumable=line.consumable,
                 location=po.destination_location,
                 defaults={'qty': 0}
@@ -178,27 +179,27 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
 def approve_purchase_order(po, user=None, request=None):
     """Transition PO from draft to approved status."""
     if po.status != PurchaseOrder.STATUS_DRAFT:
-        raise ValidationError(f"Cannot approve a purchase order in '{po.get_status_display()}' status.")
+        raise ValidationError(_("Cannot approve a purchase order in '%(status)s' status.") % {'status': po.get_status_display()})
     if not po.lines.exists():
-        raise ValidationError("Cannot approve a purchase order with no line items.")
+        raise ValidationError(_("Cannot approve a purchase order with no line items."))
     # Segregation of duties: the user who created the PO must not approve it.
     if user is not None and po.created_by_id and po.created_by_id == getattr(user, 'id', None):
-        raise ValidationError("A purchase order cannot be approved by the user who created it.")
+        raise ValidationError(_("A purchase order cannot be approved by the user who created it."))
     po.status = PurchaseOrder.STATUS_APPROVED
     po.save(update_fields=['status'])
-    return {"message": f"Purchase Order {po.order_number} has been approved."}
+    return {"message": _("Purchase Order %(number)s has been approved.") % {'number': po.order_number}}
 
 
 @transaction.atomic
 def order_purchase_order(po, user=None, request=None):
     """Transition PO from approved to ordered status."""
     if po.status != PurchaseOrder.STATUS_APPROVED:
-        raise ValidationError(f"Cannot mark a purchase order as ordered when in '{po.get_status_display()}' status. It must be Approved first.")
+        raise ValidationError(_("Cannot mark a purchase order as ordered when in '%(status)s' status. It must be Approved first.") % {'status': po.get_status_display()})
     po.status = PurchaseOrder.STATUS_ORDERED
     if not po.order_date:
         po.order_date = timezone.now().date()
     po.save(update_fields=['status', 'order_date'])
-    return {"message": f"Purchase Order {po.order_number} marked as Ordered."}
+    return {"message": _("Purchase Order %(number)s marked as Ordered.") % {'number': po.order_number}}
 
 
 @transaction.atomic
@@ -206,7 +207,7 @@ def cancel_purchase_order(po, user=None, request=None):
     """Transition PO from draft, approved, or ordered to cancelled status."""
     allowed_statuses = [PurchaseOrder.STATUS_DRAFT, PurchaseOrder.STATUS_APPROVED, PurchaseOrder.STATUS_ORDERED]
     if po.status not in allowed_statuses:
-        raise ValidationError(f"Cannot cancel a purchase order in '{po.get_status_display()}' status.")
+        raise ValidationError(_("Cannot cancel a purchase order in '%(status)s' status.") % {'status': po.get_status_display()})
     
     # Revert linked AssetRequests back to Approved and delete FulfillmentLinks
     for line in po.lines.all():
@@ -220,15 +221,15 @@ def cancel_purchase_order(po, user=None, request=None):
 
     po.status = PurchaseOrder.STATUS_CANCELLED
     po.save(update_fields=['status'])
-    return {"message": f"Purchase Order {po.order_number} cancelled. Linked asset requests reverted to Approved status."}
+    return {"message": _("Purchase Order %(number)s cancelled. Linked asset requests reverted to Approved status.") % {'number': po.order_number}}
 
 
 @transaction.atomic
 def reopen_purchase_order(po, user=None, request=None):
     """Transition PO from cancelled back to draft status."""
     if po.status != PurchaseOrder.STATUS_CANCELLED:
-        raise ValidationError(f"Cannot reopen a purchase order in '{po.get_status_display()}' status.")
-    
+        raise ValidationError(_("Cannot reopen a purchase order in '%(status)s' status.") % {'status': po.get_status_display()})
+
     po.status = PurchaseOrder.STATUS_DRAFT
     po.save(update_fields=['status'])
-    return {"message": f"Purchase Order {po.order_number} has been reopened and set to Draft."}
+    return {"message": _("Purchase Order %(number)s has been reopened and set to Draft.") % {'number': po.order_number}}

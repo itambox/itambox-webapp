@@ -151,7 +151,7 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
 
                 messages.success(
                     request,
-                    f"Asynchronous import job '{job.name}' enqueued successfully! Tracking progress in real-time.",
+                    _("Asynchronous import job '%(name)s' enqueued successfully! Tracking progress in real-time.") % {'name': job.name},
                 )
 
                 request.session.pop('import_rows', None)
@@ -161,7 +161,7 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
                     return redirect('job_detail', pk=job.pk)
                 except NoReverseMatch:
                     return redirect(f"/jobs/{job.pk}/")
-            return self._render_response(request, form, errors=['No import data found. Please upload a file first.'])
+            return self._render_response(request, form, errors=[_('No import data found. Please upload a file first.')])
 
         return self._render_response(request, form)
 

@@ -14,6 +14,7 @@ from django.contrib import messages
 from django.utils import timezone
 from django.contrib.contenttypes.models import ContentType
 from django.utils.http import urlencode
+from django.utils.translation import gettext_lazy as _
 from django_tables2 import RequestConfig
 
 from core.models import ObjectChange
@@ -330,9 +331,9 @@ class JournalEntryCreateView(LoginRequiredMixin, View):
                 user=request.user,
                 comment=form.cleaned_data['comment'],
             )
-            messages.success(request, 'Journal entry added.')
+            messages.success(request, _('Journal entry added.'))
         else:
-            messages.error(request, 'Could not add journal entry.')
+            messages.error(request, _('Could not add journal entry.'))
         return HttpResponseRedirect(safe_return_url(
             request,
             request.POST.get('return_url') or request.META.get('HTTP_REFERER'),
@@ -356,7 +357,7 @@ class ImageAttachmentUploadView(LoginRequiredMixin, View):
                 image=uploaded_file,
                 name=uploaded_file.name,
             )
-            messages.success(request, f"Image '{uploaded_file.name}' uploaded.")
+            messages.success(request, _("Image '%(name)s' uploaded.") % {'name': uploaded_file.name})
         return redirect(safe_return_url(request, request.POST.get('return_url'), obj.get_absolute_url()))
 
 
@@ -371,7 +372,7 @@ class FileAttachmentUploadView(LoginRequiredMixin, View):
         uploaded_file = request.FILES.get('file')
         if uploaded_file:
             import mimetypes
-            mime_type, _ = mimetypes.guess_type(uploaded_file.name)
+            mime_type, _encoding = mimetypes.guess_type(uploaded_file.name)
             FileAttachment.objects.create(
                 model=obj_type,
                 object_id=obj.pk,
@@ -379,7 +380,7 @@ class FileAttachmentUploadView(LoginRequiredMixin, View):
                 name=uploaded_file.name,
                 mime_type=mime_type or '',
             )
-            messages.success(request, f"File '{uploaded_file.name}' uploaded.")
+            messages.success(request, _("File '%(name)s' uploaded.") % {'name': uploaded_file.name})
         return redirect(safe_return_url(request, request.POST.get('return_url'), obj.get_absolute_url()))
 
 
@@ -404,7 +405,7 @@ class ImageAttachmentDeleteView(LoginRequiredMixin, View):
         _check_attachment_parent_access(request, attachment.model, attachment.object_id)
         obj_url = safe_return_url(request, request.POST.get('return_url'), '/')
         attachment.delete()
-        messages.success(request, f"Image '{attachment.name}' deleted.")
+        messages.success(request, _("Image '%(name)s' deleted.") % {'name': attachment.name})
         return redirect(obj_url)
 
 
@@ -414,7 +415,7 @@ class FileAttachmentDeleteView(LoginRequiredMixin, View):
         _check_attachment_parent_access(request, attachment.model, attachment.object_id)
         obj_url = safe_return_url(request, request.POST.get('return_url'), '/')
         attachment.delete()
-        messages.success(request, f"File '{attachment.name}' deleted.")
+        messages.success(request, _("File '%(name)s' deleted.") % {'name': attachment.name})
         return redirect(obj_url)
 
 
@@ -573,7 +574,7 @@ class WebhookEndpointDetailView(WorkerStatusContextMixin, ObjectDetailView):
         try:
             validate_external_url(endpoint.url)
         except ValidationError as e:
-            messages.error(request, f"Test webhook blocked: {'; '.join(e.messages)}")
+            messages.error(request, _("Test webhook blocked: %(reason)s") % {'reason': '; '.join(e.messages)})
             return redirect(self.object.get_absolute_url())
 
         try:
@@ -584,9 +585,9 @@ class WebhookEndpointDetailView(WorkerStatusContextMixin, ObjectDetailView):
                 data=body,
                 timeout=10,
             )
-            messages.success(request, f"Test webhook sent — HTTP {response.status_code}")
+            messages.success(request, _("Test webhook sent — HTTP %(status)s") % {'status': response.status_code})
         except http_requests.RequestException as e:
-            messages.error(request, f"Test webhook failed: {e}")
+            messages.error(request, _("Test webhook failed: %(error)s") % {'error': e})
 
         return redirect(self.object.get_absolute_url())
 
@@ -605,7 +606,7 @@ class WebhookEndpointEditView(ObjectEditView):
     def _test_webhook(self, request):
         url = request.POST.get('url', '')
         if not url:
-            messages.error(request, "No URL configured.")
+            messages.error(request, _("No URL configured."))
             return redirect(request.get_full_path())
 
         from django.core.exceptions import ValidationError
@@ -613,7 +614,7 @@ class WebhookEndpointEditView(ObjectEditView):
         try:
             validate_external_url(url)
         except ValidationError as e:
-            messages.error(request, f"Webhook test blocked: {'; '.join(e.messages)}")
+            messages.error(request, _("Webhook test blocked: %(reason)s") % {'reason': '; '.join(e.messages)})
             return redirect(request.get_full_path())
 
         success = False
@@ -630,11 +631,11 @@ class WebhookEndpointEditView(ObjectEditView):
                 resp = requests.post(url, json={'test': True, 'message': test_payload}, timeout=10)
                 success = resp.status_code < 400
         except Exception as e:
-            messages.error(request, f"Test failed: {e}")
+            messages.error(request, _("Test failed: %(error)s") % {'error': e})
         if success:
-            messages.success(request, "Webhook test succeeded!")
+            messages.success(request, _("Webhook test succeeded!"))
         else:
-            messages.error(request, "Webhook test failed.")
+            messages.error(request, _("Webhook test failed."))
         return redirect(request.get_full_path())
 
     def get_context_data(self, **kwargs):

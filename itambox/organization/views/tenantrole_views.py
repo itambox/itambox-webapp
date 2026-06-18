@@ -4,6 +4,7 @@ from django.db import transaction
 from django.db.models import Count, ProtectedError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
+from django.utils.translation import gettext_lazy as _
 from django.views.generic import View
 
 from itambox.views.generic import (
@@ -114,14 +115,14 @@ class TenantRoleBulkDeleteView(ObjectBulkDeleteView):
         )
 
         if not pks:
-            messages.warning(request, "No roles were selected.")
+            messages.warning(request, _("No roles were selected."))
             return HttpResponseRedirect(return_url)
 
         queryset = self._get_queryset(pks)
         objects_to_delete = list(queryset)
 
         if not objects_to_delete:
-            messages.warning(request, "No valid roles selected for deletion.")
+            messages.warning(request, _("No valid roles selected for deletion."))
             return HttpResponseRedirect(return_url)
 
         if '_confirm' in request.POST:
@@ -131,15 +132,15 @@ class TenantRoleBulkDeleteView(ObjectBulkDeleteView):
                     for obj in objects_to_delete:
                         obj.delete()
                         deleted_count += 1
-                messages.success(request, f"Successfully deleted {deleted_count} role(s).")
+                messages.success(request, _("Successfully deleted %(count)d role(s).") % {'count': deleted_count})
                 return HttpResponseRedirect(return_url)
             except ProtectedError as e:
                 # Extract the names of the roles that still have memberships.
                 blocked_names = ', '.join(str(o) for o in objects_to_delete if o.memberships.exists())
                 messages.error(
                     request,
-                    f"Cannot delete: the following roles still have members and are protected: {blocked_names}. "
-                    "Remove all memberships from these roles before deleting them."
+                    _("Cannot delete: the following roles still have members and are protected: %(names)s. "
+                      "Remove all memberships from these roles before deleting them.") % {'names': blocked_names}
                 )
                 return HttpResponseRedirect(return_url)
         else:
@@ -206,7 +207,12 @@ class TenantRoleAssignUsersView(LoginRequiredMixin, View):
                         unchanged += 1
             messages.success(
                 request,
-                f"Assigned '{role.name}': {added} added, {updated} updated, {unchanged} unchanged."
+                _("Assigned '%(role)s': %(added)d added, %(updated)d updated, %(unchanged)d unchanged.") % {
+                    'role': role.name,
+                    'added': added,
+                    'updated': updated,
+                    'unchanged': unchanged,
+                }
             )
             return redirect(reverse('organization:tenantrole_detail', kwargs={'pk': role.pk}))
 

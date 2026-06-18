@@ -255,7 +255,7 @@ class ConfigContextForm(forms.ModelForm):
             import json
             return json.loads(data)
         except json.JSONDecodeError as e:
-            raise forms.ValidationError(f"Invalid JSON: {e}")
+            raise forms.ValidationError(_("Invalid JSON: %(error)s") % {'error': e})
 
 
 import django_filters
@@ -565,7 +565,7 @@ class EventRuleForm(forms.ModelForm):
             try:
                 return _json.loads(data)
             except _json.JSONDecodeError:
-                raise forms.ValidationError('Conditions must be valid JSON.')
+                raise forms.ValidationError(_('Conditions must be valid JSON.'))
         return data or {}
 
     def clean_action_config(self):
@@ -576,7 +576,7 @@ class EventRuleForm(forms.ModelForm):
             try:
                 return _json.loads(data)
             except _json.JSONDecodeError:
-                raise forms.ValidationError('Action config must be valid JSON.')
+                raise forms.ValidationError(_('Action config must be valid JSON.'))
         return data or {}
 
     def clean(self):

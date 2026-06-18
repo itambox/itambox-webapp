@@ -6,6 +6,7 @@ from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db import transaction
 from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, get_object_or_404, render
+from django.utils.translation import gettext_lazy as _
 from django.views.generic import FormView, View
 
 from itambox.views.htmx import BaseHTMXView
@@ -18,7 +19,7 @@ class GenericTransactionView(PermissionRequiredMixin, LoginRequiredMixin, BaseHT
     model_form = None
     service_callable = None
     context_object_name = 'object'
-    success_message = "Operation completed successfully."
+    success_message = _("Operation completed successfully.")
     hx_trigger = "tableRefreshRequired"
     form_field_map = {}
     form_exclude_fields = ()
@@ -126,7 +127,7 @@ class GenericTransactionView(PermissionRequiredMixin, LoginRequiredMixin, BaseHT
             return self.form_invalid(form)
         except Exception as e:
             logger.exception("Unexpected error in %s.form_valid", self.__class__.__name__)
-            form.add_error(None, "An unexpected error occurred. Please try again or contact support.")
+            form.add_error(None, _("An unexpected error occurred. Please try again or contact support."))
             return self.form_invalid(form)
 
     def form_invalid(self, form):
@@ -146,7 +147,7 @@ class GenericTransactionView(PermissionRequiredMixin, LoginRequiredMixin, BaseHT
             "closeModalEvent": None,
             self.hx_trigger: None,
             "showMessage": {
-                "message": self.get_success_message(result),
+                "message": str(self.get_success_message(result)),
                 "level": "success"
             }
         }
@@ -186,7 +187,7 @@ class SimplePostView(PermissionRequiredMixin, LoginRequiredMixin, View):
             result = self.perform_action(obj, request)
             if getattr(request, 'htmx', False):
                 return self._htmx_success_response(obj, result)
-            messages.success(request, result.get('message', 'Action completed successfully.'))
+            messages.success(request, result.get('message', _('Action completed successfully.')))
             return self.get_success_redirect(obj, result)
         except ValidationError as e:
             if hasattr(e, 'message_dict'):
@@ -235,7 +236,7 @@ class SimplePostView(PermissionRequiredMixin, LoginRequiredMixin, View):
             "closeModalEvent": None,
             self.hx_trigger: None,
             "showMessage": {
-                "message": result.get('message', 'Done.'),
+                "message": str(result.get('message', _('Done.'))),
                 "level": "success"
             }
         })

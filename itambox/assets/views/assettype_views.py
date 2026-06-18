@@ -1,6 +1,7 @@
 from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 from django.shortcuts import redirect
+from django.utils.translation import gettext_lazy as _
 from django_tables2 import RequestConfig
 
 from ..models import AssetType
@@ -96,7 +97,11 @@ class AssetTypeDeleteView(ObjectDeleteView):
         if asset_count > 0:
             messages.error(
                 request,
-                f"Cannot delete asset type '{assettype}': It is associated with {asset_count} asset{'s' if asset_count != 1 else ''}."
+                _("Cannot delete asset type '%(type)s': It is associated with %(count)s asset%(suffix)s.") % {
+                    "type": assettype,
+                    "count": asset_count,
+                    "suffix": 's' if asset_count != 1 else '',
+                }
             )
             return redirect(assettype.get_absolute_url())
 

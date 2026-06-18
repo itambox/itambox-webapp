@@ -205,11 +205,11 @@ class CustodyTemplateForm(forms.ModelForm):
         tenant_group = cleaned_data.get('tenant_group')
 
         if tenant and tenant_group:
-            raise forms.ValidationError("You can assign this template to either a Tenant or a Tenant Group, but not both.")
+            raise forms.ValidationError(_("You can assign this template to either a Tenant or a Tenant Group, but not both."))
 
         from django.conf import settings
         if not getattr(settings, 'ALLOW_GLOBAL_CUSTODY_TEMPLATES', True):
             if not tenant and not tenant_group:
-                raise forms.ValidationError("Global custody templates are disabled. You must select either a Tenant or a Tenant Group.")
+                raise forms.ValidationError(_("Global custody templates are disabled. You must select either a Tenant or a Tenant Group."))
 
         return cleaned_data

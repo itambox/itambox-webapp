@@ -7,6 +7,7 @@ from django.db import transaction
 from django.db.models import ProtectedError
 from django.http import HttpResponseRedirect
 from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
 from django.views.generic import View
 from django.views.generic.base import TemplateResponseMixin
 
@@ -48,7 +49,7 @@ class ObjectBulkEditView(BulkViewMixin, PermissionRequiredMixin, LoginRequiredMi
         selected_fields = [f for f in raw_selected_fields if f not in ('add_tags', 'remove_tags')]
 
         if not pks:
-            messages.warning(request, f"No {model._meta.verbose_name_plural} were selected.")
+            messages.warning(request, _("No %(objects)s were selected.") % {'objects': model._meta.verbose_name_plural})
             return HttpResponseRedirect(return_url)
 
         queryset = self._get_queryset(pks)
@@ -66,8 +67,8 @@ class ObjectBulkEditView(BulkViewMixin, PermissionRequiredMixin, LoginRequiredMi
                         model_name = model._meta.model_name
                         perm_codename = f'{app_label}.change_{model_name}'
                         if not request.user.has_perm(perm_codename, obj=selected_tenant):
-                            messages.error(request, f"You do not have permission to assign objects to tenant '{selected_tenant}'.")
-                            form.add_error('tenant', f"You do not have permission to assign objects to tenant '{selected_tenant}'.")
+                            messages.error(request, _("You do not have permission to assign objects to tenant '%(tenant)s'.") % {'tenant': selected_tenant})
+                            form.add_error('tenant', _("You do not have permission to assign objects to tenant '%(tenant)s'.") % {'tenant': selected_tenant})
                             context = {
                                 'form': form,
                                 'model': model,
@@ -115,16 +116,16 @@ class ObjectBulkEditView(BulkViewMixin, PermissionRequiredMixin, LoginRequiredMi
 
                 messages.success(
                     request,
-                    f"Updated {updated_count} {model._meta.verbose_name_plural}.",
+                    _("Updated %(count)s %(objects)s.") % {'count': updated_count, 'objects': model._meta.verbose_name_plural},
                 )
                 return HttpResponseRedirect(return_url)
             else:
                 if not (selected_fields or form.cleaned_data.get('add_tags') or form.cleaned_data.get('remove_tags')):
-                    messages.warning(request, "No fields or tags were selected for editing.")
+                    messages.warning(request, _("No fields or tags were selected for editing."))
                 else:
                     for field_name, errors in form.errors.items():
                         field_label = form[field_name].label if field_name in form else field_name
-                        messages.error(request, f"Error in field '{field_label}': {', '.join(errors)}")
+                        messages.error(request, _("Error in field '%(field)s': %(errors)s") % {'field': field_label, 'errors': ', '.join(errors)})
                 form = self._get_bulk_edit_form(request.POST if '_apply' in request.POST else None, model)
         else:
             form = self._get_bulk_edit_form(model=model)
@@ -169,14 +170,14 @@ class ObjectBulkDeleteView(BulkViewMixin, PermissionRequiredMixin, LoginRequired
         )
 
         if not pks:
-            messages.warning(request, f"No {model._meta.verbose_name_plural} were selected.")
+            messages.warning(request, _("No %(objects)s were selected.") % {'objects': model._meta.verbose_name_plural})
             return HttpResponseRedirect(return_url)
 
         queryset = self._get_queryset(pks)
         objects_to_delete = list(queryset)
 
         if not objects_to_delete:
-            messages.warning(request, f"No valid {model._meta.verbose_name_plural} selected for deletion.")
+            messages.warning(request, _("No valid %(objects)s selected for deletion.") % {'objects': model._meta.verbose_name_plural})
             return HttpResponseRedirect(return_url)
 
         if '_confirm' in request.POST:
@@ -191,13 +192,13 @@ class ObjectBulkDeleteView(BulkViewMixin, PermissionRequiredMixin, LoginRequired
 
                 messages.success(
                     request,
-                    f"Successfully deleted {deleted_count} {model._meta.verbose_name_plural}.",
+                    _("Successfully deleted %(count)s %(objects)s.") % {'count': deleted_count, 'objects': model._meta.verbose_name_plural},
                 )
                 return HttpResponseRedirect(return_url)
             except ProtectedError as e:
                 messages.error(
                     request,
-                    f"Could not delete objects due to protected relationships: {e}",
+                    _("Could not delete objects due to protected relationships: %(error)s") % {'error': e},
                 )
                 return HttpResponseRedirect(return_url)
         else:

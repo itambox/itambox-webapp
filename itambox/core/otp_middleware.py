@@ -12,6 +12,7 @@ from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
 
 from core.mfa import request_needs_mfa
 
@@ -83,7 +84,7 @@ class OTPEnforcementMiddleware:
                     # browser navigations still get the redirect.
                     if self._is_api_request(request):
                         return JsonResponse(
-                            {'detail': 'MFA verification required.'},
+                            {'detail': str(_('MFA verification required.'))},
                             status=403,
                         )
                     return redirect(reverse('mfa_setup'))

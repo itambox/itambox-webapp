@@ -1,4 +1,5 @@
 from django import forms
+from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Div
 
@@ -84,7 +85,7 @@ class LocationForm(CustomFieldModelFormMixin, forms.ModelForm):
         parent = self.cleaned_data.get('parent')
         if parent and self.instance and self.instance.pk:
             if parent.pk == self.instance.pk:
-                raise forms.ValidationError("A location cannot be its own parent.")
+                raise forms.ValidationError(_("A location cannot be its own parent."))
         return parent
 
 

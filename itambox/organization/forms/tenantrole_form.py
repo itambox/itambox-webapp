@@ -1,4 +1,5 @@
 from django import forms
+from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout
 from core.forms import FilterForm
@@ -455,7 +456,7 @@ class TenantRoleForm(forms.ModelForm):
             escalated = [p for p in assigned_perms if not request_user.has_perm(p)]
             if escalated:
                 raise forms.ValidationError(
-                    f"Privilege escalation detected: You cannot assign the following permissions because you do not have them: {', '.join(escalated)}"
+                    _("Privilege escalation detected: You cannot assign the following permissions because you do not have them: %(perms)s") % {'perms': ', '.join(escalated)}
                 )
 
         # Whitelist validation: check if permission codenames are valid in Django's Permission model
@@ -467,7 +468,7 @@ class TenantRoleForm(forms.ModelForm):
         invalid_perms = [p for p in assigned_perms if p not in all_codenames]
         if invalid_perms:
             raise forms.ValidationError(
-                f"Invalid permission codenames: {', '.join(invalid_perms)}"
+                _("Invalid permission codenames: %(perms)s") % {'perms': ', '.join(invalid_perms)}
             )
 
         self.instance.permissions = list(assigned_perms)
@@ -485,7 +486,7 @@ class TenantRoleForm(forms.ModelForm):
         if self.instance.tenant:
             cleaned_data['tenant'] = self.instance.tenant
         else:
-            raise forms.ValidationError("Tenant assignment is required.")
+            raise forms.ValidationError(_("Tenant assignment is required."))
             
         return cleaned_data
 

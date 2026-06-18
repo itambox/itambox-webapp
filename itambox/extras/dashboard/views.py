@@ -6,6 +6,7 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.template.loader import render_to_string
 from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
 from django.views import View
 from django.views.generic import TemplateView
 
@@ -58,7 +59,7 @@ class DashboardWidgetConfigView(LoginRequiredMixin, View):
     def get(self, request, dashboard_id, index):
         dashboard = get_dashboard(request.user, dashboard_id=dashboard_id)
         if not (0 <= index < len(dashboard.layout)):
-            return HttpResponse('Widget not found', status=404)
+            return HttpResponse(_('Widget not found'), status=404)
         config = dashboard.layout[index]
         widget_id = config.get('widget')
         
@@ -121,7 +122,7 @@ class DashboardWidgetDeleteView(LoginRequiredMixin, View):
     def get(self, request, dashboard_id, index):
         dashboard = get_dashboard(request.user, dashboard_id=dashboard_id)
         if not (0 <= index < len(dashboard.layout)):
-            return HttpResponse('Widget not found', status=404)
+            return HttpResponse(_('Widget not found'), status=404)
         config = dashboard.layout[index]
         widget_cls = get_widget(config.get('widget', ''))
         html = render_to_string('extras/dashboard/widget_delete.html', {
@@ -209,8 +210,8 @@ class DashboardCreateView(LoginRequiredMixin, View):
         if not tenant_id:
             from django.contrib import messages
             if request.headers.get('HX-Request'):
-                return HttpResponse('<div class="alert alert-danger mb-0">Tenant is required.</div>', status=400)
-            messages.error(request, "Tenant is required.")
+                return HttpResponse('<div class="alert alert-danger mb-0">%s</div>' % _('Tenant is required.'), status=400)
+            messages.error(request, _("Tenant is required."))
             return redirect('dashboard')
 
         # Use _base_manager to bypass TenantScopingManager's fail-close.
@@ -218,8 +219,8 @@ class DashboardCreateView(LoginRequiredMixin, View):
         if not tenant:
             from django.contrib import messages
             if request.headers.get('HX-Request'):
-                return HttpResponse('<div class="alert alert-danger mb-0">Selected tenant does not exist.</div>', status=400)
-            messages.error(request, "Selected tenant does not exist.")
+                return HttpResponse('<div class="alert alert-danger mb-0">%s</div>' % _('Selected tenant does not exist.'), status=400)
+            messages.error(request, _("Selected tenant does not exist."))
             return redirect('dashboard')
 
         # If this is the user's first dashboard, make it the default
@@ -252,7 +253,7 @@ class DashboardDeleteView(LoginRequiredMixin, View):
         # Prevent deleting if it's the last dashboard
         if request.user.dashboards.count() <= 1:
             if request.headers.get('HX-Request'):
-                return HttpResponse('<div class="alert alert-danger mb-0">You must keep at least one dashboard.</div>', status=400)
+                return HttpResponse('<div class="alert alert-danger mb-0">%s</div>' % _('You must keep at least one dashboard.'), status=400)
             return redirect('dashboard')
 
         was_default = dashboard.is_default

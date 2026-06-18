@@ -2,6 +2,7 @@ from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 from django.db.models import Count, Q
+from django.utils.translation import gettext_lazy as _
 
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView,
@@ -104,7 +105,11 @@ class TenantGroupDeleteView(ObjectDeleteView):
         if tenant_count > 0:
             messages.error(
                 request,
-                f"Cannot delete tenant group '{tenantgroup.name}': It is associated with {tenant_count} tenant{'s' if tenant_count != 1 else ''}."
+                _("Cannot delete tenant group '%(name)s': It is associated with %(count)d tenant%(plural)s.") % {
+                    'name': tenantgroup.name,
+                    'count': tenant_count,
+                    'plural': 's' if tenant_count != 1 else '',
+                }
             )
             return redirect(tenantgroup.get_absolute_url())
 

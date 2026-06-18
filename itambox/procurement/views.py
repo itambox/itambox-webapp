@@ -3,6 +3,7 @@ from django.urls import reverse_lazy, reverse
 from django.contrib import messages
 from django.db import transaction
 from django.http import HttpResponse
+from django.utils.translation import gettext_lazy as _
 
 from itambox.views.generic import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
 from itambox.views.generic.service_views import SimplePostView
@@ -104,9 +105,9 @@ class PurchaseOrderEditView(ObjectEditView):
                 asset_request.status = RequestStatusChoices.PROCUREMENT
                 asset_request.save()
                 
-                messages.success(self.request, f"Linked Purchase Order to Asset Request #{asset_request.pk} and transitioned request status to Awaiting Procurement.")
+                messages.success(self.request, _("Linked Purchase Order to Asset Request #%(pk)s and transitioned request status to Awaiting Procurement.") % {'pk': asset_request.pk})
             except Exception as e:
-                messages.error(self.request, f"Failed to link PO to request: {e}")
+                messages.error(self.request, _("Failed to link PO to request: %(error)s") % {'error': e})
         return response
 
 class PurchaseOrderDeleteView(ObjectDeleteView):
@@ -132,7 +133,7 @@ class PurchaseOrderLineAddView(PermissionRequiredMixin, View):
     def post(self, request, *args, **kwargs):
         po = get_object_or_404(PurchaseOrder, pk=kwargs.get('po_pk'))
         if po.status != PurchaseOrder.STATUS_DRAFT:
-            messages.error(request, "Line items can only be added while the purchase order is in Draft status.")
+            messages.error(request, _("Line items can only be added while the purchase order is in Draft status."))
             return redirect(po.get_absolute_url())
         form = PurchaseOrderLineForm(request.POST)
         if form.is_valid():
@@ -142,7 +143,7 @@ class PurchaseOrderLineAddView(PermissionRequiredMixin, View):
             if po.tenant:
                 line.tenant = po.tenant
             line.save()
-            messages.success(request, "Line item added successfully.")
+            messages.success(request, _("Line item added successfully."))
             form = PurchaseOrderLineForm()
         else:
             for field, errors in form.errors.items():
@@ -173,7 +174,7 @@ class PurchaseOrderLineDeleteView(ObjectDeleteView):
             obj = self.get_object()
             po = obj.purchase_order
             if po.status != PurchaseOrder.STATUS_DRAFT:
-                messages.error(request, "Line items can only be removed while the purchase order is in Draft status.")
+                messages.error(request, _("Line items can only be removed while the purchase order is in Draft status."))
                 context = {
                     'object': po,
                     'lines': po.lines.all(),
@@ -181,7 +182,7 @@ class PurchaseOrderLineDeleteView(ObjectDeleteView):
                 }
                 return render(request, 'procurement/includes/purchaseorder_lines_container.html', context)
             obj.delete()
-            messages.success(request, "Line item deleted successfully.")
+            messages.success(request, _("Line item deleted successfully."))
             context = {
                 'object': po,
                 'lines': po.lines.all(),
@@ -209,7 +210,7 @@ class PurchaseOrderLineEditView(PermissionRequiredMixin, View):
         po = line.purchase_order
 
         if po.status != PurchaseOrder.STATUS_DRAFT:
-            messages.error(request, "Line items can only be edited while the purchase order is in Draft status.")
+            messages.error(request, _("Line items can only be edited while the purchase order is in Draft status."))
             context = {
                 'object': po,
                 'lines': po.lines.all(),
@@ -233,9 +234,9 @@ class PurchaseOrderLineEditView(PermissionRequiredMixin, View):
             line.qty_ordered = qty_ordered
             line.unit_price = unit_price
             line.save()
-            messages.success(request, "Line item updated successfully.")
+            messages.success(request, _("Line item updated successfully."))
         except Exception as e:
-            messages.error(request, f"Failed to update line item: {e}")
+            messages.error(request, _("Failed to update line item: %(error)s") % {'error': e})
             
         context = {
             'object': po,
@@ -266,7 +267,7 @@ class PurchaseOrderTransitionView(SimplePostView):
     def _htmx_success_response(self, obj, result):
         response = HttpResponse(status=204)
         response['HX-Redirect'] = obj.get_absolute_url()
-        messages.success(self.request, result.get('message', 'Action completed successfully.'))
+        messages.success(self.request, result.get('message', _('Action completed successfully.')))
         return response
 
 
@@ -370,10 +371,10 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
                     # Clear session
                     if 'receive_po_quantities' in request.session:
                         del request.session['receive_po_quantities']
-                    messages.success(request, "Stock received and assets provisioned successfully.")
+                    messages.success(request, _("Stock received and assets provisioned successfully."))
                     return redirect(po.get_absolute_url())
                 except Exception as e:
-                    messages.error(request, f"Error receiving purchase order: {e}")
+                    messages.error(request, _("Error receiving purchase order: %(error)s") % {'error': e})
                     return redirect(po.get_absolute_url())
             else:
                 # Render step 2 again with errors
@@ -450,10 +451,10 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
                     from .services import receive_purchase_order
                     try:
                         receive_purchase_order(po, line_quantities, asset_details=None)
-                        messages.success(request, "Stock received successfully.")
+                        messages.success(request, _("Stock received successfully."))
                         return redirect(po.get_absolute_url())
                     except Exception as e:
-                        messages.error(request, f"Error receiving purchase order: {e}")
+                        messages.error(request, _("Error receiving purchase order: %(error)s") % {'error': e})
                         return redirect(po.get_absolute_url())
             else:
                 # Step 1 invalid, render again with errors

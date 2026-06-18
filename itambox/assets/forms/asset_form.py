@@ -97,7 +97,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
             status_obj = StatusLabel.objects.filter(Q(slug=status) | Q(name__iexact=status)).first()
             if status_obj:
                 return status_obj
-            raise forms.ValidationError(f"Invalid status label: {status}")
+            raise forms.ValidationError(_("Invalid status label: %(status)s") % {"status": status})
         return status
 
     def clean_requestable(self):

@@ -5,6 +5,7 @@ from django.views.generic import View
 from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
+from django.utils.translation import gettext_lazy as _
 
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView, ObjectCloneView,
@@ -72,7 +73,11 @@ class ContactRoleDeleteView(ObjectDeleteView):
         if assignment_count > 0:
             messages.error(
                 request,
-                f"Cannot delete role '{role}': It is associated with {assignment_count} contact assignment{'s' if assignment_count != 1 else ''}."
+                _("Cannot delete role '%(role)s': It is associated with %(count)d contact assignment%(plural)s.") % {
+                    'role': role,
+                    'count': assignment_count,
+                    'plural': 's' if assignment_count != 1 else '',
+                }
             )
             return redirect(role.get_absolute_url())
 
@@ -87,7 +92,7 @@ class ContactAssignmentCreateView(LoginRequiredMixin, View):
         object_id = request.GET.get('object_id')
 
         if not content_type_id or not object_id:
-            return HttpResponseBadRequest("Missing content_type or object_id")
+            return HttpResponseBadRequest(_("Missing content_type or object_id"))
 
         content_type = get_object_or_404(ContentType, id=content_type_id)
         target_obj = get_object_or_404(content_type.model_class(), id=object_id)
@@ -106,7 +111,7 @@ class ContactAssignmentCreateView(LoginRequiredMixin, View):
         object_id = request.POST.get('object_id') or request.GET.get('object_id')
 
         if not content_type_id or not object_id:
-            return HttpResponseBadRequest("Missing content_type or object_id")
+            return HttpResponseBadRequest(_("Missing content_type or object_id"))
 
         content_type = get_object_or_404(ContentType, id=content_type_id)
         target_obj = get_object_or_404(content_type.model_class(), id=object_id)
@@ -114,7 +119,7 @@ class ContactAssignmentCreateView(LoginRequiredMixin, View):
         form = ContactAssignmentForm(request.POST, content_type=content_type, object_id=object_id)
         if form.is_valid():
             form.save()
-            messages.success(request, f"Assigned contact successfully to {target_obj}.")
+            messages.success(request, _("Assigned contact successfully to %(target)s.") % {'target': target_obj})
             return redirect(target_obj.get_absolute_url())
 
         context = {

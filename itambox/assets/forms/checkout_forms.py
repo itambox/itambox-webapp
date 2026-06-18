@@ -71,13 +71,13 @@ class AssetCheckOutForm(forms.Form):
         asset_target = cleaned_data.get('asset_target')
  
         if target_type == 'holder' and not holder:
-            raise ValidationError("Must select an Asset Holder.", code='holder_required')
+            raise ValidationError(_("Must select an Asset Holder."), code='holder_required')
         if target_type == 'location' and not location:
-            raise ValidationError("Must select a Location.", code='location_required')
+            raise ValidationError(_("Must select a Location."), code='location_required')
         if target_type == 'asset' and not asset_target:
-            raise ValidationError("Must select an Asset.", code='asset_required')
+            raise ValidationError(_("Must select an Asset."), code='asset_required')
         if not target_type:
-            raise ValidationError("Must select a target type.", code='target_type_required')
+            raise ValidationError(_("Must select a target type."), code='target_type_required')
         return cleaned_data
  
     def __init__(self, *args, **kwargs):

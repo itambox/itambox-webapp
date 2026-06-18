@@ -5,7 +5,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse, reverse_lazy
 from django.http import HttpResponse
 from django.views.generic import View
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
@@ -94,7 +94,7 @@ class AccessoryDeleteView(ObjectDeleteView):
         if assignment_count > 0:
             messages.error(
                 request,
-                f"Cannot delete accessory '{accessory}': It has {assignment_count} active assignments."
+                _("Cannot delete accessory '%(accessory)s': It has %(count)s active assignments.") % {"accessory": accessory, "count": assignment_count}
             )
             return redirect(accessory.get_absolute_url())
         return super().post(request, *args, **kwargs)
@@ -139,7 +139,7 @@ class AccessoryCheckinView(SimplePostView):
     def perform_action(self, assignment, request):
         accessory, qty, recipient = checkin_accessory(assignment.pk, user=request.user)
         return {
-            'message': f"Checked in {qty}x '{accessory}' from {recipient}.",
+            'message': str(_("Checked in %(qty)sx '%(accessory)s' from %(recipient)s.") % {"qty": qty, "accessory": accessory, "recipient": recipient}),
             'redirect': accessory.get_absolute_url(),
         }
 
@@ -221,7 +221,7 @@ class AccessoryStockAdjustView(LoginRequiredMixin, View):
 
         stock = get_object_or_404(AccessoryStock, pk=pk)
         if not request.user.has_perm('inventory.change_accessorystock', obj=stock.accessory):
-            return HttpResponseForbidden("Permission denied.")
+            return HttpResponseForbidden(_("Permission denied."))
         action = request.GET.get('action')
 
         if action == 'increment':
@@ -279,7 +279,7 @@ class AccessoryStockCreateModalView(LoginRequiredMixin, View):
                     "closeModalEvent": None,
                     "tableRefreshRequired": None,
                     "showMessage": {
-                        "message": f"Added stock pool for {stock.location}.",
+                        "message": str(_("Added stock pool for %(location)s.") % {"location": stock.location}),
                         "level": "success"
                     }
                 })

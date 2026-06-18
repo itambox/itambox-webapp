@@ -390,7 +390,10 @@ class BulkImportForm(forms.Form):
             if pk_name in mapped_data:
                 continue
             if not mapped_data.get(field):
-                raise ValidationError(f'Row {row_number}: "{field}" is required.')
+                raise ValidationError(
+                    _('Row %(row)s: "%(field)s" is required.')
+                    % {'row': row_number, 'field': field}
+                )
 
     def _create_instance(self, mapped_data):
         """Create a model instance from mapped data. Override in subclass."""

@@ -114,7 +114,7 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
                         RequestStatusChoices.CANCELLED: set(),
                     }
                     if self.status not in VALID_TRANSITIONS.get(old_status, set()):
-                        raise ValidationError(f"Invalid state transition from {old_status} to {self.status}.")
+                        raise ValidationError(_("Invalid state transition from %(old)s to %(new)s.") % {"old": old_status, "new": self.status})
             except AssetRequest.DoesNotExist:
                 pass
 
@@ -129,20 +129,20 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
             categories_filled.append("consumable")
 
         if len(categories_filled) == 0:
-            raise ValidationError("You must specify what item you are requesting (Asset, Asset Type, Component, Accessory, or Consumable).")
+            raise ValidationError(_("You must specify what item you are requesting (Asset, Asset Type, Component, Accessory, or Consumable)."))
         if len(categories_filled) > 1:
-            raise ValidationError("You cannot request more than one type of item in a single request.")
+            raise ValidationError(_("You cannot request more than one type of item in a single request."))
 
         if self.qty <= 0:
-            raise ValidationError("Requested quantity must be greater than zero.")
+            raise ValidationError(_("Requested quantity must be greater than zero."))
 
         if not self.pk:
             if self.asset and not self.asset.is_requestable:
-                raise ValidationError(f"The asset '{self.asset}' is not requestable.")
+                raise ValidationError(_("The asset '%(asset)s' is not requestable.") % {"asset": self.asset})
             if self.asset_type and not self.asset_type.requestable:
-                raise ValidationError(f"The asset type '{self.asset_type}' is not requestable.")
+                raise ValidationError(_("The asset type '%(type)s' is not requestable.") % {"type": self.asset_type})
             if self.asset and self.asset.status and self.asset.status.type != 'deployable':
-                raise ValidationError(f"The asset '{self.asset}' is currently not available (Status: {self.asset.status.name}).")
+                raise ValidationError(_("The asset '%(asset)s' is currently not available (Status: %(status)s).") % {"asset": self.asset, "status": self.asset.status.name})
 
             # Check for duplicate pending or approved requests by the same requester
             if self.requester_id and not getattr(self, '_skip_duplicate_check', False):
@@ -155,22 +155,22 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
                 )
                 if self.asset:
                     if duplicate_qs.filter(asset=self.asset).exists():
-                        raise ValidationError(f"You already have a pending or approved request for the asset '{self.asset}'.")
+                        raise ValidationError(_("You already have a pending or approved request for the asset '%(asset)s'.") % {"asset": self.asset})
                 elif self.asset_type:
                     if duplicate_qs.filter(asset_type=self.asset_type, asset__isnull=True).exists():
-                        raise ValidationError(f"You already have a pending or approved request for the asset type '{self.asset_type}'.")
+                        raise ValidationError(_("You already have a pending or approved request for the asset type '%(type)s'.") % {"type": self.asset_type})
                 elif self.component:
                     if duplicate_qs.filter(component=self.component).exists():
-                        raise ValidationError(f"You already have a pending or approved request for the component '{self.component}'.")
+                        raise ValidationError(_("You already have a pending or approved request for the component '%(component)s'.") % {"component": self.component})
                 elif self.accessory:
                     if duplicate_qs.filter(accessory=self.accessory).exists():
-                        raise ValidationError(f"You already have a pending or approved request for the accessory '{self.accessory}'.")
+                        raise ValidationError(_("You already have a pending or approved request for the accessory '%(accessory)s'.") % {"accessory": self.accessory})
                 elif self.consumable:
                     if duplicate_qs.filter(consumable=self.consumable).exists():
-                        raise ValidationError(f"You already have a pending or approved request for the consumable '{self.consumable}'.")
+                        raise ValidationError(_("You already have a pending or approved request for the consumable '%(consumable)s'.") % {"consumable": self.consumable})
 
         if self.asset and self.asset_type and self.asset.asset_type != self.asset_type:
-            raise ValidationError("The selected asset does not match the requested asset type.")
+            raise ValidationError(_("The selected asset does not match the requested asset type."))
 
     def save(self, *args, **kwargs):
         if not self.tenant:

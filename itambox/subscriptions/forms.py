@@ -253,7 +253,7 @@ class SubscriptionAssignmentForm(forms.ModelForm):
                 object_id=self.object_id
             ).exists():
                 raise forms.ValidationError(
-                    "This subscription is already assigned to this object."
+                    _("This subscription is already assigned to this object.")
                 )
         return cleaned_data
 
@@ -418,13 +418,13 @@ class SubscriptionCheckoutForm(forms.Form):
         location = cleaned_data.get('location')
 
         if target_type == 'holder' and not holder:
-            raise forms.ValidationError("Must select an Asset Holder.", code='holder_required')
+            raise forms.ValidationError(_("Must select an Asset Holder."), code='holder_required')
         if target_type == 'asset' and not asset:
-            raise forms.ValidationError("Must select a Hardware Asset.", code='asset_required')
+            raise forms.ValidationError(_("Must select a Hardware Asset."), code='asset_required')
         if target_type == 'location' and not location:
-            raise forms.ValidationError("Must select a Location.", code='location_required')
+            raise forms.ValidationError(_("Must select a Location."), code='location_required')
         if not target_type:
-            raise forms.ValidationError("Must select a target type.", code='target_type_required')
+            raise forms.ValidationError(_("Must select a target type."), code='target_type_required')
 
         # Check for duplicate assignment
         target_obj = None
@@ -444,7 +444,7 @@ class SubscriptionCheckoutForm(forms.Form):
                 object_id=target_obj.pk
             ).exists():
                 raise forms.ValidationError(
-                    f"This subscription is already assigned to {target_obj}."
+                    _("This subscription is already assigned to %(target)s.") % {"target": target_obj}
                 )
 
         return cleaned_data

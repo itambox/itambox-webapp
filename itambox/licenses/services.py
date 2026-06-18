@@ -1,6 +1,7 @@
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from .models import License, LicenseSeatAssignment
 from assets.models import Asset
 from organization.models import AssetHolder
@@ -15,16 +16,16 @@ def checkout_license(
     **kwargs
 ) -> LicenseSeatAssignment:
     if not asset and not assigned_holder:
-        raise ValidationError("Either asset or assigned_holder must be specified.")
+        raise ValidationError(_("Either asset or assigned_holder must be specified."))
     if asset and assigned_holder:
-        raise ValidationError("Cannot assign to both asset and assigned_holder.")
+        raise ValidationError(_("Cannot assign to both asset and assigned_holder."))
 
     with transaction.atomic():
         # Lock the license row to prevent TOCTOU race conditions under concurrent load
         lic = License.objects.select_for_update().get(pk=license_obj.pk)
         
         if lic.available_seats < 1:
-            raise ValidationError("No available seats left for this software license.")
+            raise ValidationError(_("No available seats left for this software license."))
             
         assignment = LicenseSeatAssignment.objects.create(
             license=lic,
@@ -60,4 +61,4 @@ def checkin_license_seat(
         lic._changelog_message = f"Checked in seat from {target}."
         lic.save(update_fields=[]) # Trigger pre_save/post_save signals for change logging
 
-        return {'message': f"License seat for '{lic.name}' checked in."}
+        return {'message': _("License seat for '%(name)s' checked in.") % {"name": lic.name}}

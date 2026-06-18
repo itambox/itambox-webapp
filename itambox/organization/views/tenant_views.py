@@ -3,6 +3,7 @@ from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 from django.db.models import Count
 from django.http import HttpResponse
+from django.utils.translation import gettext_lazy as _
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 
@@ -206,12 +207,15 @@ class TenantDeleteView(ObjectDeleteView):
 
         if related_count > 0:
             related_details = []
-            if tenant.sites.exists(): related_details.append(f"{tenant.sites.count()} sites")
-            if tenant.locations.exists(): related_details.append(f"{tenant.locations.count()} locations")
-            if tenant.asset_holders.exists(): related_details.append(f"{tenant.asset_holders.count()} asset holders")
+            if tenant.sites.exists(): related_details.append(_("%(count)d sites") % {'count': tenant.sites.count()})
+            if tenant.locations.exists(): related_details.append(_("%(count)d locations") % {'count': tenant.locations.count()})
+            if tenant.asset_holders.exists(): related_details.append(_("%(count)d asset holders") % {'count': tenant.asset_holders.count()})
             messages.error(
                 request,
-                f"Cannot delete tenant '{tenant.name}': It is associated with {', '.join(related_details)}."
+                _("Cannot delete tenant '%(name)s': It is associated with %(details)s.") % {
+                    'name': tenant.name,
+                    'details': ', '.join(str(d) for d in related_details),
+                }
             )
             return redirect(tenant.get_absolute_url())
 
@@ -241,12 +245,12 @@ def tenant_ldap_sync(request, pk):
 
     # Security check: verify user has permission to sync LDAP or change tenant
     if not request.user.has_perm('organization.change_tenant'):
-        messages.error(request, "You do not have permission to sync directory settings for this tenant.")
+        messages.error(request, _("You do not have permission to sync directory settings for this tenant."))
         return redirect(tenant.get_absolute_url())
 
     tenant_configs = getattr(settings, 'ITAMBOX_TENANT_LDAP_CONFIGS', {})
     if tenant.slug not in tenant_configs:
-        messages.error(request, f"No LDAP configuration found for tenant '{tenant.name}'.")
+        messages.error(request, _("No LDAP configuration found for tenant '%(name)s'.") % {'name': tenant.name})
         return redirect(tenant.get_absolute_url())
 
     ct = ContentType.objects.get_for_model(Tenant)
@@ -281,7 +285,7 @@ def tenant_ldap_sync(request, pk):
 
     messages.success(
         request,
-        f"LDAP synchronization job '{job.name}' enqueued successfully! Tracking progress in real-time."
+        _("LDAP synchronization job '%(name)s' enqueued successfully! Tracking progress in real-time.") % {'name': job.name}
     )
 
     try:

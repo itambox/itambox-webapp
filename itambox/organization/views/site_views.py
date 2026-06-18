@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 from django.db.models import Count
+from django.utils.translation import gettext_lazy as _
 
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView, ObjectCloneView,
@@ -100,13 +101,22 @@ class SiteDeleteView(ObjectDeleteView):
         if location_count > 0 or asset_count > 0:
             related_object_details = []
             if location_count > 0:
-                related_object_details.append(f"{location_count} location{'s' if location_count != 1 else ''}")
+                related_object_details.append(_("%(count)d location%(plural)s") % {
+                    'count': location_count,
+                    'plural': 's' if location_count != 1 else '',
+                })
             if asset_count > 0:
-                related_object_details.append(f"{asset_count} asset{'s' if asset_count != 1 else ''}")
+                related_object_details.append(_("%(count)d asset%(plural)s") % {
+                    'count': asset_count,
+                    'plural': 's' if asset_count != 1 else '',
+                })
 
             messages.error(
                 request,
-                f"Cannot delete site '{site.name}': It is associated with {', '.join(related_object_details)}."
+                _("Cannot delete site '%(name)s': It is associated with %(details)s.") % {
+                    'name': site.name,
+                    'details': ', '.join(str(d) for d in related_object_details),
+                }
             )
             return redirect(site.get_absolute_url())
 

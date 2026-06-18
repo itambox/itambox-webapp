@@ -2,6 +2,7 @@ from django.urls import reverse_lazy
 from django.contrib import messages
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
+from django.utils.translation import gettext_lazy as _
 
 from itambox.panels import Panel
 from itambox.views.generic import (
@@ -112,6 +113,6 @@ class AssetDisposeActionView(ObjectEditView):
 
         messages.success(
             self.request,
-            f"Asset '{asset}' has been marked as disposed and archived."
+            _("Asset '%(asset)s' has been marked as disposed and archived.") % {"asset": asset}
         )
         return HttpResponseRedirect(asset.get_absolute_url())

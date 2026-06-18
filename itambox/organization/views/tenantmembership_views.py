@@ -3,6 +3,7 @@ from django.db import transaction
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect, render
 from django.urls import reverse, reverse_lazy
+from django.utils.translation import gettext_lazy as _
 
 from itambox.views.generic.utils import safe_return_url
 from itambox.views.generic import (
@@ -103,14 +104,14 @@ class TenantMembershipBulkEditView(ObjectBulkEditView):
         )
 
         if not pks:
-            messages.warning(request, "No memberships were selected.")
+            messages.warning(request, _("No memberships were selected."))
             return HttpResponseRedirect(return_url)
 
         queryset = self._get_queryset(pks)
         objects = list(queryset)
 
         if not objects:
-            messages.warning(request, "No valid memberships selected (you may lack permission for the selected tenants).")
+            messages.warning(request, _("No valid memberships selected (you may lack permission for the selected tenants)."))
             return HttpResponseRedirect(return_url)
 
         if '_apply' in request.POST:
@@ -123,8 +124,8 @@ class TenantMembershipBulkEditView(ObjectBulkEditView):
                 if len(tenant_pks) > 1:
                     messages.error(
                         request,
-                        "Cannot bulk reassign: selected memberships span multiple tenants. "
-                        "Filter to a single tenant and try again."
+                        _("Cannot bulk reassign: selected memberships span multiple tenants. "
+                          "Filter to a single tenant and try again.")
                     )
                     return HttpResponseRedirect(return_url)
 
@@ -132,12 +133,12 @@ class TenantMembershipBulkEditView(ObjectBulkEditView):
                 if new_role.tenant_id != membership_tenant.pk:
                     messages.error(
                         request,
-                        f"Role '{new_role}' belongs to a different tenant than the selected memberships."
+                        _("Role '%(role)s' belongs to a different tenant than the selected memberships.") % {'role': new_role}
                     )
                     return HttpResponseRedirect(return_url)
 
                 if not request.user.has_perm('organization.change_tenantmembership', obj=membership_tenant):
-                    messages.error(request, "You do not have permission to change memberships for this tenant.")
+                    messages.error(request, _("You do not have permission to change memberships for this tenant."))
                     return HttpResponseRedirect(return_url)
 
                 updated_count = 0
@@ -147,7 +148,10 @@ class TenantMembershipBulkEditView(ObjectBulkEditView):
                         obj.save()
                         updated_count += 1
 
-                messages.success(request, f"Reassigned {updated_count} membership(s) to role '{new_role.name}'.")
+                messages.success(request, _("Reassigned %(count)d membership(s) to role '%(role)s'.") % {
+                    'count': updated_count,
+                    'role': new_role.name,
+                })
                 return HttpResponseRedirect(return_url)
         else:
             form = TenantMembershipBulkRoleForm()

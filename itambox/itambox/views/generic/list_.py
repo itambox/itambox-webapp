@@ -91,7 +91,7 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         show_deleted = self.request.GET.get('deleted') == 'true'
         if show_deleted and model and registry.model_has_feature(model, 'soft_delete'):
             if not self.request.user.is_superuser and not self.request.user.has_perm('core.view_recyclebin'):
-                raise PermissionDenied("You do not have permission to view the Recycle Bin.")
+                raise PermissionDenied(_("You do not have permission to view the Recycle Bin."))
             manager = getattr(model, 'all_objects', model._base_manager)
             queryset = manager.all()
             if hasattr(queryset, 'filter_by_tenant'):

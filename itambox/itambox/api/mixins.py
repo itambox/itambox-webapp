@@ -3,6 +3,7 @@ import logging
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import router, transaction
 from django.http import Http404
+from django.utils.translation import gettext_lazy as _
 from rest_framework import status
 from rest_framework.response import Response
 
@@ -28,7 +29,7 @@ class ETagMixin:
         if not self._get_if_match(request):
             from itambox.api.exceptions import PreconditionRequired
             raise PreconditionRequired(
-                detail='If-Match header is required for mutating requests.',
+                detail=_('If-Match header is required for mutating requests.'),
                 etag=self._get_etag(instance),
             )
 

@@ -402,7 +402,7 @@ class ColorFieldFormMixin:
             if len(cleaned_color) == 6:
                 return cleaned_color
             else:
-                raise forms.ValidationError("Ensure the color hex code is 6 characters long (after removing '#').")
+                raise forms.ValidationError(_("Ensure the color hex code is 6 characters long (after removing '#')."))
         elif not color:
             return ''
         if len(color) == 6:
@@ -410,4 +410,4 @@ class ColorFieldFormMixin:
         elif len(color) == 0:
             return ''
         else:
-            raise forms.ValidationError("Ensure the color hex code is 6 characters long.")
+            raise forms.ValidationError(_("Ensure the color hex code is 6 characters long."))

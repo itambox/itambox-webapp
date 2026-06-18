@@ -94,9 +94,9 @@ class KitItemForm(forms.ModelForm):
         targets = [asset_type, accessory, license_item, consumable]
         filled = [t for t in targets if t is not None]
         if len(filled) == 0:
-            raise ValidationError("A kit item must select either an Asset Type, Accessory, License, or Consumable.")
+            raise ValidationError(_("A kit item must select either an Asset Type, Accessory, License, or Consumable."))
         if len(filled) > 1:
-            raise ValidationError("A kit item cannot select more than one target (must be either Asset Type OR Accessory OR License OR Consumable).")
+            raise ValidationError(_("A kit item cannot select more than one target (must be either Asset Type OR Accessory OR License OR Consumable)."))
         return cleaned_data
 
 

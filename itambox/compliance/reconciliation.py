@@ -1,6 +1,7 @@
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset, StatusLabel
 from compliance.models import AuditSession, AssetAudit
@@ -63,15 +64,15 @@ def audit_asset(asset: Asset, user=None, session=None, location=None, status=Non
     status = status or asset.status
 
     if not location:
-        raise ValidationError("Audit observed location must be specified.")
+        raise ValidationError(_("Audit observed location must be specified."))
     if not status:
-        raise ValidationError("Audit observed status must be specified.")
+        raise ValidationError(_("Audit observed status must be specified."))
 
     if status and status.type == StatusLabel.TYPE_ARCHIVED:
-        raise ValidationError("Archived assets cannot be audited.")
+        raise ValidationError(_("Archived assets cannot be audited."))
 
     if session and AssetAudit.objects.filter(session=session, asset=asset).exists():
-        raise ValidationError("This asset has already been verified in this session.")
+        raise ValidationError(_("This asset has already been verified in this session."))
 
     audit_record = AssetAudit.objects.create(
         session=session,
@@ -118,8 +119,8 @@ def audit_asset_from_form(asset: Asset, user, location, status, notes: str = '',
     )
 
     if session:
-        return {'message': f"Verified inside campaign '{session.name}'.", 'session': session}
-    return {'message': "Standalone verification recorded.", 'session': None}
+        return {'message': _("Verified inside campaign '%(name)s'.") % {'name': session.name}, 'session': session}
+    return {'message': _("Standalone verification recorded."), 'session': None}
 
 
 def _audit_to_dict(audit, category: str, expected_location_name: str = None) -> dict:
@@ -172,7 +173,7 @@ def _missing_asset_to_dict(asset, session_location) -> dict:
 @transaction.atomic
 def close_audit_session(session: AuditSession, user=None, request=None, notes='', **kwargs) -> dict:
     if session.status == 'completed':
-        raise ValidationError("This audit campaign is already closed.")
+        raise ValidationError(_("This audit campaign is already closed."))
 
     session.status = 'completed'
     session.completed_at = timezone.now()
@@ -222,7 +223,7 @@ def rehome_audit_session_mismatches(session: AuditSession, user=None, request=No
     re-evaluation of current asset state.
     """
     if session.status != 'completed':
-        raise ValidationError("Audit sessions must be closed before bulk re-homing reconciliation.")
+        raise ValidationError(_("Audit sessions must be closed before bulk re-homing reconciliation."))
 
     if session.reconciliation_report:
         mismatch_ids = [
@@ -253,10 +254,10 @@ def flag_missing_assets(session: AuditSession, user=None, request=None, **kwargs
     Returns counts: flagged, skipped.
     """
     if session.status != 'completed':
-        raise ValidationError("Audit session must be closed before flagging missing assets.")
+        raise ValidationError(_("Audit session must be closed before flagging missing assets."))
 
     if not session.reconciliation_report:
-        raise ValidationError("No reconciliation report found. Close the session first.")
+        raise ValidationError(_("No reconciliation report found. Close the session first."))
 
     missing_rows = [
         row for row in session.reconciliation_report.get('rows', [])
@@ -265,7 +266,7 @@ def flag_missing_assets(session: AuditSession, user=None, request=None, **kwargs
     if not missing_rows:
         return {'flagged': 0, 'skipped': 0}
 
-    missing_status, _ = StatusLabel.objects.get_or_create(
+    missing_status, _created = StatusLabel.objects.get_or_create(
         name='Missing',
         defaults={'type': StatusLabel.TYPE_UNDEPLOYABLE, 'color': 'dc3545'},
     )

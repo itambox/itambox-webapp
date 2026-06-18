@@ -6,6 +6,7 @@ from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count, Q
+from django.utils.translation import gettext_lazy as _
 
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
@@ -145,7 +146,11 @@ class AssetHolderDeleteView(ObjectDeleteView):
         if assignment_count > 0:
             messages.error(
                 request,
-                f"Cannot delete asset holder '{assetholder}': It has {assignment_count} active assignment{'s' if assignment_count != 1 else ''}."
+                _("Cannot delete asset holder '%(holder)s': It has %(count)d active assignment%(plural)s.") % {
+                    'holder': assetholder,
+                    'count': assignment_count,
+                    'plural': 's' if assignment_count != 1 else '',
+                }
             )
             return redirect(assetholder.get_absolute_url())
 

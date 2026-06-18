@@ -45,7 +45,7 @@ class BaseCheckoutForm(forms.Form):
 
         filled = [t for t in [holder, location, asset] if t is not None]
         if len(filled) == 0:
-            raise ValidationError("You must select either an Asset Holder, a Location, or an Asset.")
+            raise ValidationError(_("You must select either an Asset Holder, a Location, or an Asset."))
         if len(filled) > 1:
-            raise ValidationError("Please select exactly one target (either Asset Holder, Location, OR Asset).")
+            raise ValidationError(_("Please select exactly one target (either Asset Holder, Location, OR Asset)."))
         return cleaned_data

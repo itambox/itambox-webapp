@@ -2,6 +2,7 @@ import logging
 
 from django.conf import settings
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from rest_framework import exceptions
 from rest_framework.authentication import BaseAuthentication, get_authorization_header
 
@@ -19,16 +20,16 @@ class TokenAuthentication(BaseAuthentication):
             return None
 
         if len(auth) == 1:
-            msg = 'Invalid token header. No credentials provided.'
+            msg = _('Invalid token header. No credentials provided.')
             raise exceptions.AuthenticationFailed(msg)
         elif len(auth) > 2:
-            msg = 'Invalid token header. Token string should not contain spaces.'
+            msg = _('Invalid token header. Token string should not contain spaces.')
             raise exceptions.AuthenticationFailed(msg)
 
         try:
             token = auth[1].decode()
         except UnicodeError:
-            msg = 'Invalid token header. Token string should not contain invalid characters.'
+            msg = _('Invalid token header. Token string should not contain invalid characters.')
             raise exceptions.AuthenticationFailed(msg)
 
         return self.authenticate_credentials(token, request)
@@ -41,10 +42,10 @@ class TokenAuthentication(BaseAuthentication):
 
         token = Token.find_by_key(key)
         if token is None:
-            raise exceptions.AuthenticationFailed('Invalid token.')
+            raise exceptions.AuthenticationFailed(_('Invalid token.'))
 
         if token.is_expired:
-            raise exceptions.AuthenticationFailed('Token expired.')
+            raise exceptions.AuthenticationFailed(_('Token expired.'))
 
         if request is not None and token.allowed_ips:
             from itambox.ratelimit import get_client_ip
@@ -54,17 +55,17 @@ class TokenAuthentication(BaseAuthentication):
                     'Token %s... rejected: source IP %s not in allowed_ips', key[:6], client_ip
                 )
                 raise exceptions.AuthenticationFailed(
-                    'Source IP address is not permitted to use this token.'
+                    _('Source IP address is not permitted to use this token.')
                 )
 
         # A read-only token must not be usable for any state-changing request.
         if request is not None and not token.write_enabled and request.method not in self.SAFE_METHODS:
             raise exceptions.AuthenticationFailed(
-                'This token is read-only and cannot be used for write operations.'
+                _('This token is read-only and cannot be used for write operations.')
             )
 
         if not token.user.is_active:
-            raise exceptions.AuthenticationFailed('User inactive or deleted.')
+            raise exceptions.AuthenticationFailed(_('User inactive or deleted.'))
 
         if not token.last_used or (timezone.now() - token.last_used).total_seconds() > 60:
             Token.objects.filter(pk=token.pk).update(last_used=timezone.now())

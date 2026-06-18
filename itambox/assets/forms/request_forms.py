@@ -185,39 +185,39 @@ class AssetRequestForm(forms.ModelForm):
             categories_filled.append("consumable")
 
         if len(categories_filled) == 0:
-            raise ValidationError("You must specify what item you are requesting (Asset, Asset Type, Component, Accessory, or Consumable).")
+            raise ValidationError(_("You must specify what item you are requesting (Asset, Asset Type, Component, Accessory, or Consumable)."))
         if len(categories_filled) > 1:
-            raise ValidationError("You cannot request more than one type of item in a single request.")
+            raise ValidationError(_("You cannot request more than one type of item in a single request."))
 
         if qty is None:
             qty = 1
             cleaned_data['qty'] = 1
         elif qty <= 0:
-            raise ValidationError({"qty": "Requested quantity must be greater than zero."})
+            raise ValidationError({"qty": _("Requested quantity must be greater than zero.")})
 
         if asset and asset_type and asset.asset_type != asset_type:
-            raise ValidationError({"asset": "Selected asset does not match the chosen asset type."})
+            raise ValidationError({"asset": _("Selected asset does not match the chosen asset type.")})
 
         # Process target selections based on target_type
         if target_type == 'assetholder':
             if not can_delegate:
-                raise ValidationError("You do not have permission to request assets on behalf of others.")
+                raise ValidationError(_("You do not have permission to request assets on behalf of others."))
             if not assigned_user:
-                raise ValidationError({"assigned_user": "Please select an Asset Holder target."})
+                raise ValidationError({"assigned_user": _("Please select an Asset Holder target.")})
             cleaned_data['assigned_location'] = None
             cleaned_data['assigned_asset'] = None
         elif target_type == 'location':
             if not can_delegate:
-                raise ValidationError("You do not have permission to request assets on behalf of others.")
+                raise ValidationError(_("You do not have permission to request assets on behalf of others."))
             if not assigned_location:
-                raise ValidationError({"assigned_location": "Please select a Location target."})
+                raise ValidationError({"assigned_location": _("Please select a Location target.")})
             cleaned_data['assigned_user'] = None
             cleaned_data['assigned_asset'] = None
         elif target_type == 'asset':
             if not can_delegate:
-                raise ValidationError("You do not have permission to request assets on behalf of others.")
+                raise ValidationError(_("You do not have permission to request assets on behalf of others."))
             if not assigned_asset:
-                raise ValidationError({"assigned_asset": "Please select a Parent Asset target."})
+                raise ValidationError({"assigned_asset": _("Please select a Parent Asset target.")})
             cleaned_data['assigned_user'] = None
             cleaned_data['assigned_location'] = None
         else: # target_type == '' (Myself)
@@ -305,14 +305,14 @@ class AssetRequestActionForm(forms.Form):
             
             # 1. Action form validation: requires stock location for inventory items
             if is_inventory and not allocated_location:
-                raise ValidationError({'allocated_location': "Stock location is required for inventory items."})
+                raise ValidationError({'allocated_location': _("Stock location is required for inventory items.")})
                 
             # 2. Action form validation: approved qty cannot exceed requested qty
             if qty is not None:
                 if qty <= 0:
-                    raise ValidationError({'qty': "Quantity must be greater than zero."})
+                    raise ValidationError({'qty': _("Quantity must be greater than zero.")})
                 if qty > self.request_instance.qty:
-                    raise ValidationError({'qty': "Approved quantity cannot exceed requested quantity."})
+                    raise ValidationError({'qty': _("Approved quantity cannot exceed requested quantity.")})
                     
         return cleaned_data
 
@@ -395,19 +395,19 @@ class AssetReceiveForm(forms.Form):
     def clean_asset_tag(self):
         asset_tag = self.cleaned_data.get('asset_tag', '').strip()
         if not asset_tag:
-            raise ValidationError("Asset tag is required.")
+            raise ValidationError(_("Asset tag is required."))
         from assets.models import Asset
         if Asset.objects.filter(asset_tag=asset_tag).exists():
-            raise ValidationError("Asset with this tag already exists.")
+            raise ValidationError(_("Asset with this tag already exists."))
         return asset_tag
 
     def clean_serial_number(self):
         serial_number = self.cleaned_data.get('serial_number', '').strip()
         if not serial_number:
-            raise ValidationError("Serial number is required.")
+            raise ValidationError(_("Serial number is required."))
         from assets.models import Asset
         if Asset.objects.filter(serial_number=serial_number).exists():
-            raise ValidationError("Asset with this serial number already exists.")
+            raise ValidationError(_("Asset with this serial number already exists."))
         return serial_number
 
 

@@ -2,6 +2,7 @@ import logging
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.utils.translation import gettext_lazy as _
 
 from core.models import Job, Notification
 from .context import TaskContext
@@ -31,7 +32,10 @@ def import_csv_task(job_id, rows_data, app_label, model_name, user_id, tenant_id
             try:
                 model = ContentType.objects.get(app_label=app_label, model=model_name).model_class()
                 if not model:
-                    raise ValidationError(f"Target model {app_label}.{model_name} could not be resolved.")
+                    raise ValidationError(
+                        _("Target model %(app_label)s.%(model_name)s could not be resolved.")
+                        % {'app_label': app_label, 'model_name': model_name}
+                    )
 
                 from itambox.views.generic import ObjectImportView
                 view_instance = ObjectImportView()

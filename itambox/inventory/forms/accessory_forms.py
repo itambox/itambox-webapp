@@ -156,7 +156,7 @@ class AccessoryCheckoutForm(BaseCheckoutForm):
         if self.accessory and qty:
             remaining = self.accessory.available
             if not self.accessory.allow_overallocate and qty > remaining:
-                raise ValidationError(f"Cannot checkout {qty} units. Only {remaining} units are currently in stock.")
+                raise ValidationError(_("Cannot checkout %(qty)s units. Only %(remaining)s units are currently in stock.") % {"qty": qty, "remaining": remaining})
         return cleaned_data
 
 

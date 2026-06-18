@@ -621,6 +621,6 @@ class KitItem(ChangeLoggingMixin, BaseModel):
         targets = [self.asset_type, self.accessory, self.license, self.consumable, self.component]
         filled = [t for t in targets if t is not None]
         if len(filled) == 0:
-            raise ValidationError("A kit item must select either an Asset Type, Accessory, License, Consumable, or Component.")
+            raise ValidationError(_("A kit item must select either an Asset Type, Accessory, License, Consumable, or Component."))
         if len(filled) > 1:
-            raise ValidationError("A kit item cannot select more than one target.")
+            raise ValidationError(_("A kit item cannot select more than one target."))

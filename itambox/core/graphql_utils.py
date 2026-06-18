@@ -1,6 +1,7 @@
 import logging
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.utils.text import slugify
+from django.utils.translation import gettext_lazy as _
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +24,9 @@ def paginate_queryset(qs, limit=None, offset=None, max_limit=MAX_PAGINATION_LIMI
 def check_permission(info, perm, obj=None):
     user = info.context.user
     if not user or not user.is_authenticated:
-        raise PermissionDenied("Authentication credentials were not provided.")
+        raise PermissionDenied(_("Authentication credentials were not provided."))
     if not user.has_perm(perm, obj=obj):
-        raise PermissionDenied("Permission denied.")
+        raise PermissionDenied(_("Permission denied."))
     return user
 
 def get_object_or_denied(model, pk, user, tenant=None):
@@ -36,7 +37,7 @@ def get_object_or_denied(model, pk, user, tenant=None):
         obj = qs.get(pk=pk)
         return obj
     except model.DoesNotExist:
-        raise PermissionDenied("Permission denied.")
+        raise PermissionDenied(_("Permission denied."))
 
 def generate_slug(instance):
     logger.debug("GENERATE SLUG called for %s with current slug: %r", instance.__class__.__name__, getattr(instance, 'slug', None))

@@ -6,6 +6,7 @@ from django.urls import reverse
 from django.http import HttpResponseRedirect
 from django.views.generic import View
 from django.db import transaction
+from django.utils.translation import gettext_lazy as _
 
 from ..models import Accessory, Consumable, AccessoryStock, ConsumableStock, Component, ComponentStock
 from inventory.services import checkout_inventory_item
@@ -32,7 +33,7 @@ class InventoryListView(LoginRequiredMixin, View):
             accessible_url = reverse('inventory:consumable_list')
 
         if not accessible_url:
-            raise PermissionDenied("You do not have permission to view inventory.")
+            raise PermissionDenied(_("You do not have permission to view inventory."))
 
         return redirect(accessible_url)
 
@@ -52,11 +53,11 @@ def bulk_checkout_inventory(request):
         perm = 'inventory.change_component'
     else:
         from django.http import HttpResponseBadRequest
-        return HttpResponseBadRequest("Invalid model specified.")
+        return HttpResponseBadRequest(_("Invalid model specified."))
 
     if not request.user.has_perm(perm):
         from django.http import HttpResponseForbidden
-        return HttpResponseForbidden("Permission denied.")
+        return HttpResponseForbidden(_("Permission denied."))
     if request.method != 'POST':
         from django.http import HttpResponseNotAllowed
         return HttpResponseNotAllowed(['POST'])
@@ -70,11 +71,11 @@ def bulk_checkout_inventory(request):
         if qty <= 0:
             raise ValueError()
     except ValueError:
-        messages.error(request, "Invalid checkout quantity specified.")
+        messages.error(request, _("Invalid checkout quantity specified."))
         return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
 
     if not object_pks:
-        messages.error(request, "No items selected.")
+        messages.error(request, _("No items selected."))
         return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
 
     from organization.models import AssetHolder, Location
@@ -86,10 +87,10 @@ def bulk_checkout_inventory(request):
 
     filled = [t for t in [holder_id, location_id, asset_id] if t]
     if len(filled) == 0:
-        messages.error(request, "You must select either an Asset Holder, a Location, or an Asset.")
+        messages.error(request, _("You must select either an Asset Holder, a Location, or an Asset."))
         return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
     if len(filled) > 1:
-        messages.error(request, "Please select only one target (Asset Holder, Location, or Asset).")
+        messages.error(request, _("Please select only one target (Asset Holder, Location, or Asset)."))
         return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
 
     holder = None
@@ -121,7 +122,7 @@ def bulk_checkout_inventory(request):
             # Catalog page checkouts: requires from_location
             from_location_id = request.POST.get('from_location')
             if not from_location_id:
-                messages.error(request, "No source location specified.")
+                messages.error(request, _("No source location specified."))
                 return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
             from_location = get_object_or_404(Location, pk=from_location_id)
 
@@ -142,7 +143,7 @@ def bulk_checkout_inventory(request):
                 except Exception as ex:
                     failure_count += 1
                     logger.exception(f"Failed to bulk checkout {item_model.__name__} PK {pk}")
-                    messages.error(request, f"Failed to check out {item}: {str(ex)}")
+                    messages.error(request, _("Failed to check out %(item)s: %(error)s") % {"item": item, "error": str(ex)})
 
         elif model_name_str in ('inventory.accessorystock', 'inventory.consumablestock', 'inventory.componentstock'):
             # Stocks page checkouts: from_location determined per stock record
@@ -164,10 +165,10 @@ def bulk_checkout_inventory(request):
                 except Exception as ex:
                     failure_count += 1
                     logger.exception(f"Failed to bulk checkout {stock_model.__name__} PK {pk}")
-                    messages.error(request, f"Failed to check out stock item: {str(ex)}")
+                    messages.error(request, _("Failed to check out stock item: %(error)s") % {"error": str(ex)})
 
     if success_count > 0:
-        messages.success(request, f"Successfully checked out {success_count} item(s).")
+        messages.success(request, _("Successfully checked out %(count)s item(s).") % {"count": success_count})
 
     redirect_url = reverse('inventory:inventory_list')
     if model_name_str in ('inventory.accessory', 'inventory.accessorystock'):

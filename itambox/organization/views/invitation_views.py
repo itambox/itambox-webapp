@@ -5,6 +5,7 @@ from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.views.generic import CreateView, View
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.utils.translation import gettext_lazy as _
 from ..models import TenantInvitation, TenantRole, accept_invitation
 from ..forms import TenantInvitationForm
 
@@ -30,7 +31,7 @@ class InviteUserView(InviteUserMixin, CreateView):
     def form_valid(self, form):
         active_tenant = getattr(self.request, 'active_tenant', None)
         if not active_tenant:
-            messages.error(self.request, "You must select an active workspace before inviting members.")
+            messages.error(self.request, _("You must select an active workspace before inviting members."))
             return redirect('dashboard')
 
         # Save invitation details
@@ -47,7 +48,10 @@ class InviteUserView(InviteUserMixin, CreateView):
 
         messages.success(
             self.request,
-            f"Successfully generated an invitation for {invitation.email}! Share this link: {accept_url}"
+            _("Successfully generated an invitation for %(email)s! Share this link: %(url)s") % {
+                'email': invitation.email,
+                'url': accept_url,
+            }
         )
         return redirect(active_tenant.get_absolute_url())
 
@@ -57,16 +61,16 @@ class AcceptInvitationView(View):
         try:
             invitation = TenantInvitation.objects.get(token=token)
         except (TenantInvitation.DoesNotExist, ValueError):
-            messages.error(request, "This invitation link is invalid or has expired.")
+            messages.error(request, _("This invitation link is invalid or has expired."))
             return redirect('login')
 
         if not invitation.is_valid:
-            messages.error(request, "This invitation has already been accepted or has expired.")
+            messages.error(request, _("This invitation has already been accepted or has expired."))
             return redirect('login')
 
         if not request.user.is_authenticated:
             # Redirect to login, passing the current path as 'next'
-            messages.info(request, f"Please sign in or register to accept your invitation to {invitation.tenant.name}.")
+            messages.info(request, _("Please sign in or register to accept your invitation to %(tenant)s.") % {'tenant': invitation.tenant.name})
             return redirect(f"{reverse('login')}?next={request.path}")
 
         # Bind the invitation to its intended recipient: the signed-in account's
@@ -78,15 +82,15 @@ class AcceptInvitationView(View):
         if user_email != invite_email:
             messages.error(
                 request,
-                f"This invitation was issued to {invitation.email}. "
-                f"Please sign in with that account to accept it."
+                _("This invitation was issued to %(email)s. "
+                  "Please sign in with that account to accept it.") % {'email': invitation.email}
             )
             return redirect('dashboard')
 
         # Accept the invitation
         accept_invitation(invitation, request.user)
 
-        messages.success(request, f"Welcome! You have successfully joined the workspace {invitation.tenant.name}.")
+        messages.success(request, _("Welcome! You have successfully joined the workspace %(tenant)s.") % {'tenant': invitation.tenant.name})
         
         # Switch the active workspace to the newly joined tenant
         request.session['active_tenant_id'] = invitation.tenant.id

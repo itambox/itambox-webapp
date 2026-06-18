@@ -70,10 +70,10 @@ class ObjectDeleteView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
         model = self.object.__class__
         try:
             self.object.delete()
-            messages.success(self.request, f"Deleted {model._meta.verbose_name} {obj_repr}.")
+            messages.success(self.request, _("Deleted %(model)s %(object)s.") % {'model': model._meta.verbose_name, 'object': obj_repr})
             return HttpResponseRedirect(self.get_success_url())
         except ProtectedError as e:
-            messages.error(self.request, f"Unable to delete {obj_repr}. Objects are protected: {e}")
+            messages.error(self.request, _("Unable to delete %(object)s. Objects are protected: %(error)s") % {'object': obj_repr, 'error': e})
             if hasattr(self.object, 'get_absolute_url'):
                 return redirect(self.object.get_absolute_url())
             return redirect(self.get_success_url())

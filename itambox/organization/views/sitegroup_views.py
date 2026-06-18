@@ -2,6 +2,7 @@ from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 from django.db.models import Count, Q
+from django.utils.translation import gettext_lazy as _
 
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectCloneView,
@@ -95,7 +96,11 @@ class SiteGroupDeleteView(ObjectDeleteView):
         if site_count > 0:
             messages.error(
                 request,
-                f"Cannot delete site group '{sitegroup.name}': It is associated with {site_count} site{'s' if site_count != 1 else ''}."
+                _("Cannot delete site group '%(name)s': It is associated with %(count)d site%(plural)s.") % {
+                    'name': sitegroup.name,
+                    'count': site_count,
+                    'plural': 's' if site_count != 1 else '',
+                }
             )
             return redirect(sitegroup.get_absolute_url())
 

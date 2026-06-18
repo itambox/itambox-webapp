@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from itambox.api.base import BaseModelSerializer
 from itambox.api.fields import RelatedObjectCountField
@@ -377,9 +378,9 @@ class AssetCheckOutAPISerializer(serializers.Serializer):
         filled = [t for t in targets if t is not None]
         
         if not filled:
-            raise serializers.ValidationError("Either holder_id, location_id, or asset_target_id must be provided.")
+            raise serializers.ValidationError(_("Either holder_id, location_id, or asset_target_id must be provided."))
         if len(filled) > 1:
-            raise serializers.ValidationError("You can only check out an asset to ONE target.")
+            raise serializers.ValidationError(_("You can only check out an asset to ONE target."))
 
         from organization.models import AssetHolder, Location
         from assets.models import Asset
@@ -389,17 +390,17 @@ class AssetCheckOutAPISerializer(serializers.Serializer):
             try:
                 data['holder'] = AssetHolder.objects.get(pk=holder_id)
             except AssetHolder.DoesNotExist:
-                raise serializers.ValidationError({"holder_id": "Specified holder does not exist."})
+                raise serializers.ValidationError({"holder_id": _("Specified holder does not exist.")})
         elif location_id:
             try:
                 data['location'] = Location.objects.get(pk=location_id)
             except Location.DoesNotExist:
-                raise serializers.ValidationError({"location_id": "Specified location does not exist."})
+                raise serializers.ValidationError({"location_id": _("Specified location does not exist.")})
         elif asset_target_id:
             try:
                 data['asset_target'] = Asset.objects.get(pk=asset_target_id)
             except Asset.DoesNotExist:
-                raise serializers.ValidationError({"asset_target_id": "Specified target asset does not exist."})
+                raise serializers.ValidationError({"asset_target_id": _("Specified target asset does not exist.")})
                 
         return data
 

@@ -174,7 +174,7 @@ def generate_scheduled_report_task(scheduled_report_id):
             if sched.recipients:
                 email_config = EmailSettings.load()
                 if not email_config or not email_config.enabled:
-                    raise ValidationError("SMTP Outbound Email is disabled in settings.")
+                    raise ValidationError(_("SMTP Outbound Email is disabled in settings."))
 
                 recipient_list = [r.strip() for r in sched.recipients.split(',') if r.strip()]
                 if recipient_list:

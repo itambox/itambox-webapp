@@ -7,6 +7,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count
 from django.http import HttpResponse, QueryDict
 from django.utils.http import urlencode
+from django.utils.translation import gettext_lazy as _, gettext
 from django.views.generic import View
 from core.managers import get_current_tenant
 from .models import Tag, CustomField, CustomFieldset, SavedFilter, ConfigContext
@@ -525,7 +526,7 @@ class _BulkAlertActionView(LoginRequiredMixin, PermissionRequiredMixin, View):
         return_url = request.POST.get('return_url') or reverse('extras:alertlog_list')
 
         if not pks:
-            return self._respond(request, "No alerts selected.", 'warning', return_url)
+            return self._respond(request, gettext("No alerts selected."), 'warning', return_url)
 
         qs = AlertLog.objects.filter(pk__in=pks)
         if self.eligible_statuses:
@@ -552,7 +553,7 @@ class AlertBulkAcknowledgeView(_BulkAlertActionView):
         return queryset.update(status=AlertLog.STATUS_ACKNOWLEDGED, acknowledged_by=user)
 
     def success_message(self, count):
-        return f"{count} alert(s) acknowledged."
+        return gettext("%(count)s alert(s) acknowledged.") % {'count': count}
 
 
 class AlertBulkResolveView(_BulkAlertActionView):
@@ -566,7 +567,7 @@ class AlertBulkResolveView(_BulkAlertActionView):
         )
 
     def success_message(self, count):
-        return f"{count} alert(s) resolved."
+        return gettext("%(count)s alert(s) resolved.") % {'count': count}
 
 
 @method_decorator(login_required, name='dispatch')
@@ -846,11 +847,11 @@ class ReportTriggerImmediateView(PermissionRequiredMixin, LoginRequiredMixin, Vi
         from core.tasks import generate_scheduled_report_task
         success = generate_scheduled_report_task(sched.pk)
         if success:
-            messages.success(request, f"Scheduled report '{sched.name}' generated and sent successfully.")
+            messages.success(request, _("Scheduled report '%(name)s' generated and sent successfully.") % {'name': sched.name})
         else:
             sched.refresh_from_db()
-            error_msg = sched.last_status or "Check logs."
-            messages.error(request, f"Failed to generate scheduled report '{sched.name}': {error_msg}")
+            error_msg = sched.last_status or _("Check logs.")
+            messages.error(request, _("Failed to generate scheduled report '%(name)s': %(error)s") % {'name': sched.name, 'error': error_msg})
 
         return redirect(request.POST.get('return_url') or reverse('extras:scheduledreport_list'))
 
@@ -934,7 +935,7 @@ class ReportTemplatePreviewView(PermissionRequiredMixin, View):
             return HttpResponse(rendered_html)
         except Exception as e:
             logger.exception("Template Render Error in preview")
-            return HttpResponse(f"<h3>Template Render Error:</h3><pre>{str(e)}</pre>", status=400)
+            return HttpResponse(f"<h3>{gettext('Template Render Error:')}</h3><pre>{str(e)}</pre>", status=400)
 
 
 @method_decorator(login_required, name='dispatch')
@@ -1020,5 +1021,5 @@ class ReportTemplateDownloadView(PermissionRequiredMixin, LoginRequiredMixin, Vi
                 return response
         except Exception as e:
             logger.exception("Template Render Error in download")
-            return HttpResponse(f"<h3>Template Render Error:</h3><pre>{str(e)}</pre>", status=400)
+            return HttpResponse(f"<h3>{gettext('Template Render Error:')}</h3><pre>{str(e)}</pre>", status=400)
 

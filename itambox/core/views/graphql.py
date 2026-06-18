@@ -2,6 +2,7 @@ from django.conf import settings
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect
 from django.utils.decorators import method_decorator
+from django.utils.translation import gettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt
 from urllib.parse import quote
 from graphene_django.views import GraphQLView
@@ -243,11 +244,11 @@ class PrivateGraphQLView(GraphQLView):
                         # Re-run tenant middleware to set tenant context
                         TenantMiddleware().process_request(request)
                     else:
-                        return HttpResponse('Unauthorized', status=401)
+                        return HttpResponse(_('Unauthorized'), status=401)
                 except exceptions.AuthenticationFailed as e:
                     return JsonResponse({'errors': [{'message': str(e)}]}, status=401)
                 except Exception as e:
-                    return JsonResponse({'errors': [{'message': 'Authentication failed'}]}, status=401)
+                    return JsonResponse({'errors': [{'message': str(_('Authentication failed'))}]}, status=401)
             
             # Perform rate limiting / throttling checks
             from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
@@ -256,7 +257,7 @@ class PrivateGraphQLView(GraphQLView):
                 if not throttle.allow_request(request, self):
                     wait = throttle.wait()
                     return JsonResponse(
-                        {'errors': [{'message': f'Request was throttled. Expected available in {wait} seconds.'}]},
+                        {'errors': [{'message': str(_('Request was throttled. Expected available in %(wait)s seconds.') % {'wait': wait})}]},
                         status=429
                     )
                     

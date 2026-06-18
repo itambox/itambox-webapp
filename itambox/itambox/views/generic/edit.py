@@ -147,13 +147,13 @@ class ObjectEditView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
                 is_creating_instance = self.object is None or self.object.pk is None
                 perm_codename = f'{app_label}.add_{model_name}' if is_creating_instance else f'{app_label}.change_{model_name}'
                 if not self.request.user.has_perm(perm_codename, obj=selected_tenant):
-                    form.add_error('tenant', f"You do not have permission to assign objects to tenant '{selected_tenant}'.")
+                    form.add_error('tenant', _("You do not have permission to assign objects to tenant '%(tenant)s'.") % {'tenant': selected_tenant})
                     return self.form_invalid(form)
 
         self.object = form.save()
-        msg_verb = 'Created' if is_creating else 'Modified'
+        msg_verb = _('Created') if is_creating else _('Modified')
         msg_link = f"<a href='{self.object.get_absolute_url()}'>{self.object}</a>" if hasattr(self.object, 'get_absolute_url') else str(self.object)
-        messages.success(self.request, f"{msg_verb} {_model._meta.verbose_name} {msg_link}")
+        messages.success(self.request, _("%(verb)s %(model)s %(link)s") % {'verb': msg_verb, 'model': _model._meta.verbose_name, 'link': msg_link})
 
         if self.request.POST.get('_addanother') and _model:
             try:

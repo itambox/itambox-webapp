@@ -8,6 +8,7 @@ from django.views.generic import View
 from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.utils.translation import gettext_lazy as _
 from django import forms
 
 from core.tables import BaseTable, ToggleColumn, ActionsColumn
@@ -128,7 +129,7 @@ class AssetAuditScanView(LoginRequiredMixin, PermissionRequiredMixin, View):
         if self.request.user.is_authenticated and getattr(self.request, 'htmx', False):
             response = HttpResponse(status=204)
             response['HX-Trigger'] = json.dumps({
-                "showMessage": {"message": "You do not have permission to record audit scans.", "level": "danger"}
+                "showMessage": {"message": str(_("You do not have permission to record audit scans.")), "level": "danger"}
             })
             return response
         return super().handle_no_permission()
@@ -145,7 +146,9 @@ class AssetAuditScanView(LoginRequiredMixin, PermissionRequiredMixin, View):
 
             if not asset:
                 response = HttpResponse(
-                    f"<div class='alert alert-danger mb-0'>Scanned asset tag or serial '{barcode}' not found in database.</div>",
+                    "<div class='alert alert-danger mb-0'>"
+                    + str(_("Scanned asset tag or serial '%(barcode)s' not found in database.") % {'barcode': barcode})
+                    + "</div>",
                     status=400
                 )
                 response['HX-Trigger'] = 'playAuditFailSound'
@@ -173,7 +176,7 @@ class AssetAuditScanView(LoginRequiredMixin, PermissionRequiredMixin, View):
             })
             return response
 
-        response = HttpResponse("<div class='alert alert-danger mb-0'>Invalid form submission.</div>", status=400)
+        response = HttpResponse("<div class='alert alert-danger mb-0'>" + str(_("Invalid form submission.")) + "</div>", status=400)
         response['HX-Trigger'] = 'playAuditFailSound'
         return response
 
@@ -190,7 +193,7 @@ class AuditSessionCloseView(GenericTransactionView):
     template_name = 'compliance/audits/audit_session_close.html'
     service_callable = close_audit_session
     permission_required = 'compliance.change_auditsession'
-    success_message = "Audit session closed. Reconciliation report generated."
+    success_message = _("Audit session closed. Reconciliation report generated.")
 
     def get_service_kwargs(self, form):
         return {}
@@ -202,7 +205,7 @@ class AuditSessionRehomeView(SimplePostView):
 
     def perform_action(self, session, request) -> dict:
         rehome_audit_session_mismatches(session, request.user)
-        return {'message': f"All mismatched assets in campaign '{session.name}' have been bulk re-homed to '{session.location.name if session.location else 'Global'}'."}
+        return {'message': _("All mismatched assets in campaign '%(name)s' have been bulk re-homed to '%(location)s'.") % {'name': session.name, 'location': session.location.name if session.location else 'Global'}}
 
 
 class AuditSessionReportCsvView(LoginRequiredMixin, PermissionRequiredMixin, View):
@@ -277,11 +280,11 @@ class AuditSessionFlagMissingView(GenericTransactionView):
 
     def get_success_message(self, result=None):
         if result:
-            return (
-                f"{result['flagged']} asset(s) flagged as Missing. "
-                f"{result['skipped']} skipped (status changed since close)."
-            )
-        return "Missing assets flagged."
+            return _(
+                "%(flagged)s asset(s) flagged as Missing. "
+                "%(skipped)s skipped (status changed since close)."
+            ) % {'flagged': result['flagged'], 'skipped': result['skipped']}
+        return _("Missing assets flagged.")
 
 
 class AuditSessionDeleteView(ObjectDeleteView):
@@ -299,7 +302,7 @@ class AuditSessionStartView(SimplePostView):
     def perform_action(self, session, request) -> dict:
         from django.core.exceptions import ValidationError
         if session.status != 'planned':
-            raise ValidationError("Only planned sessions can be started.")
+            raise ValidationError(_("Only planned sessions can be started."))
         session.status = 'active'
         session.save(update_fields=['status'])
-        return {'message': f"Campaign '{session.name}' is now active."}
+        return {'message': _("Campaign '%(name)s' is now active.") % {'name': session.name}}

@@ -16,6 +16,7 @@ from django.urls import reverse
 from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from .choices import StatusTypeChoices
 from .models import Asset, StatusLabel, AssetAssignment
 from compliance.models import CustodyReceipt
@@ -39,7 +40,7 @@ def checkout_asset(
 ) -> AssetHolder | Location | Asset:
     target = holder or location or asset_target
     if not target:
-        raise ValidationError("Either holder, location, or asset must be specified.")
+        raise ValidationError(_("Either holder, location, or asset must be specified."))
 
     with transaction.atomic():
         # Lock the asset row to prevent concurrent overallocation or state issues
@@ -55,7 +56,8 @@ def checkout_asset(
             StatusTypeChoices.ARCHIVED,
         ):
             raise ValidationError(
-                f"Cannot check out an asset that is {asset.status.get_type_display()}."
+                _("Cannot check out an asset that is %(status)s.")
+                % {"status": asset.status.get_type_display()}
             )
 
         # Reservation guard: if the asset is reserved for a *different* holder during
@@ -74,8 +76,8 @@ def checkout_asset(
             ).exclude(reserved_for=holder).first()
             if blocking:
                 raise ValidationError(
-                    f"Asset is reserved for {blocking.reserved_for} until "
-                    f"{blocking.end_date} and cannot be checked out to a different holder."
+                    _("Asset is reserved for %(holder)s until %(date)s and cannot be checked out to a different holder.")
+                    % {"holder": blocking.reserved_for, "date": blocking.end_date}
                 )
 
         if asset.active_assignment:
@@ -357,11 +359,11 @@ def dispose_asset(
 
 def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_location=None, request=None, **kwargs):
     if not holder and not location:
-        raise ValidationError("Either holder or location must be specified.")
+        raise ValidationError(_("Either holder or location must be specified."))
 
     in_use_status = StatusLabel.objects.filter(type=StatusTypeChoices.DEPLOYED).first()
     if not in_use_status:
-        raise ValidationError("No Status Label with type 'Deployed' exists. Please configure one.")
+        raise ValidationError(_("No Status Label with type 'Deployed' exists. Please configure one."))
 
     with transaction.atomic():
         allocated_assets = []
@@ -376,7 +378,7 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_lo
                     status__type=StatusTypeChoices.DEPLOYABLE
                 ).select_for_update().first()
                 if not asset:
-                    raise ValidationError(f"No available assets of type '{item.asset_type}' in stock.")
+                    raise ValidationError(_("No available assets of type '%(type)s' in stock.") % {"type": item.asset_type})
                 allocated_assets.append(asset)
                 item_assets_map[item.pk] = asset
             elif item.accessory:
@@ -384,19 +386,19 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_lo
                 acc = item.accessory.__class__.objects.select_for_update().get(pk=item.accessory.pk)
                 rem = acc.available
                 if not acc.allow_overallocate and rem < item.qty:
-                    raise ValidationError(f"Insufficient stock for accessory '{acc}'. Required: {item.qty}, Available: {rem}")
+                    raise ValidationError(_("Insufficient stock for accessory '%(acc)s'. Required: %(qty)s, Available: %(rem)s") % {"acc": acc, "qty": item.qty, "rem": rem})
             elif item.license:
                 # Lock license seat pool
                 lic = item.license.__class__.objects.select_for_update().get(pk=item.license.pk)
                 rem = lic.available_seats
                 if rem < 1:
-                    raise ValidationError(f"No available seats for software license '{lic}'.")
+                    raise ValidationError(_("No available seats for software license '%(lic)s'.") % {"lic": lic})
             elif item.consumable:
                 # Lock consumable stock pool
                 con = item.consumable.__class__.objects.select_for_update().get(pk=item.consumable.pk)
                 rem = con.available
                 if not con.allow_overallocate and rem < item.qty:
-                    raise ValidationError(f"Insufficient stock for consumable '{con}'. Required: {item.qty}, Available: {rem}")
+                    raise ValidationError(_("Insufficient stock for consumable '%(con)s'. Required: %(qty)s, Available: %(rem)s") % {"con": con, "qty": item.qty, "rem": rem})
 
         # 2. Perform allocations safely under active locks
         for item in kit.items.all():
@@ -459,4 +461,4 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_lo
                         notes=f"Checked out via Kit '{kit.name}'. {notes}"
                     )
                 else:
-                    raise ValidationError(f"License seat for '{item.license.name}' must be assigned to either a Holder or an Asset.")
+                    raise ValidationError(_("License seat for '%(name)s' must be assigned to either a Holder or an Asset.") % {"name": item.license.name})

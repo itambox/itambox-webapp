@@ -2,6 +2,7 @@ from django.db import transaction
 from django.shortcuts import render, redirect
 from django.utils import timezone
 from django.core.exceptions import ValidationError, PermissionDenied, ObjectDoesNotExist
+from django.utils.translation import gettext_lazy as _
 from django.urls import reverse, reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.views import View
@@ -25,25 +26,25 @@ from itambox.views.generic.service_views import GenericTransactionView, SimplePo
 def approve_asset_request(request_instance, user, request=None, **kwargs):
     request_instance = AssetRequest.objects.select_for_update().get(pk=request_instance.pk)
     if request_instance.status != RequestStatusChoices.PENDING:
-        raise ValidationError("Only pending requests can be approved.")
+        raise ValidationError(_("Only pending requests can be approved."))
     
     asset = kwargs.get('allocated_asset')
     if asset:
         if not asset.is_requestable:
-            raise ValidationError(f"Allocated asset '{asset.name}' is not marked as requestable.")
+            raise ValidationError(_("Allocated asset '%(name)s' is not marked as requestable.") % {"name": asset.name})
         if asset.status.type != 'deployable':
-            raise ValidationError("Allocated asset must be in a deployable status.")
+            raise ValidationError(_("Allocated asset must be in a deployable status."))
         if request_instance.asset_type and asset.asset_type != request_instance.asset_type:
-            raise ValidationError("Allocated asset does not match the requested asset type.")
+            raise ValidationError(_("Allocated asset does not match the requested asset type."))
         request_instance.asset = asset
 
     qty = kwargs.get('qty')
     if request_instance.component or request_instance.accessory or request_instance.consumable:
         if qty is not None:
             if qty <= 0:
-                raise ValidationError("Quantity must be greater than zero.")
+                raise ValidationError(_("Quantity must be greater than zero."))
             if qty > request_instance.qty:
-                raise ValidationError("Quantity cannot exceed requested quantity.")
+                raise ValidationError(_("Quantity cannot exceed requested quantity."))
             request_instance.qty = qty
 
     allocated_location = kwargs.get('allocated_location')
@@ -73,7 +74,7 @@ def approve_asset_request(request_instance, user, request=None, **kwargs):
 def deny_asset_request(request_instance, user, request=None, **kwargs):
     request_instance = AssetRequest.objects.select_for_update().get(pk=request_instance.pk)
     if request_instance.status != RequestStatusChoices.PENDING:
-        raise ValidationError("Only pending requests can be denied.")
+        raise ValidationError(_("Only pending requests can be denied."))
 
     request_instance.status = RequestStatusChoices.DENIED
     request_instance.responded_by = user
@@ -148,7 +149,7 @@ class RequestCreateView(ObjectEditView):
             response = super().form_valid(form)
             
             # Create the individual child requests
-            for _ in range(qty):
+            for _i in range(qty):
                 req = AssetRequest(
                     tenant=form.instance.tenant,
                     requester=self.request.user,
@@ -217,15 +218,15 @@ class RequestCancelView(SimplePostView):
 
     def perform_action(self, obj, request):
         if obj.requester != request.user and not (request.user.is_staff or request.user.has_perm('assets.approve_assetrequest')):
-            raise PermissionDenied("You do not have permission to cancel this request.")
+            raise PermissionDenied(_("You do not have permission to cancel this request."))
             
         with transaction.atomic():
             obj = AssetRequest.objects.select_for_update().get(pk=obj.pk)
             if obj.status not in [RequestStatusChoices.PENDING, RequestStatusChoices.APPROVED, RequestStatusChoices.PROCUREMENT]:
-                raise ValidationError("Only pending, approved, or procurement requests can be cancelled.")
-                
+                raise ValidationError(_("Only pending, approved, or procurement requests can be cancelled."))
+
             if obj.status == RequestStatusChoices.APPROVED and obj.asset and obj.asset.assignments.filter(is_active=True).exists():
-                raise ValidationError("Cannot cancel a request that has already initiated active physical checkout.")
+                raise ValidationError(_("Cannot cancel a request that has already initiated active physical checkout."))
 
             obj.status = RequestStatusChoices.CANCELLED
             obj.save()
@@ -235,7 +236,7 @@ class RequestCancelView(SimplePostView):
                     child.status = RequestStatusChoices.CANCELLED
                     child.save()
                     
-        return {'message': "Asset request cancelled successfully."}
+        return {'message': _("Asset request cancelled successfully.")}
 
 
 class RequestClaimView(SimplePostView):
@@ -245,13 +246,13 @@ class RequestClaimView(SimplePostView):
         is_requester = obj.requester_id == request.user.id
         is_assigned_user = obj.assigned_user and obj.assigned_user.user_id == request.user.id
         if not is_requester and not is_assigned_user and not (request.user.is_staff or request.user.has_perm('assets.fulfill_assetrequest')):
-            raise PermissionDenied("You do not have permission to claim this asset.")
+            raise PermissionDenied(_("You do not have permission to claim this asset."))
 
         with transaction.atomic():
             obj = AssetRequest.objects.select_for_update().get(pk=obj.pk)
             
             if obj.status != RequestStatusChoices.APPROVED:
-                raise ValidationError("Only approved requests can be claimed.")
+                raise ValidationError(_("Only approved requests can be claimed."))
 
             requests_to_claim = [obj] if not obj.is_group else list(obj.sub_requests.all())
             
@@ -259,7 +260,7 @@ class RequestClaimView(SimplePostView):
             for req in requests_to_claim:
                 is_inventory = req.component or req.accessory or req.consumable
                 if not is_inventory and not req.asset:
-                    raise ValidationError("No asset has been allocated to this request.")
+                    raise ValidationError(_("No asset has been allocated to this request."))
 
             from assets.services import checkout_asset
             
@@ -271,7 +272,7 @@ class RequestClaimView(SimplePostView):
                 if not holder and not location and not asset_target:
                     holder = req.requester.asset_holder_profiles.filter(tenant=req.tenant).first()
                     if not holder:
-                        raise ValidationError("Requester does not have an active Asset Holder profile to assign the asset to.")
+                        raise ValidationError(_("Requester does not have an active Asset Holder profile to assign the asset to."))
 
                 if req.component:
                     from inventory.models import ComponentAllocation
@@ -328,7 +329,7 @@ class RequestClaimView(SimplePostView):
                 obj.responded_by = request.user
                 obj.save(update_fields=['status', 'response_date', 'responded_by'])
 
-        return {'message': "Item(s) claimed successfully."}
+        return {'message': _("Item(s) claimed successfully.")}
 
 
 class RequestMarkFulfilledView(SimplePostView):
@@ -336,20 +337,20 @@ class RequestMarkFulfilledView(SimplePostView):
 
     def perform_action(self, obj, request):
         if not (request.user.is_staff or request.user.has_perm('assets.fulfill_assetrequest')):
-            raise PermissionDenied("You do not have permission to mark this request as fulfilled.")
+            raise PermissionDenied(_("You do not have permission to mark this request as fulfilled."))
 
         with transaction.atomic():
             obj = AssetRequest.objects.select_for_update().get(pk=obj.pk)
             
             if obj.status != RequestStatusChoices.APPROVED:
-                raise ValidationError("Only approved requests can be marked fulfilled.")
+                raise ValidationError(_("Only approved requests can be marked fulfilled."))
 
             requests_to_mark = [obj] if not obj.is_group else list(obj.sub_requests.all())
             
             for req in requests_to_mark:
                 is_inventory = req.component or req.accessory or req.consumable
                 if not is_inventory and not req.asset:
-                    raise ValidationError("No asset has been allocated to this request.")
+                    raise ValidationError(_("No asset has been allocated to this request."))
 
                 req.status = RequestStatusChoices.FULFILLED
                 req.response_date = timezone.now()
@@ -362,7 +363,7 @@ class RequestMarkFulfilledView(SimplePostView):
                 obj.responded_by = request.user
                 obj.save(update_fields=['status', 'response_date', 'responded_by'])
 
-        return {'message': "Request marked as fulfilled (no checkout generated)."}
+        return {'message': _("Request marked as fulfilled (no checkout generated).")}
 
 
 class RequestBulkReceiveView(PermissionRequiredMixin, View):
@@ -406,10 +407,10 @@ class RequestBulkReceiveView(PermissionRequiredMixin, View):
                             req.response_date = timezone.now()
                             req.save()
                             
-                        messages.success(request, "Stock received and requests fulfilled successfully.")
+                        messages.success(request, _("Stock received and requests fulfilled successfully."))
                         return redirect('assets:request_list')
                 except Exception as e:
-                    messages.error(request, f"Error processing bulk receipt: {e}")
+                    messages.error(request, _("Error processing bulk receipt: %(error)s") % {"error": e})
             
             requests_data = []
             for form in formset:
@@ -433,12 +434,12 @@ class RequestBulkReceiveView(PermissionRequiredMixin, View):
                 pks = request.GET.getlist('pk')
             
             if not pks:
-                messages.warning(request, "No requests selected for bulk receipt.")
+                messages.warning(request, _("No requests selected for bulk receipt."))
                 return redirect('assets:request_list')
                 
             requests_qs = AssetRequest.objects.filter(pk__in=pks, status=RequestStatusChoices.APPROVED).select_related('asset_type', 'requester')
             if not requests_qs.exists():
-                messages.warning(request, "None of the selected requests are in Approved status.")
+                messages.warning(request, _("None of the selected requests are in Approved status."))
                 return redirect('assets:request_list')
                 
             initial_data = []

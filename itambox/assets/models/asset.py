@@ -31,9 +31,9 @@ class AssetStateMachine:
         if current_status_type == new_status_type:
             return
         if new_status_type not in AssetStateMachine.ALLOWED_TRANSITIONS.get(current_status_type, []):
-            raise ValidationError(f"Illegal state transition from {current_status_type} to {new_status_type}")
+            raise ValidationError(_("Illegal state transition from %(current)s to %(new)s") % {"current": current_status_type, "new": new_status_type})
         if is_checked_out and new_status_type in ['undeployable', 'archived']:
-            raise ValidationError("Cannot mark an actively checked-out asset as undeployable or archived. Check it in first.")
+            raise ValidationError(_("Cannot mark an actively checked-out asset as undeployable or archived. Check it in first."))
 
 
 class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, DeletableVaultModel):

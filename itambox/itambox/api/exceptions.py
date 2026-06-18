@@ -1,3 +1,4 @@
+from django.utils.translation import gettext_lazy as _
 from rest_framework import status
 from rest_framework.exceptions import APIException
 
@@ -15,7 +16,7 @@ class PreconditionRequired(APIException):
     """
 
     status_code = status.HTTP_428_PRECONDITION_REQUIRED
-    default_detail = 'If-Match header is required for mutating requests.'
+    default_detail = _('If-Match header is required for mutating requests.')
     default_code = 'precondition_required'
 
     def __init__(self, detail=None, etag=None):
@@ -32,7 +33,7 @@ class PreconditionFailed(APIException):
     """
 
     status_code = status.HTTP_412_PRECONDITION_FAILED
-    default_detail = 'The resource has changed since it was last fetched (stale ETag).'
+    default_detail = _('The resource has changed since it was last fetched (stale ETag).')
     default_code = 'precondition_failed'
 
     def __init__(self, detail=None, etag=None):

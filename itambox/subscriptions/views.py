@@ -11,6 +11,7 @@ import json
 from django.contrib import messages
 from django.urls import reverse
 from django.contrib.contenttypes.models import ContentType
+from django.utils.translation import gettext_lazy as _
 from .models import Provider, Subscription, SubscriptionAssignment
 from . import forms
 from . import tables
@@ -176,13 +177,13 @@ class SubscriptionRenewView(LoginRequiredMixin, PermissionRequiredMixin, View):
                 comment=f"Renewed subscription. Next renewal date: {renewal_date}. Cost: {renewal_cost or '—'} {subscription.currency}."
             )
 
-            messages.success(request, f"Subscription '{subscription.name}' renewed successfully.")
+            messages.success(request, _("Subscription '%(name)s' renewed successfully.") % {"name": subscription.name})
             if request.htmx:
                 response = HttpResponse(status=204)
                 response['HX-Trigger'] = json.dumps({
                     "tableRefreshRequired": None,
                     "showMessage": {
-                        "message": f"Subscription '{subscription.name}' renewed successfully.",
+                        "message": str(_("Subscription '%(name)s' renewed successfully.") % {"name": subscription.name}),
                         "level": "success"
                     }
                 })
@@ -228,13 +229,13 @@ class SubscriptionCancelView(LoginRequiredMixin, PermissionRequiredMixin, View):
                 comment=comment_text
             )
 
-            messages.success(request, f"Subscription '{subscription.name}' cancelled successfully.")
+            messages.success(request, _("Subscription '%(name)s' cancelled successfully.") % {"name": subscription.name})
             if request.htmx:
                 response = HttpResponse(status=204)
                 response['HX-Trigger'] = json.dumps({
                     "tableRefreshRequired": None,
                     "showMessage": {
-                        "message": f"Subscription '{subscription.name}' cancelled successfully.",
+                        "message": str(_("Subscription '%(name)s' cancelled successfully.") % {"name": subscription.name}),
                         "level": "success"
                     }
                 })
@@ -264,13 +265,13 @@ class SubscriptionSuspendView(LoginRequiredMixin, PermissionRequiredMixin, View)
             comment="Suspended subscription."
         )
 
-        messages.success(request, f"Subscription '{subscription.name}' suspended successfully.")
+        messages.success(request, _("Subscription '%(name)s' suspended successfully.") % {"name": subscription.name})
         if request.htmx:
             response = HttpResponse(status=204)
             response['HX-Trigger'] = json.dumps({
                 "tableRefreshRequired": None,
                 "showMessage": {
-                    "message": f"Subscription '{subscription.name}' suspended successfully.",
+                    "message": str(_("Subscription '%(name)s' suspended successfully.") % {"name": subscription.name}),
                     "level": "success"
                 }
             })
@@ -315,13 +316,13 @@ class SubscriptionCheckoutView(LoginRequiredMixin, PermissionRequiredMixin, View
                 notes=notes
             )
             
-            messages.success(request, f"Assigned subscription '{subscription.name}' successfully to {target_obj}.")
+            messages.success(request, _("Assigned subscription '%(name)s' successfully to %(target)s.") % {"name": subscription.name, "target": target_obj})
             if request.htmx:
                 response = HttpResponse(status=204)
                 response['HX-Trigger'] = json.dumps({
                     "tableRefreshRequired": None,
                     "showMessage": {
-                        "message": f"Assigned subscription '{subscription.name}' successfully to {target_obj}.",
+                        "message": str(_("Assigned subscription '%(name)s' successfully to %(target)s.") % {"name": subscription.name, "target": target_obj}),
                         "level": "success"
                     }
                 })
@@ -355,7 +356,7 @@ class SubscriptionAssignmentCreateView(LoginRequiredMixin, PermissionRequiredMix
         object_id = request.GET.get('object_id')
 
         if not content_type_id or not object_id:
-            return HttpResponseBadRequest("Missing content_type or object_id")
+            return HttpResponseBadRequest(_("Missing content_type or object_id"))
 
         content_type = get_object_or_404(ContentType, id=content_type_id)
         target_obj = get_object_or_404(content_type.model_class().objects.all(), id=object_id)
@@ -375,7 +376,7 @@ class SubscriptionAssignmentCreateView(LoginRequiredMixin, PermissionRequiredMix
         object_id = request.POST.get('object_id') or request.GET.get('object_id')
 
         if not content_type_id or not object_id:
-            return HttpResponseBadRequest("Missing content_type or object_id")
+            return HttpResponseBadRequest(_("Missing content_type or object_id"))
 
         content_type = get_object_or_404(ContentType, id=content_type_id)
         target_obj = get_object_or_404(content_type.model_class().objects.all(), id=object_id)
@@ -385,7 +386,7 @@ class SubscriptionAssignmentCreateView(LoginRequiredMixin, PermissionRequiredMix
             assignment = form.save(commit=False)
             assignment.assigned_by = request.user
             assignment.save()
-            messages.success(request, f"Assigned subscription successfully to {target_obj}.")
+            messages.success(request, _("Assigned subscription successfully to %(target)s.") % {"target": target_obj})
             return redirect(target_obj.get_absolute_url())
 
         context = {

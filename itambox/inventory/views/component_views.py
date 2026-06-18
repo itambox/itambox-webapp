@@ -4,7 +4,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse, reverse_lazy
 from django.http import HttpResponse
 from django.views.generic import View
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
@@ -170,7 +170,7 @@ class ComponentStockAdjustView(LoginRequiredMixin, View):
 
         stock = get_object_or_404(ComponentStock, pk=pk)
         if not request.user.has_perm('inventory.change_componentstock', obj=stock.component):
-            return HttpResponseForbidden("Permission denied.")
+            return HttpResponseForbidden(_("Permission denied."))
         action = request.GET.get('action')
 
         if action == 'increment':
@@ -228,7 +228,7 @@ class ComponentStockCreateModalView(LoginRequiredMixin, View):
                     "closeModalEvent": None,
                     "tableRefreshRequired": None,
                     "showMessage": {
-                        "message": f"Added stock pool for {stock.location}.",
+                        "message": str(_("Added stock pool for %(location)s.") % {"location": stock.location}),
                         "level": "success"
                     }
                 })
@@ -274,7 +274,7 @@ class ComponentCheckinView(SimplePostView):
     def perform_action(self, assignment, request):
         component, qty, recipient = checkin_component(assignment.pk, user=request.user)
         return {
-            'message': f"Checked in {qty}x '{component}' from {recipient}.",
+            'message': str(_("Checked in %(qty)sx '%(component)s' from %(recipient)s.") % {"qty": qty, "component": component, "recipient": recipient}),
             'redirect': component.get_absolute_url(),
         }
 

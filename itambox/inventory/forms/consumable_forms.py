@@ -156,7 +156,7 @@ class ConsumableCheckoutForm(BaseCheckoutForm):
         if self.consumable and qty:
             remaining = self.consumable.available
             if not self.consumable.allow_overallocate and qty > remaining:
-                raise ValidationError(f"Cannot checkout {qty} units. Only {remaining} units are currently in stock.")
+                raise ValidationError(_("Cannot checkout %(qty)s units. Only %(remaining)s units are currently in stock.") % {"qty": qty, "remaining": remaining})
         return cleaned_data
 
 

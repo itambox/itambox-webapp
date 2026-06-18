@@ -1,4 +1,5 @@
 from django import forms
+from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Div
 
@@ -64,14 +65,14 @@ class CostCenterForm(CustomFieldModelFormMixin, forms.ModelForm):
         parent = self.cleaned_data.get('parent')
         if parent and self.instance and self.instance.pk:
             if parent.pk == self.instance.pk:
-                raise forms.ValidationError("A cost center cannot be its own parent.")
+                raise forms.ValidationError(_("A cost center cannot be its own parent."))
             # Cycle check: walk up from the proposed parent; if we reach self, it's a cycle.
             visited = set()
             node = parent
             while node is not None:
                 if node.pk == self.instance.pk:
                     raise forms.ValidationError(
-                        "Setting this parent would create a cycle in the hierarchy."
+                        _("Setting this parent would create a cycle in the hierarchy.")
                     )
                 if node.pk in visited:
                     break

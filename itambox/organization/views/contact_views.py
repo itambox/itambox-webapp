@@ -1,6 +1,7 @@
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.contrib import messages
+from django.utils.translation import gettext_lazy as _
 
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView, ObjectCloneView,
@@ -68,7 +69,11 @@ class ContactDeleteView(ObjectDeleteView):
         if assignment_count > 0:
             messages.error(
                 request,
-                f"Cannot delete contact '{contact}': It has {assignment_count} assignment{'s' if assignment_count != 1 else ''}."
+                _("Cannot delete contact '%(contact)s': It has %(count)d assignment%(plural)s.") % {
+                    'contact': contact,
+                    'count': assignment_count,
+                    'plural': 's' if assignment_count != 1 else '',
+                }
             )
             return redirect(contact.get_absolute_url())
 

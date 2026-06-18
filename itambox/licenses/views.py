@@ -20,6 +20,7 @@ from . import tables
 from . import filters
 from assets.forms.import_forms import LicenseBulkImportForm
 from itambox.views.generic.service_views import GenericTransactionView, SimplePostView
+from django.utils.translation import gettext_lazy as _
 from .services import checkout_license, checkin_license_seat
 
 # =============================================================================
@@ -125,7 +126,7 @@ class LicenseCheckoutView(GenericTransactionView):
     context_object_name = 'license'
     template_name = 'licenses/includes/license_checkout_modal.html'
     error_partial = 'licenses/includes/license_checkout_modal.html#checkout-modal-form'
-    success_message = "License checked out successfully."
+    success_message = _("License checked out successfully.")
     hx_trigger = "licenseUpdated"
     form_field_map = {}
     form_exclude_fields = ('target_type',)
@@ -138,7 +139,7 @@ class LicenseCheckoutView(GenericTransactionView):
 
     def get_success_message(self, result=None):
         target = result.asset or result.assigned_holder
-        return f"License seat for '{self.get_object().name}' checked out to {target}."
+        return _("License seat for '%(name)s' checked out to %(target)s.") % {"name": self.get_object().name, "target": target}
 
 
 class LicenseCheckinView(SimplePostView):

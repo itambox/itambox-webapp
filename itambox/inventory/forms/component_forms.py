@@ -214,14 +214,14 @@ class ComponentAllocationForm(forms.ModelForm):
 
         filled = [t for t in [holder, location, asset] if t is not None]
         if len(filled) == 0:
-            raise ValidationError("You must select either an Asset Holder, a Location, or an Asset.")
+            raise ValidationError(_("You must select either an Asset Holder, a Location, or an Asset."))
         if len(filled) > 1:
-            raise ValidationError("Please select exactly one target (either Asset Holder, Location, OR Asset).")
+            raise ValidationError(_("Please select exactly one target (either Asset Holder, Location, OR Asset)."))
 
         if component and qty:
             remaining = component.available_stock
             if not component.allow_overallocate and qty > remaining:
-                raise ValidationError(f"Cannot checkout {qty} units. Only {remaining} units are currently in stock.")
+                raise ValidationError(_("Cannot checkout %(qty)s units. Only %(remaining)s units are currently in stock.") % {"qty": qty, "remaining": remaining})
         return cleaned_data
 
 
@@ -262,7 +262,7 @@ class ComponentCheckoutForm(BaseCheckoutForm):
         if self.component and qty:
             remaining = self.component.available_stock
             if not self.component.allow_overallocate and qty > remaining:
-                raise ValidationError(f"Cannot checkout {qty} units. Only {remaining} units are currently in stock.")
+                raise ValidationError(_("Cannot checkout %(qty)s units. Only %(remaining)s units are currently in stock.") % {"qty": qty, "remaining": remaining})
         return cleaned_data
 
 
