@@ -2,7 +2,7 @@
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
-# 
+#
 #, fuzzy
 msgid ""
 msgstr ""
@@ -17,221 +17,235 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
 msgid "%(count)s selected"
-msgstr ""
+msgstr "%(count)s ausgewählt"
 
 msgid "No items selected."
-msgstr ""
+msgstr "Keine Artikel ausgewählt."
 
 msgid ""
 "Are you sure you want to PERMANENTLY delete the selected items? This cannot "
 "be undone!"
 msgstr ""
+"Möchten Sie die ausgewählten Elemente wirklich DAUERHAFT löschen? Dies kann "
+"nicht rückgängig gemacht werden!"
 
 msgid "Saved"
-msgstr ""
+msgstr "Gespeichert"
 
 msgid "No assets assigned to active status labels."
-msgstr ""
+msgstr "Keine Assets aktiven Status-Labels zugewiesen."
 
 msgid "%(count)s assets"
-msgstr ""
+msgstr "%(count)s Assets"
 
 msgid "Assets"
-msgstr ""
+msgstr "Assets"
 
 msgid "Total"
-msgstr ""
+msgstr "Gesamt"
 
 msgid "Spend"
-msgstr ""
+msgstr "Ausgaben"
 
 msgid "You have unsaved changes. Leave this page?"
-msgstr ""
+msgstr "Sie haben ungespeicherte Änderungen. Diese Seite verlassen?"
 
 msgid "Saving..."
-msgstr ""
+msgstr "Wird gespeichert..."
 
 msgid "Are you sure?"
-msgstr ""
+msgstr "Sind Sie sicher?"
 
 msgid "Copied!"
-msgstr ""
+msgstr "Kopiert!"
 
 msgid "This action is disabled in preview mode."
-msgstr ""
+msgstr "Diese Aktion ist im Vorschaumodus deaktiviert."
 
 msgid "No results found"
-msgstr ""
+msgstr "Keine Ergebnisse gefunden"
 
 msgid "Visual inventory compilation."
-msgstr ""
+msgstr "Visuelle Inventarzusammenstellung."
 
 msgid "Asset Tag"
-msgstr ""
+msgstr "Inventarnummer"
 
 msgid "Asset Name"
-msgstr ""
+msgstr "Asset-Name"
 
 msgid "Manufacturer"
-msgstr ""
+msgstr "Hersteller"
 
 msgid "Model"
-msgstr ""
+msgstr "Modell"
 
 msgid "Serial Number"
-msgstr ""
+msgstr "Seriennummer"
 
 msgid "Status Label"
-msgstr ""
+msgstr "Status-Label"
 
 msgid "Location"
-msgstr ""
+msgstr "Lagerort"
 
 msgid "Asset Holder"
-msgstr ""
+msgstr "Asset-Inhaber"
 
 msgid "Purchase Cost"
-msgstr ""
+msgstr "Anschaffungskosten"
 
 msgid "Purchase Date"
-msgstr ""
+msgstr "Kaufdatum"
 
 msgid "Warranty (Months)"
-msgstr ""
+msgstr "Garantie (Monate)"
 
 msgid "License Name"
-msgstr ""
+msgstr "Lizenzname"
 
 msgid "Software"
-msgstr ""
+msgstr "Software"
 
 msgid "Total Seats"
-msgstr ""
+msgstr "Gesamtplätze"
 
 msgid "Assigned Seats"
-msgstr ""
+msgstr "Zugewiesene Plätze"
 
 msgid "Available Seats"
-msgstr ""
+msgstr "Verfügbare Plätze"
 
 msgid "Utilization Rate"
-msgstr ""
+msgstr "Auslastungsrate"
 
 msgid "Subscription Name"
-msgstr ""
+msgstr "Abonnementname"
 
 msgid "Provider"
-msgstr ""
+msgstr "Anbieter"
 
 msgid "Billing Cycle"
-msgstr ""
+msgstr "Abrechnungszyklus"
 
 msgid "Cost"
-msgstr ""
+msgstr "Kosten"
 
 msgid "End Date"
-msgstr ""
+msgstr "Enddatum"
 
 msgid "Salvage Value"
-msgstr ""
+msgstr "Restwert"
 
 msgid "Depreciation Lifespan (Months)"
-msgstr ""
+msgstr "Abschreibungsdauer (Monate)"
 
 msgid "Depreciated Value"
-msgstr ""
+msgstr "Abgeschriebener Wert"
 
 msgid "Software Product"
-msgstr ""
+msgstr "Softwareprodukt"
 
 msgid "Installed Count"
-msgstr ""
+msgstr "Anzahl Installationen"
 
 msgid "License Count"
-msgstr ""
+msgstr "Anzahl Lizenzen"
 
 msgid "Maintenance Title"
-msgstr ""
+msgstr "Wartungsbezeichnung"
 
 msgid "Asset"
-msgstr ""
+msgstr "Asset"
 
 msgid "Type"
-msgstr ""
+msgstr "Typ"
 
 msgid "Status"
-msgstr ""
+msgstr "Status"
 
 msgid "No records found."
-msgstr ""
+msgstr "Keine Datensätze gefunden."
 
 msgid "Sent automatically by ITAMbox — IT Asset Management Console."
-msgstr ""
+msgstr "Automatisch versendet von ITAMbox — IT-Asset-Management-Konsole."
 
 msgid "Selected Sequence (Orderable)"
-msgstr ""
+msgstr "Ausgewählte Reihenfolge (sortierbar)"
 
 msgid "No columns selected. Click available columns to add them."
 msgstr ""
+"Keine Spalten ausgewählt. Klicken Sie auf verfügbare Spalten, um sie "
+"hinzuzufügen."
 
 msgid "Available Columns"
-msgstr ""
+msgstr "Verfügbare Spalten"
 
 msgid "Move Up"
-msgstr ""
+msgstr "Nach oben"
 
 msgid "Move Down"
-msgstr ""
+msgstr "Nach unten"
 
 msgid "Remove"
-msgstr ""
+msgstr "Entfernen"
 
 msgid "Bootstrap from Visual Builder"
-msgstr ""
+msgstr "Aus dem visuellen Builder übernehmen"
 
 msgid ""
 "Are you sure you want to overwrite the current custom template with the "
 "selections from the Visual Builder?"
 msgstr ""
+"Möchten Sie die aktuelle benutzerdefinierte Vorlage wirklich mit den "
+"Auswahlen aus dem visuellen Builder überschreiben?"
 
 msgid "Preview Report"
-msgstr ""
+msgstr "Bericht in der Vorschau anzeigen"
 
 msgid "Template rendering failed."
-msgstr ""
+msgstr "Rendern der Vorlage fehlgeschlagen."
 
 msgid "Preview Render Error"
-msgstr ""
+msgstr "Fehler beim Rendern der Vorschau"
 
 msgid ""
 "Camera unavailable. On iPhone/iPad, scanning requires HTTPS. Please use a "
 "hardware scanner or type the asset tag."
 msgstr ""
+"Kamera nicht verfügbar. Auf iPhone/iPad erfordert das Scannen HTTPS. Bitte "
+"verwenden Sie einen Hardware-Scanner oder geben Sie die Inventarnummer ein."
 
 msgid ""
 "Camera permission denied. On iPhone/iPad check Settings › Safari › Camera, "
 "or use a hardware scanner / type the tag."
 msgstr ""
+"Kamerazugriff verweigert. Prüfen Sie auf iPhone/iPad Einstellungen › Safari "
+"› Kamera, oder verwenden Sie einen Hardware-Scanner / geben Sie die Nummer "
+"ein."
 
 msgid ""
 "Camera unavailable. Please use a hardware scanner or type the asset tag."
 msgstr ""
+"Kamera nicht verfügbar. Bitte verwenden Sie einen Hardware-Scanner oder "
+"geben Sie die Inventarnummer ein."
 
 msgid "No asset matches: %(code)s"
-msgstr ""
+msgstr "Kein Asset stimmt überein: %(code)s"
 
 msgid "Generate from name"
-msgstr ""
+msgstr "Aus Namen generieren"
 
 msgid "Failed to save configuration"
-msgstr ""
+msgstr "Speichern der Konfiguration fehlgeschlagen"
 
 msgid "Error saving configuration: "
-msgstr ""
+msgstr "Fehler beim Speichern der Konfiguration: "
 
 msgid "Error resetting configuration: "
-msgstr ""
+msgstr "Fehler beim Zurücksetzen der Konfiguration: "
 
 msgid "Close"
-msgstr ""
+msgstr "Schließen"
