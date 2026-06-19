@@ -8,6 +8,19 @@ from extras.models import (
 )
 
 
+# Keys in NotificationChannel.config that hold credentials (Slack/Teams incoming-
+# webhook URLs, bearer tokens, etc.). These are redacted on READ so an API reader
+# cannot exfiltrate them, and preserved on WRITE so a read-modify-write round-trip
+# does not persist the mask. Mirrors WebhookEndpoint.secret being write-only.
+_SECRET_CONFIG_HINTS = ('webhook_url', 'secret', 'password', 'token', 'api_key', 'apikey', 'auth')
+_REDACTED_PLACEHOLDER = '•' * 8  # eight bullets
+
+
+def _is_secret_config_key(key):
+    k = str(key).lower()
+    return any(hint in k for hint in _SECRET_CONFIG_HINTS)
+
+
 class TagSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:extras_api:tag-detail')
 
@@ -104,13 +117,41 @@ class NotificationChannelSerializer(BaseModelSerializer):
 
     class Meta:
         model = NotificationChannel
-        # `config` is an opaque JSONField (SMTP settings, webhook URL, etc.); there
-        # is no discrete secret column, so it is exposed plainly like other JSON.
+        # `config` is a JSONField that can carry a credential (Slack/Teams
+        # webhook_url). Secret-ish keys are redacted on read (to_representation) and
+        # preserved on write (validate_config) so the URL is never exposed via the API.
         fields = [
             'id', 'url', 'name', 'channel_type', 'channel_type_display',
             'enabled', 'config', 'created_at', 'updated_at',
         ]
         brief_fields = ['id', 'url', 'name', 'channel_type', 'enabled']
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        cfg = data.get('config')
+        if isinstance(cfg, dict):
+            data['config'] = {
+                k: (_REDACTED_PLACEHOLDER if (_is_secret_config_key(k) and v not in (None, '')) else v)
+                for k, v in cfg.items()
+            }
+        return data
+
+    def validate_config(self, value):
+        # Restore redacted secrets from the stored config so a read-modify-write
+        # round-trip (which echoes back the placeholder) does not overwrite the real
+        # value; drop the placeholder entirely when there is nothing to restore.
+        if isinstance(value, dict):
+            existing = (self.instance.config or {}) if self.instance else {}
+            cleaned = {}
+            for k, v in value.items():
+                if _is_secret_config_key(k) and v == _REDACTED_PLACEHOLDER:
+                    if k in existing:
+                        cleaned[k] = existing[k]
+                    # else: nothing to restore -> drop the placeholder
+                else:
+                    cleaned[k] = v
+            return cleaned
+        return value
 
 
 class AlertRuleSerializer(BaseModelSerializer):
