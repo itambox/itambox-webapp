@@ -4,41 +4,36 @@ from django.utils.translation import gettext_lazy as _
 
 from . import Menu, MenuGroup, MenuItem, MenuItemButton, get_model_item
 
-def _build_org_menu():
-    from django.conf import settings
-    extended = getattr(settings, 'ITAMBOX_ENABLE_EXTENDED_ORG_HIERARCHY', False)
-    sites_items = [get_model_item('organization', 'site', _('Sites'))]
-    if extended:
-        sites_items += [
-            get_model_item('organization', 'region', _('Regions')),
-            get_model_item('organization', 'sitegroup', _('Site Groups')),
-        ]
-    sites_items.append(get_model_item('organization', 'location', _('Locations')))
-    return Menu(
-        label=_('Organization'),
-        icon_class='mdi mdi-domain',
-        groups=(
-            MenuGroup(
-                label=_('Sites & Locations'),
-                items=tuple(sites_items),
-            ),
-            MenuGroup(
-                label=_('Tenancy'),
-                items=(
-                    get_model_item('organization', 'tenant', _('Tenants')),
-                    get_model_item('organization', 'tenantgroup', _('Tenant Groups')),
-                    get_model_item('organization', 'assetholder', _('Asset Holders')),
-                ),
-            ),
-            MenuGroup(
-                label=_('Contacts'),
-                items=(
-                    get_model_item('organization', 'contact', _('Contacts')),
-                    get_model_item('organization', 'contactrole', _('Contact Roles')),
-                ),
+ORG_MENU = Menu(
+    label=_('Organization'),
+    icon_class='mdi mdi-domain',
+    groups=(
+        MenuGroup(
+            label=_('Sites & Locations'),
+            items=(
+                get_model_item('organization', 'site', _('Sites')),
+                get_model_item('organization', 'region', _('Regions')),
+                get_model_item('organization', 'sitegroup', _('Site Groups')),
+                get_model_item('organization', 'location', _('Locations')),
             ),
         ),
-    )
+        MenuGroup(
+            label=_('Tenancy'),
+            items=(
+                get_model_item('organization', 'tenant', _('Tenants')),
+                get_model_item('organization', 'tenantgroup', _('Tenant Groups')),
+                get_model_item('organization', 'assetholder', _('Asset Holders')),
+            ),
+        ),
+        MenuGroup(
+            label=_('Contacts'),
+            items=(
+                get_model_item('organization', 'contact', _('Contacts')),
+                get_model_item('organization', 'contactrole', _('Contact Roles')),
+            ),
+        ),
+    ),
+)
 
 
 ASSETS_MENU = Menu(
@@ -538,7 +533,7 @@ def get_menus():
     from . import Menu, MenuGroup, MenuItem, MenuItemButton
 
     menus = [
-        _build_org_menu(),
+        ORG_MENU,
         ASSETS_MENU,
         INVENTORY_MENU,
         SOFTWARE_MENU,

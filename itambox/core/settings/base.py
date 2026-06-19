@@ -435,13 +435,6 @@ if _raw_api_token_peppers:
 else:
     API_TOKEN_PEPPERS = {}
 
-# Show Regions and Site Groups in the sidebar navigation.
-# On by default — the full Region > Site Group > Site hierarchy is part of the
-# core org model; set ITAMBOX_ENABLE_EXTENDED_ORG_HIERARCHY=False to hide the
-# extra levels on simple single-site installs.
-ITAMBOX_ENABLE_EXTENDED_ORG_HIERARCHY = os.environ.get('ITAMBOX_ENABLE_EXTENDED_ORG_HIERARCHY', 'True') == 'True'
-
-
 # ==============================================================================
 # Plugins Configuration
 # ==============================================================================
