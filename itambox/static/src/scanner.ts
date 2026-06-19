@@ -15,7 +15,7 @@ interface AssetScannerConfig {
   onResult: (code: string) => void;
 }
 
-class AssetScanner {
+export class AssetScanner {
   private config: AssetScannerConfig;
   private readerElement: HTMLElement | null = null;
   private modal: HTMLElement | null = null;

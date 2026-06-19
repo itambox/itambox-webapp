@@ -4,6 +4,10 @@ from .asset_views import (
     AssetCheckoutView, AssetCheckinView, AssetAuditView, asset_label_print,
     bulk_assign_assets, bulk_print_labels,
 )
+from .bulk_scan_views import (
+    AssetScanActionResolveView, BulkCheckinScanView, BulkDisposeScanView,
+    bulk_checkin_assets, bulk_dispose_assets,
+)
 from .assetrole_views import (
     AssetRoleListView, AssetRoleDetailView, AssetRoleEditView, AssetRoleDeleteView,
     AssetRoleCloneView,

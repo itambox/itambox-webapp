@@ -174,6 +174,29 @@
   });
 
 
+  // "Seed" buttons (Check-in / Dispose Selected) — collect the checked pks and
+  // navigate to the scan-basket page with ?pk=... so the basket opens pre-filled
+  // and the user can keep scanning more.
+  document.addEventListener('click', function (event) {
+    const btn = (event.target as HTMLElement).closest<HTMLElement>('.btn-bulk-scan-seed');
+    if (!btn) return;
+    event.preventDefault();
+    const url = btn.getAttribute('data-scan-url');
+    if (!url) return;
+    const checked = document.querySelectorAll<HTMLInputElement>(
+      '#object-list-table-container input[type="checkbox"][name="pk"]:checked',
+    );
+    if (checked.length === 0) {
+      alert(gettext('No items selected.'));
+      return;
+    }
+    const params = new URLSearchParams();
+    checked.forEach(function (cb) {
+      params.append('pk', cb.value);
+    });
+    window.location.href = url + '?' + params.toString();
+  });
+
   // Delegated click handler for bulk delete/edit/restore/purge, scoped to the
   // selection container the button lives in. Aligns with strict CSP (no inline JS).
   const BULK_BUTTONS: Array<{ trigger: string; form: string; confirm?: string }> = [

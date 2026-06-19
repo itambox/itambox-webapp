@@ -18,6 +18,7 @@ import './dashboard';
 import './modal-handler';
 import './audit';
 import './scanner';
+import './scan-basket';
 import './form-toggles';
 import './report-designer';
 import './object-detail';

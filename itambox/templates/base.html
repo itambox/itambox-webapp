@@ -40,7 +40,7 @@
     <link href="{% static 'dist/vendor/tom-select/css/tom-select.bootstrap5.css' %}" rel="stylesheet">
     <link href="{% static 'dist/vendor/mdi/css/materialdesignicons.min.css' %}" rel="stylesheet"/>
     <link href="{% static 'dist/vendor/gridstack/gridstack.min.css' %}" rel="stylesheet"/>
-    <link href="{% static 'dist/itambox.css' %}?v=1.1.0" rel="stylesheet"/>
+    <link href="{% static 'dist/itambox.css' %}?v=1.1.9" rel="stylesheet"/>
     {# Skip-nav: fixed + off-screen until keyboard focus, then slides in. Self-contained because #}
     {# Tabler's CSS does not ship Bootstrap's .visually-hidden-focusable utility. #}
     <style>
@@ -101,7 +101,7 @@
     {# Django JS i18n catalog — defines gettext/ngettext/interpolate before the app bundle (same-origin, CSP 'self') #}
     <script src="{% url 'javascript-catalog' %}"></script>
     {# Application modules bundle #}
-    <script src="{% static 'dist/itambox.js' %}?v=1.1.0"></script>
+    <script src="{% static 'dist/itambox.js' %}?v=1.1.2"></script>
 
 
     {% block javascript %}{% endblock javascript %}

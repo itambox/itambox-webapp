@@ -55,7 +55,9 @@
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    max-width: 18rem;
+    // Roomier so longer German labels (e.g. "Alle Mandanten" + a long tenant
+    // name) fit before the name ellipsises.
+    max-width: 22rem;
     font-weight: 500;
     background-color: var(--tblr-bg-surface);
     border: 1px solid var(--tblr-border-color);

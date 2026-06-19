@@ -65,3 +65,29 @@
     pointer-events: none;
     box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.7);
 }
+
+// Live scan feedback rendered INSIDE the overlay. The #django-messages toast
+// container sits at z-index 1100, below this 9999 overlay, so during camera
+// scanning feedback must live here to be visible at all.
+.scanner-feedback {
+    margin-top: 1.25rem;
+    padding: 0.55rem 1.25rem;
+    border-radius: 999px;
+    font-weight: 600;
+    text-align: center;
+    max-width: 90vw;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.12);
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+
+    &.is-visible {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    &.is-ok   { background: rgba(var(--tblr-success-rgb), 0.92); }
+    &.is-warn { background: rgba(var(--tblr-warning-rgb), 0.92); color: #1a1100; }
+    &.is-fail { background: rgba(var(--tblr-danger-rgb), 0.92); }
+}

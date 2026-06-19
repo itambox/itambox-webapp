@@ -10,6 +10,13 @@ urlpatterns = [
     path('assets/bulk-assign/', views.bulk_assign_assets, name='asset_bulk_assign'),
     path('assets/bulk-print-labels/', views.bulk_print_labels, name='asset_bulk_print_labels'),
 
+    # Scanner-driven bulk check-in / disposal (scan basket)
+    path('assets/checkin/scan/', views.BulkCheckinScanView.as_view(), name='asset_bulk_checkin_scan'),
+    path('assets/dispose/scan/', views.BulkDisposeScanView.as_view(), name='asset_bulk_dispose_scan'),
+    path('assets/scan/resolve-action/', views.AssetScanActionResolveView.as_view(), name='asset_scan_resolve_action'),
+    path('assets/bulk-checkin/', views.bulk_checkin_assets, name='asset_bulk_checkin'),
+    path('assets/bulk-dispose/', views.bulk_dispose_assets, name='asset_bulk_dispose'),
+
     # Asset bulk operations
     path('assets/edit/', views.AssetBulkEditView.as_view(), name='asset_bulk_edit'),
     path('assets/delete/', views.AssetBulkDeleteView.as_view(), name='asset_bulk_delete'),

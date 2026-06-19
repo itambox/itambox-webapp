@@ -49,7 +49,7 @@
             <a href="?switch_tenant={{ membership.tenant.id }}" class="list-group-item list-group-item-action py-2 ps-4 {% if request.active_tenant.id == membership.tenant.id %}active{% endif %}">
                 <div class="d-flex align-items-center">
                     <span class="status-dot {% if membership.role == 'admin' %}bg-red{% elif membership.role == 'member' %}bg-green{% else %}bg-orange{% endif %} me-2"></span>
-                    <span class="text-truncate" style="max-width: 130px;">{{ membership.tenant.name }}</span>
+                    <span class="text-truncate" style="max-width: 200px;">{{ membership.tenant.name }}</span>
                     <span class="badge bg-secondary-lt ms-auto">{{ membership.get_role_display }}</span>
                 </div>
             </a>

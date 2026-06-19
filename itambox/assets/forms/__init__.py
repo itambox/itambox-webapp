@@ -13,6 +13,7 @@ from .audit_forms import AssetAuditConfirmForm
 from .disposal_form import AssetDisposalForm
 from .warranty_form import WarrantyForm
 from .reservation_form import AssetReservationForm
+from .bulk_scan_forms import AssetBulkCheckInForm, AssetBulkDisposeForm
 from .checkout_forms import *
 from .filter_forms import *
 from .bulk_forms import *

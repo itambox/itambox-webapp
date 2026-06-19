@@ -1,0 +1,206 @@
+{% extends base_template|default:"layout.html" %}
+{% load i18n %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ title }} {% translate "- ITAMbox" %}{% endblock %}
+
+{% block page_header %}
+    <div class="page-pretitle">{{ pretitle }}</div>
+    <h2 class="page-title">
+        {% if mode == 'dispose' %}<i class="mdi mdi-delete-clock-outline me-2"></i>{% else %}<i class="mdi mdi-inbox-arrow-down me-2"></i>{% endif %}
+        {{ title }}
+    </h2>
+{% endblock %}
+
+{% block page_actions %}
+    <a href="{% url 'assets:asset_list' %}" class="btn btn-ghost-secondary">
+        <i class="mdi mdi-arrow-left me-1"></i>{% translate "Back to Assets" %}
+    </a>
+{% endblock %}
+
+{% block content %}
+{{ seed_payloads|json_script:"scan-seed-data" }}
+
+<div id="scan-basket-root" data-mode="{{ mode }}" data-resolve-url="{{ resolve_url }}">
+
+    {# ── Scan capture (camera + USB/keyboard). Sits outside the form so Enter never submits. ── #}
+    <div class="card mb-3">
+        <div class="card-body">
+            <label for="scan-basket-input" class="form-label fw-bold">
+                {% translate "Scan or enter an asset" %}
+            </label>
+            <div class="input-group input-group-lg">
+                <span class="input-group-text"><i class="mdi mdi-barcode-scan"></i></span>
+                <input type="text" id="scan-basket-input" class="form-control"
+                       autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
+                       placeholder="{% translate 'Scan barcode / QR, or type asset tag or serial, then press Enter' %}">
+                <button type="button" class="btn btn-primary" id="basket-open-scanner-btn">
+                    <i class="mdi mdi-camera me-1"></i>{% translate "Camera" %}
+                </button>
+            </div>
+            <div class="form-text">
+                <i class="mdi mdi-information-outline me-1"></i>
+                {% translate "A USB barcode scanner types into this box automatically. Each accepted scan is added to the basket below." %}
+            </div>
+        </div>
+    </div>
+
+    <form id="scan-basket-form" method="post" action="{{ submit_url }}" hx-boost="false">
+        {% csrf_token %}
+        <div class="row g-3">
+
+            {# ── The basket ── #}
+            <div class="col-lg-7">
+                <div class="card">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <h3 class="card-title m-0">
+                            {% translate "Basket" %}
+                            <span class="badge bg-primary ms-1" id="scan-basket-count">0</span>
+                        </h3>
+                        <button type="button" class="btn btn-sm btn-ghost-danger" id="scan-basket-clear" disabled>
+                            <i class="mdi mdi-notification-clear-all me-1"></i>{% translate "Clear all" %}
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-vcenter card-table">
+                            <thead>
+                                <tr>
+                                    <th>{% translate "Tag" %}</th>
+                                    <th>{% translate "Asset" %}</th>
+                                    <th>{% translate "Status" %}</th>
+                                    {% if mode == 'dispose' %}
+                                    <th class="text-end">{% translate "Book value" %}</th>
+                                    <th style="width: 9rem;">{% translate "Proceeds" %}</th>
+                                    {% else %}
+                                    <th>{% translate "Assigned to" %}</th>
+                                    {% endif %}
+                                    <th></th>
+                                    <th class="w-1"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="scan-basket-rows"></tbody>
+                        </table>
+                    </div>
+                    <div class="card-body text-center text-muted py-5" id="scan-basket-empty">
+                        <i class="mdi mdi-basket-outline d-block mb-2" style="font-size: 2.5rem;"></i>
+                        {% translate "No assets yet — start scanning." %}
+                    </div>
+                </div>
+            </div>
+
+            {# ── Batch-wide options + submit ── #}
+            <div class="col-lg-5">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title m-0">
+                            {% if mode == 'dispose' %}{% translate "Disposal details" %}{% else %}{% translate "Check-in options" %}{% endif %}
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        {% crispy form %}
+                        {% if mode == 'dispose' %}
+                        <div class="alert alert-warning d-flex align-items-center mt-2 mb-0">
+                            <i class="mdi mdi-alert-outline me-2 fs-3"></i>
+                            <div class="small">
+                                {% translate "Disposal archives each asset and freezes its book value. Already-disposed assets are skipped." %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="card-footer text-end">
+                        {% if mode == 'dispose' %}
+                        <button type="button" class="btn btn-danger" id="scan-basket-submit" disabled
+                                data-bs-toggle="modal" data-bs-target="#bulk-dispose-confirm-modal">
+                            <i class="mdi mdi-delete-outline me-1"></i>{% translate "Dispose basket" %}
+                        </button>
+                        {% else %}
+                        <button type="submit" class="btn btn-success" id="scan-basket-submit" disabled>
+                            <i class="mdi mdi-check me-1"></i>{% translate "Check in basket" %}
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+{# ── Row template cloned by scan-basket.ts ── #}
+<template id="scan-basket-row-template">
+    <tr class="scan-basket-row">
+        <td><input type="hidden" name="pk" data-field="pk"><span class="fw-bold" data-field="asset_tag"></span></td>
+        <td data-field="label"></td>
+        <td><span class="badge bg-blue-lt" data-field="status"></span></td>
+        {% if mode == 'dispose' %}
+        <td class="text-end text-muted" data-field="book_value"></td>
+        <td>
+            <input type="number" step="0.01" min="0" inputmode="decimal"
+                   class="form-control form-control-sm" data-field="proceeds"
+                   aria-label="{% translate 'Proceeds' %}">
+        </td>
+        {% else %}
+        <td data-field="assigned_to"></td>
+        {% endif %}
+        <td><span class="badge bg-warning-lt text-warning" data-field="warning" hidden></span></td>
+        <td class="text-end">
+            <button type="button" class="btn btn-sm btn-ghost-danger scan-basket-remove" aria-label="{% translate 'Remove' %}">
+                <i class="mdi mdi-close"></i>
+            </button>
+        </td>
+    </tr>
+</template>
+{% endblock content %}
+
+{% block page_modals %}
+{# ── Camera scanner overlay (distinct IDs from audit / global scanners) ── #}
+<div id="basket-scanner-modal" class="scanner-overlay" style="display:none;">
+    <div class="text-center mb-3">
+        <h3 class="text-white mb-1">
+            {% if mode == 'dispose' %}{% translate "Scan to dispose" %}{% else %}{% translate "Scan to check in" %}{% endif %}
+        </h3>
+        <p class="text-secondary small mb-0">{% translate "Point camera at a barcode or QR code" %}</p>
+        <p class="scanner-basket-count text-secondary small mb-0 mt-1">
+            {% translate "In basket:" %} <span id="basket-scanner-count">0</span>
+        </p>
+    </div>
+    <div class="scanner-viewfinder" id="basket-scanner-reader">
+        <div class="scanner-laser"></div>
+    </div>
+    <div id="basket-scan-feedback" class="scanner-feedback" role="status" aria-live="polite"></div>
+    <div id="basket-scanner-error" class="alert alert-warning mt-3" style="display:none;">
+        <i class="mdi mdi-alert-outline me-2"></i>
+        <span data-scanner-error-msg>{% translate "Camera unavailable. On iPhone/iPad this requires HTTPS and camera permission — check Settings › Safari › Camera, or use a hardware scanner." %}</span>
+    </div>
+    <div class="mt-4 d-flex gap-2">
+        <button type="button" id="basket-toggle-torch-btn" class="btn btn-outline-light" style="display:none;">
+            <i class="mdi mdi-flashlight"></i> {% translate "Toggle Flash" %}
+        </button>
+        <button type="button" id="basket-close-scanner-btn" class="btn btn-danger">
+            {% translate "Done" %}
+        </button>
+    </div>
+</div>
+
+{% if mode == 'dispose' %}
+<div class="modal modal-blur fade" id="bulk-dispose-confirm-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{% translate "Confirm disposal" %}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+            </div>
+            <div class="modal-body">
+                <p>{% blocktranslate %}You are about to dispose <strong><span class="scan-basket-confirm-count">0</span></strong> asset(s).{% endblocktranslate %}</p>
+                <p class="text-muted mb-0">{% translate "Each asset will be checked in (if needed), archived, and recorded with a disposal entry. This is hard to reverse." %}</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                <button type="button" class="btn btn-danger" id="scan-basket-confirm-submit">
+                    <i class="mdi mdi-delete-outline me-1"></i>{% translate "Dispose" %}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock page_modals %}

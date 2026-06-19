@@ -99,6 +99,35 @@ html {
     }
 }
 
+// ---- Pagination footer ----
+// 3-column grid keeps the "showing X-Y of Z" count centred at ALL times — even
+// when the page nav isn't rendered (single page) — because both side columns are
+// equal (1fr). Per-page selector sits left, page nav right.
+.pagination-bar {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 0.5rem;
+
+    &__per-page {
+        grid-column: 1;
+        justify-self: start;
+        min-width: 0;
+    }
+
+    &__count {
+        grid-column: 2;
+        justify-self: center;
+        text-align: center;
+    }
+
+    &__nav {
+        grid-column: 3;
+        justify-self: end;
+        min-width: 0; // let many page numbers wrap/shrink instead of skewing the centre
+    }
+}
+
 // ============================================================
 //  Premium details — selection color, thin dark scrollbars
 // ============================================================

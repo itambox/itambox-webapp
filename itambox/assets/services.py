@@ -249,7 +249,10 @@ def checkin_asset(
             
             if revert_status:
                 asset.status = revert_status
-            asset.location = location
+            # Only overwrite location when a destination was provided; a blank
+            # location preserves where the asset is rather than wiping it to NULL.
+            if location is not None:
+                asset.location = location
             asset._changelog_action = 'checkin'
             asset._changelog_message = f"Checked in from {target}"
             asset.save(update_fields=['status', 'location'])
@@ -263,7 +266,8 @@ def checkin_asset(
                 revert_status = StatusLabel.objects.filter(type=StatusTypeChoices.DEPLOYABLE).first()
             if revert_status:
                 asset.status = revert_status
-            asset.location = location
+            if location is not None:
+                asset.location = location
             asset._changelog_action = 'checkin'
             asset._changelog_message = f"Checked in from Location: {checked_in_from}"
             asset.save(update_fields=['status', 'location'])

@@ -1,6 +1,33 @@
 // ============================================================
 //  Premium Sidebar & Vertical Navigation Styles
 // ============================================================
+
+// Desktop: widen the vertical sidebar a touch beyond Tabler's 15rem default and
+// keep the page content offset in lockstep so nothing overlaps or leaves a gap.
+// (Tabler hardcodes 15rem on both .navbar-vertical and .page-wrapper — no var.)
+$itambox-sidebar-width: 18rem; // 288px — Tabler default is 15rem/240px (+48px)
+
+@media (min-width: 992px) {
+    .navbar-vertical.navbar-expand-lg {
+        width: $itambox-sidebar-width;
+    }
+
+    // Match Tabler's own sibling-combinator selector (specificity 0,3,0) so our
+    // content offset actually wins — a plain `.page-wrapper` rule is outranked and
+    // the content stays at 15rem while the sidebar grows, causing overlap.
+    .navbar-vertical.navbar-expand-lg ~ .page-wrapper {
+        margin-left: $itambox-sidebar-width;
+    }
+}
+
+// Remove Tabler's ::after active-indicator border on sidebar nav items. Active
+// state is already conveyed by background + accent colour (and the nested link's
+// own left border), so the extra 3px bar is redundant. !important beats Tabler's
+// higher-specificity `.navbar-vertical… .nav-item.active:after` rule.
+.navbar-vertical .nav-item.active::after {
+    display: none !important;
+}
+
 .navbar-vertical {
     background-color: var(--itambox-sidebar-bg, var(--tblr-bg-surface)) !important;
     border-right: 1px solid var(--itambox-sidebar-border, var(--tblr-border-color)) !important;
@@ -54,6 +81,18 @@
             position: static !important;
             float: none !important;
             text-align: left !important;
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+
+        // Tabler's mega-menu columns shrink to their content width, leaving dead
+        // space on the right of the (wider) sidebar. Force them to span the full
+        // panel so item rows — and their hover/active highlights — use all the width.
+        .dropdown-menu-columns,
+        .dropdown-menu-column {
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
         }
 
         .dropdown-header {

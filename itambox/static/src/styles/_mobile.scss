@@ -108,6 +108,10 @@ $action-bar-fab-size: 56px;
     box-shadow: 0 -2px 12px rgba(0,0,0,.08);
     // Push above the safe area (iPhone home indicator)
     padding-bottom: env(safe-area-inset-bottom, 0);
+    // Promote to its own compositor layer so the bar stays glued to the bottom
+    // during momentum scrolling on mobile instead of lagging/jittering ("floating").
+    transform: translateZ(0);
+    backface-visibility: hidden;
 
     [data-bs-theme="dark"] & {
         background: var(--tblr-bg-surface, #1e2433);
@@ -155,6 +159,24 @@ $action-bar-fab-size: 56px;
     &.active {
         color: var(--tblr-primary);
     }
+}
+
+// Dropup wrapper — behaves like the other equal-width flex slots.
+.mobile-action-bar__item {
+    flex: 1;
+    display: flex;
+    min-width: 0;
+
+    .mobile-action-bar__btn {
+        flex: 1;
+    }
+}
+
+// Dropup menu floats just above the bar.
+.mobile-action-bar__menu {
+    z-index: 1045; // above the bar (1040)
+    min-width: 12rem;
+    margin-bottom: 0.5rem;
 }
 
 // Elevated centre FAB (scanner button)

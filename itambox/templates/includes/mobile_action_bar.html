@@ -4,10 +4,40 @@
 <div class="mobile-action-bar d-lg-none" role="navigation" aria-label="{% translate 'Quick actions' %}">
     <div class="mobile-action-bar__inner">
 
-        <a href="{% url 'assets:asset_create' %}" class="mobile-action-bar__btn" title="{% translate 'Add Asset' %}">
-            <i class="mdi mdi-plus-circle-outline" aria-hidden="true"></i>
-            <span>{% translate "Add" %}</span>
-        </a>
+        <div class="mobile-action-bar__item dropup">
+            <button type="button" class="mobile-action-bar__btn" data-bs-toggle="dropdown"
+                    aria-expanded="false" title="{% translate 'Add & bulk actions' %}">
+                <i class="mdi mdi-plus-circle-outline" aria-hidden="true"></i>
+                <span>{% translate "Add" %}</span>
+            </button>
+            <ul class="dropdown-menu mobile-action-bar__menu">
+                {% if perms.assets.add_asset or perms.inventory.add_component or perms.inventory.add_accessory or perms.inventory.add_consumable %}
+                <li><h6 class="dropdown-header">{% translate "Create" %}</h6></li>
+                {% if perms.assets.add_asset %}
+                <li><a class="dropdown-item" href="{% url 'assets:asset_create' %}"><i class="mdi mdi-server me-2 text-muted"></i>{% translate "Asset" %}</a></li>
+                {% endif %}
+                {% if perms.inventory.add_component %}
+                <li><a class="dropdown-item" href="{% url 'inventory:component_create' %}"><i class="mdi mdi-memory me-2 text-muted"></i>{% translate "Component" %}</a></li>
+                {% endif %}
+                {% if perms.inventory.add_accessory %}
+                <li><a class="dropdown-item" href="{% url 'inventory:accessory_create' %}"><i class="mdi mdi-headphones me-2 text-muted"></i>{% translate "Accessory" %}</a></li>
+                {% endif %}
+                {% if perms.inventory.add_consumable %}
+                <li><a class="dropdown-item" href="{% url 'inventory:consumable_create' %}"><i class="mdi mdi-water-outline me-2 text-muted"></i>{% translate "Consumable" %}</a></li>
+                {% endif %}
+                {% endif %}
+                {% if perms.assets.change_asset or perms.assets.add_assetdisposal %}
+                <li><hr class="dropdown-divider"></li>
+                <li><h6 class="dropdown-header">{% translate "Bulk" %}</h6></li>
+                {% if perms.assets.change_asset %}
+                <li><a class="dropdown-item" href="{% url 'assets:asset_bulk_checkin_scan' %}"><i class="mdi mdi-inbox-arrow-down me-2 text-muted"></i>{% translate "Bulk check-in" %}</a></li>
+                {% endif %}
+                {% if perms.assets.add_assetdisposal %}
+                <li><a class="dropdown-item" href="{% url 'assets:asset_bulk_dispose_scan' %}"><i class="mdi mdi-delete-clock-outline me-2 text-muted"></i>{% translate "Bulk disposal" %}</a></li>
+                {% endif %}
+                {% endif %}
+            </ul>
+        </div>
 
         <a href="{% url 'search' %}" class="mobile-action-bar__btn" title="{% translate 'Search' %}">
             <i class="mdi mdi-magnify" aria-hidden="true"></i>
