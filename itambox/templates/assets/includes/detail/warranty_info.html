@@ -1,0 +1,80 @@
+{% load i18n money %}
+<dl class="row mb-0">
+    <dt class="col-sm-4">{% translate "Asset:" %}</dt>
+    <dd class="col-sm-8">
+        {% if object.asset %}
+            <a href="{{ object.asset.get_absolute_url }}" class="fw-bold text-decoration-none">
+                {{ object.asset.name }} ({{ object.asset.asset_tag }})
+            </a>
+        {% else %}
+            <span class="text-muted"><i>{% translate "None" %}</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">{% translate "Type:" %}</dt>
+    <dd class="col-sm-8">
+        <span class="badge bg-purple-lt px-2 py-1 text-uppercase">
+            {{ object.get_warranty_type_display }}
+        </span>
+    </dd>
+
+    <dt class="col-sm-4">{% translate "Status:" %}</dt>
+    <dd class="col-sm-8">
+        {% if object.is_active %}
+            <span class="badge bg-success-lt text-success">{% translate "Active" %}</span>
+        {% else %}
+            <span class="badge bg-secondary-lt text-secondary">{% translate "Expired/Inactive" %}</span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">{% translate "Provider:" %}</dt>
+    <dd class="col-sm-8">
+        {% if object.provider %}
+            {{ object.provider }}
+        {% else %}
+            <span class="text-muted"><i>{% translate "Not specified" %}</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">{% translate "Start Date:" %}</dt>
+    <dd class="col-sm-8 text-secondary">{{ object.start_date|date:"Y-m-d" }}</dd>
+
+    <dt class="col-sm-4">{% translate "End Date:" %}</dt>
+    <dd class="col-sm-8 text-secondary">{{ object.end_date|date:"Y-m-d" }}</dd>
+
+    <dt class="col-sm-4">{% translate "Cost:" %}</dt>
+    <dd class="col-sm-8">
+        {% if object.cost is not None %}
+            <strong>{{ object.cost|money:object }}</strong>
+        {% else %}
+            <span class="text-muted"><i>&mdash;</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">{% translate "Reference:" %}</dt>
+    <dd class="col-sm-8">
+        {% if object.reference %}
+            {{ object.reference }}
+        {% else %}
+            <span class="text-muted"><i>{% translate "Not specified" %}</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">{% translate "Terms:" %}</dt>
+    <dd class="col-sm-8 text-secondary">
+        {% if object.terms %}
+            {{ object.terms|linebreaksbr }}
+        {% else %}
+            <span class="text-muted"><i>{% translate "Not specified" %}</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">{% translate "Notes:" %}</dt>
+    <dd class="col-sm-8 text-secondary">
+        {% if object.notes %}
+            {{ object.notes|linebreaksbr }}
+        {% else %}
+            <span class="text-muted"><i>{% translate "No notes provided." %}</i></span>
+        {% endif %}
+    </dd>
+</dl>

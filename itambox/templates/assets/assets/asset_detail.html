@@ -108,6 +108,24 @@
             {% translate "Licenses" %} <span class="badge bg-pink-lt ms-2">{{ object.license_assignments.count }}</span>
         </a>
     </li>
+    <li class="nav-item" role="presentation">
+        <a href="?tab=warranties" data-bs-target="#warranties" class="nav-link {% if request.GET.tab == 'warranties' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+            <i class="mdi mdi-shield-check me-1 text-success"></i>
+            {% translate "Warranties" %} <span class="badge bg-success-lt ms-2">{{ object.warranties.count }}</span>
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a href="?tab=reservations" data-bs-target="#reservations" class="nav-link {% if request.GET.tab == 'reservations' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+            <i class="mdi mdi-calendar-clock me-1 text-blue"></i>
+            {% translate "Reservations" %} <span class="badge bg-blue-lt ms-2">{{ object.reservations.count }}</span>
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a href="?tab=disposal" data-bs-target="#disposal" class="nav-link {% if request.GET.tab == 'disposal' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+            <i class="mdi mdi-recycle me-1 text-secondary"></i>
+            {% translate "Disposal" %} <span class="badge bg-secondary-lt ms-2">{% if disposal_obj %}1{% else %}0{% endif %}</span>
+        </a>
+    </li>
 {% endblock extra_tabs %}
 
 {% block details_tab %}
@@ -336,4 +354,72 @@
     {% translate "Allocated Software Licenses" as t_seats %}
     {% translate "No software license seats allocated to this asset." as e_seats %}
     {% include 'generic/includes/related_table_tab.html' with tab="license-seats" table=license_seats_table title=t_seats empty=e_seats %}
+
+    <div class="tab-pane fade {% if request.GET.tab == 'warranties' %}show active{% endif %}" id="warranties" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
+                <h3 class="card-title">{% translate "Warranties" %}</h3>
+                <button type="button" class="btn btn-sm btn-primary"
+                        hx-get="{% url 'assets:warranty_create' %}?asset={{ object.pk }}&_quickadd=1"
+                        hx-target="#modal-placeholder">
+                    <i class="mdi mdi-plus"></i> {% translate "Add Warranty" %}
+                </button>
+            </div>
+            {% if warranties_table.rows %}
+                <div class="table-responsive">{% render_table warranties_table %}</div>
+                {% include 'generic/includes/table_pagination.html' with table=warranties_table tab="warranties" %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center"><p class="mb-0">{% translate "No warranties registered for this asset." %}</p></div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="tab-pane fade {% if request.GET.tab == 'reservations' %}show active{% endif %}" id="reservations" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
+                <h3 class="card-title">{% translate "Reservations" %}</h3>
+                <button type="button" class="btn btn-sm btn-primary"
+                        hx-get="{% url 'assets:assetreservation_create' %}?asset={{ object.pk }}&_quickadd=1"
+                        hx-target="#modal-placeholder">
+                    <i class="mdi mdi-plus"></i> {% translate "Add Reservation" %}
+                </button>
+            </div>
+            {% if reservations_table.rows %}
+                <div class="table-responsive">{% render_table reservations_table %}</div>
+                {% include 'generic/includes/table_pagination.html' with table=reservations_table tab="reservations" %}
+            {% else %}
+                <div class="card-body py-5 text-muted text-center"><p class="mb-0">{% translate "No reservations for this asset." %}</p></div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="tab-pane fade {% if request.GET.tab == 'disposal' %}show active{% endif %}" id="disposal" role="tabpanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
+                <h3 class="card-title">{% translate "Disposal" %}</h3>
+                {% if not disposal_obj %}
+                <button type="button" class="btn btn-sm btn-primary"
+                        hx-get="{% url 'assets:assetdisposal_create' %}?asset={{ object.pk }}&_quickadd=1"
+                        hx-target="#modal-placeholder">
+                    <i class="mdi mdi-plus"></i> {% translate "Record Disposal" %}
+                </button>
+                {% endif %}
+            </div>
+            {% if disposal_obj %}
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">{% translate "Method:" %}</dt>
+                    <dd class="col-sm-8">{{ disposal_obj.get_disposal_method_display }}</dd>
+                    <dt class="col-sm-4">{% translate "Disposal Date:" %}</dt>
+                    <dd class="col-sm-8">{{ disposal_obj.disposal_date|date:"Y-m-d" }}</dd>
+                    <dt class="col-sm-4">{% translate "Recipient:" %}</dt>
+                    <dd class="col-sm-8">{{ disposal_obj.recipient|default:"-" }}</dd>
+                </dl>
+                <a href="{{ disposal_obj.get_absolute_url }}" class="btn btn-sm btn-outline-secondary mt-3">{% translate "View / Edit Disposal" %}</a>
+            </div>
+            {% else %}
+            <div class="card-body py-5 text-muted text-center"><p class="mb-0">{% translate "No disposal record for this asset." %}</p></div>
+            {% endif %}
+        </div>
+    </div>
 {% endblock extra_tab_panes %}

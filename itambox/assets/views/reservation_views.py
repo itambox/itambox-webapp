@@ -2,6 +2,7 @@ from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
 from itambox.panels import Panel
+from itambox.quick_add import QuickAddMixin
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
 )
@@ -29,12 +30,13 @@ class AssetReservationDetailView(ObjectDetailView):
     )
 
 
-class AssetReservationEditView(ObjectEditView):
+class AssetReservationEditView(QuickAddMixin, ObjectEditView):
     queryset = AssetReservation.objects.all()
     model = AssetReservation
     model_form = AssetReservationForm
     template_name = 'generic/object_edit.html'
     default_return_url = 'assets:assetreservation_list'
+    quick_add_reload = True
 
     def get_initial(self):
         initial = super().get_initial()

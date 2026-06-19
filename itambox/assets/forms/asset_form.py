@@ -9,6 +9,7 @@ from core.forms import CrispyFormMixin
 from extras.models import Tag, CustomField
 from organization.models import Location
 from ..models import Asset, AssetType, AssetRole, StatusLabel
+from ..models.choices import WarrantyTypeChoices
 
 from .fields import StatusModelChoiceField
 
@@ -61,6 +62,35 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         label=_("Requestable Status")
     )
 
+    # Optional inline warranty (non-model fields). When the dates are filled in,
+    # the view creates a Warranty for this asset via create_inline_warranty().
+    warranty_provider = forms.CharField(
+        label=_("Warranty Provider"),
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control'})
+    )
+    warranty_type = forms.ChoiceField(
+        label=_("Warranty Type"),
+        required=False,
+        choices=[('', '---------')] + list(WarrantyTypeChoices.choices),
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    warranty_start_date = forms.DateField(
+        label=_("Warranty Start Date"),
+        required=False,
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'})
+    )
+    warranty_end_date = forms.DateField(
+        label=_("Warranty End Date"),
+        required=False,
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'})
+    )
+    warranty_cost = forms.DecimalField(
+        label=_("Warranty Cost"),
+        required=False,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
+    )
+
     class Meta:
         model = Asset
         fields = [
@@ -107,6 +137,48 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         elif val == 'false':
             return False
         return None
+
+    def clean(self):
+        cleaned_data = super().clean()
+        warranty_fields = (
+            'warranty_provider', 'warranty_type',
+            'warranty_start_date', 'warranty_end_date', 'warranty_cost',
+        )
+        any_filled = any(cleaned_data.get(f) for f in warranty_fields)
+        if any_filled:
+            start = cleaned_data.get('warranty_start_date')
+            end = cleaned_data.get('warranty_end_date')
+            if not start:
+                self.add_error(
+                    'warranty_start_date',
+                    _("Start date is required when adding a warranty."),
+                )
+            if not end:
+                self.add_error(
+                    'warranty_end_date',
+                    _("End date is required when adding a warranty."),
+                )
+            if start and end and end < start:
+                self.add_error(
+                    'warranty_end_date',
+                    _("End date cannot be before the start date."),
+                )
+        return cleaned_data
+
+    def create_inline_warranty(self, asset):
+        cd = self.cleaned_data
+        start = cd.get('warranty_start_date')
+        end = cd.get('warranty_end_date')
+        if not (start and end):
+            return None
+        from ..models import Warranty  # inline import: avoid import cycle at module load
+        kwargs = dict(asset=asset, start_date=start, end_date=end,
+                      provider=cd.get('warranty_provider') or '',
+                      cost=cd.get('warranty_cost'))
+        wt = cd.get('warranty_type')
+        if wt:
+            kwargs['warranty_type'] = wt
+        return Warranty.objects.create(**kwargs)
 
     def __init__(self, *args, **kwargs):
         request = kwargs.pop('request', None)
@@ -384,6 +456,24 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
                     css_class='mb-4 border p-3 rounded'
                 )
             )
+
+        layout_elements.append(
+            Fieldset(
+                _('Optional: Warranty'),
+                HTML('<p class="text-muted small">' + str(_('Fill in to create a warranty for this asset; leave blank to skip.')) + '</p>'),
+                Div(
+                    Div('warranty_provider', css_class='col-md-6'),
+                    Div('warranty_type', css_class='col-md-6'),
+                    css_class='row'
+                ),
+                Div(
+                    Div('warranty_start_date', css_class='col-md-4'),
+                    Div('warranty_end_date', css_class='col-md-4'),
+                    Div('warranty_cost', css_class='col-md-4'),
+                    css_class='row'
+                ),
+            )
+        )
 
         layout_elements.append(
             Fieldset(

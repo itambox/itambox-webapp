@@ -2,6 +2,7 @@ from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
 from itambox.panels import Panel
+from itambox.quick_add import QuickAddMixin
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
 )
@@ -29,12 +30,13 @@ class WarrantyDetailView(ObjectDetailView):
     )
 
 
-class WarrantyEditView(ObjectEditView):
+class WarrantyEditView(QuickAddMixin, ObjectEditView):
     queryset = Warranty.objects.all()
     model = Warranty
     model_form = WarrantyForm
     template_name = 'generic/object_edit.html'
     default_return_url = 'assets:warranty_list'
+    quick_add_reload = True
 
     def get_initial(self):
         initial = super().get_initial()

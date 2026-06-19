@@ -1,0 +1,62 @@
+{% load i18n money %}
+<dl class="row mb-0">
+    <dt class="col-sm-4">{% translate "Asset:" %}</dt>
+    <dd class="col-sm-8">
+        {% if object.asset %}
+            <a href="{{ object.asset.get_absolute_url }}" class="fw-bold text-decoration-none">
+                {{ object.asset.name }} ({{ object.asset.asset_tag }})
+            </a>
+        {% else %}
+            <span class="text-muted"><i>{% translate "None" %}</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">{% translate "Reserved For:" %}</dt>
+    <dd class="col-sm-8">
+        {% if object.reserved_for %}
+            {{ object.reserved_for }}
+        {% else %}
+            <span class="text-muted"><i>{% translate "(no holder)" %}</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">{% translate "Status:" %}</dt>
+    <dd class="col-sm-8">
+        <span class="badge bg-purple-lt px-2 py-1 text-uppercase">
+            {{ object.get_status_display }}
+        </span>
+    </dd>
+
+    <dt class="col-sm-4">{% translate "Start Date:" %}</dt>
+    <dd class="col-sm-8 text-secondary">{{ object.start_date|date:"Y-m-d" }}</dd>
+
+    <dt class="col-sm-4">{% translate "End Date:" %}</dt>
+    <dd class="col-sm-8 text-secondary">{{ object.end_date|date:"Y-m-d" }}</dd>
+
+    <dt class="col-sm-4">{% translate "Purpose:" %}</dt>
+    <dd class="col-sm-8">
+        {% if object.purpose %}
+            {{ object.purpose }}
+        {% else %}
+            <span class="text-muted"><i>{% translate "Not specified" %}</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">{% translate "Created By:" %}</dt>
+    <dd class="col-sm-8">
+        {% if object.created_by %}
+            {{ object.created_by }}
+        {% else %}
+            <span class="text-muted"><i>{% translate "Not specified" %}</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-4">{% translate "Notes:" %}</dt>
+    <dd class="col-sm-8 text-secondary">
+        {% if object.notes %}
+            {{ object.notes|linebreaksbr }}
+        {% else %}
+            <span class="text-muted"><i>{% translate "No notes provided." %}</i></span>
+        {% endif %}
+    </dd>
+</dl>

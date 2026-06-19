@@ -213,6 +213,19 @@ class AssetDetailView(ObjectDetailView):
                     break
         context['approved_request'] = approved_request
 
+        warranty_qs = asset.warranties.select_related('asset')
+        warranties_table = tables.WarrantyTable(warranty_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': 10}).configure(warranties_table)
+        context['warranties_table'] = warranties_table
+
+        reservation_qs = asset.reservations.select_related('asset', 'reserved_for', 'created_by')
+        reservations_table = tables.AssetReservationTable(reservation_qs, request=self.request)
+        RequestConfig(self.request, paginate={'per_page': 10}).configure(reservations_table)
+        context['reservations_table'] = reservations_table
+
+        from assets.models import AssetDisposal  # inline import: avoid touching the module-level import block
+        context['disposal_obj'] = AssetDisposal.objects.filter(asset=asset).first()
+
         return context
 
 
@@ -233,6 +246,12 @@ class AssetEditView(ObjectEditView):
             form = self.get_form()
             return render(request, 'htmx/crispy_form.html', {'form': form})
         return super().post(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        if getattr(self, 'object', None) is not None:
+            form.create_inline_warranty(self.object)
+        return response
 
 
 class AssetDeleteView(ObjectDeleteView):

@@ -21,9 +21,19 @@ class QuickAddMixin:
     """
 
     quick_add_target = None
+    quick_add_reload = False
 
     def is_quick_add(self):
         return self.request.GET.get('_quickadd') == '1'
+
+    def get_quick_add_redirect_url(self):
+        """Where to navigate after a reload-mode quick-add success.
+        Default: the new object's parent asset detail, falling back to the object itself."""
+        obj = self.object
+        asset = getattr(obj, 'asset', None)
+        if asset is not None:
+            return asset.get_absolute_url()
+        return obj.get_absolute_url()
 
     def get_template_names(self):
         if self.is_quick_add():
@@ -50,6 +60,10 @@ class QuickAddMixin:
     def form_valid(self, form):
         if self.is_quick_add():
             self.object = form.save()
+            if getattr(self, 'quick_add_reload', False):
+                response = HttpResponse(status=204)
+                response['HX-Redirect'] = self.get_quick_add_redirect_url()
+                return response
             target = getattr(self, 'quick_add_target', None) or ''
             value = str(self.object)
             pk = self.object.pk
