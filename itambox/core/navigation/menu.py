@@ -50,6 +50,12 @@ ASSETS_MENU = Menu(
             label=_('Bulk Actions'),
             items=(
                 MenuItem(
+                    link='assets:asset_bulk_checkout_scan',
+                    link_text=_('Bulk Check-out'),
+                    permissions=['assets.change_asset'],
+                    buttons=(),
+                ),
+                MenuItem(
                     link='assets:asset_bulk_checkin_scan',
                     link_text=_('Bulk Check-in'),
                     permissions=['assets.change_asset'],

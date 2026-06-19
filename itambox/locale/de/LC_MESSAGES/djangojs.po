@@ -249,3 +249,12 @@ msgstr "Fehler beim Zurücksetzen der Konfiguration: "
 
 msgid "Close"
 msgstr "Schließen"
+
+msgid "Added: %(label)s"
+msgstr "Hinzugefügt: %(label)s"
+
+msgid "Already in basket: %(code)s"
+msgstr "Bereits im Korb: %(code)s"
+
+msgid "You do not have permission to do this."
+msgstr "Sie haben dazu keine Berechtigung."

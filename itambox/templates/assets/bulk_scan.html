@@ -7,7 +7,7 @@
 {% block page_header %}
     <div class="page-pretitle">{{ pretitle }}</div>
     <h2 class="page-title">
-        {% if mode == 'dispose' %}<i class="mdi mdi-delete-clock-outline me-2"></i>{% else %}<i class="mdi mdi-inbox-arrow-down me-2"></i>{% endif %}
+        {% if mode == 'dispose' %}<i class="mdi mdi-delete-clock-outline me-2"></i>{% elif mode == 'checkout' %}<i class="mdi mdi-logout me-2"></i>{% else %}<i class="mdi mdi-inbox-arrow-down me-2"></i>{% endif %}
         {{ title }}
     </h2>
 {% endblock %}
@@ -93,7 +93,7 @@
                 <div class="card">
                     <div class="card-header">
                         <h3 class="card-title m-0">
-                            {% if mode == 'dispose' %}{% translate "Disposal details" %}{% else %}{% translate "Check-in options" %}{% endif %}
+                            {% if mode == 'dispose' %}{% translate "Disposal details" %}{% elif mode == 'checkout' %}{% translate "Check-out options" %}{% else %}{% translate "Check-in options" %}{% endif %}
                         </h3>
                     </div>
                     <div class="card-body">
@@ -112,6 +112,10 @@
                         <button type="button" class="btn btn-danger" id="scan-basket-submit" disabled
                                 data-bs-toggle="modal" data-bs-target="#bulk-dispose-confirm-modal">
                             <i class="mdi mdi-delete-outline me-1"></i>{% translate "Dispose basket" %}
+                        </button>
+                        {% elif mode == 'checkout' %}
+                        <button type="submit" class="btn btn-success" id="scan-basket-submit" disabled>
+                            <i class="mdi mdi-logout me-1"></i>{% translate "Check out basket" %}
                         </button>
                         {% else %}
                         <button type="submit" class="btn btn-success" id="scan-basket-submit" disabled>
@@ -156,7 +160,7 @@
 <div id="basket-scanner-modal" class="scanner-overlay" style="display:none;">
     <div class="text-center mb-3">
         <h3 class="text-white mb-1">
-            {% if mode == 'dispose' %}{% translate "Scan to dispose" %}{% else %}{% translate "Scan to check in" %}{% endif %}
+            {% if mode == 'dispose' %}{% translate "Scan to dispose" %}{% elif mode == 'checkout' %}{% translate "Scan to check out" %}{% else %}{% translate "Scan to check in" %}{% endif %}
         </h3>
         <p class="text-secondary small mb-0">{% translate "Point camera at a barcode or QR code" %}</p>
         <p class="scanner-basket-count text-secondary small mb-0 mt-1">

@@ -20,6 +20,7 @@ from assets.models import (
 from assets.services import checkout_asset, dispose_asset
 from core.models import Job
 from core.tasks.checkin import bulk_checkin_task
+from core.tasks.checkout import bulk_checkout_task
 from core.tasks.disposal import bulk_dispose_task
 from core.tests.mixins import TenantTestMixin
 from organization.models import AssetHolder, Location, Site, Tenant
@@ -369,3 +370,123 @@ class BulkScanPageTests(TenantTestMixin, TestCase):
         self.client_login_to_tenant(self.tenant_user, self.tenant)
         resp = self.client.get(reverse("assets:asset_bulk_dispose_scan"))
         self.assertEqual(resp.status_code, 403)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Bulk check-out
+# ─────────────────────────────────────────────────────────────────────────────
+
+class BulkCheckoutTests(TenantTestMixin, TestCase):
+    def setUp(self):
+        self.setup_tenant_context(slug="co")
+        self.set_active_tenant(self.tenant, self.tenant_membership)
+        self.role, self.atype, self.deployable, self.deployed, self.archived = _fixtures("-co")
+        self.holder = AssetHolder.objects.create(first_name="C", last_name="O", upn="co@x.io", email="co@x.io", tenant=self.tenant)
+        self.asset = Asset.objects.create(
+            name="CO Asset", asset_tag="CO-001", serial_number="SN-CO-001",
+            asset_type=self.atype, asset_role=self.role, status=self.deployable, tenant=self.tenant,
+        )
+        self.resolve_url = reverse("assets:asset_scan_resolve_action")
+
+    def _job(self):
+        from django.contrib.contenttypes.models import ContentType
+        return Job.objects.create(name="t", tenant=self.tenant, model=ContentType.objects.get_for_model(Asset), status=Job.STATUS_PENDING)
+
+    # ── resolve ──
+    def test_resolve_checkout_eligible(self):
+        self.client_login_to_tenant(self.tenant_admin, self.tenant)
+        resp = self.client.get(self.resolve_url, {"code": "CO-001", "mode": "checkout"})
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertTrue(data["found"])
+        self.assertTrue(data["eligible"])
+
+    def test_resolve_checkout_ineligible_when_archived(self):
+        self.asset.status = self.archived
+        self.asset.save()
+        self.client_login_to_tenant(self.tenant_admin, self.tenant)
+        resp = self.client.get(self.resolve_url, {"code": "CO-001", "mode": "checkout"})
+        data = json.loads(resp.content)
+        self.assertFalse(data["eligible"])
+        self.assertTrue(data["warning"])
+
+    def test_resolve_checkout_requires_change_asset(self):
+        self.tenant_role.permissions = ["assets.view_asset"]
+        self.tenant_role.save()
+        self.client_login_to_tenant(self.tenant_user, self.tenant)
+        resp = self.client.get(self.resolve_url, {"code": "CO-001", "mode": "checkout"})
+        self.assertEqual(resp.status_code, 403)
+
+    # ── submit view ──
+    @patch("django_q.tasks.async_task")
+    def test_bulk_checkout_enqueues(self, mock_async):
+        self.client_login_to_tenant(self.tenant_admin, self.tenant)
+        resp = self.client.post(reverse("assets:asset_bulk_checkout"), {
+            "pk": [self.asset.pk],
+            "asset_holder": self.holder.pk,
+            "notes": "deploy",
+        })
+        self.assertEqual(resp.status_code, 302)
+        job = Job.objects.filter(name__contains="Bulk Check-out").first()
+        self.assertIsNotNone(job)
+        mock_async.assert_called_once()
+        args = mock_async.call_args[0]
+        self.assertEqual(args[0], "core.tasks.bulk_checkout_task")
+        self.assertEqual(args[1], job.pk)
+        self.assertEqual(args[2], [str(self.asset.pk)])
+        self.assertEqual(args[3], "assetholder")
+        self.assertEqual(args[4], str(self.holder.pk))
+
+    @patch("django_q.tasks.async_task")
+    def test_bulk_checkout_requires_one_target(self, mock_async):
+        self.client_login_to_tenant(self.tenant_admin, self.tenant)
+        resp = self.client.post(reverse("assets:asset_bulk_checkout"), {"pk": [self.asset.pk]})
+        self.assertEqual(resp.status_code, 302)
+        mock_async.assert_not_called()
+        self.assertFalse(Job.objects.exists())
+
+    @patch("django_q.tasks.async_task")
+    def test_bulk_checkout_rejects_multiple_targets(self, mock_async):
+        site = Site.objects.create(name="S", slug="s-co")
+        loc = Location.objects.create(name="L", slug="l-co", site=site, tenant=self.tenant)
+        self.client_login_to_tenant(self.tenant_admin, self.tenant)
+        resp = self.client.post(reverse("assets:asset_bulk_checkout"), {
+            "pk": [self.asset.pk],
+            "asset_holder": self.holder.pk,
+            "location": loc.pk,
+        })
+        self.assertEqual(resp.status_code, 302)
+        mock_async.assert_not_called()
+
+    def test_checkout_permission_denied(self):
+        self.tenant_role.permissions = ["assets.view_asset"]
+        self.tenant_role.save()
+        self.client_login_to_tenant(self.tenant_user, self.tenant)
+        resp = self.client.post(reverse("assets:asset_bulk_checkout"), {"pk": [self.asset.pk], "asset_holder": self.holder.pk})
+        self.assertEqual(resp.status_code, 403)
+
+    # ── task ──
+    def test_task_checks_out_to_holder(self):
+        job = self._job()
+        bulk_checkout_task(job.pk, [str(self.asset.pk)], "assetholder", self.holder.pk, self.tenant_admin.pk, "deploy", None, self.tenant.pk)
+        job.refresh_from_db()
+        self.assertEqual(job.status, Job.STATUS_COMPLETED)
+        self.assertEqual(job.result["checked_out"], 1)
+        self.asset.refresh_from_db()
+        active = self.asset.active_assignment
+        self.assertIsNotNone(active)
+        self.assertEqual(active.assigned_target, self.holder)
+
+    def test_task_applies_status_override(self):
+        custom = StatusLabel.objects.create(name="CO Custom", slug="co-custom", type="deployed")
+        job = self._job()
+        bulk_checkout_task(job.pk, [str(self.asset.pk)], "assetholder", self.holder.pk, self.tenant_admin.pk, "", None, self.tenant.pk, custom.pk)
+        self.asset.refresh_from_db()
+        self.assertEqual(self.asset.status, custom)
+
+    # ── page ──
+    def test_checkout_page_renders(self):
+        self.client_login_to_tenant(self.tenant_admin, self.tenant)
+        resp = self.client.get(reverse("assets:asset_bulk_checkout_scan"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "scan-basket-root")

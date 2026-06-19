@@ -37,6 +37,7 @@ from .. import forms
 logger = logging.getLogger(__name__)
 
 CHECKIN_PERM = 'assets.change_asset'
+CHECKOUT_PERM = 'assets.change_asset'
 DISPOSE_PERM = 'assets.add_assetdisposal'
 
 
@@ -61,6 +62,13 @@ def asset_action_payload(asset, mode):
             warning = str(_("Already disposed — will be skipped."))
         bv = compute_book_value(asset)
         book_value = str(bv) if bv is not None else None
+    elif mode == 'checkout':
+        status_type = asset.status.type if asset.status_id else None
+        if status_type in ('in_repair', 'on_order', 'archived'):
+            eligible = False
+            warning = str(_("Cannot check out — %(status)s.")) % {'status': asset.status.get_type_display()}
+        elif assigned is not None:
+            warning = str(_("Currently assigned to %(holder)s — will be reassigned.")) % {'holder': assigned}
     else:  # checkin
         if active is None and not asset.location_id:
             eligible = False
@@ -144,6 +152,14 @@ class BulkCheckinScanView(_BaseBulkScanView):
     form_class = forms.AssetBulkCheckInForm
     submit_url_name = 'assets:asset_bulk_checkin'
     page_title = _('Bulk Check-in')
+
+
+class BulkCheckoutScanView(_BaseBulkScanView):
+    permission_required = (CHECKOUT_PERM,)
+    mode = 'checkout'
+    form_class = forms.AssetBulkCheckOutForm
+    submit_url_name = 'assets:asset_bulk_checkout'
+    page_title = _('Bulk Check-out')
 
 
 class BulkDisposeScanView(_BaseBulkScanView):
@@ -273,4 +289,59 @@ def bulk_dispose_assets(request):
     return _job_redirect(
         request, job,
         _("Asynchronous disposal job '%(job)s' enqueued. Tracking progress in real-time.") % {"job": job.name},
+    )
+
+
+@login_required
+def bulk_checkout_assets(request):
+    if not request.user.has_perm(CHECKOUT_PERM):
+        return HttpResponse(status=403)
+    if request.method != 'POST':
+        return HttpResponse(status=405)
+
+    object_pks = request.POST.getlist('pk')
+    fallback = reverse('assets:asset_bulk_checkout_scan')
+    if not object_pks:
+        messages.error(request, _("No assets selected for check-out."))
+        return HttpResponseRedirect(safe_return_url(request, request.META.get('HTTP_REFERER'), fallback))
+
+    targets = (
+        ('assetholder', request.POST.get('asset_holder') or None),
+        ('location', request.POST.get('location') or None),
+        ('asset', request.POST.get('asset_target') or None),
+    )
+    chosen = [(t, i) for t, i in targets if i]
+    if len(chosen) != 1:
+        messages.error(request, _("Select exactly one check-out target: a holder, a location, or a parent asset."))
+        return HttpResponseRedirect(safe_return_url(request, request.META.get('HTTP_REFERER'), fallback))
+    target_type_str, target_pk = chosen[0]
+
+    current_tenant = get_current_tenant()
+    tenant_id = current_tenant.pk if current_tenant else None
+
+    job = Job.objects.create(
+        name=f"Bulk Check-out: {len(object_pks)} Assets",
+        tenant=current_tenant,
+        model=ContentType.objects.get_for_model(Asset),
+        status=Job.STATUS_PENDING,
+    )
+
+    _enqueue(
+        job,
+        'core.tasks.bulk_checkout_task',
+        job.pk,
+        object_pks,
+        target_type_str,
+        target_pk,
+        request.user.pk,
+        request.POST.get('notes', ''),
+        request.POST.get('expected_checkin') or None,
+        tenant_id,
+        request.POST.get('status') or None,
+        request.POST.get('checkout_date') or None,
+    )
+
+    return _job_redirect(
+        request, job,
+        _("Asynchronous check-out job '%(job)s' enqueued. Tracking progress in real-time.") % {"job": job.name},
     )

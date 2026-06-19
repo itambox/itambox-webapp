@@ -1,3 +1,4 @@
+import datetime
 import logging
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
@@ -9,7 +10,20 @@ from .utils import reverse_job_detail
 
 logger = logging.getLogger(__name__)
 
-def bulk_checkout_task(job_id, asset_pks, target_type_str, target_pk, user_id, notes, expected_checkin_date=None, tenant_id=None):
+
+def _parse_date(value):
+    if not value:
+        return None
+    if isinstance(value, datetime.date):
+        return value
+    try:
+        return datetime.date.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def bulk_checkout_task(job_id, asset_pks, target_type_str, target_pk, user_id, notes,
+                       expected_checkin_date=None, tenant_id=None, status_id=None, checkout_date=None):
     """
     Asynchronously executes bulk checkout operations on selected hardware Assets
     utilizing select_for_update row-level locking to prevent race anomalies.
@@ -43,7 +57,7 @@ def bulk_checkout_task(job_id, asset_pks, target_type_str, target_pk, user_id, n
                 target = target_model.objects.get(pk=target_pk)
                 job.append_log(f"Checkout target assignee: {str(target)}")
 
-                from assets.models import Asset
+                from assets.models import Asset, StatusLabel
                 from assets.services import checkout_asset
 
                 # Map target_type_str to the correct checkout_asset keyword argument
@@ -53,6 +67,10 @@ def bulk_checkout_task(job_id, asset_pks, target_type_str, target_pk, user_id, n
                     'location':    'location',
                 }
                 target_kwarg = _TARGET_KWARG.get(target_type_str, 'location')
+
+                status = StatusLabel.objects.filter(pk=status_id).first() if status_id else None
+                resolved_checkin = _parse_date(expected_checkin_date)
+                resolved_checkout = _parse_date(checkout_date)
 
                 success_count = 0
                 failure_count = 0
@@ -66,7 +84,9 @@ def bulk_checkout_task(job_id, asset_pks, target_type_str, target_pk, user_id, n
                                 **{target_kwarg: target},
                                 user=ctx.user,
                                 notes=notes,
-                                expected_checkin=expected_checkin_date
+                                status=status,
+                                expected_checkin=resolved_checkin,
+                                checkout_date=resolved_checkout,
                             )
                             success_count += 1
                             job.append_log(f" - Asset {asset.asset_tag} ({asset.name}) checked out successfully.")

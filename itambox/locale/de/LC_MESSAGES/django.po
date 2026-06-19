@@ -10594,6 +10594,273 @@ msgstr "{name} wird jetzt beobachtet."
 msgid "You cannot delete your own user account."
 msgstr "Sie können Ihr eigenes Benutzerkonto nicht löschen."
 
+msgid "Status after check-in"
+msgstr "Status nach Einbuchung"
+
+msgid "Leave blank to revert each asset to its pre-checkout status."
+msgstr ""
+"Leer lassen, um jedes Asset auf seinen Status vor der Herausgabe "
+"zurückzusetzen."
+
+msgid "Return to location"
+msgstr "Zurück an Lagerort"
+
+msgid "Optional. Leave blank to keep each asset's current location."
+msgstr ""
+"Optional. Leer lassen, um den aktuellen Lagerort jedes Assets beizubehalten."
+
+msgid "Check-in date"
+msgstr "Rückgabedatum"
+
+msgid "Disposal date"
+msgstr "Entsorgungsdatum"
+
+msgid "Asset holder"
+msgstr "Asset-Inhaber"
+
+msgid "Parent asset"
+msgstr "Übergeordnetes Asset"
+
+msgid "Status after check-out"
+msgstr "Status nach Herausgabe"
+
+msgid "Check-out date"
+msgstr "Herausgabedatum"
+
+msgid "Expected check-in date"
+msgstr "Erwartetes Rückgabedatum"
+
+msgid "Choose exactly one target — a holder, a location, or a parent asset."
+msgstr ""
+"Wählen Sie genau ein Ziel — einen Inhaber, einen Lagerort oder ein "
+"übergeordnetes Asset."
+
+msgid "Already disposed — will be skipped."
+msgstr "Bereits entsorgt — wird übersprungen."
+
+msgid "Not checked out — nothing to return."
+msgstr "Nicht herausgegeben — nichts zurückzugeben."
+
+msgid "Cannot check out — %(status)s."
+msgstr "Kann nicht herausgegeben werden — %(status)s."
+
+msgid "Currently assigned to %(holder)s — will be reassigned."
+msgstr "Derzeit %(holder)s zugewiesen — wird neu zugewiesen."
+
+msgid "No assets selected for check-in."
+msgstr "Keine Assets für die Einbuchung ausgewählt."
+
+msgid "No assets selected for check-out."
+msgstr "Keine Assets für die Herausgabe ausgewählt."
+
+msgid "No assets selected for disposal."
+msgstr "Keine Assets für die Entsorgung ausgewählt."
+
+msgid "A disposal date is required."
+msgstr "Ein Entsorgungsdatum ist erforderlich."
+
+msgid ""
+"Select exactly one check-out target: a holder, a location, or a parent "
+"asset."
+msgstr ""
+"Wählen Sie genau ein Herausgabe-Ziel: einen Inhaber, einen Lagerort oder ein"
+" übergeordnetes Asset."
+
+msgid ""
+"Asynchronous check-in job '%(job)s' enqueued. Tracking progress in real-"
+"time."
+msgstr ""
+"Asynchroner Einbuchungs-Job '%(job)s' eingereiht. Fortschritt wird in "
+"Echtzeit verfolgt."
+
+msgid ""
+"Asynchronous check-out job '%(job)s' enqueued. Tracking progress in real-"
+"time."
+msgstr ""
+"Asynchroner Herausgabe-Job '%(job)s' eingereiht. Fortschritt wird in "
+"Echtzeit verfolgt."
+
+msgid ""
+"Asynchronous disposal job '%(job)s' enqueued. Tracking progress in real-"
+"time."
+msgstr ""
+"Asynchroner Entsorgungs-Job '%(job)s' eingereiht. Fortschritt wird in "
+"Echtzeit verfolgt."
+
+msgid "Bulk Check-in Failed"
+msgstr "Sammel-Einbuchung fehlgeschlagen"
+
+msgid "Bulk Check-in Complete"
+msgstr "Sammel-Einbuchung abgeschlossen"
+
+msgid "Bulk Check-in Error"
+msgstr "Fehler bei der Sammel-Einbuchung"
+
+msgid "All hardware check-ins failed. View logs for details."
+msgstr "Alle Einbuchungen sind fehlgeschlagen. Details in den Protokollen."
+
+msgid "Checked in %(count)s asset(s)."
+msgstr "%(count)s Asset(s) eingebucht."
+
+msgid "A system exception occurred during check-in: %(error)s"
+msgstr "Während der Einbuchung ist eine Systemausnahme aufgetreten: %(error)s"
+
+msgid "Bulk Disposal Failed"
+msgstr "Sammel-Entsorgung fehlgeschlagen"
+
+msgid "Bulk Disposal Complete"
+msgstr "Sammel-Entsorgung abgeschlossen"
+
+msgid "Bulk Disposal Error"
+msgstr "Fehler bei der Sammel-Entsorgung"
+
+msgid "All hardware disposals failed. View logs for details."
+msgstr "Alle Entsorgungen sind fehlgeschlagen. Details in den Protokollen."
+
+msgid "Disposed %(count)s asset(s)."
+msgstr "%(count)s Asset(s) entsorgt."
+
+msgid "A system exception occurred during disposal: %(error)s"
+msgstr "Während der Entsorgung ist eine Systemausnahme aufgetreten: %(error)s"
+
+msgid "Bulk Actions"
+msgstr "Sammelaktionen"
+
+msgid "Bulk Check-in"
+msgstr "Sammel-Einbuchung"
+
+msgid "Bulk Check-out"
+msgstr "Sammel-Herausgabe"
+
+msgid "Bulk Disposal"
+msgstr "Sammel-Entsorgung"
+
+msgid "Back to Assets"
+msgstr "Zurück zu Assets"
+
+msgid "Scan or enter an asset"
+msgstr "Asset scannen oder eingeben"
+
+msgid "Scan barcode / QR, or type asset tag or serial, then press Enter"
+msgstr ""
+"Barcode / QR scannen oder Inventarnummer bzw. Seriennummer eingeben, dann "
+"Enter drücken"
+
+msgid "Camera"
+msgstr "Kamera"
+
+msgid ""
+"A USB barcode scanner types into this box automatically. Each accepted scan "
+"is added to the basket below."
+msgstr ""
+"Ein USB-Barcodescanner tippt automatisch in dieses Feld. Jeder akzeptierte "
+"Scan wird unten zum Korb hinzugefügt."
+
+msgid "Basket"
+msgstr "Korb"
+
+msgid "Clear all"
+msgstr "Alle entfernen"
+
+msgid "Book value"
+msgstr "Buchwert"
+
+msgid "Assigned to"
+msgstr "Zugewiesen an"
+
+msgid "No assets yet — start scanning."
+msgstr "Noch keine Assets — mit dem Scannen beginnen."
+
+msgid "Check-in options"
+msgstr "Einbuchungs-Optionen"
+
+msgid "Check-out options"
+msgstr "Herausgabe-Optionen"
+
+msgid "Disposal details"
+msgstr "Entsorgungsdetails"
+
+msgid ""
+"Disposal archives each asset and freezes its book value. Already-disposed "
+"assets are skipped."
+msgstr ""
+"Die Entsorgung archiviert jedes Asset und friert seinen Buchwert ein. "
+"Bereits entsorgte Assets werden übersprungen."
+
+msgid "In basket:"
+msgstr "Im Korb:"
+
+msgid "Dispose basket"
+msgstr "Korb entsorgen"
+
+msgid "Check in basket"
+msgstr "Korb einbuchen"
+
+msgid "Check out basket"
+msgstr "Korb herausgeben"
+
+msgid "Scan to dispose"
+msgstr "Scannen zum Entsorgen"
+
+msgid "Scan to check out"
+msgstr "Scannen zum Herausgeben"
+
+msgid "Scan to check in"
+msgstr "Scannen zum Einbuchen"
+
+msgid "Done"
+msgstr "Fertig"
+
+msgid "Confirm disposal"
+msgstr "Entsorgung bestätigen"
+
+msgid ""
+"You are about to dispose <strong><span class=\"scan-basket-confirm-"
+"count\">0</span></strong> asset(s)."
+msgstr ""
+"Sie sind dabei, <strong><span class=\"scan-basket-confirm-"
+"count\">0</span></strong> Asset(s) zu entsorgen."
+
+msgid ""
+"Each asset will be checked in (if needed), archived, and recorded with a "
+"disposal entry. This is hard to reverse."
+msgstr ""
+"Jedes Asset wird (falls nötig) eingebucht, archiviert und mit einem "
+"Entsorgungseintrag erfasst. Dies ist schwer rückgängig zu machen."
+
+msgid "Dispose"
+msgstr "Entsorgen"
+
+msgid "Check out selected assets via the scan basket"
+msgstr "Ausgewählte Assets über den Scan-Korb herausgeben"
+
+msgid "Check in selected assets via the scan basket"
+msgstr "Ausgewählte Assets über den Scan-Korb einbuchen"
+
+msgid "Check-in Selected"
+msgstr "Ausgewählte einbuchen"
+
+msgid "Dispose selected assets via the scan basket"
+msgstr "Ausgewählte Assets über den Scan-Korb entsorgen"
+
+msgid "Dispose Selected"
+msgstr "Ausgewählte entsorgen"
+
+msgid "Add & bulk actions"
+msgstr "Hinzufügen & Sammelaktionen"
+
+msgid "Bulk"
+msgstr "Sammelaktionen"
+
+msgid "Bulk check-out"
+msgstr "Sammel-Herausgabe"
+
+msgid "Bulk check-in"
+msgstr "Sammel-Einbuchung"
+
+msgid "Bulk disposal"
+msgstr "Sammel-Entsorgung"
+
 #~ msgid "Component Inventory"
 #~ msgstr "Komponenten-Inventar"
 
