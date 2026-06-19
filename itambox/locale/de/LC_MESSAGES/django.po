@@ -37,7 +37,7 @@ msgid "Specified target asset does not exist."
 msgstr "Das angegebene Ziel-Asset existiert nicht."
 
 msgid "Pending"
-msgstr "Pending"
+msgstr "Ausstehend"
 
 msgid "Deployable"
 msgstr "Einsatzbereit"
@@ -67,10 +67,10 @@ msgid "Awaiting Procurement"
 msgstr "Warten auf Beschaffung"
 
 msgid "Denied"
-msgstr "Denied"
+msgstr "Abgelehnt"
 
 msgid "Fulfilled"
-msgstr "Fulfilled"
+msgstr "Erfüllt"
 
 msgid "Cancelled"
 msgstr "Abgebrochen"
@@ -143,7 +143,7 @@ msgid "Active"
 msgstr "Aktiv"
 
 msgid "Inactive"
-msgstr "Inactive"
+msgstr "Inaktiv"
 
 msgid "Asset"
 msgstr "Asset"
@@ -2302,13 +2302,13 @@ msgid "Audited"
 msgstr "Geprüft"
 
 msgid "Delete"
-msgstr "Delete"
+msgstr "Löschen"
 
 msgid "Running"
-msgstr "Running"
+msgstr "Läuft"
 
 msgid "Failed"
-msgstr "Failed"
+msgstr "Fehlgeschlagen"
 
 msgid "Euro (€)"
 msgstr "Euro (€)"
@@ -3879,7 +3879,7 @@ msgid "Number"
 msgstr "Zahl"
 
 msgid "Date"
-msgstr "Date"
+msgstr "Datum"
 
 msgid "Boolean"
 msgstr "Boolescher Wert"
@@ -4305,10 +4305,10 @@ msgid "Info"
 msgstr "Info"
 
 msgid "Warning"
-msgstr "Warning"
+msgstr "Warnung"
 
 msgid "Critical"
-msgstr "Critical"
+msgstr "Kritisch"
 
 msgid "Limit count or days horizon"
 msgstr "Begrenzungsanzahl oder Tageshorizont"
@@ -4337,10 +4337,10 @@ msgid "Alert Rule"
 msgstr "Alarmregel"
 
 msgid "Acknowledged"
-msgstr "Acknowledged"
+msgstr "Bestätigt"
 
 msgid "Resolved"
-msgstr "Resolved"
+msgstr "Gelöst"
 
 msgid "Per-channel delivery result: {channel_pk: 'ok'|'failed'|'error: ...'}"
 msgstr "Zustellergebnis pro Kanal: {channel_pk: 'ok'|'failed'|'error: ...'}"
@@ -5961,10 +5961,10 @@ msgstr ""
 "Synchronisierungsquellen abzugleichen."
 
 msgid "Primary"
-msgstr "Primary"
+msgstr "Primär"
 
 msgid "Secondary"
-msgstr "Secondary"
+msgstr "Sekundär"
 
 msgid "Tertiary"
 msgstr "Tertiär"
