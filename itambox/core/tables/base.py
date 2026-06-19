@@ -3,6 +3,7 @@ import django_tables2 as tables
 from django_tables2.data import TableQuerysetData
 from django.utils.translation import gettext_lazy as _
 from core.paginator import EnhancedPaginator
+from core.tables.columns import IDColumn
 from itambox.utils import get_paginate_count
 
 
@@ -10,6 +11,12 @@ logger = logging.getLogger(__name__)
 
 class BaseTable(tables.Table):
     exempt_columns = ('pk', 'actions')
+
+    # Universal detail-link column, hidden by default. Sits immediately after
+    # the checkbox as the first data column when shown. Tables with no natural
+    # identity column (e.g. Warranty/Reservation/Disposal) re-declare it with
+    # ``visible=True``; every other table exposes it via the column selector.
+    id = IDColumn(visible=False)
 
     class Meta:
         model = None
@@ -67,6 +74,9 @@ class BaseTable(tables.Table):
         if 'pk' in sequence:
             sequence.remove('pk')
             sequence.insert(0, 'pk')
+        if 'id' in sequence:
+            sequence.remove('id')
+            sequence.insert(1 if (sequence and sequence[0] == 'pk') else 0, 'id')
         for trailing in ('checkout_checkin', 'actions'):
             if trailing in sequence:
                 sequence.remove(trailing)
@@ -122,8 +132,13 @@ class BaseTable(tables.Table):
         return self._get_columns(visible=True)
 
     def _set_columns(self, selected_columns):
-        for column in self.columns:
-            if column.name not in [*selected_columns, *self.exempt_columns]:
+        # iterall() (not the default iterator, which yields only visible
+        # columns) so we can re-show a column that is hidden by default
+        # (e.g. the `id` detail-link column) when it is explicitly selected.
+        for column in self.columns.iterall():
+            if column.name in selected_columns and not column.visible:
+                self.columns.show(column.name)
+            elif column.name not in [*selected_columns, *self.exempt_columns]:
                 self.columns.hide(column.name)
             elif column.name in self.exempt_columns and not column.visible:
                 self.columns.show(column.name)
@@ -137,6 +152,10 @@ class BaseTable(tables.Table):
         if 'pk' in self.sequence:
             self.sequence.remove('pk')
             self.sequence.insert(0, 'pk')
+
+        if 'id' in self.sequence:
+            self.sequence.remove('id')
+            self.sequence.insert(1 if (self.sequence and self.sequence[0] == 'pk') else 0, 'id')
 
         if 'actions' in self.sequence:
             self.sequence.remove('actions')

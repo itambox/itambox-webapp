@@ -1,4 +1,4 @@
-from .columns import BooleanColumn, ToggleColumn, ActionsColumn, AssigneeColumn
+from .columns import BooleanColumn, ToggleColumn, ActionsColumn, AssigneeColumn, IDColumn
 from .base import BaseTable
 from .object_change import ObjectChangeTable
 from .jobs import JobTable

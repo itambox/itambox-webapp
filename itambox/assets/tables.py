@@ -3,7 +3,7 @@ import django_tables2 as tables
 from django_tables2.utils import A  # Alias for Accessor
 from .models import Asset, AssetRole, Manufacturer, AssetType, StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence, AssetMaintenance, AssetDisposal, Warranty, AssetReservation
 from compliance.models import AssetAudit
-from core.tables import ActionsColumn, AssigneeColumn, BaseTable, ToggleColumn
+from core.tables import ActionsColumn, AssigneeColumn, BaseTable, ToggleColumn, IDColumn
 from extras.tables import TagColumn # Import TagColumn
 from django.urls import reverse
 from django.utils.safestring import mark_safe
@@ -302,8 +302,8 @@ class AssetTypeTable(BaseTable):
         return "—"
 class AssetMaintenanceTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
+    id = IDColumn(visible=True)
     asset = tables.LinkColumn('assets:asset_detail', args=[A('asset__pk')], accessor='asset', verbose_name=_('Asset'))
-    title = tables.LinkColumn('assets:assetmaintenance_detail', args=[A('pk')], verbose_name=_('Title'))
     maintenance_type = tables.Column(verbose_name=_('Type'))
     status = tables.Column(verbose_name=_('Status'))
     supplier = tables.Column(accessor='supplier__name', verbose_name=_('Supplier'))
@@ -315,8 +315,8 @@ class AssetMaintenanceTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = AssetMaintenance
-        fields = ('pk', 'asset', 'title', 'maintenance_type', 'status', 'supplier', 'cost', 'start_date', 'completion_date', 'downtime_days', 'actions')
-        default_columns = ('pk', 'asset', 'title', 'maintenance_type', 'status', 'supplier', 'cost', 'start_date', 'completion_date', 'downtime_days', 'actions')
+        fields = ('pk', 'id', 'asset', 'maintenance_type', 'status', 'supplier', 'cost', 'start_date', 'completion_date', 'downtime_days', 'actions')
+        default_columns = ('pk', 'id', 'asset', 'maintenance_type', 'status', 'supplier', 'cost', 'start_date', 'completion_date', 'downtime_days', 'actions')
 
     def render_maintenance_type(self, record):
         return record.get_maintenance_type_display()
@@ -342,6 +342,7 @@ class AssetMaintenanceTable(BaseTable):
 
 class AssetDisposalTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
+    id = IDColumn(visible=True)
     asset = tables.LinkColumn('assets:asset_detail', args=[A('asset__pk')], accessor='asset', verbose_name=_('Asset'))
     disposal_method = tables.Column(verbose_name=_('Method'))
     disposal_date = tables.DateColumn(format="Y-m-d", verbose_name=_('Disposal Date'))
@@ -352,8 +353,8 @@ class AssetDisposalTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = AssetDisposal
-        fields = ('pk', 'asset', 'disposal_method', 'disposal_date', 'data_sanitization_method', 'recipient', 'proceeds', 'actions')
-        default_columns = ('pk', 'asset', 'disposal_method', 'disposal_date', 'data_sanitization_method', 'recipient', 'proceeds', 'actions')
+        fields = ('pk', 'id', 'asset', 'disposal_method', 'disposal_date', 'data_sanitization_method', 'recipient', 'proceeds', 'actions')
+        default_columns = ('pk', 'id', 'asset', 'disposal_method', 'disposal_date', 'data_sanitization_method', 'recipient', 'proceeds', 'actions')
 
     def render_disposal_method(self, record):
         return record.get_disposal_method_display()
@@ -509,6 +510,7 @@ class AssetAuditTable(BaseTable):
 
 class WarrantyTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
+    id = IDColumn(visible=True)
     asset = tables.LinkColumn('assets:asset_detail', args=[A('asset__pk')], accessor='asset', verbose_name=_('Asset'))
     warranty_type = tables.Column(verbose_name=_('Type'))
     provider = tables.Column(verbose_name=_('Provider'))
@@ -520,8 +522,8 @@ class WarrantyTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = Warranty
-        fields = ('pk', 'asset', 'warranty_type', 'provider', 'start_date', 'end_date', 'cost', 'is_active', 'actions')
-        default_columns = ('pk', 'asset', 'warranty_type', 'provider', 'start_date', 'end_date', 'cost', 'is_active', 'actions')
+        fields = ('pk', 'id', 'asset', 'warranty_type', 'provider', 'start_date', 'end_date', 'cost', 'is_active', 'actions')
+        default_columns = ('pk', 'id', 'asset', 'warranty_type', 'provider', 'start_date', 'end_date', 'cost', 'is_active', 'actions')
 
     def render_warranty_type(self, record):
         return record.get_warranty_type_display()
@@ -541,6 +543,7 @@ class WarrantyTable(BaseTable):
 
 class AssetReservationTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
+    id = IDColumn(visible=True)
     asset = tables.LinkColumn('assets:asset_detail', args=[A('asset__pk')], accessor='asset', verbose_name=_('Asset'))
     reserved_for = tables.Column(verbose_name=_('Reserved For'))
     start_date = tables.DateColumn(format="Y-m-d", verbose_name=_('Start Date'))
@@ -551,8 +554,8 @@ class AssetReservationTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = AssetReservation
-        fields = ('pk', 'asset', 'reserved_for', 'start_date', 'end_date', 'status', 'purpose', 'actions')
-        default_columns = ('pk', 'asset', 'reserved_for', 'start_date', 'end_date', 'status', 'purpose', 'actions')
+        fields = ('pk', 'id', 'asset', 'reserved_for', 'start_date', 'end_date', 'status', 'purpose', 'actions')
+        default_columns = ('pk', 'id', 'asset', 'reserved_for', 'start_date', 'end_date', 'status', 'purpose', 'actions')
 
     def render_status(self, record):
         return record.get_status_display()

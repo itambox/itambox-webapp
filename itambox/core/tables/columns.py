@@ -31,6 +31,34 @@ class BooleanColumn(tables.Column):
         return self.EMPTY_MARK
 
 
+class IDColumn(tables.Column):
+    """Primary-key column that links to the record's own detail view.
+
+    Inherited by every :class:`BaseTable` but hidden by default; it can be
+    enabled per-table via the column selector, or declared explicitly with
+    ``visible=True`` on tables that have no natural identity column (so a row
+    is always reachable). NetBox-style convention: whatever the first visible
+    column is, it links to the object's detail view — this guarantees one
+    column always does, even when there is nothing meaningful to linkify.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault('accessor', 'pk')
+        kwargs.setdefault('verbose_name', _('ID'))
+        kwargs.setdefault('linkify', self._detail_url)
+        super().__init__(*args, **kwargs)
+
+    @staticmethod
+    def _detail_url(record):
+        get_url = getattr(record, 'get_absolute_url', None)
+        if get_url is None:
+            return None
+        try:
+            return get_url()
+        except Exception:
+            return None
+
+
 class ToggleColumn(tables.CheckBoxColumn):
     def __init__(self, *args, **kwargs):
         default = kwargs.pop('default', '')
