@@ -33,11 +33,11 @@ class AssetMaintenance(TaggableMixin, CloneableMixin, ExportableMixin,
         (MAINTENANCE_TYPE_HARDWARE_SUPPORT, _('Hardware Support')),
     ]
 
-    asset = models.ForeignKey('assets.Asset', on_delete=models.PROTECT, related_name='maintenances', db_index=True)
-    title = models.CharField(max_length=200, default='Maintenance')
-    description = models.TextField(blank=True)
+    asset = models.ForeignKey('assets.Asset', on_delete=models.PROTECT, related_name='maintenances', db_index=True, verbose_name=_("Asset"))
+    title = models.CharField(max_length=200, default='Maintenance', verbose_name=_("Title"))
+    description = models.TextField(blank=True, verbose_name=_("Description"))
     supplier = models.ForeignKey('assets.Supplier', on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Supplier/Vendor"))
-    performed_by = models.CharField(max_length=200, blank=True)
+    performed_by = models.CharField(max_length=200, blank=True, verbose_name=_("Performed By"))
     maintenance_type = models.CharField(
         max_length=50,
         choices=MAINTENANCE_TYPE_CHOICES,
@@ -49,7 +49,8 @@ class AssetMaintenance(TaggableMixin, CloneableMixin, ExportableMixin,
         max_length=20,
         choices=MaintenanceStatusChoices.choices,
         default=MaintenanceStatusChoices.SCHEDULED,
-        db_index=True
+        db_index=True,
+        verbose_name=_("Status")
     )
     cost = models.DecimalField(
         max_digits=10,
@@ -61,8 +62,8 @@ class AssetMaintenance(TaggableMixin, CloneableMixin, ExportableMixin,
     currency = CurrencyField()
     start_date = models.DateField(verbose_name=_("Start Date"), db_index=True)
     completion_date = models.DateField(null=True, blank=True, verbose_name=_("Completion Date"), db_index=True)
-    notes = models.TextField(blank=True)
-    tags = models.ManyToManyField('extras.Tag', related_name='asset_maintenances', blank=True)
+    notes = models.TextField(blank=True, verbose_name=_("Notes"))
+    tags = models.ManyToManyField('extras.Tag', related_name='asset_maintenances', blank=True, verbose_name=_("Tags"))
 
     class Meta:
         ordering = ['-start_date']

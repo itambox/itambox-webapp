@@ -417,7 +417,7 @@ class PurchaseOrderLineFormTests(TestCase):
         form = PurchaseOrderLineForm(data=form_data)
         self.assertFalse(form.is_valid())
         self.assertIn('asset_type', form.errors)
-        self.assertIn("Please select a Asset type.", form.errors['asset_type'])
+        self.assertIn("Please select a Asset Type.", form.errors['asset_type'])
 
 
 class PurchaseOrderCurrencyTests(TestCase):

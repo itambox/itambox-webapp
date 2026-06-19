@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ITAMbox 0.1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-19 10:49+0200\n"
+"POT-Creation-Date: 2026-06-19 13:29+0200\n"
 "PO-Revision-Date: 2026-05-30 08:00+0200\n"
 "Last-Translator: ITAMbox Team\n"
 "Language-Team: German\n"
@@ -45,7 +45,6 @@ msgstr "Einsatzbereit"
 msgid "Deployed"
 msgstr "Im Einsatz"
 
-#| msgid "Unavailable"
 msgid "Undeployable"
 msgstr "Nicht einsatzfähig"
 
@@ -55,14 +54,12 @@ msgstr "Archiviert"
 msgid "In Repair"
 msgstr "In Reparatur"
 
-#| msgid "Ordering"
 msgid "On Order"
 msgstr "Bestellt"
 
 msgid "Approved"
 msgstr "Genehmigt"
 
-#| msgid "Procurement"
 msgid "Awaiting Procurement"
 msgstr "Warten auf Beschaffung"
 
@@ -96,7 +93,6 @@ msgstr "Kategorie"
 msgid "Tenant"
 msgstr "Mandant"
 
-#| msgid "Assigned To:"
 msgid "Assigned To"
 msgstr "Zugewiesen an"
 
@@ -106,15 +102,12 @@ msgstr "Lieferant"
 msgid "Tags"
 msgstr "Tags"
 
-#| msgid "Purchase Date:"
 msgid "Purchased After"
 msgstr "Gekauft nach"
 
-#| msgid "Purchase +"
 msgid "Purchased Before"
 msgstr "Gekauft vor"
 
-#| msgid "Requestable:"
 msgid "Requestable"
 msgstr "Anforderbar"
 
@@ -148,32 +141,27 @@ msgstr "Inaktiv"
 msgid "Asset"
 msgstr "Asset"
 
-#| msgid "Disposed at"
 msgid "Disposal Method"
 msgstr "Entsorgungsmethode"
 
 msgid "Data Sanitization Method"
 msgstr "Datenlöschungsmethode"
 
-#| msgid "Disposed at"
 msgid "Disposal Date"
 msgstr "Entsorgungsdatum"
 
 msgid "WEEE Compliant"
 msgstr "WEEE-konform"
 
-#| msgid "Alert Type"
 msgid "Warranty Type"
 msgstr "Garantietyp"
 
 msgid "Provider"
 msgstr "Anbieter"
 
-#| msgid "Start Date:"
 msgid "Start Date"
 msgstr "Startdatum"
 
-#| msgid "Date"
 msgid "End Date"
 msgstr "Enddatum"
 
@@ -183,11 +171,9 @@ msgstr "Reserviert für"
 msgid "(no holder)"
 msgstr "(kein Inhaber)"
 
-#| msgid "Created By:"
 msgid "Created By"
 msgstr "Erstellt von"
 
-#| msgid "Requestable Status:"
 msgid "Requestable Status"
 msgstr "Anforderbarkeitsstatus"
 
@@ -198,19 +184,15 @@ msgstr "Ungültiges Status-Label: %(status)s"
 msgid "Identity"
 msgstr "Identität"
 
-#| msgid "Notifications"
 msgid "Classification"
 msgstr "Klassifizierung"
 
-#| msgid "Assignments"
 msgid "Assignment"
 msgstr "Zuweisung"
 
-#| msgid "Procurement"
 msgid "Procurement & Financial"
 msgstr "Beschaffung & Finanzen"
 
-#| msgid "Kits & Lifecycle"
 msgid "Lifecycle"
 msgstr "Lebenszyklus"
 
@@ -231,55 +213,45 @@ msgstr ""
 "URL-freundlicher Bezeichner. Leer lassen, um ihn automatisch zu generieren."
 
 # --- Dashboard activity widget ---
-#| msgid "Updated"
 msgid "Update"
 msgstr "Aktualisieren"
 
 msgid "Create"
 msgstr "Erstellen"
 
-#| msgid "Contact Information"
 msgid "General Information"
 msgstr "Allgemeine Informationen"
 
 msgid "Classification & Financial"
 msgstr "Klassifizierung & Finanzen"
 
-#| msgid "Specifications:"
 msgid "Specifications"
 msgstr "Spezifikationen"
 
-#| msgid "Contact Information"
 msgid "Additional Information"
 msgstr "Zusätzliche Informationen"
 
-#| msgid "Registered Location"
 msgid "Observed Location"
 msgstr "Beobachteter Lagerort"
 
 msgid "Where did you physically find this asset right now?"
 msgstr "Wo haben Sie dieses Asset gerade physisch vorgefunden?"
 
-#| msgid "Custody Status:"
 msgid "Observed Status"
 msgstr "Beobachteter Status"
 
-#| msgid "Tenant (Optional)"
 msgid "Notes (optional)"
 msgstr "Notizen (optional)"
 
-#| msgid "Applies To:"
 msgid "Applies to"
 msgstr "Gilt für"
 
-#| msgid "Category"
 msgid "Category Color"
 msgstr "Kategoriefarbe"
 
 msgid "Choose a color for this Category"
 msgstr "Wählen Sie eine Farbe für diese Kategorie"
 
-#| msgid "Assign"
 msgid "Assign to"
 msgstr "Zuweisen an"
 
@@ -289,62 +261,51 @@ msgstr "Asset-Inhaber"
 msgid "Location"
 msgstr "Lagerort"
 
-#| msgid "Parent Asset:"
 msgid "Parent Asset"
 msgstr "Übergeordnetes Asset"
 
-#| msgid "Checkout Kit"
 msgid "Checkout Date"
 msgstr "Herausgabedatum"
 
-#| msgid "Expected Assets"
 msgid "Expected Checkin Date"
 msgstr "Erwartetes Rückgabedatum"
 
 msgid "Notes"
 msgstr "Notes"
 
-#| msgid "— Select an Asset Holder —"
 msgid "Must select an Asset Holder."
 msgstr "Es muss ein Asset-Inhaber ausgewählt werden."
 
-#| msgid "Delete Location"
 msgid "Must select a Location."
 msgstr "Es muss ein Lagerort ausgewählt werden."
 
-#| msgid "Delete Asset"
 msgid "Must select an Asset."
 msgstr "Es muss ein Asset ausgewählt werden."
 
 msgid "Must select a target type."
 msgstr "Es muss ein Zieltyp ausgewählt werden."
 
-#| msgid "Check-in"
 msgid "Checkin Date"
 msgstr "Rückgabedatum"
 
 msgid "Record Disposal"
 msgstr "Entsorgung erfassen"
 
-#| msgid "Asset Details"
 msgid "Disposal Details"
 msgstr "Entsorgungsdetails"
 
 msgid "Data Sanitization & Compliance"
 msgstr "Datenlöschung & Compliance"
 
-#| msgid "Financial Details"
 msgid "Financial"
 msgstr "Finanzen"
 
 msgid "URL-friendly identifier."
 msgstr "URL-freundlicher Bezeichner."
 
-#| msgid "Request Date"
 msgid "Request Category"
 msgstr "Anforderungskategorie"
 
-#| msgid "Requester"
 msgid "Request For"
 msgstr "Anforderung für"
 
@@ -363,7 +324,6 @@ msgstr ""
 msgid "Requested quantity must be greater than zero."
 msgstr "Die angeforderte Menge muss größer als null sein."
 
-#| msgid "Select an Asset Holder to assign the selected assets to:"
 msgid "Selected asset does not match the chosen asset type."
 msgstr ""
 "Das ausgewählte Asset stimmt nicht mit dem gewählten Asset-Typ überein."
@@ -371,7 +331,6 @@ msgstr ""
 msgid "You do not have permission to request assets on behalf of others."
 msgstr "Sie sind nicht berechtigt, Assets im Namen anderer anzufordern."
 
-#| msgid "— Select an Asset Holder —"
 msgid "Please select an Asset Holder target."
 msgstr "Bitte wählen Sie einen Asset-Inhaber als Ziel aus."
 
@@ -381,15 +340,12 @@ msgstr "Bitte wählen Sie einen Lagerort als Ziel aus."
 msgid "Please select a Parent Asset target."
 msgstr "Bitte wählen Sie ein übergeordnetes Asset als Ziel aus."
 
-#| msgid "Allocate Specific Asset (Optional)"
 msgid "Allocate Specific Asset"
 msgstr "Bestimmtes Asset zuweisen"
 
-#| msgid "Location"
 msgid "Stock Location"
 msgstr "Lagerort"
 
-#| msgid "Approved"
 msgid "Approved Quantity"
 msgstr "Genehmigte Menge"
 
@@ -405,33 +361,27 @@ msgstr "Die Menge muss größer als null sein."
 msgid "Approved quantity cannot exceed requested quantity."
 msgstr "Die genehmigte Menge darf die angeforderte Menge nicht überschreiten."
 
-#| msgid "Asset Tag Sequence"
 msgid "Asset tag is required."
 msgstr "Eine Inventarnummer ist erforderlich."
 
-#| msgid "Assets with this Tag ("
 msgid "Asset with this tag already exists."
 msgstr "Ein Asset mit dieser Inventarnummer existiert bereits."
 
-#| msgid "Serial Number"
 msgid "Serial number is required."
 msgstr "Eine Seriennummer ist erforderlich."
 
 msgid "Asset with this serial number already exists."
 msgstr "Ein Asset mit dieser Seriennummer existiert bereits."
 
-#| msgid "Create one"
 msgid "Create Reservation"
 msgstr "Reservierung erstellen"
 
 msgid "Choose a color for this Status Label"
 msgstr "Wählen Sie eine Farbe für dieses Status-Label"
 
-#| msgid "Add Entry"
 msgid "Add Warranty"
 msgstr "Garantie hinzufügen"
 
-#| msgid "Change Details"
 msgid "Warranty Details"
 msgstr "Garantiedetails"
 
@@ -446,31 +396,49 @@ msgstr ""
 "Ein aktiv herausgegebenes Asset kann nicht als nicht einsatzfähig oder "
 "archiviert markiert werden. Buchen Sie es zuerst ein."
 
-#| msgid "Purchase Cost:"
+msgid "Name"
+msgstr "Name"
+
+# --- Common Table Column Headers ---
+msgid "Asset Tag"
+msgstr "Inventarnummer"
+
+msgid "Serial Number"
+msgstr "Serial Number"
+
+msgid "Purchase Date"
+msgstr "Kaufdatum"
+
 msgid "Purchase Cost"
 msgstr "Anschaffungskosten"
 
-#| msgid "Default depreciation policy"
+#| msgid "Total Current Book Value"
+msgid "Current Book Value"
+msgstr "Aktueller Buchwert"
+
 msgid "Materialized depreciation value"
 msgstr "Materialisierter Abschreibungswert"
 
-#| msgid "Order Number:"
+#| msgid "Depreciation Name"
+msgid "Depreciation Updated At"
+msgstr "Abschreibung aktualisiert am"
+
 msgid "Order Number"
 msgstr "Bestellnummer"
 
-#| msgid "Salvage Value:"
 msgid "Salvage Value"
 msgstr "Restwert"
 
-#| msgid "Audited"
+#| msgid "Purchase Order"
+msgid "Purchase Order Line"
+msgstr "Bestellposition"
+
 msgid "Last Audited"
 msgstr "Zuletzt geprüft"
 
-#| msgid "Audited"
 msgid "Last Audited By"
 msgstr "Zuletzt geprüft von"
 
-#| msgid "Yes (Users can request this model)"
 msgid "Allow users to request this asset"
 msgstr "Benutzern erlauben, dieses Asset anzufordern"
 
@@ -492,7 +460,6 @@ msgstr ""
 "Abschreibung beginnt hier; falls nicht gesetzt, wird das Kaufdatum "
 "verwendet."
 
-#| msgid "Cost Center:"
 msgid "Cost Center"
 msgstr "Kostenstelle"
 
@@ -502,9 +469,42 @@ msgstr "Abgang am"
 msgid "Sign-off value"
 msgstr "Restbuchwert bei Abgang"
 
+#| msgid "Assign Users"
+msgid "Assigned User"
+msgstr "Zugewiesener Benutzer"
+
+msgid "Assigned Location"
+msgstr "Zugewiesener Lagerort"
+
+msgid "Assigned Asset"
+msgstr "Zugewiesenes Asset"
+
+#| msgid "Checkout Date"
+msgid "Pre-checkout Status"
+msgstr "Status vor Herausgabe"
+
 msgid "Preserved status label to revert to upon checkin."
 msgstr ""
 "Gespeichertes Status-Label, zu dem bei der Einbuchung zurückgekehrt wird."
+
+#| msgid "Checked Out"
+msgid "Checked Out By"
+msgstr "Herausgegeben von"
+
+#| msgid "Checked Out"
+msgid "Checked Out At"
+msgstr "Herausgegeben am"
+
+msgid "Is Active"
+msgstr "Is Active"
+
+#| msgid "Checked In"
+msgid "Checked In At"
+msgstr "Eingebucht am"
+
+#| msgid "Checked In"
+msgid "Checked In By"
+msgstr "Eingebucht von"
 
 msgid "Is Loan"
 msgstr "Ist Leihgabe"
@@ -514,14 +514,12 @@ msgstr ""
 "Diese Zuweisung als befristete Leihgabe mit verpflichtendem Rückgabedatum "
 "markieren."
 
-#| msgid "Request Date"
 msgid "Due Date"
 msgstr "Fälligkeitsdatum"
 
 msgid "Mandatory return date for loaner assets."
 msgstr "Verpflichtendes Rückgabedatum für Leih-Assets."
 
-#| msgid "Return to List"
 msgid "Returned At"
 msgstr "Zurückgegeben am"
 
@@ -547,6 +545,19 @@ msgstr "Sie können ein Asset nur einem Ziel zuweisen."
 msgid "Assignment target must belong to the same tenant as the asset."
 msgstr "Das Zuweisungsziel muss zum selben Mandanten gehören wie das Asset."
 
+#| msgid "Slug:"
+msgid "Slug"
+msgstr "Slug"
+
+msgid "Type"
+msgstr "Typ"
+
+msgid "Description"
+msgstr "Beschreibung"
+
+msgid "Color"
+msgstr "Farbe"
+
 msgid "RGB color in hexadecimal (e.g. 00ff00)"
 msgstr "RGB-Farbe in Hexadezimalschreibweise (z. B. 00ff00)"
 
@@ -555,6 +566,10 @@ msgstr "Status-Label"
 
 msgid "Status Labels"
 msgstr "Status-Labels"
+
+#| msgid "Components"
+msgid "Allows Components"
+msgstr "Erlaubt Komponenten"
 
 # --- AssetRole allows_components ---
 msgid ""
@@ -615,19 +630,21 @@ msgstr ""
 "Anschaffungsmonat vollständig abgeschrieben (z. B. 800 für deutsche GWG-"
 "Regelung)."
 
-msgid "Description"
-msgstr "Beschreibung"
-
 msgid "Depreciation"
 msgstr "Abschreibung"
 
 msgid "Depreciations"
 msgstr "Abschreibungen"
 
+msgid "Model"
+msgstr "Modell"
+
+msgid "Part Number"
+msgstr "Teilenummer"
+
 msgid "Manufacturer part number or SKU"
 msgstr "Herstellerteilenummer oder SKU"
 
-#| msgid "Lifespan (Months)"
 msgid "EOL (Months)"
 msgstr "EOL (Monate)"
 
@@ -637,9 +654,11 @@ msgstr "Nutzungsdauer in Monaten bis zum EOL-Austausch"
 msgid "Custom Fieldset"
 msgstr "Benutzerdefiniertes Feldset"
 
-#| msgid "Model Name:"
 msgid "Model Image"
 msgstr "Modellbild"
+
+msgid "Comments"
+msgstr "Kommentare"
 
 msgid "Allow users to request assets of this type"
 msgstr "Benutzern erlauben, Assets dieses Typs anzufordern"
@@ -647,11 +666,26 @@ msgstr "Benutzern erlauben, Assets dieses Typs anzufordern"
 msgid "Asset Types"
 msgstr "Asset-Typen"
 
+#| msgid "Website:"
+msgid "Website"
+msgstr "Website"
+
+#| msgid "Address:"
+msgid "Address"
+msgstr "Adresse"
+
 msgid "Suppliers"
 msgstr "Lieferanten"
 
+msgid "Applies To"
+msgstr "Gilt für"
+
 msgid "Applies to: {'asset': True, 'accessory': True, 'component': True}"
 msgstr "Gilt für: {'asset': True, 'accessory': True, 'component': True}"
+
+#| msgid "Audit interval months"
+msgid "Audit Interval (Months)"
+msgstr "Prüfintervall (Monate)"
 
 msgid ""
 "How often assets in this category must be physically audited, in months. "
@@ -669,15 +703,12 @@ msgstr "Weiterverkauf"
 msgid "Recycle / WEEE"
 msgstr "Recycling / WEEE"
 
-#| msgid "Location"
 msgid "Donation"
 msgstr "Spende"
 
-#| msgid "Physical Location:"
 msgid "Physical Destruction"
 msgstr "Physische Vernichtung"
 
-#| msgid "Return to List"
 msgid "Return to Lessor"
 msgstr "Rückgabe an Leasinggeber"
 
@@ -714,7 +745,6 @@ msgstr "Hardware"
 msgid "Parts & Labor"
 msgstr "Teile & Arbeit"
 
-#| msgid "site"
 msgid "On-site"
 msgstr "Vor Ort"
 
@@ -724,11 +754,9 @@ msgstr "Unfallschaden"
 msgid "Extended"
 msgstr "Erweitert"
 
-#| msgid "Full Name:"
 msgid "Full Coverage"
 msgstr "Vollständige Abdeckung"
 
-#| msgid "Schedule"
 msgid "Scheduled"
 msgstr "Geplant"
 
@@ -752,14 +780,12 @@ msgstr ""
 "Seriennummer des Zertifikats oder Referenz-ID des "
 "Bereinigungsdienstleisters."
 
-#| msgid "Created By:"
 msgid "Sanitized By"
 msgstr "Bereinigt von"
 
 msgid "Person or vendor who performed the data sanitization."
 msgstr "Person oder Dienstleister, der die Datenbereinigung durchgeführt hat."
 
-#| msgid "Recipients"
 msgid "Recipient"
 msgstr "Empfänger"
 
@@ -768,7 +794,6 @@ msgstr ""
 "Käufer, Recycler, gemeinnützige Organisation oder sonstiger Empfänger des "
 "entsorgten Assets."
 
-#| msgid "Procurement"
 msgid "Proceeds"
 msgstr "Erlös"
 
@@ -781,11 +806,9 @@ msgid "Disposal was carried out by an authorised WEEE recycler."
 msgstr ""
 "Die Entsorgung wurde durch einen autorisierten WEEE-Recycler durchgeführt."
 
-#| msgid "Asset Details"
 msgid "Asset Disposal"
 msgstr "Asset-Entsorgung"
 
-#| msgid "Asset Details"
 msgid "Asset Disposals"
 msgstr "Asset-Entsorgungen"
 
@@ -795,18 +818,15 @@ msgstr "Kann Asset-Entsorgung / End-of-Life erfassen"
 msgid "e.g. \"Dell ProSupport Plus\""
 msgstr "z. B. \"Dell ProSupport Plus\""
 
-#| msgid "Cost:"
 msgid "Cost"
 msgstr "Kosten"
 
-#| msgid "Preferences"
 msgid "Reference"
 msgstr "Referenz"
 
 msgid "Claim number, policy reference, or contract ID."
 msgstr "Schadensnummer, Policennummer oder Vertrags-ID."
 
-#| msgid "Term:"
 msgid "Terms"
 msgstr "Bedingungen"
 
@@ -819,11 +839,9 @@ msgstr "Garantien"
 msgid "Purpose"
 msgstr "Zweck"
 
-#| msgid "Asset Request"
 msgid "Asset Reservation"
 msgstr "Asset-Reservierung"
 
-#| msgid "Asset Requests"
 msgid "Asset Reservations"
 msgstr "Asset-Reservierungen"
 
@@ -843,30 +861,31 @@ msgstr "Upgrade"
 msgid "Repair"
 msgstr "Reparatur"
 
-#| msgid "location"
 msgid "Calibration"
 msgstr "Kalibrierung"
 
-#| msgid "Software"
 msgid "Software Support"
 msgstr "Software-Support"
 
-#| msgid "Hardware Asset"
 msgid "Hardware Support"
 msgstr "Hardware-Support"
 
-#| msgid "Supplier/Vendor:"
+msgid "Title"
+msgstr "Titel"
+
 msgid "Supplier/Vendor"
 msgstr "Lieferant/Anbieter"
 
-#| msgid "Maintenance Type:"
+#| msgid "Pre-formatted for"
+msgid "Performed By"
+msgstr "Durchgeführt von"
+
 msgid "Maintenance Type"
 msgstr "Wartungstyp"
 
 msgid "Maintenance Cost"
 msgstr "Maintenance Cost"
 
-#| msgid "Completion Date:"
 msgid "Completion Date"
 msgstr "Abschlussdatum"
 
@@ -875,6 +894,42 @@ msgstr "Asset-Wartung"
 
 msgid "Asset Maintenances"
 msgstr "Asset-Wartungen"
+
+msgid "Requester"
+msgstr "Requester"
+
+msgid "Component"
+msgstr "Komponente"
+
+msgid "Accessory"
+msgstr "Zubehör"
+
+msgid "Consumable"
+msgstr "Verbrauchsmaterial"
+
+msgid "Quantity"
+msgstr "Menge"
+
+#| msgid "Source Stock Location"
+msgid "Source Location"
+msgstr "Quell-Lagerort"
+
+msgid "Response Date"
+msgstr "Response Date"
+
+msgid "Responded By"
+msgstr "Responded By"
+
+msgid "Parent"
+msgstr "Übergeordnet"
+
+#| msgid "Group:"
+msgid "Is Group"
+msgstr "Ist Gruppe"
+
+#| msgid "Response Date"
+msgid "Response Notes"
+msgstr "Antwortnotizen"
 
 #, python-format
 msgid "Invalid state transition from %(old)s to %(new)s."
@@ -932,7 +987,6 @@ msgstr ""
 "Sie haben bereits eine ausstehende oder genehmigte Anforderung für das "
 "Verbrauchsmaterial '%(consumable)s'."
 
-#| msgid "Select an Asset Holder to assign the selected assets to:"
 msgid "The selected asset does not match the requested asset type."
 msgstr ""
 "Das ausgewählte Asset stimmt nicht mit dem angeforderten Asset-Typ überein."
@@ -946,7 +1000,6 @@ msgstr "Asset-Anforderungen"
 msgid "Can request assets on behalf of others"
 msgstr "Kann Assets im Namen anderer anfordern"
 
-#| msgid "Approve Asset Request"
 msgid "Can approve asset requests"
 msgstr "Kann Asset-Anforderungen genehmigen"
 
@@ -967,8 +1020,17 @@ msgstr ""
 "Die Asset-Kategorie, für die diese Sequenz gilt. Null steht für "
 "Standardsequenzen."
 
+msgid "Prefix"
+msgstr "Präfix"
+
 msgid "Prefix for generated asset tags (e.g. ASSET-)"
 msgstr "Präfix für generierte Inventarnummern (z. B. ASSET-)"
+
+msgid "Next Value"
+msgstr "Nächster Wert"
+
+msgid "Zero Padding"
+msgstr "Nullauffüllung"
 
 msgid "Asset Tag Sequence"
 msgstr "Asset-Tag-Sequenz"
@@ -1059,24 +1121,15 @@ msgstr ""
 "Der Lizenzplatz für '%(name)s' muss entweder einem Besitzer oder einem Asset"
 " zugewiesen werden."
 
-msgid "Name"
-msgstr "Name"
-
-msgid "Model"
-msgstr "Modell"
-
 msgid "Restore"
 msgstr "Wiederherstellen"
 
-#| msgid "Delete Tenant"
 msgid "Delete Permanently"
 msgstr "Endgültig löschen"
 
-#| msgid "Are you sure you want to delete the asset:"
 msgid "Are you sure you want to restore this asset?"
 msgstr "Möchten Sie dieses Asset wirklich wiederherstellen?"
 
-#| msgid "Are you sure you want to delete the asset type"
 msgid ""
 "Are you sure you want to PERMANENTLY delete this asset? This action cannot "
 "be undone!"
@@ -1087,59 +1140,29 @@ msgstr ""
 msgid "Meta Type"
 msgstr "Meta Type"
 
-#| msgid "Color:"
-msgid "Color"
-msgstr "Farbe"
-
-#| msgid "Asset Audit"
 msgid "Asset Count"
 msgstr "Asset-Anzahl"
 
-msgid "Title"
-msgstr "Titel"
-
-msgid "Type"
-msgstr "Typ"
-
-#| msgid "Downtime Duration"
 msgid "Downtime (Days)"
 msgstr "Ausfallzeit (Tage)"
 
 # --- Sidebar Menus & Submenus (from core/navigation/menu.py) ---
-#| msgid "Organization"
 msgid "Sanitization"
 msgstr "Bereinigung"
 
 msgid "Req #"
 msgstr "Anf.-Nr."
 
-msgid "Requester"
-msgstr "Requester"
-
-#| msgid "Request Date"
 msgid "Requested Item"
 msgstr "Angefordertes Element"
 
 msgid "Request Date"
 msgstr "Request Date"
 
-#| msgid "Prefix:"
-msgid "Prefix"
-msgstr "Präfix"
-
-#| msgid "Next page"
-msgid "Next Value"
-msgstr "Nächster Wert"
-
-#| msgid "Zero Padding:"
-msgid "Zero Padding"
-msgstr "Nullauffüllung"
-
 msgid "Timestamp"
 msgstr "Zeitstempel"
 
 # --- Audit Session Details Page Translations ---
-#| msgid "Audit Campaign"
 msgid "Campaign"
 msgstr "Kampagne"
 
@@ -1154,7 +1177,6 @@ msgstr "Neue Asset-Anforderung von %(requester)s"
 msgid "%(requester)s has requested %(item)s."
 msgstr "%(requester)s hat %(item)s angefordert."
 
-#| msgid "Request Details"
 msgid "Asset Request Details"
 msgstr "Details zur Asset-Anforderung"
 
@@ -1162,7 +1184,6 @@ msgid "Decision & Response Details"
 msgstr "Entscheidungs- & Antwortdetails"
 
 #, python-format
-#| msgid "Asset Requests"
 msgid "Asset Request %(status)s"
 msgstr "Asset-Anforderung %(status)s"
 
@@ -1170,14 +1191,12 @@ msgstr "Asset-Anforderung %(status)s"
 msgid "Your request for %(item)s has been %(status)s."
 msgstr "Ihre Anforderung für %(item)s wurde %(status)s."
 
-#| msgid "Overview"
 msgid "Asset Overview"
 msgstr "Asset-Übersicht"
 
 msgid "Asset Details"
 msgstr "Asset-Details"
 
-#| msgid "System Hardware Specifications"
 msgid "Hardware Specifications"
 msgstr "Hardware-Spezifikationen"
 
@@ -1190,11 +1209,9 @@ msgstr "Deployment & Custody"
 msgid "Financial & Lifecycle"
 msgstr "Financial & Lifecycle"
 
-#| msgid "Audit & Compliance Control"
 msgid "Audit & Compliance"
 msgstr "Prüfung & Compliance"
 
-#| msgid "Software Details"
 msgid "Support & Warranty Details"
 msgstr "Support- & Garantiedetails"
 
@@ -1220,7 +1237,6 @@ msgstr ""
 msgid "No assets selected for label printing."
 msgstr "Keine Assets für den Etikettendruck ausgewählt."
 
-#| msgid "No label templates configured."
 msgid "No valid label template specified."
 msgstr "Keine gültige Etikettenvorlage angegeben."
 
@@ -1232,7 +1248,6 @@ msgstr ""
 "Asynchroner Etikettenerstellungs-Job '%(job)s' erfolgreich eingereiht! "
 "Fortschritt wird in Echtzeit verfolgt."
 
-#| msgid "Asset Details"
 msgid "Asset Role Details"
 msgstr "Details zur Asset-Rolle"
 
@@ -1244,7 +1259,6 @@ msgstr ""
 "Asset-Rolle '%(name)s' kann nicht gelöscht werden: Sie ist mit %(count)s "
 "Asset%(suffix)s verknüpft."
 
-#| msgid "Asset Details"
 msgid "Asset Type Details"
 msgstr "Details zum Asset-Typ"
 
@@ -1256,23 +1270,18 @@ msgstr ""
 "Asset-Typ '%(type)s' kann nicht gelöscht werden: Er ist mit %(count)s "
 "Asset%(suffix)s verknüpft."
 
-#| msgid "Change Details"
 msgid "Category Details"
 msgstr "Kategoriedetails"
 
-#| msgid "Assets / Depreciation Rules"
 msgid "Depreciation Rule Details"
 msgstr "Details zur Abschreibungsregel"
 
-#| msgid "Overview"
 msgid "Disposal Overview"
 msgstr "Entsorgungsübersicht"
 
-#| msgid "Tenant Invitation"
 msgid "Data Sanitization"
 msgstr "Datenbereinigung"
 
-#| msgid "Financial Details"
 msgid "Financial / Proceeds"
 msgstr "Finanzen / Erlös"
 
@@ -1280,15 +1289,12 @@ msgstr "Finanzen / Erlös"
 msgid "Asset '%(asset)s' has been marked as disposed and archived."
 msgstr "Asset '%(asset)s' wurde als entsorgt markiert und archiviert."
 
-#| msgid "Maintenance on"
 msgid "Maintenance Overview"
 msgstr "Wartungsübersicht"
 
-#| msgid "Maintenance Details:"
 msgid "Maintenance Details"
 msgstr "Wartungsdetails"
 
-#| msgid "Manufacturers"
 msgid "Manufacturer Details"
 msgstr "Herstellerdetails"
 
@@ -1311,7 +1317,6 @@ msgid "Allocated asset must be in a deployable status."
 msgstr ""
 "Das zugewiesene Asset muss sich in einem einsatzfähigen Status befinden."
 
-#| msgid "Select an Asset Holder to assign the selected assets to:"
 msgid "Allocated asset does not match the requested asset type."
 msgstr ""
 "Das zugewiesene Asset stimmt nicht mit dem angeforderten Asset-Typ überein."
@@ -1336,22 +1341,18 @@ msgstr ""
 "Eine Anforderung, für die bereits eine aktive physische Herausgabe "
 "eingeleitet wurde, kann nicht abgebrochen werden."
 
-#| msgid "Password changed successfully."
 msgid "Asset request cancelled successfully."
 msgstr "Asset-Anforderung erfolgreich abgebrochen."
 
-#| msgid "No consumables assigned to this asset."
 msgid "You do not have permission to claim this asset."
 msgstr "Sie sind nicht berechtigt, dieses Asset zu übernehmen."
 
 msgid "Only approved requests can be claimed."
 msgstr "Nur genehmigte Anforderungen können übernommen werden."
 
-#| msgid "No assets currently located at this site."
 msgid "No asset has been allocated to this request."
 msgstr "Dieser Anforderung wurde kein Asset zugewiesen."
 
-#| msgid "Select an Asset Holder to assign the selected assets to:"
 msgid ""
 "Requester does not have an active Asset Holder profile to assign the asset "
 "to."
@@ -1359,7 +1360,6 @@ msgstr ""
 "Der Anforderer hat kein aktives Asset-Inhaber-Profil, dem das Asset "
 "zugewiesen werden könnte."
 
-#| msgid "Password changed successfully."
 msgid "Item(s) claimed successfully."
 msgstr "Artikel erfolgreich übernommen."
 
@@ -1390,11 +1390,9 @@ msgid "None of the selected requests are in Approved status."
 msgstr ""
 "Keine der ausgewählten Anforderungen befindet sich im Status „Genehmigt“."
 
-#| msgid "Subscription Details"
 msgid "Reservation Details"
 msgstr "Reservierungsdetails"
 
-#| msgid "Status Labels"
 msgid "Status Label Details"
 msgstr "Status-Label-Details"
 
@@ -1406,19 +1404,15 @@ msgstr ""
 "Status-Label '%(name)s' kann nicht gelöscht werden: Es ist mit %(count)s "
 "Asset%(suffix)s verknüpft."
 
-#| msgid "- Supplier Details - ITAMbox"
 msgid "Supplier Details"
 msgstr "Lieferantendetails"
 
-#| msgid "Asset Tag Sequences"
 msgid "Asset Tag Sequence Details"
 msgstr "Asset-Tag-Sequenz-Details"
 
-#| msgid "Scanned"
 msgid "Planned"
 msgstr "Geplant"
 
-#| msgid "Barcode Scanning Engine"
 msgid "Barcode Scan"
 msgstr "Barcode-Scan"
 
@@ -1434,7 +1428,6 @@ msgstr "Agent-API-Handshake"
 msgid "Holder"
 msgstr "Besitzer"
 
-#| msgid "EULA Acceptance Portal"
 msgid "Acceptance Status"
 msgstr "Akzeptanzstatus"
 
@@ -1447,15 +1440,12 @@ msgstr "Audit-Sitzung"
 msgid "Tenant Group"
 msgstr "Mandantengruppe"
 
-#| msgid "Category"
 msgid "Target Category"
 msgstr "Zielkategorie"
 
-#| msgid "Provider"
 msgid "Signature Provider"
 msgstr "Signaturanbieter"
 
-#| msgid "Contact"
 msgid "Content"
 msgstr "Inhalt"
 
@@ -1476,7 +1466,6 @@ msgstr ""
 msgid "Start immediately"
 msgstr "Sofort starten"
 
-#| msgid "Uncheck to save as Planned and start the campaign later."
 msgid "Uncheck to save as a planned campaign and activate later."
 msgstr ""
 "Deaktivieren, um als geplante Kampagne zu speichern und später zu "
@@ -1485,8 +1474,6 @@ msgstr ""
 msgid "Tenant (Optional)"
 msgstr "Mandant (Optional)"
 
-#| msgid ""
-#| "Scope this campaign to a specific tenant. Leave blank for MSP-wide / global."
 msgid ""
 "Scope this campaign to a single tenant. Leave blank for a global MSP-wide "
 "audit."
@@ -1494,21 +1481,18 @@ msgstr ""
 "Beschränken Sie diese Kampagne auf einen einzelnen Mandanten. Leer lassen "
 "für ein globales, MSP-weites Audit."
 
-#| msgid "Target Location:"
 msgid "Target Location (Optional)"
 msgstr "Ziel-Lagerort (Optional)"
 
 msgid "Expected location to audit. Leave blank to audit globally."
 msgstr "Erwarteter zu prüfender Lagerort. Leer lassen, um global zu prüfen."
 
-#| msgid "Campaign Information"
 msgid "Campaign Options"
 msgstr "Kampagnenoptionen"
 
 msgid "The selected location does not belong to the chosen tenant."
 msgstr "Der ausgewählte Lagerort gehört nicht zum gewählten Mandanten."
 
-#| msgid "No Serial Number"
 msgid "Scan Asset Tag or Serial Number"
 msgstr "Inventarnummer oder Seriennummer scannen"
 
@@ -1524,14 +1508,27 @@ msgstr "Vorlagenname (z. B. Standard-Laptop-EULA)"
 msgid "E-Signature workflow provider module"
 msgstr "Anbietermodul für den E-Signatur-Workflow"
 
+msgid "Logo"
+msgstr "Logo"
+
 msgid "Custom EULA / signoff logo image"
 msgstr "Benutzerdefiniertes EULA-/Freigabe-Logobild"
+
+#| msgid "Text"
+msgid "EULA Text"
+msgstr "EULA-Text"
 
 msgid "Terms of Service / EULA guidelines"
 msgstr "Nutzungsbedingungen / EULA-Richtlinien"
 
+msgid "Disclaimer"
+msgstr "Haftungsausschluss"
+
 msgid "Disclaimer statement printed at signoff"
 msgstr "Bei der Freigabe gedruckter Haftungsausschluss"
+
+msgid "QMS Reference"
+msgstr "QMS-Referenz"
 
 msgid "Quality Management System document reference key"
 msgstr "Dokumentenreferenzschlüssel des Qualitätsmanagementsystems"
@@ -1539,8 +1536,14 @@ msgstr "Dokumentenreferenzschlüssel des Qualitätsmanagementsystems"
 msgid "Deactivate to hide from choices"
 msgstr "Deaktivieren, um aus der Auswahl auszublenden"
 
+msgid "Require Acceptance"
+msgstr "Akzeptanz erforderlich"
+
 msgid "Require digital signature / EULA acceptance on checkout."
 msgstr "Digitale Unterschrift / EULA-Akzeptanz bei der Herausgabe verlangen."
+
+msgid "Email Signature Request"
+msgstr "Signaturanforderung per E-Mail"
 
 msgid "Send email signature request link to the holder on checkout."
 msgstr ""
@@ -1552,20 +1555,47 @@ msgstr ""
 "Zielkategorie, die diese Vorlage für den ausgewählten Mandantenbereich "
 "überschreibt."
 
-#| msgid "Custody Receipt"
 msgid "Custody Template"
 msgstr "Übergabevorlage"
 
-#| msgid "Custody Receipts"
 msgid "Custody Templates"
 msgstr "Übergabevorlagen"
 
-#| msgid "Decline"
 msgid "Declined"
 msgstr "Abgelehnt"
 
+#| msgid "Accepted"
+msgid "Accepted Date"
+msgstr "Akzeptanzdatum"
+
+#| msgid "Acceptance Status"
+msgid "Acceptance Method"
+msgstr "Akzeptanzmethode"
+
+#| msgid "Signature Provider"
+msgid "Signature Data"
+msgstr "Signaturdaten"
+
+#| msgid "Signature Provider"
+msgid "Signature Canvas"
+msgstr "Unterschriftsfeld"
+
 msgid "Base64 canvas stroke vector string representation"
 msgstr "Base64-Zeichenfolgendarstellung des Canvas-Strichvektors"
+
+msgid "Signed At"
+msgstr "Unterzeichnet am"
+
+msgid "EULA Version"
+msgstr "EULA-Version"
+
+#| msgid "Address:"
+msgid "IP Address"
+msgstr "IP-Adresse"
+
+#| msgid "User Account"
+msgid "User Agent"
+msgstr "User-Agent"
 
 msgid "Custody Receipt"
 msgstr "Übergabeprotokoll"
@@ -1573,8 +1603,6 @@ msgstr "Übergabeprotokoll"
 msgid "Custody Receipts"
 msgstr "Übergabeprotokolle"
 
-#| msgid ""
-#| "Scope this campaign to a specific tenant. Leave blank for MSP-wide / global."
 msgid ""
 "Tenant this campaign belongs to. Leave blank for MSP-wide / global sessions."
 msgstr ""
@@ -1586,6 +1614,9 @@ msgstr ""
 "Ziel-Lagerort, der voraussichtlich geprüft wird. Wird er weggelassen, gilt "
 "die Prüfung global."
 
+msgid "Completed At"
+msgstr "Beendet am"
+
 msgid ""
 "Frozen reconciliation report written at close time. Denormalized for long-"
 "term readability."
@@ -1596,11 +1627,19 @@ msgstr ""
 msgid "Audit Sessions"
 msgstr "Audit-Sitzungen"
 
+#| msgid "Version"
+msgid "Session"
+msgstr "Sitzung"
+
 msgid "The observed physical location of the asset during audit."
 msgstr "Der während der Prüfung festgestellte physische Lagerort des Assets."
 
 msgid "The observed physical status of the asset during audit."
 msgstr "Der während der Prüfung festgestellte physische Status des Assets."
+
+#| msgid "Sanitization Method:"
+msgid "Verification Method"
+msgstr "Verifizierungsmethode"
 
 msgid "Asset Audit"
 msgstr "Asset-Audit"
@@ -1617,7 +1656,6 @@ msgstr "Der bei der Prüfung festgestellte Lagerort muss angegeben werden."
 msgid "Audit observed status must be specified."
 msgstr "Der bei der Prüfung festgestellte Status muss angegeben werden."
 
-#| msgid "This action cannot be undone."
 msgid "Archived assets cannot be audited."
 msgstr "Archivierte Assets können nicht geprüft werden."
 
@@ -1647,13 +1685,8 @@ msgstr ""
 msgid "No reconciliation report found. Close the session first."
 msgstr "Kein Abgleichsbericht gefunden. Schließen Sie zuerst die Sitzung ab."
 
-#| msgid "Edit Template"
 msgid "Template"
 msgstr "Vorlage"
-
-#| msgid "Signed in as"
-msgid "Signed At"
-msgstr "Unterzeichnet am"
 
 msgid "Maintenance on"
 msgstr "Maintenance on"
@@ -1713,7 +1746,6 @@ msgstr "Export CSV"
 msgid "Move Mismatched Assets to Campaign Location"
 msgstr "Fehlplatzierte Assets an den Kampagnen-Lagerort verschieben"
 
-#| msgid "Missing Assets"
 msgid "Flag Missing Assets"
 msgstr "Fehlende Assets markieren"
 
@@ -1732,7 +1764,6 @@ msgstr ""
 "einschließlich %(n)s Überraschungsfund(en), die nicht in der erwarteten "
 "Liste enthalten sind"
 
-#| msgid "0 selected"
 msgid "unexpected"
 msgstr "unerwartet"
 
@@ -1761,7 +1792,6 @@ msgstr "Per Kamera scannen"
 msgid "Log Scanned Asset"
 msgstr "Gescanntes Asset protokollieren"
 
-#| msgid "Asset Holder"
 msgid "Scan Asset Code"
 msgstr "Asset-Code scannen"
 
@@ -1778,7 +1808,6 @@ msgstr ""
 "Kamera, oder verwenden Sie einen Hardware-Scanner / geben Sie die Nummer "
 "ein."
 
-#| msgid "Toggle Filters"
 msgid "Toggle Flash"
 msgstr "Blitz ein-/ausschalten"
 
@@ -1828,11 +1857,6 @@ msgstr ""
 "<strong>festgestellter Lagerort</strong> zum Zeitpunkt des Scans wich vom "
 "Ziel-Lagerort der Kampagne ab (%(loc)s)."
 
-# --- Common Table Column Headers ---
-msgid "Asset Tag"
-msgstr "Inventarnummer"
-
-#| msgid "Registered Location"
 msgid "Observed Location (at scan)"
 msgstr "Festgestellter Lagerort (beim Scan)"
 
@@ -1849,14 +1873,10 @@ msgstr ""
 "Diese Assets sind hier registriert, wurden aber in dieser Kampagne NICHT "
 "gescannt oder physisch verifiziert."
 
-msgid "Serial Number"
-msgstr "Serial Number"
-
 msgid "All assets audited!"
 msgstr "Alle Assets geprüft!"
 
 #, python-format
-#| msgid "Zero missing assets. 100% campaign coverage achieved!"
 msgid "Zero missing assets. 100%% campaign coverage achieved!"
 msgstr "Keine fehlenden Assets. 100%% Kampagnenabdeckung erreicht!"
 
@@ -1877,9 +1897,6 @@ msgstr ""
 msgid "Verified / Matching Assets"
 msgstr "Verifizierte / Übereinstimmende Assets"
 
-#| msgid ""
-#| "These assets have been scanned and physically match the registered location "
-#| "in the database."
 msgid ""
 "These assets have been scanned and their observed location at time of scan "
 "matched the campaign target location."
@@ -1893,7 +1910,6 @@ msgstr "Noch keine übereinstimmenden Assets gescannt."
 msgid "Start scanning assets to physically reconcile your registry."
 msgstr "Scannen Sie Assets, um Ihre Registrierung physisch abzugleichen."
 
-#| msgid "No permissions configured in this group."
 msgid "No missing assets recorded in this session's report."
 msgstr "Im Bericht dieser Sitzung wurden keine fehlenden Assets erfasst."
 
@@ -1953,9 +1969,6 @@ msgstr "Unterzeichnungs-Zeitstempel"
 msgid "UTC"
 msgstr "UTC"
 
-msgid "EULA Version"
-msgstr "EULA-Version"
-
 msgid "SHA-256 Verification Hash"
 msgstr "SHA-256 Verifizierungshash"
 
@@ -1999,15 +2012,9 @@ msgstr "Geräteübertragungs- & Verwahrungsvereinbarung"
 msgid "EULA Acceptance Portal"
 msgstr "EULA-Akzeptanzportal"
 
-#| msgid "Contract Ref:"
 msgid "Doc Ref:"
 msgstr "Dok.-Ref.:"
 
-#| msgid "Logout"
-msgid "Logo"
-msgstr "Logo"
-
-#| msgid "Live Report Template Preview"
 msgid "Live Template Preview Sandbox"
 msgstr "Live-Sandbox für die Vorlagenvorschau"
 
@@ -2028,7 +2035,6 @@ msgstr "S/N: %(sn)s"
 msgid "Custodian / Asset Holder"
 msgstr "Verwahrer / Asset-Inhaber"
 
-#| msgid "Email"
 msgid "No Email"
 msgstr "Keine E-Mail"
 
@@ -2097,11 +2103,9 @@ msgstr "Ablehnen"
 msgid "I Agree & Accept Custody"
 msgstr "Ich stimme zu & akzeptiere die Verwahrung"
 
-#| msgid "- Custom Field - ITAMbox"
 msgid "- Custody Template - ITAMbox"
 msgstr "- Übergabevorlage - ITAMbox"
 
-#| msgid "Compliance & Audits"
 msgid "Compliance / Custody Templates"
 msgstr "Compliance / Übergabevorlagen"
 
@@ -2111,7 +2115,6 @@ msgstr "Unterschriftenseite in der Vorschau anzeigen..."
 msgid "Template Name:"
 msgstr "Template Name:"
 
-#| msgid "Tenant Group"
 msgid "Tenant / Scope:"
 msgstr "Mandant / Geltungsbereich:"
 
@@ -2120,19 +2123,15 @@ msgid "%(name)s (Tenant)"
 msgstr "%(name)s (Mandant)"
 
 #, python-format
-#| msgid "Tenant Group"
 msgid "%(name)s (Tenant Group)"
 msgstr "%(name)s (Mandantengruppe)"
 
-#| msgid "Global (No Tenant)"
 msgid "Global (All Tenants)"
 msgstr "Global (Alle Mandanten)"
 
-#| msgid "Provider:"
 msgid "Signature Provider:"
 msgstr "Signaturanbieter:"
 
-#| msgid "Category:"
 msgid "Target Category:"
 msgstr "Zielkategorie:"
 
@@ -2142,11 +2141,9 @@ msgstr "Dokumentenreferenz (QMS):"
 msgid "Require Acceptance:"
 msgstr "Require Acceptance:"
 
-#| msgid "Required"
 msgid "Yes (Required)"
 msgstr "Ja (Erforderlich)"
 
-#| msgid "Optional"
 msgid "No (Optional)"
 msgstr "Nein (Optional)"
 
@@ -2172,11 +2169,9 @@ msgstr ""
 msgid "Sign-Off Legal Disclaimer"
 msgstr "Rechtlicher Haftungsausschluss zur Freigabe"
 
-#| msgid "View Custody Receipt"
 msgid "Signed Custody Receipts"
 msgstr "Unterzeichnete Übergabeprotokolle"
 
-#| msgid "No schedules configured for this template yet."
 msgid "No custody receipts generated under this template yet."
 msgstr "Unter dieser Vorlage wurden noch keine Übergabeprotokolle erstellt."
 
@@ -2266,7 +2261,6 @@ msgstr ""
 "%(flagged)s Asset(s) als fehlend markiert. %(skipped)s übersprungen (Status "
 "seit Abschluss geändert)."
 
-#| msgid "Missing Assets"
 msgid "Missing assets flagged."
 msgstr "Fehlende Assets markiert."
 
@@ -2274,7 +2268,6 @@ msgid "Only planned sessions can be started."
 msgstr "Nur geplante Sitzungen können gestartet werden."
 
 #, python-format
-#| msgid "Campaign '%(name)s' started."
 msgid "Campaign '%(name)s' is now active."
 msgstr "Kampagne '%(name)s' ist jetzt aktiv."
 
@@ -2294,7 +2287,6 @@ msgstr "Gelöscht"
 msgid "Checked Out"
 msgstr "Ausgebucht"
 
-#| msgid "Check In"
 msgid "Checked In"
 msgstr "Eingebucht"
 
@@ -2340,11 +2332,9 @@ msgstr "Australischer Dollar (A$)"
 msgid "Japanese Yen (¥)"
 msgstr "Japanischer Yen (¥)"
 
-#| msgid "Current View"
 msgid "Currency"
 msgstr "Währung"
 
-#| msgid "Leave blank to use the default title."
 msgid "ISO 4217 code. Leave blank to use the tenant default currency."
 msgstr ""
 "ISO-4217-Code. Leer lassen, um die Standardwährung des Mandanten zu "
@@ -2354,7 +2344,6 @@ msgstr ""
 msgid "Event: %(action)s on %(model)s"
 msgstr "Ereignis: %(action)s an %(model)s"
 
-#| msgid "Notifications"
 msgid "ITAMbox Notification"
 msgstr "ITAMbox-Benachrichtigung"
 
@@ -2379,7 +2368,6 @@ msgstr "Nach"
 msgid "Before"
 msgstr "Vor"
 
-#| msgid "Files"
 msgid "File"
 msgstr "Datei"
 
@@ -2400,7 +2388,6 @@ msgstr "CSV-Trennzeichen"
 msgid "Comma (,)"
 msgstr "Komma (,)"
 
-#| msgid "Table"
 msgid "Tab"
 msgstr "Tabulator"
 
@@ -2423,7 +2410,6 @@ msgstr "Bitte fügen Sie die Daten im Editor-Tab ein."
 msgid "Failed to parse CSV data: {error}"
 msgstr "CSV-Daten konnten nicht verarbeitet werden: {error}"
 
-#| msgid "Your dashboard is empty"
 msgid "CSV data is empty."
 msgstr "CSV-Daten sind leer."
 
@@ -2467,22 +2453,18 @@ msgstr "Objekt mit der ID {id} existiert nicht"
 msgid "Row %(row)s: \"%(field)s\" is required."
 msgstr "Zeile %(row)s: \"%(field)s\" ist erforderlich."
 
-#| msgid "- ITAMbox"
 msgid "Search ITAMbox"
 msgstr "ITAMbox durchsuchen"
 
-#| msgid "Object Type"
 msgid "Object type(s)"
 msgstr "Objekttyp(en)"
 
 msgid "Partial match"
 msgstr "Teilübereinstimmung"
 
-#| msgid "Object Watch"
 msgid "Exact match"
 msgstr "Genaue Übereinstimmung"
 
-#| msgid "Started At:"
 msgid "Starts with"
 msgstr "Beginnt mit"
 
@@ -2495,11 +2477,9 @@ msgstr "Regex"
 msgid "Lookup"
 msgstr "Suche"
 
-#| msgid "Assigned Tags"
 msgid "Add Tags"
 msgstr "Tags hinzufügen"
 
-#| msgid "Remove"
 msgid "Remove Tags"
 msgstr "Tags entfernen"
 
@@ -2514,11 +2494,9 @@ msgstr "Stellen Sie sicher, dass der Hex-Farbcode 6 Zeichen lang ist."
 msgid "Authentication credentials were not provided."
 msgstr "Es wurden keine Authentifizierungsdaten bereitgestellt."
 
-#| msgid "Permission Key"
 msgid "Permission denied."
 msgstr "Zugriff verweigert."
 
-#| msgid "Custom Field"
 msgid "Custom Field Data"
 msgstr "Benutzerdefinierte Felddaten"
 
@@ -2528,8 +2506,42 @@ msgstr ""
 "Zielbenutzer für die Benachrichtigung. Null steht für eine globale "
 "Broadcast-Warnung."
 
+msgid "Subject"
+msgstr "Subject"
+
+msgid "Message"
+msgstr "Nachricht"
+
+msgid "Level"
+msgstr "Stufe"
+
+#| msgid "Read"
+msgid "Is Read"
+msgstr "Ist gelesen"
+
 msgid "Optional destination URL when clicked."
 msgstr "Optionale Ziel-URL beim Anklicken."
+
+#| msgid "Target URL:"
+msgid "Target URL"
+msgstr "Ziel-URL"
+
+#| msgid "All Data"
+msgid "Data"
+msgstr "Daten"
+
+msgid "Result"
+msgstr "Ergebnis"
+
+msgid "Logs"
+msgstr "Protokolle"
+
+msgid "Started"
+msgstr "Started"
+
+#| msgid "Scheduled Report"
+msgid "Scheduled For"
+msgstr "Geplant für"
 
 msgid "Job"
 msgstr "Job"
@@ -2537,9 +2549,37 @@ msgstr "Job"
 msgid "Jobs"
 msgstr "Jobs"
 
-#| msgid "You have no system notifications."
+msgid "SMTP Host"
+msgstr "SMTP-Host"
+
+msgid "SMTP Port"
+msgstr "SMTP-Port"
+
+msgid "SMTP Use TLS"
+msgstr "SMTP TLS verwenden"
+
+#| msgid "Username"
+msgid "SMTP Username"
+msgstr "SMTP-Benutzername"
+
+#| msgid "Change Password"
+msgid "SMTP Password"
+msgstr "SMTP-Passwort"
+
+#| msgid "Email Address"
+msgid "From Address"
+msgstr "Absenderadresse"
+
+#| msgid "First Name"
+msgid "From Name"
+msgstr "Absendername"
+
 msgid "Email address for test notifications"
 msgstr "E-Mail-Adresse für Testbenachrichtigungen"
+
+#| msgid "Recipient"
+msgid "Test Recipient"
+msgstr "Testempfänger"
 
 msgid "Can view Recycle Bin"
 msgstr "Kann Papierkorb anzeigen"
@@ -2572,7 +2612,6 @@ msgstr "Lagerorte"
 msgid "Organization"
 msgstr "Organisation"
 
-#| msgid "Sites & Regions"
 msgid "Sites & Locations"
 msgstr "Standorte & Lagerorte"
 
@@ -2597,18 +2636,15 @@ msgstr "Kontaktrollen"
 msgid "Catalog"
 msgstr "Katalog"
 
-#| msgid "Operations"
 msgid "Reservations"
 msgstr "Reservierungen"
 
-#| msgid "Disposed at"
 msgid "Disposals"
 msgstr "Abgänge"
 
 msgid "Inventory & Stock"
 msgstr "Inventar & Lager"
 
-#| msgid "Total Stock"
 msgid "Stock"
 msgstr "Bestand"
 
@@ -2618,29 +2654,24 @@ msgstr "Komponenten"
 msgid "Add Component"
 msgstr "Komponente hinzufügen"
 
-#| msgid "Import Complete"
 msgid "Import Components"
 msgstr "Komponenten importieren"
 
 msgid "Accessories"
 msgstr "Zubehör"
 
-#| msgid "Accessory"
 msgid "Add Accessory"
 msgstr "Zubehör hinzufügen"
 
-#| msgid "Accessories"
 msgid "Import Accessories"
 msgstr "Zubehör importieren"
 
 msgid "Consumables"
 msgstr "Verbrauchsmaterialien"
 
-#| msgid "Consumable"
 msgid "Add Consumable"
 msgstr "Verbrauchsmaterial hinzufügen"
 
-#| msgid "Consumables"
 msgid "Import Consumables"
 msgstr "Verbrauchsmaterialien importieren"
 
@@ -2650,11 +2681,9 @@ msgstr "Bundles"
 msgid "Kits"
 msgstr "Kits"
 
-#| msgid "Software & SaaS"
 msgid "Software & Licensing"
 msgstr "Software & Lizenzierung"
 
-#| msgid "License"
 msgid "Licensing"
 msgstr "Lizenzierung"
 
@@ -2679,26 +2708,21 @@ msgstr "Operations"
 msgid "Procurement"
 msgstr "Beschaffung"
 
-#| msgid "Purchase +"
 msgid "Purchase Orders"
 msgstr "Bestellungen"
 
 msgid "Requests"
 msgstr "Anfragen"
 
-#| msgid "Contacts"
 msgid "Contracts"
 msgstr "Verträge"
 
-#| msgid "Maintenances"
 msgid "Finance"
 msgstr "Finanzen"
 
-#| msgid "Cost Center:"
 msgid "Cost Centers"
 msgstr "Kostenstellen"
 
-#| msgid "Compliance & Audits"
 msgid "Compliance"
 msgstr "Compliance"
 
@@ -2711,44 +2735,36 @@ msgstr "Überwachung & Berichtswesen"
 msgid "Alerting"
 msgstr "Alarmierung"
 
-#| msgid "Cost Center:"
 msgid "Alerts Center"
 msgstr "Warnungszentrale"
 
-#| msgid "Alert Rule"
 msgid "Alert Rules"
 msgstr "Alarmregeln"
 
 msgid "Notification Channels"
 msgstr "Notification Channels"
 
-#| msgid "Report Designer"
 msgid "Reporting"
 msgstr "Berichtswesen"
 
-#| msgid "Schedule"
 msgid "Scheduled Reports"
 msgstr "Geplante Berichte"
 
-#| msgid "Report Template"
 msgid "Report Templates"
 msgstr "Berichtsvorlagen"
 
-#| msgid "Activity Log"
 msgid "Activity"
 msgstr "Aktivität"
 
 msgid "Changelog"
 msgstr "Änderungsprotokoll"
 
-#| msgid "Background Tasks & Jobs"
 msgid "Background Jobs"
 msgstr "Hintergrundjobs"
 
 msgid "Customization"
 msgstr "Anpassung"
 
-#| msgid "Target Model:"
 msgid "Data Model"
 msgstr "Datenmodell"
 
@@ -2758,51 +2774,42 @@ msgstr "Benutzerdefinierte Feldgruppen"
 msgid "Config Contexts"
 msgstr "Konfigurationskontexte"
 
-#| msgid "Filters"
 msgid "Saved Filters"
 msgstr "Gespeicherte Filter"
 
 msgid "Tagging"
 msgstr "Tagging"
 
-#| msgid "Edit Template"
 msgid "Templates"
 msgstr "Vorlagen"
 
 msgid "Export Templates"
 msgstr "Export-Vorlagen"
 
-#| msgid "Manage Templates"
 msgid "Label Templates"
 msgstr "Etikettenvorlagen"
 
-#| msgid "Customization"
 msgid "Automation"
 msgstr "Automatisierung"
 
 msgid "Webhook Endpoints"
 msgstr "Webhook-Endpunkte"
 
-#| msgid "Edit Rule"
 msgid "Event Rules"
 msgstr "Ereignisregeln"
 
 msgid "Admin"
 msgstr "Administration"
 
-#| msgid "Accessor"
 msgid "Access Control"
 msgstr "Zugriffssteuerung"
 
-#| msgid "User"
 msgid "Users"
 msgstr "Benutzer"
 
-#| msgid "Role"
 msgid "Roles"
 msgstr "Rollen"
 
-#| msgid "Seat Assignments"
 msgid "Tenant Assignments"
 msgstr "Mandantenzuweisungen"
 
@@ -2821,73 +2828,54 @@ msgstr "Plugin-Liste"
 msgid "MFA verification required."
 msgstr "MFA-Verifizierung erforderlich."
 
-#| msgid "Purchase Date:"
-msgid "Purchase Date"
-msgstr "Kaufdatum"
-
-#| msgid "Lifespan (Months)"
 msgid "Warranty (Months)"
 msgstr "Garantie (Monate)"
 
-#| msgid "License"
 msgid "License Name"
 msgstr "Lizenzname"
 
-#| msgid "Total Stock"
 msgid "Total Seats"
 msgstr "Gesamtplätze"
 
-#| msgid "Assigned Tags"
 msgid "Assigned Seats"
 msgstr "Zugewiesene Plätze"
 
 msgid "Available Seats"
 msgstr "Verfügbare Plätze"
 
-#| msgid "Highest Utilization Rates"
 msgid "Utilization Rate"
 msgstr "Auslastungsrate"
 
-#| msgid "Subscription"
 msgid "Subscription Name"
 msgstr "Abonnementname"
 
-#| msgid "Billing Cycle:"
 msgid "Billing Cycle"
 msgstr "Abrechnungszyklus"
 
-#| msgid "Maintenance Type:"
 msgid "Maintenance Title"
 msgstr "Wartungsbezeichnung"
 
-#| msgid "Lifespan (Months)"
 msgid "Depreciation Lifespan (Months)"
 msgstr "Abschreibungsdauer (Monate)"
 
-#| msgid "Depreciated Book Value:"
 msgid "Depreciated Value"
 msgstr "Abgeschriebener Wert"
 
-#| msgid "Software"
 msgid "Software Product"
 msgstr "Softwareprodukt"
 
-#| msgid "Installed Instances"
 msgid "Installed Count"
 msgstr "Anzahl Installationen"
 
-#| msgid "License"
 msgid "License Count"
 msgstr "Anzahl Lizenzen"
 
-#| msgid "Hardware Asset"
 msgid "Total Hardware Assets"
 msgstr "Hardware-Assets gesamt"
 
 msgid "Total Acquisition Sum"
 msgstr "Anschaffungssumme gesamt"
 
-#| msgid "Assigned:"
 msgid "Unassigned"
 msgstr "Nicht zugewiesen"
 
@@ -2906,11 +2894,9 @@ msgstr "Asset-Statusverteilung"
 msgid "Total License Products"
 msgstr "Lizenzprodukte gesamt"
 
-#| msgid "Active License Seat Allocations"
 msgid "License Seat Utilization"
 msgstr "Lizenzplatzauslastung"
 
-#| msgid "Active subscription spend:"
 msgid "Active Subscriptions"
 msgstr "Aktive Abonnements"
 
@@ -2920,57 +2906,45 @@ msgstr "Gesch. monatliche Ausgaben"
 msgid "Monthly Spend by Provider"
 msgstr "Monatliche Ausgaben nach Anbieter"
 
-#| msgid "Maintenances"
 msgid "Total Maintenances"
 msgstr "Wartungen gesamt"
 
-#| msgid "Maintenance Cost"
 msgid "Total Maintenance Cost"
 msgstr "Wartungskosten gesamt"
 
-#| msgid "Maintenance Type:"
 msgid "Maintenance Type Distribution"
 msgstr "Verteilung der Wartungstypen"
 
-#| msgid "Total Physical Assets"
 msgid "Total Depreciable Assets"
 msgstr "Abschreibbare Assets gesamt"
 
 msgid "Total Acquisition Cost"
 msgstr "Anschaffungskosten gesamt"
 
-#| msgid "Total Salvage Book Value"
 msgid "Total Current Book Value"
 msgstr "Aktueller Buchwert gesamt"
 
-#| msgid "Custom Schemas"
 msgid "No Scheme"
 msgstr "Kein Schema"
 
-#| msgid "Depreciated Book Value:"
 msgid "Depreciated Book Value"
 msgstr "Abgeschriebener Buchwert"
 
-#| msgid "Depreciated over"
 msgid "Depreciated Amount"
 msgstr "Abschreibungsbetrag"
 
-#| msgid "Assets / Depreciation Rules"
 msgid "Asset Value Depreciation"
 msgstr "Wertabschreibung der Assets"
 
 msgid "Total Software Products"
 msgstr "Softwareprodukte gesamt"
 
-#| msgid "EULA Version"
 msgid "Version"
 msgstr "Version"
 
-#| msgid "License Type:"
 msgid "License Type"
 msgstr "Lizenztyp"
 
-#| msgid "Software Catalog Details"
 msgid "Software Category Distribution"
 msgstr "Verteilung der Softwarekategorien"
 
@@ -2992,15 +2966,12 @@ msgstr "Das von Ihnen beobachtete Objekt '%(instance)s' wurde %(action)s."
 msgid "No {model_name} found"
 msgstr "Keine {model_name} gefunden"
 
-#| msgid "No results found."
 msgid "No results found"
 msgstr "Keine Ergebnisse gefunden"
 
-#| msgid "Select Tenant"
 msgid "Select all"
 msgstr "Alle auswählen"
 
-#| msgid "Toggle Filters"
 msgid "Toggle all"
 msgstr "Alle umschalten"
 
@@ -3008,12 +2979,10 @@ msgid "Edit"
 msgstr "Bearbeiten"
 
 #, python-brace-format
-#| msgid "Are you sure you want to delete the tenant:"
 msgid "Are you sure you want to restore this {model_name}?"
 msgstr "Möchten Sie diese(s) {model_name} wirklich wiederherstellen?"
 
 #, python-brace-format
-#| msgid "Are you sure you want to delete the location:"
 msgid ""
 "Are you sure you want to PERMANENTLY delete this {model_name}? This action "
 "cannot be undone!"
@@ -3024,24 +2993,17 @@ msgstr ""
 msgid "Toggle Dropdown"
 msgstr "Toggle Dropdown"
 
-#| msgid "Copy/Clone"
 msgid "Clone"
 msgstr "Klonen"
 
 msgid "Assignee"
 msgstr "Zugewiesen an"
 
-#| msgid "Created"
 msgid "Created At"
 msgstr "Erstellt am"
 
-#| msgid "Started At:"
 msgid "Started At"
 msgstr "Gestartet am"
-
-#| msgid "Completed At:"
-msgid "Completed At"
-msgstr "Beendet am"
 
 msgid "Object"
 msgstr "Object"
@@ -3049,17 +3011,11 @@ msgstr "Object"
 msgid "Request ID"
 msgstr "Request ID"
 
-#| msgid "Target Object:"
 msgid "Changed Object"
 msgstr "Geändertes Objekt"
 
-#| msgid "Field Type:"
 msgid "File Type"
 msgstr "Dateityp"
-
-#| msgid "Search Results"
-msgid "Result"
-msgstr "Ergebnis"
 
 msgid "Unknown Type"
 msgstr "Unbekannter Typ"
@@ -3073,7 +3029,6 @@ msgstr "Breite (Zoll)"
 msgid "Height (in)"
 msgstr "Höhe (Zoll)"
 
-#| msgid "Barcode Format:"
 msgid "Barcode"
 msgstr "Barcode"
 
@@ -3125,7 +3080,6 @@ msgid "License '%(name)s' expires on %(date)s (%(days)s day(s) remaining)."
 msgstr "Lizenz '%(name)s' läuft am %(date)s ab (noch %(days)s Tag(e))."
 
 #, python-format
-#| msgid "Subscription Details"
 msgid "Subscription Renewal Due: %(name)s"
 msgstr "Abonnementverlängerung fällig: %(name)s"
 
@@ -3138,7 +3092,6 @@ msgstr ""
 " eine Verlängerungsprüfung."
 
 #, python-format
-#| msgid "Warranty Expiration:"
 msgid "Warranty Expiring: %(tag)s"
 msgstr "Garantie läuft ab: %(tag)s"
 
@@ -3162,12 +3115,10 @@ msgstr "alle %(days)s Tag(e)"
 msgid "last audited %(days)s day(s) ago (%(date)s)"
 msgstr "zuletzt vor %(days)s Tag(en) geprüft (%(date)s)"
 
-#| msgid "Never Audited"
 msgid "never audited"
 msgstr "nie geprüft"
 
 #, python-format
-#| msgid "Audit Overdue: %(asset_tag)s"
 msgid "Audit Overdue: %(tag)s"
 msgstr "Prüfung überfällig: %(tag)s"
 
@@ -3179,7 +3130,6 @@ msgstr ""
 "Für Asset %(tag)s (%(name)s) ist eine Prüfung überfällig (%(detail)s; "
 "Schwellenwert: %(threshold)s)."
 
-#| msgid "Checkout Kit"
 msgid "Bulk Checkout Failed"
 msgstr "Sammel-Herausgabe fehlgeschlagen"
 
@@ -3217,7 +3167,6 @@ msgstr ""
 "Import der CSV-/YAML-Daten nach %(model)s fehlgeschlagen. Details finden Sie"
 " in den Job-Protokollen."
 
-#| msgid "Import Complete"
 msgid "Bulk Import Complete"
 msgstr "Sammelimport abgeschlossen"
 
@@ -3225,7 +3174,6 @@ msgstr "Sammelimport abgeschlossen"
 msgid "Successfully imported %(count)s record(s) to %(model)s."
 msgstr "%(count)s Datensatz/Datensätze erfolgreich nach %(model)s importiert."
 
-#| msgid "Import Errors"
 msgid "Bulk Import Error"
 msgstr "Fehler beim Sammelimport"
 
@@ -3308,7 +3256,6 @@ msgstr ""
 "Assets gesamt: %(total_assets)s\n"
 "Anschaffungssumme: $%(acquisition_sum)s"
 
-#| msgid "Required"
 msgid "A URL is required."
 msgstr "Eine URL ist erforderlich."
 
@@ -3412,7 +3359,6 @@ msgstr "Header Color Style"
 msgid "Info (Blue)"
 msgstr "Info (Blau)"
 
-#| msgid "Warning"
 msgid "Warning (Yellow)"
 msgstr "Warnung (Gelb)"
 
@@ -3425,7 +3371,6 @@ msgstr "Gefahr (Rot)"
 msgid "Widget not found"
 msgstr "Widget nicht gefunden"
 
-#| msgid "Quantity Required"
 msgid "Tenant is required."
 msgstr "Mandant ist erforderlich."
 
@@ -3444,8 +3389,6 @@ msgstr "Alle Mandanten"
 msgid "Target Tenant Context"
 msgstr "Target Tenant Context"
 
-#| msgid ""
-#| "Scope this campaign to a specific tenant. Leave blank for MSP-wide / global."
 msgid "Scope this widget to a specific tenant."
 msgstr "Beschränken Sie dieses Widget auf einen bestimmten Mandanten."
 
@@ -3454,11 +3397,9 @@ msgstr ""
 "Markdown wird unterstützt (Überschriften, Fettdruck, Listen, Links, "
 "Tabellen, Code)."
 
-#| msgid "Model"
 msgid "Models"
 msgstr "Modelle"
 
-#| msgid "units limit"
 msgid "Budget Limit"
 msgstr "Budgetgrenze"
 
@@ -3475,29 +3416,24 @@ msgstr ""
 "Zeilen, die unterhalb der TCO-Überschrift angezeigt werden. Wenn keine "
 "ausgewählt sind, werden alle angezeigt."
 
-#| msgid "View Detail"
 msgid "View Cost Details"
 msgstr "Kostendetails anzeigen"
 
-#| msgid "Alert Type"
 msgid "Chart Type"
 msgstr "Diagrammtyp"
 
-#| msgid "View All Tenants"
 msgid "View All Assets"
 msgstr "Alle Assets anzeigen"
 
 msgid "Limit to Top N"
 msgstr "Auf Top N beschränken"
 
-#| msgid "GWG Threshold:"
 msgid "Warning Threshold (%)"
 msgstr "Warnschwelle (%)"
 
 msgid "Threshold percentage to flag high utilization."
 msgstr "Schwellenwert in Prozent zur Kennzeichnung hoher Auslastung."
 
-#| msgid "View All Tenants"
 msgid "View All Licenses"
 msgstr "Alle Lizenzen anzeigen"
 
@@ -3512,22 +3448,18 @@ msgstr ""
 msgid "Long-Running Threshold (days)"
 msgstr "Schwellenwert für lange Laufzeit (Tage)"
 
-#| msgid "View All Tenants"
 msgid "View All Repairs"
 msgstr "Alle Reparaturen anzeigen"
 
-#| msgid "days planning horizon"
 msgid "Planning Horizon"
 msgstr "Planungshorizont"
 
 msgid "Max Items to Display"
 msgstr "Maximal anzuzeigende Elemente"
 
-#| msgid "Fast Async Actions"
 msgid "Filter by Action"
 msgstr "Nach Aktion filtern"
 
-#| msgid "Object Type"
 msgid "Filter by Object Types"
 msgstr "Nach Objekttypen filtern"
 
@@ -3546,40 +3478,32 @@ msgstr ""
 "Jede Änderung schreibt auch eine interne Ereigniszeile — beide anzuzeigen "
 "dupliziert den Feed."
 
-#| msgid "Change Log"
 msgid "View Full Change Log"
 msgstr "Vollständiges Änderungsprotokoll anzeigen"
 
-#| msgid "Subscriptions"
 msgid "View All Subscriptions"
 msgstr "Alle Abonnements anzeigen"
 
-#| msgid "Accessories"
 msgid "Include Accessories"
 msgstr "Zubehör einbeziehen"
 
-#| msgid "Consumables"
 msgid "Include Consumables"
 msgstr "Verbrauchsmaterialien einbeziehen"
 
-#| msgid "Components"
 msgid "Include Components"
 msgstr "Komponenten einbeziehen"
 
 # --- Bookmarks & Watch (users/views.py, templates/users/, templates/generic/)
 # ---
-#| msgid "Bookmarks"
 msgid "All Bookmarks"
 msgstr "Alle Lesezeichen"
 
-#| msgid "Data Format"
 msgid "Chart Format"
 msgstr "Diagrammformat"
 
 msgid "Max Tenants to Show"
 msgstr "Maximal anzuzeigende Mandanten"
 
-#| msgid "assigned asset"
 msgid "Exclude Unassigned Assets"
 msgstr "Nicht zugewiesene Assets ausschließen"
 
@@ -3589,22 +3513,18 @@ msgstr "Ausgaben für Assets ohne Mandant nicht anzeigen."
 msgid "View All Tenants"
 msgstr "View All Tenants"
 
-#| msgid "Shared Secret:"
 msgid "Shared"
 msgstr "Geteilt"
 
 msgid "Severity"
 msgstr "Severity"
 
-#| msgid "Edit Rule"
 msgid "Rule"
 msgstr "Regel"
 
-#| msgid "Create Board"
 msgid "Created after"
 msgstr "Erstellt nach"
 
-#| msgid "Create one"
 msgid "Created before"
 msgstr "Erstellt vor"
 
@@ -3622,11 +3542,9 @@ msgstr ""
 msgid "Enter configuration data in valid JSON format."
 msgstr "Geben Sie die Konfigurationsdaten im gültigen JSON-Format ein."
 
-#| msgid "Tenant (Optional)"
 msgid "Scope (optional)"
 msgstr "Geltungsbereich (optional)"
 
-#| msgid "Rule Configuration"
 msgid "Configuration Data"
 msgstr "Konfigurationsdaten"
 
@@ -3634,11 +3552,9 @@ msgstr "Konfigurationsdaten"
 msgid "Invalid JSON: %(error)s"
 msgstr "Ungültiges JSON: %(error)s"
 
-#| msgid "Weight:"
 msgid "Weight"
 msgstr "Gewicht"
 
-#| msgid "Custom Field"
 msgid "Custom"
 msgstr "Benutzerdefiniert"
 
@@ -3654,7 +3570,6 @@ msgstr "Payload-Vorlage"
 msgid "Select a preset to pre-fill the payload template above"
 msgstr "Wählen Sie eine Vorlage, um die obige Payload-Vorlage vorauszufüllen"
 
-#| msgid "Upload"
 msgid "Payload"
 msgstr "Payload"
 
@@ -3667,7 +3582,6 @@ msgstr "Webhook-Endpunkt speichern"
 msgid "Headers must be valid JSON."
 msgstr "Header müssen gültiges JSON sein."
 
-#| msgid "Trigger Events:"
 msgid "Trigger Events"
 msgstr "Auslöseereignisse"
 
@@ -3681,7 +3595,6 @@ msgstr ""
 msgid "Select a preset to pre-fill the action config"
 msgstr "Wählen Sie eine Vorlage, um die Aktionskonfiguration vorauszufüllen"
 
-#| msgid "Target Model:"
 msgid "Target Model"
 msgstr "Zielmodell"
 
@@ -3696,11 +3609,9 @@ msgstr ""
 "Endpunkte. Lassen Sie das Feld nur leer, wenn Sie unten in der "
 "Aktionskonfiguration eine \"url\" angeben."
 
-#| msgid "Trigger Events:"
 msgid "Trigger"
 msgstr "Auslöser"
 
-#| msgid "Manage Alert Rules"
 msgid "Save Event Rule"
 msgstr "Ereignisregel speichern"
 
@@ -3710,15 +3621,12 @@ msgstr "Bedingungen müssen gültiges JSON sein."
 msgid "Action config must be valid JSON."
 msgstr "Die Aktionskonfiguration muss gültiges JSON sein."
 
-#| msgid "Label Size:"
 msgid "Page Size"
 msgstr "Seitengröße"
 
-#| msgid "Available Label Templates"
 msgid "Save Label Template"
 msgstr "Etikettenvorlage speichern"
 
-#| msgid "All Standard Columns"
 msgid "Included Columns"
 msgstr "Enthaltene Spalten"
 
@@ -3730,7 +3638,6 @@ msgstr ""
 "werden sollen. Nur Spalten, die zu Ihrem Berichtstyp passen, werden "
 "dargestellt."
 
-#| msgid "Scoped to Tenant"
 msgid "Scope / Tenant Filter"
 msgstr "Geltungsbereich / Mandantenfilter"
 
@@ -3789,7 +3696,6 @@ msgstr "Geltungsbereich"
 msgid "Save Scheduled Report"
 msgstr "Geplanten Bericht speichern"
 
-#| msgid "days planning horizon"
 msgid "Days horizon"
 msgstr "Tageshorizont"
 
@@ -3813,14 +3719,12 @@ msgstr "Begrenzungsanzahl oder Tageshorizont, je nach Alarmtyp."
 msgid "Re-notify every (days)"
 msgstr "Erneut benachrichtigen alle (Tage)"
 
-#| msgid "Rule Configuration"
 msgid "Alert Configuration"
 msgstr "Alarmkonfiguration"
 
 msgid "Notifications"
 msgstr "Benachrichtigungen"
 
-#| msgid "Alert Rule"
 msgid "Save Alert Rule"
 msgstr "Alarmregel speichern"
 
@@ -3838,7 +3742,6 @@ msgstr "E-Mail-Adressen der Empfänger"
 msgid "Comma- or newline-separated email addresses."
 msgstr "Durch Komma oder Zeilenumbruch getrennte E-Mail-Adressen."
 
-#| msgid "Specifications:"
 msgid "Specific recipients"
 msgstr "Bestimmte Empfänger"
 
@@ -3860,10 +3763,18 @@ msgstr "Dieser Kanaltyp erfordert eine Incoming-Webhook-URL."
 msgid "Tag"
 msgstr "Tag"
 
+#| msgid "Default"
+msgid "Is Default"
+msgstr "Ist Standard"
+
 msgid "Scope all widgets on this dashboard to this specific tenant context."
 msgstr ""
 "Alle Widgets auf diesem Dashboard auf diesen spezifischen Mandantenkontext "
 "beschränken."
+
+#| msgid "Save Layout"
+msgid "Layout"
+msgstr "Layout"
 
 msgid "Ordered list of widget config dicts"
 msgstr "Geordnete Liste von Widget-Konfigurations-Dicts"
@@ -3874,7 +3785,6 @@ msgstr "Dashboards"
 msgid "Text"
 msgstr "Text"
 
-#| msgid "Part Number:"
 msgid "Number"
 msgstr "Zahl"
 
@@ -3884,24 +3794,24 @@ msgstr "Datum"
 msgid "Boolean"
 msgstr "Boolescher Wert"
 
-#| msgid "Toggle Dropdown"
 msgid "Select / Dropdown"
 msgstr "Auswahl / Dropdown"
 
-#| msgid "Field Name:"
 msgid "Field Name"
 msgstr "Feldname"
 
 msgid "Slug-like name (e.g. sim_card_number)"
 msgstr "Slug-artiger Name (z. B. sim_card_number)"
 
-#| msgid "Display Label:"
 msgid "Display Label"
 msgstr "Anzeige-Label"
 
-#| msgid "Field Type:"
 msgid "Field Type"
 msgstr "Feldtyp"
+
+#| msgid "Choices:"
+msgid "Choices"
+msgstr "Auswahloptionen"
 
 msgid "New-line separated list of choices (only for 'select' type)"
 msgstr ""
@@ -3911,7 +3821,6 @@ msgstr ""
 msgid "Required"
 msgstr "Required"
 
-#| msgid "Object Type"
 msgid "Object Types"
 msgstr "Objekttypen"
 
@@ -3927,9 +3836,12 @@ msgstr ""
 msgid "Custom Field"
 msgstr "Benutzerdefiniertes Feld"
 
-#| msgid "Fieldset Name:"
 msgid "Fieldset Name"
 msgstr "Feldgruppenname"
+
+#| msgid "Proceeds"
+msgid "Processed"
+msgstr "Verarbeitet"
 
 msgid "Event"
 msgstr "Ereignis"
@@ -3940,15 +3852,22 @@ msgstr "Ereignisse"
 msgid "Webhook"
 msgstr "Webhook"
 
-#| msgid "Notifications"
 msgid "Notification"
 msgstr "Benachrichtigung"
 
 msgid "List of event action types, e.g. ['create', 'update']"
 msgstr "Liste von Ereignis-Aktionstypen, z. B. ['create', 'update']"
 
+#| msgid "Consumptions"
+msgid "Conditions"
+msgstr "Bedingungen"
+
 msgid "Optional conditions for rule matching"
 msgstr "Optionale Bedingungen für die Regelübereinstimmung"
+
+#| msgid "Action Type:"
+msgid "Action Type"
+msgstr "Aktionstyp"
 
 msgid ""
 "Endpoint to call when the action type is Webhook. Takes precedence over any "
@@ -3956,6 +3875,10 @@ msgid ""
 msgstr ""
 "Endpunkt, der aufgerufen wird, wenn der Aktionstyp Webhook ist. Hat Vorrang "
 "vor einer 'url' in action_config."
+
+#| msgid "Action Configuration:"
+msgid "Action Config"
+msgstr "Aktionskonfiguration"
 
 msgid ""
 "Advanced/optional JSON config (notification body, header overrides, etc.)"
@@ -3967,7 +3890,6 @@ msgid "The tenant owning this rule. Null represents system-wide rules."
 msgstr ""
 "Der Mandant, dem diese Regel gehört. Null steht für systemweite Regeln."
 
-#| msgid "Edit Rule"
 msgid "Event Rule"
 msgstr "Ereignisregel"
 
@@ -3978,12 +3900,33 @@ msgstr ""
 "Der Webhook-Endpunkt muss zum selben Mandanten gehören wie die Regel oder "
 "systemweit sein."
 
+#| msgid "Web URL"
+msgid "URL"
+msgstr "URL"
+
+#| msgid "HTTP Method:"
+msgid "HTTP Method"
+msgstr "HTTP-Methode"
+
+msgid "Headers"
+msgstr "Header"
+
+#| msgid "Shared Secret:"
+msgid "Secret"
+msgstr "Geheimnis"
+
 msgid "Shared secret for HMAC payload signing"
 msgstr "Gemeinsames Geheimnis für die HMAC-Signierung der Nutzdaten"
 
-#| msgid "retry attempts with"
+#| msgid "Retry Connection"
+msgid "Retry Count"
+msgstr "Anzahl der Wiederholungen"
+
 msgid "Max retry attempts on failure"
 msgstr "Maximale Anzahl von Wiederholungsversuchen bei Fehlern"
+
+msgid "Retry Backoff"
+msgstr "Wiederholungsverzögerung"
 
 msgid "Backoff in seconds between retries"
 msgstr "Wartezeit in Sekunden zwischen Wiederholungsversuchen"
@@ -3994,6 +3937,10 @@ msgstr ""
 "Der Mandant, dem dieser Endpunkt gehört. Null steht für systemweite "
 "Endpunkte."
 
+#| msgid "Comments"
+msgid "Comment"
+msgstr "Kommentar"
+
 msgid ""
 "Denormalised owning tenant, derived from the journaled object on save. Null "
 "= system/global object."
@@ -4001,7 +3948,6 @@ msgstr ""
 "Denormalisierter besitzender Mandant, beim Speichern aus dem journalierten "
 "Objekt abgeleitet. Null = System-/globales Objekt."
 
-#| msgid "Add Journal Entry"
 msgid "Journal Entry"
 msgstr "Journaleintrag"
 
@@ -4022,21 +3968,33 @@ msgstr "Beobachtetes Objekt"
 msgid "Object Watches"
 msgstr "Beobachtete Objekte"
 
-#| msgid "Attachments"
+#| msgid "Images"
+msgid "Image"
+msgstr "Bild"
+
 msgid "Image Attachment"
 msgstr "Bildanhang"
 
-#| msgid "Attachments"
 msgid "Image Attachments"
 msgstr "Bildanhänge"
 
-#| msgid "Attachments"
+#| msgid "MIME Type:"
+msgid "MIME Type"
+msgstr "MIME-Typ"
+
 msgid "File Attachment"
 msgstr "Dateianhang"
 
-#| msgid "Attachments"
 msgid "File Attachments"
 msgstr "Dateianhänge"
+
+#| msgid "Content Type:"
+msgid "Content Type"
+msgstr "Inhaltstyp"
+
+#| msgid "Template Code:"
+msgid "Template Code"
+msgstr "Vorlagencode"
 
 msgid "Jinja2 or Django template code for export"
 msgstr "Jinja2- oder Django-Template-Code für den Export"
@@ -4044,15 +4002,30 @@ msgstr "Jinja2- oder Django-Template-Code für den Export"
 msgid "MIME type for the exported file"
 msgstr "MIME-Typ für die exportierte Datei"
 
-#| msgid "Export Templates"
+#| msgid "File Extension:"
+msgid "File Extension"
+msgstr "Dateierweiterung"
+
 msgid "Export Template"
 msgstr "Export-Vorlage"
+
+#| msgid "Page Size"
+msgid "Page Width"
+msgstr "Seitenbreite"
 
 msgid "Label width in inches"
 msgstr "Etikettenbreite in Zoll"
 
+#| msgid "Page Size"
+msgid "Page Height"
+msgstr "Seitenhöhe"
+
 msgid "Label height in inches"
 msgstr "Etikettenhöhe in Zoll"
+
+#| msgid "Barcode Scan"
+msgid "Barcode Format"
+msgstr "Barcode-Format"
 
 msgid "Code 128"
 msgstr "Code 128"
@@ -4063,14 +4036,12 @@ msgstr "Code 39"
 msgid "QR Code"
 msgstr "QR-Code"
 
-#| msgid "Data Format"
 msgid "Data Matrix"
 msgstr "Data Matrix"
 
 msgid "Jinja2/HTML template for label layout"
 msgstr "Jinja2-/HTML-Vorlage für das Etikettenlayout"
 
-#| msgid "Manage Templates"
 msgid "Label Template"
 msgstr "Etikettenvorlage"
 
@@ -4085,27 +4056,21 @@ msgstr "Serialisiertes Konfigurations-Dictionary"
 msgid "Config Context"
 msgstr "Konfigurationskontext"
 
-#| msgid "Related Inventory"
 msgid "Asset Inventory Summary"
 msgstr "Asset-Inventarübersicht"
 
-#| msgid "Highest Utilization Rates"
 msgid "License Utilization"
 msgstr "Lizenzauslastung"
 
-#| msgid "Subscription Details"
 msgid "Subscription Renewals"
 msgstr "Abonnementverlängerungen"
 
-#| msgid "Asset Maintenances"
 msgid "Asset Maintenance & Repairs"
 msgstr "Asset-Wartung & Reparaturen"
 
-#| msgid "Assets / Depreciation Rules"
 msgid "Asset Depreciation Summary"
 msgstr "Asset-Abschreibungsübersicht"
 
-#| msgid "Software Catalog Details"
 msgid "Software Catalog & Installations"
 msgstr "Software-Katalog & Installationen"
 
@@ -4116,6 +4081,10 @@ msgstr ""
 "Der Mandant, dem diese Berichtsvorlage gehört. Null steht für systemweite "
 "Vorlagen."
 
+#| msgid "Delete Tenant"
+msgid "Filter Tenants"
+msgstr "Mandanten filtern"
+
 msgid ""
 "Filter compiled data to only include these selected tenants. If none are "
 "selected, aggregates data globally."
@@ -4124,14 +4093,25 @@ msgstr ""
 "Mandanten enthalten sind. Wenn keine ausgewählt sind, werden die Daten "
 "global aggregiert."
 
+msgid "Report Type"
+msgstr "Report Type"
+
 msgid "Checked columns to render in the report data grid."
 msgstr ""
 "Markierte Spalten, die im Datenraster des Berichts dargestellt werden."
+
+#| msgid "Include Consumables"
+msgid "Include Summary Cards"
+msgstr "Übersichtskarten einbeziehen"
 
 msgid "Toggle displaying top card widgets (totals, counts, financial sums)."
 msgstr ""
 "Anzeige der oberen Karten-Widgets (Summen, Anzahlen, Finanzsummen) "
 "ein-/ausschalten."
+
+#| msgid "Spend Distribution Chart"
+msgid "Include Distribution Chart"
+msgstr "Verteilungsdiagramm einbeziehen"
 
 msgid ""
 "Toggle embedding spend or status distribution charts in the HTML report."
@@ -4139,28 +4119,40 @@ msgstr ""
 "Einbettung von Diagrammen zur Ausgaben- oder Statusverteilung im HTML-"
 "Bericht ein-/ausschalten."
 
+msgid "Group By Field"
+msgstr "Nach Feld gruppieren"
+
 msgid ""
 "Optional column key to group grid records under (e.g. location, status)."
 msgstr ""
 "Optionaler Spaltenschlüssel, nach dem Rasterdatensätze gruppiert werden (z. "
 "B. Standort, Status)."
 
+#| msgid "Payload Preset"
+msgid "Style Preset"
+msgstr "Stilvorlage"
+
 msgid "Professional Layout"
 msgstr "Professionelles Layout"
 
-#| msgid "Compliance & Audits"
 msgid "Compact Audit Sheet"
 msgstr "Kompaktes Prüfblatt"
 
-#| msgid "Financial Details"
 msgid "Financial Spend Summary"
 msgstr "Finanzielle Ausgabenübersicht"
+
+#| msgid "Advanced Code Active"
+msgid "Advanced Mode"
+msgstr "Erweiterter Modus"
 
 msgid "Enable custom Jinja2/HTML template code override."
 msgstr ""
 "Benutzerdefinierte Überschreibung des Jinja2-/HTML-Vorlagencodes aktivieren."
 
-#| msgid "Jinja2 HTML Override Code"
+#| msgid "Template Code:"
+msgid "Template Content"
+msgstr "Vorlageninhalt"
+
 msgid "Optional Jinja2 custom HTML override template"
 msgstr "Optionale benutzerdefinierte Jinja2-HTML-Überschreibungsvorlage"
 
@@ -4171,11 +4163,9 @@ msgstr "Report Template"
 msgid "Jinja2 template compilation failed: %(error)s"
 msgstr "Kompilierung der Jinja2-Vorlage fehlgeschlagen: %(error)s"
 
-#| msgid "Email"
 msgid "HTML Email"
 msgstr "HTML-E-Mail"
 
-#| msgid "Attachments"
 msgid "CSV Attachment"
 msgstr "CSV-Anhang"
 
@@ -4194,7 +4184,6 @@ msgstr "Wöchentlich"
 msgid "Biweekly"
 msgstr "Zweiwöchentlich"
 
-#| msgid "months"
 msgid "Monthly"
 msgstr "Monatlich"
 
@@ -4214,22 +4203,59 @@ msgstr ""
 "Der Mandant, dem dieser geplante Bericht gehört. Null steht für systemweite "
 "Zeitpläne."
 
+#| msgid "Reporting"
+msgid "Report"
+msgstr "Bericht"
+
 msgid "Linked Django-Q Schedule"
 msgstr "Verknüpfter Django-Q-Zeitplan"
+
+#| msgid "Recipient"
+msgid "Recipients"
+msgstr "Empfänger"
 
 msgid "Comma-separated email addresses"
 msgstr "Durch Kommas getrennte E-Mail-Adressen"
 
+msgid "Frequency"
+msgstr "Häufigkeit"
+
+msgid "Format"
+msgstr "Format"
+
+#| msgid "Custom Cron Expression"
+msgid "Cron Expression"
+msgstr "Cron-Ausdruck"
+
 msgid "Custom Cron Expression (e.g. '0 8 * * 1-5')"
 msgstr "Benutzerdefinierter Cron-Ausdruck (z. B. '0 8 * * 1-5')"
+
+#| msgid "Started"
+msgid "Start Time"
+msgstr "Startzeit"
 
 msgid "Time of day to run the schedule (e.g. 08:00:00)"
 msgstr "Uhrzeit für die Ausführung des Zeitplans (z. B. 08:00:00)"
 
+#| msgid "Changelog"
+msgid "Channels"
+msgstr "Kanäle"
+
+#| msgid "Archived"
+msgid "Save To Archive"
+msgstr "Im Archiv speichern"
+
 msgid "Store a copy of generated reports in the local file archive"
 msgstr "Eine Kopie der generierten Berichte im lokalen Dateiarchiv speichern"
 
-#| msgid "Schedule"
+#| msgid "Last Seen"
+msgid "Last Run"
+msgstr "Letzte Ausführung"
+
+#| msgid "Status"
+msgid "Last Status"
+msgstr "Letzter Status"
+
 msgid "Scheduled Report"
 msgstr "Geplanter Bericht"
 
@@ -4249,6 +4275,9 @@ msgstr "Keine Empfänger-E-Mail-Adressen eingegeben."
 msgid "'%(email)s' is not a valid email address."
 msgstr "'%(email)s' ist keine gültige E-Mail-Adresse."
 
+msgid "Error Message"
+msgstr "Fehlermeldung"
+
 msgid "Report Generation Archive"
 msgstr "Berichtsgenerierungsarchiv"
 
@@ -4267,6 +4296,13 @@ msgstr "Slack"
 msgid "Microsoft Teams"
 msgstr "Microsoft Teams"
 
+msgid "Channel Type"
+msgstr "Kanaltyp"
+
+#| msgid "Configure"
+msgid "Config"
+msgstr "Konfiguration"
+
 msgid "Channel-specific config (SMTP settings, webhook URL, etc.)"
 msgstr "Kanalspezifische Konfiguration (SMTP-Einstellungen, Webhook-URL usw.)"
 
@@ -4274,30 +4310,24 @@ msgid "The tenant owning this channel. Null represents system-wide channels."
 msgstr ""
 "Der Mandant, dem dieser Kanal gehört. Null steht für systemweite Kanäle."
 
-#| msgid "Notification Channels"
 msgid "Notification Channel"
 msgstr "Benachrichtigungskanal"
 
-#| msgid "Out of Stock Alert:"
 msgid "Low Stock Alert"
 msgstr "Warnung bei niedrigem Bestand"
 
 msgid "Upcoming EOL Planning"
 msgstr "Anstehende EOL-Planung"
 
-#| msgid "License Seats"
 msgid "License Expiry Alert"
 msgstr "Warnung bei Lizenzablauf"
 
-#| msgid "Renewal Cost:"
 msgid "Renewal Due Alert"
 msgstr "Warnung bei fälliger Verlängerung"
 
-#| msgid "Warranty Expiration:"
 msgid "Warranty Expiry Alert"
 msgstr "Warnung bei Garantieablauf"
 
-#| msgid "Audit Due"
 msgid "Audit Overdue"
 msgstr "Prüfung überfällig"
 
@@ -4310,11 +4340,21 @@ msgstr "Warnung"
 msgid "Critical"
 msgstr "Kritisch"
 
+msgid "Alert Type"
+msgstr "Alarmtyp"
+
+msgid "Threshold Value"
+msgstr "Threshold Value"
+
 msgid "Limit count or days horizon"
 msgstr "Begrenzungsanzahl oder Tageshorizont"
 
 msgid "Inactive rules are not evaluated at all."
 msgstr "Inaktive Regeln werden überhaupt nicht ausgewertet."
+
+#| msgid "Muted"
+msgid "Is Muted"
+msgstr "Ist stummgeschaltet"
 
 msgid ""
 "Muted rules still track alerts in the Alert Center but send no channel "
@@ -4322,6 +4362,10 @@ msgid ""
 msgstr ""
 "Stummgeschaltete Regeln verfolgen Warnungen weiterhin im Alert Center, "
 "senden jedoch keine Kanalbenachrichtigungen."
+
+#| msgid "Re-notify every (days)"
+msgid "Renotify Interval Days"
+msgstr "Tage zwischen erneuten Benachrichtigungen"
 
 msgid ""
 "0 = notify once. N = re-send channel notifications every N days while an "
@@ -4342,8 +4386,15 @@ msgstr "Bestätigt"
 msgid "Resolved"
 msgstr "Gelöst"
 
+#| msgid "Active Status"
+msgid "Delivery Status"
+msgstr "Lieferstatus"
+
 msgid "Per-channel delivery result: {channel_pk: 'ok'|'failed'|'error: ...'}"
 msgstr "Zustellergebnis pro Kanal: {channel_pk: 'ok'|'failed'|'error: ...'}"
+
+msgid "Last Notified At"
+msgstr "Zuletzt benachrichtigt am"
 
 msgid ""
 "When channel notifications were last dispatched for this alert (drives re-"
@@ -4352,21 +4403,38 @@ msgstr ""
 "Wann zuletzt Kanalbenachrichtigungen für diese Warnung versendet wurden "
 "(steuert die erneute Benachrichtigung)."
 
+#| msgid "Acknowledged"
+msgid "Acknowledged By"
+msgstr "Bestätigt von"
+
+#| msgid "Resolved"
+msgid "Resolved By"
+msgstr "Gelöst von"
+
+#| msgid "Resolution Time"
+msgid "Resolution Notes"
+msgstr "Lösungsnotizen"
+
+#| msgid "Resolved"
+msgid "Resolved At"
+msgstr "Gelöst am"
+
 msgid "The tenant owning this log. Null represents system-wide logs."
 msgstr ""
 "Der Mandant, dem dieses Protokoll gehört. Null steht für systemweite "
 "Protokolle."
 
-#| msgid "Alert Rule"
 msgid "Alert Log"
 msgstr "Warnungsprotokoll"
 
-#| msgid "Activity Logs"
 msgid "Alert Logs"
 msgstr "Warnungsprotokolle"
 
 msgid "The model whose list view this filter applies to."
 msgstr "Das Modell, auf dessen Listenansicht dieser Filter angewendet wird."
+
+msgid "Parameters"
+msgstr "Parameter"
 
 msgid "Stored list-view filter querystring parameters."
 msgstr "Gespeicherte Filter-Querystring-Parameter der Listenansicht."
@@ -4382,25 +4450,15 @@ msgid "The tenant owning this filter. Null represents system-wide filters."
 msgstr ""
 "Der Mandant, dem dieser Filter gehört. Null steht für systemweite Filter."
 
-#| msgid "Clear Filters"
 msgid "Saved Filter"
 msgstr "Gespeicherter Filter"
 
 msgid "Label"
 msgstr "Label"
 
-#| msgid "Applies To:"
-msgid "Applies To"
-msgstr "Gilt für"
-
-#| msgid "Fields to Update"
 msgid "Fields Count"
 msgstr "Anzahl der Felder"
 
-msgid "Alert Type"
-msgstr "Alarmtyp"
-
-#| msgid "GWG Threshold:"
 msgid "Threshold"
 msgstr "Schwellenwert"
 
@@ -4409,10 +4467,6 @@ msgstr "Stummgeschaltet"
 
 msgid "Actions"
 msgstr "Aktionen"
-
-#| msgid "Channel Name"
-msgid "Channel Type"
-msgstr "Kanaltyp"
 
 msgid "All clear. No alerts match the current filters."
 msgstr "Alles in Ordnung. Keine Warnungen entsprechen den aktuellen Filtern."
@@ -4497,7 +4551,6 @@ msgstr "Entfernen"
 msgid "Time"
 msgstr "Time"
 
-#| msgid "Full Name:"
 msgid "Full Name"
 msgstr "Vollständiger Name"
 
@@ -4537,7 +4590,6 @@ msgstr "Gesamtbetriebskosten (TCO)"
 msgid "TCO (%(code)s)"
 msgstr "TCO (%(code)s)"
 
-#| msgid "TCO Budget Utilization"
 msgid "Budget Utilization"
 msgstr "Budgetauslastung"
 
@@ -4564,7 +4616,6 @@ msgstr "Wartungsausgaben"
 msgid "Total Salvage Book Value"
 msgstr "Gesamt-Restbuchwert"
 
-#| msgid "Related Assets"
 msgid "Costed Assets"
 msgstr "Bewertete Assets"
 
@@ -4650,7 +4701,6 @@ msgstr "Optional"
 msgid "Applies To:"
 msgstr "Gilt für:"
 
-#| msgid "Object Deleted"
 msgid "No object types selected"
 msgstr "Keine Objekttypen ausgewählt"
 
@@ -4661,44 +4711,35 @@ msgid "Fieldset Name:"
 msgstr "Fieldset Name:"
 
 #, python-format
-#| msgid "Custom Fields ("
 msgid "Custom Fields (%(count)s):"
 msgstr "Benutzerdefinierte Felder (%(count)s):"
 
 msgid "No custom fields assigned."
 msgstr "No custom fields assigned."
 
-#| msgid "Change Details"
 msgid "Tag Details"
 msgstr "Tag-Details"
 
-#| msgid "Custom Fieldsets"
 msgid "Custom Field Details"
 msgstr "Details zum benutzerdefinierten Feld"
 
-#| msgid "Custom Fieldsets"
 msgid "Custom Field Set Details"
 msgstr "Details zum benutzerdefinierten Feldset"
 
-#| msgid "Edit Details"
 msgid "Saved Filter Details"
 msgstr "Details zum gespeicherten Filter"
 
 #, python-format
-#| msgid "Alert Rule"
 msgid "Alert Rule: %(name)s"
 msgstr "Alarmregel: %(name)s"
 
-#| msgid "Manage Alert Rules"
 msgid "Create Alert Rule"
 msgstr "Alarmregel erstellen"
 
 #, python-format
-#| msgid "Audit Overdue: %(asset_tag)s"
 msgid "Edit Alert Rule: %(name)s"
 msgstr "Alarmregel bearbeiten: %(name)s"
 
-#| msgid "Delete Selected"
 msgid "No alerts selected."
 msgstr "Keine Warnungen ausgewählt."
 
@@ -4710,16 +4751,13 @@ msgstr "%(count)s Warnung(en) bestätigt."
 msgid "%(count)s alert(s) resolved."
 msgstr "%(count)s Warnung(en) aufgelöst."
 
-#| msgid "Notification Channels"
 msgid "Create Notification Channel"
 msgstr "Benachrichtigungskanal erstellen"
 
 #, python-format
-#| msgid "Notification Channels"
 msgid "Edit Notification Channel: %(name)s"
 msgstr "Benachrichtigungskanal bearbeiten: %(name)s"
 
-#| msgid "Notifications"
 msgid "ITAMbox Test Notification"
 msgstr "ITAMbox-Testbenachrichtigung"
 
@@ -4730,25 +4768,20 @@ msgstr ""
 " wurde."
 
 #, python-format
-#| msgid "Report Template"
 msgid "Report Template: %(name)s"
 msgstr "Berichtsvorlage: %(name)s"
 
-#| msgid "Report Template"
 msgid "Create Report Template"
 msgstr "Berichtsvorlage erstellen"
 
 #, python-format
-#| msgid "Report Template"
 msgid "Edit Report Template: %(name)s"
 msgstr "Berichtsvorlage bearbeiten: %(name)s"
 
-#| msgid "Schedule"
 msgid "Schedule a Report"
 msgstr "Bericht planen"
 
 #, python-format
-#| msgid "Audit Overdue: %(asset_tag)s"
 msgid "Edit Schedule: %(name)s"
 msgstr "Zeitplan bearbeiten: %(name)s"
 
@@ -4756,7 +4789,6 @@ msgstr "Zeitplan bearbeiten: %(name)s"
 msgid "Scheduled report '%(name)s' generated and sent successfully."
 msgstr "Geplanter Bericht '%(name)s' erfolgreich erstellt und gesendet."
 
-#| msgid "Check In"
 msgid "Check logs."
 msgstr "Protokolle prüfen."
 
@@ -4770,14 +4802,12 @@ msgstr "Einbuchen"
 msgid "SKU or manufacturer part number"
 msgstr "SKU oder Herstellerteilenummer"
 
-#| msgid "GWG Threshold:"
 msgid "Safety Threshold"
 msgstr "Sicherheitsschwelle"
 
 msgid "Alert threshold quantity"
 msgstr "Warnschwellenmenge"
 
-#| msgid "Over-allocation Policy:"
 msgid "Allow Over-allocation"
 msgstr "Überbelegung zulassen"
 
@@ -4785,45 +4815,24 @@ msgid "Allow checkout count to exceed stock capacity"
 msgstr ""
 "Zulassen, dass die Herausgabemenge die Bestandskapazität überschreitet"
 
-#| msgid "Location"
-msgid "From Location"
-msgstr "Vom Lagerort"
-
-#| msgid "Checkout Kit"
-msgid "Checkout Quantity"
-msgstr "Herausgabemenge"
-
-msgid "Accessory"
-msgstr "Zubehör"
-
-msgid "Consumable"
-msgstr "Verbrauchsmaterial"
-
-#| msgid "Asset Holder"
 msgid "Assigned Holder"
 msgstr "Zugewiesener Inhaber"
 
-#| msgid "Associated Locations"
-msgid "Assigned Location"
-msgstr "Zugewiesener Lagerort"
+msgid "From Location"
+msgstr "Vom Lagerort"
+
+msgid "Checkout Quantity"
+msgstr "Herausgabemenge"
+
+#| msgid "Assigned At"
+msgid "Assigned Date"
+msgstr "Zuweisungsdatum"
 
 msgid "Kit"
 msgstr "Kit"
 
 msgid "License"
 msgstr "Lizenz"
-
-#| msgid "Components"
-msgid "Component"
-msgstr "Komponente"
-
-#| msgid "Assign Asset"
-msgid "Assigned Asset"
-msgstr "Zugewiesenes Asset"
-
-#| msgid "Quantity Required"
-msgid "Quantity"
-msgstr "Menge"
 
 #, python-format
 msgid ""
@@ -4833,15 +4842,12 @@ msgstr ""
 "%(qty)s Einheiten können nicht herausgegeben werden. Derzeit sind nur "
 "%(remaining)s Einheiten auf Lager."
 
-#| msgid "Associated Asset Holders"
 msgid "Assign to Asset Holder"
 msgstr "Asset-Inhaber zuweisen"
 
-#| msgid "Associated Locations"
 msgid "Assign to Location"
 msgstr "Lagerort zuweisen"
 
-#| msgid "Assign Asset"
 msgid "Assign to Asset"
 msgstr "Asset zuweisen"
 
@@ -4875,6 +4881,9 @@ msgstr "Quell-Lagerort (Bestandsabbuchung)"
 
 msgid "Check-out"
 msgstr "Herausgeben"
+
+msgid "Specs"
+msgstr "Spezifikationen"
 
 msgid "Component (Catalog)"
 msgstr "Komponente (Katalog)"
@@ -4918,27 +4927,21 @@ msgstr "Verbrauchsmaterial-Verbrauch"
 msgid "Consumable Consumptions"
 msgstr "Verbrauchsmaterial-Verbräuche"
 
-#| msgid "Asset Name"
 msgid "Kit Name"
 msgstr "Kit-Name"
 
-#| msgid "Asset Type / Model:"
 msgid "Asset Type / Model"
 msgstr "Asset-Typ / Modell"
 
-#| msgid "Accessory Stock"
 msgid "Accessory Catalog Item"
 msgstr "Zubehör-Katalogartikel"
 
-#| msgid "Software Details"
 msgid "Software License"
 msgstr "Softwarelizenz"
 
-#| msgid "Consumable Usage"
 msgid "Consumable Catalog Item"
 msgstr "Verbrauchsmaterial-Katalogartikel"
 
-#| msgid "Component (Catalog)"
 msgid "Component Catalog Item"
 msgstr "Komponenten-Katalogartikel"
 
@@ -4975,10 +4978,6 @@ msgstr ""
 "Unzureichender Bestand am Lagerort %(location)s. Verfügbar: %(available)s, "
 "Angefordert: %(requested)s"
 
-#| msgid "Part Number:"
-msgid "Part Number"
-msgstr "Teilenummer"
-
 msgid "Total Stock"
 msgstr "Gesamtbestand"
 
@@ -4988,29 +4987,24 @@ msgstr "Verfügbar"
 msgid "Qty"
 msgstr "Menge"
 
-#| msgid "Are you sure you want to delete the asset:"
 msgid "Are you sure you want to check in this accessory assignment?"
 msgstr "Möchten Sie diese Zubehörzuweisung wirklich einbuchen?"
 
 msgid "Check-in"
 msgstr "Einbuchen"
 
-#| msgid "Total"
 msgid "Total Qty"
 msgstr "Gesamtmenge"
 
 msgid "Consumed"
 msgstr "Verbraucht"
 
-#| msgid "Consumed"
 msgid "Consumed By"
 msgstr "Verbraucht von"
 
-#| msgid "Items Logged"
 msgid "Items Count"
 msgstr "Anzahl der Artikel"
 
-#| msgid "Are you sure you want to delete the location:"
 msgid "Are you sure you want to check in this component allocation?"
 msgstr "Möchten Sie diese Komponentenzuweisung wirklich einbuchen?"
 
@@ -5035,7 +5029,6 @@ msgstr "Bestandspools nach Lagerort"
 msgid "Add Stock..."
 msgstr "Bestand hinzufügen..."
 
-#| msgid "No catalog software items registered on this asset."
 msgid "No stock pools registered for this accessory."
 msgstr "Für dieses Zubehör sind keine Bestandspools registriert."
 
@@ -5063,7 +5056,6 @@ msgstr "Consume Item..."
 msgid "Consumption Log"
 msgstr "Consumption Log"
 
-#| msgid "No catalog software items registered on this asset."
 msgid "No stock pools registered for this consumable."
 msgstr "Für dieses Verbrauchsmaterial sind keine Bestandspools registriert."
 
@@ -5073,7 +5065,6 @@ msgstr "Consumption & Debit History Log"
 msgid "No permanent stock consumption debits recorded yet for this item."
 msgstr "No permanent stock consumption debits recorded yet for this item."
 
-#| msgid "Associated Consumables"
 msgid "Kits Allocating this Consumable"
 msgstr "Kits, die dieses Verbrauchsmaterial zuweisen"
 
@@ -5135,15 +5126,12 @@ msgstr "- Component Details - ITAMbox"
 msgid "Assets / Components"
 msgstr "Assets / Components"
 
-#| msgid "location"
 msgid "Allocations"
 msgstr "Zuweisungen"
 
-#| msgid "No schedules configured for this template yet."
 msgid "No stock records for this component yet."
 msgstr "Noch keine Bestandsdatensätze für diese Komponente vorhanden."
 
-#| msgid "No locations found for this tenant."
 msgid "No allocations recorded for this component yet."
 msgstr "Noch keine Zuweisungen für diese Komponente erfasst."
 
@@ -5156,7 +5144,6 @@ msgstr "Check Out Accessory:"
 msgid "Check Out"
 msgstr "Herausgeben"
 
-#| msgid "Check Out Asset:"
 msgid "Check Out Component:"
 msgstr "Komponente herausgeben:"
 
@@ -5232,7 +5219,6 @@ msgstr "Remaining Stock"
 msgid "Description:"
 msgstr "Beschreibung:"
 
-#| msgid "No notes provided."
 msgid "No description provided."
 msgstr "Keine Beschreibung angegeben."
 
@@ -5242,11 +5228,9 @@ msgstr "Kit herausgeben:"
 msgid "Checkout Kit"
 msgstr "Kit herausgeben"
 
-#| msgid "Overview"
 msgid "Metrics Overview"
 msgstr "Kennzahlenübersicht"
 
-#| msgid "- Accessory Details - ITAMbox"
 msgid "Accessory Details"
 msgstr "Zubehördetails"
 
@@ -5258,7 +5242,6 @@ msgstr ""
 "Zubehör '%(accessory)s' kann nicht gelöscht werden: Es hat %(count)s aktive "
 "Zuweisungen."
 
-#| msgid "Password changed successfully."
 msgid "Accessory checked out successfully."
 msgstr "Zubehör erfolgreich herausgegeben."
 
@@ -5282,7 +5265,6 @@ msgstr "Ungültiges Modell angegeben."
 msgid "Invalid checkout quantity specified."
 msgstr "Ungültige Herausgabemenge angegeben."
 
-#| msgid "Edit Selected"
 msgid "No items selected."
 msgstr "Keine Artikel ausgewählt."
 
@@ -5305,11 +5287,9 @@ msgstr "Herausgabe des Bestandsartikels fehlgeschlagen: %(error)s"
 msgid "Successfully checked out %(count)s item(s)."
 msgstr "%(count)s Artikel erfolgreich herausgegeben."
 
-#| msgid "Components"
 msgid "Component Details"
 msgstr "Komponentendetails"
 
-#| msgid "Password changed successfully."
 msgid "Component checked out successfully."
 msgstr "Komponente erfolgreich herausgegeben."
 
@@ -5317,7 +5297,6 @@ msgstr "Komponente erfolgreich herausgegeben."
 msgid "Checked in %(qty)sx '%(component)s' from %(recipient)s."
 msgstr "%(qty)sx '%(component)s' von %(recipient)s eingebucht."
 
-#| msgid "Consumables"
 msgid "Consumable Details"
 msgstr "Verbrauchsmaterialdetails"
 
@@ -5330,20 +5309,16 @@ msgstr ""
 "%(count)s historische Verbrauchsdatensätze."
 
 # --- Views Success / Error Flash Toast Messages ---
-#| msgid "Profile updated successfully."
 msgid "Consumable consumed successfully."
 msgstr "Verbrauchsmaterial erfolgreich verbraucht."
 
-#| msgid "Consumption Log"
 msgid "Consumptions"
 msgstr "Verbräuche"
 
-#| msgid "Edit Details"
 msgid "Kit Details"
 msgstr "Kit-Details"
 
 # --- Views Success / Error Flash Toast Messages ---
-#| msgid "Profile updated successfully."
 msgid "Kit checked out successfully."
 msgstr "Kit erfolgreich herausgegeben."
 
@@ -5449,11 +5424,9 @@ msgid "Related object not found using the provided numeric ID: {id}"
 msgstr ""
 "Verknüpftes Objekt mit der angegebenen numerischen ID nicht gefunden: {id}"
 
-#| msgid "Edit"
 msgid "Bulk Edit"
 msgstr "Sammelbearbeitung"
 
-#| msgid "Delete"
 msgid "Bulk Delete"
 msgstr "Sammellöschung"
 
@@ -5461,15 +5434,12 @@ msgstr "Sammellöschung"
 msgid "Export"
 msgstr "Exportieren"
 
-#| msgid "Check-out"
 msgid "Checkout"
 msgstr "Herausgeben"
 
-#| msgid "Check-in"
 msgid "Checkin"
 msgstr "Einbuchen"
 
-#| msgid "Auditor"
 msgid "Audit"
 msgstr "Prüfung"
 
@@ -5483,51 +5453,40 @@ msgstr "Zu viele Anfragen. Bitte versuchen Sie es in einer Minute erneut."
 msgid "Change #%(pk)s"
 msgstr "Änderung #%(pk)s"
 
-#| msgid "Export Templates"
 msgid "Export Template Details"
 msgstr "Details der Export-Vorlage"
 
-#| msgid "Export Templates"
 msgid "Edit Export Template"
 msgstr "Export-Vorlage bearbeiten"
 
-#| msgid "Export Templates"
 msgid "Create Export Template"
 msgstr "Export-Vorlage erstellen"
 
-#| msgid "Journal Entries"
 msgid "Journal entry added."
 msgstr "Journaleintrag hinzugefügt."
 
-#| msgid "No journal entries yet."
 msgid "Could not add journal entry."
 msgstr "Journaleintrag konnte nicht hinzugefügt werden."
 
 #, python-format
-#| msgid "Campaign '%(name)s' started."
 msgid "Image '%(name)s' uploaded."
 msgstr "Bild '%(name)s' hochgeladen."
 
 #, python-format
-#| msgid "Campaign '%(name)s' started."
 msgid "File '%(name)s' uploaded."
 msgstr "Datei '%(name)s' hochgeladen."
 
 #, python-format
-#| msgid "Campaign '%(name)s' started."
 msgid "Image '%(name)s' deleted."
 msgstr "Bild '%(name)s' gelöscht."
 
 #, python-format
-#| msgid "Campaign '%(name)s' started."
 msgid "File '%(name)s' deleted."
 msgstr "Datei '%(name)s' gelöscht."
 
-#| msgid "Available Label Templates"
 msgid "Select Label Template"
 msgstr "Etikettenvorlage auswählen"
 
-#| msgid "Edit Details"
 msgid "Webhook Endpoint Details"
 msgstr "Details des Webhook-Endpunkts"
 
@@ -5543,7 +5502,6 @@ msgstr "Test-Webhook gesendet — HTTP %(status)s"
 msgid "Test webhook failed: %(error)s"
 msgstr "Test-Webhook fehlgeschlagen: %(error)s"
 
-#| msgid "Not configured"
 msgid "No URL configured."
 msgstr "Keine URL konfiguriert."
 
@@ -5551,11 +5509,9 @@ msgstr "Keine URL konfiguriert."
 msgid "Webhook test blocked: %(reason)s"
 msgstr "Webhook-Test blockiert: %(reason)s"
 
-#| msgid "Notification Inbox"
 msgid "Test notification from ITAMbox"
 msgstr "Test-Benachrichtigung von ITAMbox"
 
-#| msgid "ITAMbox"
 msgid "ITAMbox Test"
 msgstr "ITAMbox-Test"
 
@@ -5575,27 +5531,21 @@ msgstr "Webhook-Endpunkt bearbeiten"
 msgid "Create Webhook Endpoint"
 msgstr "Webhook-Endpunkt erstellen"
 
-#| msgid "Edit Details"
 msgid "Event Rule Details"
 msgstr "Details der Ereignisregel"
 
-#| msgid "Edit Rule"
 msgid "Edit Event Rule"
 msgstr "Ereignisregel bearbeiten"
 
-#| msgid "Create one"
 msgid "Create Event Rule"
 msgstr "Ereignisregel erstellen"
 
-#| msgid "Available Label Templates"
 msgid "Label Template Details"
 msgstr "Details der Etikettenvorlage"
 
-#| msgid "Edit Template"
 msgid "Edit Label Template"
 msgstr "Etikettenvorlage bearbeiten"
 
-#| msgid "Available Label Templates"
 msgid "Create Label Template"
 msgstr "Etikettenvorlage erstellen"
 
@@ -5645,7 +5595,6 @@ msgid "Confirm Bulk Deletion"
 msgstr "Gesammeltes Löschen bestätigen"
 
 #, python-format
-#| msgid "Delete Location"
 msgid "Delete (%(count)s)"
 msgstr "Löschen (%(count)s)"
 
@@ -5666,7 +5615,6 @@ msgstr "{verbose_name} löschen: {object}"
 msgid "Delete {object}"
 msgstr "{object} löschen"
 
-#| msgid "Modified Object"
 msgid "Modified"
 msgstr "Geändert"
 
@@ -5707,7 +5655,6 @@ msgid "You do not have permission to view the Recycle Bin."
 msgstr "Sie sind nicht berechtigt, den Papierkorb anzuzeigen."
 
 #, python-brace-format
-#| msgid "Import {verbose_name_plural}"
 msgid "Recycle Bin — {verbose_name_plural}"
 msgstr "Papierkorb — {verbose_name_plural}"
 
@@ -5718,7 +5665,6 @@ msgid "Recycle Bin"
 msgstr "Papierkorb"
 
 #, python-brace-format
-#| msgid "Delete {verbose_name}: {object}"
 msgid "Restored {model} {object}"
 msgstr "{model} {object} wiederhergestellt"
 
@@ -5735,7 +5681,6 @@ msgid "Successfully permanently purged {count} {model_plural}."
 msgstr "{count} {model_plural} erfolgreich endgültig entfernt."
 
 # --- Views Success / Error Flash Toast Messages ---
-#| msgid "Profile updated successfully."
 msgid "Operation completed successfully."
 msgstr "Vorgang erfolgreich abgeschlossen."
 
@@ -5745,7 +5690,6 @@ msgstr ""
 "wenden Sie sich an den Support."
 
 # --- Views Success / Error Flash Toast Messages ---
-#| msgid "Profile updated successfully."
 msgid "Action completed successfully."
 msgstr "Aktion erfolgreich abgeschlossen."
 
@@ -5776,15 +5720,12 @@ msgstr "Auftrag \"%(name)s\" ist bereits abgeschlossen."
 msgid "Search Results"
 msgstr "Search Results"
 
-#| msgid "Renewal Cost:"
 msgid "Renewal Date"
 msgstr "Verlängerungsdatum"
 
-#| msgid "Software Catalog:"
 msgid "Software Catalog"
 msgstr "Software-Katalog"
 
-#| msgid "Software Catalog:"
 msgid "Software Catalog Item"
 msgstr "Software-Katalogeintrag"
 
@@ -5804,18 +5745,15 @@ msgstr "Lizenzaktivierungsschlüssel oder Volumen-Zugangsdaten"
 msgid "Entitlement"
 msgstr "Berechtigung"
 
-#| msgid "Pending"
 msgid "Funding"
 msgstr "Finanzierung"
 
-#| msgid "Hardware Asset"
 msgid "Must select a Hardware Asset."
 msgstr "Es muss ein Hardware-Asset ausgewählt werden."
 
 msgid "Perpetual Seat"
 msgstr "Dauerhafter Platz"
 
-#| msgid "Subscription"
 msgid "Subscription Seat"
 msgstr "Abonnementsplatz"
 
@@ -5824,10 +5762,17 @@ msgid ""
 msgstr ""
 "Beschreibender Name für die Lizenz (z. B. Visio Pro 2021 - EA Renewal FY24)"
 
+msgid "Product Key"
+msgstr "Product Key"
+
 msgid "Product key or activation code. Consider security implications."
 msgstr ""
 "Produktschlüssel oder Aktivierungscode. Berücksichtigen Sie die "
 "Sicherheitsauswirkungen."
+
+#| msgid "seats ("
+msgid "Seats"
+msgstr "Plätze"
 
 msgid "Total number of seats purchased or entitled"
 msgstr "Gesamtzahl der erworbenen oder berechtigten Plätze"
@@ -5841,9 +5786,14 @@ msgstr ""
 "'16.x'). Nur zur Information — der Abgleich erfolgt auf Software-Ebene "
 "(versionsunabhängig)."
 
-#| msgid "No licenses found for this tenant."
+msgid "Expiration Date"
+msgstr "Ablaufdatum"
+
 msgid "For term licenses or maintenance"
 msgstr "Für Laufzeitlizenzen oder Wartung"
+
+msgid "Subscription"
+msgstr "Abonnement"
 
 msgid ""
 "Optional subscription (billing agreement) that funds this license; seats "
@@ -5855,9 +5805,12 @@ msgstr ""
 msgid "Selected software belongs to a different tenant."
 msgstr "Die ausgewählte Software gehört zu einem anderen Mandanten."
 
-#| msgid "No subscriptions found for this tenant."
 msgid "Selected subscription belongs to a different tenant."
 msgstr "Das ausgewählte Abonnement gehört zu einem anderen Mandanten."
+
+#| msgid "Installed Software Instance"
+msgid "Installed Software"
+msgstr "Installierte Software"
 
 msgid "License Seat Assignment"
 msgstr "Lizenzplatzzuweisung"
@@ -5896,7 +5849,6 @@ msgid "Cannot assign to both asset and assigned_holder."
 msgstr ""
 "Eine Zuweisung an sowohl asset als auch assigned_holder ist nicht möglich."
 
-#| msgid "No active seats assigned for this license entitlement."
 msgid "No available seats left for this software license."
 msgstr "Für diese Softwarelizenz sind keine Plätze mehr verfügbar."
 
@@ -5904,30 +5856,21 @@ msgstr "Für diese Softwarelizenz sind keine Plätze mehr verfügbar."
 msgid "License seat for '%(name)s' checked in."
 msgstr "Lizenzplatz für '%(name)s' eingebucht."
 
-#| msgid "Expiration Date:"
-msgid "Expiration Date"
-msgstr "Ablaufdatum"
-
-#| msgid "Assigned Qty:"
 msgid "Assigned At"
 msgstr "Zugewiesen am"
 
-#| msgid "asset"
 msgid "via asset"
 msgstr "über Asset"
 
-#| msgid "Overview"
 msgid "License Overview"
 msgstr "Lizenzübersicht"
 
-#| msgid "License Seats"
 msgid "License Details"
 msgstr "Lizenzdetails"
 
 msgid "Seat Assignments"
 msgstr "Seat Assignments"
 
-#| msgid "Password changed successfully."
 msgid "License checked out successfully."
 msgstr "Lizenz erfolgreich herausgegeben."
 
@@ -5935,7 +5878,6 @@ msgstr "Lizenz erfolgreich herausgegeben."
 msgid "License seat for '%(name)s' checked out to %(target)s."
 msgstr "Lizenzplatz für '%(name)s' an %(target)s herausgegeben."
 
-#| msgid "Parent Group:"
 msgid "Parent Group"
 msgstr "Übergeordnete Gruppe"
 
@@ -5948,7 +5890,6 @@ msgstr "Role"
 msgid "Contact"
 msgstr "Kontakt"
 
-#| msgid "Linked User account:"
 msgid "Linked User account"
 msgstr "Verknüpftes Benutzerkonto"
 
@@ -5983,11 +5924,9 @@ msgstr ""
 msgid "Building, Floor, Room, Rack, etc."
 msgstr "Gebäude, Etage, Raum, Rack usw."
 
-#| msgid "This action cannot be undone."
 msgid "A location cannot be its own parent."
 msgstr "Ein Lagerort kann nicht sein eigenes übergeordnetes Element sein."
 
-#| msgid "This action cannot be undone."
 msgid "A region cannot be its own parent."
 msgstr "Eine Region kann nicht ihr eigenes übergeordnetes Element sein."
 
@@ -6028,8 +5967,6 @@ msgstr "AUD — Australischer Dollar"
 msgid "JPY — Japanese Yen (¥)"
 msgstr "JPY — Japanischer Yen (¥)"
 
-#| msgid ""
-#| "ISO 4217 currency code used for value display (display only, no conversion)."
 msgid ""
 "ISO 4217 code used when displaying this tenant's monetary values (display "
 "only, no conversion)."
@@ -6044,49 +5981,39 @@ msgstr ""
 msgid "The selected role does not belong to the selected tenant."
 msgstr "Die ausgewählte Rolle gehört nicht zum ausgewählten Mandanten."
 
-#| msgid "Inventory & Stock"
 msgid "Inventory & Hardware"
 msgstr "Inventar & Hardware"
 
-#| msgid "Compliance & Audits"
 msgid "Compliance & Custody"
 msgstr "Compliance & Verwahrung"
 
-#| msgid "Associated Subscriptions"
 msgid "Software & Subscriptions"
 msgstr "Software & Abonnements"
 
 msgid "Subscription Assignments"
 msgstr "Abonnementszuweisungen"
 
-#| msgid "Organization / Sites"
 msgid "Organization & Structure"
 msgstr "Organisation & Struktur"
 
-#| msgid "Permissions"
 msgid "Roles & Permissions"
 msgstr "Rollen & Berechtigungen"
 
 msgid "Tenant Invitations"
 msgstr "Mandanten-Einladungen"
 
-#| msgid "Widget Settings"
 msgid "Metadata & Settings"
 msgstr "Metadaten & Einstellungen"
 
-#| msgid "Suppliers"
 msgid "Suppliers (Hardware)"
 msgstr "Lieferanten (Hardware)"
 
-#| msgid "Associated Subscriptions"
 msgid "Providers (Subscription)"
 msgstr "Anbieter (Abonnement)"
 
-#| msgid "Depreciation override"
 msgid "Depreciation Schedules"
 msgstr "Abschreibungspläne"
 
-#| msgid "Sites & Regions"
 msgid "System & Reporting"
 msgstr "System & Berichtswesen"
 
@@ -6111,23 +6038,31 @@ msgstr ""
 msgid "Invalid permission codenames: %(perms)s"
 msgstr "Ungültige Berechtigungs-Codenamen: %(perms)s"
 
-#| msgid "Seat Assignments"
 msgid "Tenant assignment is required."
 msgstr "Eine Mandantenzuweisung ist erforderlich."
 
 msgid "Staging"
 msgstr "Bereitstellung"
 
-#| msgid "Permissions"
 msgid "Decommissioning"
 msgstr "Außerbetriebnahme"
 
-#| msgid "Required"
 msgid "Retired"
 msgstr "Ausgemustert"
 
+msgid "Site"
+msgstr "Standort"
+
+#| msgid "Facility:"
+msgid "Facility"
+msgstr "Einrichtung"
+
 msgid "Region"
 msgstr "Region"
+
+#| msgid "Group:"
+msgid "Group"
+msgstr "Gruppe"
 
 msgid "Display currency"
 msgstr "Anzeigewährung"
@@ -6147,19 +6082,44 @@ msgstr ""
 "Fallback-Regel für alle Assets ohne Asset-Typ-Zeitplan und ohne individuelle"
 " Überschreibung."
 
-msgid "Site"
-msgstr "Standort"
+#| msgid "Time Zone:"
+msgid "Time Zone"
+msgstr "Zeitzone"
 
-#| msgid "User Principal Name (UPN):"
+#| msgid "Physical Address:"
+msgid "Physical Address"
+msgstr "Physische Adresse"
+
+#| msgid "Shipping Address:"
+msgid "Shipping Address"
+msgstr "Lieferadresse"
+
+msgid "Latitude"
+msgstr "Breitengrad"
+
+msgid "Longitude"
+msgstr "Längengrad"
+
+msgid "First Name"
+msgstr "Vorname"
+
+msgid "Last Name"
+msgstr "Nachname"
+
 msgid "User Principal Name"
 msgstr "User Principal Name"
 
 msgid "Contact Role"
 msgstr "Kontaktrolle"
 
-#| msgid "Web URL:"
+msgid "Phone"
+msgstr "Phone"
+
 msgid "Web URL"
 msgstr "Web-URL"
+
+msgid "Priority"
+msgstr "Priority"
 
 msgid "Contact Assignment"
 msgstr "Kontaktzuweisung"
@@ -6167,11 +6127,12 @@ msgstr "Kontaktzuweisung"
 msgid "Contact Assignments"
 msgstr "Contact Assignments"
 
-#| msgid "Tenant"
+msgid "Permissions"
+msgstr "Permissions"
+
 msgid "Tenant Role"
 msgstr "Mandantenrolle"
 
-#| msgid "Tenants"
 msgid "Tenant Roles"
 msgstr "Mandantenrollen"
 
@@ -6181,11 +6142,26 @@ msgstr "Mandanten-Mitgliedschaft"
 msgid "Tenant Memberships"
 msgstr "Mandanten-Mitgliedschaften"
 
+#| msgid "Sanitized By"
+msgid "Invited By"
+msgstr "Eingeladen von"
+
+#| msgid "Expires"
+msgid "Expires At"
+msgstr "Läuft ab am"
+
+#| msgid "Accepted"
+msgid "Accepted At"
+msgstr "Akzeptiert am"
+
 msgid "Tenant Invitation"
 msgstr "Mandanten-Einladung"
 
 msgid "Short identifier for this cost center (e.g. \"CC-100\")."
 msgstr "Kurzbezeichnung für diese Kostenstelle (z. B. \"CC-100\")."
+
+msgid "Code"
+msgstr "Code"
 
 msgid "This invitation has expired or has already been accepted."
 msgstr "Diese Einladung ist abgelaufen oder wurde bereits angenommen."
@@ -6193,36 +6169,24 @@ msgstr "Diese Einladung ist abgelaufen oder wurde bereits angenommen."
 msgid "UPN"
 msgstr "UPN"
 
-#| msgid "Expected Return:"
 msgid "Expected Check-in"
 msgstr "Erwartete Einbuchung"
 
-#| msgid "Assigned Objects"
 msgid "Assigned Object"
 msgstr "Zugewiesenes Objekt"
 
-#| msgid "Invite Member"
 msgid "Members"
 msgstr "Mitglieder"
 
 msgid "Joined"
 msgstr "Beigetreten"
 
-msgid "Code"
-msgstr "Code"
-
-#| msgid "Parent:"
-msgid "Parent"
-msgstr "Übergeordnet"
-
 msgid "Sub-units"
 msgstr "Untereinheiten"
 
-#| msgid "Asset Holders"
 msgid "Asset Holder Details"
 msgstr "Asset-Inhaber-Details"
 
-#| msgid "Custody Status:"
 msgid "Custody EULAs"
 msgstr "Verwahrungs-EULAs"
 
@@ -6234,7 +6198,6 @@ msgstr ""
 "Asset-Inhaber '%(holder)s' kann nicht gelöscht werden: Er hat %(count)d "
 "aktive Zuweisung%(plural)s."
 
-#| msgid "- Contact Details - ITAMbox"
 msgid "Contact Details"
 msgstr "Kontaktdetails"
 
@@ -6245,7 +6208,6 @@ msgstr ""
 "Kontakt '%(contact)s' kann nicht gelöscht werden: Er hat %(count)d "
 "Zuweisung%(plural)s."
 
-#| msgid "Contact Roles"
 msgid "Contact Role Details"
 msgstr "Kontaktrollen-Details"
 
@@ -6264,7 +6226,6 @@ msgstr "content_type oder object_id fehlt"
 msgid "Assigned contact successfully to %(target)s."
 msgstr "Kontakt erfolgreich %(target)s zugewiesen."
 
-#| msgid "Cost Center:"
 msgid "Cost Center Details"
 msgstr "Kostenstellen-Details"
 
@@ -6305,14 +6266,12 @@ msgid "Welcome! You have successfully joined the workspace %(tenant)s."
 msgstr ""
 "Willkommen! Sie sind dem Arbeitsbereich %(tenant)s erfolgreich beigetreten."
 
-#| msgid "- Location Details - ITAMbox"
 msgid "Location Details"
 msgstr "Lagerort-Details"
 
 msgid "Child Locations"
 msgstr "Untergeordnete Lagerorte"
 
-#| msgid "Check-out"
 msgid "Checkout Log"
 msgstr "Herausgabeprotokoll"
 
@@ -6324,11 +6283,9 @@ msgstr ""
 "Lagerort '%(name)s' kann nicht gelöscht werden: Er ist mit %(count)d "
 "Asset%(plural)s verknüpft."
 
-#| msgid "Edit Details"
 msgid "Region Details"
 msgstr "Regions-Details"
 
-#| msgid "Child Regions ("
 msgid "Child Regions"
 msgstr "Untergeordnete Regionen"
 
@@ -6340,7 +6297,6 @@ msgstr ""
 "Region '%(name)s' kann nicht gelöscht werden: Sie ist mit %(count)d "
 "Standort%(plural)s verknüpft."
 
-#| msgid "Edit Details"
 msgid "Site Details"
 msgstr "Standort-Details"
 
@@ -6358,11 +6314,9 @@ msgstr ""
 "Standort '%(name)s' kann nicht gelöscht werden: Er ist mit %(details)s "
 "verknüpft."
 
-#| msgid "Site Groups"
 msgid "Site Group Details"
 msgstr "Standortgruppen-Details"
 
-#| msgid "Child Groups ("
 msgid "Child Groups"
 msgstr "Untergeordnete Gruppen"
 
@@ -6374,7 +6328,6 @@ msgstr ""
 "Standortgruppe '%(name)s' kann nicht gelöscht werden: Sie ist mit %(count)d "
 "Standort%(plural)s verknüpft."
 
-#| msgid "Asset Details"
 msgid "Tenant Details"
 msgstr "Mandanten-Details"
 
@@ -6414,19 +6367,15 @@ msgstr "Zugehörige Verbrauchsmaterialien"
 msgid "No consumables found for this tenant."
 msgstr "No consumables found for this tenant."
 
-#| msgid "Component (Catalog)"
 msgid "Associated Component Catalog"
 msgstr "Zugehöriger Komponentenkatalog"
 
-#| msgid "No licenses found for this tenant."
 msgid "No components found for this tenant."
 msgstr "Für diesen Mandanten wurden keine Komponenten gefunden."
 
-#| msgid "Associated Asset Holders"
 msgid "Associated Custody Policies & EULAs"
 msgstr "Zugehörige Verwahrungsrichtlinien & EULAs"
 
-#| msgid "No sites found for this tenant."
 msgid "No custody policies found for this tenant."
 msgstr "Für diesen Mandanten wurden keine Verwahrungsrichtlinien gefunden."
 
@@ -6453,12 +6402,10 @@ msgid "%(count)d sites"
 msgstr "%(count)d Standorte"
 
 #, python-format
-#| msgid "child location"
 msgid "%(count)d locations"
 msgstr "%(count)d Lagerorte"
 
 #, python-format
-#| msgid "Associated Asset Holders"
 msgid "%(count)d asset holders"
 msgstr "%(count)d Asset-Inhaber"
 
@@ -6474,7 +6421,6 @@ msgstr ""
 "Mandanten zu synchronisieren."
 
 #, python-format
-#| msgid "No locations found for this tenant."
 msgid "No LDAP configuration found for tenant '%(name)s'."
 msgstr "Für den Mandanten '%(name)s' wurde keine LDAP-Konfiguration gefunden."
 
@@ -6486,7 +6432,6 @@ msgstr ""
 "LDAP-Synchronisierungsauftrag '%(name)s' erfolgreich in die Warteschlange "
 "eingereiht! Der Fortschritt wird in Echtzeit verfolgt."
 
-#| msgid "Tenant Groups"
 msgid "Tenant Group Details"
 msgstr "Mandantengruppen-Details"
 
@@ -6532,11 +6477,9 @@ msgstr ""
 msgid "Reassigned %(count)d membership(s) to role '%(role)s'."
 msgstr "%(count)d Mitgliedschaft(en) der Rolle '%(role)s' neu zugewiesen."
 
-#| msgid "Bulk Assign Assets"
 msgid "Bulk Reassign Role"
 msgstr "Rolle gesammelt neu zuweisen"
 
-#| msgid "Tenant Memberships"
 msgid "Memberships"
 msgstr "Mitgliedschaften"
 
@@ -6564,7 +6507,6 @@ msgstr ""
 " bevor Sie sie löschen."
 
 #, python-format
-#| msgid "Delete Location"
 msgid "Delete (%(count)d)"
 msgstr "Löschen (%(count)d)"
 
@@ -6579,7 +6521,6 @@ msgstr ""
 msgid "Vendor / Commercial"
 msgstr "Anbieter / Kommerziell"
 
-#| msgid "Date"
 msgid "Dates"
 msgstr "Datumsangaben"
 
@@ -6589,11 +6530,9 @@ msgstr "SLA"
 msgid "Coverage"
 msgstr "Abdeckung"
 
-#| msgid "Total Purchased"
 msgid "Save Purchase Order"
 msgstr "Bestellung speichern"
 
-#| msgid "Category"
 msgid "Item Category"
 msgstr "Artikelkategorie"
 
@@ -6611,7 +6550,6 @@ msgstr "Ungültige Kategorie ausgewählt: %(category)s"
 msgid "Please select a %(label)s."
 msgstr "Bitte wählen Sie %(label)s aus."
 
-#| msgid "Contact"
 msgid "Save Contract"
 msgstr "Vertrag speichern"
 
@@ -6638,7 +6576,6 @@ msgstr "Ein Asset mit der Seriennummer '%(serial)s' existiert bereits."
 msgid "Draft"
 msgstr "Entwurf"
 
-#| msgid "Ordering"
 msgid "Ordered"
 msgstr "Bestellt"
 
@@ -6648,11 +6585,34 @@ msgstr "Teilweise erhalten"
 msgid "Received"
 msgstr "Erhalten"
 
+msgid "Order Date"
+msgstr "Bestelldatum"
+
+msgid "Expected Delivery Date"
+msgstr "Voraussichtliches Lieferdatum"
+
+msgid "Destination Location"
+msgstr "Ziel-Lagerort"
+
 msgid "Can receive stock from a purchase order"
 msgstr "Kann Bestand aus einer Bestellung erfassen"
 
 msgid "Can approve/submit a purchase order"
 msgstr "Kann eine Bestellung genehmigen/einreichen"
+
+msgid "Purchase Order"
+msgstr "Bestellung"
+
+#| msgid "Ordered"
+msgid "Qty Ordered"
+msgstr "Bestellte Menge"
+
+#| msgid "Qty to Receive"
+msgid "Qty Received"
+msgstr "Erhaltene Menge"
+
+msgid "Unit Price"
+msgstr "Stückpreis"
 
 msgid "You must specify what item you are ordering."
 msgstr "Sie müssen angeben, welchen Artikel Sie bestellen."
@@ -6660,25 +6620,21 @@ msgstr "Sie müssen angeben, welchen Artikel Sie bestellen."
 msgid "A line item can only refer to one type of item."
 msgstr "Eine Position kann sich nur auf eine Artikelart beziehen."
 
-#| msgid "Support:"
 msgid "Support"
 msgstr "Support"
 
-#| msgid "Maintenances"
 msgid "Maintenance"
 msgstr "Wartung"
 
 msgid "Lease"
 msgstr "Leasing"
 
-#| msgid "Overview"
 msgid "Service"
 msgstr "Service"
 
 msgid "Expired"
 msgstr "Abgelaufen"
 
-#| msgid "Est. Annual:"
 msgid "Annual"
 msgstr "Jährlich"
 
@@ -6688,29 +6644,27 @@ msgstr "Halbjährlich"
 msgid "Multi-Year"
 msgstr "Mehrjährig"
 
-#| msgid "Time"
 msgid "One-Time"
 msgstr "Einmalig"
 
-#| msgid "Contract Ref:"
+msgid "Contract Number"
+msgstr "Vertragsnummer"
+
 msgid "Contract Type"
 msgstr "Vertragsart"
 
-#| msgid "Contact Roles"
 msgid "Contract Cost"
 msgstr "Vertragskosten"
 
 msgid "Total or per-cycle cost"
 msgstr "Gesamt- oder Kosten pro Zyklus"
 
-#| msgid "Auto-Renewal"
 msgid "Auto-Renew"
 msgstr "Automatisch verlängern"
 
 msgid "Whether this contract renews automatically"
 msgstr "Ob sich dieser Vertrag automatisch verlängert"
 
-#| msgid "Response Date"
 msgid "SLA Response Time"
 msgstr "SLA-Reaktionszeit"
 
@@ -6735,13 +6689,8 @@ msgstr "SLA-Bedingungen"
 msgid "Full SLA terms or summary text"
 msgstr "Vollständige SLA-Bedingungen oder Zusammenfassungstext"
 
-#| msgid "Related Assets"
 msgid "Covered Assets"
 msgstr "Abgedeckte Assets"
-
-#| msgid "Purchase +"
-msgid "Purchase Order"
-msgstr "Bestellung"
 
 msgid "The PO this contract originated from, if any"
 msgstr ""
@@ -6749,6 +6698,10 @@ msgstr ""
 
 msgid "End date must be on or after the start date."
 msgstr "Das Enddatum muss am oder nach dem Startdatum liegen."
+
+#| msgid "Allocated"
+msgid "Qty Allocated"
+msgstr "Zugewiesene Menge"
 
 #, python-format
 msgid ""
@@ -6817,13 +6770,8 @@ msgstr ""
 msgid "Purchase Order %(number)s has been reopened and set to Draft."
 msgstr "Bestellung %(number)s wurde wieder geöffnet und auf Entwurf gesetzt."
 
-#| msgid "- Contact Details - ITAMbox"
 msgid "Contract Details"
 msgstr "Vertragsdetails"
-
-#| msgid "Contract Ref:"
-msgid "Contract Number"
-msgstr "Vertragsnummer"
 
 msgid "Expiring Soon"
 msgstr "Läuft bald ab"
@@ -6831,7 +6779,6 @@ msgstr "Läuft bald ab"
 msgid "Days Until Expiry"
 msgstr "Tage bis zum Ablauf"
 
-#| msgid "Response Date"
 msgid "Response Time"
 msgstr "Reaktionszeit"
 
@@ -6841,7 +6788,6 @@ msgstr "Lösungszeit"
 msgid "Serial"
 msgstr "Seriennummer"
 
-#| msgid "No assets found for this tenant."
 msgid "No assets linked to this contract."
 msgstr "Keine Assets mit diesem Vertrag verknüpft."
 
@@ -6851,81 +6797,54 @@ msgstr "Kommerziell"
 msgid "Metadata"
 msgstr "Metadaten"
 
-#| msgid "Last Used"
 msgid "Last Updated"
 msgstr "Zuletzt aktualisiert"
 
-#| msgid "Add Item"
 msgid "Item"
 msgstr "Artikel"
 
-msgid "Unit Price"
-msgstr "Stückpreis"
-
-#| msgid "Total Stock"
 msgid "Total Cost"
 msgstr "Gesamtkosten"
 
 msgid "Are you sure?"
 msgstr "Sind Sie sicher?"
 
-#| msgid "No matching assets scanned yet."
 msgid "No line items added yet."
 msgstr "Noch keine Positionen hinzugefügt."
 
 msgid "Quick Add Line Item"
 msgstr "Position schnell hinzufügen"
 
-#| msgid "Approved"
 msgid "Approve"
 msgstr "Genehmigen"
 
-#| msgid "Cancel"
 msgid "Cancel Order"
 msgstr "Bestellung stornieren"
 
-#| msgid "Mark as Read"
 msgid "Mark as Ordered"
 msgstr "Als bestellt markieren"
 
-#| msgid "Remaining Stock"
 msgid "Receive Stock"
 msgstr "Bestand erfassen"
 
 msgid "Reopen Draft"
 msgstr "Entwurf erneut öffnen"
 
-#| msgid "Provider Details"
 msgid "Purchase Order Details"
 msgstr "Bestelldetails"
 
-#| msgid "Order Number:"
-msgid "Order Date"
-msgstr "Bestelldatum"
-
-msgid "Expected Delivery Date"
-msgstr "Voraussichtliches Lieferdatum"
-
-#| msgid "Delete Location"
-msgid "Destination Location"
-msgstr "Ziel-Lagerort"
-
-#| msgid "Kit Items"
 msgid "Line Items"
 msgstr "Positionen"
 
 msgid "Summary"
 msgstr "Summary"
 
-#| msgid "Total Salvage Book Value"
 msgid "Total Order Value"
 msgstr "Gesamtbestellwert"
 
-#| msgid "Asset Requests"
 msgid "Linked Asset Requests"
 msgstr "Verknüpfte Asset-Anforderungen"
 
-#| msgid "Requests"
 msgid "Request"
 msgstr "Anforderung"
 
@@ -6933,7 +6852,6 @@ msgstr "Anforderung"
 msgid "Qty: %(qty)s"
 msgstr "Menge: %(qty)s"
 
-#| msgid "asset(s) assigned to this role."
 msgid "No asset requests linked to this PO."
 msgstr "Keine Asset-Anforderungen mit dieser Bestellung verknüpft."
 
@@ -6973,11 +6891,9 @@ msgstr ""
 "zu erfassenden Hardware-Artikel. Die Inventarnummern wurden anhand Ihrer "
 "aktiven Sequenz vorausgefüllt, bleiben aber bearbeitbar."
 
-#| msgid "Hardware"
 msgid "Hardware Model"
 msgstr "Hardware-Modell"
 
-#| msgid "Confirm Delete"
 msgid "Confirm & Receive"
 msgstr "Bestätigen & erfassen"
 
@@ -7001,7 +6917,6 @@ msgstr ""
 "Status Entwurf befindet."
 
 # --- Views Success / Error Flash Toast Messages ---
-#| msgid "Profile updated successfully."
 msgid "Line item added successfully."
 msgstr "Position erfolgreich hinzugefügt."
 
@@ -7012,7 +6927,6 @@ msgstr ""
 " Entwurf befindet."
 
 # --- Views Success / Error Flash Toast Messages ---
-#| msgid "Profile updated successfully."
 msgid "Line item deleted successfully."
 msgstr "Position erfolgreich gelöscht."
 
@@ -7023,7 +6937,6 @@ msgstr ""
 "Status Entwurf befindet."
 
 # --- Views Success / Error Flash Toast Messages ---
-#| msgid "Profile updated successfully."
 msgid "Line item updated successfully."
 msgstr "Position erfolgreich aktualisiert."
 
@@ -7031,7 +6944,6 @@ msgstr "Position erfolgreich aktualisiert."
 msgid "Failed to update line item: %(error)s"
 msgstr "Aktualisierung der Position fehlgeschlagen: %(error)s"
 
-#| msgid "Preferences saved successfully."
 msgid "Stock received and assets provisioned successfully."
 msgstr "Bestand erfasst und Assets erfolgreich bereitgestellt."
 
@@ -7039,7 +6951,6 @@ msgstr "Bestand erfasst und Assets erfolgreich bereitgestellt."
 msgid "Error receiving purchase order: %(error)s"
 msgstr "Fehler beim Wareneingang der Bestellung: %(error)s"
 
-#| msgid "Preferences saved successfully."
 msgid "Stock received successfully."
 msgstr "Bestand erfolgreich eingebucht."
 
@@ -7076,15 +6987,21 @@ msgstr "Aktuelle Version (z. B. 2021, 16.0)"
 msgid "Functional category"
 msgstr "Funktionale Kategorie"
 
-#| msgid "License Type:"
 msgid "Default license type"
 msgstr "Standard-Lizenztyp"
 
 msgid "Product homepage or vendor URL"
 msgstr "Produkt-Homepage oder Hersteller-URL"
 
+#| msgid "Assign Selected"
+msgid "Version Detected"
+msgstr "Erkannte Version"
+
 msgid "Specific version discovered on the asset (e.g., 16.78.1)"
 msgstr "Auf dem Asset erkannte konkrete Version (z. B. 16.78.1)"
+
+msgid "Install Date"
+msgstr "Installationsdatum"
 
 msgid "Estimated or known installation date"
 msgstr "Geschätztes oder bekanntes Installationsdatum"
@@ -7098,6 +7015,10 @@ msgid ""
 msgstr ""
 "Kennung der Erkennungsquelle oder des Agenten (z. B. SCCM, Intune, "
 "Lansweeper)"
+
+#| msgid "Last Seen"
+msgid "Last Seen Date"
+msgstr "Datum der letzten Sichtung"
 
 msgid "Timestamp when this software was last detected on the asset"
 msgstr "Zeitstempel der letzten Erkennung dieser Software auf dem Asset"
@@ -7115,11 +7036,6 @@ msgid "Selected software belongs to a different tenant than the asset."
 msgstr ""
 "Die ausgewählte Software gehört zu einem anderen Mandanten als das Asset."
 
-#| msgid "Installed Instances"
-msgid "Install Date"
-msgstr "Installationsdatum"
-
-#| msgid "Last Used"
 msgid "Last Seen"
 msgstr "Zuletzt gesehen"
 
@@ -7132,25 +7048,21 @@ msgstr "Installed Instances"
 msgid "Dates & Terms"
 msgstr "Daten & Konditionen"
 
-#| msgid "Cost:"
 msgid "Costs"
 msgstr "Kosten"
 
 msgid "Details"
 msgstr "Details"
 
-#| msgid "Completed"
 msgid "Computed"
 msgstr "Berechnet"
 
-#| msgid "Expired"
 msgid "Expired?"
 msgstr "Abgelaufen?"
 
 msgid "Days Until Renewal"
 msgstr "Tage bis zur Verlängerung"
 
-#| msgid "Mark All as Read"
 msgid "Mark selected as Expired"
 msgstr "Ausgewählte als abgelaufen markieren"
 
@@ -7175,30 +7087,21 @@ msgstr ""
 msgid "Dates & Term"
 msgstr "Daten & Laufzeit"
 
-#| msgid "Retry Policy:"
 msgid "Policy"
 msgstr "Richtlinie"
 
-msgid "Subscription"
-msgstr "Abonnement"
-
-#| msgid "No subscriptions linked to this provider yet."
 msgid "This subscription is already assigned to this object."
 msgstr "Dieses Abonnement ist diesem Objekt bereits zugewiesen."
 
-#| msgid "Next Renewal:"
 msgid "Next Renewal Date"
 msgstr "Nächstes Verlängerungsdatum"
 
-#| msgid "Renewal Cost:"
 msgid "Renewal Cost"
 msgstr "Verlängerungskosten"
 
-#| msgid "Completion Date:"
 msgid "Cancellation Date"
 msgstr "Kündigungsdatum"
 
-#| msgid "Cancel Request"
 msgid "Cancellation Reason"
 msgstr "Kündigungsgrund"
 
@@ -7206,7 +7109,6 @@ msgid "Optional reason notes to log on the subscription."
 msgstr "Optionale Begründungsnotizen, die am Abonnement protokolliert werden."
 
 #, python-format
-#| msgid "This asset role is not currently assigned to any assets."
 msgid "This subscription is already assigned to %(target)s."
 msgstr "Dieses Abonnement ist %(target)s bereits zugewiesen."
 
@@ -7218,21 +7120,18 @@ msgstr ""
 "URL-freundliche Kennung (wird bei leerem Feld automatisch aus dem Namen "
 "erzeugt)"
 
-#| msgid "Account ID:"
 msgid "Account ID"
 msgstr "Konto-ID"
 
 msgid "Optional customer account number with the provider"
 msgstr "Optionale Kundennummer beim Anbieter"
 
-#| msgid "Admin Portal:"
 msgid "Admin Portal URL"
 msgstr "URL des Admin-Portals"
 
 msgid "URL for the provider's management/administration portal"
 msgstr "URL des Verwaltungs-/Administrationsportals des Anbieters"
 
-#| msgid "Admin Portal:"
 msgid "Admin Notes"
 msgstr "Admin-Notizen"
 
@@ -7249,32 +7148,27 @@ msgstr ""
 "Der Mandant, dem dieser Anbieter gehört. Null steht für systemweite/globale "
 "Anbieter."
 
-#| msgid "No tenants found in this group."
 msgid "The tenant group owning this provider."
 msgstr "Die Mandantengruppe, der dieser Anbieter gehört."
 
-#| msgid "Spend"
 msgid "Suspended"
 msgstr "Ausgesetzt"
 
 msgid "Renewing"
 msgstr "Wird verlängert"
 
-#| msgid "Serial"
 msgid "Trial"
 msgstr "Testversion"
 
 msgid "Descriptive name (e.g., Adobe Creative Cloud - All Apps (Team))"
 msgstr "Beschreibender Name (z. B. Adobe Creative Cloud - All Apps (Team))"
 
-#| msgid "Subscription"
 msgid "Subscription Type"
 msgstr "Abonnementtyp"
 
 msgid "Cost per renewal period"
 msgstr "Kosten pro Verlängerungszeitraum"
 
-#| msgid "Lifespan (Months)"
 msgid "Term (Months)"
 msgstr "Laufzeit (Monate)"
 
@@ -7287,14 +7181,12 @@ msgstr "Automatische Verlängerung"
 msgid "Whether this subscription renews automatically"
 msgstr "Ob sich dieses Abonnement automatisch verlängert"
 
-#| msgid "Licensed Qty:"
 msgid "Licensed Quantity"
 msgstr "Lizenzierte Menge"
 
 msgid "Number of seats/users/devices covered (for SaaS/support)"
 msgstr "Anzahl der abgedeckten Plätze/Benutzer/Geräte (für SaaS/Support)"
 
-#| msgid "Contract Ref:"
 msgid "Contract Reference"
 msgstr "Vertragsreferenz"
 
@@ -7304,7 +7196,6 @@ msgstr "Vertragsnummer, Bestellreferenz oder Angebots-ID"
 msgid "Financial cost center responsible for this subscription"
 msgstr "Für dieses Abonnement zuständige Kostenstelle"
 
-#| msgid "Owner:"
 msgid "Owner"
 msgstr "Eigentümer"
 
@@ -7317,7 +7208,6 @@ msgstr "Optionaler Text mit Angaben zu Leistungsumfang oder Konditionen"
 msgid "Optional internal notes"
 msgstr "Optionale interne Notizen"
 
-#| msgid "Assigned Qty:"
 msgid "Assigned By"
 msgstr "Zugewiesen von"
 
@@ -7339,26 +7229,21 @@ msgstr "Nur Superuser können Anbieter global machen."
 msgid "Only superusers can delete global providers."
 msgstr "Nur Superuser können globale Anbieter löschen."
 
-#| msgid "No tenant data available."
 msgid "CostCenter model is not yet available."
 msgstr "Das CostCenter-Modell ist noch nicht verfügbar."
 
-#| msgid "Contact Role"
 msgid "Contact Email"
 msgstr "Kontakt-E-Mail"
 
-#| msgid "Started"
 msgid "Start"
 msgstr "Beginn"
 
-#| msgid "Next Renewal:"
 msgid "Next Renewal"
 msgstr "Nächste Verlängerung"
 
 msgid "Due In"
 msgstr "Fällig in"
 
-#| msgid "Assigned:"
 msgid "Assigned"
 msgstr "Zugewiesen"
 
@@ -7366,7 +7251,6 @@ msgid "By"
 msgstr "Von"
 
 #, python-format
-#| msgid "Subscription Assignments"
 msgid "Subscription Expired: %(name)s"
 msgstr "Abonnement abgelaufen: %(name)s"
 
@@ -7407,7 +7291,6 @@ msgstr "Abonnement '%(name)s' erfolgreich gekündigt."
 
 # --- Views Success / Error Flash Toast Messages ---
 #, python-format
-#| msgid "Profile updated successfully."
 msgid "Subscription '%(name)s' suspended successfully."
 msgstr "Abonnement '%(name)s' erfolgreich ausgesetzt."
 
@@ -7416,7 +7299,6 @@ msgid "Assigned subscription '%(name)s' successfully to %(target)s."
 msgstr "Abonnement '%(name)s' erfolgreich %(target)s zugewiesen."
 
 #, python-format
-#| msgid "Assign Subscription to"
 msgid "Assign Subscription to %(target)s"
 msgstr "Abonnement %(target)s zuweisen"
 
@@ -7424,11 +7306,9 @@ msgstr "Abonnement %(target)s zuweisen"
 msgid "Assigned subscription successfully to %(target)s."
 msgstr "Abonnement erfolgreich %(target)s zugewiesen."
 
-#| msgid "Disposed at"
 msgid "Disposal"
 msgstr "Abgang"
 
-#| msgid "Disposed at"
 msgid "Dispose Asset"
 msgstr "Asset entsorgen"
 
@@ -7487,27 +7367,20 @@ msgstr "Löschen bestätigen"
 msgid ") - ITAMbox"
 msgstr "- ) - ITAMbox"
 
-#| msgid "Check In"
 msgid "Check In..."
 msgstr "Einbuchen..."
 
 msgid "Claim &amp; Confirm Pickup"
 msgstr "Übernehmen &amp; Abholung bestätigen"
 
-#| msgid "Auditor"
 msgid "Audits"
 msgstr "Audits"
 
-#| msgid "Deployment & Custody"
 msgid "Deployment &amp; Custody"
 msgstr "Bereitstellung &amp; Verwahrung"
 
-#| msgid "Software Details"
 msgid "Support &amp; Warranty Details"
 msgstr "Support- &amp; Garantiedetails"
-
-msgid "Comments"
-msgstr "Kommentare"
 
 msgid "Created:"
 msgstr "Created:"
@@ -7518,7 +7391,6 @@ msgstr "Updated:"
 msgid "Assigned Tags"
 msgstr "Assigned Tags"
 
-#| msgid "Financial & Lifecycle"
 msgid "Financial &amp; Lifecycle"
 msgstr "Finanzen &amp; Lebenszyklus"
 
@@ -7533,7 +7405,6 @@ msgid ""
 msgstr ""
 "No physical modules (like RAM, SSD, GPU) checked into this hardware asset."
 
-#| msgid "Asset Repair & Upgrade History"
 msgid "Asset Repair &amp; Upgrade History"
 msgstr "Reparatur- &amp; Aufrüstungshistorie des Assets"
 
@@ -7562,32 +7433,24 @@ msgstr "Assigned Consumables"
 msgid "No consumables assigned to this asset."
 msgstr "No consumables assigned to this asset."
 
-#| msgid "Asset Requests"
 msgid "Asset Requests History"
 msgstr "Historie der Asset-Anforderungen"
 
-#| msgid "No sites found for this tenant."
 msgid "No requests logged for this asset."
 msgstr "Für dieses Asset wurden keine Anforderungen protokolliert."
 
-#| msgid "Assets / Depreciation Rules"
 msgid "Asset Verification &amp; Audits"
 msgstr "Asset-Verifizierung &amp; Audits"
 
-#| msgid ""
-#| "No repair, calibration, or hardware maintenance logged for this asset."
 msgid "No verification audits logged for this asset."
 msgstr "Für dieses Asset wurden keine Verifizierungs-Audits protokolliert."
 
-#| msgid "No accessories assigned to this asset."
 msgid "No custody receipts generated for this asset."
 msgstr "Für dieses Asset wurden keine Übergabeprotokolle erstellt."
 
-#| msgid "Associated Licenses"
 msgid "Allocated Software Licenses"
 msgstr "Zugewiesene Softwarelizenzen"
 
-#| msgid "No catalog software items registered on this asset."
 msgid "No software license seats allocated to this asset."
 msgstr "Diesem Asset sind keine Softwarelizenzplätze zugewiesen."
 
@@ -7641,19 +7504,15 @@ msgstr "Assets of this Model / Typ"
 msgid "No physical assets registered under this type/model yet."
 msgstr "No physical assets registered under this type/model yet."
 
-#| msgid "Assets of this Model / Type"
 msgid "Asset Requests for this Model / Type"
 msgstr "Asset-Anforderungen für dieses Modell / diesen Typ"
 
-#| msgid "No schedules configured for this template yet."
 msgid "No requests logged for this asset type."
 msgstr "Für diesen Asset-Typ wurden keine Anforderungen protokolliert."
 
-#| msgid "Assets of this Model / Type"
 msgid "Kits Allocating this Model / Type"
 msgstr "Kits, die dieses Modell / diesen Typ verwenden"
 
-#| msgid "No assets currently located at this site."
 msgid "No kits allocate this asset type."
 msgstr "Kein Kit verwendet diesen Asset-Typ."
 
@@ -7666,12 +7525,10 @@ msgstr "- Category Details - ITAMbox"
 msgid "Assets / Categories"
 msgstr "Assets / Categories"
 
-#| msgid "Custody Receipts"
 msgid "Custody EULAs &amp; Policies"
 msgstr "Verwahrungs-EULAs &amp; Richtlinien"
 
 #, python-format
-#| msgid "Asset Types / Models Categorized under"
 msgid "Asset Types / Models Categorized under %(name)s"
 msgstr "Asset-Typen / Modelle in der Kategorie %(name)s"
 
@@ -7679,7 +7536,6 @@ msgid "No asset types or models categorized under this section yet."
 msgstr "No asset types or models categorized under this section yet."
 
 #, python-format
-#| msgid "Accessories Monitored under"
 msgid "Accessories Monitored under %(name)s"
 msgstr "Unter %(name)s erfasstes Zubehör"
 
@@ -7690,8 +7546,6 @@ msgstr "No accessories registered under this notification category yet."
 msgid "Components Scoped under %(name)s"
 msgstr "Unter %(name)s zugeordnete Komponenten"
 
-#| msgid ""
-#| "No accessories registered under this notification category yet."
 msgid "No components registered under this category yet."
 msgstr "Unter dieser Kategorie sind noch keine Komponenten registriert."
 
@@ -7699,13 +7553,10 @@ msgstr "Unter dieser Kategorie sind noch keine Komponenten registriert."
 msgid "Consumables Scoped under %(name)s"
 msgstr "Unter %(name)s zugeordnete Verbrauchsmaterialien"
 
-#| msgid ""
-#| "No accessories registered under this notification category yet."
 msgid "No consumables registered under this category yet."
 msgstr ""
 "Unter dieser Kategorie sind noch keine Verbrauchsmaterialien registriert."
 
-#| msgid "Associated Asset Holders"
 msgid "Tenant-Scoped Custody Policies &amp; EULAs"
 msgstr "Mandantenspezifische Verwahrungsrichtlinien &amp; EULAs"
 
@@ -7715,33 +7566,16 @@ msgstr "Verwahrungsrichtlinie hinzufügen"
 msgid "Policy / EULA Name"
 msgstr "Richtlinien- / EULA-Name"
 
-#| msgid "Tenant Group"
 msgid "Tenant / Scope"
 msgstr "Mandant / Geltungsbereich"
-
-#| msgid "Require Acceptance:"
-msgid "Require Acceptance"
-msgstr "Akzeptanz erforderlich"
-
-#| msgid "Draw Signature Below"
-msgid "Email Signature Request"
-msgstr "Signaturanforderung per E-Mail"
-
-#| msgid "Preferences"
-msgid "QMS Reference"
-msgstr "QMS-Referenz"
 
 #, python-format
 msgid "Group: %(group)s"
 msgstr "Gruppe: %(group)s"
 
-#| msgid "Default"
 msgid "Global Default"
 msgstr "Globaler Standard"
 
-#| msgid ""
-#| "No assets, holders, or locations are currently assigned to this "
-#| "subscription."
 msgid ""
 "No custody policies or templates are currently registered for this category."
 msgstr ""
@@ -7754,27 +7588,22 @@ msgstr "- Abschreibungsregel - ITAMbox"
 msgid "Assets / Depreciation Rules"
 msgstr "Assets / Abschreibungsregeln"
 
-#| msgid "Delete Asset Type"
 msgid "Affected Asset Types"
 msgstr "Betroffene Asset-Typen"
 
-#| msgid "Active Alerts"
 msgid "Active Assets"
 msgstr "Aktive Assets"
 
-#| msgid "No assets assigned to this specific location."
 msgid "No asset types associated with this depreciation rule."
 msgstr "Dieser Abschreibungsregel sind keine Asset-Typen zugeordnet."
 
 msgid "Active Assets Amortization Schedule"
 msgstr "Abschreibungsplan aktiver Assets"
 
-#| msgid "No assets currently located at this site."
 msgid "No active assets currently using this depreciation rule."
 msgstr "Derzeit verwenden keine aktiven Assets diese Abschreibungsregel."
 
 #, python-format
-#| msgid "Audited So Far"
 msgid "Audited by %(auditor)s"
 msgstr "Geprüft von %(auditor)s"
 
@@ -7784,15 +7613,12 @@ msgstr "ago by"
 msgid "Never Audited"
 msgstr "Never Audited"
 
-#| msgid "Verify Physical Presence"
 msgid "Verify Physical Presence:"
 msgstr "Physische Präsenz verifizieren:"
 
-#| msgid "Confirm Deletion"
 msgid "Confirm Verification"
 msgstr "Verifizierung bestätigen"
 
-#| msgid "Check Out Asset:"
 msgid "Check In Asset:"
 msgstr "Asset einbuchen:"
 
@@ -7820,14 +7646,12 @@ msgstr "Asset-Rolle:"
 msgid "Requestable Status:"
 msgstr "Requestable Status:"
 
-#| msgid "Requestable by Staff"
 msgid "Requestable by Staff (Inherited)"
 msgstr "Von Mitarbeitern anforderbar (vererbt)"
 
 msgid "Requestable by Staff"
 msgstr "Requestable by Staff"
 
-#| msgid "Administrative Custody Only"
 msgid "Administrative Custody Only (Inherited)"
 msgstr "Nur administrative Verwahrung (vererbt)"
 
@@ -7837,11 +7661,9 @@ msgstr "Nur administrative Verwahrung"
 msgid "Purchase Date:"
 msgstr "Kaufdatum:"
 
-#| msgid "Warranty Expiration:"
 msgid "Warranty Until:"
 msgstr "Garantie bis:"
 
-#| msgid "No active assignment"
 msgid "No active warranty"
 msgstr "Keine aktive Garantie"
 
@@ -7878,7 +7700,6 @@ msgstr "Verwahrungsstatus:"
 msgid "Custody Secured"
 msgstr "Verwahrung gesichert"
 
-#| msgid "View Custody Receipt"
 msgid "View Signed Receipt"
 msgstr "Unterzeichnetes Protokoll anzeigen"
 
@@ -7894,11 +7715,9 @@ msgstr "Kopiert!"
 msgid "Copy Link"
 msgstr "Link kopieren"
 
-#| msgid "Quantity Required"
 msgid "Acceptance Not Required"
 msgstr "Akzeptanz nicht erforderlich"
 
-#| msgid "Audit & Compliance Control"
 msgid "Audit &amp; Compliance Control"
 msgstr "Audit- &amp; Compliance-Kontrolle"
 
@@ -7974,7 +7793,6 @@ msgid "Software Inventory"
 msgstr "Software Inventory"
 
 #, python-format
-#| msgid "Items Logged"
 msgid "%(n)s Item Logged"
 msgid_plural "%(n)s Items Logged"
 msgstr[0] "%(n)s Element protokolliert"
@@ -7989,7 +7807,6 @@ msgstr "Im Inventar verfügbar"
 msgid "Assigned System Hardware Specifications"
 msgstr "Assigned System Hardware Specifications"
 
-#| msgid "System Hardware Specifications"
 msgid "Active Hardware Modifications &amp; Upgrades"
 msgstr "Aktive Hardware-Modifikationen &amp; -Upgrades"
 
@@ -8023,33 +7840,27 @@ msgstr "No active support contact is configured for"
 msgid "Configure Support Contact"
 msgstr "Supportkontakt konfigurieren"
 
-#| msgid "Procurement"
 msgid "Proceeds:"
 msgstr "Erlös:"
 
-#| msgid "No Cost Recorded"
 msgid "No proceeds recorded"
 msgstr "Kein Erlös erfasst"
 
 msgid "Currency:"
 msgstr "Währung:"
 
-#| msgid "tenant default"
 msgid "Tenant default"
 msgstr "Mandantenstandard"
 
 msgid "Disposal Method:"
 msgstr "Entsorgungsmethode:"
 
-#| msgid "Disposed at"
 msgid "Disposal Date:"
 msgstr "Entsorgungsdatum:"
 
-#| msgid "Recipients"
 msgid "Recipient:"
 msgstr "Empfänger:"
 
-#| msgid "Not Specified"
 msgid "Not specified"
 msgstr "Nicht angegeben"
 
@@ -8062,15 +7873,12 @@ msgstr "Notes:"
 msgid "Sanitization Method:"
 msgstr "Datenlöschungsmethode:"
 
-#| msgid "Created By:"
 msgid "Sanitized By:"
 msgstr "Datenlöschung durch:"
 
-#| msgid "Clear table preferences"
 msgid "Certificate / Reference:"
 msgstr "Zertifikat / Referenz:"
 
-#| msgid "Notification Inbox"
 msgid "No certificate on record"
 msgstr "Kein Zertifikat hinterlegt"
 
@@ -8149,15 +7957,12 @@ msgstr "Farbe:"
 msgid "Tags:"
 msgstr "Tags:"
 
-#| msgid "Remaining Lifespan:"
 msgid "Lifespan:"
 msgstr "Nutzungsdauer:"
 
-#| msgid "Method"
 msgid "Method:"
 msgstr "Methode:"
 
-#| msgid "Convention"
 msgid "Convention:"
 msgstr "Konvention:"
 
@@ -8167,11 +7972,9 @@ msgstr "GWG-Grenze:"
 msgid "(assets at or below this cost are immediately expensed)"
 msgstr "(Assets bis zu diesem Betrag werden sofort vollständig abgeschrieben)"
 
-#| msgid "Description"
 msgid "No description."
 msgstr "Keine Beschreibung."
 
-#| msgid "Support Contact:"
 msgid "Support &amp; Contracts"
 msgstr "Support &amp; Verträge"
 
@@ -8199,7 +8002,6 @@ msgstr "Website:"
 msgid "Address:"
 msgstr "Adresse:"
 
-#| msgid "Contact"
 msgid "Primary Contact"
 msgstr "Hauptkontakt"
 
@@ -8254,40 +8056,27 @@ msgstr "Assigned Contacts"
 msgid "Assign Contact"
 msgstr "Assign Contact"
 
-msgid "Priority"
-msgstr "Priority"
-
-msgid "Phone"
-msgstr "Phone"
-
 msgid "No contacts are assigned to this manufacturer yet."
 msgstr "No contacts are assigned to this manufacturer yet."
 
-#| msgid "Components (Catalog)"
 msgid "Components Catalog"
 msgstr "Komponentenkatalog"
 
-#| msgid "No contacts are assigned to this manufacturer yet."
 msgid "No components registered for this manufacturer."
 msgstr "Für diesen Hersteller sind keine Komponenten registriert."
 
-#| msgid "Accessories"
 msgid "Accessories Catalog"
 msgstr "Zubehörkatalog"
 
-#| msgid "No asset types defined for this manufacturer yet."
 msgid "No accessories registered for this manufacturer."
 msgstr "Für diesen Hersteller ist kein Zubehör registriert."
 
-#| msgid "Consumable Usage"
 msgid "Consumables Catalog"
 msgstr "Verbrauchsmaterialkatalog"
 
-#| msgid "No contacts are assigned to this manufacturer yet."
 msgid "No consumables registered for this manufacturer."
 msgstr "Für diesen Hersteller sind keine Verbrauchsmaterialien registriert."
 
-#| msgid "No asset types defined for this manufacturer yet."
 msgid "No software catalog products registered for this manufacturer."
 msgstr ""
 "Für diesen Hersteller sind keine Softwarekatalog-Produkte registriert."
@@ -8310,19 +8099,15 @@ msgid "(Accessory, Qty: %(qty)s)"
 msgstr "(Zubehör, Menge: %(qty)s)"
 
 #, python-format
-#| msgid "Consumable Stocks"
 msgid "(Consumable, Qty: %(qty)s)"
 msgstr "(Verbrauchsmaterial, Menge: %(qty)s)"
 
-#| msgid "Asset"
 msgid "(Asset)"
 msgstr "(Asset)"
 
-#| msgid "Asset Type"
 msgid "(Asset Type)"
 msgstr "(Asset-Typ)"
 
-#| msgid "Approve Asset Request"
 msgid "Approve Request"
 msgstr "Anfrage genehmigen"
 
@@ -8359,7 +8144,6 @@ msgstr "Anfrage abbrechen"
 msgid "Fulfillment Tracker"
 msgstr "Erfüllungs-Tracker"
 
-#| msgid "Request Date"
 msgid "Request Created"
 msgstr "Anfrage erstellt"
 
@@ -8372,7 +8156,6 @@ msgstr "Bestellerstellung ausstehend"
 msgid "Not Required (Stock)"
 msgstr "Nicht erforderlich (Lagerbestand)"
 
-#| msgid "Fulfilled"
 msgid "Fulfill completed"
 msgstr "Erfüllung abgeschlossen"
 
@@ -8385,54 +8168,38 @@ msgstr "Requested Asset Type"
 msgid "Requested Specific Asset"
 msgstr "Requested Specific Asset"
 
-#| msgid "Add Component"
 msgid "Requested Component"
 msgstr "Angeforderte Komponente"
 
-#| msgid "Requested Asset Type"
 msgid "Requested Accessory"
 msgstr "Angefordertes Zubehör"
 
-#| msgid "Associated Consumables"
 msgid "Requested Consumable"
 msgstr "Angefordertes Verbrauchsmaterial"
 
-#| msgid "Target Location:"
 msgid "Source Stock Location"
 msgstr "Quell-Lagerort"
 
-#| msgid "Requester"
 msgid "Requester (Myself)"
 msgstr "Anforderer (Ich selbst)"
 
-#| msgid "Notifications"
 msgid "Notes &amp; Justification"
 msgstr "Notizen &amp; Begründung"
 
-#| msgid "Requests"
 msgid "Sub-Requests"
 msgstr "Unteranfragen"
 
-#| msgid "Associated Assets"
 msgid "Allocated Asset"
 msgstr "Zugewiesenes Asset"
 
-#| msgid "No results found."
 msgid "No sub-requests found."
 msgstr "Keine Unteranfragen gefunden."
 
 msgid "Decision &amp; Response Details"
 msgstr "Entscheidungs- &amp; Antwortdetails"
 
-msgid "Responded By"
-msgstr "Responded By"
-
-#| msgid "System Activity"
 msgid "System / Automated"
 msgstr "System / Automatisiert"
-
-msgid "Response Date"
-msgstr "Response Date"
 
 msgid "Decision Notes"
 msgstr "Decision Notes"
@@ -8463,23 +8230,18 @@ msgstr "Fehler bei der Validierung des Stapels"
 msgid "Autofill Details (Apply to All Rows)"
 msgstr "Details automatisch ausfüllen (auf alle Zeilen anwenden)"
 
-#| msgid "— Select an Asset Holder —"
 msgid "— Select Status —"
 msgstr "— Status auswählen —"
 
-#| msgid "Location"
 msgid "Location Target"
 msgstr "Ziel-Lagerort"
 
-#| msgid "Delete Location"
 msgid "— Select Location —"
 msgstr "— Lagerort auswählen —"
 
-#| msgid "— Select an Asset Holder —"
 msgid "— Select Supplier —"
 msgstr "— Lieferant auswählen —"
 
-#| msgid "Ordering"
 msgid "Order #"
 msgstr "Bestell-Nr."
 
@@ -8490,27 +8252,21 @@ msgid "Requested Item / Requester"
 msgstr "Angefordertes Element / Anforderer"
 
 # --- Common Table Column Headers ---
-#| msgid "Asset Tag"
 msgid "Asset Tag *"
 msgstr "Inventarnummer *"
 
-#| msgid "Serial Number"
 msgid "Serial Number *"
 msgstr "Seriennummer *"
 
-#| msgid "Asset Name"
 msgid "Asset Name *"
 msgstr "Asset-Name *"
 
-#| msgid "Status"
 msgid "Status *"
 msgstr "Status *"
 
-#| msgid "Target URL:"
 msgid "Target:"
 msgstr "Ziel:"
 
-#| msgid "Remaining Stock"
 msgid "Receive &amp; Allocate Stock"
 msgstr "Bestand entgegennehmen &amp; zuweisen"
 
@@ -8521,7 +8277,6 @@ msgid "Assets / Status Labels"
 msgstr "Assets / Status Labels"
 
 #, python-format
-#| msgid "Assets / Devices with status \""
 msgid "Assets / Devices with status \"%(name)s\""
 msgstr "Assets / Geräte mit Status \"%(name)s\""
 
@@ -8537,12 +8292,10 @@ msgstr "Assets / Lieferanten"
 msgid "Supplied Assets"
 msgstr "Supplied Assets"
 
-#| msgid "No contacts are assigned to this role yet."
 msgid "No contacts are assigned to this supplier yet."
 msgstr "Diesem Lieferanten sind noch keine Kontakte zugewiesen."
 
 #, python-format
-#| msgid "Assets Sourced from"
 msgid "Assets Sourced from %(name)s"
 msgstr "Von %(name)s bezogene Assets"
 
@@ -8550,20 +8303,16 @@ msgid "No physical assets sourced from this supplier yet."
 msgstr "No physical assets sourced from this supplier yet."
 
 #, python-format
-#| msgid "Accessories Monitored under"
 msgid "Accessories Supplied by %(name)s"
 msgstr "Von %(name)s geliefertes Zubehör"
 
-#| msgid "No accessories assigned to this asset."
 msgid "No accessories supplied by this supplier yet."
 msgstr "Von diesem Lieferanten wurde noch kein Zubehör geliefert."
 
 #, python-format
-#| msgid "Maintenance Expenditures"
 msgid "Maintenance Expenditures with %(name)s"
 msgstr "Wartungsausgaben bei %(name)s"
 
-#| msgid "No physical assets sourced from this supplier yet."
 msgid "No maintenance logs recorded for this supplier yet."
 msgstr "Für diesen Lieferanten wurden noch keine Wartungsprotokolle erfasst."
 
@@ -8571,7 +8320,6 @@ msgstr "Für diesen Lieferanten wurden noch keine Wartungsprotokolle erfasst."
 msgid "Licenses Purchased from %(name)s"
 msgstr "Von %(name)s erworbene Lizenzen"
 
-#| msgid "No physical assets sourced from this supplier yet."
 msgid "No licenses purchased from this supplier yet."
 msgstr "Von diesem Lieferanten wurden noch keine Lizenzen erworben."
 
@@ -8596,7 +8344,6 @@ msgstr "Under review by administrators"
 msgid "Configure Threshold Rules"
 msgstr "Schwellenwertregeln konfigurieren"
 
-#| msgid "Manage triggers & notification channels"
 msgid "Manage triggers &amp; notification channels"
 msgstr "Trigger &amp; Benachrichtigungskanäle verwalten"
 
@@ -8611,9 +8358,6 @@ msgstr "Edit Rule"
 
 msgid "Rule Configuration"
 msgstr "Rule Configuration"
-
-msgid "Threshold Value"
-msgstr "Threshold Value"
 
 msgid "units limit"
 msgstr "units limit"
@@ -8634,7 +8378,6 @@ msgstr "Nur einmal"
 msgid "Tracked in Alert Center, but channel notifications suppressed."
 msgstr "Im Alert-Center erfasst, jedoch Kanalbenachrichtigungen unterdrückt."
 
-#| msgid "Last Used"
 msgid "Last Evaluated"
 msgstr "Zuletzt ausgewertet"
 
@@ -8655,9 +8398,6 @@ msgstr "Total Historical Alerts"
 
 msgid "Triggered Alerts History"
 msgstr "Triggered Alerts History"
-
-msgid "Subject"
-msgstr "Subject"
 
 msgid "Acknowledge"
 msgstr "Acknowledge"
@@ -8686,21 +8426,15 @@ msgstr "Reset"
 msgid "Apply"
 msgstr "Anwenden"
 
-#| msgid "Cancel"
 msgid "Cancel job"
 msgstr "Auftrag abbrechen"
 
 msgid "Job Information"
 msgstr "Job Information"
 
-msgid "Started"
-msgstr "Started"
-
-#| msgid "Generate Token"
 msgid "Generated Files"
 msgstr "Generierte Dateien"
 
-#| msgid "Login"
 msgid "Log"
 msgstr "Protokoll"
 
@@ -8713,12 +8447,9 @@ msgstr "Übersicht"
 msgid "Refreshing automatically"
 msgstr "Wird automatisch aktualisiert"
 
-#| msgid "No jobs found"
 msgid "No jobs yet"
 msgstr "Noch keine Aufträge"
 
-#| msgid ""
-#| "Asynchronous import and checkout tasks will appear in this registry."
 msgid "Background tasks like imports and bulk checkouts will appear here."
 msgstr ""
 "Hintergrundaufgaben wie Importe und Sammel-Herausgaben werden hier "
@@ -8771,7 +8502,6 @@ msgstr "GENERIERT: %(gen)s UTC | STIL: %(style)s"
 msgid "Print Report"
 msgstr "Print Report"
 
-#| msgid "No results found."
 msgid "No records found."
 msgstr "Keine Datensätze gefunden."
 
@@ -8790,7 +8520,6 @@ msgstr "Hourly, nightly, or weekly runs cataloged"
 msgid "Report Templates Available"
 msgstr "Report Templates Available"
 
-#| msgid "Asset summary, license allocation & renewals"
 msgid "Asset summary, license allocation &amp; renewals"
 msgstr "Asset-Übersicht, Lizenzzuweisung &amp; Verlängerungen"
 
@@ -8803,14 +8532,8 @@ msgstr "Edit Template"
 msgid "Template Information"
 msgstr "Template Information"
 
-msgid "Report Type"
-msgstr "Report Type"
-
 msgid "Active Schedules"
 msgstr "Aktive Pläne"
-
-msgid "Format"
-msgstr "Format"
 
 msgid "No schedules configured for this template yet."
 msgstr "No schedules configured for this template yet."
@@ -8870,7 +8593,6 @@ msgstr "Loading..."
 msgid "Compiling Report Template..."
 msgstr "Compiling Report Template..."
 
-#| msgid "Gathering tenant records & rendering template"
 msgid "Gathering tenant records &amp; rendering template"
 msgstr "Mandantendatensätze werden erfasst &amp; Vorlage wird gerendert"
 
@@ -8878,7 +8600,6 @@ msgid "Close Preview"
 msgstr "Vorschau schließen"
 
 #, python-format
-#| msgid "Search Results"
 msgid "Search Results for \"%(q)s\""
 msgstr "Suchergebnisse für \"%(q)s\""
 
@@ -8932,7 +8653,6 @@ msgstr "No widgets are currently configured."
 msgid "Add your first widget"
 msgstr "Fügen Sie Ihr erstes Widget hinzu"
 
-#| msgid "Accessories"
 msgid "Access denied"
 msgstr "Zugriff verweigert"
 
@@ -8943,7 +8663,6 @@ msgstr ""
 "Sie haben keine Berechtigung, diese Seite anzuzeigen. Falls Sie der Meinung "
 "sind, dass dies ein Fehler ist, wenden Sie sich an Ihren Administrator."
 
-#| msgid "Lock dashboard"
 msgid "Back to dashboard"
 msgstr "Zurück zum Dashboard"
 
@@ -8968,7 +8687,6 @@ msgstr ""
 "Er wurde protokolliert und das Team wird sich darum kümmern. Bitte versuchen"
 " Sie es in Kürze erneut."
 
-#| msgid ") - ITAMbox"
 msgid "Back to ITAMbox"
 msgstr "Zurück zu ITAMbox"
 
@@ -8993,7 +8711,6 @@ msgstr "Action Type:"
 msgid "Webhook Endpoint:"
 msgstr "Webhook-Endpunkt:"
 
-#| msgid "Endpoint Name:"
 msgid "Endpoint disabled"
 msgstr "Endpunkt deaktiviert"
 
@@ -9048,7 +8765,6 @@ msgstr "Custom HTTP Headers:"
 msgid "Used By Rules:"
 msgstr "Verwendet von Regeln:"
 
-#| msgid "No contacts are assigned to this role yet."
 msgid "No event rules target this endpoint yet."
 msgstr "Noch keine Ereignisregeln verweisen auf diesen Endpunkt."
 
@@ -9058,7 +8774,6 @@ msgstr "Assets with this Tag ("
 msgid "Add Stock pool for:"
 msgstr "Bestandspool hinzufügen für:"
 
-#| msgid "Total Stock"
 msgid "Add Stock"
 msgstr "Bestand hinzufügen"
 
@@ -9077,11 +8792,9 @@ msgstr "Schließen"
 msgid "0 selected"
 msgstr "0 selected"
 
-#| msgid "Delete Selected"
 msgid "Restore Selected"
 msgstr "Ausgewählte wiederherstellen"
 
-#| msgid "Delete Selected"
 msgid "Purge Selected"
 msgstr "Ausgewählte endgültig löschen"
 
@@ -9094,23 +8807,18 @@ msgstr "Assign Selected"
 msgid "Print labels for selected assets"
 msgstr "Etiketten für ausgewählte Assets drucken"
 
-#| msgid "Print Label"
 msgid "Print Labels"
 msgstr "Etiketten drucken"
 
-#| msgid "Checkout Kit"
 msgid "Check-out selected items"
 msgstr "Ausgewählte Artikel herausgeben"
 
-#| msgid "Check-out"
 msgid "Check-out Selected"
 msgstr "Ausgewählte herausgeben"
 
-#| msgid "Acknowledged"
 msgid "Acknowledge Selected"
 msgstr "Ausgewählte bestätigen"
 
-#| msgid "Delete Selected"
 msgid "Resolve Selected"
 msgstr "Ausgewählte beheben"
 
@@ -9210,6 +8918,8 @@ msgstr "This model has no fields available for bulk editing."
 msgid "Apply Changes"
 msgstr "Änderungen übernehmen"
 
+#| msgid "Delete %(counter)s %(model_verbose_name)s"
+#| msgid_plural "Delete %(counter)s %(model_verbose_name_plural)s"
 msgid "Delete %(counter)s %(model_verbose_name)s"
 msgid_plural "Delete %(counter)s %(model_verbose_name_plural)s"
 msgstr[0] "%(counter)s %(model_verbose_name)s löschen"
@@ -9227,7 +8937,6 @@ msgstr "Löschen bestätigen:"
 msgid "Are you sure you want to delete"
 msgstr "Are you sure you want to delete"
 
-#| msgid "Details"
 msgid "Detail View"
 msgstr "Detailansicht"
 
@@ -9243,7 +8952,6 @@ msgstr "Beobachten (bei Änderungen benachrichtigen)"
 msgid "Copy/Clone"
 msgstr "Kopieren/Klonen"
 
-#| msgid "Locations"
 msgid "More actions"
 msgstr "Weitere Aktionen"
 
@@ -9275,7 +8983,6 @@ msgstr "Journaleintrag hinzufügen"
 msgid "Add Entry"
 msgstr "Eintrag hinzufügen"
 
-#| msgid "Assigned SaaS & Support Licenses"
 msgid "Assigned SaaS &amp; Support Licenses"
 msgstr "Zugewiesene SaaS- &amp; Support-Lizenzen"
 
@@ -9407,20 +9114,16 @@ msgstr "— Select an Asset Holder —"
 msgid "Assign"
 msgstr "Assign"
 
-#| msgid "Print Label"
 msgid "Bulk Print Labels"
 msgstr "Etiketten gesammelt drucken"
 
-#| msgid "Select an Asset Holder to assign the selected assets to:"
 msgid "Select the label template and layout for the selected assets:"
 msgstr ""
 "Wählen Sie die Etikettenvorlage und das Layout für die ausgewählten Assets:"
 
-#| msgid "— Select an Asset Holder —"
 msgid "— Select a Template —"
 msgstr "— Vorlage auswählen —"
 
-#| msgid "No template found for panel \""
 msgid "No templates found in database"
 msgstr "Keine Vorlagen in der Datenbank gefunden"
 
@@ -9439,39 +9142,33 @@ msgstr "Letter-Raster (3x8)"
 msgid "Queue Print Job"
 msgstr "Druckauftrag in Warteschlange stellen"
 
-#| msgid "Checkout Kit"
 msgid "Bulk Check-out Items"
 msgstr "Artikel gesammelt herausgeben"
 
 msgid "OR"
 msgstr "ODER"
 
-#| msgid "— Select an Asset Holder —"
 msgid "— Select a Location —"
 msgstr "— Lagerort auswählen —"
 
-#| msgid "— Select an Asset Holder —"
 msgid "— Select an Asset —"
 msgstr "— Asset auswählen —"
 
 msgid "From Location (source of stock)"
 msgstr "Aus Lagerort (Bestandsquelle)"
 
-#| msgid "Delete Location"
 msgid "— Select Source Location —"
 msgstr "— Quell-Lagerort auswählen —"
 
 msgid "Quantity to Check-out (per item)"
 msgstr "Herauszugebende Menge (pro Artikel)"
 
-#| msgid "List"
 msgid "List View"
 msgstr "Listenansicht"
 
 msgid "Manage"
 msgstr "Verwalten"
 
-#| msgid "Object"
 msgid "Objects"
 msgstr "Objekte"
 
@@ -9482,7 +9179,6 @@ msgstr "Zurück zu aktiven Elementen"
 msgid "Create %(object_type)s"
 msgstr "%(object_type)s erstellen"
 
-#| msgid "No results found."
 msgid "No items found."
 msgstr "Keine Elemente gefunden."
 
@@ -9504,11 +9200,9 @@ msgstr "Alle Mandanten (Global)"
 msgid "Show All"
 msgstr "Alle anzeigen"
 
-#| msgid "Scoped to Tenant"
 msgid "Ungrouped Tenants"
 msgstr "Nicht gruppierte Mandanten"
 
-#| msgid "No tenant data available."
 msgid "No tenants available"
 msgstr "Keine Mandanten verfügbar"
 
@@ -9528,7 +9222,6 @@ msgstr "Suchen…"
 msgid "Search in website"
 msgstr "Website durchsuchen"
 
-#| msgid "Group:"
 msgid "(Group)"
 msgstr "(Gruppe)"
 
@@ -9606,37 +9299,30 @@ msgstr "Filter anwenden"
 msgid "Clear Filters"
 msgstr "Filter löschen"
 
-#| msgid "Clear Filters"
 msgid "Saved filters"
 msgstr "Gespeicherte Filter"
 
-#| msgid "— Select an Asset Holder —"
 msgid "Select a saved filter…"
 msgstr "Gespeicherten Filter auswählen…"
 
 msgid "Private"
 msgstr "Privat"
 
-#| msgid "Clear Filters"
 msgid "Clear saved filter"
 msgstr "Gespeicherten Filter zurücksetzen"
 
 msgid "Save current filter"
 msgstr "Aktuellen Filter speichern"
 
-#| msgid "Active Alerts"
 msgid "e.g. Active laptops"
 msgstr "z. B. Aktive Laptops"
 
-#| msgid "Purchase cost by tenant"
 msgid "Share with my tenant"
 msgstr "Mit meinem Mandanten teilen"
 
-#| msgid "Global (No Tenant)"
 msgid "Make global (all tenants)"
 msgstr "Global machen (alle Mandanten)"
 
-#| msgid "Save layout"
 msgid "Save filter"
 msgstr "Filter speichern"
 
@@ -9655,29 +9341,24 @@ msgstr "Suchen..."
 msgid "Clear search"
 msgstr "Suche löschen"
 
-#| msgid "Locations"
 msgid "Quick actions"
 msgstr "Schnellaktionen"
 
-#| msgid "Any Asset"
 msgid "Add Asset"
 msgstr "Asset hinzufügen"
 
 msgid "Scan barcode or QR code"
 msgstr "Barcode oder QR-Code scannen"
 
-#| msgid "Open user menu"
 msgid "Open scanner"
 msgstr "Scanner öffnen"
 
-#| msgid "Scanned"
 msgid "Scan"
 msgstr "Scannen"
 
 msgid "Home"
 msgstr "Startseite"
 
-#| msgid "Log Scanned Asset"
 msgid "Scan to Find Asset"
 msgstr "Scannen, um Asset zu finden"
 
@@ -9743,11 +9424,9 @@ msgstr "Total Purchased Seats"
 msgid "0 (Fully Allocated)"
 msgstr "0 (Fully Allocated)"
 
-#| msgid "Check Out Asset:"
 msgid "Check Out License:"
 msgstr "Lizenz herausgeben:"
 
-#| msgid "Associated Licenses"
 msgid "Assign License"
 msgstr "Lizenz zuweisen"
 
@@ -9757,11 +9436,9 @@ msgstr "- Lizenzen - ITAMbox"
 msgid "Licenses / License Entitlements"
 msgstr "Lizenzen / License Entitlements"
 
-#| msgid "Check Out..."
 msgid "Check Out Seat..."
 msgstr "Platz herausgeben..."
 
-#| msgid "Assignments"
 msgid "Kit Assignments"
 msgstr "Kit-Zuweisungen"
 
@@ -9774,7 +9451,6 @@ msgstr "No active seats assigned for this license entitlement."
 msgid "Kits Allocating this License"
 msgstr "Kits, die diese Lizenz zuweisen"
 
-#| msgid "No assets currently located at this site."
 msgid "No kits allocate this license."
 msgstr "Keine Kits weisen diese Lizenz zu."
 
@@ -9794,7 +9470,6 @@ msgstr ""
 "Anscheinend besteht keine aktive Internetverbindung. Bitte überprüfen Sie "
 "Ihre Netzwerkkabel oder WLAN-Einstellungen."
 
-#| msgid "Registered Location"
 msgid "Retry Connection"
 msgstr "Verbindung erneut versuchen"
 
@@ -9810,30 +9485,24 @@ msgstr "Ausgebuchte Assets"
 msgid "No checked out assets assigned to this holder."
 msgstr "No checked out assets assigned to this holder."
 
-#| msgid "No checked out assets assigned to this holder."
 msgid "No checked out accessories assigned to this holder."
 msgstr "Diesem Inhaber ist kein herausgegebenes Zubehör zugewiesen."
 
-#| msgid "Consumable Usage"
 msgid "Consumable Dispatches"
 msgstr "Verbrauchsmaterial-Ausgaben"
 
-#| msgid "No consumables assigned to this asset."
 msgid "No consumables assigned to this holder."
 msgstr "Diesem Inhaber sind keine Verbrauchsmaterialien zugewiesen."
 
-#| msgid "Associated Licenses"
 msgid "Software Licenses"
 msgstr "Software-Lizenzen"
 
-#| msgid "No checked out assets assigned to this holder."
 msgid "No software license seats assigned to this holder."
 msgstr "Diesem Inhaber sind keine Software-Lizenzplätze zugewiesen."
 
 msgid "Signed Custody EULAs"
 msgstr "Unterzeichnete Verwahrungs-EULAs"
 
-#| msgid "No active checkout assignments logged for this peripheral."
 msgid "No electronic custody receipts logged for this holder."
 msgstr ""
 "Für diesen Inhaber sind keine elektronischen Übergabeprotokolle erfasst."
@@ -9901,7 +9570,6 @@ msgstr "License Seats"
 msgid "Title:"
 msgstr "Title:"
 
-#| msgid "Title"
 msgid "No title"
 msgstr "Kein Titel"
 
@@ -10003,29 +9671,24 @@ msgstr "Assets Located in this Specific Location"
 msgid "No assets assigned to this specific location."
 msgstr "No assets assigned to this specific location."
 
-#| msgid "No accessories assigned to this asset."
 msgid "No accessories stored in this location."
 msgstr "An diesem Lagerort ist kein Zubehör gelagert."
 
-#| msgid "No consumables assigned to this asset."
 msgid "No consumables stored in this location."
 msgstr "An diesem Lagerort sind keine Verbrauchsmaterialien gelagert."
 
-#| msgid "No child locations defined under this location."
 msgid "No components stored in this location."
 msgstr "An diesem Lagerort sind keine Komponenten gelagert."
 
 msgid "Historical Checkout Log"
 msgstr "Verlauf der Herausgaben"
 
-#| msgid "No child locations defined under this location."
 msgid "No checkout logs for this location."
 msgstr "Für diesen Lagerort sind keine Herausgaben protokolliert."
 
 msgid "Audit Campaigns run in this Location"
 msgstr "In diesem Lagerort durchgeführte Audit-Kampagnen"
 
-#| msgid "No child locations defined under this location."
 msgid "No audit campaigns logged for this location."
 msgstr "Für diesen Lagerort sind keine Audit-Kampagnen erfasst."
 
@@ -10138,7 +9801,6 @@ msgstr ""
 "Für diese Mandantengruppe sind derzeit keine Verwahrungsrichtlinien oder "
 "-vorlagen registriert."
 
-#| msgid "Request Details"
 msgid "Role Details"
 msgstr "Rollendetails"
 
@@ -10149,7 +9811,6 @@ msgstr ""
 "Der Mandant kann nach der Erstellung nicht mehr geändert werden. Um einen "
 "anderen Mandanten zu verwenden, erstellen Sie bitte eine neue Rolle."
 
-#| msgid "Permissions"
 msgid "Permissions Matrix"
 msgstr "Berechtigungsmatrix"
 
@@ -10161,37 +9822,30 @@ msgstr ""
 "Berechtigungen auswählen. Granulare Berechtigungen ermöglichen die Trennung "
 "von Erstellungs- und Bearbeitungsfunktionen."
 
-#| msgid "Object Deleted"
 msgid "Object / Model"
 msgstr "Objekt / Modell"
 
 msgid "Read"
 msgstr "Read"
 
-#| msgid "Toggle Filters"
 msgid "Toggle all Read"
 msgstr "Alle Leserechte umschalten"
 
-#| msgid "Toggle Filters"
 msgid "Toggle all Create"
 msgstr "Alle Erstellungsrechte umschalten"
 
-#| msgid "Toggle navigation"
 msgid "Toggle all Edit"
 msgstr "Alle Bearbeitungsrechte umschalten"
 
-#| msgid "Toggle Filters"
 msgid "Toggle all Delete"
 msgstr "Alle Löschrechte umschalten"
 
 msgid "Row All"
 msgstr "Zeile alle"
 
-#| msgid "Toggle Dropdown"
 msgid "Toggle all in row"
 msgstr "Alle in der Zeile umschalten"
 
-#| msgid "Permissions"
 msgid "Additional Permissions"
 msgstr "Zusätzliche Berechtigungen"
 
@@ -10202,7 +9856,6 @@ msgstr ""
 "Aktivieren Sie spezielle Berechtigungen, die administrative oder delegierte "
 "Funktionen steuern."
 
-#| msgid "Requester Notes:"
 msgid "Request on behalf of others"
 msgstr "Im Namen anderer anfordern"
 
@@ -10233,19 +9886,15 @@ msgstr ""
 "Erlaubt das Vereinnahmen von Bestand aus einer Bestellung "
 "(procurement.receive_purchaseorder)."
 
-#| msgid "Assigned Users ("
 msgid "Assign Users to"
 msgstr "Benutzer zuweisen zu"
 
-#| msgid "- ITAMbox"
 msgid "— ITAMbox"
 msgstr "— ITAMbox"
 
-#| msgid "Organization / Regions"
 msgid "Organization / Roles"
 msgstr "Organisation / Rollen"
 
-#| msgid "Back to Upload"
 msgid "Back to Role"
 msgstr "Zurück zur Rolle"
 
@@ -10263,22 +9912,18 @@ msgstr ""
 "                    anderen Rolle vorhanden sind, werden neu zugewiesen; Benutzer, die diese Rolle bereits innehaben, bleiben unverändert.\n"
 "                    "
 
-#| msgid "Assigned Users ("
 msgid "Assign Users"
 msgstr "Benutzer zuweisen"
 
-#| msgid "Assets in this Role"
 msgid "user(s) with this role"
 msgstr "Benutzer mit dieser Rolle"
 
-#| msgid "Permissions"
 msgid "Permissions List"
 msgstr "Berechtigungsliste"
 
 msgid "Additional Capabilities"
 msgstr "Zusätzliche Funktionen"
 
-#| msgid "This contact has no active assignments."
 msgid "This role has no permissions."
 msgstr "Diese Rolle hat keine Berechtigungen."
 
@@ -10303,47 +9948,36 @@ msgstr "location"
 msgid "- Tenant Details - ITAMbox"
 msgstr "- Tenant Details - ITAMbox"
 
-#| msgid "Custody Receipts"
 msgid "Custody Policies"
 msgstr "Verwahrungsrichtlinien"
 
-#| msgid "Loading..."
 msgid "Loading Sites..."
 msgstr "Standorte werden geladen..."
 
-#| msgid "Loading..."
 msgid "Loading Locations..."
 msgstr "Lagerorte werden geladen..."
 
-#| msgid "Associated Asset Holders"
 msgid "Loading Asset Holders..."
 msgstr "Asset-Inhaber werden geladen..."
 
-#| msgid "Loading..."
 msgid "Loading Assets..."
 msgstr "Assets werden geladen..."
 
-#| msgid "Associated Accessories"
 msgid "Loading Accessories..."
 msgstr "Zubehör wird geladen..."
 
-#| msgid "Associated Consumables"
 msgid "Loading Consumables..."
 msgstr "Verbrauchsmaterialien werden geladen..."
 
-#| msgid "Kit Components"
 msgid "Loading Components..."
 msgstr "Komponenten werden geladen..."
 
-#| msgid "Loading..."
 msgid "Loading Licenses..."
 msgstr "Lizenzen werden geladen..."
 
-#| msgid "Loading..."
 msgid "Loading Kits..."
 msgstr "Kits werden geladen..."
 
-#| msgid "Associated Subscriptions"
 msgid "Loading Subscriptions..."
 msgstr "Abonnements werden geladen..."
 
@@ -10428,11 +10062,9 @@ msgstr "TOTP-QR-Code"
 msgid "Or enter this key manually"
 msgstr "Oder geben Sie diesen Schlüssel manuell ein"
 
-#| msgid "Confirm Delete"
 msgid "Confirm &amp; enable"
 msgstr "Bestätigen &amp; aktivieren"
 
-#| msgid "Sign up"
 msgid "Sign out"
 msgstr "Abmelden"
 
@@ -10445,7 +10077,6 @@ msgstr "- Software Catalog - ITAMbox"
 msgid "Software Catalog Details"
 msgstr "Software Catalog Details"
 
-#| msgid "Licenses / License Entitlements"
 msgid "Licenses &amp; Entitlements"
 msgstr "Lizenzen &amp; Berechtigungen"
 
@@ -10455,7 +10086,6 @@ msgstr "Installed Instances on Assets / Geräte"
 msgid "This software catalog item is not currently installed on any asset."
 msgstr "This software catalog item is not currently installed on any asset."
 
-#| msgid "Licenses / License Entitlements"
 msgid "Associated Software Licenses &amp; Entitlements"
 msgstr "Zugehörige Softwarelizenzen &amp; Berechtigungen"
 
@@ -10522,23 +10152,18 @@ msgstr "Licensed Qty:"
 msgid "Assigned Qty:"
 msgstr "Assigned Qty:"
 
-#| msgid "Subscriptions:"
 msgid "Cancel Subscription:"
 msgstr "Abonnement kündigen:"
 
-#| msgid "Subscription"
 msgid "Cancel Subscription"
 msgstr "Abonnement kündigen"
 
-#| msgid "Assign Subscription"
 msgid "Assign Subscription:"
 msgstr "Abonnement zuweisen:"
 
-#| msgid "Subscriptions:"
 msgid "Renew Subscription:"
 msgstr "Abonnement verlängern:"
 
-#| msgid "Subscription"
 msgid "Renew Subscription"
 msgstr "Abonnement verlängern"
 
@@ -10557,7 +10182,6 @@ msgstr "Open Admin Portal"
 msgid "No subscriptions linked to this provider yet."
 msgstr "No subscriptions linked to this provider yet."
 
-#| msgid "No contacts are assigned to this role yet."
 msgid "No contacts are assigned to this provider yet."
 msgstr "Diesem Anbieter sind noch keine Kontakte zugewiesen."
 
@@ -10582,19 +10206,15 @@ msgstr "Open Provider Portal"
 msgid "Renew..."
 msgstr "Verlängern..."
 
-#| msgid "Are you sure you want to delete the location:"
 msgid "Are you sure you want to suspend this subscription?"
 msgstr "Möchten Sie dieses Abonnement wirklich aussetzen?"
 
-#| msgid "Spend"
 msgid "Suspend"
 msgstr "Aussetzen"
 
-#| msgid "Cancel"
 msgid "Cancel..."
 msgstr "Kündigen..."
 
-#| msgid "Assign Subscription"
 msgid "Assign Subscription..."
 msgstr "Abonnement zuweisen..."
 
@@ -10636,9 +10256,6 @@ msgstr "Aktive Token"
 
 msgid "Token"
 msgstr "Token"
-
-msgid "Permissions"
-msgstr "Permissions"
 
 msgid "Expires"
 msgstr "Ablaufdatum"
@@ -10742,7 +10359,6 @@ msgstr "Select one or more table configurations to clear."
 msgid "Save Changes"
 msgstr "Save Changes"
 
-#| msgid "User is not assigned to any groups."
 msgid "User has no active tenant memberships."
 msgstr "Der Benutzer hat keine aktiven Mandanten-Mitgliedschaften."
 
@@ -10755,27 +10371,15 @@ msgstr "No activity data available."
 msgid "View All Activity"
 msgstr "View All Activity"
 
-#| msgid "User"
 msgid "Username"
 msgstr "Benutzername"
 
-#| msgid "Fieldset Name:"
-msgid "First Name"
-msgstr "Vorname"
-
-#| msgid "Asset Name"
-msgid "Last Name"
-msgstr "Nachname"
-
-#| msgid "Email Address:"
 msgid "Email Address"
 msgstr "E-Mail-Adresse"
 
-#| msgid "Active Alerts"
 msgid "Active Status"
 msgstr "Aktiv-Status"
 
-#| msgid "Status"
 msgid "Staff Status"
 msgstr "Mitarbeiter-Status"
 
@@ -10785,7 +10389,6 @@ msgstr "Mitarbeiter"
 msgid "Non-Staff"
 msgstr "Kein Mitarbeiter"
 
-#| msgid "Requestable Status:"
 msgid "Superuser Status"
 msgstr "Superuser-Status"
 
@@ -10795,19 +10398,15 @@ msgstr "Superuser"
 msgid "Regular User"
 msgstr "Normaler Benutzer"
 
-#| msgid "Create one"
 msgid "Date Joined"
 msgstr "Beitrittsdatum"
 
-#| msgid "Login"
 msgid "Last Login"
 msgstr "Letzte Anmeldung"
 
-#| msgid "Tenant Membership"
 msgid "Remove Membership"
 msgstr "Mitgliedschaft entfernen"
 
-#| msgid "No custom fields assigned."
 msgid "No memberships assigned."
 msgstr "Keine Mitgliedschaften zugewiesen."
 
@@ -10841,7 +10440,6 @@ msgstr ""
 "Klartext-Passwörter werden nicht gespeichert. Lassen Sie dieses Feld beim "
 "Bearbeiten eines Benutzers leer, um das aktuelle Passwort beizubehalten."
 
-#| msgid "Leave blank to use the default title."
 msgid "Leave blank to keep the current password."
 msgstr "Leer lassen, um das aktuelle Passwort beizubehalten."
 
@@ -10851,22 +10449,18 @@ msgstr "Nur Superuser können den Superuser-Status vergeben."
 msgid "Only superusers can grant staff status."
 msgstr "Nur Superuser können den Mitarbeiter-Status vergeben."
 
-#| msgid "Per Page"
 msgid "Items Per Page"
 msgstr "Einträge pro Seite"
 
-#| msgid "Change language"
 msgid "Language"
 msgstr "Sprache"
 
 msgid "Interface language. Applies across the whole application."
 msgstr "Sprache der Benutzeroberfläche. Gilt für die gesamte Anwendung."
 
-#| msgid "Available"
 msgid "Available Columns"
 msgstr "Verfügbare Spalten"
 
-#| msgid "All Standard Columns"
 msgid "Selected Columns"
 msgstr "Ausgewählte Spalten"
 
@@ -10891,7 +10485,6 @@ msgid "\"%(prefix)s\" is not a valid IP address or CIDR prefix."
 msgstr ""
 "„%(prefix)s“ ist keine gültige IP-Adresse oder kein gültiges CIDR-Präfix."
 
-#| msgid "Weight:"
 msgid "Light"
 msgstr "Hell"
 
@@ -10901,7 +10494,10 @@ msgstr "Dunkel"
 msgid "User Preference"
 msgstr "Benutzerpräferenz"
 
-#| msgid "Allocated"
+#| msgid "Enabled"
+msgid "Write Enabled"
+msgstr "Schreibzugriff aktiviert"
+
 msgid "Allowed IPs"
 msgstr "Zulässige IPs"
 
@@ -11036,9 +10632,6 @@ msgstr "Sie können Ihr eigenes Benutzerkonto nicht löschen."
 #~ msgid "Contact Person:"
 #~ msgstr "Contact Person:"
 
-#~ msgid "Content Type:"
-#~ msgstr "Inhaltstyp:"
-
 #~ msgid "Day"
 #~ msgstr "Day"
 
@@ -11069,9 +10662,6 @@ msgstr "Sie können Ihr eigenes Benutzerkonto nicht löschen."
 #~ msgid "Execution & Activity Logs"
 #~ msgstr "Execution & Activity Logs"
 
-#~ msgid "File Extension:"
-#~ msgstr "File Extension:"
-
 #~ msgid "Generated Attachments"
 #~ msgstr "Generated Attachments"
 
@@ -11084,14 +10674,8 @@ msgstr "Sie können Ihr eigenes Benutzerkonto nicht löschen."
 #~ msgid "Historical runs queue"
 #~ msgstr "Historical runs queue"
 
-#~ msgid "Is Active"
-#~ msgstr "Is Active"
-
 #~ msgid "Label:"
 #~ msgstr "Label:"
-
-#~ msgid "MIME Type:"
-#~ msgstr "MIME Type:"
 
 #~ msgid "Monitor the status and execution logs of asynchronous operations."
 #~ msgstr "Monitor the status and execution logs of asynchronous operations."
@@ -11151,9 +10735,6 @@ msgstr "Sie können Ihr eigenes Benutzerkonto nicht löschen."
 #~ msgid "Tasks Queue"
 #~ msgstr "Tasks Queue"
 
-#~ msgid "Template Code:"
-#~ msgstr "Template Code:"
-
 #~ msgid "Template HTML/Jinja Code:"
 #~ msgstr "Template HTML/Jinja Code:"
 
@@ -11208,9 +10789,6 @@ msgstr "Sie können Ihr eigenes Benutzerkonto nicht löschen."
 #~ msgid "processing..."
 #~ msgstr "processing..."
 
-#~ msgid "seats ("
-#~ msgstr "seats ("
-
 #~ msgid "″ height"
 #~ msgstr "″ height"
 
@@ -11228,9 +10806,6 @@ msgstr "Sie können Ihr eigenes Benutzerkonto nicht löschen."
 
 #~ msgid "Asset Holder Assignments"
 #~ msgstr "Asset-Inhaber-Zuweisungen"
-
-#~ msgid "Audit interval months"
-#~ msgstr "Prüfungsintervall (Monate)"
 
 #~ msgid "Start Campaign"
 #~ msgstr "Kampagne starten"

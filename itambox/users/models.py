@@ -68,11 +68,12 @@ class UserPreference(models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name='preferences' # Keep related_name for now, or change if needed
+        related_name='preferences', # Keep related_name for now, or change if needed
+        verbose_name=_("User"),
     )
     # Store various preferences as key-value pairs
     # Example: {"tables": {"assets.AssetTable": {"columns": [...]}}}
-    data = models.JSONField(default=dict, blank=True)
+    data = models.JSONField(default=dict, blank=True, verbose_name=_("Data"))
 
     def __str__(self):
         return f"Preferences for {self.user.username}"
@@ -102,19 +103,21 @@ class Token(ChangeLoggingMixin, models.Model):
     user = models.ForeignKey(
         to=settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name='tokens'
+        related_name='tokens',
+        verbose_name=_("User"),
     )
     tenant = models.ForeignKey(
         to='organization.Tenant',
         on_delete=models.CASCADE,
         related_name='tokens',
-        db_index=True
+        db_index=True,
+        verbose_name=_("Tenant"),
     )
     created = models.DateTimeField(auto_now_add=True)
-    expires = models.DateTimeField(blank=True, null=True, db_index=True)
-    last_used = models.DateTimeField(blank=True, null=True)
-    write_enabled = models.BooleanField(default=True)
-    description = models.CharField(max_length=200, blank=True)
+    expires = models.DateTimeField(blank=True, null=True, db_index=True, verbose_name=_("Expires"))
+    last_used = models.DateTimeField(blank=True, null=True, verbose_name=_("Last Used"))
+    write_enabled = models.BooleanField(default=True, verbose_name=_("Write Enabled"))
+    description = models.CharField(max_length=200, blank=True, verbose_name=_("Description"))
     allowed_ips = ArrayField(
         base_field=models.CharField(max_length=43),
         blank=True,

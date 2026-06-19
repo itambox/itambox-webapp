@@ -204,7 +204,7 @@ class ComponentTrackingTestCase(TransactionTestCase):
         response = self.client.get(reverse('assets:asset_detail', kwargs={'pk': self.asset.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Assigned System Hardware Specifications")
-        self.assertContains(response, "Active Hardware Modifications & Upgrades")
+        self.assertContains(response, "Active Hardware Modifications &amp; Upgrades")
         self.assertContains(response, "16GB DDR5 RAM")
         self.assertContains(response, "Qty: <strong>2</strong>")
 

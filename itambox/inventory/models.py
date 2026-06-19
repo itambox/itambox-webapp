@@ -136,18 +136,20 @@ class Component(AbstractInventoryItem):
     objects = TenantScopingComponentManager()
     all_objects = AllObjectsComponentManager()
 
-    specs = models.JSONField(default=dict, blank=True)
+    specs = models.JSONField(default=dict, blank=True, verbose_name=_("Specs"))
     tenant = models.ForeignKey(
         'organization.Tenant',
         on_delete=models.PROTECT,
         blank=True,
         null=True,
         related_name='components',
+        verbose_name=_("Tenant"),
         db_index=True
     )
     tags = models.ManyToManyField(
         'extras.Tag',
         related_name='components',
+        verbose_name=_("Tags"),
         blank=True
     )
 
@@ -195,7 +197,8 @@ class Accessory(AbstractInventoryItem):
     manufacturer = models.ForeignKey(
         'assets.Manufacturer',
         on_delete=models.PROTECT,
-        related_name='accessories'
+        related_name='accessories',
+        verbose_name=_("Manufacturer")
     )
     category = models.ForeignKey(
         'assets.Category',
@@ -203,6 +206,7 @@ class Accessory(AbstractInventoryItem):
         null=True,
         blank=True,
         related_name='accessories',
+        verbose_name=_("Category"),
         db_index=True
     )
     supplier = models.ForeignKey(
@@ -220,6 +224,7 @@ class Accessory(AbstractInventoryItem):
         blank=True,
         null=True,
         related_name='accessories',
+        verbose_name=_("Tenant"),
         db_index=True
     )
 
@@ -304,12 +309,13 @@ class ComponentStock(AbstractStock):
         return self.component.tenant if self.component_id else None
 
     component = models.ForeignKey(
-        Component, on_delete=models.PROTECT, related_name='stocks', db_index=True
+        Component, on_delete=models.PROTECT, related_name='stocks', verbose_name=_("Component"), db_index=True
     )
     location = models.ForeignKey(
         'organization.Location',
         on_delete=models.PROTECT,
         related_name='component_stocks',
+        verbose_name=_("Location"),
         db_index=True
     )
 
@@ -339,7 +345,7 @@ class AccessoryStock(AbstractStock):
         return self.accessory.tenant if self.accessory_id else None
 
     accessory = models.ForeignKey(
-        Accessory, on_delete=models.PROTECT, related_name='stocks', db_index=True
+        Accessory, on_delete=models.PROTECT, related_name='stocks', verbose_name=_("Accessory"), db_index=True
     )
 
     class Meta(AbstractStock.Meta):
@@ -368,7 +374,7 @@ class ConsumableStock(AbstractStock):
         return self.consumable.tenant if self.consumable_id else None
 
     consumable = models.ForeignKey(
-        Consumable, on_delete=models.PROTECT, related_name='stocks', db_index=True
+        Consumable, on_delete=models.PROTECT, related_name='stocks', verbose_name=_("Consumable"), db_index=True
     )
 
     class Meta(AbstractStock.Meta):
@@ -398,7 +404,7 @@ class ComponentAllocation(AbstractAssignment):
         return self.component.tenant if self.component_id else None
 
     component = models.ForeignKey(
-        Component, on_delete=models.PROTECT, related_name='allocations', db_index=True
+        Component, on_delete=models.PROTECT, related_name='allocations', verbose_name=_("Component"), db_index=True
     )
     assigned_asset = models.ForeignKey(
         'assets.Asset',
@@ -406,6 +412,7 @@ class ComponentAllocation(AbstractAssignment):
         null=True,
         blank=True,
         related_name='component_allocations',
+        verbose_name=_("Assigned Asset"),
         db_index=True
     )
     from_location = models.ForeignKey(
@@ -420,6 +427,7 @@ class ComponentAllocation(AbstractAssignment):
     tags = models.ManyToManyField(
         'extras.Tag',
         related_name='component_allocations',
+        verbose_name=_("Tags"),
         blank=True
     )
 
@@ -467,7 +475,7 @@ class AccessoryAssignment(AbstractAssignment):
     def tenant(self):
         return self.accessory.tenant if self.accessory_id else None
 
-    accessory = models.ForeignKey(Accessory, on_delete=models.PROTECT, related_name='assignments', db_index=True)
+    accessory = models.ForeignKey(Accessory, on_delete=models.PROTECT, related_name='assignments', verbose_name=_("Accessory"), db_index=True)
 
     class Meta(AbstractAssignment.Meta):
         verbose_name = _("Accessory Assignment")
@@ -507,7 +515,7 @@ class ConsumableAssignment(AbstractAssignment):
     def tenant(self):
         return self.consumable.tenant if self.consumable_id else None
 
-    consumable = models.ForeignKey(Consumable, on_delete=models.PROTECT, related_name='consumptions', db_index=True)
+    consumable = models.ForeignKey(Consumable, on_delete=models.PROTECT, related_name='consumptions', verbose_name=_("Consumable"), db_index=True)
 
     class Meta(AbstractAssignment.Meta):
         verbose_name = _("Consumable Consumption")
@@ -545,8 +553,8 @@ class Kit(JournalingMixin, TaggableMixin, CloneableMixin, ExportableMixin, SoftD
 
     name = models.CharField(max_length=100, verbose_name=_("Kit Name"))
     description = models.TextField(blank=True, verbose_name=_("Description"))
-    tenant = models.ForeignKey('organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='kits', db_index=True)
-    tags = models.ManyToManyField('extras.Tag', related_name='kits', blank=True)
+    tenant = models.ForeignKey('organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='kits', verbose_name=_("Tenant"), db_index=True)
+    tags = models.ManyToManyField('extras.Tag', related_name='kits', verbose_name=_("Tags"), blank=True)
 
     class Meta:
         ordering = ['name']

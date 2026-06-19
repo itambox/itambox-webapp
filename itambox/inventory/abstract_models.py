@@ -11,12 +11,13 @@ from .mixins import CheckableInventoryModelMixin
 
 class AbstractInventoryItem(CustomFieldDataMixin, CheckableInventoryModelMixin, AutoSlugMixin, SubscribableMixin, DeletableVaultModel):
     allow_global_tenant = True
-    name = models.CharField(max_length=255)
-    slug = models.SlugField(max_length=255)
+    name = models.CharField(max_length=255, verbose_name=_("Name"))
+    slug = models.SlugField(max_length=255, verbose_name=_("Slug"))
     manufacturer = models.ForeignKey(
         'assets.Manufacturer',
         on_delete=models.PROTECT,
-        related_name='%(class)ss'
+        related_name='%(class)ss',
+        verbose_name=_("Manufacturer")
     )
     category = models.ForeignKey(
         'assets.Category',
@@ -24,6 +25,7 @@ class AbstractInventoryItem(CustomFieldDataMixin, CheckableInventoryModelMixin, 
         null=True,
         blank=True,
         related_name='%(class)ss',
+        verbose_name=_("Category"),
         db_index=True
     )
     supplier = models.ForeignKey(
@@ -39,6 +41,7 @@ class AbstractInventoryItem(CustomFieldDataMixin, CheckableInventoryModelMixin, 
         max_length=100,
         blank=True,
         db_index=True,
+        verbose_name=_("Part Number"),
         help_text=_("SKU or manufacturer part number")
     )
     min_qty = models.PositiveIntegerField(
@@ -52,18 +55,20 @@ class AbstractInventoryItem(CustomFieldDataMixin, CheckableInventoryModelMixin, 
         verbose_name=_("Allow Over-allocation"),
         help_text=_("Allow checkout count to exceed stock capacity")
     )
-    notes = models.TextField(blank=True)
+    notes = models.TextField(blank=True, verbose_name=_("Notes"))
     tenant = models.ForeignKey(
         'organization.Tenant',
         on_delete=models.PROTECT,
         blank=True,
         null=True,
         related_name='%(class)ss',
+        verbose_name=_("Tenant"),
         db_index=True
     )
     tags = models.ManyToManyField(
         'extras.Tag',
         related_name='%(app_label)s_%(class)s',
+        verbose_name=_("Tags"),
         blank=True
     )
 
@@ -85,13 +90,14 @@ class AbstractStock(ChangeLoggingMixin, BaseModel):
         'organization.Location',
         on_delete=models.PROTECT,
         related_name='%(class)s_stocks',
+        verbose_name=_("Location"),
         db_index=True
     )
     # Signed: when an item allows over-allocation, a checkout can drive on-hand
     # below zero. The balance must be able to represent that deficit so check-in
     # restores symmetrically instead of materialising phantom stock. Non-over-
     # allocatable items are guarded against going negative in adjust_inventory_stock.
-    qty = models.IntegerField(default=0)
+    qty = models.IntegerField(default=0, verbose_name=_("Quantity"))
 
     class Meta:
         abstract = True
@@ -105,6 +111,7 @@ class AbstractAssignment(JournalingMixin, TaggableMixin, SoftDeleteMixin, Change
         null=True,
         blank=True,
         related_name='%(class)s_assignments',
+        verbose_name=_("Assigned Holder"),
         db_index=True
     )
     assigned_location = models.ForeignKey(
@@ -113,6 +120,7 @@ class AbstractAssignment(JournalingMixin, TaggableMixin, SoftDeleteMixin, Change
         null=True,
         blank=True,
         related_name='%(class)s_assignments',
+        verbose_name=_("Assigned Location"),
         db_index=True
     )
     assigned_asset = models.ForeignKey(
@@ -121,6 +129,7 @@ class AbstractAssignment(JournalingMixin, TaggableMixin, SoftDeleteMixin, Change
         null=True,
         blank=True,
         related_name='%(class)s_assignments',
+        verbose_name=_("Assigned Asset"),
         db_index=True
     )
     from_location = models.ForeignKey(
@@ -133,9 +142,9 @@ class AbstractAssignment(JournalingMixin, TaggableMixin, SoftDeleteMixin, Change
         db_index=True
     )
     qty = models.PositiveIntegerField(default=1, verbose_name=_("Checkout Quantity"))
-    assigned_date = models.DateTimeField(default=timezone.now)
-    notes = models.TextField(blank=True)
-    tags = models.ManyToManyField('extras.Tag', related_name='%(class)s_assignments', blank=True)
+    assigned_date = models.DateTimeField(default=timezone.now, verbose_name=_("Assigned Date"))
+    notes = models.TextField(blank=True, verbose_name=_("Notes"))
+    tags = models.ManyToManyField('extras.Tag', related_name='%(class)s_assignments', verbose_name=_("Tags"), blank=True)
 
     class Meta:
         abstract = True

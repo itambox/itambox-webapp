@@ -712,7 +712,7 @@ class RequisitionSystemTestCase(TestCase):
         response = self.client.get(reverse('assets:asset_detail', kwargs={'pk': self.asset_requestable.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, 'Check Out...')
-        self.assertNotContains(response, 'Claim & Confirm Pickup')
+        self.assertNotContains(response, 'Claim &amp; Confirm Pickup')
 
         # 2. Admin visits asset page:
         # Should see Check-out button (has permission) but NOT see Claim button.
@@ -720,7 +720,7 @@ class RequisitionSystemTestCase(TestCase):
         response = self.client.get(reverse('assets:asset_detail', kwargs={'pk': self.asset_requestable.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Check Out...')
-        self.assertNotContains(response, 'Claim & Confirm Pickup')
+        self.assertNotContains(response, 'Claim &amp; Confirm Pickup')
 
         # 3. Create approved request for requester allocating this asset
         req = AssetRequest.objects.create(
@@ -741,7 +741,7 @@ class RequisitionSystemTestCase(TestCase):
         response = self.client.get(reverse('assets:asset_detail', kwargs={'pk': self.asset_requestable.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, 'Check Out...')
-        self.assertContains(response, 'Claim & Confirm Pickup')
+        self.assertContains(response, 'Claim &amp; Confirm Pickup')
 
     def test_inventory_request_validation(self):
         # Setup inventory items

@@ -42,20 +42,24 @@ class Software(CustomFieldDataMixin, DeletableVaultModel):
         blank=True,
         related_name='software',
         db_index=True,
+        verbose_name=_("Tenant"),
         help_text=_("Owning tenant. Null denotes a shared/global catalogue entry visible to all tenants."),
     )
     name = models.CharField(
         max_length=255,
+        verbose_name=_("Name"),
         help_text=_("Name of the software product (e.g., Microsoft Visio Professional 2021). Unique per tenant.")
     )
     manufacturer = models.ForeignKey(
         to='assets.Manufacturer',
         on_delete=models.PROTECT,
-        related_name='software_products'
+        related_name='software_products',
+        verbose_name=_("Manufacturer")
     )
     version = models.CharField(
         max_length=50,
         blank=True,
+        verbose_name=_("Version"),
         help_text=_("Current version (e.g., 2021, 16.0)")
     )
     category = models.CharField(
@@ -63,26 +67,31 @@ class Software(CustomFieldDataMixin, DeletableVaultModel):
         choices=SoftwareCategoryChoices.choices,
         blank=True,
         db_index=True,
+        verbose_name=_("Category"),
         help_text=_("Functional category")
     )
     license_type = models.CharField(
         max_length=50,
         choices=SoftwareLicenseTypeChoices.choices,
         blank=True,
+        verbose_name=_("License Type"),
         help_text=_("Default license type")
     )
     website = models.URLField(
         blank=True,
+        verbose_name=_("Website"),
         help_text=_("Product homepage or vendor URL")
     )
     description = models.TextField(
         blank=True,
+        verbose_name=_("Description"),
         help_text=_("Optional description of the software product.")
     )
     tags = models.ManyToManyField(
         to=Tag,
         blank=True,
-        related_name='software'
+        related_name='software',
+        verbose_name=_("Tags")
     )
 
     class Meta:
@@ -157,22 +166,26 @@ class InstalledSoftware(ChangeLoggingMixin, BaseModel):
         to='assets.Asset',
         on_delete=models.CASCADE,
         related_name='installed_software',
-        db_index=True
+        db_index=True,
+        verbose_name=_("Asset")
     )
     software = models.ForeignKey(
         to=Software,
         on_delete=models.PROTECT,
-        related_name='installed_instances'
+        related_name='installed_instances',
+        verbose_name=_("Software")
     )
     version_detected = models.CharField(
         max_length=100,
         blank=True,
+        verbose_name=_("Version Detected"),
         help_text=_("Specific version discovered on the asset (e.g., 16.78.1)")
     )
     install_date = models.DateField(
         blank=True,
         null=True,
         db_index=True,
+        verbose_name=_("Install Date"),
         help_text=_("Estimated or known installation date")
     )
     discovered_by_agent = models.CharField(
@@ -185,10 +198,12 @@ class InstalledSoftware(ChangeLoggingMixin, BaseModel):
         blank=True,
         null=True,
         db_index=True,
+        verbose_name=_("Last Seen Date"),
         help_text=_("Timestamp when this software was last detected on the asset")
     )
     notes = models.TextField(
         blank=True,
+        verbose_name=_("Notes"),
         help_text=_("Optional notes specific to this installation")
     )
 

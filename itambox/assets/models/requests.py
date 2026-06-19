@@ -21,27 +21,29 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
         blank=True,
         null=True,
         related_name='asset_requests',
-        db_index=True
+        db_index=True,
+        verbose_name=_("Tenant")
     )
-    requester = models.ForeignKey(User, on_delete=models.PROTECT, related_name='asset_requests', db_index=True)
-    asset = models.ForeignKey('assets.Asset', on_delete=models.SET_NULL, null=True, blank=True, related_name='requests', db_index=True)
-    asset_type = models.ForeignKey('assets.AssetType', on_delete=models.SET_NULL, null=True, blank=True, related_name='requests', db_index=True)
-    component = models.ForeignKey('inventory.Component', on_delete=models.SET_NULL, null=True, blank=True, related_name='requests', db_index=True)
-    accessory = models.ForeignKey('inventory.Accessory', on_delete=models.SET_NULL, null=True, blank=True, related_name='requests', db_index=True)
-    consumable = models.ForeignKey('inventory.Consumable', on_delete=models.SET_NULL, null=True, blank=True, related_name='requests', db_index=True)
-    qty = models.PositiveIntegerField(default=1)
+    requester = models.ForeignKey(User, on_delete=models.PROTECT, related_name='asset_requests', db_index=True, verbose_name=_("Requester"))
+    asset = models.ForeignKey('assets.Asset', on_delete=models.SET_NULL, null=True, blank=True, related_name='requests', db_index=True, verbose_name=_("Asset"))
+    asset_type = models.ForeignKey('assets.AssetType', on_delete=models.SET_NULL, null=True, blank=True, related_name='requests', db_index=True, verbose_name=_("Asset Type"))
+    component = models.ForeignKey('inventory.Component', on_delete=models.SET_NULL, null=True, blank=True, related_name='requests', db_index=True, verbose_name=_("Component"))
+    accessory = models.ForeignKey('inventory.Accessory', on_delete=models.SET_NULL, null=True, blank=True, related_name='requests', db_index=True, verbose_name=_("Accessory"))
+    consumable = models.ForeignKey('inventory.Consumable', on_delete=models.SET_NULL, null=True, blank=True, related_name='requests', db_index=True, verbose_name=_("Consumable"))
+    qty = models.PositiveIntegerField(default=1, verbose_name=_("Quantity"))
     source_location = models.ForeignKey(
         'organization.Location',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='source_requests',
-        db_index=True
+        db_index=True,
+        verbose_name=_("Source Location")
     )
-    status = models.CharField(max_length=20, choices=RequestStatusChoices.choices, default=RequestStatusChoices.PENDING, db_index=True)
+    status = models.CharField(max_length=20, choices=RequestStatusChoices.choices, default=RequestStatusChoices.PENDING, db_index=True, verbose_name=_("Status"))
     request_date = models.DateTimeField(auto_now_add=True, db_index=True)
-    response_date = models.DateTimeField(null=True, blank=True)
-    responded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='asset_request_responses')
+    response_date = models.DateTimeField(null=True, blank=True, verbose_name=_("Response Date"))
+    responded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='asset_request_responses', verbose_name=_("Responded By"))
 
     # Intended assignee target fields (delegated targets)
     assigned_user = models.ForeignKey(
@@ -49,21 +51,24 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='asset_requests'
+        related_name='asset_requests',
+        verbose_name=_("Assigned User")
     )
     assigned_location = models.ForeignKey(
         'organization.Location',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='asset_requests'
+        related_name='asset_requests',
+        verbose_name=_("Assigned Location")
     )
     assigned_asset = models.ForeignKey(
         'assets.Asset',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='child_requests_for'
+        related_name='child_requests_for',
+        verbose_name=_("Assigned Asset")
     )
 
     parent = models.ForeignKey(
@@ -72,13 +77,14 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
         null=True,
         blank=True,
         related_name='sub_requests',
-        db_index=True
+        db_index=True,
+        verbose_name=_("Parent")
     )
-    is_group = models.BooleanField(default=False, db_index=True)
+    is_group = models.BooleanField(default=False, db_index=True, verbose_name=_("Is Group"))
 
-    notes = models.TextField(blank=True)
-    response_notes = models.TextField(blank=True)
-    tags = models.ManyToManyField('extras.Tag', related_name='asset_requests_tagged', blank=True)
+    notes = models.TextField(blank=True, verbose_name=_("Notes"))
+    response_notes = models.TextField(blank=True, verbose_name=_("Response Notes"))
+    tags = models.ManyToManyField('extras.Tag', related_name='asset_requests_tagged', blank=True, verbose_name=_("Tags"))
 
     @property
     def assigned_target(self):

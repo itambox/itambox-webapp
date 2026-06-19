@@ -34,24 +34,27 @@ class Location(CustomFieldDataMixin, SubscribableMixin, StandardModel, SoftDelet
         'Site', # Use string reference
         on_delete=models.PROTECT, # Or PROTECT if locations shouldn't be deleted when site is
         related_name='locations',
-        db_index=True
+        db_index=True,
+        verbose_name=_("Site")
         # null=True # REMOVED temporary null
         # No blank=True as per requirements
     )
-    name = models.CharField(max_length=100, db_index=True) # Changed max_length based on Site/Region etc.
-    slug = models.SlugField(max_length=100)
+    name = models.CharField(max_length=100, db_index=True, verbose_name=_("Name")) # Changed max_length based on Site/Region etc.
+    slug = models.SlugField(max_length=100, verbose_name=_("Slug"))
     status = models.CharField(
         max_length=50,
         choices=STATUS_CHOICES,
         default=STATUS_ACTIVE,
-        db_index=True
+        db_index=True,
+        verbose_name=_("Status")
     )
     parent = models.ForeignKey(
         'self',
         on_delete=models.SET_NULL,
         related_name='children',
         blank=True,
-        null=True
+        null=True,
+        verbose_name=_("Parent")
     )
     tenant = models.ForeignKey(
         'Tenant',
@@ -59,11 +62,12 @@ class Location(CustomFieldDataMixin, SubscribableMixin, StandardModel, SoftDelet
         related_name='locations',
         blank=True,
         null=True,
-        db_index=True
+        db_index=True,
+        verbose_name=_("Tenant")
     )
-    facility = models.CharField(max_length=100, blank=True)
-    description = models.TextField(blank=True) # Using TextField for potentially longer descriptions
-    tags = models.ManyToManyField('extras.Tag', related_name="locations", blank=True)
+    facility = models.CharField(max_length=100, blank=True, verbose_name=_("Facility"))
+    description = models.TextField(blank=True, verbose_name=_("Description")) # Using TextField for potentially longer descriptions
+    tags = models.ManyToManyField('extras.Tag', related_name="locations", blank=True, verbose_name=_("Tags"))
 
     class Meta:
         ordering = ['site', 'name']
@@ -84,18 +88,19 @@ class Location(CustomFieldDataMixin, SubscribableMixin, StandardModel, SoftDelet
 class Region(StandardModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    name = models.CharField(max_length=100)
-    slug = models.SlugField(max_length=100)
+    name = models.CharField(max_length=100, verbose_name=_("Name"))
+    slug = models.SlugField(max_length=100, verbose_name=_("Slug"))
     parent = models.ForeignKey(
         'self',
         on_delete=models.SET_NULL,
         related_name='children',
         blank=True,
         null=True,
-        db_index=True
+        db_index=True,
+        verbose_name=_("Parent")
     )
-    description = models.TextField(blank=True)
-    tags = models.ManyToManyField('extras.Tag', related_name="regions", blank=True)
+    description = models.TextField(blank=True, verbose_name=_("Description"))
+    tags = models.ManyToManyField('extras.Tag', related_name="regions", blank=True, verbose_name=_("Tags"))
 
     class Meta:
         ordering = ['name']
@@ -115,17 +120,18 @@ class Region(StandardModel, SoftDeleteMixin):
 class SiteGroup(StandardModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    name = models.CharField(max_length=100)
-    slug = models.SlugField(max_length=100)
+    name = models.CharField(max_length=100, verbose_name=_("Name"))
+    slug = models.SlugField(max_length=100, verbose_name=_("Slug"))
     parent = models.ForeignKey(
         'self',
         on_delete=models.SET_NULL,
         related_name='children',
         blank=True,
-        null=True
+        null=True,
+        verbose_name=_("Parent")
     )
-    description = models.TextField(blank=True)
-    tags = models.ManyToManyField('extras.Tag', related_name="sitegroups", blank=True)
+    description = models.TextField(blank=True, verbose_name=_("Description"))
+    tags = models.ManyToManyField('extras.Tag', related_name="sitegroups", blank=True, verbose_name=_("Tags"))
 
     class Meta:
         ordering = ['name']
@@ -145,17 +151,18 @@ class SiteGroup(StandardModel, SoftDeleteMixin):
 class TenantGroup(StandardModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    name = models.CharField(max_length=100)
-    slug = models.SlugField(max_length=100)
+    name = models.CharField(max_length=100, verbose_name=_("Name"))
+    slug = models.SlugField(max_length=100, verbose_name=_("Slug"))
     parent = models.ForeignKey(
         'self',
         on_delete=models.SET_NULL,
         related_name='children',
         blank=True,
-        null=True
+        null=True,
+        verbose_name=_("Parent")
     )
-    description = models.TextField(blank=True)
-    tags = models.ManyToManyField('extras.Tag', related_name="tenantgroups", blank=True)
+    description = models.TextField(blank=True, verbose_name=_("Description"))
+    tags = models.ManyToManyField('extras.Tag', related_name="tenantgroups", blank=True, verbose_name=_("Tags"))
 
     class Meta:
         ordering = ['name']
@@ -175,18 +182,19 @@ class TenantGroup(StandardModel, SoftDeleteMixin):
 class Tenant(DeletableVaultModel, BookmarkableMixin):
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()
-    name = models.CharField(max_length=100)
-    slug = models.SlugField(max_length=100)
+    name = models.CharField(max_length=100, verbose_name=_("Name"))
+    slug = models.SlugField(max_length=100, verbose_name=_("Slug"))
     group = models.ForeignKey(
         TenantGroup,
         on_delete=models.SET_NULL,
         related_name='tenants',
         blank=True,
-        null=True
+        null=True,
+        verbose_name=_("Group")
     )
-    description = models.TextField(blank=True)
-    comments = models.TextField(blank=True)
-    tags = models.ManyToManyField('extras.Tag', related_name="tenants", blank=True)
+    description = models.TextField(blank=True, verbose_name=_("Description"))
+    comments = models.TextField(blank=True, verbose_name=_("Comments"))
+    tags = models.ManyToManyField('extras.Tag', related_name="tenants", blank=True, verbose_name=_("Tags"))
     currency = models.CharField(
         max_length=3,
         default=_default_currency,
@@ -234,22 +242,22 @@ class Site(DeletableVaultModel, BookmarkableMixin):
         (STATUS_RETIRED, _('Retired')),
     ]
 
-    name = models.CharField(max_length=100)
-    slug = models.SlugField(max_length=100)
-    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default=STATUS_ACTIVE, db_index=True)
+    name = models.CharField(max_length=100, verbose_name=_("Name"))
+    slug = models.SlugField(max_length=100, verbose_name=_("Slug"))
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default=STATUS_ACTIVE, db_index=True, verbose_name=_("Status"))
     # Use local models for FKs within the app
-    region = models.ForeignKey(Region, on_delete=models.SET_NULL, related_name='sites', blank=True, null=True, db_index=True)
-    group = models.ForeignKey(SiteGroup, on_delete=models.SET_NULL, related_name='sites', blank=True, null=True, db_index=True)
-    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name='sites', blank=True, null=True, db_index=True)
-    facility = models.CharField(max_length=100, blank=True)
-    time_zone = models.CharField(max_length=63, blank=True) # Consider using timezone_field package later
-    description = models.CharField(max_length=200, blank=True)
-    physical_address = models.CharField(max_length=200, blank=True)
-    shipping_address = models.CharField(max_length=200, blank=True)
-    latitude = models.DecimalField(max_digits=8, decimal_places=6, blank=True, null=True)
-    longitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
-    comments = models.TextField(blank=True)
-    tags = models.ManyToManyField('extras.Tag', related_name="sites", blank=True)
+    region = models.ForeignKey(Region, on_delete=models.SET_NULL, related_name='sites', blank=True, null=True, db_index=True, verbose_name=_("Region"))
+    group = models.ForeignKey(SiteGroup, on_delete=models.SET_NULL, related_name='sites', blank=True, null=True, db_index=True, verbose_name=_("Group"))
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name='sites', blank=True, null=True, db_index=True, verbose_name=_("Tenant"))
+    facility = models.CharField(max_length=100, blank=True, verbose_name=_("Facility"))
+    time_zone = models.CharField(max_length=63, blank=True, verbose_name=_("Time Zone")) # Consider using timezone_field package later
+    description = models.CharField(max_length=200, blank=True, verbose_name=_("Description"))
+    physical_address = models.CharField(max_length=200, blank=True, verbose_name=_("Physical Address"))
+    shipping_address = models.CharField(max_length=200, blank=True, verbose_name=_("Shipping Address"))
+    latitude = models.DecimalField(max_digits=8, decimal_places=6, blank=True, null=True, verbose_name=_("Latitude"))
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True, verbose_name=_("Longitude"))
+    comments = models.TextField(blank=True, verbose_name=_("Comments"))
+    tags = models.ManyToManyField('extras.Tag', related_name="sites", blank=True, verbose_name=_("Tags"))
 
     class Meta:
         ordering = ['name']
@@ -275,23 +283,25 @@ class AssetHolder(CustomFieldDataMixin, SubscribableMixin, StandardModel, SoftDe
         on_delete=models.SET_NULL, # Keep holder if user is deleted, set user link to null
         related_name='asset_holder_profiles', # Custom related_name
         blank=True,
-        null=True
+        null=True,
+        verbose_name=_("User")
     )
-    first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
+    first_name = models.CharField(max_length=100, verbose_name=_("First Name"))
+    last_name = models.CharField(max_length=100, verbose_name=_("Last Name"))
     upn = models.CharField(max_length=255, verbose_name=_('User Principal Name'))
-    email = models.EmailField(blank=True)
+    email = models.EmailField(blank=True, verbose_name=_("Email"))
     tenant = models.ForeignKey(
         Tenant,
         on_delete=models.PROTECT,
         blank=True,
         null=True,
         related_name='asset_holders',
-        db_index=True
+        db_index=True,
+        verbose_name=_("Tenant")
     )
-    description = models.TextField(blank=True)
-    comments = models.TextField(blank=True)
-    tags = models.ManyToManyField('extras.Tag', blank=True, related_name='organization_assetholders') # M2M to extras.Tag
+    description = models.TextField(blank=True, verbose_name=_("Description"))
+    comments = models.TextField(blank=True, verbose_name=_("Comments"))
+    tags = models.ManyToManyField('extras.Tag', blank=True, related_name='organization_assetholders', verbose_name=_("Tags")) # M2M to extras.Tag
 
     class Meta:
         ordering = ['last_name', 'first_name', 'upn']
@@ -322,9 +332,9 @@ class AssetHolder(CustomFieldDataMixin, SubscribableMixin, StandardModel, SoftDe
 class ContactRole(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    name = models.CharField(max_length=100)
-    slug = models.SlugField(max_length=100)
-    description = models.TextField(blank=True)
+    name = models.CharField(max_length=100, verbose_name=_("Name"))
+    slug = models.SlugField(max_length=100, verbose_name=_("Slug"))
+    description = models.TextField(blank=True, verbose_name=_("Description"))
 
     class Meta:
         ordering = ['name']
@@ -345,14 +355,14 @@ class ContactRole(AutoSlugMixin, StandardModel, SoftDeleteMixin):
 class Contact(CustomFieldDataMixin, StandardModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    name = models.CharField(max_length=100)
-    title = models.CharField(max_length=100, blank=True)
-    phone = models.CharField(max_length=50, blank=True)
-    email = models.EmailField(blank=True)
+    name = models.CharField(max_length=100, verbose_name=_("Name"))
+    title = models.CharField(max_length=100, blank=True, verbose_name=_("Title"))
+    phone = models.CharField(max_length=50, blank=True, verbose_name=_("Phone"))
+    email = models.EmailField(blank=True, verbose_name=_("Email"))
     web_url = models.URLField(blank=True, verbose_name=_("Web URL"))
-    description = models.TextField(blank=True)
-    comments = models.TextField(blank=True)
-    tags = models.ManyToManyField('extras.Tag', blank=True, related_name='organization_contacts')
+    description = models.TextField(blank=True, verbose_name=_("Description"))
+    comments = models.TextField(blank=True, verbose_name=_("Comments"))
+    tags = models.ManyToManyField('extras.Tag', blank=True, related_name='organization_contacts', verbose_name=_("Tags"))
 
     class Meta:
         ordering = ['name']
@@ -367,8 +377,8 @@ class Contact(CustomFieldDataMixin, StandardModel, SoftDeleteMixin):
 
 
 class ContactAssignment(ChangeLoggingMixin, BaseModel):
-    contact = models.ForeignKey(Contact, on_delete=models.CASCADE, related_name='assignments')
-    role = models.ForeignKey(ContactRole, on_delete=models.PROTECT, related_name='assignments')
+    contact = models.ForeignKey(Contact, on_delete=models.CASCADE, related_name='assignments', verbose_name=_("Contact"))
+    role = models.ForeignKey(ContactRole, on_delete=models.PROTECT, related_name='assignments', verbose_name=_("Role"))
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     assigned_object = GenericForeignKey('content_type', 'object_id')
@@ -381,6 +391,7 @@ class ContactAssignment(ChangeLoggingMixin, BaseModel):
             ('inactive', _('Inactive')),
         ],
         blank=True,
+        verbose_name=_("Priority"),
     )
 
     class Meta:
@@ -420,11 +431,12 @@ class TenantRole(StandardModel, SoftDeleteMixin):
     tenant = models.ForeignKey(
         'organization.Tenant',
         on_delete=models.CASCADE,
-        related_name='custom_roles'
+        related_name='custom_roles',
+        verbose_name=_("Tenant")
     )
-    name = models.CharField(max_length=100)
-    description = models.TextField(blank=True)
-    permissions = models.JSONField(default=list, blank=True)
+    name = models.CharField(max_length=100, verbose_name=_("Name"))
+    description = models.TextField(blank=True, verbose_name=_("Description"))
+    permissions = models.JSONField(default=list, blank=True, verbose_name=_("Permissions"))
 
     class Meta:
         ordering = ['name']
@@ -450,17 +462,20 @@ class TenantMembership(ChangeLoggingMixin, models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name='memberships'
+        related_name='memberships',
+        verbose_name=_("User")
     )
     tenant = models.ForeignKey(
         'organization.Tenant',
         on_delete=models.CASCADE,
-        related_name='memberships'
+        related_name='memberships',
+        verbose_name=_("Tenant")
     )
     role = models.ForeignKey(
         'organization.TenantRole',
         on_delete=models.PROTECT,
-        related_name='memberships'
+        related_name='memberships',
+        verbose_name=_("Role")
     )
     joined_at = models.DateTimeField(auto_now_add=True)
 
@@ -481,18 +496,19 @@ class TenantMembership(ChangeLoggingMixin, models.Model):
 class TenantInvitation(models.Model):
     objects = TenantScopingManager()
 
-    email = models.EmailField()
-    tenant = models.ForeignKey('organization.Tenant', on_delete=models.CASCADE)
+    email = models.EmailField(verbose_name=_("Email"))
+    tenant = models.ForeignKey('organization.Tenant', on_delete=models.CASCADE, verbose_name=_("Tenant"))
     role = models.ForeignKey(
         'organization.TenantRole',
         on_delete=models.CASCADE,
-        related_name='invitations'
+        related_name='invitations',
+        verbose_name=_("Role")
     )
     token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    invited_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    invited_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, verbose_name=_("Invited By"))
     created_at = models.DateTimeField(auto_now_add=True)
-    expires_at = models.DateTimeField()
-    accepted_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(verbose_name=_("Expires At"))
+    accepted_at = models.DateTimeField(null=True, blank=True, verbose_name=_("Accepted At"))
 
     @property
     def is_valid(self):
@@ -522,13 +538,15 @@ class CostCenter(AutoSlugMixin, CustomFieldDataMixin, StandardModel, SoftDeleteM
         blank=True,
         null=True,
         db_index=True,
+        verbose_name=_("Tenant"),
     )
-    name = models.CharField(max_length=100, db_index=True)
-    slug = models.SlugField(max_length=100)
+    name = models.CharField(max_length=100, db_index=True, verbose_name=_("Name"))
+    slug = models.SlugField(max_length=100, verbose_name=_("Slug"))
     code = models.CharField(
         max_length=50,
         db_index=True,
         help_text=_('Short identifier for this cost center (e.g. "CC-100").'),
+        verbose_name=_("Code"),
     )
     parent = models.ForeignKey(
         'self',
@@ -537,9 +555,10 @@ class CostCenter(AutoSlugMixin, CustomFieldDataMixin, StandardModel, SoftDeleteM
         null=True,
         blank=True,
         db_index=True,
+        verbose_name=_("Parent"),
     )
-    description = models.TextField(blank=True)
-    is_active = models.BooleanField(default=True, db_index=True)
+    description = models.TextField(blank=True, verbose_name=_("Description"))
+    is_active = models.BooleanField(default=True, db_index=True, verbose_name=_("Is Active"))
 
     class Meta:
         ordering = ['name']

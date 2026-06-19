@@ -43,12 +43,12 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
     # NOTE: asset status is a FK to StatusLabel; the lifecycle vocabulary is
     # StatusLabel.type (assets.choices.StatusTypeChoices), not a local choice set.
 
-    name = models.CharField(max_length=255)
-    asset_tag = models.CharField(max_length=50, blank=True)
-    serial_number = models.CharField(max_length=100, blank=True, db_index=True)
-    asset_type = models.ForeignKey('assets.AssetType', on_delete=models.PROTECT, related_name='assets', null=True, blank=True, db_index=True)
-    asset_role = models.ForeignKey('assets.AssetRole', on_delete=models.SET_NULL, blank=True, null=True, related_name='assets', db_index=True)
-    purchase_date = models.DateField(blank=True, null=True, db_index=True)
+    name = models.CharField(max_length=255, verbose_name=_("Name"))
+    asset_tag = models.CharField(max_length=50, blank=True, verbose_name=_("Asset Tag"))
+    serial_number = models.CharField(max_length=100, blank=True, db_index=True, verbose_name=_("Serial Number"))
+    asset_type = models.ForeignKey('assets.AssetType', on_delete=models.PROTECT, related_name='assets', null=True, blank=True, db_index=True, verbose_name=_("Asset Type"))
+    asset_role = models.ForeignKey('assets.AssetRole', on_delete=models.SET_NULL, blank=True, null=True, related_name='assets', db_index=True, verbose_name=_("Asset Role"))
+    purchase_date = models.DateField(blank=True, null=True, db_index=True, verbose_name=_("Purchase Date"))
 
     # Procurement Metadata (Maturity Phase 1)
     purchase_cost = models.DecimalField(
@@ -63,9 +63,10 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
         decimal_places=2,
         null=True,
         blank=True,
+        verbose_name=_("Current Book Value"),
         help_text=_("Materialized depreciation value")
     )
-    depreciation_updated_at = models.DateTimeField(null=True, blank=True)
+    depreciation_updated_at = models.DateTimeField(null=True, blank=True, verbose_name=_("Depreciation Updated At"))
     order_number = models.CharField(
         max_length=100,
         blank=True,
@@ -88,12 +89,12 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
         verbose_name=_("Salvage Value")
     )
     currency = CurrencyField()
-    status = models.ForeignKey('assets.StatusLabel', on_delete=models.PROTECT, related_name='assets', null=True, blank=True, db_index=True)
-    location = models.ForeignKey('organization.Location', on_delete=models.SET_NULL, blank=True, null=True, related_name='assets', db_index=True)
-    tenant = models.ForeignKey('organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='assets', db_index=True)
-    purchase_order_line = models.ForeignKey('procurement.PurchaseOrderLine', on_delete=models.SET_NULL, blank=True, null=True, related_name='assets', db_index=True)
-    notes = models.TextField(blank=True)
-    tags = models.ManyToManyField('extras.Tag', related_name="assets", blank=True)
+    status = models.ForeignKey('assets.StatusLabel', on_delete=models.PROTECT, related_name='assets', null=True, blank=True, db_index=True, verbose_name=_("Status"))
+    location = models.ForeignKey('organization.Location', on_delete=models.SET_NULL, blank=True, null=True, related_name='assets', db_index=True, verbose_name=_("Location"))
+    tenant = models.ForeignKey('organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='assets', db_index=True, verbose_name=_("Tenant"))
+    purchase_order_line = models.ForeignKey('procurement.PurchaseOrderLine', on_delete=models.SET_NULL, blank=True, null=True, related_name='assets', db_index=True, verbose_name=_("Purchase Order Line"))
+    notes = models.TextField(blank=True, verbose_name=_("Notes"))
+    tags = models.ManyToManyField('extras.Tag', related_name="assets", blank=True, verbose_name=_("Tags"))
     last_audited = models.DateTimeField(null=True, blank=True, verbose_name=_("Last Audited"), db_index=True)
     last_audited_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -104,7 +105,7 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
         verbose_name=_("Last Audited By")
     )
     # custom_field_data JSONField comes from CustomFieldDataMixin
-    requestable = models.BooleanField(null=True, blank=True, default=None, db_index=True, help_text=_("Allow users to request this asset"))
+    requestable = models.BooleanField(null=True, blank=True, default=None, db_index=True, verbose_name=_("Requestable"), help_text=_("Allow users to request this asset"))
     depreciation_override = models.ForeignKey(
         'assets.Depreciation',
         on_delete=models.SET_NULL,

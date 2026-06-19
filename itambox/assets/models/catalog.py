@@ -26,12 +26,12 @@ class StatusLabel(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     TYPE_ON_ORDER = StatusTypeChoices.ON_ORDER
     TYPE_CHOICES = StatusTypeChoices.choices
 
-    name = models.CharField(max_length=100)
-    slug = models.SlugField(max_length=100)
-    type = models.CharField(max_length=50, choices=StatusTypeChoices.choices, default=StatusTypeChoices.DEPLOYABLE, db_index=True)
-    description = models.TextField(blank=True)
-    color = models.CharField(max_length=6, blank=True, help_text=_("RGB color in hexadecimal (e.g. 00ff00)"))
-    tags = models.ManyToManyField('extras.Tag', related_name='status_labels_tagged', blank=True)
+    name = models.CharField(max_length=100, verbose_name=_("Name"))
+    slug = models.SlugField(max_length=100, verbose_name=_("Slug"))
+    type = models.CharField(max_length=50, choices=StatusTypeChoices.choices, default=StatusTypeChoices.DEPLOYABLE, db_index=True, verbose_name=_("Type"))
+    description = models.TextField(blank=True, verbose_name=_("Description"))
+    color = models.CharField(max_length=6, blank=True, verbose_name=_("Color"), help_text=_("RGB color in hexadecimal (e.g. 00ff00)"))
+    tags = models.ManyToManyField('extras.Tag', related_name='status_labels_tagged', blank=True, verbose_name=_("Tags"))
 
     class Meta:
         ordering = ['name']
@@ -53,18 +53,20 @@ class AssetRole(StandardModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     """Categorizes assets based on their functional role (e.g., Laptop, Monitor, Server)."""
-    name = models.CharField(max_length=100)
-    slug = models.SlugField(max_length=100)
-    description = models.TextField(blank=True)
-    color = models.CharField(max_length=6, blank=True, help_text=_("RGB color in hexadecimal (e.g. 00ff00)"))
+    name = models.CharField(max_length=100, verbose_name=_("Name"))
+    slug = models.SlugField(max_length=100, verbose_name=_("Slug"))
+    description = models.TextField(blank=True, verbose_name=_("Description"))
+    color = models.CharField(max_length=6, blank=True, verbose_name=_("Color"), help_text=_("RGB color in hexadecimal (e.g. 00ff00)"))
     allows_components = models.BooleanField(
         default=False,
+        verbose_name=_("Allows Components"),
         help_text=_("Assets with this role can have components allocated (servers, workstations, …)"),
     )
     tags = models.ManyToManyField(
         to='extras.Tag',
         related_name='asset_roles',
-        blank=True
+        blank=True,
+        verbose_name=_("Tags")
     )
 
     class Meta:
@@ -86,12 +88,12 @@ class AssetRole(StandardModel, SoftDeleteMixin):
 class Manufacturer(StandardModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    name = models.CharField(max_length=255)
-    slug = models.SlugField(max_length=255)
-    description = models.TextField(blank=True)
+    name = models.CharField(max_length=255, verbose_name=_("Name"))
+    slug = models.SlugField(max_length=255, verbose_name=_("Slug"))
+    description = models.TextField(blank=True, verbose_name=_("Description"))
 
     contacts = GenericRelation('organization.ContactAssignment')
-    tags = models.ManyToManyField('extras.Tag', related_name='manufacturers', blank=True)
+    tags = models.ManyToManyField('extras.Tag', related_name='manufacturers', blank=True, verbose_name=_("Tags"))
 
     class Meta:
         ordering = ['name']
@@ -184,10 +186,10 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
     """Defines a specific type of asset (e.g., a specific laptop model)."""
     slug_source = ('manufacturer__name', 'model')
 
-    manufacturer = models.ForeignKey('assets.Manufacturer', on_delete=models.PROTECT, related_name='asset_types')
-    model = models.CharField(max_length=255, db_index=True)
-    slug = models.SlugField(max_length=255)
-    part_number = models.CharField(max_length=100, blank=True, db_index=True, help_text=_("Manufacturer part number or SKU"))
+    manufacturer = models.ForeignKey('assets.Manufacturer', on_delete=models.PROTECT, related_name='asset_types', verbose_name=_("Manufacturer"))
+    model = models.CharField(max_length=255, db_index=True, verbose_name=_("Model"))
+    slug = models.SlugField(max_length=255, verbose_name=_("Slug"))
+    part_number = models.CharField(max_length=100, blank=True, db_index=True, verbose_name=_("Part Number"), help_text=_("Manufacturer part number or SKU"))
 
     eol_months = models.PositiveIntegerField(
         null=True,
@@ -234,10 +236,10 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
     image = models.ImageField(upload_to='asset_types/', blank=True, null=True, verbose_name=_("Model Image"))
 
     # Other
-    description = models.TextField(blank=True)
-    comments = models.TextField(blank=True)
-    tags = models.ManyToManyField('extras.Tag', related_name="asset_types", blank=True)
-    requestable = models.BooleanField(default=False, db_index=True, help_text=_("Allow users to request assets of this type"))
+    description = models.TextField(blank=True, verbose_name=_("Description"))
+    comments = models.TextField(blank=True, verbose_name=_("Comments"))
+    tags = models.ManyToManyField('extras.Tag', related_name="asset_types", blank=True, verbose_name=_("Tags"))
+    requestable = models.BooleanField(default=False, db_index=True, verbose_name=_("Requestable"), help_text=_("Allow users to request assets of this type"))
 
     class Meta:
         constraints = [
@@ -261,12 +263,12 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
 class Supplier(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    name = models.CharField(max_length=255)
-    slug = models.SlugField(max_length=255)
-    website = models.URLField(max_length=500, blank=True)
-    address = models.TextField(blank=True)
-    notes = models.TextField(blank=True)
-    tags = models.ManyToManyField('extras.Tag', related_name='suppliers', blank=True)
+    name = models.CharField(max_length=255, verbose_name=_("Name"))
+    slug = models.SlugField(max_length=255, verbose_name=_("Slug"))
+    website = models.URLField(max_length=500, blank=True, verbose_name=_("Website"))
+    address = models.TextField(blank=True, verbose_name=_("Address"))
+    notes = models.TextField(blank=True, verbose_name=_("Notes"))
+    tags = models.ManyToManyField('extras.Tag', related_name='suppliers', blank=True, verbose_name=_("Tags"))
     contacts = GenericRelation('organization.ContactAssignment')
 
     @property
@@ -293,16 +295,17 @@ class Supplier(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMix
 class Category(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    name = models.CharField(max_length=255)
-    slug = models.SlugField(max_length=255)
-    color = models.CharField(max_length=6, blank=True, help_text=_("RGB color in hexadecimal (e.g. 00ff00)"))
-    description = models.TextField(blank=True)
-    applies_to = models.JSONField(default=dict, blank=True, help_text=_("Applies to: {'asset': True, 'accessory': True, 'component': True}"))
+    name = models.CharField(max_length=255, verbose_name=_("Name"))
+    slug = models.SlugField(max_length=255, verbose_name=_("Slug"))
+    color = models.CharField(max_length=6, blank=True, verbose_name=_("Color"), help_text=_("RGB color in hexadecimal (e.g. 00ff00)"))
+    description = models.TextField(blank=True, verbose_name=_("Description"))
+    applies_to = models.JSONField(default=dict, blank=True, verbose_name=_("Applies To"), help_text=_("Applies to: {'asset': True, 'accessory': True, 'component': True}"))
     audit_interval_months = models.PositiveIntegerField(
         null=True, blank=True,
+        verbose_name=_("Audit Interval (Months)"),
         help_text=_("How often assets in this category must be physically audited, in months. Leave blank for no required cadence.")
     )
-    tags = models.ManyToManyField('extras.Tag', related_name='categories', blank=True)
+    tags = models.ManyToManyField('extras.Tag', related_name='categories', blank=True, verbose_name=_("Tags"))
 
     class Meta:
         ordering = ['name']

@@ -30,22 +30,26 @@ class PurchaseOrder(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixi
     objects = TenantScopingSoftDeleteManager()
 
     tenant = models.ForeignKey(
-        'organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='purchase_orders'
+        'organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='purchase_orders',
+        verbose_name=_("Tenant")
     )
-    order_number = models.CharField(max_length=100, db_index=True)
+    order_number = models.CharField(max_length=100, db_index=True, verbose_name=_("Order Number"))
     currency = CurrencyField()
     supplier = models.ForeignKey(
-        'assets.Supplier', on_delete=models.PROTECT, related_name='purchase_orders'
+        'assets.Supplier', on_delete=models.PROTECT, related_name='purchase_orders',
+        verbose_name=_("Supplier")
     )
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT)
-    order_date = models.DateField(null=True, blank=True)
-    expected_delivery_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT, verbose_name=_("Status"))
+    order_date = models.DateField(null=True, blank=True, verbose_name=_("Order Date"))
+    expected_delivery_date = models.DateField(null=True, blank=True, verbose_name=_("Expected Delivery Date"))
     destination_location = models.ForeignKey(
-        'organization.Location', on_delete=models.PROTECT, related_name='incoming_purchase_orders'
+        'organization.Location', on_delete=models.PROTECT, related_name='incoming_purchase_orders',
+        verbose_name=_("Destination Location")
     )
-    notes = models.TextField(blank=True)
+    notes = models.TextField(blank=True, verbose_name=_("Notes"))
     created_by = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True, related_name='created_purchase_orders'
+        User, on_delete=models.SET_NULL, null=True, related_name='created_purchase_orders',
+        verbose_name=_("Created By")
     )
 
     class Meta:
@@ -68,30 +72,37 @@ class PurchaseOrderLine(BaseModel, ChangeLoggingMixin, SoftDeleteMixin):
     objects = TenantScopingSoftDeleteManager()
 
     tenant = models.ForeignKey(
-        'organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='po_lines'
+        'organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='po_lines',
+        verbose_name=_("Tenant")
     )
     purchase_order = models.ForeignKey(
-        PurchaseOrder, on_delete=models.CASCADE, related_name='lines'
+        PurchaseOrder, on_delete=models.CASCADE, related_name='lines',
+        verbose_name=_("Purchase Order")
     )
     asset_type = models.ForeignKey(
-        'assets.AssetType', on_delete=models.PROTECT, null=True, blank=True, related_name='po_lines'
+        'assets.AssetType', on_delete=models.PROTECT, null=True, blank=True, related_name='po_lines',
+        verbose_name=_("Asset Type")
     )
     component = models.ForeignKey(
-        'inventory.Component', on_delete=models.PROTECT, null=True, blank=True, related_name='po_lines'
+        'inventory.Component', on_delete=models.PROTECT, null=True, blank=True, related_name='po_lines',
+        verbose_name=_("Component")
     )
     accessory = models.ForeignKey(
-        'inventory.Accessory', on_delete=models.PROTECT, null=True, blank=True, related_name='po_lines'
+        'inventory.Accessory', on_delete=models.PROTECT, null=True, blank=True, related_name='po_lines',
+        verbose_name=_("Accessory")
     )
     consumable = models.ForeignKey(
-        'inventory.Consumable', on_delete=models.PROTECT, null=True, blank=True, related_name='po_lines'
+        'inventory.Consumable', on_delete=models.PROTECT, null=True, blank=True, related_name='po_lines',
+        verbose_name=_("Consumable")
     )
     license = models.ForeignKey(
-        'licenses.License', on_delete=models.PROTECT, null=True, blank=True, related_name='po_lines'
+        'licenses.License', on_delete=models.PROTECT, null=True, blank=True, related_name='po_lines',
+        verbose_name=_("License")
     )
 
-    qty_ordered = models.PositiveIntegerField(default=1)
-    qty_received = models.PositiveIntegerField(default=0)
-    unit_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    qty_ordered = models.PositiveIntegerField(default=1, verbose_name=_("Qty Ordered"))
+    qty_received = models.PositiveIntegerField(default=0, verbose_name=_("Qty Received"))
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name=_("Unit Price"))
 
     def __str__(self):
         item = self.asset_type or self.component or self.accessory or self.consumable or self.license or "Unknown Item"
@@ -164,9 +175,10 @@ class Contract(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin):
         blank=True,
         null=True,
         related_name='contracts',
+        verbose_name=_('Tenant'),
     )
-    name = models.CharField(max_length=255)
-    contract_number = models.CharField(max_length=100, db_index=True)
+    name = models.CharField(max_length=255, verbose_name=_('Name'))
+    contract_number = models.CharField(max_length=100, db_index=True, verbose_name=_('Contract Number'))
     contract_type = models.CharField(
         max_length=20,
         choices=ContractTypeChoices.choices,
@@ -177,6 +189,7 @@ class Contract(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin):
         max_length=20,
         choices=ContractStatusChoices.choices,
         default=ContractStatusChoices.DRAFT,
+        verbose_name=_('Status'),
     )
 
     # --- Vendor / commercial ---
@@ -186,6 +199,7 @@ class Contract(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin):
         null=True,
         blank=True,
         related_name='contracts',
+        verbose_name=_('Supplier'),
     )
     cost = models.DecimalField(
         max_digits=12,
@@ -205,9 +219,9 @@ class Contract(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin):
     )
 
     # --- Dates ---
-    start_date = models.DateField()
-    end_date = models.DateField()
-    renewal_date = models.DateField(null=True, blank=True)
+    start_date = models.DateField(verbose_name=_('Start Date'))
+    end_date = models.DateField(verbose_name=_('End Date'))
+    renewal_date = models.DateField(null=True, blank=True, verbose_name=_('Renewal Date'))
     auto_renew = models.BooleanField(
         default=False,
         verbose_name=_('Auto-Renew'),
@@ -267,7 +281,7 @@ class Contract(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin):
     )
 
     # --- Notes ---
-    notes = models.TextField(blank=True)
+    notes = models.TextField(blank=True, verbose_name=_('Notes'))
 
     class Meta:
         ordering = ['name']
@@ -313,17 +327,20 @@ class FulfillmentLink(BaseModel, ChangeLoggingMixin, SoftDeleteMixin):
     
     tenant = models.ForeignKey(
         'organization.Tenant', on_delete=models.PROTECT,
-        blank=True, null=True, related_name='fulfillment_links'
+        blank=True, null=True, related_name='fulfillment_links',
+        verbose_name=_("Tenant")
     )
     asset_request = models.ForeignKey(
         'assets.AssetRequest', on_delete=models.CASCADE,
-        related_name='fulfillment_links'
+        related_name='fulfillment_links',
+        verbose_name=_("Asset Request")
     )
     purchase_order_line = models.ForeignKey(
         PurchaseOrderLine, on_delete=models.CASCADE,
-        related_name='fulfillment_links'
+        related_name='fulfillment_links',
+        verbose_name=_("Purchase Order Line")
     )
-    qty_allocated = models.PositiveIntegerField(default=1)
+    qty_allocated = models.PositiveIntegerField(default=1, verbose_name=_("Qty Allocated"))
     
     class Meta:
         constraints = [

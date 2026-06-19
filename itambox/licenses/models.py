@@ -49,41 +49,47 @@ class License(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
 
     name = models.CharField(
         max_length=255,
+        verbose_name=_("Name"),
         help_text=_("Descriptive name for the license (e.g., Visio Pro 2021 - EA Renewal FY24)")
     )
     software = models.ForeignKey(
         to=Software,
         on_delete=models.PROTECT,
-        related_name='licenses'
+        related_name='licenses',
+        verbose_name=_("Software")
     )
     license_type = models.CharField(
         max_length=50,
         choices=LicenseTypeChoices.choices,
         default=LicenseTypeChoices.PERPETUAL_SEAT,
-        db_index=True
+        db_index=True,
+        verbose_name=_("License Type")
     )
     product_key = models.TextField(
         blank=True,
+        verbose_name=_("Product Key"),
         help_text=_("Product key or activation code. Consider security implications.")
     )
     seats = models.PositiveIntegerField(
         default=1,
+        verbose_name=_("Seats"),
         help_text=_("Total number of seats purchased or entitled")
     )
-    purchase_date = models.DateField(blank=True, null=True, db_index=True)
-    purchase_cost = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-    currency = CurrencyField()
-    order_number = models.CharField(max_length=100, blank=True)
+    purchase_date = models.DateField(blank=True, null=True, db_index=True, verbose_name=_("Purchase Date"))
+    purchase_cost = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name=_("Purchase Cost"))
+    currency = CurrencyField(verbose_name=_("Currency"))
+    order_number = models.CharField(max_length=100, blank=True, verbose_name=_("Order Number"))
     version = models.CharField(
         max_length=100,
         blank=True,
+        verbose_name=_("Version"),
         help_text=_("Optional version constraint for this license entitlement (e.g. '2021', '16.x'). "
                   "Informational only — reconciliation is performed at the Software level (version-agnostic)."),
     )
-    expiration_date = models.DateField(blank=True, null=True, db_index=True, help_text=_("For term licenses or maintenance"))
-    notes = models.TextField(blank=True)
-    tags = models.ManyToManyField(Tag, blank=True, related_name='licenses')
-    supplier = models.ForeignKey('assets.Supplier', on_delete=models.SET_NULL, blank=True, null=True, related_name='licenses', db_index=True)
+    expiration_date = models.DateField(blank=True, null=True, db_index=True, verbose_name=_("Expiration Date"), help_text=_("For term licenses or maintenance"))
+    notes = models.TextField(blank=True, verbose_name=_("Notes"))
+    tags = models.ManyToManyField(Tag, blank=True, related_name='licenses', verbose_name=_("Tags"))
+    supplier = models.ForeignKey('assets.Supplier', on_delete=models.SET_NULL, blank=True, null=True, related_name='licenses', db_index=True, verbose_name=_("Supplier"))
     cost_center = models.ForeignKey(
         'organization.CostCenter',
         on_delete=models.SET_NULL,
@@ -91,6 +97,7 @@ class License(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
         blank=True,
         related_name='licenses',
         db_index=True,
+        verbose_name=_("Cost Center"),
     )
     subscription = models.ForeignKey(
         'subscriptions.Subscription',
@@ -99,9 +106,10 @@ class License(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
         null=True,
         related_name='licenses',
         db_index=True,
+        verbose_name=_("Subscription"),
         help_text=_("Optional subscription (billing agreement) that funds this license; seats roll up to it."),
     )
-    tenant = models.ForeignKey('organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='licenses', db_index=True)
+    tenant = models.ForeignKey('organization.Tenant', on_delete=models.PROTECT, blank=True, null=True, related_name='licenses', db_index=True, verbose_name=_("Tenant"))
 
     objects = SoftDeleteLicenseManager()
     all_objects = AllObjectsLicenseManager()
@@ -186,7 +194,8 @@ class LicenseSeatAssignment(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
         to=License,
         on_delete=models.PROTECT,
         related_name='assignments',
-        db_index=True
+        db_index=True,
+        verbose_name=_("License")
     )
     # CASCADE (not SET_NULL): a seat targets exactly one of asset/holder
     # (chk_assignment_to_one_target). Hard-deleting the target releases the seat
@@ -198,7 +207,8 @@ class LicenseSeatAssignment(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
         null=True,
         blank=True,
         related_name='license_assignments',
-        db_index=True
+        db_index=True,
+        verbose_name=_("Asset")
     )
     assigned_holder = models.ForeignKey(
         to=AssetHolder,
@@ -206,7 +216,8 @@ class LicenseSeatAssignment(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
         null=True,
         blank=True,
         related_name='license_assignments',
-        db_index=True
+        db_index=True,
+        verbose_name=_("Assigned Holder")
     )
     # Optional precise link: an asset-assigned seat may point at the exact
     # InstalledSoftware row it covers (seat-level SAM).  Only valid when the
@@ -219,9 +230,10 @@ class LicenseSeatAssignment(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
         blank=True,
         related_name='covering_seats',
         db_index=True,
+        verbose_name=_("Installed Software"),
     )
     assigned_date = models.DateTimeField(auto_now_add=True, editable=False)
-    notes = models.TextField(blank=True)
+    notes = models.TextField(blank=True, verbose_name=_("Notes"))
 
     class Meta:
         ordering = ('license', 'asset', 'assigned_holder')

@@ -20,12 +20,14 @@ class Provider(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     """Represents the vendor/supplier of a subscription or service."""
     name = models.CharField(
         max_length=255,
+        verbose_name=_("Name"),
         help_text=_("Unique name of the provider (e.g., Adobe Inc.)")
     )
     slug = models.SlugField(
         max_length=255,
         null=True,
         blank=True,
+        verbose_name=_("Slug"),
         help_text=_("URL-friendly identifier (auto-generated from name if left blank)")
     )
     account_id = models.CharField(
@@ -53,7 +55,8 @@ class Provider(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     tags = models.ManyToManyField(
         to=Tag,
         blank=True,
-        related_name='subscription_providers'
+        related_name='subscription_providers',
+        verbose_name=_("Tags")
     )
     tenant = models.ForeignKey(
         'organization.Tenant',
@@ -62,6 +65,7 @@ class Provider(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         null=True,
         related_name='subscription_providers',
         db_index=True,
+        verbose_name=_("Tenant"),
         help_text=_("The tenant owning this provider. Null represents system-wide/global providers.")
     )
     tenant_group = models.ForeignKey(
@@ -71,6 +75,7 @@ class Provider(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         null=True,
         related_name='subscription_providers',
         db_index=True,
+        verbose_name=_("Tenant Group"),
         help_text=_("The tenant group owning this provider.")
     )
     contacts = GenericRelation('organization.ContactAssignment')
@@ -165,18 +170,21 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
     """Represents a recurring service agreement (SaaS, Support, etc.)."""
     name = models.CharField(
         max_length=255,
+        verbose_name=_("Name"),
         help_text=_("Descriptive name (e.g., Adobe Creative Cloud - All Apps (Team))")
     )
     slug = models.SlugField(
         max_length=255,
         null=True,
         blank=True,
+        verbose_name=_("Slug"),
         help_text=_("URL-friendly identifier (auto-generated from name if left blank)")
     )
     provider = models.ForeignKey(
         to=Provider,
         on_delete=models.PROTECT,
-        related_name='subscriptions'
+        related_name='subscriptions',
+        verbose_name=_("Provider")
     )
     type = models.CharField(
         max_length=50,
@@ -209,6 +217,7 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
         decimal_places=2,
         blank=True,
         null=True,
+        verbose_name=_("Renewal Cost"),
         help_text=_("Cost per renewal period")
     )
     currency = CurrencyField()
@@ -269,16 +278,19 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
     )
     description = models.TextField(
         blank=True,
+        verbose_name=_("Description"),
         help_text=_("Optional text detailing coverage or terms")
     )
     notes = models.TextField(
         blank=True,
+        verbose_name=_("Notes"),
         help_text=_("Optional internal notes")
     )
     tags = models.ManyToManyField(
         to=Tag,
         blank=True,
-        related_name='subscriptions'
+        related_name='subscriptions',
+        verbose_name=_("Tags")
     )
     tenant = models.ForeignKey(
         'organization.Tenant',
@@ -287,6 +299,7 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
         null=True,
         related_name='subscriptions_org',
         db_index=True,
+        verbose_name=_("Tenant"),
     )
 
     class Meta:
@@ -390,7 +403,8 @@ class SubscriptionAssignment(ChangeLoggingMixin, BaseModel):
     subscription = models.ForeignKey(
         to=Subscription,
         on_delete=models.CASCADE,
-        related_name='assignments'
+        related_name='assignments',
+        verbose_name=_("Subscription")
     )
 
     @property
@@ -420,7 +434,7 @@ class SubscriptionAssignment(ChangeLoggingMixin, BaseModel):
         related_name='subscription_assignments_created',
         verbose_name=_("Assigned By"),
     )
-    notes = models.TextField(blank=True)
+    notes = models.TextField(blank=True, verbose_name=_("Notes"))
 
     class Meta:
         ordering = ('-assigned_date',)

@@ -54,6 +54,7 @@ class ObjectChange(models.Model):
         blank=True,
         null=True,
         db_index=True,
+        verbose_name=_("Tenant"),
     )
     time = models.DateTimeField(
         default=timezone.now,
@@ -65,7 +66,8 @@ class ObjectChange(models.Model):
         on_delete=models.SET_NULL,
         related_name='changes',
         blank=True,
-        null=True
+        null=True,
+        verbose_name=_("User"),
     )
     user_name = models.CharField(
         max_length=150,
@@ -77,7 +79,8 @@ class ObjectChange(models.Model):
     action = models.CharField(
         max_length=50,
         choices=ObjectChangeActionChoices(),
-        db_index=True
+        db_index=True,
+        verbose_name=_("Action"),
     )
     changed_object_type = models.ForeignKey(
         to=ContentType,
@@ -341,13 +344,14 @@ class Notification(models.Model):
         related_name='notifications',
         null=True,
         blank=True,
-        help_text=_("Target user for the notification. Null represents global broadcast alert.")
+        help_text=_("Target user for the notification. Null represents global broadcast alert."),
+        verbose_name=_("User"),
     )
-    subject = models.CharField(max_length=255)
-    message = models.TextField()
-    level = models.CharField(max_length=20, choices=LEVEL_CHOICES, default=LEVEL_INFO)
-    is_read = models.BooleanField(default=False)
-    target_url = models.CharField(max_length=500, blank=True, help_text=_("Optional destination URL when clicked."))
+    subject = models.CharField(max_length=255, verbose_name=_("Subject"))
+    message = models.TextField(verbose_name=_("Message"))
+    level = models.CharField(max_length=20, choices=LEVEL_CHOICES, default=LEVEL_INFO, verbose_name=_("Level"))
+    is_read = models.BooleanField(default=False, verbose_name=_("Is Read"))
+    target_url = models.CharField(max_length=500, blank=True, help_text=_("Optional destination URL when clicked."), verbose_name=_("Target URL"))
     created_at = models.DateTimeField(auto_now_add=True)
 
 
@@ -371,7 +375,7 @@ class Job(ChangeLoggingMixin, BaseModel):
 
     STATUS_CHOICES = JobStatusChoices()
 
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, verbose_name=_("Name"))
     # Tenant the job was enqueued for. Null means a system-level job
     # (e.g. management commands); those are only visible to superusers.
     tenant = models.ForeignKey(
@@ -380,18 +384,19 @@ class Job(ChangeLoggingMixin, BaseModel):
         related_name='jobs',
         null=True,
         blank=True,
+        verbose_name=_("Tenant"),
     )
     model = models.ForeignKey(ContentType, on_delete=models.SET_NULL, null=True, blank=True)
     object_id = models.PositiveBigIntegerField(null=True, blank=True)
     content_object = GenericForeignKey('model', 'object_id')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
-    data = models.JSONField(default=dict, blank=True)
-    result = models.JSONField(null=True, blank=True)
-    logs = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True, verbose_name=_("Status"))
+    data = models.JSONField(default=dict, blank=True, verbose_name=_("Data"))
+    result = models.JSONField(null=True, blank=True, verbose_name=_("Result"))
+    logs = models.TextField(blank=True, verbose_name=_("Logs"))
     created = models.DateTimeField(auto_now_add=True, db_index=True)
-    started = models.DateTimeField(null=True, blank=True)
-    completed = models.DateTimeField(null=True, blank=True)
-    scheduled_for = models.DateTimeField(null=True, blank=True, db_index=True)
+    started = models.DateTimeField(null=True, blank=True, verbose_name=_("Started"))
+    completed = models.DateTimeField(null=True, blank=True, verbose_name=_("Completed"))
+    scheduled_for = models.DateTimeField(null=True, blank=True, db_index=True, verbose_name=_("Scheduled For"))
 
     class Meta:
         ordering = ['-created']
@@ -468,15 +473,15 @@ class Job(ChangeLoggingMixin, BaseModel):
 
 
 class EmailSettings(ChangeLoggingMixin, BaseModel):
-    smtp_host = models.CharField(max_length=255, default='localhost')
-    smtp_port = models.PositiveIntegerField(default=25)
-    smtp_use_tls = models.BooleanField(default=True)
-    smtp_username = models.CharField(max_length=255, blank=True)
-    smtp_password = models.CharField(max_length=1000, blank=True)
-    from_address = models.EmailField(max_length=255, default='itambox@localhost')
-    from_name = models.CharField(max_length=255, default='ITAMbox Notifications')
-    enabled = models.BooleanField(default=False)
-    test_recipient = models.EmailField(max_length=255, blank=True, help_text=_("Email address for test notifications"))
+    smtp_host = models.CharField(max_length=255, default='localhost', verbose_name=_("SMTP Host"))
+    smtp_port = models.PositiveIntegerField(default=25, verbose_name=_("SMTP Port"))
+    smtp_use_tls = models.BooleanField(default=True, verbose_name=_("SMTP Use TLS"))
+    smtp_username = models.CharField(max_length=255, blank=True, verbose_name=_("SMTP Username"))
+    smtp_password = models.CharField(max_length=1000, blank=True, verbose_name=_("SMTP Password"))
+    from_address = models.EmailField(max_length=255, default='itambox@localhost', verbose_name=_("From Address"))
+    from_name = models.CharField(max_length=255, default='ITAMbox Notifications', verbose_name=_("From Name"))
+    enabled = models.BooleanField(default=False, verbose_name=_("Enabled"))
+    test_recipient = models.EmailField(max_length=255, blank=True, help_text=_("Email address for test notifications"), verbose_name=_("Test Recipient"))
 
     class Meta:
         verbose_name = "Email Settings"

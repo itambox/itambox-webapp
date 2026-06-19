@@ -23,16 +23,20 @@ class AssetAssignment(SoftDeleteMixin, JournalingMixin, TaggableMixin, ChangeLog
         return self.asset.tenant if self.asset_id else None
 
     asset = models.ForeignKey(
-        'assets.Asset', on_delete=models.CASCADE, related_name='assignments', db_index=True
+        'assets.Asset', on_delete=models.CASCADE, related_name='assignments', db_index=True,
+        verbose_name=_("Asset")
     )
     assigned_user = models.ForeignKey(
-        'organization.AssetHolder', on_delete=models.SET_NULL, null=True, blank=True, related_name='asset_assignments'
+        'organization.AssetHolder', on_delete=models.SET_NULL, null=True, blank=True, related_name='asset_assignments',
+        verbose_name=_("Assigned User")
     )
     assigned_location = models.ForeignKey(
-        'organization.Location', on_delete=models.SET_NULL, null=True, blank=True, related_name='asset_assignments'
+        'organization.Location', on_delete=models.SET_NULL, null=True, blank=True, related_name='asset_assignments',
+        verbose_name=_("Assigned Location")
     )
     assigned_asset = models.ForeignKey(
-        'assets.Asset', on_delete=models.SET_NULL, null=True, blank=True, related_name='child_assignments'
+        'assets.Asset', on_delete=models.SET_NULL, null=True, blank=True, related_name='child_assignments',
+        verbose_name=_("Assigned Asset")
     )
     pre_checkout_status = models.ForeignKey(
         'assets.StatusLabel',
@@ -40,23 +44,26 @@ class AssetAssignment(SoftDeleteMixin, JournalingMixin, TaggableMixin, ChangeLog
         null=True,
         blank=True,
         related_name='assignment_pre_checkouts',
+        verbose_name=_("Pre-checkout Status"),
         help_text=_("Preserved status label to revert to upon checkin.")
     )
 
     checked_out_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='checkouts'
+        related_name='checkouts',
+        verbose_name=_("Checked Out By")
     )
-    checked_out_at = models.DateTimeField(default=timezone.now)
-    expected_checkin_date = models.DateField(null=True, blank=True)
-    is_active = models.BooleanField(default=True, db_index=True)
-    checked_in_at = models.DateTimeField(null=True, blank=True)
+    checked_out_at = models.DateTimeField(default=timezone.now, verbose_name=_("Checked Out At"))
+    expected_checkin_date = models.DateField(null=True, blank=True, verbose_name=_("Expected Checkin Date"))
+    is_active = models.BooleanField(default=True, db_index=True, verbose_name=_("Is Active"))
+    checked_in_at = models.DateTimeField(null=True, blank=True, verbose_name=_("Checked In At"))
     checked_in_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='checkins'
+        related_name='checkins',
+        verbose_name=_("Checked In By")
     )
-    notes = models.TextField(blank=True)
-    tags = models.ManyToManyField('extras.Tag', related_name='asset_assignments', blank=True)
+    notes = models.TextField(blank=True, verbose_name=_("Notes"))
+    tags = models.ManyToManyField('extras.Tag', related_name='asset_assignments', blank=True, verbose_name=_("Tags"))
 
     # Loaner-specific fields
     is_loan = models.BooleanField(
