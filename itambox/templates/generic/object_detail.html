@@ -343,7 +343,7 @@
     <div class="tab-pane fade {% if request.GET.tab == 'subscriptions' %}show active{% endif %}" id="subscriptions" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
-                <h3 class="card-title">{% translate "Assigned SaaS & Support Licenses" %}</h3>
+                <h3 class="card-title">{% translate "Assigned SaaS &amp; Support Licenses" %}</h3>
                 {% if can_change %}
                 <a href="{% url 'subscriptions:subscriptionassignment_create' %}?content_type={{ subscribable_content_type_id }}&object_id={{ object.pk }}" class="btn btn-sm btn-primary">
                     <i class="mdi mdi-plus"></i>

@@ -30,7 +30,7 @@
                     <i class="mdi mdi-archive-plus-outline"></i>
                 </div>
                 <div>
-                    <h4 class="mb-1 fw-bold">{% translate "Bulk Stock Receipt & Allocation" %}</h4>
+                    <h4 class="mb-1 fw-bold">{% translate "Bulk Stock Receipt &amp; Allocation" %}</h4>
                     <p class="mb-0 text-muted">
                         {% blocktranslate with count=requests_data|length %}You are receiving hardware to fulfill {{ count }} approved request(s). Enter the serial numbers and unique details for each asset below. Creating these assets will automatically allocate them to the corresponding requests.{% endblocktranslate %}
                     </p>
@@ -232,7 +232,7 @@
                 </a>
                 <button type="submit" name="submit" class="btn btn-success d-flex align-items-center">
                     <i class="mdi mdi-check-bold me-1"></i>
-                    {% translate "Receive & Allocate Stock" %}
+                    {% translate "Receive &amp; Allocate Stock" %}
                 </button>
             </div>
         </div>

@@ -39,7 +39,7 @@
     <li class="nav-item" role="presentation">
         <a href="?tab=custody-policies" data-bs-target="#custody-policies" class="nav-link {% if request.GET.tab == 'custody-policies' %}active{% endif %}" data-bs-toggle="tab" role="tab">
             <i class="mdi mdi-hand-heart-outline me-1 text-green"></i>
-            {% translate "Custody EULAs & Policies" %} <span class="badge bg-green-lt ms-2">{{ custody_templates|length }}</span>
+            {% translate "Custody EULAs &amp; Policies" %} <span class="badge bg-green-lt ms-2">{{ custody_templates|length }}</span>
         </a>
     </li>
 {% endblock extra_tabs %}
@@ -74,7 +74,7 @@
     <div class="tab-pane fade {% if request.GET.tab == 'custody-policies' %}show active{% endif %}" id="custody-policies" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent d-flex align-items-center justify-content-between">
-                <h3 class="card-title">{% translate "Tenant-Scoped Custody Policies & EULAs" %}</h3>
+                <h3 class="card-title">{% translate "Tenant-Scoped Custody Policies &amp; EULAs" %}</h3>
                 <a href="{% url 'compliance:custodytemplate_create' %}?category={{ object.pk }}" class="btn btn-primary btn-sm">
                     <i class="mdi mdi-plus me-1"></i>
                     {% translate "Add Custody Policy" %}

@@ -53,13 +53,13 @@
     <li class="nav-item" role="presentation">
         <a href="?tab=custody-policies" class="nav-link {% if request.GET.tab == 'custody-policies' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#custody-policies" role="tab" aria-selected="{% if request.GET.tab == 'custody-policies' %}true{% else %}false{% endif %}">
             <i class="mdi mdi-file-sign me-1 text-green"></i>
-            {% translate "Custody EULAs & Policies" %} <span class="badge bg-green-lt ms-2">{{ custody_templates_table.rows|length }}</span>
+            {% translate "Custody EULAs &amp; Policies" %} <span class="badge bg-green-lt ms-2">{{ custody_templates_table.rows|length }}</span>
         </a>
     </li>
 {% endblock extra_tabs %}
 
 {% block extra_tab_panes %}
-    {% translate "Tenant-Scoped Custody Policies & EULAs" as t_custody %}
+    {% translate "Tenant-Scoped Custody Policies &amp; EULAs" as t_custody %}
     {% translate "No custody policies or templates are currently registered for this tenant group." as e_custody %}
     {% include 'generic/includes/related_table_tab.html' with tab="custody-policies" table=custody_templates_table title=t_custody empty=e_custody %}
 {% endblock extra_tab_panes %}

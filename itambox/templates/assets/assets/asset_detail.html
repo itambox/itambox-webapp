@@ -40,7 +40,7 @@
             {% csrf_token %}
             <button type="submit" class="btn btn-soft-success" data-confirm="Are you sure you want to claim this asset and confirm pickup?">
                 <i class="mdi mdi-package-down"></i>
-                {% translate "Claim & Confirm Pickup" %}
+                {% translate "Claim &amp; Confirm Pickup" %}
             </button>
         </form>
     {% endif %}
@@ -127,7 +127,7 @@
             {# 2. Deployment & Custody Card #}
             <div class="card mb-3 shadow-sm">
                 <div class="card-header border-0 bg-transparent pb-0">
-                    <h3 class="card-title text-secondary">{% translate "Deployment & Custody" %}</h3>
+                    <h3 class="card-title text-secondary">{% translate "Deployment &amp; Custody" %}</h3>
                 </div>
                 <div class="card-body">
                     {% include 'assets/includes/detail/asset_assignment.html' %}
@@ -155,7 +155,7 @@
             {# 5. Support & Warranty Details Card #}
             <div class="card mb-3 shadow-sm">
                 <div class="card-header border-0 bg-transparent pb-0">
-                    <h3 class="card-title text-secondary">{% translate "Support & Warranty Details" %}</h3>
+                    <h3 class="card-title text-secondary">{% translate "Support &amp; Warranty Details" %}</h3>
                 </div>
                 <div class="card-body">
                     {% include 'assets/includes/detail/asset_support.html' %}
@@ -223,7 +223,7 @@
             {# 3. Financial & Lifecycle Card #}
             <div class="card mb-3 shadow-sm">
                 <div class="card-header border-0 bg-transparent pb-0">
-                    <h3 class="card-title text-secondary">{% translate "Financial & Lifecycle" %}</h3>
+                    <h3 class="card-title text-secondary">{% translate "Financial &amp; Lifecycle" %}</h3>
                 </div>
                 <div class="card-body">
                     {% include 'assets/includes/detail/asset_financial.html' %}
@@ -286,7 +286,7 @@
     <div class="tab-pane fade {% if request.GET.tab == 'maintenances' %}show active{% endif %}" id="maintenances" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
-                <h3 class="card-title">{% translate "Asset Repair & Upgrade History" %}</h3>
+                <h3 class="card-title">{% translate "Asset Repair &amp; Upgrade History" %}</h3>
                 <a href="{% url 'assets:assetmaintenance_create' %}?asset={{ object.pk }}" class="btn btn-sm btn-primary">
                     <i class="mdi mdi-plus"></i>
                     {% translate "Record Maintenance" %}
@@ -325,7 +325,7 @@
     {% translate "No requests logged for this asset." as e_requests %}
     {% include 'generic/includes/related_table_tab.html' with tab="requests" table=requests_table title=t_requests empty=e_requests %}
 
-    {% translate "Asset Verification & Audits" as t_audits %}
+    {% translate "Asset Verification &amp; Audits" as t_audits %}
     {% translate "No verification audits logged for this asset." as e_audits %}
     {% include 'generic/includes/related_table_tab.html' with tab="audits" table=audits_table title=t_audits empty=e_audits %}
 
