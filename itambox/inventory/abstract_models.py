@@ -44,6 +44,13 @@ class AbstractInventoryItem(CustomFieldDataMixin, CheckableInventoryModelMixin, 
         verbose_name=_("Part Number"),
         help_text=_("SKU or manufacturer part number")
     )
+    ean = models.CharField(
+        max_length=14,
+        blank=True,
+        db_index=True,
+        verbose_name=_("EAN"),
+        help_text=_("Barcode (EAN / UPC / GTIN) — scannable to open this item.")
+    )
     min_qty = models.PositiveIntegerField(
         default=0,
         blank=True,

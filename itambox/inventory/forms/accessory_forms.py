@@ -41,11 +41,12 @@ class AccessoryForm(CustomFieldModelFormMixin, SlugModelForm):
 
     class Meta:
         model = Accessory
-        fields = ['manufacturer', 'name', 'slug', 'category', 'supplier', 'part_number', 'min_qty', 'allow_overallocate', 'notes', 'tags', 'tenant']
+        fields = ['manufacturer', 'name', 'slug', 'category', 'supplier', 'part_number', 'ean', 'min_qty', 'allow_overallocate', 'notes', 'tags', 'tenant']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'slug': forms.TextInput(attrs={'class': 'form-control', 'slugify': 'name'}),
             'part_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'ean': forms.TextInput(attrs={'class': 'form-control', 'inputmode': 'numeric'}),
             'min_qty': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
             'allow_overallocate': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
@@ -67,8 +68,9 @@ class AccessoryForm(CustomFieldModelFormMixin, SlugModelForm):
                 Column('name', css_class='col-md-6')
             ),
             Row(
-                Column('supplier', css_class='col-md-6'),
-                Column('part_number', css_class='col-md-6')
+                Column('supplier', css_class='col-md-4'),
+                Column('part_number', css_class='col-md-4'),
+                Column('ean', css_class='col-md-4')
             ),
             Row(
                 Column('slug', css_class='col-md-6'),

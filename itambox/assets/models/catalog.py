@@ -190,6 +190,7 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
     model = models.CharField(max_length=255, db_index=True, verbose_name=_("Model"))
     slug = models.SlugField(max_length=255, verbose_name=_("Slug"))
     part_number = models.CharField(max_length=100, blank=True, db_index=True, verbose_name=_("Part Number"), help_text=_("Manufacturer part number or SKU"))
+    ean = models.CharField(max_length=14, blank=True, db_index=True, verbose_name=_("EAN"), help_text=_("Barcode (EAN / UPC / GTIN) — scanning shows assets of this type."))
 
     eol_months = models.PositiveIntegerField(
         null=True,

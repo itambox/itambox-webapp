@@ -30,7 +30,7 @@ class AssetTypeForm(SlugModelForm):
     class Meta:
         model = AssetType
         fields = [
-            'manufacturer', 'part_number', 'model', 'slug',
+            'manufacturer', 'part_number', 'ean', 'model', 'slug',
             'eol_months',
             'category', 'asset_role', 'custom_fieldset', 'depreciation', 'image',
             'description', 'comments', 'tags', 'requestable'
@@ -39,6 +39,7 @@ class AssetTypeForm(SlugModelForm):
             'model': forms.TextInput(attrs={'class': 'form-control'}),
             'slug': forms.TextInput(attrs={'class': 'form-control', 'slugify': 'model'}),
             'part_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'ean': forms.TextInput(attrs={'class': 'form-control', 'inputmode': 'numeric'}),
             'eol_months': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
             'category': forms.Select(attrs={'class': 'form-select'}),
             'custom_fieldset': forms.Select(attrs={'class': 'form-select'}),
@@ -161,9 +162,10 @@ class AssetTypeForm(SlugModelForm):
                     Column('model', css_class='col-md-6')
                 ),
                 Row(
-                    Column('part_number', css_class='col-md-4'),
-                    Column('slug', css_class='col-md-4'),
-                    Column('eol_months', css_class='col-md-4')
+                    Column('part_number', css_class='col-md-3'),
+                    Column('ean', css_class='col-md-3'),
+                    Column('slug', css_class='col-md-3'),
+                    Column('eol_months', css_class='col-md-3')
                 ),
                 Row(
                     Column('image', css_class='col-md-6'),

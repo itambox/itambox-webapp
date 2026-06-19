@@ -40,6 +40,12 @@ class AssetFilterSet(BaseFilterSet):
         label=_('Asset Type'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
+    ean = django_filters.CharFilter(
+        field_name='asset_type__ean',
+        lookup_expr='iexact',
+        label=_('EAN'),
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'EAN / barcode'})
+    )
     manufacturer = django_filters.ModelChoiceFilter(
         field_name='asset_type__manufacturer',
         queryset=Manufacturer.objects.all(),

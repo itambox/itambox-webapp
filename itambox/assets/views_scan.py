@@ -4,7 +4,7 @@ from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from django.views import View
 
-from assets.scanning import resolve_scanned_code
+from assets.scanning import resolve_scanned_target
 from core.managers import get_current_tenant
 
 
@@ -26,12 +26,12 @@ class ScanResolveView(View):
         if not code:
             return JsonResponse({'found': False}, status=400)
 
-        asset = resolve_scanned_code(code)
-        if asset is None:
+        target = resolve_scanned_target(code, request.user)
+        if target is None:
             return JsonResponse({'found': False}, status=404)
 
         return JsonResponse({
             'found': True,
-            'url': asset.get_absolute_url(),
-            'label': str(asset),
+            'url': target['url'],
+            'label': target['label'],
         })

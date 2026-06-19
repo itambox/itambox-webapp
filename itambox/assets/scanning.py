@@ -67,4 +67,52 @@ def resolve_scanned_code(code: str):
     ).first()
 
 
+def resolve_scanned_target(code, user):
+    """Resolve a scanned code to a navigation target for the global scanner.
+
+    Resolution order (tenant-scoped, and permission-gated so names never leak
+    across object types):
+      1. Asset by tag / serial / itambox link  -> asset detail.
+      2. AssetType by EAN                       -> asset list filtered to that EAN.
+      3. Component / Accessory / Consumable EAN -> that item's detail.
+
+    Returns ``{'url': ..., 'label': ...}`` or ``None``.
+    """
+    from django.urls import reverse
+    from urllib.parse import urlencode
+
+    if user.has_perm('assets.view_asset'):
+        asset = resolve_scanned_code(code)
+        if asset is not None:
+            return {'url': asset.get_absolute_url(), 'label': str(asset)}
+
+    raw = strip_itambox_prefix(code)
+    if not raw:
+        return None
+
+    # AssetType EAN -> the asset list filtered to assets of that type.
+    if user.has_perm('assets.view_asset'):
+        from assets.models import AssetType
+        atype = AssetType.objects.filter(ean__iexact=raw).first()
+        if atype is not None:
+            url = "%s?%s" % (reverse('assets:asset_list'), urlencode({'ean': raw}))
+            return {'url': url, 'label': str(atype)}
+
+    # Inventory item EAN -> item detail.
+    # inline import: inventory imports from assets — avoid a load-time cycle.
+    from inventory.models import Component, Accessory, Consumable
+    for model, perm in (
+        (Component, 'inventory.view_component'),
+        (Accessory, 'inventory.view_accessory'),
+        (Consumable, 'inventory.view_consumable'),
+    ):
+        if not user.has_perm(perm):
+            continue
+        obj = model.objects.filter(ean__iexact=raw).first()
+        if obj is not None:
+            return {'url': obj.get_absolute_url(), 'label': str(obj)}
+
+    return None
+
+
 
