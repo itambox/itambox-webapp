@@ -1369,7 +1369,6 @@ class SnipeITImporter:
                 c['skipped'] += 1
                 continue
 
-            title = (row.get('title') or row.get('asset_maintenance_type') or 'Maintenance').strip()
             raw_type = (row.get('asset_maintenance_type') or 'maintenance').lower()
             mtype = _MAINTENANCE_TYPE_MAP.get(raw_type, 'repair')
             raw_status = (row.get('completion_date') and 'complete') or (row.get('is_warranty') and 'complete') or 'pending'
@@ -1389,9 +1388,9 @@ class SnipeITImporter:
             try:
                 with transaction.atomic():
                     if not self.dry_run and asset.pk and asset.pk > 0:
-                        # Idempotency: match by asset + title + start_date
+                        # Idempotency: match by asset + start_date + maintenance_type
                         obj = AssetMaintenance.all_objects.filter(
-                            asset=asset, title=title, start_date=start_date
+                            asset=asset, start_date=start_date, maintenance_type=mtype
                         ).first()
                         if obj:
                             if not self.update:
@@ -1408,7 +1407,6 @@ class SnipeITImporter:
                             continue
                         AssetMaintenance.objects.create(
                             asset=asset,
-                            title=title,
                             maintenance_type=mtype,
                             status=mstatus,
                             start_date=start_date,

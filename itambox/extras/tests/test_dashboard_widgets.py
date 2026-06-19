@@ -63,7 +63,7 @@ class DashboardWidgetsMultiTenancyTests(TestCase):
             purchase_cost=1000.00, purchase_date=date.today() - timedelta(days=300)
         )
         self.maint_a = AssetMaintenance.objects.create(
-            asset=self.asset_a, title="Repair A", start_date=date.today(), cost=150.00
+            asset=self.asset_a, start_date=date.today(), cost=150.00
         )
 
         # Tenant B Assets & Maintenances
@@ -73,7 +73,7 @@ class DashboardWidgetsMultiTenancyTests(TestCase):
             purchase_cost=2000.00, purchase_date=date.today() - timedelta(days=300)
         )
         self.maint_b = AssetMaintenance.objects.create(
-            asset=self.asset_b, title="Repair B", start_date=date.today(), cost=300.00
+            asset=self.asset_b, start_date=date.today(), cost=300.00
         )
 
         # Setup subscriptions
@@ -231,12 +231,12 @@ class DashboardWidgetsMultiTenancyTests(TestCase):
         # Tenant A active maintenances
         ctx_a = widget.get_context(self.make_request(self.user_a))
         self.assertEqual(ctx_a['active_maintenance_count'], 1)
-        self.assertEqual(ctx_a['active_maintenances'][0].title, "Repair A")
+        self.assertEqual(ctx_a['active_maintenances'][0].pk, self.maint_a.pk)
 
         # Tenant B active maintenances
         ctx_b = widget.get_context(self.make_request(self.user_b))
         self.assertEqual(ctx_b['active_maintenance_count'], 1)
-        self.assertEqual(ctx_b['active_maintenances'][0].title, "Repair B")
+        self.assertEqual(ctx_b['active_maintenances'][0].pk, self.maint_b.pk)
 
     def test_eol_alerts_widget_scoping(self):
         widget = EOLAlertsWidget()

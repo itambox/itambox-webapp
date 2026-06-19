@@ -21,7 +21,7 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
         elif template.report_type == 'license_utilization':
             active_cols = ['license_name', 'software', 'seats', 'assigned_seats', 'available_seats', 'utilization_rate']
         elif template.report_type == 'asset_maintenance':
-            active_cols = ['maintenance_title', 'maintenance_asset', 'maintenance_type', 'maintenance_status', 'maintenance_cost']
+            active_cols = ['maintenance_asset', 'maintenance_type', 'maintenance_status', 'maintenance_cost']
         elif template.report_type == 'asset_depreciation':
             active_cols = ['asset_tag', 'name', 'purchase_cost', 'salvage_value', 'depreciation_months', 'current_value']
         elif template.report_type == 'software_inventory':
@@ -57,7 +57,6 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
         'billing_cycle': _('Billing Cycle'),
         'cost': _('Cost'),
         'end_date': _('End Date'),
-        'maintenance_title': _('Maintenance Title'),
         'maintenance_asset': _('Asset'),
         'maintenance_type': _('Type'),
         'maintenance_status': _('Status'),
@@ -406,8 +405,6 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
         type_counts = {}
         for maint in maint_qs[:500]:
             row = {}
-            if 'maintenance_title' in active_cols:
-                row[_('Maintenance Title')] = maint.title or '-'
             if 'maintenance_asset' in active_cols:
                 row[_('Asset')] = maint.asset.name if maint.asset else '-'
             if 'maintenance_type' in active_cols:
@@ -441,9 +438,7 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
         if not rows:
             row = {}
             for col in active_cols:
-                if col == 'maintenance_title':
-                    row[_('Maintenance Title')] = 'Laptop Repair (Mock)'
-                elif col == 'maintenance_asset':
+                if col == 'maintenance_asset':
                     row[_('Asset')] = 'MacBook Pro 16"'
                 elif col == 'maintenance_type':
                     row[_('Type')] = 'Repair'

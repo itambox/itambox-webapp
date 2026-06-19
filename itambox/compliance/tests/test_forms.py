@@ -15,7 +15,6 @@ class AssetMaintenanceFormTests(TestCase):
     def test_form_validation_success(self):
         form = AssetMaintenanceForm(data={
             'asset': self.asset.pk,
-            'title': 'Scheduled maintenance',
             'maintenance_type': 'repair',
             'status': 'scheduled',
             'start_date': '2026-06-01',
@@ -27,7 +26,6 @@ class AssetMaintenanceFormTests(TestCase):
         # start_date is required
         form = AssetMaintenanceForm(data={
             'asset': self.asset.pk,
-            'title': 'Scheduled maintenance',
             'maintenance_type': 'repair',
             'status': 'scheduled',
         })

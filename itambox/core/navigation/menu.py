@@ -65,6 +65,7 @@ ASSETS_MENU = Menu(
             label=_('Lifecycle'),
             items=(
                 get_model_item('assets', 'warranty', _('Warranties')),
+                get_model_item('assets', 'assetmaintenance', _('Maintenances')),
                 get_model_item('assets', 'assetreservation', _('Reservations')),
                 get_model_item('assets', 'assetdisposal', _('Disposals')),
             ),
@@ -253,7 +254,6 @@ OPERATIONS_MENU = Menu(
                         ),
                     ),
                 ),
-                get_model_item('assets', 'assetmaintenance', _('Maintenances')),
                 get_model_item('compliance', 'custodytemplate', _('Custody Templates')),
             ),
         ),

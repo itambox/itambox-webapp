@@ -45,12 +45,11 @@ class AssetMaintenanceForm(forms.ModelForm):
     class Meta:
         model = AssetMaintenance
         fields = [
-            'asset', 'title', 'supplier', 'maintenance_type', 'status',
+            'asset', 'supplier', 'maintenance_type', 'status',
             'cost', 'currency', 'start_date', 'completion_date', 'performed_by',
             'description', 'notes', 'tags'
         ]
         widgets = {
-            'title': forms.TextInput(attrs={'class': 'form-control'}),
             'performed_by': forms.TextInput(attrs={'class': 'form-control'}),
             'cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'currency': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
@@ -70,8 +69,7 @@ class AssetMaintenanceForm(forms.ModelForm):
 
         self.helper.layout = Layout(
             Row(
-                Column('asset', css_class='col-md-6'),
-                Column('title', css_class='col-md-6')
+                Column('asset', css_class='col-md-12')
             ),
             Row(
                 Column('supplier', css_class='col-md-6'),

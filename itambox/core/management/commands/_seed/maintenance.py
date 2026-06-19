@@ -43,7 +43,7 @@ class SeedMaintenanceMixin:
                 start = days_ago(random.randint(10, 120))
             done = start + datetime.timedelta(days=random.randint(1, 5)) if random.random() < 0.7 else None
             AssetMaintenance.objects.create(
-                asset=asset, title=f"{mtype.replace('_', ' ').title()} — {asset.name}",
+                asset=asset,
                 maintenance_type=mtype, supplier=self._suppliers[random.choice(self.HW_SUPPLIERS)],
                 cost=cost, start_date=start, completion_date=done, notes=note)
             count += 1

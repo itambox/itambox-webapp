@@ -662,7 +662,6 @@ class ReportTemplateForm(forms.ModelForm):
         ('cost', _('Cost')),
         ('end_date', _('End Date')),
         # Asset Maintenance Columns
-        ('maintenance_title', _('Maintenance Title')),
         ('maintenance_asset', _('Asset')),
         ('maintenance_type', _('Type')),
         ('maintenance_status', _('Status')),

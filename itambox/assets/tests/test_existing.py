@@ -628,7 +628,6 @@ class AssetMaintenanceAndLifecycleTestCase(TestCase):
         # Record maintenance 1 costing $150.00
         AssetMaintenance.objects.create(
             asset=asset,
-            title="Screen replacement",
             status="completed",
             supplier=supplier,
             maintenance_type=AssetMaintenance.MAINTENANCE_TYPE_REPAIR,
@@ -641,7 +640,6 @@ class AssetMaintenanceAndLifecycleTestCase(TestCase):
         # Record maintenance 2 costing $50.00
         AssetMaintenance.objects.create(
             asset=asset,
-            title="RAM upgrade",
             status="completed",
             supplier=supplier,
             maintenance_type=AssetMaintenance.MAINTENANCE_TYPE_UPGRADE,

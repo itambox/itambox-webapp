@@ -34,7 +34,6 @@ class AssetMaintenance(TaggableMixin, CloneableMixin, ExportableMixin,
     ]
 
     asset = models.ForeignKey('assets.Asset', on_delete=models.PROTECT, related_name='maintenances', db_index=True, verbose_name=_("Asset"))
-    title = models.CharField(max_length=200, default='Maintenance', verbose_name=_("Title"))
     description = models.TextField(blank=True, verbose_name=_("Description"))
     supplier = models.ForeignKey('assets.Supplier', on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Supplier/Vendor"))
     performed_by = models.CharField(max_length=200, blank=True, verbose_name=_("Performed By"))
