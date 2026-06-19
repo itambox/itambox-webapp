@@ -2616,7 +2616,7 @@ msgid "Sites & Locations"
 msgstr "Standorte & Lagerorte"
 
 msgid "Tenancy"
-msgstr "Mandantenfähigkeit"
+msgstr "Mandanten"
 
 msgid "Tenants"
 msgstr "Mandanten"
