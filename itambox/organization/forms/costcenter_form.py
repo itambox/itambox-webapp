@@ -39,6 +39,9 @@ class CostCenterForm(CustomFieldModelFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Rescope the tenant-owned self-referential `parent` FK per request
+        # (import-frozen unscoped — would expose another tenant's cost centers).
+        self.fields['parent'].queryset = CostCenter.objects.all()
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
         self.helper.form_tag = True

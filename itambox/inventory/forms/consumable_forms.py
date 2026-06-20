@@ -107,6 +107,9 @@ class ConsumableStockForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Rescope tenant-owned FK querysets per request (import-frozen unscoped).
+        self.fields['consumable'].queryset = Consumable.objects.all()
+        self.fields['location'].queryset = Location.objects.all().select_related('site')
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
         self.helper.form_tag = True
@@ -185,5 +188,7 @@ class ConsumableStockModalForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Rescope the tenant-owned `location` FK per request (import-frozen unscoped).
+        self.fields['location'].queryset = Location.objects.all().select_related('site')
         self.helper = FormHelper()
         self.helper.form_tag = False

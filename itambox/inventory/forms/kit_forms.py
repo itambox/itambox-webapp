@@ -64,6 +64,14 @@ class KitItemForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Rescope the tenant-owned FK querysets per request (import-frozen
+        # unscoped) so a kit item can't reference another tenant's kit/accessory/
+        # license/consumable. asset_type is a global catalogue model — left as-is.
+        for fk_name in ('kit', 'accessory', 'license', 'consumable'):
+            field = self.fields.get(fk_name)
+            if field is not None and getattr(field, 'queryset', None) is not None:
+                field.queryset = field.queryset.model._default_manager.all()
+
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
         self.helper.form_tag = True

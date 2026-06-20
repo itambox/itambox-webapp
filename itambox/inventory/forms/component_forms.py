@@ -114,6 +114,9 @@ class ComponentStockForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Rescope tenant-owned FK querysets per request (import-frozen unscoped).
+        self.fields['component'].queryset = Component.objects.all()
+        self.fields['location'].queryset = Location.objects.all().select_related('site')
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
         self.helper.form_tag = True
@@ -180,6 +183,12 @@ class ComponentAllocationForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Rescope every tenant-owned FK queryset per request (import-frozen unscoped).
+        self.fields['component'].queryset = Component.objects.all()
+        self.fields['assigned_holder'].queryset = AssetHolder.objects.all().order_by('last_name', 'first_name')
+        self.fields['assigned_location'].queryset = Location.objects.all().select_related('site').order_by('site__name', 'name')
+        self.fields['assigned_asset'].queryset = Asset.objects.all().order_by('asset_tag')
+        self.fields['from_location'].queryset = Location.objects.all().select_related('site').order_by('name')
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
         self.helper.form_tag = True
@@ -291,5 +300,7 @@ class ComponentStockModalForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Rescope the tenant-owned `location` FK per request (import-frozen unscoped).
+        self.fields['location'].queryset = Location.objects.all().select_related('site')
         self.helper = FormHelper()
         self.helper.form_tag = False

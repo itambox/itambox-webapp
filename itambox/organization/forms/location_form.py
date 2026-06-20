@@ -54,6 +54,10 @@ class LocationForm(CustomFieldModelFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Rescope tenant-owned FK querysets per request (import-frozen unscoped):
+        # `site` and the self-referential `parent` are both tenant-scoped.
+        self.fields['site'].queryset = Site.objects.all()
+        self.fields['parent'].queryset = Location.objects.all()
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
         self.helper.form_tag = True

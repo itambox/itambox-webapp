@@ -60,6 +60,11 @@ class AssetMaintenanceForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Rescope the tenant-owned `asset` FK per request — its queryset is frozen
+        # unscoped at import, so a maintenance record could otherwise reference (and
+        # expose in the dropdown) another tenant's asset.
+        self.fields['asset'].queryset = Asset.objects.all()
+
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
         self.helper.form_tag = True
