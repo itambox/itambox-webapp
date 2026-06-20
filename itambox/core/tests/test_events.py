@@ -78,6 +78,47 @@ class EventsSystemTestCase(TransactionTestCase):
         self.assertIn("manufacturer", notification.subject)
         self.assertIn("assets", notification.message)
 
+    def test_event_rules_scoped_to_instance_tenant_in_system_context(self):
+        """WS5-1: in a system context (no active tenant/user) a save must fire ONLY the
+        rules belonging to the saved object's OWN tenant (plus global rules), never every
+        tenant's rules. Reproduces the cross-tenant dispatch the unscoped manager allowed."""
+        from organization.models import Tenant, Location
+        from core.managers import set_current_tenant
+
+        tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
+        tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
+        loc_ct = ContentType.objects.get_for_model(Location)
+
+        EventRule.objects.create(
+            name="A rule", tenant=tenant_a, model=loc_ct, events=['create'],
+            action_type=EventRule.ACTION_NOTIFICATION,
+            action_config={'subject': 'A-FIRED', 'body': 'x'}, enabled=True,
+        )
+        EventRule.objects.create(
+            name="B rule", tenant=tenant_b, model=loc_ct, events=['create'],
+            action_type=EventRule.ACTION_NOTIFICATION,
+            action_config={'subject': 'B-FIRED', 'body': 'x'}, enabled=True,
+        )
+        EventRule.objects.create(
+            name="Global rule", tenant=None, model=loc_ct, events=['create'],
+            action_type=EventRule.ACTION_NOTIFICATION,
+            action_config={'subject': 'GLOBAL-FIRED', 'body': 'x'}, enabled=True,
+        )
+
+        # A Location owned by tenant A, dispatched in a no-tenant / no-user system context.
+        set_current_tenant(None)
+        loc = Location(name="Site A", tenant=tenant_a)
+        loc.pk = 987654  # dispatch only needs pk + tenant_id; no real save required
+
+        dispatch_event(Location, loc, 'create')
+
+        self.assertTrue(Notification.objects.filter(subject='A-FIRED').exists())
+        self.assertTrue(Notification.objects.filter(subject='GLOBAL-FIRED').exists())
+        self.assertFalse(
+            Notification.objects.filter(subject='B-FIRED').exists(),
+            "Tenant B's event rule must NOT fire for a tenant-A object in a system context.",
+        )
+
     @patch('requests.request')
     def test_webhook_delivery_with_hmac_signature(self, mock_request):
         mock_response = MagicMock()

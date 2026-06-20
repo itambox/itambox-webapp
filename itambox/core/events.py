@@ -13,6 +13,34 @@ from extras.models import Event, EventRule, NotificationChannel, WebhookEndpoint
 logger = logging.getLogger(__name__)
 
 
+def _resolve_instance_tenant_id(instance):
+    """Resolve the tenant that owns ``instance`` so event rules are matched against the
+    object's OWN tenant rather than the ambient tenant contextvar.
+
+    The contextvar is unset in system contexts (management commands, the django-q worker
+    after a ``TaskContext`` exits, the shell). There the tenant-scoping manager fails *open*
+    (``filter_by_tenant`` returns the unscoped queryset), so matching rules by the contextvar
+    would fire EVERY tenant's rules for the object's ContentType — a cross-tenant dispatch
+    (foreign webhooks/notifications about another tenant's object). Resolving the tenant from
+    the instance itself closes that regardless of context. Returns the tenant pk, or ``None``
+    for a tenant-less/global object (in which case only global ``tenant=None`` rules fire).
+    """
+    tenant_id = getattr(instance, 'tenant_id', None)
+    if tenant_id is not None:
+        return tenant_id
+    # Models that derive their tenant through a relation (assignments/stock) declare a
+    # ``tenant_lookup`` ORM path (e.g. 'asset__tenant'); walk it to the owning tenant.
+    lookup = getattr(type(instance), 'tenant_lookup', None)
+    if lookup:
+        obj = instance
+        for part in lookup.split('__'):
+            obj = getattr(obj, part, None)
+            if obj is None:
+                return None
+        return getattr(obj, 'pk', None)
+    return None
+
+
 def dispatch_event(sender, instance, action, created=None):
     """Dispatch an event when a ChangeLoggingMixin model is created, updated, or deleted."""
 
@@ -28,15 +56,25 @@ def dispatch_event(sender, instance, action, created=None):
         data={'app_label': ct.app_label, 'model_name': ct.model},
     )
 
-    process_event_rules(event)
+    process_event_rules(event, _resolve_instance_tenant_id(instance))
 
 
-def process_event_rules(event):
-    """Match and execute event rules for the given event."""
+def process_event_rules(event, instance_tenant_id=None):
+    """Match and execute event rules for the given event.
 
-    rules = EventRule.objects.filter(
+    Rules are scoped to the triggering object's OWN tenant (plus global ``tenant=None``
+    rules), read through the unscoped ``_base_manager`` so the result NEVER depends on the
+    ambient tenant contextvar (which fails open in system contexts). See
+    ``_resolve_instance_tenant_id``.
+    """
+    from django.db.models import Q
+
+    rules = EventRule._base_manager.filter(
         model=event.model,
         enabled=True,
+        deleted_at__isnull=True,
+    ).filter(
+        Q(tenant_id=instance_tenant_id) | Q(tenant__isnull=True)
     ).select_related('webhook')
 
     if not rules.exists():
