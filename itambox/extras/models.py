@@ -362,6 +362,14 @@ class WebhookEndpoint(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     def get_absolute_url(self):
         return reverse('extras:webhookendpoint_detail', kwargs={'pk': self.pk})
 
+    def clean(self):
+        super().clean()
+        if self.url:
+            # SSRF guard at the WRITE boundary (forms/admin/full_clean), not only at dispatch:
+            # reject loopback/link-local/private/metadata URLs before they are persisted.
+            from core.validators import validate_external_url
+            validate_external_url(self.url)
+
     def save(self, *args, **kwargs):
         if self.secret and not self.secret.startswith("enc$"):
             from core.crypto import encrypt_string
