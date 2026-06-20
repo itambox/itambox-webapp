@@ -32,8 +32,29 @@ from .serializers import (
 from assets.services import checkout_asset, checkin_asset
 
 
+class AssetStateActionPermissions(TokenPermissions):
+    """checkout/checkin mutate asset state, so they require change_<model> rather than the
+    POST-default add_<model> (TokenPermissions maps POST->add, PATCH->change). All the base
+    tenant-resolution logic is reused; only the action->perm mapping is adjusted."""
+    STATE_CHANGE_ACTIONS = {'checkout', 'checkin'}
+    _current_action = None
+
+    def get_required_permissions(self, method, model):
+        if self._current_action in self.STATE_CHANGE_ACTIONS:
+            method = 'PATCH'
+        return super().get_required_permissions(method, model)
+
+    def has_permission(self, request, view):
+        self._current_action = getattr(view, 'action', None)
+        return super().has_permission(request, view)
+
+    def has_object_permission(self, request, view, obj):
+        self._current_action = getattr(view, 'action', None)
+        return super().has_object_permission(request, view, obj)
+
+
 class AssetViewSet(ITAMBoxModelViewSet):
-    permission_classes = [TokenPermissions, StrictTenantPermission]
+    permission_classes = [AssetStateActionPermissions, StrictTenantPermission]
     queryset = Asset.objects.select_related('asset_role', 'asset_type__manufacturer', 'location').prefetch_related(
         Prefetch('assignments', queryset=AssetAssignment.objects.filter(is_active=True), to_attr='_active_assignments')
     )

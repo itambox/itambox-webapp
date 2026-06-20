@@ -4,6 +4,7 @@ import difflib
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import Http404, HttpResponse, HttpResponseRedirect
+from django.core.exceptions import PermissionDenied
 from django.apps import apps
 from django.urls import reverse, NoReverseMatch
 from django.utils.decorators import method_decorator
@@ -484,6 +485,10 @@ class ImageAttachmentServeView(LoginRequiredMixin, View):
 
 class LabelSelectView(LoginRequiredMixin, View):
     def get(self, request, app_label, model_name, object_id):
+        # Require view access to the object's model — printing a label exposes its
+        # name/tag/serial, so a member lacking view_<model> must not reach it.
+        if not request.user.has_perm(f'{app_label}.view_{model_name}'):
+            raise PermissionDenied
         templates = LabelTemplate.objects.all()
         context = {
             'label_templates': templates,
@@ -507,8 +512,12 @@ class LabelPrintView(LoginRequiredMixin, View):
             obj = get_object_or_404(model, pk=object_id)
         else:
             # Dynamic model lookup to break circular dependency
-            Asset = apps.get_model('assets', 'Asset')
-            obj = get_object_or_404(Asset, pk=object_id)
+            model = apps.get_model('assets', 'Asset')
+            obj = get_object_or_404(model, pk=object_id)
+
+        # Require object-level view access — a printed label exposes name/tag/serial.
+        if not request.user.has_perm(f'{model._meta.app_label}.view_{model._meta.model_name}', obj=obj):
+            raise PermissionDenied
 
         # Same engine as the bulk print job — synchronous, no background Job.
         pdf_bytes = render_labels_pdf([obj], label_template)

@@ -141,6 +141,41 @@ class ITAMBoxAPITestCase(APITestCase):
         self.asset_a.refresh_from_db()
         self.assertIsNone(self.asset_a.active_assignment)
 
+    def test_checkout_requires_change_not_add_perm(self):
+        """WS1-6: checkout is a state change -> requires assets.change_asset, not the
+        POST-default assets.add_asset."""
+        add_only = User.objects.create_user(username='addonly', password='pw')
+        TenantMembership.objects.create(
+            user=add_only, tenant=self.tenant_a,
+            role=TenantRole.objects.create(
+                tenant=self.tenant_a, name='Add Only',
+                permissions=['assets.view_asset', 'assets.add_asset'],
+            ),
+        )
+        change_only = User.objects.create_user(username='changeonly', password='pw')
+        TenantMembership.objects.create(
+            user=change_only, tenant=self.tenant_a,
+            role=TenantRole.objects.create(
+                tenant=self.tenant_a, name='Change Only',
+                permissions=['assets.view_asset', 'assets.change_asset'],
+            ),
+        )
+        checkout_url = reverse('api:assets_api:asset-checkout', kwargs={'pk': self.asset_a.pk})
+
+        self.client.force_login(add_only)
+        session = self.client.session
+        session['active_tenant_id'] = self.tenant_a.pk
+        session.save()
+        resp = self.client.post(checkout_url, {'holder_id': self.holder_a.id}, format='json')
+        self.assertEqual(resp.status_code, 403, resp.data)
+
+        self.client.force_login(change_only)
+        session = self.client.session
+        session['active_tenant_id'] = self.tenant_a.pk
+        session.save()
+        resp = self.client.post(checkout_url, {'holder_id': self.holder_a.id}, format='json')
+        self.assertEqual(resp.status_code, 200, resp.data)
+
     def test_checkout_multiple_targets_fails(self):
         self.client.force_authenticate(user=self.superuser)
 
