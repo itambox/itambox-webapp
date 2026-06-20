@@ -56,6 +56,11 @@ class SubscriptionFixesTests(TestCase):
         # Create memberships
         TenantMembership.objects.create(user=self.user_a, tenant=self.tenant_a, role=self.role_a)
         TenantMembership.objects.create(user=self.user_b, tenant=self.tenant_b, role=self.role_b)
+        # super_user is a platform operator who is also a member of tenant_a, so it
+        # receives tenant_a's subscription notifications. Expiry/reminder recipients
+        # are scoped to staff who are MEMBERS of the subscription's tenant (B7) —
+        # a bare is_staff user with no membership is no longer notified.
+        TenantMembership.objects.create(user=self.super_user, tenant=self.tenant_a, role=self.role_a)
 
 
         # Create providers and subscriptions
@@ -233,7 +238,8 @@ class SubscriptionFixesTests(TestCase):
         # - Sub 30
         # - Sub 14
         # - Sub 7
-        # Note: Each notification is sent to all superusers (is_staff=True). self.super_user is staff.
+        # Note: notifications go to staff who are members of the subscription's
+        # tenant (B7). self.super_user is staff AND a member of tenant_a.
         self.assertTrue(any("Subscription Expired: Expired Sub" in s for s in subjects))
         self.assertTrue(any("Subscription Renewal Warning: Sub 30 in 30 Days" in s for s in subjects))
         self.assertTrue(any("Subscription Renewal Warning: Sub 14 in 14 Days" in s for s in subjects))
