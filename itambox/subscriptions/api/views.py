@@ -1,5 +1,6 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Count, Q
+from django.db import router, transaction
 from rest_framework import serializers as drf_serializers, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -18,7 +19,10 @@ class SubscriptionStatusSerializer(drf_serializers.Serializer):
 
     def update(self, instance, validated_data):
         instance.status = validated_data['status']
-        instance.save(update_fields=['status'])
+        # `updated_at` (auto_now) bumps with the row, so save the status alongside
+        # it; otherwise the optimistic-concurrency ETag would not advance and the
+        # change-log diff would be recorded but the token left stale.
+        instance.save(update_fields=['status', 'updated_at'])
         return instance
 
 
@@ -45,13 +49,32 @@ class SubscriptionViewSet(ITAMBoxModelViewSet):
 
     @action(detail=True, methods=['patch'], url_path='status', serializer_class=SubscriptionStatusSerializer)
     def update_status(self, request, pk=None):
-        """Action for updating subscription status only."""
-        subscription = self.get_object()
+        """Update only the status of a subscription.
+
+        Routed through the same optimistic-concurrency machinery as the standard
+        ``update()`` so two concurrent status writes get a 412 instead of silent
+        last-writer-wins, and the snapshot keeps the change-log diff accurate.
+        """
+        # Snapshot + require/match the caller's If-Match against the current row.
+        subscription = self.get_object_with_snapshot()
+        self._validate_etag(request, subscription)
+
         serializer = SubscriptionStatusSerializer(subscription, data=request.data, partial=True)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        serializer.save()
-        return Response(SubscriptionSerializer(subscription, context={'request': request}).data)
+
+        # Re-validate the ETag against a row-locked re-read so a write that slips
+        # in between the read above and the save loses the race with a 412.
+        with transaction.atomic(using=router.db_for_write(Subscription)):
+            locked = Subscription.objects.select_for_update().get(pk=subscription.pk)
+            self._validate_etag(request, locked)
+            serializer.save()
+
+        qs = self.get_queryset().get(pk=subscription.pk)
+        response = Response(SubscriptionSerializer(qs, context={'request': request}).data)
+        if etag := self._get_etag(qs):
+            response['ETag'] = etag
+        return response
 
 
 class SubscriptionAssignmentViewSet(ITAMBoxModelViewSet):

@@ -119,11 +119,17 @@ class SubscriptionAPITests(APITestCase):
         new_pk = response.data['id']
         etag = response['ETag']
 
-        # Update status action
+        # Update status action — now routed through the optimistic-concurrency
+        # machinery, so it requires the current If-Match ETag like update().
         status_url = reverse('api:subscriptions_api:subscription-update-status', kwargs={'pk': new_pk})
-        response = self.client.patch(status_url, data={'status': 'suspended'}, format='json')
+        response = self.client.patch(
+            status_url, data={'status': 'suspended'}, format='json', HTTP_IF_MATCH=etag
+        )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['status'], 'suspended')
+        # The status write advanced the row, so its response carries a fresh ETag
+        # that the subsequent delete must use (the create ETag is now stale).
+        etag = response['ETag']
 
         # Delete
         detail_url = reverse('api:subscriptions_api:subscription-detail', kwargs={'pk': new_pk})

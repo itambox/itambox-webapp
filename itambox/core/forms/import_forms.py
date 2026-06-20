@@ -338,9 +338,15 @@ class BulkImportForm(forms.Form):
                 imported += 1
             except ValidationError as e:
                 errors.append(f'Row {i}: {"; ".join(e.messages if hasattr(e, "messages") else [str(e)])}')
-            except Exception as e:
+            except Exception:
+                # Keep the driver/exception detail (which can leak SQL fragments,
+                # column names, or other internals) in the server log only; show
+                # the user a generic, non-revealing per-row message.
                 logger.exception(f'Import error row {i}')
-                errors.append(f'Row {i}: {e}')
+                errors.append(
+                    str(_('Row %(row)s: could not be imported due to an unexpected error.')
+                        % {'row': i})
+                )
 
         self.imported_count = imported
         self.errors_list = errors
@@ -398,4 +404,3 @@ class BulkImportForm(forms.Form):
     def _create_instance(self, mapped_data):
         """Create a model instance from mapped data. Override in subclass."""
         return self.model(**mapped_data)
-

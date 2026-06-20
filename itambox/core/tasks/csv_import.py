@@ -85,12 +85,16 @@ def import_csv_task(job_id, rows_data, app_label, model_name, user_id, tenant_id
                 )
 
             except Exception as e:
+                # The raw exception (str(e)) can carry DB driver text / SQL
+                # fragments / internal paths — log it server-side only and surface
+                # a generic message to the user. The job log carries the details
+                # for an operator who can already see them.
                 logger.exception("Exception during async import task")
                 job.mark_failed(str(e))
                 Notification.objects.create(
                     user=ctx.user,
                     subject=_("Bulk Import Error"),
-                    message=_("A system exception occurred during the import: %(error)s") % {'error': str(e)},
+                    message=_("A system error occurred during the import. View job logs for details."),
                     level=Notification.LEVEL_DANGER,
                     target_url=reverse_job_detail(job.pk)
                 )
