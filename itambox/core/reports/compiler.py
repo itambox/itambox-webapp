@@ -5,6 +5,30 @@ from django.utils.translation import gettext as _
 from .charts import generate_doughnut_chart, generate_bar_chart
 
 
+def _record_currency(record_currency, active_tenant):
+    """Resolve a money record's currency: its own currency, else the active tenant's, else
+    the configured default. Mirrors the subscription-renewals branch's _resolve_currency."""
+    code = (record_currency or '').upper()
+    if code:
+        return code
+    if active_tenant is not None and getattr(active_tenant, 'currency', None):
+        return active_tenant.currency.upper()
+    from django.conf import settings as _settings
+    return (getattr(_settings, 'ITAMBOX_DEFAULT_CURRENCY', 'EUR') or 'EUR').upper()
+
+
+def _format_per_currency(amount_by_currency):
+    """Render a {currency: amount} mapping as ONE money figure per currency joined with
+    ' · '. There is no FX source, so amounts in different currencies are NEVER summed into a
+    single (meaningless) total. Mirrors the subscription-renewals spend card."""
+    from extras.templatetags.money import money as _money_fmt
+    from types import SimpleNamespace
+    items = sorted(amount_by_currency.items(), key=lambda kv: kv[1], reverse=True)
+    return ' · '.join(
+        _money_fmt(amount, SimpleNamespace(currency=cur)) for cur, amount in items
+    ) or _money_fmt(0, None)
+
+
 def compile_report_context(template, active_tenant=None, filter_tenants=None):
     """
     Unified report compiler that aggregates assets/licenses/subscriptions,
@@ -94,11 +118,20 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
         # Aggregate in the DB rather than pulling every filtered asset (and its
         # prefetched assignments) into Python just to sum one column.
         acquisition_sum = assets_qs.aggregate(total=Sum('purchase_cost'))['total'] or 0
-        
+        # Bucket acquisition cost per currency (each Asset carries its own currency and there
+        # is no FX source, so a single combined sum would be meaningless).
+        acq_by_currency = {}
+        for cur, total in (
+            assets_qs.exclude(purchase_cost__isnull=True)
+            .values('currency').annotate(c=Sum('purchase_cost')).values_list('currency', 'c')
+        ):
+            code = _record_currency(cur, active_tenant)
+            acq_by_currency[code] = acq_by_currency.get(code, 0) + (total or 0)
+
         if template.include_summary_cards:
             summary_cards = [
                 {'label': _('Total Hardware Assets'), 'value': str(total_assets)},
-                {'label': _('Total Acquisition Sum'), 'value': f"${acquisition_sum:,.2f}"}
+                {'label': _('Total Acquisition Sum'), 'value': _format_per_currency(acq_by_currency)}
             ]
             
         for asset in assets_qs[:500]:
@@ -401,12 +434,19 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
             maint_qs = maint_qs.filter(asset__tenant=active_tenant)
             
         total_maint = maint_qs.count()
-        total_cost = sum(m.cost for m in maint_qs if m.cost)
-        
+        # Bucket maintenance cost per currency (AssetMaintenance carries its own currency).
+        total_cost = 0
+        cost_by_currency = {}
+        for m in maint_qs:
+            if m.cost:
+                total_cost += m.cost
+                code = _record_currency(getattr(m, 'currency', None), active_tenant)
+                cost_by_currency[code] = cost_by_currency.get(code, 0) + m.cost
+
         if template.include_summary_cards:
             summary_cards = [
                 {'label': _('Total Maintenances'), 'value': str(total_maint)},
-                {'label': _('Total Maintenance Cost'), 'value': f"${total_cost:,.2f}"}
+                {'label': _('Total Maintenance Cost'), 'value': _format_per_currency(cost_by_currency)}
             ]
             
         type_counts = {}
@@ -484,14 +524,25 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
         assets_qs = assets_qs.select_related('asset_type', 'asset_type__depreciation', 'status')
         
         total_assets = assets_qs.count()
-        total_purchase_cost = sum(asset.purchase_cost for asset in assets_qs if asset.purchase_cost) or 0
-        total_current_value = sum(asset.current_value for asset in assets_qs if asset.current_value is not None) or 0
-        
+        # Bucket acquisition cost and current book value per currency (no FX source).
+        total_purchase_cost = 0
+        total_current_value = 0
+        pc_by_currency = {}
+        cv_by_currency = {}
+        for asset in assets_qs:
+            code = _record_currency(getattr(asset, 'currency', None), active_tenant)
+            if asset.purchase_cost:
+                total_purchase_cost += asset.purchase_cost
+                pc_by_currency[code] = pc_by_currency.get(code, 0) + asset.purchase_cost
+            if asset.current_value is not None:
+                total_current_value += asset.current_value
+                cv_by_currency[code] = cv_by_currency.get(code, 0) + asset.current_value
+
         if template.include_summary_cards:
             summary_cards = [
                 {'label': _('Total Depreciable Assets'), 'value': str(total_assets)},
-                {'label': _('Total Acquisition Cost'), 'value': f"${total_purchase_cost:,.2f}"},
-                {'label': _('Total Current Book Value'), 'value': f"${total_current_value:,.2f}"}
+                {'label': _('Total Acquisition Cost'), 'value': _format_per_currency(pc_by_currency)},
+                {'label': _('Total Current Book Value'), 'value': _format_per_currency(cv_by_currency)}
             ]
             
         for asset in assets_qs[:500]:
