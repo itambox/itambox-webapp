@@ -1,10 +1,31 @@
 from django.core.management.base import BaseCommand
 from django.db import transaction
+
 from core.crypto import decrypt_string, encrypt_string
-from licenses.models import License
+
+
+def encrypted_field_specs():
+    """Every (model, field_name) pair that stores an ``enc$``-prefixed Fernet ciphertext.
+
+    Key rotation MUST cover every encrypted field: a field omitted here keeps its old
+    ciphertext, so once the operator drops the old key it becomes permanently undecryptable
+    (broken SMTP / webhook signing). When you add a new encrypted field, add it here.
+
+    Imported lazily to avoid touching the app registry at module import time.
+    """
+    from licenses.models import License
+    from core.models import EmailSettings
+    from extras.models import WebhookEndpoint
+
+    return [
+        (License, 'product_key'),
+        (EmailSettings, 'smtp_password'),
+        (WebhookEndpoint, 'secret'),
+    ]
+
 
 class Command(BaseCommand):
-    help = 'Rotate all encrypted fields in the database using the latest encryption keys.'
+    help = 'Re-encrypt every encrypted field with the current primary key (key rotation).'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -16,72 +37,73 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         dry_run = options['dry_run']
-        
+
         self.stdout.write("Scanning for encrypted fields in the database...")
-        
-        # Load all License objects (including soft-deleted)
-        licenses = License.all_objects.all()
-        total_licenses = licenses.count()
-        
-        self.stdout.write(f"Found {total_licenses} total licenses to inspect.")
-        
-        rotated_count = 0
-        error_count = 0
-        skipped_count = 0
-        
+
+        totals = {'rotated': 0, 'skipped': 0, 'errors': 0}
         with transaction.atomic():
-            for license_obj in licenses:
-                raw_key = license_obj.product_key
-                if not raw_key:
-                    skipped_count += 1
-                    continue
-                
-                if not raw_key.startswith("enc$"):
-                    # Not encrypted yet (plaintext fallback)
-                    decrypted_val = raw_key
-                else:
-                    try:
-                        decrypted_val = decrypt_string(raw_key)
-                    except Exception as e:
-                        self.stderr.write(self.style.ERROR(
-                            f"Failed to decrypt license {license_obj.pk} ({license_obj.name}): {e}"
-                        ))
-                        error_count += 1
-                        continue
-                
-                # Check if decrypting returned the cipher string itself (meaning decryption failed fallback)
-                if decrypted_val == raw_key and raw_key.startswith("enc$"):
+            for model, field_name in encrypted_field_specs():
+                result = self._rotate_field(model, field_name, dry_run)
+                for key in totals:
+                    totals[key] += result[key]
+
+            prefix = "[DRY RUN] Simulation complete." if dry_run else "Rotation complete!"
+            self.stdout.write(self.style.SUCCESS(
+                f"{prefix} Rotated: {totals['rotated']}, "
+                f"Skipped: {totals['skipped']}, Errors: {totals['errors']}."
+            ))
+
+    def _rotate_field(self, model, field_name, dry_run):
+        label = f"{model.__name__}.{field_name}"
+
+        # _base_manager: unscoped (every tenant) and INCLUDES soft-deleted rows, independent
+        # of the (absent) request tenant/user context this management command runs in.
+        rows = model._base_manager.all()
+        self.stdout.write(f"Inspecting {rows.count()} {model.__name__} row(s) for '{field_name}'.")
+
+        rotated = skipped = errors = 0
+        for obj in rows:
+            raw = getattr(obj, field_name)
+            if not raw:
+                skipped += 1
+                continue
+
+            if not raw.startswith("enc$"):
+                # Not encrypted yet (plaintext fallback) — adopt it under the current key.
+                decrypted_val = raw
+            else:
+                try:
+                    decrypted_val = decrypt_string(raw)
+                except Exception as e:
                     self.stderr.write(self.style.ERROR(
-                        f"Decryption failed or returned cipher value for license {license_obj.pk} ({license_obj.name}). Skipping to avoid data loss."
+                        f"Failed to decrypt {label} pk={obj.pk}: {e}"
                     ))
-                    error_count += 1
+                    errors += 1
                     continue
-                
-                # Symmetrically encrypt with the current primary key (first key in the keyring)
-                new_encrypted_key = encrypt_string(decrypted_val)
-                
-                if new_encrypted_key == raw_key:
-                    # Key did not change (already encrypted with current primary key)
-                    skipped_count += 1
-                    continue
-                
-                rotated_count += 1
-                
-                if dry_run:
-                    self.stdout.write(self.style.WARNING(
-                        f"[DRY RUN] Would rotate encryption key for license {license_obj.pk} ({license_obj.name})"
-                    ))
-                else:
-                    # Bypass standard validations and save to database
-                    License.all_objects.filter(pk=license_obj.pk).update(product_key=new_encrypted_key)
-                    
+
+            # Defensive: decrypt_string raises on failure, but guard against a silent
+            # cipher-passthrough to avoid re-encrypting an unrecoverable value.
+            if decrypted_val == raw and raw.startswith("enc$"):
+                self.stderr.write(self.style.ERROR(
+                    f"Decryption returned the cipher for {label} pk={obj.pk}; "
+                    f"skipping to avoid data loss."
+                ))
+                errors += 1
+                continue
+
+            new_encrypted = encrypt_string(decrypted_val)
+            if new_encrypted == raw:
+                # Already under the current primary key (rare — Fernet is non-deterministic).
+                skipped += 1
+                continue
+
+            rotated += 1
             if dry_run:
-                self.stdout.write(self.style.SUCCESS(
-                    f"[DRY RUN] Simulation complete. "
-                    f"Rotated: {rotated_count}, Skipped: {skipped_count}, Errors: {error_count}."
+                self.stdout.write(self.style.WARNING(
+                    f"[DRY RUN] Would rotate {label} pk={obj.pk}"
                 ))
             else:
-                self.stdout.write(self.style.SUCCESS(
-                    f"Rotation complete! "
-                    f"Successfully rotated: {rotated_count}, Skipped: {skipped_count}, Errors: {error_count}."
-                ))
+                # .update() bypasses save()'s encrypt-on-save, storing the new ciphertext as-is.
+                model._base_manager.filter(pk=obj.pk).update(**{field_name: new_encrypted})
+
+        return {'rotated': rotated, 'skipped': skipped, 'errors': errors}
