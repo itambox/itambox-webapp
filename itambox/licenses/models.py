@@ -144,6 +144,16 @@ class License(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
             raise ValidationError({
                 'subscription': _("Selected subscription belongs to a different tenant."),
             })
+        # Seats cannot be reduced below the number of currently-assigned seats (which would
+        # silently leave the pool over-allocated with no audit signal).
+        if self.pk and self.seats is not None:
+            assigned = self.assignments.count()
+            if self.seats < assigned:
+                raise ValidationError({
+                    'seats': _("Cannot set seats to %(seats)s — %(n)s are already assigned.") % {
+                        'seats': self.seats, 'n': assigned,
+                    },
+                })
 
     def get_absolute_url(self):
         try:

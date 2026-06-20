@@ -1,5 +1,6 @@
 """Lifecycle models: AssetDisposal, Warranty, AssetReservation, and DateRange helper."""
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import Func
 from django.contrib.postgres.constraints import ExclusionConstraint
@@ -104,6 +105,7 @@ class AssetDisposal(FileAttachmentMixin, JournalingMixin, SoftDeleteMixin,
         decimal_places=2,
         null=True,
         blank=True,
+        validators=[MinValueValidator(0)],
         verbose_name=_('Proceeds'),
         help_text=_('Amount received for the asset (resale / salvage). Leave blank if none.'),
     )

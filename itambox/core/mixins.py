@@ -228,7 +228,12 @@ class SoftDeleteMixin(models.Model):
                                 instance.delete()
                     
                     if pks_to_soft_delete:
-                        model.objects.filter(pk__in=pks_to_soft_delete).update(deleted_at=now)
+                        # _base_manager (unscoped): these are cascade children of `self`
+                        # collected by the ORM, so they MUST be soft-deleted regardless of
+                        # the active tenant context. The tenant-scoped manager would match
+                        # zero rows for a child in a different/None tenant — leaving it active
+                        # while a 'delete' audit entry was already written above (divergence).
+                        model._base_manager.filter(pk__in=pks_to_soft_delete).update(deleted_at=now)
                 
                 self.soft_delete()
 

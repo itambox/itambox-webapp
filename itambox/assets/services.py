@@ -346,6 +346,16 @@ def dispose_asset(
         asset.disposed_at = None
         asset.disposal_value = None
 
+        # Proceeds must be non-negative and in the asset's own currency: there is no FX
+        # source, so a foreign-currency or negative proceeds would corrupt the frozen
+        # book value / TCO it flows into.
+        if proceeds is not None and proceeds < 0:
+            raise ValidationError(_("Disposal proceeds cannot be negative."))
+        if proceeds is not None and currency and getattr(asset, 'currency', None) and currency != asset.currency:
+            raise ValidationError(
+                _("Disposal proceeds currency must match the asset's currency (no conversion is applied).")
+            )
+
         # Update the asset: stamp disposal fields and transition status
         if proceeds is not None:
             asset.disposal_value = proceeds

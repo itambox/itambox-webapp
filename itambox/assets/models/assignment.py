@@ -90,7 +90,10 @@ class AssetAssignment(SoftDeleteMixin, JournalingMixin, TaggableMixin, ChangeLog
         constraints = [
             models.UniqueConstraint(
                 fields=['asset'],
-                condition=models.Q(is_active=True),
+                # Also exclude soft-deleted rows: a soft-deleted assignment keeps is_active=True,
+                # so without this a deleted-but-active row occupies the asset's unique slot and
+                # a fresh checkout fails with a raw IntegrityError (500).
+                condition=models.Q(is_active=True) & models.Q(deleted_at__isnull=True),
                 name='unique_active_assignment_per_asset'
             ),
             models.CheckConstraint(
