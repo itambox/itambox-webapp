@@ -214,8 +214,14 @@ def _send_webhook(rule, event):
     from django.db import transaction
     from django.conf import settings
 
+    # For an endpoint-linked webhook, pass the endpoint pk (NOT the decrypted secret) so the
+    # task re-derives it at run time — this keeps the secret out of the django_q payload /
+    # the retry Schedule.kwargs (which are stored plaintext). Legacy action_config webhooks
+    # have no endpoint and their secret already lives plaintext in the rule config.
     task_kwargs = dict(
-        url=url, method=method, headers=headers, secret=secret,
+        url=url, method=method, headers=headers,
+        secret='' if endpoint is not None else secret,
+        webhook_endpoint_id=endpoint.pk if endpoint is not None else None,
         event_action=event.action,
         event_model_app_label=event.model.app_label,
         event_model_name=event.model.model,

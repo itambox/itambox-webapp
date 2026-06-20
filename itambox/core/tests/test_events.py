@@ -425,3 +425,32 @@ class WebhookRetryTestCase(TransactionTestCase):
         self.assertEqual(retry['retry_count'], 2)
         self.assertEqual(retry['retry_backoff'], 60)
         self.assertEqual(retry['url'], self.BASE_KWARGS['url'])
+
+    @patch('core.tasks.webhooks.requests.request')
+    @patch('core.tasks.webhooks.async_task')
+    @patch('core.tasks.webhooks.Schedule')
+    def test_endpoint_secret_not_persisted_in_retry_schedule(self, mock_schedule, mock_async, mock_request):
+        """WS5-4: an endpoint-linked retry must re-derive the secret from the endpoint, never
+        write it into Schedule.kwargs (which django-q stores plaintext)."""
+        import ast
+        from core.tasks.webhooks import send_webhook_task
+        endpoint = WebhookEndpoint.objects.create(
+            name='WH', url='https://example.com/hook', secret='top-secret',
+        )
+        resp = MagicMock(status_code=503)
+        resp.raise_for_status.side_effect = __import__('requests').HTTPError(response=resp)
+        mock_request.return_value = resp
+
+        kwargs = dict(self.BASE_KWARGS, secret='', webhook_endpoint_id=endpoint.pk,
+                      retry_count=2, retry_backoff=60)
+        send_webhook_task(**kwargs)
+
+        # The HMAC was still computed (secret re-derived from the endpoint at run time).
+        self.assertIn('X-Hub-Signature-256', mock_request.call_args[1]['headers'])
+        # The retry Schedule.kwargs must NOT contain the secret — only the endpoint id.
+        mock_schedule.objects.create.assert_called_once()
+        _, kw = mock_schedule.objects.create.call_args
+        self.assertNotIn('top-secret', kw['kwargs'])
+        retry = ast.literal_eval(kw['kwargs'])
+        self.assertEqual(retry['webhook_endpoint_id'], endpoint.pk)
+        self.assertEqual(retry['secret'], '')
