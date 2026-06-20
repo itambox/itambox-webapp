@@ -304,6 +304,15 @@ class ExportTemplateEditView(ObjectEditView):
     queryset = ExportTemplate.objects.all()
     fields = ['name', 'description', 'content_type', 'template_code', 'mime_type', 'file_extension']
 
+    def has_permission(self):
+        # ExportTemplate is a global, admin-managed resource with NO tenant field — its
+        # template_code is server-rendered (Jinja) for EVERY tenant's exports. Gating only on
+        # the model perm let any tenant member create/edit/delete the shared templates,
+        # i.e. tamper with another tenant's export output (a cross-tenant integrity /
+        # stored-template-injection vector). Authoring is restricted to superusers; members
+        # keep read/render access.
+        return self.request.user.is_superuser and super().has_permission()
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = _('Edit Export Template') if self.object else _('Create Export Template')
@@ -313,6 +322,10 @@ class ExportTemplateEditView(ObjectEditView):
 @method_decorator(login_required, name='dispatch')
 class ExportTemplateDeleteView(ObjectDeleteView):
     queryset = ExportTemplate.objects.all()
+
+    def has_permission(self):
+        # See ExportTemplateEditView: deleting a shared global template affects every tenant.
+        return self.request.user.is_superuser and super().has_permission()
 
 
 class JournalEntryCreateView(LoginRequiredMixin, View):
