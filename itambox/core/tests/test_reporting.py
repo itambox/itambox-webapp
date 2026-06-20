@@ -90,18 +90,25 @@ class ScheduledReportingAndAlertsTests(TestCase):
     @patch('requests.post')
     def test_generate_report_task_success(self, mock_post, mock_email_message):
         """Test general execution of report generation task, local archiving and dispatches."""
+        # A tenant is required now — a tenantless report with no filter_tenants is refused
+        # (WS5-6). The channel is scoped to the same tenant so it is visible under the run.
+        from organization.models import Tenant
+        tenant = Tenant.objects.create(name='Report Tenant', slug='report-tenant-gen')
+
         # Setup a Slack channel (report task dispatches to all enabled channels)
         channel_slack = NotificationChannel.objects.create(
             name='Test Slack Channel',
             channel_type=NotificationChannel.TYPE_SLACK,
             enabled=True,
+            tenant=tenant,
             config={'webhook_url': 'https://hooks.slack.com/services/test'}
         )
 
-        # Create a scheduled report with the Slack channel and archiving active
+        # Create a scheduled report with the Slack channel and archiving active.
         sched = ScheduledReport.objects.create(
             name='Full Task Test Schedule',
             report=self.template,
+            tenant=tenant,
             frequency='once',
             format='html',
             recipients='',

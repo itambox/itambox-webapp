@@ -46,6 +46,16 @@ def generate_scheduled_report_task(scheduled_report_id):
         if not filter_tenants and sched.report:
             filter_tenants = list(sched.report.filter_tenants.all())
 
+        # Refuse a cross-tenant report: with no owning tenant AND no explicit filter_tenants
+        # the compiler spans EVERY tenant and emails the aggregate to the free-text recipients.
+        # A global report must name its tenants via filter_tenants.
+        if active_tenant is None and not filter_tenants:
+            logger.error(
+                "Scheduled report '%s' has no tenant scope (no tenant, no filter_tenants) — "
+                "refusing to compile a cross-tenant report.", sched.name,
+            )
+            return
+
         logger.info(f"Generating scheduled report: {sched.name} (Format: {sched.format})")
         sched.last_run = timezone.now()
         sched.save()
