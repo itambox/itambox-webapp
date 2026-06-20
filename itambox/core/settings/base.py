@@ -246,6 +246,7 @@ REST_FRAMEWORK = {
         'itambox.api.permissions.StrictTenantPermission',
     ],
     'DEFAULT_PAGINATION_CLASS': 'itambox.api.pagination.ITAMBoxPagination',
+    'EXCEPTION_HANDLER': 'itambox.api.exceptions.itambox_exception_handler',
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle',

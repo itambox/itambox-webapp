@@ -33,7 +33,11 @@ class CoreConfig(AppConfig):
 
         def scoped_baseform_init(self, *args, **kwargs):
             original_baseform_init(self, *args, **kwargs)
-            if 'tenant' in self.fields:
+            # Skip tenant-XOR-group forms (a `tenant_group` field present alongside
+            # `tenant` means the object scopes to a tenant OR a group OR is global):
+            # forcing `tenant` required would make their tenant-XOR-group clean()
+            # unsatisfiable. Such forms manage `tenant.required` themselves.
+            if 'tenant' in self.fields and 'tenant_group' not in self.fields:
                 class_name = self.__class__.__name__
                 if 'Filter' not in class_name and 'BulkEdit' not in class_name:
                     from django.db import connection

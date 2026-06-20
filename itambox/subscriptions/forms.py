@@ -61,8 +61,9 @@ class ProviderForm(CrispyFormMixin, forms.ModelForm):
         # (or global) — auto-setting the tenant would break the XOR clean().
         scope_tenant_field(self, autoset_when_single=False)
         scope_tenant_group_field(self)
-        # Keep `tenant` optional (tenant XOR group, or global) despite the global
-        # BaseForm patch (core/apps.py) marking tenant fields required.
+        # Keep `tenant` optional (tenant XOR group, or global). The global BaseForm
+        # patch (core/apps.py) already skips forms that also declare `tenant_group`;
+        # this explicit reset is the load-bearing guard for the XOR clean().
         self.fields['tenant'].required = False
 
         cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse('subscriptions:provider_list')

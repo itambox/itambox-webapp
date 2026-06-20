@@ -2,7 +2,7 @@ import json
 import logging
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.core.exceptions import ImproperlyConfigured, ValidationError
+from django.core.exceptions import ImproperlyConfigured, PermissionDenied, ValidationError
 from django.db import transaction
 from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, get_object_or_404, render
@@ -211,6 +211,14 @@ class SimplePostView(PermissionRequiredMixin, LoginRequiredMixin, View):
                 return self._htmx_success_response(obj, result)
             messages.success(request, result.get('message', _('Action completed successfully.')))
             return self.get_success_redirect(obj, result)
+        except PermissionDenied as e:
+            # A per-object authorization failure raised inside perform_action
+            # (views that opt out of declarative perms via permission_required = ()).
+            # For HTMX, surface a toast instead of swapping a raw 403 page into the
+            # modal; for full-page requests, let the standard 403 handler run.
+            if getattr(request, 'htmx', False):
+                return self._htmx_error_response(str(e) or str(_("You do not have permission to perform this action.")))
+            raise
         except ValidationError as e:
             if hasattr(e, 'message_dict'):
                 msg = "; ".join([f"{k}: {', '.join(v)}" for k, v in e.message_dict.items()])
