@@ -157,6 +157,23 @@ class CustodyReceiptViewTests(TestCase):
         self.assertEqual(self.receipt.signature_data, sig_data)
         self.assertIsNotNone(self.receipt.signature_hash)
 
+    def test_sign_post_locks_receipt_row(self):
+        """WS6-5: the sign-off POST must hold a row lock (SELECT ... FOR UPDATE) so two
+        concurrent submits cannot both recompute a fresh signature/hash."""
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        url = reverse('compliance:custody_eula_sign', kwargs={'token': self.receipt.token})
+        with CaptureQueriesContext(connection) as ctx:
+            self.client.post(url, {'action': 'accept', 'signature_canvas': 'data:image/png;base64,AAA'})
+        locked = any(
+            'custodyreceipt' in q['sql'].lower() and 'for update' in q['sql'].lower()
+            for q in ctx.captured_queries
+        )
+        self.assertTrue(locked, 'custody sign-off must lock the receipt row (FOR UPDATE)')
+        self.receipt.refresh_from_db()
+        self.assertEqual(self.receipt.acceptance_status, CustodyReceipt.STATUS_ACCEPTED)
+
     def test_sign_portal_already_accepted(self):
         self.receipt.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
         self.receipt.save()

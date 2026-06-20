@@ -78,6 +78,16 @@ def custody_eula_sign(request, token):
         from django.db import transaction
 
         with transaction.atomic():
+            # Re-fetch under a row lock and re-check status so two concurrent (or
+            # double-submitted) POSTs cannot both compute a fresh signature/hash from
+            # timezone.now() — that would leave non-deterministic compliance evidence.
+            receipt = CustodyReceipt.objects.select_for_update().get(pk=receipt.pk)
+            if receipt.acceptance_status == CustodyReceipt.STATUS_ACCEPTED:
+                # Already signed by the winning request — idempotent success, no rewrite.
+                return render(request, "compliance/custody/receipt_success.html", {"receipt": receipt, "asset": asset, "holder": holder})
+            if receipt.acceptance_status == CustodyReceipt.STATUS_DECLINED:
+                return render(request, "compliance/custody/sign_error.html", {"error": "This custody transfer has been declined."})
+
             action = request.POST.get('action', 'accept')
             signature_data = request.POST.get('signature_canvas')
 
