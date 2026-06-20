@@ -90,7 +90,10 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
                     req_idx += 1
                     
         elif line.component:
-            stock, _created = ComponentStock.objects.get_or_create(
+            # Lock the stock row across the read-modify-write so concurrent receipts (or a
+            # concurrent checkout deduction) on the same component+location cannot lose an
+            # increment. Mirrors adjust_inventory_stock's locking discipline.
+            stock, _created = ComponentStock.objects.select_for_update().get_or_create(
                 component=line.component,
                 location=po.destination_location,
                 defaults={'qty': 0}
@@ -110,7 +113,7 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
                 req.save()
                 
         elif line.accessory:
-            stock, _created = AccessoryStock.objects.get_or_create(
+            stock, _created = AccessoryStock.objects.select_for_update().get_or_create(
                 accessory=line.accessory,
                 location=po.destination_location,
                 defaults={'qty': 0}
@@ -130,7 +133,7 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
                 req.save()
                 
         elif line.consumable:
-            stock, _created = ConsumableStock.objects.get_or_create(
+            stock, _created = ConsumableStock.objects.select_for_update().get_or_create(
                 consumable=line.consumable,
                 location=po.destination_location,
                 defaults={'qty': 0}
