@@ -4,7 +4,8 @@ from .models import Software
 from assets.models import Manufacturer
 from core.graphql_utils import check_permission, get_object_or_denied, paginate_queryset
 from graphql import GraphQLError
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, PermissionDenied
+from django.utils.translation import gettext_lazy as _
 
 class SoftwareNode(DjangoObjectType):
     class Meta:
@@ -58,12 +59,19 @@ class CreateSoftware(graphene.Mutation):
         active_tenant = getattr(info.context, 'active_tenant', None)
         manufacturer = get_object_or_denied(Manufacturer, manufacturer_id, user, tenant=active_tenant)
         
-        software = Software(manufacturer=manufacturer)
+        software = Software(manufacturer=manufacturer, tenant=active_tenant)
         ALLOWED_FIELDS = {'name', 'version', 'category', 'license_type', 'website', 'description'}
         for key, val in kwargs.items():
             if key in ALLOWED_FIELDS:
                 setattr(software, key, val)
-                
+
+        # A globally-visible (tenant=None) catalogue row is reserved for superusers. Without
+        # pinning the active tenant and this guard, a tenant member — or any tenant-group /
+        # token context where active_tenant is None — would mint a Software row visible to
+        # EVERY tenant (the REST path is already protected by perform_create + StrictTenant).
+        if software.tenant is None and not user.is_superuser:
+            raise PermissionDenied(_("Only superusers can create global software."))
+
         try:
             software.full_clean()
         except ValidationError as e:
@@ -92,7 +100,13 @@ class UpdateSoftware(graphene.Mutation):
         active_tenant = getattr(info.context, 'active_tenant', None)
         software = get_object_or_denied(Software, id, user, tenant=active_tenant)
         check_permission(info, 'software.change_software', obj=software)
-        
+
+        # In a tenant-group context (active_tenant is None) get_object_or_denied skips its
+        # explicit tenant filter and can resolve a global row; block non-superusers from
+        # mutating it (GraphQL has no StrictTenantPermission equivalent).
+        if software.tenant is None and not user.is_superuser:
+            raise PermissionDenied(_("Only superusers can modify global software."))
+
         if 'manufacturer_id' in kwargs:
             software.manufacturer = get_object_or_denied(Manufacturer, kwargs.pop('manufacturer_id'), user, tenant=active_tenant)
             
@@ -122,6 +136,8 @@ class DeleteSoftware(graphene.Mutation):
         active_tenant = getattr(info.context, 'active_tenant', None)
         software = get_object_or_denied(Software, id, user, tenant=active_tenant)
         check_permission(info, 'software.delete_software', obj=software)
+        if software.tenant is None and not user.is_superuser:
+            raise PermissionDenied(_("Only superusers can delete global software."))
         software.delete()
         return DeleteSoftware(success=True)
 

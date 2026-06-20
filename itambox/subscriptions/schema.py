@@ -399,6 +399,11 @@ class CreateSubscription(graphene.Mutation):
         provider = get_object_or_denied(Provider, provider_id, user, tenant=active_tenant)
         subscription = Subscription(provider=provider, tenant=active_tenant)
 
+        # tenant=active_tenant is None in a tenant-group / no-tenant token context, which would
+        # mint a global subscription visible to every tenant — reserve that for superusers.
+        if subscription.tenant is None and not user.is_superuser:
+            raise PermissionDenied(_("Only superusers can create global subscriptions."))
+
         if 'owner_id' in kwargs:
             subscription.owner = _resolve_owner(kwargs.pop('owner_id'), user, active_tenant)
 

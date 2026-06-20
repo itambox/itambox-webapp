@@ -5,7 +5,8 @@ from software.models import Software
 from assets.models import Supplier
 from core.graphql_utils import check_permission, get_object_or_denied, paginate_queryset
 from graphql import GraphQLError
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, PermissionDenied
+from django.utils.translation import gettext_lazy as _
 
 class LicenseNode(DjangoObjectType):
     class Meta:
@@ -75,7 +76,12 @@ class CreateLicense(graphene.Mutation):
         
         software = get_object_or_denied(Software, software_id, user, tenant=active_tenant)
         lic = License(software=software, tenant=active_tenant)
-        
+
+        # tenant=active_tenant is None in a tenant-group / no-tenant token context, which would
+        # mint a global license visible to every tenant — reserve that for superusers.
+        if lic.tenant is None and not user.is_superuser:
+            raise PermissionDenied(_("Only superusers can create global licenses."))
+
         if 'supplier_id' in kwargs:
             lic.supplier = get_object_or_denied(Supplier, kwargs.pop('supplier_id'), user, tenant=active_tenant)
             
