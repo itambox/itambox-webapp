@@ -1,12 +1,30 @@
+from collections import OrderedDict
+
 from django.conf import settings
 from django.db.models import QuerySet
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.response import Response
 from rest_framework.utils.urls import remove_query_param, replace_query_param
 
 
 class ITAMBoxPagination(LimitOffsetPagination):
+    """Offset pagination with two scale safeguards:
+
+    1. **Capped count** — the ``count`` field is counted only up to
+       ``ITAMBOX_PAGINATOR_COUNT_CAP`` (default 100k) rather than a full
+       ``SELECT COUNT(*)`` over the whole filtered table on every page, which is
+       slow once a tenant has hundreds of thousands of rows. When the real total
+       exceeds the cap, ``count`` reports the cap and ``count_capped`` is True.
+       Set the cap to 0 to disable (stock unbounded count). Mirrors the UI's
+       ``core.paginator.EnhancedPaginator``.
+    2. **Keyset cursor** — pass ``?start=<pk>`` to iterate by primary key
+       (``pk >= start``, ordered by pk). This skips the COUNT entirely (``count``
+       is null) and is the recommended mode for bulk export / iterating large
+       collections, where offset pagination degrades.
+    """
+
     start_query_param = 'start'
 
     def __init__(self):
@@ -14,6 +32,7 @@ class ITAMBoxPagination(LimitOffsetPagination):
         self.start = None
         self._page_length = 0
         self._last_pk = None
+        self.count_capped = False
 
     def paginate_queryset(self, queryset, request, view=None):
         if isinstance(queryset, QuerySet) and not queryset.ordered:
@@ -106,7 +125,45 @@ class ITAMBoxPagination(LimitOffsetPagination):
         return max_limit
 
     def get_queryset_count(self, queryset):
-        return queryset.count()
+        cap = getattr(settings, 'ITAMBOX_PAGINATOR_COUNT_CAP', 0)
+        try:
+            cap = int(cap)
+        except (TypeError, ValueError):
+            cap = 0
+        if cap <= 0:
+            # Capping disabled — stock unbounded count.
+            return queryset.count()
+        # Count over a bounded slice so the DB stops scanning at cap + 1 rows
+        # instead of a full COUNT(*) on every list page (qs[:n].count() emits
+        # COUNT(*) over a LIMIT-ed subquery). Mirrors EnhancedPaginator.
+        raw = queryset[:cap + 1].count()
+        if raw > cap:
+            self.count_capped = True
+            return cap
+        return raw
+
+    def get_paginated_response(self, data):
+        return Response(OrderedDict([
+            ('count', self.count),
+            # True when `count` was capped (the real total is larger). Clients
+            # that must enumerate everything should switch to ?start= cursoring.
+            ('count_capped', self.count_capped),
+            ('next', self.get_next_link()),
+            ('previous', self.get_previous_link()),
+            ('results', data),
+        ]))
+
+    def get_paginated_response_schema(self, schema):
+        response_schema = super().get_paginated_response_schema(schema)
+        response_schema['properties']['count_capped'] = {
+            'type': 'boolean',
+            'description': (
+                'True when `count` was capped at ITAMBOX_PAGINATOR_COUNT_CAP and '
+                'the real total is larger. Use `start` (keyset cursor) pagination '
+                'to iterate the full result set.'
+            ),
+        }
+        return response_schema
 
     def get_next_link(self):
         if self.limit is None:
@@ -138,7 +195,12 @@ class ITAMBoxPagination(LimitOffsetPagination):
             'name': self.start_query_param,
             'required': False,
             'in': 'query',
-            'description': 'Cursor-based pagination: return results with pk >= start, ordered by pk.',
+            'description': (
+                'Keyset/cursor pagination: return results with pk >= start, ordered by pk. '
+                'Skips the (capped) row count and stays O(page) regardless of table size — '
+                'use this instead of offset/limit for bulk export or iterating large '
+                'collections. Follow the `next` link to walk subsequent pages.'
+            ),
             'schema': {
                 'type': 'integer',
             },
