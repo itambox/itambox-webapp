@@ -96,7 +96,14 @@ def deny_asset_request(request_instance, user, request=None, **kwargs):
 # --- Requisition Views ---
 
 class RequestListView(ObjectListView):
-    queryset = AssetRequest.objects.select_related('requester', 'asset_type', 'asset', 'responded_by')
+    # select_related the FKs the table renderers touch (render_item reads
+    # component/accessory/consumable; render_requested_for reads assigned_target =
+    # assigned_user/assigned_location/assigned_asset) to avoid an N+1 per row.
+    queryset = AssetRequest.objects.select_related(
+        'requester', 'asset_type', 'asset', 'responded_by',
+        'component', 'accessory', 'consumable',
+        'assigned_user', 'assigned_location', 'assigned_asset',
+    )
     filterset = filters.AssetRequestFilterSet
     filterset_form = None
     table = tables.AssetRequestTable

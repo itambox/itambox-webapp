@@ -1,5 +1,5 @@
 from django.utils import timezone
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Sum
 from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import gettext as _
 from .charts import generate_doughnut_chart, generate_bar_chart
@@ -91,7 +91,9 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
         )
         
         total_assets = assets_qs.count()
-        acquisition_sum = sum(asset.purchase_cost for asset in assets_qs if asset.purchase_cost)
+        # Aggregate in the DB rather than pulling every filtered asset (and its
+        # prefetched assignments) into Python just to sum one column.
+        acquisition_sum = assets_qs.aggregate(total=Sum('purchase_cost'))['total'] or 0
         
         if template.include_summary_cards:
             summary_cards = [
@@ -559,8 +561,7 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
             chart_svg = generate_doughnut_chart(deprec_data, title=_("Asset Value Depreciation"))
 
     elif template.report_type == ReportTemplate.REPORT_TYPE_SOFTWARE_INVENTORY:
-        from software.models import Software, InstalledSoftware
-        from licenses.models import License
+        from software.models import Software
 
         software_qs = Software.objects.all().select_related('manufacturer')
         # Scope the product list to the report's tenant(s) — every other branch
@@ -589,16 +590,37 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
                 {'label': _('Total Software Products'), 'value': str(total_software)},
             ]
             
+        # Annotate the per-product install/licence counts in a single query
+        # instead of two .count() queries per row (N+1). distinct=True keeps each
+        # count correct despite the join fan-out across the two relations; the
+        # tenant filters mirror the row scoping above so the figures never include
+        # another tenant's installs/licences.
+        if report_tenant_ids is not None:
+            installed_count_expr = Count(
+                'installed_instances',
+                filter=Q(installed_instances__asset__tenant_id__in=report_tenant_ids),
+                distinct=True,
+            )
+            license_count_expr = Count(
+                'licenses',
+                filter=Q(licenses__deleted_at__isnull=True) & Q(licenses__tenant_id__in=report_tenant_ids),
+                distinct=True,
+            )
+        else:
+            installed_count_expr = Count('installed_instances', distinct=True)
+            license_count_expr = Count(
+                'licenses', filter=Q(licenses__deleted_at__isnull=True), distinct=True,
+            )
+        software_qs = software_qs.annotate(
+            scoped_installed_count=installed_count_expr,
+            scoped_license_count=license_count_expr,
+        )
+
         category_counts = {}
         for soft in software_qs[:500]:
             row = {}
-            installed_qs = InstalledSoftware.objects.filter(software=soft)
-            licenses_count_qs = License.objects.filter(software=soft, deleted_at__isnull=True)
-            if report_tenant_ids is not None:
-                installed_qs = installed_qs.filter(asset__tenant_id__in=report_tenant_ids)
-                licenses_count_qs = licenses_count_qs.filter(tenant_id__in=report_tenant_ids)
-            installed = installed_qs.count()
-            licenses = licenses_count_qs.count()
+            installed = soft.scoped_installed_count
+            licenses = soft.scoped_license_count
             
             if 'software_name' in active_cols:
                 row[_('Software Product')] = soft.name or '-'
