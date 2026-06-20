@@ -93,7 +93,12 @@ class AssetDisposeActionView(ObjectEditView):
         from django.core.exceptions import ValidationError as DjangoValidationError
 
         data = form.cleaned_data
-        asset = data['asset']
+        # B1: re-fetch the asset through the tenant-scoped manager before
+        # disposing. `data['asset']` comes from the form's ModelChoiceField,
+        # whose queryset is import-frozen and unscoped, so a crafted POST could
+        # otherwise submit (and destructively dispose) another tenant's asset by
+        # pk. Asset.objects is tenant-scoped, so a cross-tenant pk 404s here.
+        asset = get_object_or_404(Asset.objects, pk=data['asset'].pk)
         try:
             disposal = dispose_asset(
                 asset=asset,

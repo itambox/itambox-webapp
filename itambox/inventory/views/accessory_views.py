@@ -108,6 +108,7 @@ class AccessoryCloneView(ObjectCloneView):
 
 
 class AccessoryCheckoutView(GenericTransactionView):
+    permission_required = ('inventory.change_accessory',)
     queryset = Accessory.objects.all()
     model_form = forms.AccessoryCheckoutForm
     service_callable = checkout_inventory_item
@@ -134,6 +135,7 @@ class AccessoryCheckoutView(GenericTransactionView):
 
 
 class AccessoryCheckinView(SimplePostView):
+    permission_required = ('inventory.change_accessory',)
     queryset = AccessoryAssignment.objects.all()
 
     def perform_action(self, assignment, request):

@@ -284,6 +284,29 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
 
     def clean(self):
         super().clean()
+
+        # B2: tenant-boundary integrity for tenant-owned FKs. A tenant-scoped
+        # asset may only reference Locations / CostCenters / PurchaseOrderLines in
+        # its own tenant; global (null-tenant) rows are shared and always allowed.
+        # Closes the cross-tenant FK assignment hole the import-frozen form
+        # querysets left open. This runs on every save via the global
+        # validate_custom_validators_on_save pre_save signal, so it also guards
+        # the API/import/GraphQL paths, not just the AssetForm.
+        if self.tenant_id is not None:
+            fk_errors = {}
+            for fk_field_name in ('location', 'cost_center', 'purchase_order_line'):
+                related = getattr(self, fk_field_name, None)
+                if (
+                    related is not None
+                    and related.tenant_id is not None
+                    and related.tenant_id != self.tenant_id
+                ):
+                    fk_errors[fk_field_name] = _(
+                        "Selected %(field)s belongs to a different tenant than the asset."
+                    ) % {'field': self._meta.get_field(fk_field_name).verbose_name}
+            if fk_errors:
+                raise ValidationError(fk_errors)
+
         if self.pk and self.status_id:
             # Integrity checks must see the row as stored, not through the current
             # request's tenant/soft-delete lens — otherwise a context mismatch

@@ -5,7 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Row, Div, Fieldset
 
-from assets.models import AssetDisposal
+from assets.models import AssetDisposal, Asset
 
 
 class AssetDisposalForm(forms.ModelForm):
@@ -46,6 +46,15 @@ class AssetDisposalForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        # B1: the `asset` ModelChoiceField queryset is frozen at import time when
+        # no tenant context is active, so it would otherwise expose (and allow
+        # disposal of) every tenant's assets by pk. Re-evaluate it per request so
+        # the tenant-scoping manager restricts choices to the active tenant. The
+        # disposal views additionally re-fetch the asset through Asset.objects
+        # before disposing as defence-in-depth.
+        self.fields['asset'].queryset = Asset.objects.all()
+
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
         self.helper.form_tag = True

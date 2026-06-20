@@ -243,6 +243,7 @@ class ComponentStockCreateModalView(LoginRequiredMixin, View):
 
 
 class ComponentCheckoutView(GenericTransactionView):
+    permission_required = ('inventory.change_component',)
     queryset = Component.objects.all()
     model_form = forms.ComponentCheckoutForm
     service_callable = checkout_inventory_item
@@ -269,6 +270,7 @@ class ComponentCheckoutView(GenericTransactionView):
 
 
 class ComponentCheckinView(SimplePostView):
+    permission_required = ('inventory.change_component',)
     queryset = ComponentAllocation.objects.all()
 
     def perform_action(self, assignment, request):

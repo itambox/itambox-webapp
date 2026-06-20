@@ -214,6 +214,10 @@ class RequestDenyView(GenericTransactionView):
 
 
 class RequestCancelView(SimplePostView):
+    # Self-authorizing: the requester may cancel their own request; everyone else
+    # needs staff/approve_assetrequest. The per-object ownership check lives in
+    # perform_action, so opt out of the static permission gate (fail-closed base).
+    permission_required = ()
     queryset = AssetRequest.objects.all()
 
     def perform_action(self, obj, request):
@@ -240,6 +244,10 @@ class RequestCancelView(SimplePostView):
 
 
 class RequestClaimView(SimplePostView):
+    # Self-authorizing: the requester / assigned user may claim; everyone else
+    # needs staff/fulfill_assetrequest. Ownership check is in perform_action, so
+    # opt out of the static permission gate (fail-closed base).
+    permission_required = ()
     queryset = AssetRequest.objects.all()
 
     def perform_action(self, obj, request):
@@ -333,6 +341,9 @@ class RequestClaimView(SimplePostView):
 
 
 class RequestMarkFulfilledView(SimplePostView):
+    # Self-authorizing: requires staff/fulfill_assetrequest, checked in
+    # perform_action. Opt out of the static permission gate (fail-closed base).
+    permission_required = ()
     queryset = AssetRequest.objects.all()
 
     def perform_action(self, obj, request):

@@ -32,8 +32,19 @@ class GenericTransactionView(PermissionRequiredMixin, LoginRequiredMixin, BaseHT
     error_partial = None
 
     def get_permission_required(self):
+        # Fail closed: a service/action view that mutates state must declare the
+        # permission(s) it requires. A missing (None) permission_required is a
+        # developer error, not an open door — historically it silently allowed
+        # ANY authenticated tenant member to run the action (B3). Views that
+        # intentionally perform their own per-object authorization (e.g. an
+        # ownership check inside perform_action/form_valid) opt out explicitly by
+        # setting `permission_required = ()`.
         if self.permission_required is None:
-            return ()
+            raise ImproperlyConfigured(
+                f"{self.__class__.__name__} is missing permission_required. Set it "
+                f"to the required permission(s), or to an empty tuple () to opt into "
+                f"handling authorization itself."
+            )
         if isinstance(self.permission_required, str):
             return (self.permission_required,)
         return self.permission_required
@@ -163,8 +174,19 @@ class SimplePostView(PermissionRequiredMixin, LoginRequiredMixin, View):
     hx_trigger = "tableRefreshRequired"
 
     def get_permission_required(self):
+        # Fail closed: a service/action view that mutates state must declare the
+        # permission(s) it requires. A missing (None) permission_required is a
+        # developer error, not an open door — historically it silently allowed
+        # ANY authenticated tenant member to run the action (B3). Views that
+        # intentionally perform their own per-object authorization (e.g. an
+        # ownership check inside perform_action/form_valid) opt out explicitly by
+        # setting `permission_required = ()`.
         if self.permission_required is None:
-            return ()
+            raise ImproperlyConfigured(
+                f"{self.__class__.__name__} is missing permission_required. Set it "
+                f"to the required permission(s), or to an empty tuple () to opt into "
+                f"handling authorization itself."
+            )
         if isinstance(self.permission_required, str):
             return (self.permission_required,)
         return self.permission_required

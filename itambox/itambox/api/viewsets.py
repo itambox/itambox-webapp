@@ -210,11 +210,34 @@ class ITAMBoxModelViewSet(
         model = self.queryset.model
         logger.info(f"Updating {model._meta.verbose_name} {serializer.instance} (PK: {serializer.instance.pk})")
 
+        save_kwargs = {}
+        # Re-pin the tenant on update for non-superusers.  A PATCH/PUT that sets
+        # tenant=null (or a different tenant) on an allow_global_tenant model
+        # would otherwise globalize the row (tenant=None) — making it visible to
+        # every tenant — or move it into another tenant entirely, a cross-tenant
+        # read.  Force it back to the object's existing tenant.  Superusers may
+        # still retarget tenant explicitly.  Mirrors perform_create's tenant
+        # pinning and the GraphQL mutations, which never let a client set tenant.
+        validated = serializer.validated_data
+        if (
+            not getattr(serializer, 'many', False)
+            and isinstance(validated, dict)
+            and not self.request.user.is_superuser
+            and 'tenant' in validated
+        ):
+            from django.core.exceptions import FieldDoesNotExist
+            try:
+                model._meta.get_field('tenant')
+            except FieldDoesNotExist:
+                pass
+            else:
+                save_kwargs['tenant'] = getattr(serializer.instance, 'tenant', None)
+
         try:
             with transaction.atomic(using=router.db_for_write(model)):
                 locked = model.objects.select_for_update().get(pk=serializer.instance.pk)
                 self._validate_etag(self.request, locked)
-                instance = serializer.save()
+                instance = serializer.save(**save_kwargs)
                 self._validate_objects(instance)
         except ObjectDoesNotExist:
             raise PermissionDenied()

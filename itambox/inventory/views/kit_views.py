@@ -186,6 +186,7 @@ class KitItemDeleteView(ObjectDeleteView):
 
 
 class KitCheckoutView(GenericTransactionView):
+    permission_required = ('inventory.change_kit',)
     queryset = Kit.objects.all()
     model_form = forms.KitCheckoutForm
     service_callable = checkout_kit

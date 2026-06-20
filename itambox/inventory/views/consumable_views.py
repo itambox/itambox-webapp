@@ -108,6 +108,7 @@ class ConsumableCloneView(ObjectCloneView):
 
 
 class ConsumableCheckoutView(GenericTransactionView):
+    permission_required = ('inventory.change_consumable',)
     queryset = Consumable.objects.all()
     model_form = forms.ConsumableCheckoutForm
     service_callable = checkout_inventory_item

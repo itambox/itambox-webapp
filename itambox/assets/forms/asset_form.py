@@ -7,7 +7,8 @@ from crispy_forms.layout import Layout, Submit, HTML, Row, Column, Fieldset, Div
 
 from core.forms import CrispyFormMixin
 from extras.models import Tag, CustomField
-from organization.models import Location
+from organization.models import Location, CostCenter
+from procurement.models import PurchaseOrderLine
 from ..models import Asset, AssetType, AssetRole, StatusLabel
 from ..models.choices import WarrantyTypeChoices
 
@@ -271,6 +272,25 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
                     selected_tenant = Tenant.objects.get(pk=raw_tenant)
                 except (Tenant.DoesNotExist, ValueError, TypeError):
                     pass
+
+        # B2: rescope tenant-owned FK choice fields per request. Their querysets
+        # are frozen at import time (no tenant context), so they would otherwise
+        # expose every tenant's Locations / CostCenters / PurchaseOrderLines and
+        # permit cross-tenant FK assignment. Re-evaluate through the scoping
+        # managers so choices are limited to the active tenant, narrowed to the
+        # selected tenant when one is resolvable. Asset.clean() validates the
+        # final selection as defence-in-depth.
+        tenant_scoped_fk_fields = {
+            'location': Location,
+            'cost_center': CostCenter,
+            'purchase_order_line': PurchaseOrderLine,
+        }
+        for fk_field_name, fk_model in tenant_scoped_fk_fields.items():
+            if fk_field_name in self.fields:
+                fk_qs = fk_model.objects.all()
+                if selected_tenant:
+                    fk_qs = fk_qs.filter(tenant=selected_tenant)
+                self.fields[fk_field_name].queryset = fk_qs
 
         # 2. Resolve asset_type object
         selected_type = None
