@@ -36,7 +36,12 @@ def check_subscription_expiries_and_reminders():
             expired_count += 1
 
             # Notify owner and admins about auto-expiry
-            recipients = set(User.objects.filter(is_staff=True))
+            # Scope recipients to staff who belong to this subscription's tenant.
+            # The bare is_staff=True query notified every platform operator with
+            # another tenant's per-tenant financials (a cross-tenant data flow).
+            recipients = set(User.objects.filter(
+                is_staff=True, is_active=True, memberships__tenant_id=sub.tenant_id
+            ).distinct())
             if sub.owner:
                 recipients.add(sub.owner)
 
@@ -69,7 +74,12 @@ def check_subscription_expiries_and_reminders():
         )
         for sub in subs_to_remind:
             with TaskContext(tenant_id=sub.tenant_id, user_id=None):
-                recipients = set(User.objects.filter(is_staff=True))
+                # Scope recipients to staff who belong to this subscription's tenant.
+                # The bare is_staff=True query notified every platform operator with
+                # another tenant's per-tenant financials (a cross-tenant data flow).
+                recipients = set(User.objects.filter(
+                    is_staff=True, is_active=True, memberships__tenant_id=sub.tenant_id
+                ).distinct())
                 if sub.owner:
                     recipients.add(sub.owner)
 
