@@ -153,7 +153,13 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
                 req.save()
         
         elif line.license:
-            # Increment qty_received and transition linked requests
+            # License seats are an entitlement, not a quantity materialised from
+            # receipts: License.seats is the manually-entered number of seats the
+            # tenant is licensed for, so receiving a license PO line deliberately
+            # does NOT increment License.seats or any received-seat counter (unlike
+            # the asset/component/accessory/consumable branches above, which create
+            # assets or grow stock). Receiving only records line.qty_received (below)
+            # and transitions the linked requests from procurement to approved.
             linked_requests = list(
                 AssetRequest.objects.filter(
                     fulfillment_links__purchase_order_line=line,
