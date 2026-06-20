@@ -16,6 +16,7 @@ from extras.dashboard.forms import DashboardWidgetAddForm, DashboardWidgetConfig
 from extras.dashboard.utils import get_dashboard, get_default_dashboard
 from extras.dashboard.widgets import get_widget, get_registered_widgets
 from extras.models import Dashboard
+from organization.models import Tenant, TenantMembership
 
 
 class DashboardWidgetAddView(LoginRequiredMixin, View):
@@ -183,16 +184,25 @@ class DashboardSaveLayoutView(LoginRequiredMixin, View):
         return HttpResponse('ok')
 
 
-from organization.models import Tenant
-
 class DashboardManageModalView(LoginRequiredMixin, View):
     """Modal view to manage the user's dashboards."""
 
     def get(self, request):
         dashboards = request.user.dashboards.all()
-        # Use _base_manager to bypass TenantScopingManager's fail-close so the
-        # dropdown is populated even when the user has no active tenant context.
-        tenants = Tenant._base_manager.all().order_by('name')
+        # Scope the tenant dropdown to the tenants the user is a member of; a
+        # superuser keeps the global view. Using _base_manager bypasses the
+        # TenantScopingManager fail-close so the list populates even when the
+        # user has no active tenant context, but the membership filter keeps it
+        # from offering tenants the user cannot legitimately bind to.
+        if request.user.is_superuser:
+            tenants = Tenant._base_manager.all().order_by('name')
+        else:
+            member_tenant_ids = TenantMembership.objects.filter(
+                user=request.user
+            ).values_list('tenant_id', flat=True)
+            tenants = Tenant._base_manager.filter(
+                id__in=member_tenant_ids
+            ).order_by('name')
         html = render_to_string('extras/dashboard/manage_dashboards.html', {
             'dashboards': dashboards,
             'tenants': tenants,
@@ -224,6 +234,19 @@ class DashboardCreateView(LoginRequiredMixin, View):
             if request.headers.get('HX-Request'):
                 return HttpResponse('<div class="alert alert-danger mb-0">%s</div>' % _('Selected tenant does not exist.'), status=400)
             messages.error(request, _("Selected tenant does not exist."))
+            return redirect('dashboard')
+
+        # A user may only bind a dashboard to a tenant they belong to; a
+        # superuser may bind to any tenant. Without this check a member could
+        # POST a foreign tenant_id (Tenant._base_manager bypasses scoping).
+        is_member = TenantMembership.objects.filter(
+            user=request.user, tenant=tenant
+        ).exists()
+        if not request.user.is_superuser and not is_member:
+            from django.contrib import messages
+            if request.headers.get('HX-Request'):
+                return HttpResponse('<div class="alert alert-danger mb-0">%s</div>' % _('You are not a member of the selected tenant.'), status=403)
+            messages.error(request, _("You are not a member of the selected tenant."))
             return redirect('dashboard')
 
         # If this is the user's first dashboard, make it the default
