@@ -79,6 +79,29 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         return f'{self.prefix}{self.next_value:0{self.zero_padding}d}'
 
     @classmethod
+    def _get_or_create_global_default(cls):
+        """
+        Returns the global default sequence (no tenant, no category, prefix='ASSET-'),
+        creating it on first use.
+
+        get_or_create's check-then-create is not atomic: two concurrent first-ever
+        blank-tag, no-tenant assets can both take the create branch and race the
+        unique_global_prefix constraint -> IntegrityError. Absorb that race by
+        re-selecting the row the other writer committed.
+        """
+        from django.db import IntegrityError
+        try:
+            seq, _ = cls.all_objects.get_or_create(
+                tenant__isnull=True,
+                category__isnull=True,
+                prefix='ASSET-',
+                defaults={'next_value': 1, 'zero_padding': 6, 'is_active': True}
+            )
+        except IntegrityError:
+            seq = cls.all_objects.get(tenant__isnull=True, category__isnull=True, prefix='ASSET-')
+        return seq
+
+    @classmethod
     def get_next_tag_for_asset(cls, asset):
         """
         Resolves the next asset tag for the given asset based on a hierarchical fallback chain:
@@ -106,13 +129,7 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
                 return seq.next_tag()
 
         # 4. Global default (no tenant, no category, prefix='ASSET-')
-        seq, _ = cls.all_objects.get_or_create(
-            tenant__isnull=True,
-            category__isnull=True,
-            prefix='ASSET-',
-            defaults={'next_value': 1, 'zero_padding': 6, 'is_active': True}
-        )
-        return seq.next_tag()
+        return cls._get_or_create_global_default().next_tag()
 
     @classmethod
     def resolve_sequence_for_asset(cls, asset):
@@ -139,10 +156,4 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
                 return seq
 
         # 4. Global default (no tenant, no category, prefix='ASSET-')
-        seq, _ = cls.all_objects.get_or_create(
-            tenant__isnull=True,
-            category__isnull=True,
-            prefix='ASSET-',
-            defaults={'next_value': 1, 'zero_padding': 6, 'is_active': True}
-        )
-        return seq
+        return cls._get_or_create_global_default()
