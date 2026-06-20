@@ -19,6 +19,10 @@ from users.api.scim.authentication import SCIMBearerTokenAuthentication
 logger = logging.getLogger('itambox.scim.views')
 User = get_user_model()
 
+# Sentinel for "attribute not supplied by this SCIM request" (distinct from an explicit
+# empty/false value) so partial PATCH/PUT updates only touch the fields actually sent.
+_UNSET = object()
+
 
 def link_or_create_assetholder(user, tenant):
     email = user.email
@@ -62,22 +66,25 @@ def link_or_create_assetholder(user, tenant):
 
 
 def sync_group_members(tenant, role, member_ids):
-    # 1. For users in member_ids, ensure they have TenantMembership with this role
+    # 1. Assign this role only to users who are ALREADY members of `tenant`. A SCIM token is
+    #    scoped to a single tenant, so group sync must never create a TenantMembership /
+    #    AssetHolder for an arbitrary global user id — that would be a cross-tenant
+    #    access-control write and a username-enumeration oracle (the group response reflects
+    #    member usernames). New members are provisioned exclusively through SCIM /Users;
+    #    unknown or non-member ids are skipped.
     for uid in member_ids:
-        try:
-            user = User.objects.get(id=uid)
-            membership = TenantMembership.objects.filter(user=user, tenant=tenant).first()
-            if membership:
-                membership.role = role
-                membership.save()
-            else:
-                TenantMembership.objects.create(user=user, tenant=tenant, role=role)
-            # Ensure they have matching AssetHolder profile
-            link_or_create_assetholder(user, tenant)
-        except User.DoesNotExist:
-            logger.warning(f"SCIM Group member user ID {uid} not found.")
+        membership = TenantMembership.objects.filter(user_id=uid, tenant=tenant).first()
+        if membership:
+            membership.role = role
+            membership.save()
+            link_or_create_assetholder(membership.user, tenant)
+        else:
+            logger.warning(
+                "SCIM group sync skipped user id %s: not a member of tenant %s "
+                "(provision via SCIM /Users first).", uid, tenant.slug
+            )
 
-    # 2. For users who currently have TenantMembership with this role, but are NOT in member_ids:
+    # 2. Drop this role from members no longer listed (within this tenant only).
     to_remove = TenantMembership.objects.filter(tenant=tenant, role=role).exclude(user_id__in=member_ids)
     to_remove.delete()
 
@@ -319,10 +326,46 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
     def get(self, request, pk, *args, **kwargs):
         user = get_object_or_404(User.objects.filter(memberships__tenant=self.tenant).distinct(), id=pk)
         serializer = SCIMUserSerializer(
-            user, 
+            user,
             context={'request': request, 'tenant_slug': self.tenant.slug, 'tenant': self.tenant}
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def _apply_scim_identity(self, user, *, username=_UNSET, email=_UNSET,
+                             first_name=_UNSET, last_name=_UNSET, active=_UNSET):
+        """Apply SCIM-provisioned identity/active changes to the User.
+
+        A SCIM token is bound to exactly one tenant. It must NEVER rewrite the global
+        identity (username/email/name) or globally (de)activate a user who is also a member
+        of another tenant — that is a cross-tenant write on a shared principal (it would lock
+        them out of, or hijack their identity in, the other tenant). For such shared users
+        these changes are ignored; the only tenant-scoped de-provisioning path is DELETE,
+        which drops just this tenant's membership. For a user whose sole membership is this
+        tenant, the global User is updated as before.
+        """
+        has_other = (
+            TenantMembership.objects.filter(user=user)
+            .exclude(tenant=self.tenant)
+            .exists()
+        )
+        if has_other:
+            # Keep this tenant's AssetHolder linked, but leave the shared global User alone.
+            link_or_create_assetholder(user, self.tenant)
+            return user
+
+        if username is not _UNSET:
+            user.username = username
+        if email is not _UNSET:
+            user.email = email
+        if first_name is not _UNSET:
+            user.first_name = first_name
+        if last_name is not _UNSET:
+            user.last_name = last_name
+        if active is not _UNSET:
+            user.is_active = active
+        user.save()
+        link_or_create_assetholder(user, self.tenant)
+        return user
 
     def put(self, request, pk, *args, **kwargs):
         user = get_object_or_404(User.objects.filter(memberships__tenant=self.tenant).distinct(), id=pk)
@@ -382,76 +425,83 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
             active = bool(active)
 
         with transaction.atomic():
-            user.username = username
-            user.email = email
-            user.first_name = first_name
-            user.last_name = last_name
-            user.is_active = active
-            user.save()
-            
-            link_or_create_assetholder(user, self.tenant)
+            user = self._apply_scim_identity(
+                user, username=username, email=email,
+                first_name=first_name, last_name=last_name, active=active,
+            )
 
         serializer = SCIMUserSerializer(
-            user, 
+            user,
             context={'request': request, 'tenant_slug': self.tenant.slug, 'tenant': self.tenant}
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def patch(self, request, pk, *args, **kwargs):
         user = get_object_or_404(User.objects.filter(memberships__tenant=self.tenant).distinct(), id=pk)
-        
+
+        # Parse the requested attribute changes into locals (sentinel = not supplied), then
+        # apply them through the tenant-boundary guard so a shared multi-tenant user's global
+        # identity/active is never rewritten from one tenant's SCIM token.
+        new_username = _UNSET
+        new_email = _UNSET
+        new_first = _UNSET
+        new_last = _UNSET
+        new_active = _UNSET
+
+        for op in request.data.get('Operations', []):
+            op_type = op.get('op', '').lower()
+            path = op.get('path', '')
+            value = op.get('value')
+
+            if op_type in ('add', 'replace'):
+                if isinstance(value, dict) and not path:
+                    for k, v in value.items():
+                        if k == 'active':
+                            new_active = bool(v)
+                        elif k == 'userName':
+                            new_username = v
+                        elif k == 'emails':
+                            if isinstance(v, list) and v:
+                                new_email = v[0].get('value', '')
+                            elif isinstance(v, str):
+                                new_email = v
+                        elif k == 'name':
+                            if isinstance(v, dict):
+                                new_first = v.get('givenName', user.first_name)
+                                new_last = v.get('familyName', user.last_name)
+                else:
+                    path_lower = path.lower() if path else ""
+                    if path_lower == 'active':
+                        if isinstance(value, str):
+                            new_active = (value.lower() == 'true')
+                        else:
+                            new_active = bool(value)
+                    elif path_lower == 'username':
+                        new_username = str(value)
+                    elif path_lower in ('email', 'emails', 'emails.value'):
+                        if isinstance(value, list) and value:
+                            new_email = value[0].get('value', '')
+                        else:
+                            new_email = str(value)
+                    elif path_lower.startswith('name.'):
+                        sub = path_lower.split('.')[1]
+                        if sub == 'givenname':
+                            new_first = str(value)
+                        elif sub == 'familyname':
+                            new_last = str(value)
+                    elif path_lower == 'name':
+                        if isinstance(value, dict):
+                            new_first = value.get('givenName', user.first_name)
+                            new_last = value.get('familyName', user.last_name)
+
         with transaction.atomic():
-            for op in request.data.get('Operations', []):
-                op_type = op.get('op', '').lower()
-                path = op.get('path', '')
-                value = op.get('value')
-                
-                if op_type in ('add', 'replace'):
-                    if isinstance(value, dict) and not path:
-                        for k, v in value.items():
-                            if k == 'active':
-                                user.is_active = bool(v)
-                            elif k == 'userName':
-                                user.username = v
-                            elif k == 'emails':
-                                if isinstance(v, list) and v:
-                                    user.email = v[0].get('value', '')
-                                elif isinstance(v, str):
-                                    user.email = v
-                            elif k == 'name':
-                                if isinstance(v, dict):
-                                    user.first_name = v.get('givenName', user.first_name)
-                                    user.last_name = v.get('familyName', user.last_name)
-                    else:
-                        path_lower = path.lower() if path else ""
-                        if path_lower == 'active':
-                            if isinstance(value, str):
-                                user.is_active = (value.lower() == 'true')
-                            else:
-                                user.is_active = bool(value)
-                        elif path_lower == 'username':
-                            user.username = str(value)
-                        elif path_lower in ('email', 'emails', 'emails.value'):
-                            if isinstance(value, list) and value:
-                                user.email = value[0].get('value', '')
-                            else:
-                                user.email = str(value)
-                        elif path_lower.startswith('name.'):
-                            sub = path_lower.split('.')[1]
-                            if sub == 'givenname':
-                                user.first_name = str(value)
-                            elif sub == 'familyname':
-                                user.last_name = str(value)
-                        elif path_lower == 'name':
-                            if isinstance(value, dict):
-                                user.first_name = value.get('givenName', user.first_name)
-                                user.last_name = value.get('familyName', user.last_name)
-            
-            user.save()
-            link_or_create_assetholder(user, self.tenant)
+            user = self._apply_scim_identity(
+                user, username=new_username, email=new_email,
+                first_name=new_first, last_name=new_last, active=new_active,
+            )
 
         serializer = SCIMUserSerializer(
-            user, 
+            user,
             context={'request': request, 'tenant_slug': self.tenant.slug, 'tenant': self.tenant}
         )
         return Response(serializer.data, status=status.HTTP_200_OK)

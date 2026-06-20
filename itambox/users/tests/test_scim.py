@@ -289,9 +289,12 @@ class SCIMProvisioningTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()["totalResults"], 2)
 
-        # 2. POST create group with members
+        # Group sync only (re)assigns roles to EXISTING tenant members (provisioned via
+        # SCIM /Users); it never creates a membership for an arbitrary global user id.
         member_user = User.objects.create_user(username="memberuser", email="member@example.com")
-        
+        TenantMembership.objects.create(user=member_user, tenant=self.tenant, role=self.role_member)
+
+        # 2. POST create group with an existing member
         post_payload = {
             "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
             "displayName": "Software Managers",
@@ -307,7 +310,7 @@ class SCIMProvisioningTests(TestCase):
 
         role = TenantRole.objects.get(id=group_id, tenant=self.tenant)
         self.assertEqual(role.name, "Software Managers")
-        
+
         membership = TenantMembership.objects.get(user=member_user, tenant=self.tenant)
         self.assertEqual(membership.role, role)
 
@@ -317,8 +320,9 @@ class SCIMProvisioningTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()["displayName"], "Software Managers")
 
-        # 4. PUT Group Update
+        # 4. PUT Group Update — swap the role to a different existing member
         new_member = User.objects.create_user(username="newmember", email="newmember@example.com")
+        TenantMembership.objects.create(user=new_member, tenant=self.tenant, role=self.role_member)
         put_payload = {
             "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
             "displayName": "Software Managers Updated",
@@ -328,14 +332,16 @@ class SCIMProvisioningTests(TestCase):
         }
         response = self.client.put(detail_url, data=put_payload, content_type='application/json', **self.auth_headers)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        
+
         role.refresh_from_db()
         self.assertEqual(role.name, "Software Managers Updated")
-        
+
         self.assertTrue(TenantMembership.objects.filter(user=new_member, tenant=self.tenant, role=role).exists())
         self.assertFalse(TenantMembership.objects.filter(user=member_user, tenant=self.tenant, role=role).exists())
 
-        # 5. PATCH Group Update
+        # 5. PATCH Group Update — re-provision member_user (PUT dropped its membership), then
+        #    add it back to the group alongside new_member.
+        TenantMembership.objects.create(user=member_user, tenant=self.tenant, role=self.role_member)
         patch_payload = {
             "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
             "Operations": [
@@ -399,3 +405,69 @@ class SCIMProvisioningTests(TestCase):
             response = self.client.post(url, data=payload, content_type='application/json', **self.auth_headers)
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
             self.assertTrue(User.objects.filter(username="mockeduser@example.com").exists())
+
+    def test_scim_patch_does_not_mutate_shared_global_user(self):
+        """WS1-3: a tenant-A SCIM token must NOT globally deactivate or rename a user who is
+        also a member of tenant B (cross-tenant write on a shared principal)."""
+        shared = User.objects.create_user(username="shared", email="shared@x.com", is_active=True)
+        TenantMembership.objects.create(user=shared, tenant=self.tenant, role=self.role_member)
+        other_role = TenantRole.objects.create(tenant=self.other_tenant, name="Member", permissions=[])
+        TenantMembership.objects.create(user=shared, tenant=self.other_tenant, role=other_role)
+
+        detail_url = reverse('api:scim:user-detail', kwargs={'tenant_slug': self.tenant.slug, 'pk': shared.id})
+        patch_payload = {
+            "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+            "Operations": [
+                {"op": "replace", "path": "active", "value": False},
+                {"op": "replace", "path": "userName", "value": "hijacked"},
+            ],
+        }
+        response = self.client.patch(detail_url, data=patch_payload, content_type='application/json', **self.auth_headers)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        shared.refresh_from_db()
+        # Global identity/active are untouched — the user stays active & authenticatable to B.
+        self.assertTrue(shared.is_active)
+        self.assertEqual(shared.username, "shared")
+        self.assertTrue(TenantMembership.objects.filter(user=shared, tenant=self.other_tenant).exists())
+
+    def test_scim_put_updates_sole_tenant_user(self):
+        """Control for WS1-3: a user whose ONLY membership is this tenant is still fully
+        updatable (the guard must not over-block single-tenant users)."""
+        solo = User.objects.create_user(username="solo", email="solo@acme.com", is_active=True)
+        TenantMembership.objects.create(user=solo, tenant=self.tenant, role=self.role_member)
+        detail_url = reverse('api:scim:user-detail', kwargs={'tenant_slug': self.tenant.slug, 'pk': solo.id})
+        put_payload = {
+            "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+            "userName": "solo_renamed",
+            "name": {"familyName": "S", "givenName": "Solo"},
+            "emails": [{"value": "solo2@acme.com", "primary": True}],
+            "active": False,
+        }
+        response = self.client.put(detail_url, data=put_payload, content_type='application/json', **self.auth_headers)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        solo.refresh_from_db()
+        self.assertEqual(solo.username, "solo_renamed")
+        self.assertFalse(solo.is_active)
+
+    def test_scim_group_post_does_not_provision_foreign_user(self):
+        """WS1-4: posting a group whose members reference a user who belongs ONLY to another
+        tenant must not grant that user a membership/AssetHolder here, nor leak their username."""
+        foreign_role = TenantRole.objects.create(tenant=self.other_tenant, name="Member", permissions=[])
+        foreign_user = User.objects.create_user(username="foreignuser", email="foreign@other.com")
+        TenantMembership.objects.create(user=foreign_user, tenant=self.other_tenant, role=foreign_role)
+
+        list_url = reverse('api:scim:group-list', kwargs={'tenant_slug': self.tenant.slug})
+        payload = {
+            "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+            "displayName": "Injected Group",
+            "members": [{"value": str(foreign_user.id)}],
+        }
+        response = self.client.post(list_url, data=payload, content_type='application/json', **self.auth_headers)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # No cross-tenant membership / AssetHolder was created for the foreign user.
+        self.assertFalse(TenantMembership.objects.filter(user=foreign_user, tenant=self.tenant).exists())
+        self.assertFalse(AssetHolder.objects.filter(user=foreign_user, tenant=self.tenant).exists())
+        # The foreign username is not reflected back (no enumeration oracle).
+        self.assertNotIn("foreignuser", str(response.json().get("members", [])))
