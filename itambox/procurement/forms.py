@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, Row, Column, HTML
+from core.forms import scope_tenant_field
 from .models import PurchaseOrder, PurchaseOrderLine, Contract
 
 
@@ -22,6 +23,7 @@ class PurchaseOrderForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        scope_tenant_field(self)
         # status has a model default (draft); keep it optional in the form so a
         # new PO can be created without explicitly choosing one, while still
         # letting users change it. clean_status() falls back to the default.
@@ -192,6 +194,7 @@ class ContractForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        scope_tenant_field(self)
 
         # Scope tenant-aware querysets to the active tenant
         from core.managers import get_current_tenant

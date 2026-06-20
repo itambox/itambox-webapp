@@ -3,7 +3,7 @@ from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Div, Row, Column, Fieldset
 from django.urls import reverse
-from core.forms import FilterForm, CrispyFormMixin
+from core.forms import FilterForm, CrispyFormMixin, scope_tenant_field
 from organization.models import Tenant, TenantGroup, AssetHolder, Location, CostCenter
 from assets.models import Asset
 from django.db import models as db_models
@@ -57,6 +57,7 @@ class ProviderForm(CrispyFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        scope_tenant_field(self)
 
         cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse('subscriptions:provider_list')
 
@@ -147,6 +148,7 @@ class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelFo
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        scope_tenant_field(self)
         # Rescope the tenant-owned `cost_center` FK per request (import-frozen
         # unscoped — would expose/permit another tenant's cost center).
         self.fields['cost_center'].queryset = CostCenter.objects.all()

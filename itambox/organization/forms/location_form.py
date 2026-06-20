@@ -3,7 +3,7 @@ from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Div
 
-from core.forms import FilterForm
+from core.forms import FilterForm, scope_tenant_field
 from extras.models import Tag
 
 from ..models import Location, Site, Tenant
@@ -54,6 +54,7 @@ class LocationForm(CustomFieldModelFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        scope_tenant_field(self)
         # Rescope tenant-owned FK querysets per request (import-frozen unscoped):
         # `site` and the self-referential `parent` are both tenant-scoped.
         self.fields['site'].queryset = Site.objects.all()

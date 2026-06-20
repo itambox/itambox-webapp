@@ -3,7 +3,7 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Row, Column, Fieldset
-from core.forms import FilterForm
+from core.forms import FilterForm, scope_tenant_field
 from assets.models import Asset, Supplier, Category, AssetMaintenance
 
 class AssetMaintenanceFilterForm(FilterForm):
@@ -158,6 +158,7 @@ class CustodyTemplateForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        scope_tenant_field(self)
         self.fields['signature_provider'].choices = signature_providers.choices()
         
         self.helper = FormHelper(self)

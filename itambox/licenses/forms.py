@@ -2,7 +2,7 @@ from django import forms
 from django.utils.translation import gettext_lazy as _
 from software.models import Software
 from extras.models import Tag
-from core.forms import FilterForm, CrispyFormMixin
+from core.forms import FilterForm, CrispyFormMixin, scope_tenant_field
 from .filters import LicenseFilterSet
 from .models import License, LicenseSeatAssignment
 from crispy_forms.helper import FormHelper
@@ -59,6 +59,14 @@ class LicenseForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        scope_tenant_field(self)
+        # Rescope the tenant-owned `cost_center`/`subscription` FK pickers per
+        # request (import-frozen unscoped). `software` is validated same-tenant in
+        # License.clean(); `supplier` is a global catalogue model.
+        for fk_name in ('cost_center', 'subscription'):
+            field = self.fields.get(fk_name)
+            if field is not None and getattr(field, 'queryset', None) is not None:
+                field.queryset = field.queryset.model._default_manager.all()
         if self.instance and self.instance.pk:
             self.fields['product_key'].initial = self.instance.decrypted_product_key
 

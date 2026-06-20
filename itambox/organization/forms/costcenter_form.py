@@ -3,7 +3,7 @@ from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Div
 
-from core.forms import FilterForm
+from core.forms import FilterForm, scope_tenant_field
 from extras.customfields import CustomFieldModelFormMixin
 
 from ..models import CostCenter, Tenant
@@ -39,6 +39,7 @@ class CostCenterForm(CustomFieldModelFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        scope_tenant_field(self)
         # Rescope the tenant-owned self-referential `parent` FK per request
         # (import-frozen unscoped — would expose another tenant's cost centers).
         self.fields['parent'].queryset = CostCenter.objects.all()

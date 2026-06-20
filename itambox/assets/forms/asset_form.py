@@ -5,7 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Row, Column, Fieldset, Div
 
-from core.forms import CrispyFormMixin
+from core.forms import CrispyFormMixin, scope_tenant_field
 from extras.models import Tag, CustomField
 from organization.models import Location, CostCenter
 from procurement.models import PurchaseOrderLine
@@ -184,6 +184,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         request = kwargs.pop('request', None)
         super().__init__(*args, **kwargs)
+        scope_tenant_field(self)
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
         self.helper.form_tag = True

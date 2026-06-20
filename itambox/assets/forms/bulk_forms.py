@@ -1,9 +1,13 @@
 from django import forms
-from core.forms import BulkEditForm
+from core.forms import BulkEditForm, scope_tenant_field
 from ..models import StatusLabel, AssetRole
 from organization.models import Location, Tenant
 
 class AssetBulkEditForm(BulkEditForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        scope_tenant_field(self, autoset_when_single=False)
+
     status = forms.ModelChoiceField(
         queryset=StatusLabel.objects.all(),
         required=False,

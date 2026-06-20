@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Row, Column
 
-from core.forms import FilterForm
+from core.forms import FilterForm, scope_tenant_field
 from extras.models import Tag
 
 from ..models import Site, Region, SiteGroup
@@ -62,6 +62,7 @@ class SiteForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        scope_tenant_field(self)
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
         self.helper.form_tag = True

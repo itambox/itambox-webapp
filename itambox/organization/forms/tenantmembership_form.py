@@ -4,7 +4,7 @@ from crispy_forms.layout import Layout
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
-from core.forms import FilterForm, BulkEditForm
+from core.forms import FilterForm, BulkEditForm, scope_tenant_field
 from ..models import Tenant, TenantRole, TenantMembership
 from ..filters import TenantMembershipFilterSet
 
@@ -36,6 +36,7 @@ class TenantMembershipForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        scope_tenant_field(self)
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
         self.helper.form_tag = True

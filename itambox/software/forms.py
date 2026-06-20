@@ -2,7 +2,7 @@ from django import forms
 from django.utils.translation import gettext_lazy as _
 from assets.models import Manufacturer # Import Manufacturer
 from extras.models import Tag
-from core.forms import FilterForm, CrispyFormMixin
+from core.forms import FilterForm, CrispyFormMixin, scope_tenant_field
 from .filters import SoftwareFilterSet
 from .models import Software
 from crispy_forms.helper import FormHelper
@@ -47,6 +47,7 @@ class SoftwareForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        scope_tenant_field(self)
         self.fields['tenant'].required = False
 
         if self.instance and self.instance.pk:
