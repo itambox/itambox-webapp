@@ -85,7 +85,7 @@ class TagTable(BaseTable):
 
     def render_color(self, value):
         if value:
-            return mark_safe(f'<span class="badge" style="background-color: #{value};">&nbsp;</span> #{value}')
+            return format_html('<span class="badge" style="background-color: #{};">&nbsp;</span> #{}', value, value)
         return "—"
 
 

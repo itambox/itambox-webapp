@@ -220,6 +220,7 @@ class NoteWidget(DashboardWidget):
         )
 
     def get_context(self, request):
+        import re
         import markdown as md
         from django.utils.html import escape
         from django.utils.safestring import mark_safe
@@ -231,10 +232,19 @@ class NoteWidget(DashboardWidget):
             # then let markdown add formatting on top of the escaped text.
             # (Tradeoff: the blockquote '>' prefix is escaped away — acceptable
             # in exchange for XSS safety without a sanitizer dependency.)
-            content_html = mark_safe(md.markdown(
+            rendered = md.markdown(
                 escape(raw),
                 extensions=['extra', 'sane_lists', 'nl2br'],
-            ))
+            )
+            # escape() does not touch markdown link syntax, so [x](javascript:…)/[y](data:…)
+            # still emit a dangerous href/src. Neutralize those schemes to '#'.
+            rendered = re.sub(
+                r'((?:href|src)\s*=\s*")\s*(?:javascript|data|vbscript):[^"]*"',
+                r'\1#"',
+                rendered,
+                flags=re.IGNORECASE,
+            )
+            content_html = mark_safe(rendered)
         return {
             'content': raw,
             'content_html': content_html,

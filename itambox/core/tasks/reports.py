@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext as _
 
 from core.models import EmailSettings
+from core.csv_utils import csv_safe, safe_csv_filename
 from core.events import send_notification_to_channel
 from core.tasks.context import TaskContext
 from extras.models import FileAttachment, ScheduledReport, ReportTemplate, ReportGenerationArchive
@@ -114,26 +115,26 @@ def generate_scheduled_report_task(scheduled_report_id):
                         writer.writerow([])
                         writer.writerow(['Location', 'Allocated Count'])
                         for k, v in grouped_data.items():
-                            writer.writerow([k, len(v)])
+                            writer.writerow([csv_safe(k), len(v)])
                     elif template.report_type == ReportTemplate.REPORT_TYPE_LICENSE_UTILIZATION:
                         writer.writerow(['License', 'Software', 'Total Seats', 'Assigned Seats', 'Available Seats', 'Utilization Rate'])
                         for r in rows:
-                            writer.writerow([r.get(_('License Name')), r.get(_('Software')), r.get(_('Total Seats')), r.get(_('Assigned Seats')), r.get(_('Available Seats')), r.get(_('Utilization Rate'))])
+                            writer.writerow([csv_safe(r.get(_('License Name'))), csv_safe(r.get(_('Software'))), r.get(_('Total Seats')), r.get(_('Assigned Seats')), r.get(_('Available Seats')), r.get(_('Utilization Rate'))])
                     elif template.report_type == ReportTemplate.REPORT_TYPE_SUBSCRIPTION_RENEWALS:
                         writer.writerow(['Active Subscriptions', total_active])
                         writer.writerow(['Monthly Spend ($)', total_monthly_spend])
                         writer.writerow([])
                         writer.writerow(['Subscription', 'Provider', 'Billing Cycle', 'Cost', 'End Date'])
                         for r in rows:
-                            writer.writerow([r.get(_('Subscription Name')), r.get(_('Provider')), r.get(_('Billing Cycle')), r.get(_('Cost')), r.get(_('End Date'))])
+                            writer.writerow([csv_safe(r.get(_('Subscription Name'))), csv_safe(r.get(_('Provider'))), csv_safe(r.get(_('Billing Cycle'))), r.get(_('Cost')), r.get(_('End Date'))])
                 else:
                     # Dynamic visual-columns CSV format
                     writer.writerow(headers)
                     for r in rows:
-                        writer.writerow([r.get(head, '-') for head in headers])
+                        writer.writerow([csv_safe(r.get(head, '-')) for head in headers])
 
                 attachment_content = csv_buffer.getvalue()
-                attachment_filename = f"{template.name.lower().replace(' ', '_')}_{timezone.now():%Y%m%d}.csv"
+                attachment_filename = f"{safe_csv_filename(template.name).lower().replace(' ', '_')}_{timezone.now():%Y%m%d}.csv"
                 attachment_mime = "text/csv"
                 email_body = _("Please find attached the scheduled CSV report for '%(name)s' generated on %(timestamp)s UTC.") % {
                     'name': template.name,

@@ -31,18 +31,9 @@ from itambox.panels import Panel
 
 from .generic import BaseHTMXView, ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
 from itambox.views.generic.utils import safe_return_url
+from core.csv_utils import csv_safe
 
 logger = logging.getLogger(__name__)
-
-
-def _csv_safe(value):
-    """Neutralize CSV formula injection: a cell whose first character is one a
-    spreadsheet treats as a formula trigger is prefixed with a single quote so
-    it is rendered as literal text rather than evaluated."""
-    text = '' if value is None else str(value)
-    if text and text[0] in ('=', '+', '-', '@', '\t', '\r'):
-        return "'" + text
-    return text
 
 
 @method_decorator(login_required, name='dispatch')
@@ -217,9 +208,14 @@ class ObjectExportView(LoginRequiredMixin, View):
         if template_id == 0:
             _REDACTED_FIELD_SUBSTRINGS = ('secret', 'password', 'token')
 
-            def _is_redacted(field_name):
+            def _is_redacted(field_name, val):
+                # Redact by name, AND auto-redact any encrypted-field ciphertext regardless
+                # of the field's name (enc$ is the Fernet sentinel — covers product_key,
+                # smtp_password, webhook secret, and any future encrypted field).
                 name = field_name.lower()
-                return any(sub in name for sub in _REDACTED_FIELD_SUBSTRINGS)
+                if any(sub in name for sub in _REDACTED_FIELD_SUBSTRINGS):
+                    return True
+                return isinstance(val, str) and val.startswith('enc$')
 
             if export_format == 'yaml':
                 import yaml
@@ -228,16 +224,16 @@ class ObjectExportView(LoginRequiredMixin, View):
                 for obj in queryset:
                     row_dict = {}
                     for field in fields:
-                        if _is_redacted(field.name):
+                        val = getattr(obj, field.name)
+                        if _is_redacted(field.name, val):
                             row_dict[field.name] = '***'
                             continue
-                        val = getattr(obj, field.name)
                         if val is None:
                             val = ''
                         elif isinstance(val, (int, float, bool)):
                             row_dict[field.name] = val
                         else:
-                            row_dict[field.name] = str(val)
+                            row_dict[field.name] = csv_safe(str(val))
                     export_data.append(row_dict)
 
                 yaml_content = yaml.safe_dump(export_data, default_flow_style=False, sort_keys=False)
@@ -256,11 +252,11 @@ class ObjectExportView(LoginRequiredMixin, View):
                 for obj in queryset:
                     row = []
                     for field in fields:
-                        if _is_redacted(field.name):
+                        val = getattr(obj, field.name)
+                        if _is_redacted(field.name, val):
                             row.append('***')
                             continue
-                        val = getattr(obj, field.name)
-                        row.append(_csv_safe(val))
+                        row.append(csv_safe(val))
                     writer.writerow(row)
                 return response
 

@@ -214,6 +214,7 @@ class AuditSessionReportCsvView(LoginRequiredMixin, PermissionRequiredMixin, Vie
 
     def get(self, request, pk, *args, **kwargs):
         import csv
+        from core.csv_utils import csv_safe
         session = get_object_or_404(AuditSession, pk=pk, status='completed')
         report = session.reconciliation_report or {}
         rows = report.get('rows', [])
@@ -230,13 +231,13 @@ class AuditSessionReportCsvView(LoginRequiredMixin, PermissionRequiredMixin, Vie
         ])
         for row in rows:
             writer.writerow([
-                row.get('category', ''),
-                row.get('asset_tag', ''),
-                row.get('name', ''),
-                row.get('observed_location', ''),
-                row.get('expected_location', ''),
-                row.get('auditor', ''),
-                row.get('timestamp_display', '') or (row.get('timestamp', '') or '')[:16],
+                csv_safe(row.get('category', '')),
+                csv_safe(row.get('asset_tag', '')),
+                csv_safe(row.get('name', '')),
+                csv_safe(row.get('observed_location', '')),
+                csv_safe(row.get('expected_location', '')),
+                csv_safe(row.get('auditor', '')),
+                csv_safe(row.get('timestamp_display', '') or (row.get('timestamp', '') or '')[:16]),
             ])
         return response
 

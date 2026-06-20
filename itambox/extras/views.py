@@ -22,6 +22,7 @@ from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.contrib import messages
 from itambox.views.generic import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView
+from itambox.views.generic.utils import safe_return_url
 from itambox.panels import Panel
 
 class TagDetailView(ObjectDetailView):
@@ -269,7 +270,8 @@ class SavedFilterSaveView(LoginRequiredMixin, PermissionRequiredMixin, View):
     def _list_url(self, request, model_str):
         return_url = request.POST.get('return_url')
         if return_url:
-            return return_url.split('?', 1)[0]
+            # Same-host only — guard against an attacker-supplied external return_url.
+            return safe_return_url(request, return_url.split('?', 1)[0], reverse('extras:savedfilter_list'))
         content_type = self._resolve_content_type(model_str)
         if content_type is not None:
             model = content_type.model_class()
@@ -431,9 +433,10 @@ class AlertRuleRunNowView(SimplePostView):
         return {'message': f"Evaluation queued for '{rule.name}'. New alerts will appear shortly."}
 
     def get_success_redirect(self, obj, result):
-        return redirect(
-            self.request.POST.get('return_url') or reverse('extras:alertrule_detail', kwargs={'pk': obj.pk})
-        )
+        return redirect(safe_return_url(
+            self.request, self.request.POST.get('return_url'),
+            reverse('extras:alertrule_detail', kwargs={'pk': obj.pk}),
+        ))
 
 
 @method_decorator(login_required, name='dispatch')
@@ -481,9 +484,9 @@ class AlertAcknowledgeView(SimplePostView):
         return {'message': f"Alert '{alert.subject}' acknowledged."}
 
     def get_success_redirect(self, obj, result):
-        return redirect(
-            self.request.POST.get('return_url') or reverse('extras:alertlog_list')
-        )
+        return redirect(safe_return_url(
+            self.request, self.request.POST.get('return_url'), reverse('extras:alertlog_list'),
+        ))
 
 
 class AlertResolveView(SimplePostView):
@@ -499,9 +502,9 @@ class AlertResolveView(SimplePostView):
         return {'message': f"Alert '{alert.subject}' marked as resolved."}
 
     def get_success_redirect(self, obj, result):
-        return redirect(
-            self.request.POST.get('return_url') or reverse('extras:alertlog_list')
-        )
+        return redirect(safe_return_url(
+            self.request, self.request.POST.get('return_url'), reverse('extras:alertlog_list'),
+        ))
 
 
 class _BulkAlertActionView(LoginRequiredMixin, PermissionRequiredMixin, View):
@@ -523,7 +526,7 @@ class _BulkAlertActionView(LoginRequiredMixin, PermissionRequiredMixin, View):
 
     def post(self, request, *args, **kwargs):
         pks = request.POST.getlist('pk')
-        return_url = request.POST.get('return_url') or reverse('extras:alertlog_list')
+        return_url = safe_return_url(request, request.POST.get('return_url'), reverse('extras:alertlog_list'))
 
         if not pks:
             return self._respond(request, gettext("No alerts selected."), 'warning', return_url)
@@ -856,7 +859,7 @@ class ReportTriggerImmediateView(PermissionRequiredMixin, LoginRequiredMixin, Vi
             error_msg = sched.last_status or _("Check logs.")
             messages.error(request, _("Failed to generate scheduled report '%(name)s': %(error)s") % {'name': sched.name, 'error': error_msg})
 
-        return redirect(request.POST.get('return_url') or reverse('extras:scheduledreport_list'))
+        return redirect(safe_return_url(request, request.POST.get('return_url'), reverse('extras:scheduledreport_list')))
 
 
 @method_decorator(login_required, name='dispatch')
@@ -917,7 +920,7 @@ class ReportTemplatePreviewView(PermissionRequiredMixin, View):
                 # Sandbox or legacy Django render
                 try:
                     from jinja2.sandbox import SandboxedEnvironment
-                    env = SandboxedEnvironment()
+                    env = SandboxedEnvironment(autoescape=True)
                     jinja_template = env.from_string(template_content)
                     if report_type == ReportTemplate.REPORT_TYPE_ASSET_SUMMARY:
                         context_data.update({
@@ -978,17 +981,18 @@ class ReportTemplateDownloadView(PermissionRequiredMixin, LoginRequiredMixin, Vi
             if format_type == 'csv':
                 import io
                 import csv
+                from core.csv_utils import csv_safe, safe_csv_filename
                 csv_buffer = io.StringIO()
                 writer = csv.writer(csv_buffer)
 
                 # Write headers
                 writer.writerow(headers)
-                # Write rows in sequence
+                # Write rows in sequence (each cell neutralized against formula injection)
                 for r in rows:
-                    writer.writerow([r.get(head, '-') for head in headers])
+                    writer.writerow([csv_safe(r.get(head, '-')) for head in headers])
 
                 response = HttpResponse(csv_buffer.getvalue(), content_type='text/csv')
-                filename = f"{template.name.lower().replace(' ', '_')}_{timezone.now():%Y%m%d}.csv"
+                filename = f"{safe_csv_filename(template.name).lower().replace(' ', '_')}_{timezone.now():%Y%m%d}.csv"
                 response['Content-Disposition'] = f'attachment; filename="{filename}"'
                 return response
 
@@ -997,7 +1001,10 @@ class ReportTemplateDownloadView(PermissionRequiredMixin, LoginRequiredMixin, Vi
                 if template.advanced_mode and template.template_content.strip():
                     try:
                         from jinja2.sandbox import SandboxedEnvironment
-                        env = SandboxedEnvironment()
+                        # autoescape escapes {{ data }} expressions (e.g. a malicious asset
+                        # name) when rendered into the text/html report; the author's literal
+                        # template markup is unaffected.
+                        env = SandboxedEnvironment(autoescape=True)
                         jinja_template = env.from_string(template.template_content)
                         if template.report_type == ReportTemplate.REPORT_TYPE_ASSET_SUMMARY:
                             context_data.update({
