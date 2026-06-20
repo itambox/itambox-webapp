@@ -244,7 +244,20 @@ class LicenseSeatAssignment(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
                 check=Q(asset__isnull=False, assigned_holder__isnull=True) |
                       Q(asset__isnull=True, assigned_holder__isnull=False),
                 name='chk_assignment_to_one_target'
-            )
+            ),
+            # A target (asset or holder) may hold at most ONE active seat on a given
+            # license — a hard DB backstop against the same target consuming multiple
+            # seats (the API create path also checks this for a friendly error).
+            models.UniqueConstraint(
+                fields=['license', 'asset'],
+                condition=Q(asset__isnull=False, deleted_at__isnull=True),
+                name='unique_active_license_seat_per_asset',
+            ),
+            models.UniqueConstraint(
+                fields=['license', 'assigned_holder'],
+                condition=Q(assigned_holder__isnull=False, deleted_at__isnull=True),
+                name='unique_active_license_seat_per_holder',
+            ),
         ]
 
     def __str__(self):

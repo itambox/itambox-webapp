@@ -1,3 +1,5 @@
+from django.db import transaction
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from itambox.api.base import BaseModelSerializer
 from itambox.api.nested_serializers import NestedManufacturerSerializer, NestedAssetSerializer
@@ -80,4 +82,30 @@ class LicenseSeatAssignmentSerializer(BaseModelSerializer):
             'assigned_date', 'notes', 'created_at', 'updated_at'
         )
         brief_fields = ['id', 'license', 'asset']
+
+    def create(self, validated_data):
+        # The seat-availability + locking guard lives in checkout_license(); the REST CRUD
+        # path bypassed it, so N+1 POSTs could over-allocate a license and the same target
+        # could consume multiple seats. Re-apply the invariant here under a row lock (held
+        # through perform_create's transaction) so the API can't over-allocate.
+        license_obj = validated_data['license']
+        asset = validated_data.get('asset')
+        holder = validated_data.get('assigned_holder')
+        with transaction.atomic():
+            lic = License.objects.select_for_update().get(pk=license_obj.pk)
+            if lic.available_seats < 1:
+                raise serializers.ValidationError(
+                    {'license_id': _("No available seats left for this license.")}
+                )
+            existing = LicenseSeatAssignment.objects.filter(license=lic)
+            if asset is not None and existing.filter(asset=asset).exists():
+                raise serializers.ValidationError(
+                    {'asset_id': _("This asset already holds a seat on this license.")}
+                )
+            if holder is not None and existing.filter(assigned_holder=holder).exists():
+                raise serializers.ValidationError(
+                    {'assigned_holder_id': _("This holder already holds a seat on this license.")}
+                )
+            validated_data['license'] = lic
+            return super().create(validated_data)
 

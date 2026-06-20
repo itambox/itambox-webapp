@@ -1,5 +1,37 @@
+from django.db import transaction
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from itambox.api.base import BaseModelSerializer
+
+
+class _AssignmentAvailabilityMixin:
+    """Re-applies the availability + row-lock invariant on the REST create path.
+
+    The over-allocation guard lives only in checkout_inventory_item(); the CRUD viewsets
+    create assignments straight through the serializer, and adjust_inventory_stock only
+    checks/deducts stock when ``from_location`` is set — so a POST with ``from_location``
+    omitted (or qty > available) bypassed every check. Lock the parent item and re-check
+    ``available`` here (held through perform_create's transaction), mirroring the service.
+    """
+
+    item_source_field = None  # 'accessory' | 'consumable' | 'component'
+
+    def create(self, validated_data):
+        item = validated_data.get(self.item_source_field)
+        qty = validated_data.get('qty') or 0
+        if item is not None and qty:
+            with transaction.atomic():
+                locked = type(item).objects.select_for_update().get(pk=item.pk)
+                if not locked.allow_overallocate and locked.available < qty:
+                    raise serializers.ValidationError({
+                        'qty': _(
+                            "Not enough stock for %(item)s: %(available)s available, "
+                            "%(qty)s requested."
+                        ) % {'item': locked.name, 'available': locked.available, 'qty': qty}
+                    })
+                validated_data[self.item_source_field] = locked
+                return super().create(validated_data)
+        return super().create(validated_data)
 from itambox.api.nested_serializers import NestedManufacturerSerializer, NestedAssetTypeSerializer, NestedAssetSerializer
 from inventory.models import (
     Accessory, AccessoryStock, AccessoryAssignment,
@@ -86,7 +118,8 @@ class AccessoryStockSerializer(BaseModelSerializer):
         brief_fields = ['id', 'accessory', 'location', 'qty']
 
 
-class AccessoryAssignmentSerializer(BaseModelSerializer):
+class AccessoryAssignmentSerializer(_AssignmentAvailabilityMixin, BaseModelSerializer):
+    item_source_field = 'accessory'
     accessory = NestedAccessorySerializer(read_only=True)
     accessory_id = serializers.PrimaryKeyRelatedField(
         queryset=Accessory.objects,
@@ -189,7 +222,8 @@ class ConsumableStockSerializer(BaseModelSerializer):
         brief_fields = ['id', 'consumable', 'location', 'qty']
 
 
-class ConsumableAssignmentSerializer(BaseModelSerializer):
+class ConsumableAssignmentSerializer(_AssignmentAvailabilityMixin, BaseModelSerializer):
+    item_source_field = 'consumable'
     consumable = NestedConsumableSerializer(read_only=True)
     consumable_id = serializers.PrimaryKeyRelatedField(
         queryset=Consumable.objects,
@@ -337,7 +371,8 @@ class ComponentStockSerializer(BaseModelSerializer):
         brief_fields = ['id', 'component_name', 'location', 'qty']
 
 
-class ComponentAllocationSerializer(BaseModelSerializer):
+class ComponentAllocationSerializer(_AssignmentAvailabilityMixin, BaseModelSerializer):
+    item_source_field = 'component'
     component = NestedComponentSerializer(read_only=True)
     component_id = serializers.PrimaryKeyRelatedField(
         queryset=Component.objects,
