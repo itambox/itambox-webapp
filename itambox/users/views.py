@@ -230,13 +230,15 @@ class MarkNotificationReadView(LoginRequiredMixin, View):
 class ViewNotificationView(LoginRequiredMixin, View):
     def get(self, request, pk):
         from core.models import Notification
-        from django.db.models import Q
-        notification = get_object_or_404(Notification, Q(user=request.user) | Q(user__isnull=True), pk=pk)
-        
-        if notification.user == request.user:
-            notification.is_read = True
-            notification.save()
-            
+        # Only the recipient may open a notification by pk. The previous
+        # Q(user__isnull=True) clause let ANY authenticated user (any tenant) open a global
+        # broadcast row by pk and follow its target_url — a cross-tenant info leak. Tenant
+        # EventRule notifications now fan out per-user instead of creating user=None rows.
+        notification = get_object_or_404(Notification, pk=pk, user=request.user)
+
+        notification.is_read = True
+        notification.save()
+
         if notification.target_url:
             return redirect(notification.target_url)
         return redirect('users:user_notifications')

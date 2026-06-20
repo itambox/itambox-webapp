@@ -285,13 +285,24 @@ def _send_notification(rule, event):
     except Exception:
         pass
 
-    Notification.objects.create(
-        user=None,
-        subject=subject,
-        message=body,
-        level=level,
-        target_url=target_url,
-    )
+    if rule.tenant_id:
+        # A tenant-scoped rule must fan out to the rule's tenant members, NOT create a global
+        # user=None row that any authenticated user could open by pk (cross-tenant leak of the
+        # rule's subject/body + the target object's URL). Mirrors the IN_APP channel branch.
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        users = User.objects.filter(
+            memberships__tenant_id=rule.tenant_id, is_active=True
+        ).distinct()
+        Notification.objects.bulk_create([
+            Notification(user=u, subject=subject, message=body, level=level, target_url=target_url)
+            for u in users
+        ])
+    else:
+        # Truly system-wide (tenant=None) rule may broadcast.
+        Notification.objects.create(
+            user=None, subject=subject, message=body, level=level, target_url=target_url,
+        )
 
 
 def _is_safe_outbound_url(url):

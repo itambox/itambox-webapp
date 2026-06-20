@@ -81,12 +81,20 @@ class EventsSystemTestCase(TransactionTestCase):
     def test_event_rules_scoped_to_instance_tenant_in_system_context(self):
         """WS5-1: in a system context (no active tenant/user) a save must fire ONLY the
         rules belonging to the saved object's OWN tenant (plus global rules), never every
-        tenant's rules. Reproduces the cross-tenant dispatch the unscoped manager allowed."""
-        from organization.models import Tenant, Location
+        tenant's rules. Reproduces the cross-tenant dispatch the unscoped manager allowed.
+        Also covers WS5-2: a tenant rule's notification fans out to the rule's members, not a
+        global user=None broadcast."""
+        from django.contrib.auth import get_user_model
+        from organization.models import Tenant, Location, TenantRole, TenantMembership
         from core.managers import set_current_tenant
 
         tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
         tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
+        member_a = get_user_model().objects.create_user(username='member_a', password='pw')
+        TenantMembership.objects.create(
+            user=member_a, tenant=tenant_a,
+            role=TenantRole.objects.create(tenant=tenant_a, name='R', permissions=[]),
+        )
         loc_ct = ContentType.objects.get_for_model(Location)
 
         EventRule.objects.create(
@@ -112,8 +120,11 @@ class EventsSystemTestCase(TransactionTestCase):
 
         dispatch_event(Location, loc, 'create')
 
-        self.assertTrue(Notification.objects.filter(subject='A-FIRED').exists())
-        self.assertTrue(Notification.objects.filter(subject='GLOBAL-FIRED').exists())
+        # WS5-2: tenant-A rule fans out to tenant-A members (not a global user=None row).
+        self.assertTrue(Notification.objects.filter(subject='A-FIRED', user=member_a).exists())
+        self.assertFalse(Notification.objects.filter(subject='A-FIRED', user__isnull=True).exists())
+        # A truly global (tenant=None) rule still broadcasts as user=None.
+        self.assertTrue(Notification.objects.filter(subject='GLOBAL-FIRED', user__isnull=True).exists())
         self.assertFalse(
             Notification.objects.filter(subject='B-FIRED').exists(),
             "Tenant B's event rule must NOT fire for a tenant-A object in a system context.",
