@@ -155,6 +155,9 @@ class ITAMBoxPagination(LimitOffsetPagination):
 
     def get_paginated_response_schema(self, schema):
         response_schema = super().get_paginated_response_schema(schema)
+        # `count` is null in keyset/cursor mode (?start=), where no COUNT is run.
+        if 'count' in response_schema.get('properties', {}):
+            response_schema['properties']['count']['nullable'] = True
         response_schema['properties']['count_capped'] = {
             'type': 'boolean',
             'description': (

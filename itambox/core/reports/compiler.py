@@ -568,10 +568,13 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
         # does this. Without it the Software branch ignored active_tenant/
         # filter_tenants and leaked every tenant's catalogue into MSP/scheduled
         # reports.
+        # Software is allow_global_tenant: a null-tenant row is a shared catalogue
+        # product visible to every tenant, so include it alongside the report's
+        # own tenant(s) rather than dropping it.
         if filter_tenants:
-            software_qs = software_qs.filter(tenant__in=filter_tenants)
+            software_qs = software_qs.filter(Q(tenant__in=filter_tenants) | Q(tenant__isnull=True))
         elif active_tenant:
-            software_qs = software_qs.filter(tenant=active_tenant)
+            software_qs = software_qs.filter(Q(tenant=active_tenant) | Q(tenant__isnull=True))
 
         # Per-product install/licence counts come from the model properties, which
         # derive their scope from the ambient tenant context — unreliable in a

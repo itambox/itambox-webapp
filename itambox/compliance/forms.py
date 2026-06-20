@@ -158,8 +158,15 @@ class CustodyTemplateForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        scope_tenant_field(self)
+        # autoset_when_single=False: this form scopes to a tenant OR a tenant
+        # group (or global), so the tenant field must stay optional/visible —
+        # auto-setting it would make the tenant-XOR-group clean() unsatisfiable.
+        scope_tenant_field(self, autoset_when_single=False)
         scope_tenant_group_field(self)
+        # Keep `tenant` optional: a template scopes to a tenant OR a group, or is
+        # global. The global BaseForm patch (core/apps.py) marks tenant fields
+        # required, which would make the tenant-XOR-group clean() unsatisfiable.
+        self.fields['tenant'].required = False
         self.fields['signature_provider'].choices = signature_providers.choices()
         
         self.helper = FormHelper(self)

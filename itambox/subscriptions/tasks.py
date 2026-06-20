@@ -42,7 +42,7 @@ def check_subscription_expiries_and_reminders():
             recipients = set(User.objects.filter(
                 is_staff=True, is_active=True, memberships__tenant_id=sub.tenant_id
             ).distinct())
-            if sub.owner:
+            if sub.owner and sub.owner.is_active:
                 recipients.add(sub.owner)
 
             for user in recipients:
@@ -80,7 +80,7 @@ def check_subscription_expiries_and_reminders():
                 recipients = set(User.objects.filter(
                     is_staff=True, is_active=True, memberships__tenant_id=sub.tenant_id
                 ).distinct())
-                if sub.owner:
+                if sub.owner and sub.owner.is_active:
                     recipients.add(sub.owner)
 
                 for user in recipients:

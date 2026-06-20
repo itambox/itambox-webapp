@@ -79,7 +79,7 @@ class TenantScopingQuerySet(models.QuerySet):
                     # _base_manager (unscoped): TenantGroup.objects is itself
                     # tenant-scoped now, so using it here would recurse back into
                     # filter_by_tenant. The descendant walk needs the true tree.
-                    children = list(TenantGroup._base_manager.filter(parent_id__in=to_check).values_list('pk', flat=True))
+                    children = list(TenantGroup._base_manager.filter(parent_id__in=to_check, deleted_at__isnull=True).values_list('pk', flat=True))
                     if not children:
                         break
                     descendant_ids.extend(children)
@@ -111,6 +111,8 @@ class TenantScopingQuerySet(models.QuerySet):
             # system/anonymous contexts see all. The parent walk uses
             # _base_manager so it does not recurse through this (scoped) manager.
             if self.model._meta.model_name == 'tenantgroup':
+                # inline imports: avoid a core.managers -> middleware /
+                # organization circular import at module load.
                 from itambox.middleware import get_current_user
                 tg_user = get_current_user()
                 if tg_user is None or getattr(tg_user, 'is_superuser', False):
@@ -127,7 +129,8 @@ class TenantScopingQuerySet(models.QuerySet):
                 while frontier:
                     visible_ids |= frontier
                     parent_ids = set(
-                        TenantGroupModel._base_manager.filter(pk__in=frontier)
+                        TenantGroupModel._base_manager
+                        .filter(pk__in=frontier, deleted_at__isnull=True)
                         .values_list('parent_id', flat=True)
                     )
                     parent_ids.discard(None)
