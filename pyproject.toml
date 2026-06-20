@@ -3,6 +3,14 @@ name = "itambox"
 version = "1.0.0-alpha1"
 description = "IT Asset Management System inspired by NetBox"
 requires-python = ">=3.11"
+# NOTE: itambox/requirements.txt is the canonical, fully-enumerated install set
+# (it pins every runtime dependency, including a few transitives this list omits,
+# e.g. mozilla-django-oidc, gunicorn, whitenoise, pyOpenSSL). This [project] table
+# must stay bootable on its own: `pip install .` with NO extras has to yield a
+# runnable app, so the always-required infrastructure deps below (DB driver,
+# cache/broker client) live in the base set rather than in an opt-in extra. The
+# app rejects SQLite at settings load, so a missing DB driver here means the app
+# cannot boot at all. Keep version ranges in sync with requirements.txt.
 dependencies = [
     "Django>=5.2,<5.3",
     "djangorestframework>=3.16,<3.17",
@@ -22,17 +30,19 @@ dependencies = [
     "python-barcode>=0.15,<1.0",
     "django-q2>=1.7,<2.0",
     "sqlparse>=0.5.4,<0.6.0",
-    "django-cors-headers",
-]
-
-[project.optional-dependencies]
-postgres = [
+    "django-cors-headers>=4.4,<5.0",
+    # Database driver — required at boot (settings reject SQLite). Without this,
+    # `pip install .` produces a non-bootable app.
     "psycopg2-binary>=2.9,<3.0",
-]
-redis = [
+    # Cache / broker client. django-redis is referenced by core/settings when
+    # ITAMBOX_CACHE_BACKEND=redis (the prod-recommended multi-worker config), and
+    # `redis` is the wire client it drives; ship both in the base set so the redis
+    # cache path is always available.
     "django-redis>=5.4,<6.0",
     "redis>=5.2,<6.0",
 ]
+
+[project.optional-dependencies]
 dev = [
     "pytest>=8.0,<9.0",
     "pytest-django>=4.8,<5.0",
