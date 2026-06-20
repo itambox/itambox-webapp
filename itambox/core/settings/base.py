@@ -226,6 +226,13 @@ STATICFILES_DIRS = [
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.environ.get('ITAMBOX_MEDIA_ROOT', str(BASE_DIR / 'media'))
 
+# Upload size ceilings — kept coherent with the file-attachment validators (10 MB file /
+# 5 MB image). Django's 2.5 MB default DATA_UPLOAD_MAX_MEMORY_SIZE would otherwise reject the
+# non-file portion of a large multipart upload (and the large import_text textarea) before
+# the validators run.
+FILE_UPLOAD_MAX_MEMORY_SIZE = 11 * 1024 * 1024   # 11 MB (> the 10 MB file validator)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024   # 12 MB
+
 # Local static end-user documentation root
 DOCS_ROOT = os.environ.get('ITAMBOX_DOCS_ROOT', BASE_DIR / 'docs')
 

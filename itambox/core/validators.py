@@ -146,12 +146,16 @@ def validate_file_attachment(file):
     if file.size > max_size:
         raise ValidationError(_("File size must not exceed 10 MB."))
 
-    # 2. Extension Validation (blacklist dangerous extensions)
+    # 2. Extension Validation (blacklist dangerous extensions). Kept broad because the
+    # libmagic signature check below is best-effort (it degrades to '' when python-magic /
+    # libmagic is unavailable in the running image), so the extension gate must stand alone.
     ext = os.path.splitext(file.name)[1].lower()
     dangerous_extensions = {
-        '.exe', '.dll', '.bat', '.cmd', '.sh', '.bash', '.php', '.pl', '.py',
-        '.cgi', '.asp', '.aspx', '.jsp', '.vbs', '.scr', '.pif', '.app',
-        '.msi', '.com', '.htm', '.html', '.xml', '.svg'
+        '.exe', '.dll', '.bat', '.cmd', '.sh', '.bash', '.php', '.phtml', '.pl', '.py',
+        '.cgi', '.asp', '.aspx', '.jsp', '.vbs', '.vbe', '.scr', '.pif', '.app',
+        '.msi', '.com', '.htm', '.html', '.xhtml', '.shtml', '.xml', '.svg', '.svgz',
+        '.mhtml', '.mht', '.jar', '.iso', '.jnlp', '.hta', '.js', '.jse', '.wsf',
+        '.ps1', '.psm1', '.reg',
     }
     if ext in dangerous_extensions:
         raise ValidationError(

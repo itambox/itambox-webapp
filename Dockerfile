@@ -26,9 +26,10 @@ WORKDIR /app
 #   postgresql-client           - pg_isready / psql for ops & entrypoint waits
 #   libldap2-dev, libsasl2-dev  - python-ldap (django-auth-ldap)
 #   xmlsec1                      - pysaml2 (djangosaml2) signature handling
+#   libmagic1                    - python-magic MIME sniffing for upload validators
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        gcc postgresql-client libldap2-dev libsasl2-dev xmlsec1 \
+        gcc postgresql-client libldap2-dev libsasl2-dev xmlsec1 libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY itambox/requirements.txt .
