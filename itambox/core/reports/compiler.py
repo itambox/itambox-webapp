@@ -187,7 +187,12 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
     elif template.report_type == ReportTemplate.REPORT_TYPE_LICENSE_UTILIZATION:
         from licenses.models import License
         
-        licenses_qs = License.objects.filter(deleted_at__isnull=True).select_related('software').annotate(assigned_seats_count=Count('assignments'))
+        # Count only *active* seat assignments. A bare Count('assignments') also
+        # tallies soft-deleted (checked-in) seats, overstating utilization and the
+        # downstream SAM/financial figures.
+        licenses_qs = License.objects.filter(deleted_at__isnull=True).select_related('software').annotate(
+            assigned_seats_count=Count('assignments', filter=Q(assignments__deleted_at__isnull=True))
+        )
         if filter_tenants:
             licenses_qs = licenses_qs.filter(tenant__in=filter_tenants)
         elif active_tenant:
@@ -554,10 +559,29 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
             chart_svg = generate_doughnut_chart(deprec_data, title=_("Asset Value Depreciation"))
 
     elif template.report_type == ReportTemplate.REPORT_TYPE_SOFTWARE_INVENTORY:
-        from software.models import Software
-        
+        from software.models import Software, InstalledSoftware
+        from licenses.models import License
+
         software_qs = Software.objects.all().select_related('manufacturer')
-        
+        # Scope the product list to the report's tenant(s) — every other branch
+        # does this. Without it the Software branch ignored active_tenant/
+        # filter_tenants and leaked every tenant's catalogue into MSP/scheduled
+        # reports.
+        if filter_tenants:
+            software_qs = software_qs.filter(tenant__in=filter_tenants)
+        elif active_tenant:
+            software_qs = software_qs.filter(tenant=active_tenant)
+
+        # Per-product install/licence counts come from the model properties, which
+        # derive their scope from the ambient tenant context — unreliable in a
+        # scheduled/MSP run. Scope them explicitly to the report's tenant(s) so the
+        # figures never include another tenant's installs or licences.
+        report_tenant_ids = None
+        if filter_tenants:
+            report_tenant_ids = [t.pk for t in filter_tenants]
+        elif active_tenant:
+            report_tenant_ids = [active_tenant.pk]
+
         total_software = software_qs.count()
         
         if template.include_summary_cards:
@@ -568,8 +592,13 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
         category_counts = {}
         for soft in software_qs[:500]:
             row = {}
-            installed = soft.installed_count
-            licenses = soft.license_count
+            installed_qs = InstalledSoftware.objects.filter(software=soft)
+            licenses_count_qs = License.objects.filter(software=soft, deleted_at__isnull=True)
+            if report_tenant_ids is not None:
+                installed_qs = installed_qs.filter(asset__tenant_id__in=report_tenant_ids)
+                licenses_count_qs = licenses_count_qs.filter(tenant_id__in=report_tenant_ids)
+            installed = installed_qs.count()
+            licenses = licenses_count_qs.count()
             
             if 'software_name' in active_cols:
                 row[_('Software Product')] = soft.name or '-'
