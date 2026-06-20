@@ -88,7 +88,12 @@ def process_event_rules(event, instance_tenant_id=None):
         if not _check_conditions(rule.conditions, event):
             continue
 
-        _execute_event_action(rule, event)
+        # Per-rule isolation: one rule's action raising must not abort the remaining rules
+        # for this event.
+        try:
+            _execute_event_action(rule, event)
+        except Exception:
+            logger.exception("Event rule %s action failed for event %s", rule.pk, event.pk)
 
     event.processed = True
     event.save(update_fields=['processed'])

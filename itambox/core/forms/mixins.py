@@ -41,7 +41,8 @@ class SearchForm(forms.Form):
         ('iexact', _('Exact match')),
         ('istartswith', _('Starts with')),
         ('iendswith', _('Ends with')),
-        ('iregex', _('Regex')),
+        # No 'iregex' — the search view whitelists lookups to the four above (ReDoS guard),
+        # so advertising a regex choice here was dead/misleading config.
     )
     lookup = forms.ChoiceField(
         label=_('Lookup'),

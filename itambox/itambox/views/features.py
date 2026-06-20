@@ -479,6 +479,12 @@ class ImageAttachmentServeView(LoginRequiredMixin, View):
         if not _attachment_within_tenant(attachment.model, attachment.object_id):
             raise Http404
         response = FileResponse(attachment.image.open('rb'))
+        # Force an image/* content-type (defence-in-depth alongside nosniff) so a mislabeled
+        # upload can't be served as HTML/SVG inline. The validator restricts uploads to image
+        # extensions, so a valid image always resolves to image/*; anything else -> download.
+        import mimetypes
+        guessed, _enc = mimetypes.guess_type(attachment.image.name)
+        response['Content-Type'] = guessed if (guessed or '').startswith('image/') else 'application/octet-stream'
         response['X-Content-Type-Options'] = 'nosniff'
         return response
 
