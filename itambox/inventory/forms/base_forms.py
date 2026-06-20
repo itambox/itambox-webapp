@@ -35,7 +35,21 @@ class BaseCheckoutForm(forms.Form):
         tenant = kwargs.pop('tenant', None)
         super().__init__(*args, **kwargs)
         if tenant:
-            self.fields['assigned_holder'].queryset = AssetHolder.objects.filter(tenant=tenant).order_by('last_name', 'first_name')
+            # Rescope every tenant-owned FK choice to the item's tenant. These
+            # querysets are import-frozen and unscoped, so without this a checkout
+            # could target (and expose in the dropdown) another tenant's holders,
+            # locations or assets. Subclasses contribute their own Location source
+            # field (source_location / from_location), scoped here as well.
+            self.fields['assigned_holder'].queryset = AssetHolder.objects.filter(
+                tenant=tenant).order_by('last_name', 'first_name')
+            self.fields['assigned_location'].queryset = Location.objects.filter(
+                tenant=tenant).select_related('site').order_by('site__name', 'name')
+            self.fields['assigned_asset'].queryset = Asset.objects.filter(
+                tenant=tenant).order_by('asset_tag')
+            for loc_field in ('source_location', 'from_location'):
+                if loc_field in self.fields:
+                    self.fields[loc_field].queryset = Location.objects.filter(
+                        tenant=tenant).order_by('name')
 
     def clean(self):
         cleaned_data = super().clean()
