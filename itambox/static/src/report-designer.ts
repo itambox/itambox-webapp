@@ -294,10 +294,19 @@
         // Hide standard inputs
         formChecks.forEach(el => el.style.display = 'none');
         
-        // Read saved sequence from report-template-metadata element
-        const meta = document.getElementById('report-template-metadata');
-        const savedSeqRaw = meta ? meta.getAttribute('data-saved-sequence') : null;
-        const savedSeq: string[] = savedSeqRaw ? JSON.parse(savedSeqRaw) : [];
+        // Read saved sequence from the json_script element (autoescaped by Django).
+        const savedSeqEl = document.getElementById('report-template-saved-sequence');
+        let savedSeq: string[] = [];
+        if (savedSeqEl && savedSeqEl.textContent) {
+          try {
+            const parsed = JSON.parse(savedSeqEl.textContent);
+            if (Array.isArray(parsed)) {
+              savedSeq = parsed;
+            }
+          } catch {
+            savedSeq = [];
+          }
+        }
         
         if (savedSeq.length > 0) {
           const formChecksMap: Record<string, HTMLElement> = {};
