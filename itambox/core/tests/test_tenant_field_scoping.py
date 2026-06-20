@@ -33,6 +33,15 @@ class ScopeTenantFieldTests(TestCase):
             role = TenantRole.objects.create(tenant=t, name='R', permissions=[])
             TenantMembership.objects.create(user=self.member, tenant=t, role=role)
 
+        # Load the URLconf now, under a clean (no-tenant) context, so view
+        # `queryset = Model.objects.all()` class attributes bake UNSCOPED. The
+        # real-form test below instantiates a form whose __init__ calls reverse()
+        # under a tenant context; without this that could be the first URLconf
+        # load and would freeze view querysets to the wrong tenant for later
+        # tests (see memory: import-baked view querysets).
+        from django.urls import reverse
+        reverse('organization:location_list')
+
     def _pks(self, form):
         return set(form.fields['tenant'].queryset.values_list('pk', flat=True))
 

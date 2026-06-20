@@ -150,10 +150,22 @@ class CoreTenantSecurityTestCase(TestCase):
             'tenant': tenant_readonly.pk,
         }
         response = self.client.post(url_create, data=post_data)
-        self.assertEqual(response.status_code, 200)
-        form = response.context['form']
-        self.assertIn('tenant', form.errors)
-        self.assertEqual(form.errors['tenant'][0], "Select a valid choice. That choice is not one of the available choices.")
+        # The owning-tenant picker is scoped to the user's accessible tenants, so a
+        # crafted tenant_readonly value is never accepted. For a member whose active
+        # context resolves to a single tenant the field is hidden/auto-set (the POST
+        # value is ignored and the asset lands in the active tenant); a member with
+        # several accessible tenants instead gets a "not a valid choice" form error.
+        # Either way the asset is NEVER created in the readonly tenant.
+        self.assertIn(response.status_code, (200, 302))
+        # _base_manager (unscoped): all_objects is itself tenant-scoped and would
+        # hide a cross-tenant leak under the active context.
+        self.assertFalse(
+            Asset._base_manager.filter(asset_tag='TAG-ILLEGAL', tenant=tenant_readonly).exists()
+        )
+        if response.status_code == 302:
+            created = Asset._base_manager.filter(asset_tag='TAG-ILLEGAL').first()
+            self.assertIsNotNone(created)
+            self.assertEqual(created.tenant_id, tenant_admin.pk)
         
         # Cleanup context
         set_current_tenant(None)
