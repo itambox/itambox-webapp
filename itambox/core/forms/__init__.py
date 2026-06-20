@@ -19,7 +19,7 @@ from .mixins import (
     FilterForm,
     ColorFieldFormMixin,
 )
-from .tenant import scope_tenant_field
+from .tenant import scope_tenant_field, scope_tenant_group_field
 
 __all__ = [
     # mixins / base forms
@@ -35,4 +35,5 @@ __all__ = [
     "FilterForm",
     "ColorFieldFormMixin",
     "scope_tenant_field",
+    "scope_tenant_group_field",
 ]

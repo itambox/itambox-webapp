@@ -76,7 +76,10 @@ class TenantScopingQuerySet(models.QuerySet):
                 descendant_ids = [group_id]
                 to_check = [group_id]
                 while to_check:
-                    children = list(TenantGroup.objects.filter(parent_id__in=to_check).values_list('pk', flat=True))
+                    # _base_manager (unscoped): TenantGroup.objects is itself
+                    # tenant-scoped now, so using it here would recurse back into
+                    # filter_by_tenant. The descendant walk needs the true tree.
+                    children = list(TenantGroup._base_manager.filter(parent_id__in=to_check).values_list('pk', flat=True))
                     if not children:
                         break
                     descendant_ids.extend(children)
@@ -101,6 +104,35 @@ class TenantScopingQuerySet(models.QuerySet):
             # If the query is for the Tenant model itself:
             if self.model._meta.model_name == 'tenant':
                 return self.filter(pk__in=allowed_tenant_ids)
+
+            # If the query is for the TenantGroup model itself: a user may see the
+            # groups that contain a tenant they are a member of, plus those groups'
+            # ancestors (the path to the root) for navigation. Superusers and
+            # system/anonymous contexts see all. The parent walk uses
+            # _base_manager so it does not recurse through this (scoped) manager.
+            if self.model._meta.model_name == 'tenantgroup':
+                from itambox.middleware import get_current_user
+                tg_user = get_current_user()
+                if tg_user is None or getattr(tg_user, 'is_superuser', False):
+                    return self
+                from organization.models import TenantMembership
+                TenantGroupModel = apps.get_model('organization', 'TenantGroup')
+                member_group_ids = set(
+                    TenantMembership.objects.filter(user=tg_user)
+                    .values_list('tenant__group_id', flat=True)
+                )
+                member_group_ids.discard(None)
+                visible_ids = set()
+                frontier = set(member_group_ids)
+                while frontier:
+                    visible_ids |= frontier
+                    parent_ids = set(
+                        TenantGroupModel._base_manager.filter(pk__in=frontier)
+                        .values_list('parent_id', flat=True)
+                    )
+                    parent_ids.discard(None)
+                    frontier = parent_ids - visible_ids
+                return self.filter(pk__in=visible_ids)
 
             allowed_group_ids = []
             if active_group:

@@ -156,7 +156,7 @@ class TenantGroupSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:tenantgroup-detail')
     parent = NestedTenantGroupSerializer(read_only=True)
     parent_id = serializers.PrimaryKeyRelatedField(
-        queryset=TenantGroup.objects.all(), source='parent', write_only=True, required=False, allow_null=True
+        queryset=TenantGroup.objects, source='parent', write_only=True, required=False, allow_null=True
     )
     tenant_count = serializers.IntegerField(read_only=True)
 
@@ -174,7 +174,7 @@ class TenantSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:tenant-detail')
     group = NestedTenantGroupSerializer(read_only=True)
     group_id = serializers.PrimaryKeyRelatedField(
-        queryset=TenantGroup.objects.all(), source='group', write_only=True, required=False, allow_null=True
+        queryset=TenantGroup.objects, source='group', write_only=True, required=False, allow_null=True
     )
 
     class Meta:

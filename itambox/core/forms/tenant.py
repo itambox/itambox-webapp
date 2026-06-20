@@ -55,3 +55,19 @@ def scope_tenant_field(form, field_name='tenant', autoset_when_single=True):
         instance = getattr(form, 'instance', None)
         if not (instance and getattr(instance, f'{field_name}_id', None)):
             form.initial[field_name] = accessible_pks[0]
+
+
+def scope_tenant_group_field(form, field_name='tenant_group'):
+    """Scope a tenant-group picker to the groups the current user may use.
+
+    Re-evaluates the field's queryset per request through the (now tenant-scoped)
+    ``TenantGroup`` manager, so the import-frozen field no longer lists every
+    group, and ModelChoiceField validation rejects an out-of-scope group on
+    submit. Superusers see all groups (the manager returns the full set for
+    them); members see the groups containing a tenant they belong to, plus those
+    groups' ancestors.
+    """
+    field = form.fields.get(field_name)
+    if field is None or getattr(field, 'queryset', None) is None:
+        return
+    field.queryset = field.queryset.model._default_manager.all()

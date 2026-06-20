@@ -149,7 +149,11 @@ class SiteGroup(StandardModel, SoftDeleteMixin):
         return reverse('organization:sitegroup_detail', kwargs={'pk': self.pk})
 
 class TenantGroup(StandardModel, SoftDeleteMixin):
-    objects = SoftDeleteManager()
+    # Tenant-scoped via a dedicated branch in filter_by_tenant: a user sees the
+    # groups containing a tenant they're a member of, plus those groups'
+    # ancestors. Internal tenancy machinery (the descendant walk, middleware
+    # group resolution) uses TenantGroup._base_manager to stay unscoped.
+    objects = TenantScopingSoftDeleteManager()
     all_objects = AllObjectsManager()
     name = models.CharField(max_length=100, verbose_name=_("Name"))
     slug = models.SlugField(max_length=100, verbose_name=_("Slug"))

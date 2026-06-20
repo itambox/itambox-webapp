@@ -3,7 +3,7 @@ from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout
 
-from core.forms import FilterForm
+from core.forms import FilterForm, scope_tenant_group_field
 from extras.models import Tag
 
 from ..models import TenantGroup
@@ -36,6 +36,8 @@ class TenantGroupForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Scope the self-referential parent picker to the user's accessible groups.
+        scope_tenant_group_field(self, field_name='parent')
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
         self.helper.form_tag = True

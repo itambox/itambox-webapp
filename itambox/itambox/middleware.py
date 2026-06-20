@@ -198,7 +198,10 @@ class TenantMiddleware:
                         del request.session['active_tenant_id']
             elif session_group_id:
                 try:
-                    active_tenant_group = TenantGroup.objects.get(pk=session_group_id)
+                    # _base_manager: resolve the active group unscoped (bootstrap —
+                    # the scope isn't established yet; membership access is checked
+                    # separately above for standard users).
+                    active_tenant_group = TenantGroup._base_manager.get(pk=session_group_id)
                 except TenantGroup.DoesNotExist:
                     session_group_id = None
                     if 'active_tenant_group_id' in request.session:
@@ -222,7 +225,10 @@ class TenantMiddleware:
                     tenant__group_id=session_group_id
                 ).select_related('tenant', 'tenant__group', 'role')
                 if memberships.exists():
-                    active_tenant_group = TenantGroup.objects.get(pk=session_group_id)
+                    # _base_manager: resolve the active group unscoped (bootstrap —
+                    # the scope isn't established yet; membership access is checked
+                    # separately above for standard users).
+                    active_tenant_group = TenantGroup._base_manager.get(pk=session_group_id)
                     # Use first membership for role-based permission fallback within group
                     active_membership = memberships.first()
                 else:

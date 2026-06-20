@@ -39,7 +39,7 @@ class ProviderSerializer(BaseModelSerializer):
     )
     tenant_group = NestedTenantGroupSerializer(read_only=True)
     tenant_group_id = serializers.PrimaryKeyRelatedField(
-        queryset=TenantGroup.objects.all(),
+        queryset=TenantGroup.objects,
         source='tenant_group', write_only=True, required=False, allow_null=True
     )
     contacts = ContactAssignmentSerializer(many=True, read_only=True)

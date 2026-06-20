@@ -144,18 +144,20 @@ class LocationFilterSet(BaseOrgFilterSet):
 
 # --- TenantGroup Filter ---
 class TenantGroupFilterSet(BaseOrgFilterSet):
+    # Callable queryset → re-evaluated per request through the tenant-scoping
+    # TenantGroup manager, so the filter dropdown only lists accessible groups.
     parent = django_filters.ModelChoiceFilter(
-        queryset=TenantGroup.objects.all(),
+        queryset=lambda request: TenantGroup.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     class Meta:
         model = TenantGroup
         fields = ['name', 'parent']
 
-# --- Tenant Filter --- 
+# --- Tenant Filter ---
 class TenantFilterSet(BaseOrgFilterSet):
     group = django_filters.ModelChoiceFilter(
-        queryset=TenantGroup.objects.all(),
+        queryset=lambda request: TenantGroup.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     class Meta:
