@@ -18,7 +18,7 @@
                     {% translate "Close Campaign & Reconcile" %}
                 </a>
             {% elif object.status == 'completed' %}
-                <a href="{% url 'compliance:auditsession_report_csv' pk=object.pk %}" class="btn btn-outline-secondary">
+                <a href="{% url 'compliance:auditsession_report_csv' pk=object.pk %}" class="btn btn-outline-secondary" download hx-boost="false">
                     <i class="mdi mdi-file-delimited-outline"></i>
                     {% translate "Export CSV" %}
                 </a>
@@ -252,19 +252,19 @@
                 <div class="card-header">
                     <ul class="nav nav-tabs card-header-tabs" data-bs-toggle="tabs">
                         <li class="nav-item">
-                            <a href="?tab=mismatch" data-bs-target="#tab-mismatch" class="nav-link active" data-bs-toggle="tab">
+                            <a href="?tab=mismatch" data-bs-target="#tab-mismatch" class="nav-link active" data-bs-toggle="tab" hx-boost="false">
                                 {% translate "Location Mismatches" %}
                                 <span class="badge bg-warning-lt ms-2">{{ mismatches|length }}</span>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a href="?tab=missing" data-bs-target="#tab-missing" class="nav-link {% if request.GET.tab == 'missing' %}active{% endif %}" data-bs-toggle="tab">
+                            <a href="?tab=missing" data-bs-target="#tab-missing" class="nav-link {% if request.GET.tab == 'missing' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false">
                                 {% translate "Missing Expected Assets" %}
                                 <span class="badge bg-danger-lt ms-2">{{ missing_assets|length }}</span>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a href="?tab=surprise" data-bs-target="#tab-surprise" class="nav-link {% if request.GET.tab == 'surprise' %}active{% endif %}" data-bs-toggle="tab">
+                            <a href="?tab=surprise" data-bs-target="#tab-surprise" class="nav-link {% if request.GET.tab == 'surprise' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false">
                                 {% translate "Surprise Finds" %}
                                 {% if surprise_finds %}
                                     <span class="badge bg-orange-lt ms-2">{{ surprise_finds|length }}</span>
@@ -274,7 +274,7 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a href="?tab=matching" data-bs-target="#tab-matching" class="nav-link {% if request.GET.tab == 'matching' %}active{% endif %}" data-bs-toggle="tab">
+                            <a href="?tab=matching" data-bs-target="#tab-matching" class="nav-link {% if request.GET.tab == 'matching' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false">
                                 {% translate "Verified / Matching" %}
                                 <span class="badge bg-success-lt ms-2">{{ matching|length }}</span>
                             </a>
