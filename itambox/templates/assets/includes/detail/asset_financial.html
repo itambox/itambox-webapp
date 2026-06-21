@@ -19,6 +19,20 @@
         {% endif %}
     </dd>
 
+    <dt class="col-sm-4">{% translate "Cost Center:" %}</dt>
+    <dd class="col-sm-8">
+        {% if object.cost_center %}
+            <a href="{% url 'organization:costcenter_detail' pk=object.cost_center.pk %}">{{ object.cost_center }}</a>
+        {% else %}<span class="text-muted"><i>{% translate "Not Set" %}</i></span>{% endif %}
+    </dd>
+
+    <dt class="col-sm-4">{% translate "Purchase Order:" %}</dt>
+    <dd class="col-sm-8">
+        {% if object.purchase_order_line %}
+            <a href="{{ object.purchase_order_line.purchase_order.get_absolute_url }}">{{ object.purchase_order_line.purchase_order }}</a>
+        {% else %}<span class="text-muted"><i>{% translate "Not linked" %}</i></span>{% endif %}
+    </dd>
+
     <dt class="col-sm-4">{% translate "Estimated value (indicative):" %}</dt>
     <dd class="col-sm-8">
         {% if object.disposed_at %}

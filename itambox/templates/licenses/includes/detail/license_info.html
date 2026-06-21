@@ -16,9 +16,21 @@
          {% endif %}
     </dd>
 
+    <dt class="col-sm-3">{% translate "Version:" %}</dt>
+    <dd class="col-sm-9">{% if object.version %}<code>{{ object.version }}</code>{% else %}<span class="text-muted"><i>{% translate "Any / Unversioned" %}</i></span>{% endif %}</dd>
+
     <dt class="col-sm-3">{% translate "License Type:" %}</dt>
     <dd class="col-sm-9">
         <span class="badge bg-blue-lt text-uppercase">{{ object.get_license_type_display }}</span>
+    </dd>
+
+    <dt class="col-sm-3">{% translate "Funding Subscription:" %}</dt>
+    <dd class="col-sm-9">
+        {% if object.subscription %}
+            <a href="{{ object.subscription.get_absolute_url }}">{{ object.subscription }}</a>
+        {% else %}
+            <span class="text-muted"><i>{% translate "None (perpetual / standalone)" %}</i></span>
+        {% endif %}
     </dd>
 
     <dt class="col-sm-3">{% translate "Assigned Tenant:" %}</dt>
@@ -34,6 +46,15 @@
     <dd class="col-sm-9">
         {% if object.supplier %}
             <a href="{% url 'assets:supplier_detail' pk=object.supplier.pk %}"><strong>{{ object.supplier.name }}</strong></a>
+        {% else %}
+            <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">{% translate "Cost Center:" %}</dt>
+    <dd class="col-sm-9">
+        {% if object.cost_center %}
+            <a href="{% url 'organization:costcenter_detail' pk=object.cost_center.pk %}">{{ object.cost_center }}</a>
         {% else %}
             <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
         {% endif %}

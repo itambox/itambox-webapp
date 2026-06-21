@@ -164,6 +164,17 @@
             </div>
         </div>
 
+        {% if object.tags.all %}
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header border-0 bg-transparent pb-0">
+                <h3 class="card-title text-secondary">{% translate "Tags" %}</h3>
+            </div>
+            <div class="card-body">
+                {% for tag in object.tags.all %}{% include 'inc/tags.html' with tag=tag %}{% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Linked Asset Requests -->
         <div class="card shadow-sm border-0">
             <div class="card-header border-0 bg-transparent pb-0">

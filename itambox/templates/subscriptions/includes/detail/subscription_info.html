@@ -35,7 +35,7 @@
     <dd class="col-sm-9 text-secondary">{{ object.start_date|date:"Y-m-d"|default:"&mdash;" }}</dd>
 
     <dt class="col-sm-3">{% translate "Term:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{{ object.term_months|default:"&mdash;" }} {% translate "months" %}{% if object.billing_cycle %} &middot; {{ object.get_billing_cycle_display }}{% endif %}</dd>
+    <dd class="col-sm-9 text-secondary">{% if object.term_months %}{{ object.term_months }} {% translate "months" %}{% else %}&mdash;{% endif %}{% if object.billing_cycle %} &middot; {{ object.get_billing_cycle_display }}{% endif %}</dd>
 
     <dt class="col-sm-3">{% translate "Next Renewal:" %}</dt>
     <dd class="col-sm-9">
@@ -85,8 +85,14 @@
     <dd class="col-sm-9"><strong>{{ object.licensed_quantity }}</strong></dd>
     {% endif %}
 
-    {% if object.licensed_quantity and assignment_count is not None %}
-    <dt class="col-sm-3">{% translate "Assigned Qty:" %}</dt>
+    <dt class="col-sm-3">{% translate "Seat Usage:" %}</dt>
+    <dd class="col-sm-9">
+        <strong>{{ object.assigned_seats }}</strong> / {{ object.total_seats }}
+        <span class="text-muted ms-1">({{ object.available_seats }} {% translate "available" %})</span>
+    </dd>
+
+    {% if assignment_count is not None %}
+    <dt class="col-sm-3">{% translate "Linked Items:" %}</dt>
     <dd class="col-sm-9"><span class="badge bg-primary">{{ assignment_count }}</span></dd>
     {% endif %}
 </dl>

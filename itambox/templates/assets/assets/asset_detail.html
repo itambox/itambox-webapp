@@ -129,6 +129,8 @@
 {% endblock extra_tabs %}
 
 {% block details_tab %}
+    {# Asset overview metrics (assignment status + installed-software count) #}
+    {% include 'assets/includes/detail/asset_metrics.html' %}
     <div class="row g-3">
         {# --- Left Column: Main area (col-lg-8) --- #}
         <div class="col-12 col-lg-8">
