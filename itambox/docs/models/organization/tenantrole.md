@@ -8,12 +8,10 @@ A **Tenant Role** represents a tenant-specific permission role. It allows tenant
 
 | Field | Description | Type | Required |
 | --- | --- | --- | --- |
-| **Tenant** | The Tenant context this role is bound to. | Foreign Key | Yes |
-| **Name** | The name of the role (e.g., `Auditor`). | String | Yes |
 | **Description** | Optional notes detailing the purpose of the role. | Text | No |
+| **Name** | The name of the role (e.g., `Auditor`). | String | Yes |
 | **Permissions** | A list of string permission keys granted to members of this role (e.g., `["view_asset", "add_assetrequest"]`). | JSON | No |
-
----
+| **Tenant** | The Tenant context this role is bound to. | Foreign Key | Yes |
 
 ## Business Logic
 Tenant Roles enforce granular, tenant-scoped access control (RBAC). All permissions listed in the `permissions` field are checked at the API and GraphQL layers against the active user's active tenant membership.

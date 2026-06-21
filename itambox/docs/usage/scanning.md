@@ -42,15 +42,33 @@ To scan with the camera:
 
 ---
 
-## Find by Scan (`/scan/`)
+## Find by Scan & EAN Resolution (`/scan/`)
 
-The **Find by Scan** view resolves any supported code to the matching asset and redirects you to its detail page. Use it to:
+The **Find by Scan** view resolves any supported code or EAN to the matching target and redirects you to its detail page. The resolution follows a strict hierarchy (tenant-scoped and permission-gated):
 
-- Quickly look up an asset from a printed label.
-- Verify that a code is correctly linked to the expected record.
-- Test scanner hardware before running an audit campaign.
+1. **Asset Match**: If the code matches an `Asset` (by asset tag, serial number, or a deep link like `itambox://asset/<pk>`), it redirects you directly to the asset's detail page.
+2. **AssetType EAN Match**: If the code matches an `AssetType` EAN, it redirects you to the asset list view filtered to that EAN (`/assets/?ean=<ean>`).
+3. **Inventory EAN Match**: If the code matches a `Component`, `Accessory`, or `Consumable` EAN, it redirects you directly to that inventory item's detail page.
 
-If no asset matches, a 404 page is shown. Cross-tenant isolation is enforced: users only see assets belonging to their active tenant.
+If no object matches the scanned code, a 404 error is shown. Tenant scoping is strictly enforced.
+
+---
+
+## Scanner-Driven Bulk Actions
+
+ITAMbox supports scanner-driven bulk actions (check-out, check-in, and disposal) via a unified **Scan Basket** interface. This scales for high-volume transactions and survives request timeouts by running asynchronously.
+
+### The Scan Basket Page
+1. Navigate to the bulk scan basket page (e.g. `Bulk Check-in` at `/assets/bulk-checkin-scan/`, `Bulk Check-out` at `/assets/bulk-checkout-scan/`, or `Bulk Disposal` at `/assets/bulk-dispose-scan/`).
+2. Add assets to the basket using the mobile camera scanner, keyboard-emulated USB barcode scanner, or manual entry.
+3. The frontend (`scan-basket.ts` / `scanner.ts`) implements throttle limits to prevent duplicate scan bursts from registering.
+4. Active warnings (e.g., "Already checked out", "Already disposed") are shown inline for ineligible scanned rows.
+
+### Asynchronous Execution
+Upon clicking submit, the web thread creates a background `Job` tracking record and enqueues the action into `django-q2` worker tasks:
+*   **Bulk Check-in (`bulk_checkin_task`)**: Checks in the basket assets, allowing state overrides (deployable, pending, undeployable) and target location settings.
+*   **Bulk Check-out (`bulk_checkout_task`)**: Checks out the assets to a single chosen target (holder, location, or parent asset) and sets expected return dates.
+*   **Bulk Disposal (`bulk_dispose_task`)**: Disposes of assets, collecting WEEE compliance flags, data sanitization certificates, sanitized-by values, recipients, and asset-specific financial proceeds.
 
 ---
 

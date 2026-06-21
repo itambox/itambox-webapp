@@ -6,14 +6,18 @@ A **Component** represents a physical, modular hardware sub-assembly tracked ins
 
 | Field | Description | Type | Required |
 | --- | --- | --- | --- |
-| **Name** | Unique model name of the component (e.g. `16GB DDR4 SODIMM`). | String | Yes |
-| **Slug** | URL-safe name representation. | Slug | Yes |
-| **Manufacturer** | Hardware developer (e.g. `Crucial`). | Foreign Key | Yes |
+| **Allow Overallocate** | Allow checkout count to exceed stock capacity | Boolean | Yes |
 | **Category** | The asset category. Must have `applies_to__component` enabled. | Foreign Key | Yes |
-| **Part Number / SKU** | Global SKU identifier. | String | No |
+| **Ean** | Barcode (EAN / UPC / GTIN) — scannable to open this item. | String | No |
+| **Manufacturer** | Hardware developer (e.g. `Crucial`). | Foreign Key | Yes |
+| **Min Qty** | Alert threshold quantity | Integer | No |
+| **Name** | Unique model name of the component (e.g. `16GB DDR4 SODIMM`). | String | Yes |
+| **Notes** | The notes of the component (catalog). | Text | No |
+| **Part Number** | SKU or manufacturer part number | String | No |
+| **Slug** | URL-safe name representation. | Slug | Yes |
 | **Specs** | JSON dictionary storing specific technical properties (e.g. speed, latency). | JSON | No |
-| **Min Stock Level** | Safety threshold trigger alert when stock levels drop below this count. | Integer | Yes |
-| **Description** | Optional notes. | Text | No |
+| **Supplier** | The supplier of the component (catalog). | Foreign Key | No |
+| **Tenant** | The tenant of the component (catalog). | Foreign Key | No |
 
 ## Stock & Allocation Lifecycle
 Components reside in local stock repositories before being physically installed into parent servers or workstations. Installing components registers an allocation, deducting quantities from the warehouse stock automatically.

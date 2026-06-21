@@ -6,18 +6,20 @@ A **Site** represents a physical facility, building, office campus, or data cent
 
 | Field | Description | Type | Required |
 | --- | --- | --- | --- |
-| **Name** | The unique, friendly name of the facility (e.g. `HQ Building A`). | String | Yes |
-| **Slug** | A unique URL-friendly representation of the name (e.g. `hq-building-a`). Auto-generated if blank. | Slug | Yes |
-| **Region** | The geographic region where this site belongs (e.g. `Europe`). | Foreign Key | No |
+| **Comments** | Optional internal comments or access notes. | Text | No |
+| **Description** | The description of the site. | String | No |
+| **Facility** | The facility of the site. | String | No |
 | **Group** | The functional or logical site group (e.g. `Corporate Offices`). | Foreign Key | No |
-| **Status** | Current operational status of the site (Active, Planned, Retired). | Choice | Yes |
-| **Time Zone** | Local timezone identifier (e.g. `America/New_York`) for scheduling audits. | String | No |
-| **Physical Address** | The full physical address of the facility. | Text | No |
-| **Shipping Address** | Dedicated shipping address for hardware deliveries. | String | No |
 | **Latitude** | Latitude coordinate of the site for mapping. | Decimal | No |
 | **Longitude** | Longitude coordinate of the site for mapping. | Decimal | No |
+| **Name** | The unique, friendly name of the facility (e.g. `HQ Building A`). | String | Yes |
+| **Physical Address** | The full physical address of the facility. | Text | No |
+| **Region** | The geographic region where this site belongs (e.g. `Europe`). | Foreign Key | No |
+| **Shipping Address** | Dedicated shipping address for hardware deliveries. | String | No |
+| **Slug** | A unique URL-friendly representation of the name (e.g. `hq-building-a`). Auto-generated if blank. | Slug | Yes |
+| **Status** | Current operational status of the site (Active, Planned, Retired). | Choice | Yes |
 | **Tenant** | Optional department or tenant that owns/occupies the site. | Foreign Key | No |
-| **Comments** | Optional internal comments or access notes. | Text | No |
+| **Time Zone** | Local timezone identifier (e.g. `America/New_York`) for scheduling audits. | String | No |
 
 ## Relationships
 

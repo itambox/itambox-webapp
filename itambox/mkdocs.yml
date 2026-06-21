@@ -57,10 +57,11 @@ nav:
       - Tenant Memberships: 'models/organization/tenantmembership.md'
       - Tenant Invitations: 'models/organization/tenantinvitation.md'
       - Asset Holders: 'models/organization/assetholder.md'
-      - Holder Assignments: 'models/organization/assetholderassignment.md'
       - Contacts: 'models/organization/contact.md'
       - Contact Roles: 'models/organization/contactrole.md'
       - Contact Assignments: 'models/organization/contactassignment.md'
+      - Cost Centers: 'models/organization/costcenter.md'
+      - Users: 'models/auth/user.md'
   - Physical Assets:
       - Assets: 'models/assets/asset.md'
       - Asset Roles: 'models/assets/assetrole.md'
@@ -74,6 +75,9 @@ nav:
       - Audit Sessions: 'models/assets/auditsession.md'
       - Asset Assignments: 'models/assets/assetassignment.md'
       - Suppliers: 'models/assets/supplier.md'
+      - Warranties: 'models/assets/warranty.md'
+      - Asset Reservations: 'models/assets/assetreservation.md'
+      - Asset Disposals: 'models/assets/assetdisposal.md'
   - Hardware Components:
       - Components: 'models/components/component.md'
       - Component Stock: 'models/components/componentstock.md'
@@ -94,6 +98,11 @@ nav:
       - SaaS Subscriptions: 'models/subscriptions/subscription.md'
       - SaaS Providers: 'models/subscriptions/provider.md'
       - Subscription Assignments: 'models/subscriptions/subscriptionassignment.md'
+  - Procurement:
+      - Purchase Orders: 'models/procurement/purchaseorder.md'
+      - Purchase Order Lines: 'models/procurement/purchaseorderline.md'
+      - Contracts: 'models/procurement/contract.md'
+      - Fulfillment Links: 'models/procurement/fulfillmentlink.md'
   - Operations & Compliance:
       - Asset Maintenances: 'models/compliance/assetmaintenance.md'
       - Custody Templates: 'models/compliance/custodytemplate.md'
@@ -101,6 +110,22 @@ nav:
       - DocuSign Envelopes: 'models/itambox_esign/docusignenvelope.md'
       - Metadata Tags: 'models/extras/tag.md'
       - Object Changelog: 'models/core/objectchange.md'
+      - Jobs: 'models/core/job.md'
+  - Alerting & Notifications:
+      - Alert Log: 'models/extras/alertlog.md'
+      - Alert Rules: 'models/extras/alertrule.md'
+      - Notification Channels: 'models/extras/notificationchannel.md'
+  - Reporting:
+      - Report Templates: 'models/extras/reporttemplate.md'
+      - Scheduled Reports: 'models/extras/scheduledreport.md'
+  - Customization & Automation:
+      - Custom Fields: 'models/extras/customfield.md'
+      - Custom Fieldsets: 'models/extras/customfieldset.md'
+      - Saved Filters: 'models/extras/savedfilter.md'
+      - Export Templates: 'models/extras/exporttemplate.md'
+      - Label Templates: 'models/extras/labeltemplate.md'
+      - Webhooks: 'models/extras/webhookendpoint.md'
+      - Event Rules: 'models/extras/eventrule.md'
   - Guides:
       - Scanning Assets: 'usage/scanning.md'
       - Depreciation Guide: 'usage/depreciation.md'

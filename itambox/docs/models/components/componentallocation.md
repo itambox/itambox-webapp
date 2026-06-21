@@ -6,11 +6,14 @@ A **Component Allocation** represents a physical installation mapping record, re
 
 | Field | Description | Type | Required |
 | --- | --- | --- | --- |
+| **Assigned Asset** | The assigned asset of the component allocation. | Foreign Key | No |
+| **Assigned Date** | The assigned date of the component allocation. | Date Time | Yes |
+| **Assigned Holder** | The assigned holder of the component allocation. | Foreign Key | No |
+| **Assigned Location** | The assigned location of the component allocation. | Foreign Key | No |
 | **Component** | The catalog modular part being allocated. | Foreign Key | Yes |
-| **Asset** | The parent physical asset receiving the parts. | Foreign Key | Yes |
 | **From Location** | The physical Site Location room warehouse from which the stock is pulled. | Foreign Key | No |
-| **Quantity Allocated** | Quantity of components physically installed. | Integer | Yes |
-| **Allocated At** | Timestamp of allocation execution. | DateTime | Yes |
+| **Notes** | The notes of the component allocation. | Text | No |
+| **Qty** | The checkout quantity of the component allocation. | Integer | Yes |
 
 ## Automated Stock Control
 * **On Creation**: Trigger signals automatically decrement the allocated quantity from the defined `From Location` warehouse stock.

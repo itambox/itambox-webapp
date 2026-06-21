@@ -17,14 +17,13 @@ Through generic relations, subscriptions can be assigned polymorphicly to:
 
 | Field | Description | Type | Required |
 | --- | --- | --- | --- |
-| **Subscription** | The parent Subscription being allocated. | Foreign Key | Yes |
-| **Content Type** | The target model type (Asset, Holder, Location, etc.). | Content Type | Yes |
-| **Object ID** | The unique database ID of the target entity. | Integer | Yes |
-| **Assigned Date** | Timestamp when the assignment occurred. | DateTime | Yes (Auto) |
 | **Assigned By** | The User who created the subscription allocation. | Foreign Key | No |
+| **Assigned Date** | Timestamp when the assignment occurred. | DateTime | Yes (Auto) |
+| **Assigned Object** | The assigned object of the subscription assignment. | GenericForeignKey | Yes |
+| **Content Type** | The target model type (Asset, Holder, Location, etc.). | Content Type | Yes |
 | **Notes** | Optional assignment details (e.g. usage justification). | Text | No |
-
----
+| **Object ID** | The unique database ID of the target entity. | Integer | Yes |
+| **Subscription** | The parent Subscription being allocated. | Foreign Key | Yes |
 
 ## Constraints
 To prevent seat overallocation or double-assignments, a `UniqueConstraint` enforces that a specific entity can only be assigned to a specific subscription once.

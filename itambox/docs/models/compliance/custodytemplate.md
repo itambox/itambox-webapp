@@ -10,20 +10,18 @@ Custody Templates can be scoped globally, to specific Tenant Groups (e.g. parent
 
 | Field | Description | Type | Required |
 | --- | --- | --- | --- |
+| **Category** | The asset category this template overrides for the specified scope. | Foreign Key | No |
+| **Disclaimer** | Short disclaimer printed at the bottom of the signoff receipt. | Text | No |
+| **Email Signature Request** | Sends an email containing a secure signature link to the holder. | Boolean | Yes |
+| **EULA Text** | The legal terms of service shown to the end-user. | Text | Yes |
+| **Is Active** | Deactivate to hide from choices | Boolean | Yes |
+| **Logo** | Custom corporate logo printed on the receipt. | Image | No |
 | **Name** | Descriptive name for this template (e.g. *Standard Laptop EULA*). | String | Yes |
+| **QMS Reference** | Reference ID mapping to an internal Quality Management System document. | String | No |
+| **Require Acceptance** | If checked, checkout blocks/restricts asset status until signed. | Boolean | Yes |
+| **Signature Provider** | The service handling the signature process (e.g., `local` for on-platform canvas, or plugin integrations like `docusign`). | String | Yes |
 | **Tenant** | The specific Tenant scope that this template applies to. | Foreign Key | No |
 | **Tenant Group** | The Tenant Group scope that this template applies to. | Foreign Key | No |
-| **Category** | The asset category this template overrides for the specified scope. | Foreign Key | No |
-| **Signature Provider** | The service handling the signature process (e.g., `local` for on-platform canvas, or plugin integrations like `docusign`). | String | Yes |
-| **Require Acceptance** | If checked, checkout blocks/restricts asset status until signed. | Boolean | Yes |
-| **Email Signature Request**| Sends an email containing a secure signature link to the holder. | Boolean | Yes |
-| **EULA Text** | The legal terms of service shown to the end-user. | Text | Yes |
-| **Disclaimer** | Short disclaimer printed at the bottom of the signoff receipt. | Text | No |
-| **Logo** | Custom corporate logo printed on the receipt. | Image | No |
-| **QMS Reference** | Reference ID mapping to an internal Quality Management System document. | String | No |
-| **Active** | Deactivate to retire this template without purging records. | Boolean | Yes |
-
----
 
 ## EULA Overrides & Precedence
 

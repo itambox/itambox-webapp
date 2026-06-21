@@ -45,8 +45,7 @@ https://your-itambox-instance.com/api/
 |               | `/api/assets/asset-roles/`                         | Manage asset roles                       |
 |               | `/api/assets/asset-assignments/`                   | Manage asset assignments to users        |
 | **Compliance**| `/api/compliance/...`                              | Compliance checks and policies           |
-| **Components**| `/api/components/...`                              | Hardware/software components             |
-| **Inventory** | `/api/inventory/...`                               | Inventory management                     |
+| **Inventory** | `/api/inventory/...`                               | Inventory management (components, accessories, consumables, kits) |
 | **Licenses**  | `/api/licenses/...`                                | License management                       |
 | **Organization**| `/api/organization/sites/`                       | Manage sites                             |
 |               | `/api/organization/locations/`                     | Manage locations                         |
