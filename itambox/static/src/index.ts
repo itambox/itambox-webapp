@@ -27,4 +27,5 @@ import './permission-matrix';
 import './beta-banner';
 import './command-k';
 import './inline-actions';
+import './bulk-receive';
 
