@@ -1,0 +1,35 @@
+{% load i18n %}
+<dl class="row mb-0">
+    <dt class="col-sm-3">{% translate "Name:" %}</dt>
+    <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
+
+    <dt class="col-sm-3">{% translate "Code:" %}</dt>
+    <dd class="col-sm-9"><code>{{ object.code }}</code></dd>
+
+    <dt class="col-sm-3">{% translate "Parent:" %}</dt>
+    <dd class="col-sm-9">
+        {% if object.parent %}
+            <a href="{% url 'organization:costcenter_detail' pk=object.parent.pk %}">{{ object.parent.name }}</a>
+        {% else %}
+            <span class="text-muted"><i>{% translate "None (top-level cost center)" %}</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">{% translate "Tenant:" %}</dt>
+    <dd class="col-sm-9">
+        {% if object.tenant %}
+            <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant }}</a>
+        {% else %}
+            <span class="text-muted"><i>{% translate "Global" %}</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">{% translate "Status:" %}</dt>
+    <dd class="col-sm-9">
+        {% if object.is_active %}
+            <span class="badge bg-success-lt">{% translate "Active" %}</span>
+        {% else %}
+            <span class="badge bg-secondary-lt">{% translate "Inactive" %}</span>
+        {% endif %}
+    </dd>
+</dl>

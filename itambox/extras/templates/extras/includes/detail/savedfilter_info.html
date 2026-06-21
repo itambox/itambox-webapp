@@ -1,0 +1,45 @@
+{% load i18n %}
+<dl class="row mb-0">
+    <dt class="col-sm-3">{% translate "Name:" %}</dt>
+    <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
+
+    <dt class="col-sm-3">{% translate "Applies To:" %}</dt>
+    <dd class="col-sm-9">{{ object.content_type.model|capfirst }}</dd>
+
+    <dt class="col-sm-3">{% translate "Shared:" %}</dt>
+    <dd class="col-sm-9">
+        {% if object.shared %}
+            <span class="badge bg-info-lt">{% translate "Shared with tenant" %}</span>
+        {% else %}
+            <span class="badge bg-secondary-lt">{% translate "Private (owner only)" %}</span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">{% translate "Enabled:" %}</dt>
+    <dd class="col-sm-9">
+        {% if object.enabled %}
+            <span class="badge bg-success-lt">{% translate "Enabled" %}</span>
+        {% else %}
+            <span class="badge bg-secondary-lt">{% translate "Disabled" %}</span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">{% translate "Owner:" %}</dt>
+    <dd class="col-sm-9">
+        {% if object.created_by %}{{ object.created_by }}{% else %}<span class="text-muted"><i>{% translate "System" %}</i></span>{% endif %}
+    </dd>
+
+    <dt class="col-sm-3">{% translate "Scope:" %}</dt>
+    <dd class="col-sm-9">
+        {% if object.tenant %}
+            <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant }}</a>
+        {% else %}
+            <span class="text-muted"><i>{% translate "Global (system-wide)" %}</i></span>
+        {% endif %}
+    </dd>
+
+    <dt class="col-sm-3">{% translate "Parameters:" %}</dt>
+    <dd class="col-sm-9">
+        {% if object.parameters %}<pre class="mb-0 small bg-body-tertiary rounded p-2">{{ object.parameters }}</pre>{% else %}<span class="text-muted"><i>{% translate "None" %}</i></span>{% endif %}
+    </dd>
+</dl>
