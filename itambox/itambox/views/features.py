@@ -25,7 +25,7 @@ from core.tables import (
     EventRuleTable, LabelTemplateTable
 )
 from core.forms import JournalEntryForm
-from extras.forms import WebhookEndpointForm, EventRuleForm, LabelTemplateForm, ObjectChangeFilterForm
+from extras.forms import WebhookEndpointForm, EventRuleForm, ExportTemplateForm, LabelTemplateForm, ObjectChangeFilterForm
 from core.filters import ObjectChangeFilterSet
 from itambox.registry import registry
 from itambox.panels import Panel
@@ -263,10 +263,26 @@ class ObjectExportView(LoginRequiredMixin, View):
 
         content_type = ContentType.objects.get_for_model(model)
         template = get_object_or_404(ExportTemplate, pk=template_id, content_type=content_type)
-        content = template.render_queryset(queryset)
+        try:
+            content = template.render(queryset)
+        except Exception as exc:
+            # Template code is author-controlled and can fail at render time (undefined
+            # variable, type error, sandbox violation). Never surface a 500 — flash the
+            # error and send the user back where they came from, NetBox-style.
+            logger.warning("Export template %s render failed: %s", template.pk, exc)
+            messages.error(request, _(
+                'There was an error rendering the export template "%(name)s": %(error)s'
+            ) % {'name': template.name, 'error': exc})
+            return HttpResponseRedirect(safe_return_url(
+                request, request.META.get('HTTP_REFERER'), template.get_absolute_url(),
+            ))
 
-        response = HttpResponse(content, content_type=template.mime_type)
-        response['Content-Disposition'] = f'attachment; filename="{model_name}_export.{template.file_extension}"'
+        response = HttpResponse(content, content_type=template.mime_type or ExportTemplate.DEFAULT_MIME_TYPE)
+        # mime_type AND the rendered body are author-controlled (could be HTML/SVG);
+        # stop the browser content-sniffing its way into executing them.
+        response['X-Content-Type-Options'] = 'nosniff'
+        if template.as_attachment:
+            response['Content-Disposition'] = f'attachment; filename="{template.get_export_filename(model)}"'
         return response
 
 
@@ -292,14 +308,27 @@ class ExportTemplateDetailView(ObjectDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = str(self.get_object())
+        obj = self.get_object()
+        context['title'] = str(obj)
+        # Expose the target model so the panel can link "Run this export" to the
+        # live export endpoint — but only when the viewer actually holds
+        # view_<target_model>. ObjectExportView 404s without it, so showing the
+        # button to a user who lacks the perm would just dead-end on a 404.
+        target_model = obj.content_type.model_class()
+        if target_model is not None:
+            app_label = target_model._meta.app_label
+            model_name = target_model._meta.model_name
+            if self.request.user.has_perm(f'{app_label}.view_{model_name}'):
+                context['target_app_label'] = app_label
+                context['target_model_name'] = model_name
+                context['target_model_verbose'] = target_model._meta.verbose_name_plural
         return context
 
 
 @method_decorator(login_required, name='dispatch')
 class ExportTemplateEditView(ObjectEditView):
     queryset = ExportTemplate.objects.all()
-    fields = ['name', 'description', 'content_type', 'template_code', 'mime_type', 'file_extension']
+    model_form = ExportTemplateForm
 
     def has_permission(self):
         # ExportTemplate is a global, admin-managed resource with NO tenant field — its

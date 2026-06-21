@@ -309,7 +309,7 @@ import json as _json
 
 from django.contrib.contenttypes.models import ContentType
 from crispy_forms.layout import Layout, Field, HTML, Div, Submit, Row, Column, Fieldset
-from .models import WebhookEndpoint, EventRule, Event, LabelTemplate, ReportTemplate, ScheduledReport, AlertRule, NotificationChannel
+from .models import WebhookEndpoint, EventRule, Event, ExportTemplate, LabelTemplate, ReportTemplate, ScheduledReport, AlertRule, NotificationChannel
 from itambox.middleware import get_current_user
 
 
@@ -328,6 +328,27 @@ def logged_content_types():
         if model is None:
             continue
         if issubclass(model, ChangeLoggingMixin) and model.__name__ not in _SIGNAL_SKIP_MODELS:
+            ids.append(ct.id)
+    return ContentType.objects.filter(id__in=ids).order_by('app_label', 'model')
+
+
+def exportable_content_types():
+    """ContentTypes whose model is user-exportable (see ``is_model_importable``).
+
+    An ExportTemplate pointed at a generated-log / UI-only model could never be
+    reached from a list view's export menu, so constraining the dropdown to real
+    domain models keeps authors out of that dead-end — and keeps the picker free
+    of the hundreds of internal ContentTypes (sessions, permissions, tokens, …)
+    that a bare ``content_type`` field would otherwise list.
+    """
+    from core.forms.import_forms import is_model_importable
+
+    ids = []
+    for ct in ContentType.objects.all():
+        model = ct.model_class()
+        if model is None:
+            continue
+        if is_model_importable(model):
             ids.append(ct.id)
     return ContentType.objects.filter(id__in=ids).order_by('app_label', 'model')
 
@@ -632,6 +653,101 @@ class LabelTemplateForm(forms.ModelForm):
                 'data-no-dirty-track="true">' + str(_('Cancel')) + '</a>'
             ),
         )
+
+
+class ExportTemplateForm(forms.ModelForm):
+    """Author a global ExportTemplate (superuser-only; see ExportTemplateEditView).
+
+    Curates ``content_type`` to exportable domain models and validates that
+    ``template_code`` actually compiles in the sandbox used at render time, so a
+    broken template is rejected here rather than 500-ing a member's export later.
+    """
+
+    class Meta:
+        model = ExportTemplate
+        fields = [
+            'name', 'content_type', 'description', 'template_code',
+            'mime_type', 'file_extension', 'as_attachment',
+        ]
+        widgets = {
+            'description': forms.Textarea(attrs={'rows': 2}),
+            'template_code': forms.Textarea(attrs={
+                'rows': 16,
+                'class': 'font-monospace',
+                'spellcheck': 'false',
+                'data-no-dirty-track': 'false',
+            }),
+        }
+        help_texts = {
+            'template_code': _(
+                'Jinja2 template rendered once over the whole result set. The full '
+                'queryset is available as <code>queryset</code> — loop it with '
+                '<code>{% for obj in queryset %}…{% endfor %}</code> and emit your own '
+                'header row. Built-in filters such as <code>|tojson</code> are available.'
+            ),
+            'mime_type': _('Sent as the Content-Type header, e.g. text/csv or application/json.'),
+            'file_extension': _('Appended to the download filename (without a leading dot).'),
+            'as_attachment': _('Download the result as a file. Disable to render inline in the browser (useful for previewing).'),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['content_type'].queryset = exportable_content_types()
+        self.fields['content_type'].label = _('Model')
+        self.fields['content_type'].help_text = _('The object type this template can export.')
+        self.fields['file_extension'].required = False
+
+        self.helper = FormHelper()
+        self.helper.layout = Layout(
+            Fieldset(
+                _('Identity'),
+                Row(
+                    Column('name', css_class='col-md-7'),
+                    Column('content_type', css_class='col-md-5'),
+                    css_class='row g-3',
+                ),
+                'description',
+            ),
+            Fieldset(
+                _('Output'),
+                Row(
+                    Column('mime_type', css_class='col-md-6'),
+                    Column('file_extension', css_class='col-md-3'),
+                    Column('as_attachment', css_class='col-md-3 d-flex align-items-end'),
+                    css_class='row g-3',
+                ),
+            ),
+            Fieldset(
+                _('Template'),
+                'template_code',
+            ),
+            HTML('<div class="mt-4"></div>'),
+            Submit('submit', _('Save Export Template'), css_class='btn btn-primary'),
+            HTML(
+                '<a href="{% url \'extras:exporttemplate_list\' %}" class="btn btn-outline-secondary ms-2" '
+                'data-no-dirty-track="true">' + str(_('Cancel')) + '</a>'
+            ),
+        )
+
+    def clean_file_extension(self):
+        # Normalise: drop a leading dot and lowercase so filenames stay tidy.
+        ext = (self.cleaned_data.get('file_extension') or '').strip().lstrip('.').lower()
+        return ext
+
+    def clean_template_code(self):
+        code = self.cleaned_data.get('template_code') or ''
+        # inline import: jinja2 is only needed when validating template authoring,
+        # not on every forms.py import.
+        from jinja2 import TemplateSyntaxError
+        try:
+            ExportTemplate.get_jinja_environment().from_string(code)
+        except TemplateSyntaxError as exc:
+            raise forms.ValidationError(
+                _('Template syntax error on line %(line)s: %(message)s') % {
+                    'line': exc.lineno, 'message': exc.message,
+                }
+            )
+        return code
 
 
 class ReportTemplateForm(forms.ModelForm):

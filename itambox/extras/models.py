@@ -12,6 +12,7 @@ from core.managers import (
 )
 from core.mixins import SoftDeleteMixin, BookmarkableMixin
 from core.validators import validate_image_attachment, validate_file_attachment
+from core.csv_utils import csv_safe, safe_csv_filename
 
 
 class Tag(ChangeLoggingMixin, BaseModel, SoftDeleteMixin, BookmarkableMixin):
@@ -554,12 +555,23 @@ class FileAttachment(ChangeLoggingMixin, BaseModel):
 
 
 class ExportTemplate(BaseModel):
+    # Fallback Content-Type when ``mime_type`` is left blank (NetBox parity).
+    DEFAULT_MIME_TYPE = 'text/plain; charset=utf-8'
+
     name = models.CharField(max_length=255, verbose_name=_("Name"))
     description = models.TextField(blank=True, verbose_name=_("Description"))
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='export_templates', verbose_name=_("Content Type"))
-    template_code = models.TextField(verbose_name=_("Template Code"), help_text=_("Jinja2 or Django template code for export"))
-    mime_type = models.CharField(max_length=50, default='text/csv', verbose_name=_("MIME Type"), help_text=_("MIME type for the exported file"))
-    file_extension = models.CharField(max_length=10, default='csv', verbose_name=_("File Extension"))
+    template_code = models.TextField(
+        verbose_name=_("Template Code"),
+        help_text=_("Jinja2 template rendered once over the whole result set, which is available as `queryset`."),
+    )
+    mime_type = models.CharField(max_length=50, default='text/csv', blank=True, verbose_name=_("MIME Type"), help_text=_("MIME type for the exported file"))
+    file_extension = models.CharField(max_length=10, default='csv', blank=True, verbose_name=_("File Extension"))
+    as_attachment = models.BooleanField(
+        default=True,
+        verbose_name=_("Download as attachment"),
+        help_text=_("Serve the rendered output as a file download. Disable to display it inline in the browser."),
+    )
 
     class Meta:
         ordering = ['content_type', 'name']
@@ -578,20 +590,55 @@ class ExportTemplate(BaseModel):
     def get_absolute_url(self):
         return reverse('extras:exporttemplate_detail', kwargs={'pk': self.pk})
 
-    def render(self, obj):
-        from jinja2.sandbox import SandboxedEnvironment
-        env = SandboxedEnvironment()
-        template = env.from_string(self.template_code)
-        return template.render(obj=obj)
+    @staticmethod
+    def get_jinja_environment(autoescape=False):
+        """A hardened sandboxed Jinja2 environment for rendering export templates.
 
-    def render_queryset(self, queryset):
-        from jinja2.sandbox import SandboxedEnvironment
-        env = SandboxedEnvironment()
+        Built on ``ImmutableSandboxedEnvironment`` (blocks dunder access + builtin
+        mutation gadgets), with the documented SSTI sandbox-escape primitives
+        (``|attr``, ``|format``, ``|format_map``, ``|map``, ``|pprint``, ``|xmlattr``)
+        and gadget globals (``cycler``/``joiner``/``namespace``/``lipsum``) removed.
+        Authoring is already restricted to superusers, so this is defence-in-depth.
+
+        We deliberately never expose Jinja ``Environment`` parameters (``finalize``,
+        ``undefined``, …) to stored template data — that is the CVE-2026-29514 RCE
+        vector in NetBox's analogous ExportTemplate.
+        """
+        # inline import: jinja2 is a render-only dependency; keep it off the
+        # import-time path of extras.models.
+        from jinja2.sandbox import ImmutableSandboxedEnvironment
+
+        env = ImmutableSandboxedEnvironment(autoescape=autoescape)
+        for unsafe_filter in ('attr', 'format', 'format_map', 'map', 'pprint', 'xmlattr'):
+            env.filters.pop(unsafe_filter, None)
+        for unsafe_global in ('cycler', 'joiner', 'namespace', 'lipsum'):
+            env.globals.pop(unsafe_global, None)
+        # Useful, safe export helper: neutralise spreadsheet formula injection.
+        env.filters['csv_safe'] = csv_safe
+        return env
+
+    def _autoescape_for_output(self):
+        # Escape interpolated {{ ... }} only for markup output (HTML/XHTML/SVG/XML),
+        # where unescaped tenant data would be stored XSS or break the document. CSV/
+        # JSON/plain text MUST stay un-escaped, or the rendered document is corrupted.
+        mime = (self.mime_type or '').lower()
+        return 'html' in mime or 'svg' in mime or 'xml' in mime
+
+    def render(self, queryset):
+        """Render the entire queryset in a single pass (NetBox-style).
+
+        The template author iterates the rows themselves via ``queryset`` and emits
+        any header. Returns the rendered string with CRLF normalised to LF.
+        """
+        env = self.get_jinja_environment(autoescape=self._autoescape_for_output())
         template = env.from_string(self.template_code)
-        results = []
-        for obj in queryset:
-            results.append(template.render(obj=obj))
-        return '\n'.join(results)
+        output = template.render(queryset=queryset)
+        return output.replace('\r\n', '\n')
+
+    def get_export_filename(self, model):
+        """ASCII-safe download filename for this template applied to ``model``."""
+        ext = f".{self.file_extension}" if self.file_extension else ""
+        return safe_csv_filename(f"{model._meta.model_name}_export{ext}", default=f"export{ext}")
 
 
 class LabelTemplate(ChangeLoggingMixin, BaseModel):
