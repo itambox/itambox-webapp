@@ -19,13 +19,4 @@
         <small class="text-muted">{% translate "(assets at or below this cost are immediately expensed)" %}</small>
     </dd>
     {% endif %}
-
-    <dt class="col-sm-3">{% translate "Description:" %}</dt>
-    <dd class="col-sm-9 text-secondary">
-        {% if object.description %}
-            {{ object.description|linebreaksbr }}
-        {% else %}
-            <i class="text-muted">{% translate "No description." %}</i>
-        {% endif %}
-    </dd>
 </dl>

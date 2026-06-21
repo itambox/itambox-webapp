@@ -10,45 +10,8 @@
 {# Object details rendered via panel layout #}
 
 {% block extra_cards_right %}
-<div class="card mb-3 border-0 shadow-sm">
-    <div class="card-header border-0 bg-transparent">
-        <h3 class="card-title text-secondary d-flex align-items-center">
-            <i class="mdi mdi-currency-usd me-2 text-green"></i>
-            {% translate "Financial Details" %}
-        </h3>
-    </div>
-    <div class="card-body">
-        <dl class="row mb-0">
-            <dt class="col-5">{% translate "Renewal Cost:" %}</dt>
-            <dd class="col-7">
-                {% if object.renewal_cost %}
-                    <strong>{{ object.renewal_cost|floatformat:2 }} {{ object.currency }}</strong>
-                {% else %}—{% endif %}
-            </dd>
-
-            <dt class="col-5">{% translate "Billing Cycle:" %}</dt>
-            <dd class="col-7 text-secondary">{{ object.get_billing_cycle_display|default:"—" }}</dd>
-
-            {% if object.annual_cost %}
-            <dt class="col-5">{% translate "Est. Annual:" %}</dt>
-            <dd class="col-7"><strong>{{ object.annual_cost|floatformat:2 }} {{ object.currency }}</strong></dd>
-            {% endif %}
-
-            {% if object.licensed_quantity %}
-            <dt class="col-5">{% translate "Licensed Qty:" %}</dt>
-            <dd class="col-7{% if object.licensed_quantity < 10 %} text-warning{% endif %}"><strong>{{ object.licensed_quantity }}</strong></dd>
-            {% endif %}
-
-            {% if object.licensed_quantity and assignment_count %}
-            <dt class="col-5">{% translate "Assigned:" %}</dt>
-            <dd class="col-7">
-                <span class="badge bg-primary">{{ assignment_count }}</span>
-            </dd>
-            {% endif %}
-        </dl>
-    </div>
-</div>
-
+{# Financial fields (renewal/annual cost, billing cycle, licensed/assigned qty) live #}
+{# in the info panel (subscription_info.html) — no duplicate Financial Details card here. #}
 {% if object.provider.portal_url %}
 <a href="{{ object.provider.portal_url }}" class="btn btn-outline-primary d-inline-flex align-items-center w-100 justify-content-center mb-3" target="_blank" rel="noopener">
     <i class="mdi mdi-open-in-new me-1"></i>

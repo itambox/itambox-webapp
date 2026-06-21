@@ -14,16 +14,4 @@
             <i>{% translate "None" %}</i>
         {% endif %}
     </dd>
-
-    <dt class="col-sm-3">{% translate "Description:" %}</dt>
-    <dd class="col-sm-9">{% if object.description %}{{object.description}}{% else %}<i>{% translate "None" %}</i>{% endif %}</dd>
-
-    {% if object.tags.all %}
-    <dt class="col-sm-3">{% translate "Tags:" %}</dt>
-    <dd class="col-sm-9">
-        {% for tag in object.tags.all %}
-            {% include 'inc/tags.html' with tag=tag %}
-        {% endfor %}
-    </dd>
-    {% endif %}
 </dl>

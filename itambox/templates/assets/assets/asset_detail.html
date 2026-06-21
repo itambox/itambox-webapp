@@ -190,23 +190,7 @@
             </div>
             {% endif %}
             
-            {% if object.comments %}
-            <div class="card mb-3 shadow-sm">
-                <div class="card-header border-0 bg-transparent">
-                    <h3 class="card-title text-secondary">{% translate "Comments" %}</h3>
-                </div>
-                <div class="card-body pt-0">{{ object.comments|linebreaksbr }}</div>
-            </div>
-            {% endif %}
-
-            {% if object.description %}
-            <div class="card mb-3 shadow-sm">
-                <div class="card-header border-0 bg-transparent">
-                    <h3 class="card-title text-secondary">{% translate "Description" %}</h3>
-                </div>
-                <div class="card-body pt-0">{{ object.description|linebreaksbr }}</div>
-            </div>
-            {% endif %}
+            {# Asset has no `comments` or `description` field (only `notes`, above); dead cards removed. #}
         </div>
 
         {# --- Right Column: Sidebar (col-lg-4) --- #}
