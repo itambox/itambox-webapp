@@ -180,7 +180,7 @@ class SeedAssetsMixin:
             # AssetTagSequence. Tag-derived fields (hostname, display name) are filled
             # in the second save, once the generated tag is known.
             asset = Asset(
-                name=f"{atype.model} (provisioning)", asset_tag='', asset_type=atype, asset_role=role,
+                name=atype.model, asset_tag='', asset_type=atype, asset_role=role,
                 status=self._status_labels[status_slug], location=base_location, tenant=tenant,
                 serial_number=f"{code}{random.randint(100000, 999999)}", purchase_cost=cost,
                 salvage_value=salvage, purchase_date=p_date, in_service_date=in_service,
@@ -212,9 +212,10 @@ class SeedAssetsMixin:
                       'firmware_version': f"v{random.randint(7, 17)}.{random.randint(0, 12)}.{random.randint(0, 9)}"}
             elif fs_name == 'AV & Conference Specs':
                 cv = {'mounted_state': random.choice(['Wall-Mounted', 'Table-Top'])}
-            asset.name = f"{atype.model} ({tag})"
+            # Name is the model only (e.g. "Catalyst 9300"); the unique asset_tag is its
+            # own field and column, not baked into the display name.
             asset.custom_field_data = cv
-            asset.save(update_fields=['name', 'custom_field_data'])
+            asset.save(update_fields=['custom_field_data'])
             if tags:
                 asset.tags.add(*[self._tags[t] for t in tags if t in self._tags])
             if status_slug == 'in-use' and holder:

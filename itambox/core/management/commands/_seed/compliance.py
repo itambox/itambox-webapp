@@ -93,7 +93,7 @@ class SeedComplianceMixin:
                     completed_at = _as_dt(close_date)
 
                 quarter_label = f"Q{((audit_date.month - 1) // 3) + 1} {audit_date.year}"
-                session_name = f"{tenant.name} — {quarter_label} Asset Audit"
+                session_name = f"{quarter_label} Asset Audit"
                 engineer = random.choice(actors)
 
                 session = AuditSession.objects.create(
