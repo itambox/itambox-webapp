@@ -50,78 +50,78 @@
 {% block extra_tabs %}
     {% if object.is_modular %}
     <li class="nav-item" role="presentation">
-        <a href="?tab=components" data-bs-target="#components" class="nav-link {% if request.GET.tab == 'components' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=components" data-bs-target="#components" class="nav-link {% if request.GET.tab == 'components' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-chip me-1 text-teal"></i>
             {% translate "Components" %} <span class="badge bg-teal-lt ms-2">{{ object.component_allocations.count }}</span>
         </a>
     </li>
     {% endif %}
-    {% if object.accessory_assignments.exists %}
+    {% if accessory_table.rows %}
     <li class="nav-item" role="presentation">
-        <a href="?tab=accessories" data-bs-target="#accessories" class="nav-link {% if request.GET.tab == 'accessories' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=accessories" data-bs-target="#accessories" class="nav-link {% if request.GET.tab == 'accessories' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-application-outline me-1 text-azure"></i>
-            {% translate "Accessories" %} <span class="badge bg-azure-lt ms-2">{{ object.accessory_assignments.count }}</span>
+            {% translate "Accessories" %} <span class="badge bg-azure-lt ms-2">{{ accessory_table.rows|length }}</span>
         </a>
     </li>
     {% endif %}
-    {% if object.consumable_consumptions.exists %}
+    {% if consumable_table.rows %}
     <li class="nav-item" role="presentation">
-        <a href="?tab=consumables" data-bs-target="#consumables" class="nav-link {% if request.GET.tab == 'consumables' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=consumables" data-bs-target="#consumables" class="nav-link {% if request.GET.tab == 'consumables' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-package-variant-closed me-1 text-orange"></i>
-            {% translate "Consumables" %} <span class="badge bg-orange-lt ms-2">{{ object.consumable_consumptions.count }}</span>
+            {% translate "Consumables" %} <span class="badge bg-orange-lt ms-2">{{ consumable_table.rows|length }}</span>
         </a>
     </li>
     {% endif %}
     <li class="nav-item" role="presentation">
-        <a href="?tab=maintenances" data-bs-target="#maintenances" class="nav-link {% if request.GET.tab == 'maintenances' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=maintenances" data-bs-target="#maintenances" class="nav-link {% if request.GET.tab == 'maintenances' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-tools me-1 text-red"></i>
             {% translate "Maintenances" %} <span class="badge bg-red-lt ms-2">{{ object.maintenances.count }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="?tab=software" data-bs-target="#software" class="nav-link {% if request.GET.tab == 'software' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=software" data-bs-target="#software" class="nav-link {% if request.GET.tab == 'software' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-application-outline me-1 text-purple"></i>
             {% translate "Software" %} <span class="badge bg-purple-lt ms-2">{{ object.installed_software.count }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="?tab=requests" data-bs-target="#requests" class="nav-link {% if request.GET.tab == 'requests' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=requests" data-bs-target="#requests" class="nav-link {% if request.GET.tab == 'requests' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-clipboard-text-outline me-1 text-yellow"></i>
             {% translate "Requests" %} <span class="badge bg-yellow-lt ms-2">{{ object.requests.count }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="?tab=audits" data-bs-target="#audits" class="nav-link {% if request.GET.tab == 'audits' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=audits" data-bs-target="#audits" class="nav-link {% if request.GET.tab == 'audits' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-checkbox-marked-circle-outline me-1 text-cyan"></i>
             {% translate "Audits" %} <span class="badge bg-cyan-lt ms-2">{{ object.audits.count }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="?tab=custody-receipts" data-bs-target="#custody-receipts" class="nav-link {% if request.GET.tab == 'custody-receipts' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=custody-receipts" data-bs-target="#custody-receipts" class="nav-link {% if request.GET.tab == 'custody-receipts' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-file-document-edit me-1 text-indigo"></i>
             {% translate "Custody Receipts" %} <span class="badge bg-indigo-lt ms-2">{{ object.custody_receipts.count }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="?tab=license-seats" data-bs-target="#license-seats" class="nav-link {% if request.GET.tab == 'license-seats' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=license-seats" data-bs-target="#license-seats" class="nav-link {% if request.GET.tab == 'license-seats' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-key-outline me-1 text-pink"></i>
             {% translate "Licenses" %} <span class="badge bg-pink-lt ms-2">{{ object.license_assignments.count }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="?tab=warranties" data-bs-target="#warranties" class="nav-link {% if request.GET.tab == 'warranties' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=warranties" data-bs-target="#warranties" class="nav-link {% if request.GET.tab == 'warranties' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-shield-check me-1 text-success"></i>
             {% translate "Warranties" %} <span class="badge bg-success-lt ms-2">{{ object.warranties.count }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="?tab=reservations" data-bs-target="#reservations" class="nav-link {% if request.GET.tab == 'reservations' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=reservations" data-bs-target="#reservations" class="nav-link {% if request.GET.tab == 'reservations' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-calendar-clock me-1 text-blue"></i>
             {% translate "Reservations" %} <span class="badge bg-blue-lt ms-2">{{ object.reservations.count }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="?tab=disposal" data-bs-target="#disposal" class="nav-link {% if request.GET.tab == 'disposal' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=disposal" data-bs-target="#disposal" class="nav-link {% if request.GET.tab == 'disposal' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-recycle me-1 text-secondary"></i>
             {% translate "Disposal" %} <span class="badge bg-secondary-lt ms-2">{% if disposal_obj %}1{% else %}0{% endif %}</span>
         </a>
@@ -327,13 +327,13 @@
     {% translate "No catalog software items registered on this asset." as e_software %}
     {% include 'generic/includes/related_table_tab.html' with tab="software" table=software_table title=t_software empty=e_software %}
 
-    {% if object.accessory_assignments.exists %}
+    {% if accessory_table.rows %}
     {% translate "Assigned Accessories" as t_acc %}
     {% translate "No accessories assigned to this asset." as e_acc %}
     {% include 'generic/includes/related_table_tab.html' with tab="accessories" table=accessory_table title=t_acc empty=e_acc %}
     {% endif %}
 
-    {% if object.consumable_consumptions.exists %}
+    {% if consumable_table.rows %}
     {% translate "Assigned Consumables" as t_cons %}
     {% translate "No consumables assigned to this asset." as e_cons %}
     {% include 'generic/includes/related_table_tab.html' with tab="consumables" table=consumable_table title=t_cons empty=e_cons %}

@@ -65,7 +65,7 @@ class SoftwareDetailView(ObjectDetailView):
             related_objects_list.append({
                 'label': _('Installed Instances'),
                 'count': instance_count,
-                'url': f"{reverse('software:software_detail', kwargs={'pk': software.pk})}#instances"
+                'url': f"{reverse('software:software_detail', kwargs={'pk': software.pk})}#installed-instances"
             })
         license_count = license_qs.count()
         if license_count:

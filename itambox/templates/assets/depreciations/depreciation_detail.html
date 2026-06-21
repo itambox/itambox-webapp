@@ -8,13 +8,13 @@
 
 {% block extra_tabs %}
     <li class="nav-item" role="presentation">
-        <a href="?tab=asset-types" data-bs-target="#asset-types" class="nav-link {% if request.GET.tab == 'asset-types' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=asset-types" data-bs-target="#asset-types" class="nav-link {% if request.GET.tab == 'asset-types' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-shape-outline me-1 text-purple"></i>
             {% translate "Affected Asset Types" %} <span class="badge bg-purple-lt ms-2">{{ assettypes_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="?tab=assets" data-bs-target="#assets" class="nav-link {% if request.GET.tab == 'assets' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=assets" data-bs-target="#assets" class="nav-link {% if request.GET.tab == 'assets' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-laptop me-1 text-blue"></i>
             {% translate "Active Assets" %} <span class="badge bg-blue-lt ms-2">{{ assets_table.rows|length }}</span>
         </a>

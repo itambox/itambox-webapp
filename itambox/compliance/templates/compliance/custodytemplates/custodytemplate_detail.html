@@ -104,7 +104,7 @@
 
 {% block extra_tabs %}
     <li class="nav-item" role="presentation">
-        <a href="?tab=receipts" data-bs-target="#receipts" class="nav-link {% if request.GET.tab == 'receipts' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=receipts" data-bs-target="#receipts" class="nav-link {% if request.GET.tab == 'receipts' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-file-sign me-1 text-green"></i>
             {% translate "Signed Custody Receipts" %} <span class="badge bg-green-lt ms-2">{{ receipts_table.rows|length }}</span>
         </a>

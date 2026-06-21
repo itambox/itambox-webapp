@@ -12,7 +12,7 @@
 {# --- Tabs Hook --- #}
 {% block extra_tabs %}
     <li class="nav-item" role="presentation">
-        <a href="?tab=assignments" class="nav-link {% if request.GET.tab == 'assignments' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#assignments" role="tab" aria-selected="{% if request.GET.tab == 'assignments' %}true{% else %}false{% endif %}">
+        <a href="?tab=assignments" class="nav-link {% if request.GET.tab == 'assignments' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" data-bs-target="#assignments" role="tab" aria-selected="{% if request.GET.tab == 'assignments' %}true{% else %}false{% endif %}">
             <i class="mdi mdi-account-circle-outline me-1 text-purple"></i>
             {% translate "Contact Assignments" %} <span class="badge bg-purple-lt ms-2">{{ assignments_table.rows|length }}</span>
         </a>

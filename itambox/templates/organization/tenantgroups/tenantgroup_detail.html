@@ -51,7 +51,7 @@
 
 {% block extra_tabs %}
     <li class="nav-item" role="presentation">
-        <a href="?tab=custody-policies" class="nav-link {% if request.GET.tab == 'custody-policies' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#custody-policies" role="tab" aria-selected="{% if request.GET.tab == 'custody-policies' %}true{% else %}false{% endif %}">
+        <a href="?tab=custody-policies" class="nav-link {% if request.GET.tab == 'custody-policies' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" data-bs-target="#custody-policies" role="tab" aria-selected="{% if request.GET.tab == 'custody-policies' %}true{% else %}false{% endif %}">
             <i class="mdi mdi-file-sign me-1 text-green"></i>
             {% translate "Custody EULAs &amp; Policies" %} <span class="badge bg-green-lt ms-2">{{ custody_templates_table.rows|length }}</span>
         </a>

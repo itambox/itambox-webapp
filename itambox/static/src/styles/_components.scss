@@ -422,6 +422,86 @@ $badge-colors: ('primary', 'secondary', 'success', 'info', 'warning', 'danger',
     }
 }
 
+// Lazy related-object tab panes (hx-get loaded): reserve vertical space so the
+// spinner placeholder -> loaded table swap does not cause a large layout jump.
+.tab-pane--lazy {
+    min-height: 24rem;
+}
+
+// ---- Tab bar horizontal scroll affordance ----
+// The tab bar scrolls horizontally when tabs overflow, but the scrollbar is
+// hidden (premium look). object-detail.ts toggles has-scroll-start/-end based on
+// scroll position; we fade the overflowing edge(s) and show a chevron hint.
+.page-header-tabs {
+    scroll-behavior: smooth;
+    transition: -webkit-mask-image 0.2s ease, mask-image 0.2s ease;
+
+    &.has-scroll-end {
+        -webkit-mask-image: linear-gradient(to right, #000 80%, transparent 100%);
+        mask-image: linear-gradient(to right, #000 80%, transparent 100%);
+    }
+
+    &.has-scroll-start {
+        -webkit-mask-image: linear-gradient(to left, #000 80%, transparent 100%);
+        mask-image: linear-gradient(to left, #000 80%, transparent 100%);
+    }
+
+    &.has-scroll-start.has-scroll-end {
+        -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 7%, #000 93%, transparent 100%);
+        mask-image: linear-gradient(to right, transparent 0%, #000 7%, #000 93%, transparent 100%);
+    }
+}
+
+// Chevron hint rendered on the (non-scrolling) host so it stays pinned at the edge.
+.tab-scroll-host {
+    position: relative;
+
+    &::before,
+    &::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        width: 0.5rem;
+        height: 0.5rem;
+        border-style: solid;
+        border-color: var(--tblr-primary);
+        border-width: 2px 2px 0 0; // top + right edges -> a chevron when rotated
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+        z-index: 2;
+    }
+
+    &::after {
+        right: 0.4rem;
+        transform: translateY(-60%) rotate(45deg); // points right
+    }
+
+    &::before {
+        left: 0.4rem;
+        transform: translateY(-60%) rotate(-135deg); // points left
+    }
+
+    &.has-scroll-end::after {
+        opacity: 0.85;
+        animation: tabScrollPulse 1.6s ease-in-out infinite;
+    }
+
+    &.has-scroll-start::before {
+        opacity: 0.85;
+    }
+}
+
+@keyframes tabScrollPulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.9; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .page-header-tabs { scroll-behavior: auto; }
+    .tab-scroll-host.has-scroll-end::after { animation: none; }
+}
+
 // ============================================================
 //  Card Actions & Buttons Alignment
 // ============================================================

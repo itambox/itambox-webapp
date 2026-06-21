@@ -89,34 +89,23 @@
 {% endblock %}
 
 {% block tabs %}
-<ul class="nav nav-tabs page-header-tabs" data-bs-toggle="tabs" role="tablist">
+{# Canonical tab order (see scratch/TAB_CONVENTIONS.md): #}
+{#   Details -> primary children + secondary relations ({% block extra_tabs %}) #}
+{#   -> Subscriptions -> Attachments -> Changelog -> Journal. #}
+{# hx-boost="false" on every tab anchor: panes switch client-side (Bootstrap), #}
+{# never a boosted full-content reload. id="detail-tabs" is the hx-sync abort #}
+{# group shared by lazy tabs. #}
+<ul id="detail-tabs" class="nav nav-tabs page-header-tabs" data-bs-toggle="tabs" role="tablist">
     <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Details' %}">
-        <a href="?tab=details" data-bs-target="#details" class="nav-link {% if not request.GET.tab or request.GET.tab == 'details' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=details" data-bs-target="#details" class="nav-link {% if not request.GET.tab or request.GET.tab == 'details' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-information-outline me-1"></i>
             <span class="d-none d-xl-inline ms-1">{% translate "Details" %}</span>
         </a>
     </li>
     {% block extra_tabs %}{% endblock extra_tabs %}
-    {% if changelog_table %}
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Changelog' %}">
-        <a href="?tab=changelog" data-bs-target="#changelog" class="nav-link {% if request.GET.tab == 'changelog' %}active{% endif %}" data-bs-toggle="tab" role="tab">
-            <i class="mdi mdi-history me-1"></i>
-            <span class="d-none d-xl-inline ms-1">{% translate "Changelog" %}</span>
-        </a>
-    </li>
-    {% endif %}
-    {% if has_journaling %}
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Journal' %}">
-        <a href="?tab=journal" data-bs-target="#journal" class="nav-link {% if request.GET.tab == 'journal' %}active{% endif %}" data-bs-toggle="tab" role="tab">
-            <i class="mdi mdi-notebook-outline me-1"></i>
-            <span class="d-none d-xl-inline ms-1">{% translate "Journal" %}</span>
-            <span class="badge bg-secondary ms-1">{{ journal_entries_count }}</span>
-        </a>
-    </li>
-    {% endif %}
     {% if has_subscriptions %}
     <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Subscriptions' %}">
-        <a href="?tab=subscriptions" data-bs-target="#subscriptions" class="nav-link {% if request.GET.tab == 'subscriptions' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=subscriptions" data-bs-target="#subscriptions" class="nav-link {% if request.GET.tab == 'subscriptions' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-receipt-text-outline me-1 text-info"></i>
             <span class="d-none d-xl-inline ms-1">{% translate "Subscriptions" %}</span>
             <span class="badge bg-info-lt ms-1">{{ subscription_assignments_count }}</span>
@@ -125,9 +114,26 @@
     {% endif %}
     {% if has_image_attachments or has_file_attachments %}
     <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Attachments' %}">
-        <a href="?tab=attachments" data-bs-target="#attachments" class="nav-link {% if request.GET.tab == 'attachments' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=attachments" data-bs-target="#attachments" class="nav-link {% if request.GET.tab == 'attachments' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-paperclip me-1"></i>
             <span class="d-none d-xl-inline ms-1">{% translate "Attachments" %}</span>
+        </a>
+    </li>
+    {% endif %}
+    {% if changelog_table %}
+    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Changelog' %}">
+        <a href="?tab=changelog" data-bs-target="#changelog" class="nav-link {% if request.GET.tab == 'changelog' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
+            <i class="mdi mdi-history me-1"></i>
+            <span class="d-none d-xl-inline ms-1">{% translate "Changelog" %}</span>
+        </a>
+    </li>
+    {% endif %}
+    {% if has_journaling %}
+    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Journal' %}">
+        <a href="?tab=journal" data-bs-target="#journal" class="nav-link {% if request.GET.tab == 'journal' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
+            <i class="mdi mdi-notebook-outline me-1"></i>
+            <span class="d-none d-xl-inline ms-1">{% translate "Journal" %}</span>
+            <span class="badge bg-secondary ms-1">{{ journal_entries_count }}</span>
         </a>
     </li>
     {% endif %}

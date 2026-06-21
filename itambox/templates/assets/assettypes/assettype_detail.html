@@ -12,19 +12,19 @@
 {# --- Tabs Hook --- #}
 {% block extra_tabs %}
     <li class="nav-item" role="presentation">
-        <a href="?tab=related-assets" data-bs-target="#related-assets" class="nav-link {% if request.GET.tab == 'related-assets' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=related-assets" data-bs-target="#related-assets" class="nav-link {% if request.GET.tab == 'related-assets' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-office-building-outline me-1 text-purple"></i>
             {% translate "Related Assets" %} <span class="badge bg-purple-lt ms-2">{{ assets_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="?tab=requests" data-bs-target="#requests" class="nav-link {% if request.GET.tab == 'requests' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=requests" data-bs-target="#requests" class="nav-link {% if request.GET.tab == 'requests' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-clipboard-text-outline me-1 text-yellow"></i>
             {% translate "Requests" %} <span class="badge bg-yellow-lt ms-2">{{ object.requests.count }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="?tab=kits" data-bs-target="#kits" class="nav-link {% if request.GET.tab == 'kits' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=kits" data-bs-target="#kits" class="nav-link {% if request.GET.tab == 'kits' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-package-variant-closed me-1 text-orange"></i>
             {% translate "Kits" %} <span class="badge bg-orange-lt ms-2">{{ kits_table.rows|length }}</span>
         </a>

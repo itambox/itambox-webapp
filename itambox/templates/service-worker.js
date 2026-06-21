@@ -1,4 +1,4 @@
-const CACHE_NAME = 'itambox-pwa-cache-v12';
+const CACHE_NAME = 'itambox-pwa-cache-v13';
 const OFFLINE_URL = '/offline/';
 
 // Core assets to pre-cache on service worker installation
