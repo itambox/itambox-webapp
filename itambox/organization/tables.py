@@ -25,6 +25,9 @@ class RegionTable(BaseTable):
         default_columns = ('pk', 'name', 'site_count', 'description', 'tags', 'actions')
 
     def render_site_count(self, value, record=None):
+        if record and value:
+            url = f"{reverse('organization:site_list')}?region={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
         return value or 0
 
 class SiteGroupTable(BaseTable):
@@ -40,6 +43,9 @@ class SiteGroupTable(BaseTable):
         default_columns = ('pk', 'name', 'site_count', 'description', 'tags', 'actions')
 
     def render_site_count(self, value, record=None):
+        if record and value:
+            url = f"{reverse('organization:site_list')}?group={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
         return value or 0
 
 class SiteTable(BaseTable):
@@ -59,9 +65,15 @@ class SiteTable(BaseTable):
         default_columns = ('pk', 'name', 'status', 'region', 'group', 'tenant', 'location_count', 'asset_count', 'tags', 'actions')
 
     def render_location_count(self, value, record=None):
+        if record and value:
+            url = f"{reverse('organization:location_list')}?site={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
         return value or 0
 
     def render_asset_count(self, value, record=None):
+        if record and value:
+            url = f"{reverse('assets:asset_list')}?site={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
         return value or 0
 
     def render_status(self, value, record):
@@ -91,6 +103,9 @@ class LocationTable(BaseTable):
         default_columns = ('pk', 'name', 'status', 'site', 'tenant', 'asset_count', 'tags', 'actions')
 
     def render_asset_count(self, value, record=None):
+        if record and value:
+            url = f"{reverse('assets:asset_list')}?location={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
         return value or 0
 
     def render_status(self, value, record):
@@ -118,6 +133,9 @@ class TenantGroupTable(BaseTable):
         default_columns = ('pk', 'name', 'tenant_count', 'description', 'tags', 'actions')
 
     def render_tenant_count(self, value, record=None):
+        if record and value:
+            url = f"{reverse('organization:tenant_list')}?group={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
         return value or 0
 
 class TenantTable(BaseTable):
@@ -135,9 +153,15 @@ class TenantTable(BaseTable):
         default_columns = ('pk', 'name', 'group', 'site_count', 'location_count', 'tags', 'actions')
 
     def render_site_count(self, value, record=None):
+        if record and value:
+            url = f"{reverse('organization:site_list')}?tenant={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
         return value or 0
 
     def render_location_count(self, value, record=None):
+        if record and value:
+            url = f"{reverse('organization:location_list')}?tenant={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
         return value or 0
 
 
@@ -156,6 +180,12 @@ class AssetHolderTable(BaseTable):
         model = AssetHolder
         fields = ('pk', 'upn', 'first_name', 'last_name', 'email', 'tenant', 'assignment_count', 'description', 'tags', 'actions')
         default_columns = ('pk', 'upn', 'first_name', 'last_name', 'tenant', 'assignment_count', 'tags', 'actions')
+
+    def render_assignment_count(self, value, record=None):
+        if record and value:
+            url = f"{reverse('assets:asset_list')}?assigned_to={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
+        return value or 0
 
 # --- AssetAssignment Table ---
 class AssetAssignmentTable(BaseTable):
@@ -300,4 +330,7 @@ class CostCenterTable(BaseTable):
         default_columns = ('pk', 'code', 'name', 'tenant', 'parent', 'child_count', 'is_active', 'actions')
 
     def render_child_count(self, value, record=None):
+        if record and value:
+            url = f"{reverse('organization:costcenter_list')}?parent={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
         return value or 0

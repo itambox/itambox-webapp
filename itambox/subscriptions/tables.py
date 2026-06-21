@@ -21,6 +21,12 @@ class ProviderTable(BaseTable):
         fields = ('pk', 'name', 'is_active', 'account_id', 'contact_email', 'subscription_count', 'tags', 'actions')
         default_columns = ('pk', 'name', 'is_active', 'account_id', 'subscription_count', 'tags', 'actions')
 
+    def render_subscription_count(self, value, record):
+        if record and value:
+            url = f"{reverse('subscriptions:subscription_list')}?provider={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
+        return value or 0
+
 
 class SubscriptionTable(BaseTable):
     pk = ToggleColumn(accessor='pk')

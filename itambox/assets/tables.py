@@ -225,6 +225,9 @@ class StatusLabelTable(BaseTable):
         return value.title() if value else "—"
 
     def render_asset_count(self, value, record=None):
+        if record and value:
+            url = f"{reverse('assets:asset_list')}?status={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
         return value or 0
 
 class AssetRoleTable(BaseTable):
@@ -241,6 +244,9 @@ class AssetRoleTable(BaseTable):
         default_columns = ('pk', 'name', 'color', 'asset_count', 'description', 'tags', 'actions')
 
     def render_asset_count(self, value, record=None):
+        if record and value:
+            url = f"{reverse('assets:asset_list')}?asset_role={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
         return value or 0
         
     def render_color(self, value):
@@ -252,9 +258,7 @@ class ManufacturerTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn()
     asset_type_count = tables.Column(
-        verbose_name=_('Asset Types'),
-        linkify=True,
-        accessor='asset_type_count'
+        verbose_name=_('Asset Types')
     )
     asset_count = tables.Column(
         verbose_name=_('Assets')
@@ -263,12 +267,16 @@ class ManufacturerTable(BaseTable):
     actions = ActionsColumn()
 
     def render_asset_count(self, value, record=None):
+        if record and value:
+            url = f"{reverse('assets:asset_list')}?manufacturer={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
         return value or 0
 
     def render_asset_type_count(self, value, record):
-        # Customize the link for asset_type_count
-        url = reverse('assets:assettype_list') + f'?manufacturer_id={record.pk}'
-        return format_html('<a href="{}">{}</a>', url, value)
+        if record and value:
+            url = f"{reverse('assets:assettype_list')}?manufacturer={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
+        return value or 0
 
     class Meta(BaseTable.Meta):
         model = Manufacturer
@@ -408,18 +416,52 @@ class CategoryTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('assets:category_detail', args=[A('pk')], verbose_name=_('Name'))
     color = tables.Column(verbose_name=_('Color'), orderable=False)
+    assettype_count = tables.Column(verbose_name=_('Asset Types'), orderable=False)
+    accessory_count = tables.Column(verbose_name=_('Accessories'), orderable=False)
+    consumable_count = tables.Column(verbose_name=_('Consumables'), orderable=False)
+    component_count = tables.Column(verbose_name=_('Components'), orderable=False)
     tags = TagColumn(url_name='assets:category_list')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = Category
-        fields = ('pk', 'name', 'color', 'tags', 'actions')
-        default_columns = ('pk', 'name', 'color', 'tags', 'actions')
+        fields = (
+            'pk', 'name', 'color', 'assettype_count', 'accessory_count',
+            'consumable_count', 'component_count', 'tags', 'actions'
+        )
+        default_columns = (
+            'pk', 'name', 'color', 'assettype_count', 'accessory_count',
+            'consumable_count', 'component_count', 'tags', 'actions'
+        )
 
     def render_color(self, value):
         if value:
             return format_html('<span class="badge" style="background-color: #{};">&nbsp;</span> #{}', value, value)
         return "—"
+
+    def render_assettype_count(self, value, record=None):
+        if record and value:
+            url = f"{reverse('assets:assettype_list')}?category={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
+        return value or 0
+
+    def render_accessory_count(self, value, record=None):
+        if record and value:
+            url = f"{reverse('inventory:accessory_list')}?category={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
+        return value or 0
+
+    def render_consumable_count(self, value, record=None):
+        if record and value:
+            url = f"{reverse('inventory:consumable_list')}?category={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
+        return value or 0
+
+    def render_component_count(self, value, record=None):
+        if record and value:
+            url = f"{reverse('inventory:component_list')}?category={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
+        return value or 0
 
 
 class AssetRequestTable(BaseTable):

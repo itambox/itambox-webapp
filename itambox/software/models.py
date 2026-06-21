@@ -121,10 +121,14 @@ class Software(CustomFieldDataMixin, DeletableVaultModel):
 
     @property
     def installed_count(self):
+        if hasattr(self, '_installed_count'):
+            return self._installed_count
         return InstalledSoftware.objects.filter(software=self).count()
 
     @property
     def license_count(self):
+        if hasattr(self, '_license_count'):
+            return self._license_count
         from licenses.models import License
         return License.objects.filter(software=self, deleted_at__isnull=True).count()
 

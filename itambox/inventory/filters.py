@@ -26,6 +26,11 @@ class AccessoryFilterSet(BaseFilterSet):
         label=_('Manufacturer'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
+    category = django_filters.ModelChoiceFilter(
+        queryset=Category.objects.filter(applies_to__accessory=True),
+        label=_('Category'),
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
     tenant = django_filters.ModelChoiceFilter(
         queryset=Tenant.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'}),
@@ -57,6 +62,11 @@ class ConsumableFilterSet(BaseFilterSet):
         label=_('Manufacturer'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
+    category = django_filters.ModelChoiceFilter(
+        queryset=Category.objects.filter(applies_to__consumable=True),
+        label=_('Category'),
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
     tenant = django_filters.ModelChoiceFilter(
         queryset=Tenant.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'}),
@@ -65,7 +75,7 @@ class ConsumableFilterSet(BaseFilterSet):
 
     class Meta:
         model = Consumable
-        fields = ['manufacturer', 'category']
+        fields = []
 
     def search(self, queryset, name, value):
         if not value.strip():

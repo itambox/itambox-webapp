@@ -5,6 +5,9 @@ from core.tables import BaseTable, BooleanColumn, ToggleColumn, ActionsColumn
 from extras.tables import TagColumn
 from .models import Software, InstalledSoftware
 
+from django.urls import reverse
+from django.utils.html import format_html
+
 class SoftwareTable(BaseTable):
     """Table for displaying Software instances."""
     pk = ToggleColumn(accessor='pk')
@@ -18,6 +21,8 @@ class SoftwareTable(BaseTable):
         accessor='manufacturer.name',
         verbose_name=_("Manufacturer")
     )
+    license_count = tables.Column(verbose_name=_("Licenses"), orderable=False)
+    installed_count = tables.Column(verbose_name=_("Installs"), orderable=False)
     tags = TagColumn(
         url_name='software:software_list' # Link back to the list view filtered by tag
     )
@@ -25,8 +30,20 @@ class SoftwareTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = Software
-        fields = ('pk', 'name', 'manufacturer', 'description', 'tags', 'created_at', 'updated_at', 'actions')
-        default_columns = ('pk', 'name', 'manufacturer', 'description', 'tags', 'actions')
+        fields = ('pk', 'name', 'manufacturer', 'license_count', 'installed_count', 'description', 'tags', 'created_at', 'updated_at', 'actions')
+        default_columns = ('pk', 'name', 'manufacturer', 'license_count', 'installed_count', 'description', 'tags', 'actions')
+
+    def render_license_count(self, value, record=None):
+        if record and value:
+            url = f"{reverse('licenses:license_list')}?software={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
+        return value or 0
+
+    def render_installed_count(self, value, record=None):
+        if record and value:
+            url = f"{reverse('software:software_detail', args=[record.pk])}#instances"
+            return format_html('<a href="{}">{}</a>', url, value)
+        return value or 0
 
 class InstalledSoftwareTable(BaseTable):
     """Table for displaying InstalledSoftware instances."""

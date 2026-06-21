@@ -37,6 +37,18 @@ class AccessoryTable(CheckableInventoryTableMixin, BaseTable):
             return format_html('<span class="badge bg-warning-lt text-warning font-weight-bold">{} (Low)</span>', value)
         return value
 
+    def render_total_stock(self, value, record):
+        if record and value:
+            url = f"{reverse('inventory:accessorystock_list')}?accessory={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
+        return value or 0
+
+    def render_checked_out_qty(self, value, record):
+        if record and value:
+            url = f"{reverse('inventory:accessoryassignment_list')}?accessory={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
+        return value or 0
+
 
 class AccessoryStockTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
@@ -184,6 +196,18 @@ class ConsumableTable(CheckableInventoryTableMixin, BaseTable):
             return format_html('<span class="badge bg-warning-lt text-warning font-weight-bold">{} (Low Stock)</span>', value)
         return value
 
+    def render_total_stock(self, value, record):
+        if record and value:
+            url = f"{reverse('inventory:consumablestock_list')}?consumable={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
+        return value or 0
+
+    def render_consumed_qty(self, value, record):
+        if record and value:
+            url = f"{reverse('inventory:consumableassignment_list')}?consumable={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
+        return value or 0
+
 
 class ConsumableStockTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
@@ -293,6 +317,12 @@ class KitTable(BaseTable):
         fields = ('pk', 'name', 'tenant', 'description', 'item_count', 'actions')
         default_columns = ('pk', 'name', 'tenant', 'description', 'item_count', 'actions')
 
+    def render_item_count(self, value, record):
+        if record and value:
+            url = reverse('inventory:kit_detail', args=[record.pk])
+            return format_html('<a href="{}">{}</a>', url, value)
+        return value or 0
+
 
 class ComponentTable(CheckableInventoryTableMixin, BaseTable):
     pk = ToggleColumn(accessor='pk')
@@ -310,6 +340,12 @@ class ComponentTable(CheckableInventoryTableMixin, BaseTable):
         model = Component
         fields = ('pk', 'name', 'manufacturer', 'category', 'part_number', 'total_stock', 'available_stock', 'min_qty', 'tenant', 'tags', 'actions')
         default_columns = ('pk', 'name', 'manufacturer', 'category', 'part_number', 'total_stock', 'available_stock', 'min_qty', 'tenant', 'tags', 'actions')
+
+    def render_total_stock(self, value, record):
+        if record and value:
+            url = f"{reverse('inventory:componentstock_list')}?component={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
+        return value or 0
 
 
 class ComponentStockTable(BaseTable):

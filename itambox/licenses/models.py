@@ -147,7 +147,11 @@ class License(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
         # Seats cannot be reduced below the number of currently-assigned seats (which would
         # silently leave the pool over-allocated with no audit signal).
         if self.pk and self.seats is not None:
-            assigned = self.assignments.count()
+            from .models import LicenseSeatAssignment
+            assigned = LicenseSeatAssignment.all_objects.filter(
+                license=self,
+                deleted_at__isnull=True
+            ).count()
             if self.seats < assigned:
                 raise ValidationError({
                     'seats': _("Cannot set seats to %(seats)s — %(n)s are already assigned.") % {

@@ -2,6 +2,7 @@ from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from django_tables2 import RequestConfig
 
+from django.db.models import Count
 from ..models import Category, AssetType
 from .. import forms, tables, filters
 
@@ -16,7 +17,12 @@ from itambox.views.generic import (
 
 
 class CategoryListView(ObjectListView):
-    queryset = Category.objects.prefetch_related('tags')
+    queryset = Category.objects.prefetch_related('tags').annotate(
+        assettype_count=Count('asset_types', distinct=True),
+        accessory_count=Count('accessories', distinct=True),
+        consumable_count=Count('consumables', distinct=True),
+        component_count=Count('components', distinct=True),
+    )
     filterset = filters.CategoryFilterSet
     filterset_form = forms.CategoryFilterForm
     table = tables.CategoryTable

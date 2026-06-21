@@ -50,6 +50,11 @@ class LicenseSeatCheckoutChangelogTests(TenantTestMixin, TestCase):
         _current_user.set(self.tenant_admin)
         _request_id.set(uuid.uuid4())
 
+    def tearDown(self):
+        super().tearDown()
+        _current_user.set(None)
+        _request_id.set(None)
+
     def _license_update_changes(self):
         # _base_manager: assert independently of the active tenant scope/soft-delete.
         return ObjectChange._base_manager.filter(
