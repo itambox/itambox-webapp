@@ -115,27 +115,61 @@ class TenantScopingQuerySet(models.QuerySet):
                 # organization circular import at module load.
                 from itambox.middleware import get_current_user
                 tg_user = get_current_user()
+                TenantGroupModel = apps.get_model('organization', 'TenantGroup')
+
+                def expand_to_ancestors(seed_ids):
+                    # Walk parent links up to the root so the path to every visible
+                    # group stays navigable. _base_manager (unscoped): don't recurse
+                    # back through this (scoped) manager.
+                    visible_ids = set()
+                    frontier = set(seed_ids)
+                    while frontier:
+                        visible_ids |= frontier
+                        parent_ids = set(
+                            TenantGroupModel._base_manager
+                            .filter(pk__in=frontier, deleted_at__isnull=True)
+                            .values_list('parent_id', flat=True)
+                        )
+                        parent_ids.discard(None)
+                        frontier = parent_ids - visible_ids
+                    return visible_ids
+
+                # An explicit group scope is a "show only this group" filter: the
+                # TenantGroup list is restricted to the scoped group's subtree
+                # (descendants) plus its ancestors (path to root, for navigation) —
+                # for everyone, superusers included. This mirrors how the Tenant
+                # list is already restricted to the scoped group's tenants under a
+                # group scope. Without it, activating a group scope still leaked
+                # every other (sibling/unrelated) group's row into the list.
+                if active_group:
+                    scope_ids = expand_to_ancestors(get_descendant_group_ids(active_group.pk))
+                    if tg_user is None or getattr(tg_user, 'is_superuser', False):
+                        return self.filter(pk__in=scope_ids)
+                    # A member never sees a group they hold no membership in (e.g. a
+                    # descendant/sibling group inside the scoped subtree): intersect
+                    # the scope with their own accessible groups + ancestors. The
+                    # scoped group itself always survives — middleware only grants a
+                    # group scope to a member with a tenant directly in that group.
+                    from organization.models import TenantMembership
+                    member_group_ids = set(
+                        TenantMembership.objects.filter(user=tg_user)
+                        .values_list('tenant__group_id', flat=True)
+                    )
+                    member_group_ids.discard(None)
+                    return self.filter(pk__in=(scope_ids & expand_to_ancestors(member_group_ids)))
+
+                # No explicit group scope (single-tenant scope): superusers and
+                # system/anonymous contexts see all; a member sees the groups
+                # containing a tenant they belong to, plus those groups' ancestors.
                 if tg_user is None or getattr(tg_user, 'is_superuser', False):
                     return self
                 from organization.models import TenantMembership
-                TenantGroupModel = apps.get_model('organization', 'TenantGroup')
                 member_group_ids = set(
                     TenantMembership.objects.filter(user=tg_user)
                     .values_list('tenant__group_id', flat=True)
                 )
                 member_group_ids.discard(None)
-                visible_ids = set()
-                frontier = set(member_group_ids)
-                while frontier:
-                    visible_ids |= frontier
-                    parent_ids = set(
-                        TenantGroupModel._base_manager
-                        .filter(pk__in=frontier, deleted_at__isnull=True)
-                        .values_list('parent_id', flat=True)
-                    )
-                    parent_ids.discard(None)
-                    frontier = parent_ids - visible_ids
-                return self.filter(pk__in=visible_ids)
+                return self.filter(pk__in=expand_to_ancestors(member_group_ids))
 
             allowed_group_ids = []
             if active_group:
