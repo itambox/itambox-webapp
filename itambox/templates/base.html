@@ -53,6 +53,10 @@
         }
         .skip-link:focus { top: 0.75rem; }
     </style>
+    {# htmx config — must precede htmx.min.js so it's read at init. #}
+    {# scrollIntoViewOnBoost off: a boosted navigation must NOT auto-scroll the swapped #}
+    {# target into view — on mobile that jolts the persistent topbar out of view. Keep it fixed. #}
+    <meta name="htmx-config" content='{"scrollIntoViewOnBoost": false}'>
     {# HTMX (in head for early hx-* processing) #}
     <script src="{% static 'dist/vendor/htmx.min.js' %}"></script>
     <script src="{% static 'dist/vendor/apexcharts.min.js' %}"></script>
@@ -101,7 +105,7 @@
     {# Django JS i18n catalog — defines gettext/ngettext/interpolate before the app bundle (same-origin, CSP 'self') #}
     <script src="{% url 'javascript-catalog' %}"></script>
     {# Application modules bundle #}
-    <script src="{% static 'dist/itambox.js' %}?v=1.1.3"></script>
+    <script src="{% static 'dist/itambox.js' %}?v=1.1.4"></script>
 
 
     {% block javascript %}{% endblock javascript %}

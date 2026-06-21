@@ -155,36 +155,8 @@
         {% include 'core/modals/table_config.html' %}
     {% endif %}
 
-    {# Bulk Assign & Print Modals — only rendered on Asset list page #}
+    {# Bulk Print Modal — only rendered on Asset list page #}
     {% if model_name_str == 'assets.asset' %}
-    <div class="modal modal-blur fade" id="bulk-assign-modal" tabindex="-1" aria-labelledby="bulkAssignModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <form id="bulk-assign-form" method="post" action="{% url 'assets:asset_bulk_assign' %}" hx-boost="false">
-                    {% csrf_token %}
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="bulkAssignModalLabel">{% translate "Bulk Assign Assets" %}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="text-muted">{% translate "Select an Asset Holder to assign the selected assets to:" %}</p>
-                        <label for="bulk-assign-holder" class="form-label">{% translate "Asset Holder" %}</label>
-                        <select name="holder_id" id="bulk-assign-holder" class="form-select" required>
-                            <option value="">{% translate "— Select an Asset Holder —" %}</option>
-                            {% for holder in asset_holders %}
-                            <option value="{{ holder.pk }}">{{ holder }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
-                        <button type="submit" class="btn btn-primary">{% translate "Assign" %}</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
     <div class="modal modal-blur fade" id="bulk-print-modal" tabindex="-1" aria-labelledby="bulkPrintModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
