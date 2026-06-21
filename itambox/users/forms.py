@@ -349,11 +349,86 @@ class TokenForm(forms.ModelForm):
         return prefixes
 
 
-from core.forms import FilterForm
+from core.forms import FilterForm, BulkEditForm
 from .filters import UserFilterSet
 
 
 class UserFilterForm(FilterForm):
     filterset_class = UserFilterSet
+
+
+class UserBulkEditForm(BulkEditForm):
+    def __init__(self, *args, request_user=None, **kwargs):
+        self.request_user = request_user
+        if 'model' not in kwargs:
+            kwargs['model'] = get_user_model()
+        super().__init__(*args, **kwargs)
+
+        # Remove fields that should not be bulk editable
+        forbidden_fields = {'password', 'last_login', 'username', 'first_name', 'last_name', 'email', 'date_joined'}
+        for f in forbidden_fields:
+            if f in self.fields:
+                del self.fields[f]
+        if '_selected_fields' in self.fields:
+            self.fields['_selected_fields'].choices = [
+                c for c in self.fields['_selected_fields'].choices if c[0] not in forbidden_fields
+            ]
+
+        self.fields['is_active'] = forms.NullBooleanField(
+            required=False,
+            label=_('Active'),
+            widget=forms.Select(choices=(
+                (None, _('— No Change —')),
+                (True, _('Yes')),
+                (False, _('No')),
+            ), attrs={'class': 'form-select'})
+        )
+        self.fields['is_staff'] = forms.NullBooleanField(
+            required=False,
+            label=_('Staff'),
+            widget=forms.Select(choices=(
+                (None, _('— No Change —')),
+                (True, _('Yes')),
+                (False, _('No')),
+            ), attrs={'class': 'form-select'})
+        )
+        self.fields['is_superuser'] = forms.NullBooleanField(
+            required=False,
+            label=_('Superuser'),
+            widget=forms.Select(choices=(
+                (None, _('— No Change —')),
+                (True, _('Yes')),
+                (False, _('No')),
+            ), attrs={'class': 'form-select'})
+        )
+
+        # Security check: only superusers can modify is_superuser and is_staff
+        if not self.request_user or not self.request_user.is_superuser:
+            if 'is_superuser' in self.fields:
+                self.fields['is_superuser'].disabled = True
+                self.fields['is_superuser'].widget.attrs['disabled'] = 'disabled'
+            if 'is_staff' in self.fields:
+                self.fields['is_staff'].disabled = True
+                self.fields['is_staff'].widget.attrs['disabled'] = 'disabled'
+
+    def clean(self):
+        cleaned_data = super().clean()
+        selected_fields = self.data.getlist('_selected_fields') if self.data else []
+
+        # Only superusers can change is_superuser / is_staff
+        has_privilege_field_selected = 'is_superuser' in selected_fields or 'is_staff' in selected_fields
+        if has_privilege_field_selected and (not self.request_user or not self.request_user.is_superuser):
+            raise forms.ValidationError(_("Only superusers can grant or modify staff or superuser status."))
+
+        # Prevent non-nullable fields from being set to None if they are selected
+        for field_name in ['is_active', 'is_staff', 'is_superuser']:
+            if field_name in selected_fields:
+                val = cleaned_data.get(field_name)
+                # If they are superuser, these fields aren't disabled and we validate they aren't None.
+                # If they aren't superuser, they were already validated/gated above, so we only need to validate fields that aren't disabled (i.e. is_active).
+                if val is None and (self.request_user and self.request_user.is_superuser or field_name == 'is_active'):
+                    self.add_error(field_name, _("Please select Yes or No for this field."))
+
+        return cleaned_data
 
  

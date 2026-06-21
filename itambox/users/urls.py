@@ -22,6 +22,7 @@ urlpatterns = [
     # User Management Views (Frontend Admin)
     path('users/', views.UserListView.as_view(), name='user_list'),
     path('users/add/', views.UserEditView.as_view(), name='user_create'),
+    path('users/edit/', views.UserBulkEditView.as_view(), name='user_bulk_edit'),
     path('users/<int:pk>/', views.UserDetailView.as_view(), name='user_detail'),
     path('users/<int:pk>/edit/', views.UserEditView.as_view(), name='user_update'),
     path('users/<int:pk>/delete/', views.UserDeleteView.as_view(), name='user_delete'),

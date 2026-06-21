@@ -447,10 +447,11 @@ class WatchToggleView(LoginRequiredMixin, View):
 
 
 # User Management Views (Frontend Admin)
-from itambox.views.generic import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
+from itambox.views.generic import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, safe_return_url
+from django.http import HttpResponseRedirect
 from .tables import UserTable
 from .filters import UserFilterSet
-from .forms import UserFilterForm, UserForm
+from .forms import UserFilterForm, UserForm, UserBulkEditForm
 
 class UserListView(ObjectListView):
     queryset = User.objects.all()
@@ -458,6 +459,98 @@ class UserListView(ObjectListView):
     filterset_form = UserFilterForm
     table = UserTable
     action_buttons = ('add',)
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.request.user.is_superuser:
+            return qs
+        from core.managers import get_current_tenant
+        active_tenant = get_current_tenant()
+        if active_tenant is None:
+            return qs.none()
+        return qs.filter(memberships__tenant=active_tenant).distinct()
+
+
+class UserBulkEditView(ObjectBulkEditView):
+    queryset = User.objects.all()
+    form_class = UserBulkEditForm
+    table = UserTable
+    template_name = 'generic/object_bulk_edit.html'
+
+    def _get_bulk_edit_form(self, data=None, model=None):
+        return self.form_class(data, model=model, request_user=self.request.user)
+
+    def _get_queryset(self, pks):
+        qs = super()._get_queryset(pks)
+        if self.request.user.is_superuser:
+            return qs
+        from core.managers import get_current_tenant
+        active_tenant = get_current_tenant()
+        if active_tenant is None:
+            return qs.none()
+        return qs.filter(memberships__tenant=active_tenant).distinct()
+
+    def post(self, request, *args, **kwargs):
+        pks = request.POST.getlist('pk')
+        model = self._get_model()
+        return_url = safe_return_url(
+            request,
+            request.POST.get('return_url') or request.META.get('HTTP_REFERER'),
+            reverse('dashboard'),
+        )
+        raw_selected_fields = request.POST.getlist('_selected_fields')
+        selected_fields = [f for f in raw_selected_fields if f not in ('add_tags', 'remove_tags')]
+
+        if not pks:
+            messages.warning(request, _("No %(objects)s were selected.") % {'objects': model._meta.verbose_name_plural})
+            return HttpResponseRedirect(return_url)
+
+        queryset = self._get_queryset(pks)
+
+        if '_apply' in request.POST:
+            form = self._get_bulk_edit_form(request.POST, model)
+            if form.is_valid():
+                # Self-lockout check
+                if request.user in queryset:
+                    is_active = form.cleaned_data.get('is_active')
+                    is_superuser = form.cleaned_data.get('is_superuser')
+                    is_staff = form.cleaned_data.get('is_staff')
+
+                    if 'is_active' in selected_fields and is_active is False:
+                        messages.error(request, _("You cannot deactivate your own user account in a bulk edit operation."))
+                        context = self.get_context_data_compat(form, queryset, pks, return_url, selected_fields, model)
+                        return self.render_to_response(context)
+
+                    if 'is_superuser' in selected_fields and is_superuser is False:
+                        messages.error(request, _("You cannot revoke your own superuser status in a bulk edit operation."))
+                        context = self.get_context_data_compat(form, queryset, pks, return_url, selected_fields, model)
+                        return self.render_to_response(context)
+
+                    if 'is_staff' in selected_fields and is_staff is False:
+                        messages.error(request, _("You cannot revoke your own staff status in a bulk edit operation."))
+                        context = self.get_context_data_compat(form, queryset, pks, return_url, selected_fields, model)
+                        return self.render_to_response(context)
+
+        return super().post(request, *args, **kwargs)
+
+    def get_context_data_compat(self, form, queryset, pks, return_url, selected_fields, model):
+        return {
+            'form': form,
+            'model': model,
+            'model_name': f'{model._meta.app_label}.{model._meta.model_name}',
+            'objects': queryset,
+            'object_pks': pks,
+            'return_url': return_url,
+            'selected_fields': selected_fields,
+            'verbose_name': model._meta.verbose_name,
+            'verbose_name_plural': model._meta.verbose_name_plural,
+            'title': _('Bulk Edit %(objects)s') % {'objects': str(model._meta.verbose_name_plural).title()},
+            'breadcrumbs': [
+                (reverse('dashboard'), _('Dashboard')),
+                (return_url, str(model._meta.verbose_name_plural).title()),
+                (None, _('Bulk Edit (%(count)s)') % {'count': len(pks)}),
+            ],
+        }
 
 
 class UserDetailView(ObjectDetailView):
