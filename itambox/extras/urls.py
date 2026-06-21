@@ -45,8 +45,6 @@ urlpatterns = [
     path('saved-filters/<int:pk>/', views.SavedFilterDetailView.as_view(), name='savedfilter_detail'),
     path('saved-filters/<int:pk>/edit/', views.SavedFilterEditView.as_view(), name='savedfilter_update'),
     path('saved-filters/<int:pk>/delete/', views.SavedFilterDeleteView.as_view(), name='savedfilter_delete'),
-    # Config Contexts
-    path('config-contexts/', include('extras.urls_contexts')),
 
     # Scheduled Reporting & Alerts UI
     path('alerts/', views.AlertLogListView.as_view(), name='alertlog_list'),

@@ -190,31 +190,12 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
         if not self.pk and self.status == RequestStatusChoices.PENDING:
             from django.conf import settings
             from django.utils import timezone
-            from extras.models import ConfigContext
 
-            # Default thresholds
+            # Auto-approval thresholds come from settings (sane defaults below).
             thresholds = getattr(settings, 'REQUISITION_AUTO_APPROVAL_THRESHOLDS', {
                 'accessory': 3,
                 'consumable': 5,
             })
-
-            # Look up tenant config contexts for overrides. The override comes from
-            # operator-authored ConfigContext JSON, so its shape is untrusted: accept
-            # it only if it's a dict of int thresholds; otherwise keep the defaults
-            # (never raise on a malformed config).
-            if self.tenant:
-                cc = ConfigContext.objects.filter(tenants=self.tenant).order_by('-weight').first()
-                if cc and isinstance(cc.data, dict):
-                    override = cc.data.get('requisition_auto_approval_thresholds')
-                    if isinstance(override, dict):
-                        # Layer valid int entries over the defaults so a malformed
-                        # value (non-dict, or string/None thresholds) leaves the sane
-                        # default in place instead of raising on the <= comparison.
-                        # bool is an int subclass but is never a valid threshold here.
-                        thresholds = {**thresholds, **{
-                            k: v for k, v in override.items()
-                            if isinstance(v, int) and not isinstance(v, bool)
-                        }}
 
             if self.accessory:
                 max_qty = thresholds.get('accessory', 0)

@@ -207,13 +207,6 @@ MATRIX_MODELS = {
         'model_name': 'tag',
         'group': _('Metadata & Settings'),
     },
-    'configcontext': {
-        'label': _('Config Contexts'),
-        'app': 'extras',
-        'model_name': 'configcontext',
-        'group': _('Metadata & Settings'),
-    },
-
     # System & Reporting
     'reporttemplate': {
         'label': _('Report Templates'),

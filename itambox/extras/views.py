@@ -10,8 +10,8 @@ from django.utils.http import urlencode
 from django.utils.translation import gettext_lazy as _, gettext
 from django.views.generic import View
 from core.managers import get_current_tenant
-from .models import Tag, CustomField, CustomFieldset, SavedFilter, ConfigContext
-from .forms import TagForm, TagFilterForm, CustomFieldForm, CustomFieldFilterForm, CustomFieldsetForm, CustomFieldsetFilterForm, SavedFilterForm, SavedFilterFilterForm, ConfigContextForm, ConfigContextFilterSet, ConfigContextFilterForm, ConfigContextTable
+from .models import Tag, CustomField, CustomFieldset, SavedFilter
+from .forms import TagForm, TagFilterForm, CustomFieldForm, CustomFieldFilterForm, CustomFieldsetForm, CustomFieldsetFilterForm, SavedFilterForm, SavedFilterFilterForm
 from django_tables2 import RequestConfig
 from .tables import TagTable, CustomFieldTable, CustomFieldsetTable, SavedFilterTable
 from .filters import TagFilter, CustomFieldFilterSet, CustomFieldsetFilterSet, SavedFilterFilterSet
@@ -295,38 +295,6 @@ class SavedFilterSaveView(LoginRequiredMixin, PermissionRequiredMixin, View):
             response['HX-Redirect'] = target
             return response
         return redirect(target)
-
-
-# =============================================================================
-# Config Context Views
-# =============================================================================
-
-class ConfigContextListView(ObjectListView):
-    queryset = ConfigContext.objects.all()
-    filterset = ConfigContextFilterSet
-    filterset_form = ConfigContextFilterForm
-    table = ConfigContextTable
-    action_buttons = ('add',)
-    template_name = 'generic/object_list.html'
-
-
-class ConfigContextCreateView(ObjectEditView):
-    model_form = ConfigContextForm
-    template_name = 'generic/object_edit.html'
-    default_return_url = 'extras:configcontext_list'
-
-
-class ConfigContextEditView(ObjectEditView):
-    queryset = ConfigContext.objects.all()
-    model_form = ConfigContextForm
-    template_name = 'generic/object_edit.html'
-    default_return_url = 'extras:configcontext_list'
-
-
-class ConfigContextDeleteView(ObjectDeleteView):
-    queryset = ConfigContext.objects.all()
-    template_name = 'generic/object_confirm_delete.html'
-    success_url = reverse_lazy('extras:configcontext_list')
 
 
 # =============================================================================

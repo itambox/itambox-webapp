@@ -385,12 +385,6 @@ EXTRAS_MENU = Menu(
             items=(
                 get_model_item('extras', 'customfield', _('Custom Fields')),
                 get_model_item('extras', 'customfieldset', _('Custom Fieldsets')),
-                MenuItem(
-                    link='extras:configcontext_list',
-                    link_text=_('Config Contexts'),
-                    permissions=['extras.view_configcontext'],
-                    buttons=(),
-                ),
                 get_model_item('extras', 'savedfilter', _('Saved Filters')),
             ),
         ),

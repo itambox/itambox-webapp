@@ -42,7 +42,6 @@ IMPORT_EXCLUDED_MODELS = frozenset({
     'extras.scheduledreport', 'extras.reporttemplate',
     # Other config (relations / JSON / secrets)
     'extras.eventrule', 'extras.webhookendpoint', 'extras.dashboard',
-    'extras.configcontext',
 })
 
 

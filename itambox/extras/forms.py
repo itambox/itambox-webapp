@@ -1,7 +1,8 @@
 from django import forms
 from django.utils.translation import gettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
-from .models import Tag, CustomField, CustomFieldset, SavedFilter, ConfigContext
+from django.db.models import Q
+from .models import Tag, CustomField, CustomFieldset, SavedFilter
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Div, Field, Fieldset, Row, Column
 from django.urls import reverse
@@ -185,117 +186,6 @@ class SavedFilterForm(forms.ModelForm):
 class SavedFilterFilterForm(FilterForm):
     from .filters import SavedFilterFilterSet
     filterset_class = SavedFilterFilterSet
-
-
-# =============================================================================
-# Config Context
-# =============================================================================
-
-class ConfigContextForm(forms.ModelForm):
-    data = forms.CharField(
-        widget=forms.Textarea(attrs={'class': 'form-control font-monospace', 'rows': 10}),
-        help_text=_("Enter configuration data in valid JSON format.")
-    )
-
-    class Meta:
-        model = ConfigContext
-        fields = ['name', 'description', 'weight', 'regions', 'sites', 'locations', 'tenants', 'data']
-        widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'weight': forms.NumberInput(attrs={'class': 'form-control'}),
-            'regions': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
-            'sites': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
-            'locations': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
-            'tenants': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
-        }
-
-    def __init__(self, *args, **kwargs):
-        if 'instance' in kwargs and kwargs['instance'] and kwargs['instance'].pk:
-            import json
-            initial = kwargs.get('initial', {})
-            initial['data'] = json.dumps(kwargs['instance'].data, indent=4)
-            kwargs['initial'] = initial
-        super().__init__(*args, **kwargs)
-        self.helper = FormHelper(self)
-        self.helper.form_method = 'post'
-        self.helper.form_tag = True
-        button_text = _('Update') if self.instance.pk else _('Create')
-        cancel_url = reverse('extras:configcontext_list')
-        self.helper.layout = Layout(
-            'name',
-            'description',
-            'weight',
-            Fieldset(
-                _('Scope (optional)'),
-                Row(
-                    Column('regions', css_class='col-md-6'),
-                    Column('sites', css_class='col-md-6'),
-                    css_class='row g-3',
-                ),
-                Row(
-                    Column('locations', css_class='col-md-6'),
-                    Column('tenants', css_class='col-md-6'),
-                    css_class='row g-3',
-                ),
-            ),
-            Fieldset(
-                _('Configuration Data'),
-                'data',
-            ),
-            HTML('<div class="mt-3">'),
-            Submit('submit', button_text, css_class='btn btn-primary'),
-            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">{_("Cancel")}</a>'),
-            HTML('</div>')
-        )
-
-    def clean_data(self):
-        data = self.cleaned_data.get('data')
-        try:
-            import json
-            return json.loads(data)
-        except json.JSONDecodeError as e:
-            raise forms.ValidationError(_("Invalid JSON: %(error)s") % {'error': e})
-
-
-import django_filters
-from django.db.models import Q
-
-class ConfigContextFilterSet(django_filters.FilterSet):
-    q = django_filters.CharFilter(method='search', label=_('Search'))
-
-    class Meta:
-        model = ConfigContext
-        fields = ['name', 'weight']
-
-    def search(self, queryset, name, value):
-        if not value.strip():
-            return queryset
-        return queryset.filter(
-            Q(name__icontains=value) |
-            Q(description__icontains=value)
-        ).distinct()
-
-
-class ConfigContextFilterForm(FilterForm):
-    filterset_class = ConfigContextFilterSet
-
-
-import django_tables2 as tables
-from django_tables2.utils import A
-from core.tables import ActionsColumn, BaseTable, ToggleColumn
-
-class ConfigContextTable(BaseTable):
-    pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('extras:configcontext_edit', args=[A('pk')], verbose_name=_('Name'))
-    weight = tables.Column(verbose_name=_('Weight'))
-    description = tables.Column(verbose_name=_('Description'))
-    actions = ActionsColumn()
-
-    class Meta(BaseTable.Meta):
-        model = ConfigContext
-        fields = ('pk', 'name', 'weight', 'description', 'actions')
-        default_columns = ('pk', 'name', 'weight', 'description', 'actions')
 
 
 # =============================================================================

@@ -666,32 +666,6 @@ class LabelTemplate(ChangeLoggingMixin, BaseModel):
         return reverse('extras:labeltemplate_detail', kwargs={'pk': self.pk})
 
 
-class ConfigContext(ChangeLoggingMixin, BaseModel):
-    name = models.CharField(max_length=100, unique=True, verbose_name=_("Name"))
-    description = models.TextField(blank=True, verbose_name=_("Description"))
-    weight = models.PositiveSmallIntegerField(
-        default=100,
-        verbose_name=_("Weight"),
-        help_text=_("Priority weight for dictionary merging conflict resolution")
-    )
-    regions = models.ManyToManyField('organization.Region', blank=True, related_name='config_contexts', verbose_name=_("Regions"))
-    sites = models.ManyToManyField('organization.Site', blank=True, related_name='config_contexts', verbose_name=_("Sites"))
-    locations = models.ManyToManyField('organization.Location', blank=True, related_name='config_contexts', verbose_name=_("Locations"))
-    tenants = models.ManyToManyField('organization.Tenant', blank=True, related_name='config_contexts', verbose_name=_("Tenants"))
-    data = models.JSONField(verbose_name=_("Data"), help_text=_("Serialized configuration dictionary"))
-
-    class Meta:
-        ordering = ['weight', 'name']
-        verbose_name = _("Config Context")
-        verbose_name_plural = _("Config Contexts")
-
-    def __str__(self):
-        return self.name
-
-    def get_absolute_url(self):
-        return reverse('extras:configcontext_edit', kwargs={'pk': self.pk})
-
-
 class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()

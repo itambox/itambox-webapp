@@ -816,26 +816,6 @@ class RequisitionSystemTestCase(TestCase):
         )
         self.assertEqual(req_pending.status, RequestStatusChoices.PENDING)
 
-        # Override via ConfigContext
-        from extras.models import ConfigContext
-        ConfigContext.objects.create(
-            name="Auto Approval Settings",
-            data={'requisition_auto_approval_thresholds': {'accessory': 5}},
-            weight=100
-        ).tenants.add(self.tenant)
-
-        # Delete the previous approved request for this user/accessory to avoid duplicate check validation error
-        req_approved.delete()
-
-        # Now, Qty = 4 (<= 5) -> should auto-approve
-        req_cc_approved = AssetRequest.objects.create(
-            requester=self.requester_user,
-            accessory=acc,
-            qty=4,
-            tenant=self.tenant
-        )
-        self.assertEqual(req_cc_approved.status, RequestStatusChoices.APPROVED)
-
     def test_partial_approval_and_location(self):
         from assets.forms.request_forms import AssetRequestActionForm
         comp_cat = Category.objects.create(name="Components", slug="components", applies_to={"component": True})

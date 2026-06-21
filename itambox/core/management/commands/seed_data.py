@@ -114,7 +114,7 @@ class Command(SeedCatalogMixin, SeedOrganizationsMixin, SeedAccessMixin, SeedAss
             ('extras', 'WebhookEndpoint'), ('extras', 'LabelTemplate'),
             ('extras', 'ExportTemplate'), ('extras', 'JournalEntry'),
             ('core', 'Notification'), ('core', 'ObjectChange'),
-            ('extras', 'ConfigContext'), ('extras', 'Dashboard'),
+            ('extras', 'Dashboard'),
             ('procurement', 'FulfillmentLink'), ('procurement', 'PurchaseOrderLine'),
             ('procurement', 'PurchaseOrder'), ('procurement', 'Contract'),
             ('assets', 'AssetRequest'), ('compliance', 'AssetAudit'), ('compliance', 'AuditSession'),

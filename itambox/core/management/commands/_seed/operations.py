@@ -34,7 +34,7 @@ class SeedOperationsMixin:
     def _seed_operations(self):
         from extras.models import NotificationChannel, AlertRule, AlertLog
         from extras.models import EventRule, WebhookEndpoint, LabelTemplate, JournalEntry, ReportTemplate, ScheduledReport
-        from extras.models import ConfigContext, Dashboard
+        from extras.models import Dashboard
         from assets.models import Asset, AssetType, AssetRequest
         from compliance.models import AuditSession, AssetAudit
         from licenses.models import License
@@ -119,23 +119,6 @@ class SeedOperationsMixin:
         EventRule.objects.create(
             name='Push asset status changes to Slack', model=ct_asset, events=['update'], action_type='webhook',
             action_config={'endpoint': webhook.name}, enabled=True)
-
-        # Config contexts
-        ctx_sec = ConfigContext.objects.create(
-            name='Baseline Endpoint Security', weight=100,
-            description='Security baseline applied to all managed endpoints.',
-            data={'disk_encryption': 'required', 'edr_agent': 'CrowdStrike Falcon',
-                  'password_manager': '1Password', 'mdm': 'Microsoft Intune', 'screen_lock_minutes': 10})
-        ctx_sec.tenants.add(*self._tenants.values())
-        pharma_tenants = [t for s, t in self._tenants.items()
-                          if self._tenant_meta[s]['industry'] == 'Pharmaceuticals']
-        if pharma_tenants:
-            ctx_gxp = ConfigContext.objects.create(
-                name='GxP Lab Controls', weight=50,
-                description='Additional controls for GxP-validated lab and production systems.',
-                data={'audit_logging': 'enabled', 'usb_storage': 'blocked',
-                      'software_whitelisting': True, 'change_control': 'QMS-required'})
-            ctx_gxp.tenants.add(*pharma_tenants)
 
         # Dashboards for the MSP operators
         for user in [self._provisioner] + list(User.objects.filter(is_superuser=True)[:1]):
