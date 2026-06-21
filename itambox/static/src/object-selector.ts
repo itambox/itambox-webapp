@@ -99,19 +99,24 @@
     initAll();
   });
 
-  // Clean up Tom Select instances before elements are removed from the DOM
-  document.body.addEventListener('htmx:beforeCleanUp', function (evt: Event) {
-    const target = (evt as CustomEvent).detail.target as HTMLElement;
-    if (!target) return;
-    target.querySelectorAll<HTMLSelectElement>('select[data-tom-select]').forEach(function (sel) {
-      const ts = (sel as any).tomselect;
-      if (ts && typeof ts.destroy === 'function') {
-        try {
-          ts.destroy();
-        } catch (_e) {
-          // Ignore
-        }
+  // Clean up Tom Select instances before HTMX removes their <select> from the DOM.
+  // htmx fires `htmx:beforeCleanupElement` on EACH element it cleans up (recursing into
+  // children), with the element exposed as `detail.elt`. TomSelect registers listeners on
+  // document/window; unless we call destroy() they orphan on every boosted swap and pile up
+  // without bound (measured: ~12 leaked document listeners per asset-list visit).
+  // NOTE: htmx has no `htmx:beforeCleanUp` event and the detail carries `elt`, not `target`
+  // — the previous handler was bound to a non-existent event AND read the wrong property,
+  // so it never ran.
+  document.body.addEventListener('htmx:beforeCleanupElement', function (evt: Event) {
+    const el = (evt as CustomEvent).detail.elt as HTMLElement | undefined;
+    if (!el || typeof el.matches !== 'function' || !el.matches('select[data-tom-select]')) return;
+    const ts = (el as any).tomselect;
+    if (ts && typeof ts.destroy === 'function') {
+      try {
+        ts.destroy();
+      } catch (_e) {
+        // Ignore
       }
-    });
+    }
   });
 })();
