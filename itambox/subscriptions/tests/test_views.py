@@ -111,6 +111,26 @@ class ProviderViewTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "AWS")
 
+    def test_list_view_renders_subscription_count_link(self):
+        # A provider WITH subscriptions exercises render_subscription_count,
+        # which builds a reverse() link to the filtered subscription list. The
+        # plain list test above uses a provider with zero subscriptions and so
+        # never hit this branch (regression: missing `reverse` import -> 500).
+        Subscription.objects.create(
+            name="AWS Sub",
+            provider=self.provider,
+            type=SubscriptionTypeChoices.SAAS,
+            status=SubscriptionStatusChoices.ACTIVE,
+            renewal_cost=10,
+            currency="EUR",
+            billing_cycle=BillingCycleChoices.ANNUAL,
+        )
+        url = reverse("subscriptions:provider_list")
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        expected = f"{reverse('subscriptions:subscription_list')}?provider={self.provider.pk}"
+        self.assertContains(resp, expected)
+
     def test_detail_view_status_200(self):
         url = reverse("subscriptions:provider_detail", kwargs={"pk": self.provider.pk})
         resp = self.client.get(url)

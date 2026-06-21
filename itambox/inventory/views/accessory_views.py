@@ -20,7 +20,7 @@ from inventory.services import checkout_inventory_item, checkin_accessory
 
 
 class AccessoryListView(ObjectListView):
-    queryset = Accessory.objects.with_counts().select_related('tenant', 'manufacturer').prefetch_related('tags')
+    queryset = Accessory.objects.with_counts().select_related('tenant', 'manufacturer', 'category').prefetch_related('tags')
     filterset = filters.AccessoryFilterSet
     filterset_form = forms.AccessoryFilterForm
     table = tables.AccessoryTable

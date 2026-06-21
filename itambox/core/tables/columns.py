@@ -5,6 +5,27 @@ from django.utils.translation import gettext_lazy as _
 from django.urls import reverse, NoReverseMatch
 from itambox.utils import get_model_viewname
 
+class ColorChipColumn(tables.Column):
+    """Renders a colour dot + name linking to the object's detail page. The
+    accessor must resolve to an instance exposing ``.color``, ``.name`` and
+    ``.get_absolute_url()`` (or None) — e.g. Category or AssetRole, both of which
+    carry a user-pickable colour."""
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault('empty_values', ())  # always call render, even for None
+        super().__init__(*args, **kwargs)
+
+    def render(self, value):
+        if not value:
+            return mark_safe('<span class="text-muted">&mdash;</span>')
+        return format_html(
+            '<a href="{}" class="text-reset text-decoration-none d-inline-flex align-items-center">'
+            '<span class="d-inline-block rounded-circle me-1" '
+            'style="width:.6rem;height:.6rem;background-color:#{};"></span>{}</a>',
+            value.get_absolute_url(), value.color or '6c757d', value.name,
+        )
+
+
 class BooleanColumn(tables.Column):
     TRUE_MARK = mark_safe(
         '<span class="text-success">'

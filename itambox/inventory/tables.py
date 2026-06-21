@@ -5,7 +5,7 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django_tables2.utils import A
 
-from core.tables import BaseTable, ToggleColumn, ActionsColumn
+from core.tables import BaseTable, ToggleColumn, ActionsColumn, ColorChipColumn
 from extras.tables import TagColumn
 from .models import Accessory, AccessoryAssignment, AccessoryStock, Consumable, ConsumableAssignment, ConsumableStock, Kit, Component, ComponentStock, ComponentAllocation
 
@@ -17,7 +17,7 @@ class AccessoryTable(CheckableInventoryTableMixin, BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('inventory:accessory_detail', args=[A('pk')], verbose_name=_('Name'))
     manufacturer = tables.Column(linkify=True)
-    category = tables.Column(verbose_name=_('Category'))
+    category = ColorChipColumn(accessor='category', verbose_name=_('Category'), order_by=('category__name',))
     part_number = tables.Column(verbose_name=_('Part Number'))
     total_stock = tables.Column(accessor='total_stock', verbose_name=_('Total Stock'))
     checked_out_qty = tables.Column(accessor='checked_out_qty', verbose_name=_('Checked Out'))
@@ -176,7 +176,7 @@ class ConsumableTable(CheckableInventoryTableMixin, BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('inventory:consumable_detail', args=[A('pk')], verbose_name=_('Name'))
     manufacturer = tables.Column(linkify=True)
-    category = tables.Column(verbose_name=_('Category'))
+    category = ColorChipColumn(accessor='category', verbose_name=_('Category'), order_by=('category__name',))
     part_number = tables.Column(verbose_name=_('Part Number'))
     total_stock = tables.Column(accessor='total_stock', verbose_name=_('Total Qty'))
     consumed_qty = tables.Column(accessor='consumed_qty', verbose_name=_('Consumed'))
@@ -328,7 +328,7 @@ class ComponentTable(CheckableInventoryTableMixin, BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('inventory:component_detail', args=[A('pk')], verbose_name=_('Name'))
     manufacturer = tables.Column(linkify=True)
-    category = tables.Column(accessor='category.name', verbose_name=_('Category'))
+    category = ColorChipColumn(accessor='category', verbose_name=_('Category'), order_by=('category__name',))
     part_number = tables.Column(verbose_name=_('Part Number'))
     total_stock = tables.Column(verbose_name=_('Total Stock'), orderable=False)
     available_stock = tables.Column(verbose_name=_('Available'), orderable=False)

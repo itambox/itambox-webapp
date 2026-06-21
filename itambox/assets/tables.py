@@ -3,7 +3,7 @@ import django_tables2 as tables
 from django_tables2.utils import A  # Alias for Accessor
 from .models import Asset, AssetRole, Manufacturer, AssetType, StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence, AssetMaintenance, AssetDisposal, Warranty, AssetReservation
 from compliance.models import AssetAudit
-from core.tables import ActionsColumn, AssigneeColumn, BaseTable, ToggleColumn, IDColumn
+from core.tables import ActionsColumn, AssigneeColumn, BaseTable, ToggleColumn, IDColumn, BooleanColumn, ColorChipColumn
 from extras.tables import TagColumn # Import TagColumn
 from django.urls import reverse
 from django.utils.safestring import mark_safe
@@ -16,6 +16,8 @@ class AssetTable(BaseTable): # Inherit from BaseTable
     manufacturer = tables.Column(accessor='asset_type.manufacturer', linkify=True, verbose_name=_('Manufacturer'))
     model = tables.Column(accessor='asset_type.model', linkify=True, verbose_name=_('Model'))
     asset_type = tables.LinkColumn('assets:assettype_detail', args=[A('asset_type_id')], verbose_name=_('Asset Type'))
+    category = ColorChipColumn(accessor='asset_type.category', verbose_name=_('Category'), order_by=('asset_type__category__name',))
+    asset_role = ColorChipColumn(accessor='asset_role', verbose_name=_('Asset Role'), order_by=('asset_role__name',))
     assignee = AssigneeColumn(
         location_field='location',
         assignment_model_path='assets.AssetAssignment',
@@ -25,7 +27,15 @@ class AssetTable(BaseTable): # Inherit from BaseTable
     supplier = tables.LinkColumn('assets:supplier_detail', args=[A('supplier_id')], accessor='supplier.name', verbose_name=_('Supplier'))
 
     tags = TagColumn(url_name='assets:asset_list')
-    requestable = tables.BooleanColumn(verbose_name=_('Requestable'), yesno='Yes,No')
+    # Shows the *effective* requestable state (Asset.requestable can be unset and
+    # inherit from the asset type — see Asset.is_requestable). Not DB-orderable
+    # because the effective value is computed, not a single column.
+    requestable = tables.Column(
+        verbose_name=_('Requestable'),
+        accessor='is_requestable',
+        orderable=False,
+        empty_values=(),
+    )
     audit_due_date = tables.Column(
         verbose_name=_('Audit Due'),
         orderable=False,
@@ -45,11 +55,11 @@ class AssetTable(BaseTable): # Inherit from BaseTable
     class Meta(BaseTable.Meta): # Inherit Meta from BaseTable
         model = Asset
         fields = (
-            'pk', 'name', 'asset_tag', 'serial_number', 'asset_type', 'asset_role',
+            'pk', 'name', 'asset_tag', 'serial_number', 'asset_type', 'category', 'asset_role',
             'status', 'assignee', 'tenant', 'location', 'purchase_date', 'purchase_cost', 'salvage_value', 'order_number', 'supplier', 'tags', 'requestable', 'audit_due_date', 'actions',
         )
         default_columns = (
-            'pk', 'name', 'asset_tag', 'serial_number', 'asset_type', 'asset_role',
+            'pk', 'name', 'asset_tag', 'serial_number', 'asset_type', 'category', 'asset_role',
             'status', 'assignee', 'tenant', 'location', 'purchase_date', 'purchase_cost', 'supplier', 'requestable', 'tags', 'actions',
         )
         order_by = ('name',)
@@ -59,9 +69,6 @@ class AssetTable(BaseTable): # Inherit from BaseTable
 
     def render_serial_number(self, value):
         return value or "—"
-        
-    def render_asset_role(self, value):
-        return value.name if value else "—"
 
     def render_status(self, value):
         # .badge-status derives fill/text/border from --status-color and adds
@@ -87,6 +94,27 @@ class AssetTable(BaseTable): # Inherit from BaseTable
         if value is not None:
             return f"${value:,.2f}"
         return "—"
+
+    def render_requestable(self, record):
+        # Effective state (icon), plus whether it is set on the asset or inherited
+        # from the asset type. Same check/cross icons as core BooleanColumn.
+        icon = 'mdi-check-circle-outline' if record.is_requestable else 'mdi-close-circle-outline'
+        color = 'text-success' if record.is_requestable else 'text-danger'
+        if record.requestable is None:
+            # Not set on the asset → inherited from its type: muted, with a small
+            # inheritance marker and a tooltip.
+            return format_html(
+                '<span class="{} opacity-50" title="{}">'
+                '<i class="mdi {}"></i>'
+                '<i class="mdi mdi-arrow-bottom-left text-muted ms-1" style="font-size:.7em"></i>'
+                '</span>',
+                color, _('Inherited from asset type'), icon,
+            )
+        # Explicitly set on the asset (overrides the type).
+        return format_html(
+            '<span class="{}" title="{}"><i class="mdi {}"></i></span>',
+            color, _('Set on this asset'), icon,
+        )
 
     def value_purchase_date(self, value):
         # Format date if it exists
@@ -291,17 +319,18 @@ class AssetTypeTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     manufacturer = tables.Column(linkify=True) # Linkify using default get_absolute_url
     model = tables.LinkColumn('assets:assettype_detail', args=[A('pk')], verbose_name=_('Model'))
+    category = ColorChipColumn(accessor='category', verbose_name=_('Category'), order_by=('category__name',))
     eol_months = tables.Column(verbose_name=_('EOL (Months)'))
     created_at = tables.DateTimeColumn(format="Y-m-d")
     updated_at = tables.DateTimeColumn(format="Y-m-d H:i")
     tags = TagColumn(url_name='assets:assettype_list')
-    requestable = tables.BooleanColumn(verbose_name=_('Requestable'), yesno='Yes,No')
+    requestable = BooleanColumn(verbose_name=_('Requestable'))
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = AssetType
-        fields = ('pk', 'manufacturer', 'model', 'part_number', 'eol_months', 'created_at', 'updated_at', 'tags', 'requestable', 'actions')
-        default_columns = ('pk', 'manufacturer', 'model', 'part_number', 'eol_months', 'created_at', 'updated_at', 'requestable', 'tags', 'actions')
+        fields = ('pk', 'manufacturer', 'model', 'category', 'part_number', 'eol_months', 'created_at', 'updated_at', 'tags', 'requestable', 'actions')
+        default_columns = ('pk', 'manufacturer', 'model', 'category', 'part_number', 'eol_months', 'created_at', 'updated_at', 'requestable', 'tags', 'actions')
         order_by = ('manufacturer', 'model')
 
     def render_eol_months(self, value):

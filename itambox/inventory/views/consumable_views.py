@@ -20,7 +20,7 @@ from inventory.services import checkout_inventory_item
 
 
 class ConsumableListView(ObjectListView):
-    queryset = Consumable.objects.with_counts().select_related('tenant', 'manufacturer').prefetch_related('tags')
+    queryset = Consumable.objects.with_counts().select_related('tenant', 'manufacturer', 'category').prefetch_related('tags')
     filterset = filters.ConsumableFilterSet
     filterset_form = forms.ConsumableFilterForm
     table = tables.ConsumableTable
