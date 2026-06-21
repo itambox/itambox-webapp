@@ -422,7 +422,7 @@
                         <ul class="list-group list-group-flush">
                         {% for file in file_attachments %}
                         <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <a href="{{ file.get_download_url }}" class="text-reset">{{ file.name }}</a>
+                            <a href="{{ file.get_download_url }}" class="text-reset" download hx-boost="false">{{ file.name }}</a>
                             <form method="post" action="{% url 'file_attachment_delete' pk=file.pk %}" class="d-inline">
                                 {% csrf_token %}
                                 <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
