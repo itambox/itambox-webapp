@@ -155,7 +155,10 @@ class ScheduledReportingAndAlertsTests(TestCase):
             asset_tag='AST-1001',
             name='Developer Laptop',
             status=status,
-            purchase_cost=1200.00
+            purchase_cost=1200.00,
+            # Explicit currency so the per-currency summary card renders '$1,200.00';
+            # without it the money filter falls back to ITAMBOX_DEFAULT_CURRENCY (EUR).
+            currency='USD',
         )
         
         # Test direct compilation of context

@@ -358,7 +358,10 @@ class BookmarkAndNotificationTests(TestCase):
         Notification.objects.filter(user=self.user).delete()
 
         self.tenant.comments = "Updated tenant comment"
-        self.tenant.save()
+        # Watcher notification is deferred to transaction.on_commit, which never fires
+        # under a plain TestCase's wrapping transaction — capture and run the callbacks.
+        with self.captureOnCommitCallbacks(execute=True):
+            self.tenant.save()
 
         notifications = Notification.objects.filter(user=self.user)
         self.assertEqual(notifications.count(), 1)
@@ -369,7 +372,8 @@ class BookmarkAndNotificationTests(TestCase):
 
         notifications.delete()
 
-        self.tenant.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.tenant.delete()
 
         notifications = Notification.objects.filter(user=self.user)
         self.assertEqual(notifications.count(), 1)

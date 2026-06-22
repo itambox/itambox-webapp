@@ -126,8 +126,10 @@ class AuditBasketTests(TenantTestMixin, TestCase):
         response = self.client.post(url, {
             'pk': [self.asset_matching.pk, self.asset_surprise.pk]
         })
+        # A successful commit re-renders the reconciliation container (hx-swap="outerHTML")
+        # rather than firing an auditCommitSuccess trigger — see static/src/audit-basket.ts.
         self.assertEqual(response.status_code, 200)
-        self.assertIn('auditCommitSuccess', response['HX-Trigger'])
+        self.assertContains(response, 'reconciliation-container')
 
         # Verify audits created
         audits = AssetAudit.objects.filter(session=self.session)
@@ -178,8 +180,10 @@ class AuditBasketTests(TenantTestMixin, TestCase):
         response = self.client.post(url, {
             'pk': [self.asset_matching.pk, self.asset_archived.pk]
         })
-        self.assertEqual(response.status_code, 400)
-        self.assertIn('Archived assets cannot be audited', response.content.decode('utf-8'))
+        # A validation failure preserves the basket: 204 (no swap) + an error toast via
+        # HX-Trigger, instead of swapping the body. The atomic block still rolls back.
+        self.assertEqual(response.status_code, 204)
+        self.assertIn('Archived assets cannot be audited', response['HX-Trigger'])
 
         # Verify transaction atomicity: matching asset audit was NOT created
         self.assertEqual(AssetAudit.objects.filter(session=self.session).count(), 0)
