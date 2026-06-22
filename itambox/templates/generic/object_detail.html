@@ -44,29 +44,16 @@
             {% translate "Edit" %}
         </a>
         {% endif %}
-         {% if action_urls.clone %}
-        {# Clone — ghost secondary; folds into the [...] menu on mobile. #}
-        <a href="{{ action_urls.clone }}" class="btn btn-ghost-secondary d-none d-sm-inline-flex" title="{% translate 'Copy/Clone' %}">
-            <i class="mdi mdi-content-copy"></i>
-            {% translate "Clone" %}
-        </a>
-        {% endif %}
-         {% if action_urls.delete %}
-        {# Delete stays visible on tablet/desktop; on mobile it folds into the [...] menu below. #}
-        <a href="{{ action_urls.delete }}" class="btn btn-ghost-danger d-none d-sm-inline-flex">
-            <i class="mdi mdi-trash-can-outline"></i>
-            {% translate "Delete" %}
-        </a>
-        {% endif %}
+        {# Clone & Delete live in the [...] overflow menu below (all widths). #}
 
         {# --- Placeholder for Extra Actions (like Check In/Out) --- #}
         {% block extra_page_actions %}{% endblock %}
         {% if object %}{% plugin_template_content object 'buttons' object %}{% endif %}
 
-        {# --- Mobile overflow menu — secondary actions collapse here on small screens --- #}
+        {# --- Overflow menu — secondary actions live here at all widths --- #}
         {% if action_urls.delete or action_urls.clone %}
-        <div class="dropdown d-sm-none">
-            <button type="button" class="btn btn-icon" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="{% translate 'More actions' %}">
+        <div class="dropdown">
+            <button type="button" class="btn btn-ghost-secondary btn-icon" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="{% translate 'More actions' %}">
                 <i class="mdi mdi-dots-vertical"></i>
             </button>
             <div class="dropdown-menu dropdown-menu-end">

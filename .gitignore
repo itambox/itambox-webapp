@@ -80,3 +80,6 @@ local_http_settings.py
 build.log
 itambox/static/docs/
 
+# Claude Code local config + agent worktrees (personal settings, transient worktrees)
+.claude/
+

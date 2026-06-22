@@ -48,7 +48,9 @@ class ImportExportPermissionTestCase(TestCase):
         self.assertNotContains(response, 'Create Asset')
         self.assertNotContains(response, 'Import')
         # Export should be present since it only requires view permission
-        self.assertContains(response, 'Export')
+        # Export needs only view permission. Since the kebab consolidation, the
+        # affordance is the export links in the ⋮ menu (no literal "Export" label).
+        self.assertContains(response, '/export/assets/asset/')
 
     def test_list_view_gating_with_add_permission(self):
         # Grant add permission to staff by updating the role permissions
@@ -67,7 +69,9 @@ class ImportExportPermissionTestCase(TestCase):
         # Verify that Create and Import action buttons are present in HTML output
         self.assertContains(response, 'Create Asset')
         self.assertContains(response, 'Import')
-        self.assertContains(response, 'Export')
+        # Export needs only view permission. Since the kebab consolidation, the
+        # affordance is the export links in the ⋮ menu (no literal "Export" label).
+        self.assertContains(response, '/export/assets/asset/')
 
     def test_list_view_gating_admin(self):
         # Log in as superuser
@@ -80,7 +84,9 @@ class ImportExportPermissionTestCase(TestCase):
         self.assertTrue(response.context['can_add'])
         self.assertContains(response, 'Create Asset')
         self.assertContains(response, 'Import')
-        self.assertContains(response, 'Export')
+        # Export needs only view permission. Since the kebab consolidation, the
+        # affordance is the export links in the ⋮ menu (no literal "Export" label).
+        self.assertContains(response, '/export/assets/asset/')
 
 
 class AdvancedImportExportTestCase(TestCase):

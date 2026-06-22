@@ -14,37 +14,11 @@
     </h2>
 </div>
 
-{# --- OOB Block: Page Actions --- #}
-<div id="page-actions-block" hx-swap-oob="true">
-    <div class="btn-list">
-        {% if is_deleted_view %}
-            {% if has_soft_delete %}
-            <a href="?deleted=false" class="btn btn-outline-secondary" hx-get="?deleted=false" hx-push-url="true" hx-target="#object-list-dynamic-content">
-                <i class="mdi mdi-arrow-left me-1"></i>
-                {% translate "Back to Active Items" %}
-            </a>
-            {% endif %}
-        {% else %}
-            {% if create_url_name and can_add %}
-            <a href="{% url create_url_name %}" class="btn btn-primary">
-                <i class="mdi mdi-plus"></i>
-                {% translate "Create" %} {{ object_type|default:_("Object") }}
-            </a>
-            {% endif %}
-            {% if export_url_name %}
-            <a href="#" class="btn btn-secondary d-none d-sm-inline-block">
-                <i class="mdi mdi-download me-1"></i>
-                {% translate "Export" %}
-            </a>
-            {% endif %}
-            {% if has_soft_delete %}
-                {% if request.user.is_superuser or perms.core.view_recyclebin %}
-                <a href="?deleted=true" class="btn btn-outline-danger" hx-get="?deleted=true" hx-push-url="true" hx-target="#object-list-dynamic-content">
-                    <i class="mdi mdi-trash-can-outline me-1"></i>
-                    {% translate "Recycle Bin" %}
-                </a>
-                {% endif %}
-            {% endif %}
-        {% endif %}
-    </div>
+{% comment %}
+OOB Block: Page Actions — single source: generic/includes/list_page_actions.html.
+The wrapper mirrors generic/object_list.html's #page-actions-block (nested btn-list) so the
+swap is a like-for-like replacement; extra_controls live outside it and persist.
+{% endcomment %}
+<div id="page-actions-block" class="btn-list" hx-swap-oob="true">
+    {% include 'generic/includes/list_page_actions.html' %}
 </div>

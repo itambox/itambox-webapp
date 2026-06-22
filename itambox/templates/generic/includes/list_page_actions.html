@@ -1,0 +1,58 @@
+{% load i18n %}
+{% comment %}
+Standard list-view action toolbar — SINGLE source of truth.
+Rendered on full page load (generic/object_list.html) AND out-of-band on every HTMX
+list navigation (htmx/includes/list_oob_header.html -> #page-actions-block), so the
+toolbar stays in sync when toggling Active / Recycle Bin, filtering, or paginating
+without a full reload.
+{% endcomment %}
+{% if is_deleted_view %}
+    {% if has_soft_delete %}
+    <a href="?deleted=false" class="btn btn-ghost-secondary" hx-get="?deleted=false" hx-push-url="true" hx-target="#object-list-dynamic-content">
+        <i class="mdi mdi-arrow-left me-1"></i>
+        {% translate "Back to Active Items" %}
+    </a>
+    {% endif %}
+{% else %}
+    {% if can_add %}
+        {% if create_url_name %}
+        {# On mobile the label collapses, leaving a compact "+" icon button. #}
+        <a href="{% url create_url_name %}" class="btn btn-primary" title="{% blocktranslate %}Create {{ object_type }}{% endblocktranslate %}">
+            <i class="mdi mdi-plus"></i>
+            <span class="d-none d-sm-inline ms-1">{% blocktranslate %}Create {{ object_type }}{% endblocktranslate %}</span>
+        </a>
+        {% endif %}
+    {% endif %}
+
+    {# Overflow menu — Import / Export / Recycle Bin at all widths #}
+    {% if can_export or can_add and import_url or has_soft_delete and request.user.is_superuser or has_soft_delete and perms.core.view_recyclebin %}
+    <div class="dropdown">
+        <button type="button" class="btn btn-ghost-secondary btn-icon" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="{% translate 'More actions' %}">
+            <i class="mdi mdi-dots-vertical"></i>
+        </button>
+        <div class="dropdown-menu dropdown-menu-end">
+            {% if can_add and import_url %}
+            <a class="dropdown-item" href="{{ import_url }}">
+                <i class="mdi mdi-upload me-2 text-muted"></i>
+                {% translate "Import" %}
+            </a>
+            <div class="dropdown-divider"></div>
+            {% endif %}
+
+            {% if can_export %}
+            {% include 'generic/includes/export_menu_items.html' %}
+            {% endif %}
+
+            {% if has_soft_delete %}
+                {% if request.user.is_superuser or perms.core.view_recyclebin %}
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item" href="?deleted=true" hx-get="?deleted=true" hx-push-url="true" hx-target="#object-list-dynamic-content">
+                    <i class="mdi mdi-trash-can-outline me-2 text-muted"></i>
+                    {% translate "Recycle Bin" %}
+                </a>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+{% endif %}
