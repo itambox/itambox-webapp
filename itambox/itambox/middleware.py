@@ -11,6 +11,19 @@ def get_current_request_id():
 def get_current_user():
     return _current_user.get()
 
+def set_current_user(user):
+    """Bind the current-user contextvar after the fact.
+
+    DRF authentication runs inside a view's ``initial()`` — *after*
+    ``CurrentUserMiddleware`` has already captured ``request.user`` (which is
+    ``AnonymousUser`` for a token-authenticated request at that point). Token-auth
+    views (e.g. SCIM) call this once authenticated so changelog rows are attributed
+    to the acting principal instead of being recorded as ``user=None`` ('System').
+    The middleware's response phase resets the contextvar via its entry token, so
+    this set is correctly torn down at request end (no cross-request leak).
+    """
+    _current_user.set(user)
+
 class CurrentUserMiddleware:
     """
     Middleware to store the current user and a unique request ID in context variables.

@@ -94,6 +94,10 @@ class Token(ChangeLoggingMixin, models.Model):
     and available on the in-memory instance via the ``key`` property until the
     object is reloaded from the database.
     """
+    # Never serialize the at-rest credential (digest), its pepper id, or the
+    # high-frequency last_used heartbeat into the changelog JSON.
+    _change_logging_excluded_fields = ['updated_at', 'digest', 'pepper', 'last_used']
+
     # HMAC-SHA256(pepper, plaintext) — the only at-rest representation of the
     # secret. `pepper` records which configured pepper produced this digest so
     # peppers can be rotated without rehashing.

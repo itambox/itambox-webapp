@@ -47,6 +47,10 @@ class AllObjectsLicenseManager(AllObjectsManager.from_queryset(LicenseQuerySet))
 class License(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
     """Represents the specific entitlement/purchase record for software."""
 
+    # product_key is stored encrypted (enc$…); keep even the ciphertext out of
+    # the changelog JSON so it does not accumulate in every ObjectChange row.
+    _change_logging_excluded_fields = ['updated_at', 'product_key']
+
     name = models.CharField(
         max_length=255,
         verbose_name=_("Name"),

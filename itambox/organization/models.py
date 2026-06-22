@@ -86,6 +86,7 @@ class Location(CustomFieldDataMixin, SubscribableMixin, StandardModel, SoftDelet
         return reverse('organization:location_detail', kwargs={'pk': self.pk})
 
 class Region(StandardModel, SoftDeleteMixin):
+    changelog_global = True  # global reference data → changelog attributed to tenant=None
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     name = models.CharField(max_length=100, verbose_name=_("Name"))
@@ -118,6 +119,7 @@ class Region(StandardModel, SoftDeleteMixin):
         return reverse('organization:region_detail', kwargs={'pk': self.pk})
 
 class SiteGroup(StandardModel, SoftDeleteMixin):
+    changelog_global = True  # global reference data → changelog attributed to tenant=None
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     name = models.CharField(max_length=100, verbose_name=_("Name"))
@@ -334,6 +336,7 @@ class AssetHolder(CustomFieldDataMixin, SubscribableMixin, StandardModel, SoftDe
 
 
 class ContactRole(AutoSlugMixin, StandardModel, SoftDeleteMixin):
+    changelog_global = True  # global reference data → changelog attributed to tenant=None
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     name = models.CharField(max_length=100, verbose_name=_("Name"))
@@ -357,8 +360,26 @@ class ContactRole(AutoSlugMixin, StandardModel, SoftDeleteMixin):
 
 
 class Contact(CustomFieldDataMixin, StandardModel, SoftDeleteMixin):
-    objects = SoftDeleteManager()
-    all_objects = AllObjectsManager()
+    objects = TenantScopingSoftDeleteManager()
+    all_objects = TenantScopingAllObjectsManager()
+    # Hybrid tenancy: tenant=None is a global/shared contact (manufacturers,
+    # service desks) visible to every tenant; a set tenant makes the contact
+    # private to that tenant. allow_global_tenant surfaces the tenant=None rows
+    # under tenant scoping. Changelog attribution follows the `tenant` field
+    # automatically (None → global, surfaced via ObjectChange.allow_global_tenant).
+    allow_global_tenant = True
+
+    tenant = models.ForeignKey(
+        'organization.Tenant',
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name='contacts',
+        db_index=True,
+        verbose_name=_("Tenant"),
+        help_text=_("Owning tenant. Leave blank for a global/shared contact "
+                    "(e.g. a manufacturer or service desk) visible to all tenants."),
+    )
     name = models.CharField(max_length=100, verbose_name=_("Name"))
     title = models.CharField(max_length=100, blank=True, verbose_name=_("Title"))
     phone = models.CharField(max_length=50, blank=True, verbose_name=_("Phone"))
@@ -504,8 +525,11 @@ class TenantMembership(ChangeLoggingMixin, models.Model):
         return f"{self.user.username} is {self.role.name} at {self.tenant.name}"
 
 
-class TenantInvitation(models.Model):
+class TenantInvitation(ChangeLoggingMixin, models.Model):
     objects = TenantScopingManager()
+    # Audit invite issuance/acceptance/deletion (security-relevant access grant)
+    # but keep the one-time bearer token out of the changelog JSON.
+    _change_logging_excluded_fields = ['updated_at', 'token']
 
     email = models.EmailField(verbose_name=_("Email"))
     tenant = models.ForeignKey('organization.Tenant', on_delete=models.CASCADE, verbose_name=_("Tenant"))

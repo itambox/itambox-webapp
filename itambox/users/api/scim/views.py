@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 
 from core.managers import set_current_tenant
+from itambox.middleware import set_current_user
 from organization.models import Tenant, TenantRole, TenantMembership, AssetHolder
 from users.api.scim.serializers import (
     SCIMUserSerializer, SCIMGroupSerializer, SCIMServiceProviderConfigSerializer
@@ -85,8 +86,11 @@ def sync_group_members(tenant, role, member_ids):
             )
 
     # 2. Drop this role from members no longer listed (within this tenant only).
+    #    Delete per-instance so ChangeLoggingMixin records each membership removal
+    #    (QuerySet.delete() bypasses Model.delete() and writes no ObjectChange).
     to_remove = TenantMembership.objects.filter(tenant=tenant, role=role).exclude(user_id__in=member_ids)
-    to_remove.delete()
+    for membership in to_remove:
+        membership.delete()
 
 
 class SCIMTenantMixin:
@@ -122,8 +126,14 @@ class SCIMTenantMixin:
             self.tenant = Tenant._base_manager.get(slug=tenant_slug)
         except Tenant.DoesNotExist:
             raise exceptions.NotFound("Tenant not found.")
-            
+
         set_current_tenant(self.tenant)
+        # DRF authenticated the bearer token in super().initial(); bind the token's
+        # owner as the current user so SCIM-driven changelog rows are attributed to
+        # the acting service account rather than 'System' (CurrentUserMiddleware
+        # captured AnonymousUser before DRF auth ran).
+        if getattr(request, 'user', None) and request.user.is_authenticated:
+            set_current_user(request.user)
 
 
 class ServiceProviderConfigView(SCIMTenantMixin, APIView):
@@ -534,10 +544,14 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
     def delete(self, request, pk, *args, **kwargs):
         user = get_object_or_404(User.objects.filter(memberships__tenant=self.tenant).distinct(), id=pk)
         with transaction.atomic():
-            # Remove only the membership for the current tenant (soft-delete)
-            TenantMembership.objects.filter(user=user, tenant=self.tenant).delete()
-            # Delete the associated AssetHolder for this tenant if one exists
-            AssetHolder.objects.filter(user=user, tenant=self.tenant).delete()
+            # Remove only the membership for the current tenant. Delete per-instance
+            # so each removal is change-logged (QuerySet.delete() bypasses
+            # ChangeLoggingMixin / SoftDeleteMixin entirely).
+            for membership in TenantMembership.objects.filter(user=user, tenant=self.tenant):
+                membership.delete()
+            # Soft-delete the associated AssetHolder for this tenant if one exists.
+            for holder in AssetHolder.objects.filter(user=user, tenant=self.tenant):
+                holder.delete()
             # If user has no remaining memberships, deactivate instead of hard-deleting
             if not TenantMembership.objects.filter(user=user).exists():
                 user.is_active = False
@@ -780,6 +794,8 @@ class SCIMGroupDetailView(SCIMTenantMixin, APIView):
     def delete(self, request, pk, *args, **kwargs):
         role = get_object_or_404(TenantRole.objects.filter(tenant=self.tenant), id=pk)
         with transaction.atomic():
-            TenantMembership.objects.filter(tenant=self.tenant, role=role).delete()
+            # Per-instance delete so each membership removal is change-logged.
+            for membership in TenantMembership.objects.filter(tenant=self.tenant, role=role):
+                membership.delete()
             role.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

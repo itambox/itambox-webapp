@@ -249,12 +249,18 @@ class ContactRoleSerializer(BaseModelSerializer):
 class ContactSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:contact-detail')
     tags = TagSerializer(many=True, read_only=True)
+    # tenant=None → global/shared contact (visible to all tenants); a set tenant
+    # makes it private to that tenant. Optional on write.
+    tenant = NestedTenantSerializer(read_only=True)
+    tenant_id = serializers.PrimaryKeyRelatedField(
+        queryset=Tenant.objects, source='tenant', write_only=True, required=False, allow_null=True
+    )
 
     class Meta:
         model = Contact
         fields = [
             'id', 'url', 'name', 'title', 'phone', 'email',
-            'web_url', 'description', 'comments', 'tags',
+            'web_url', 'tenant', 'tenant_id', 'description', 'comments', 'tags',
             'created_at', 'updated_at'
         ]
         brief_fields = ['id', 'url', 'name', 'email']

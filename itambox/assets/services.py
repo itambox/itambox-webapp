@@ -318,8 +318,13 @@ def dispose_asset(
             type=StatusTypeChoices.ARCHIVED
         ).first()
 
-        # Remove any existing disposal record for this asset (idempotent re-run)
-        AssetDisposal.all_objects.filter(asset=asset).delete()
+        # Remove any existing disposal record for this asset (idempotent re-run).
+        # asset is a OneToOne, so the row must be HARD-deleted to free the unique
+        # slot (a soft-delete tombstone would still occupy asset_id). force_hard_delete
+        # is now change-logged by ChangeLoggingMixin, so destroying this
+        # GDPR/WEEE/SOC2 disposal evidence is captured in the audit trail.
+        for existing_disposal in AssetDisposal.all_objects.filter(asset=asset):
+            existing_disposal.delete(force_hard_delete=True)
 
         disposal = AssetDisposal(
             asset=asset,

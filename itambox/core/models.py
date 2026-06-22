@@ -43,9 +43,12 @@ class BaseModel(models.Model):
 
 class ObjectChange(models.Model):
     # Tenant-scoped so one tenant cannot read another tenant's change history
-    # (which includes full field-level prechange/postchange snapshots). Null for
-    # system/global changes made outside any tenant context.
+    # (which includes full field-level prechange/postchange snapshots). Rows with
+    # tenant=None are system/global changes (global catalogue / system config);
+    # allow_global_tenant below makes those — and only those — visible to every
+    # tenant, mirroring how the global objects themselves are shared.
     objects = TenantScopingManager()
+    allow_global_tenant = True
 
     tenant = models.ForeignKey(
         to='organization.Tenant',
@@ -200,6 +203,13 @@ class ChangeLoggingMixin:
     # tenant happens to be active on the request.
     changelog_tenant_lookup = None
 
+    # Tenant-less global/shared models (catalogue, system config) set this True so
+    # their changes are attributed to tenant=None — recorded once, system-wide —
+    # instead of the ambient request tenant (which fragments the history across
+    # whichever tenant happened to be active). ObjectChange.allow_global_tenant=True
+    # then surfaces these tenant=None rows to every tenant (shared-catalogue pattern).
+    changelog_global = False
+
     def __init__(self, *args, **kwargs):
         self._changelog_action = None
         self._changelog_message = ''
@@ -245,7 +255,11 @@ class ChangeLoggingMixin:
             change_tenant = None
         if change_tenant is None and self.changelog_tenant_lookup:
             change_tenant = self._resolve_changelog_tenant(self.changelog_tenant_lookup)
-        if change_tenant is None:
+        # Global/shared models (changelog_global) record changes against
+        # tenant=None (system-wide, surfaced to all tenants via
+        # ObjectChange.allow_global_tenant); everything else falls back to the
+        # ambient request tenant.
+        if change_tenant is None and not self.changelog_global:
             change_tenant = get_current_tenant()
 
         write_object_change(
@@ -305,12 +319,17 @@ class ChangeLoggingMixin:
         self._log_change(action=action, prechange_data=prechange_data, postchange_data=postchange_data, message=self._changelog_message)
 
     def delete(self, *args, **kwargs):
-        # Peek at force_hard_delete without consuming it — SoftDeleteMixin owns
-        # and consumes the flag wherever it sits in the MRO. (Never treat a
-        # positional arg as the flag: positionally, delete()'s first arg is
-        # Django's `using`.)
+        # Resolve force_hard_delete from EITHER the kwarg (a direct
+        # delete(force_hard_delete=True) call) OR a flag stashed on the instance
+        # by SoftDeleteMixin earlier in the MRO. Re-stash it for the partner mixin
+        # and POP the kwarg so it never reaches models.Model.delete() (which
+        # rejects it). This makes the two mixins order-independent: a hard delete
+        # is change-logged whether ChangeLoggingMixin or SoftDeleteMixin runs
+        # first. (Never treat a positional arg as the flag: positionally,
+        # delete()'s first arg is Django's `using`.)
         from core.mixins import SoftDeleteMixin
-        force_hard = bool(kwargs.get('force_hard_delete', False))
+        force_hard = bool(kwargs.pop('force_hard_delete', False)) or getattr(self, '_force_hard_delete', False)
+        self._force_hard_delete = force_hard
 
         if not get_current_request_id():
             super().delete(*args, **kwargs)
@@ -493,6 +512,13 @@ class Job(ChangeLoggingMixin, BaseModel):
 
 
 class EmailSettings(ChangeLoggingMixin, BaseModel):
+    # Keep the encrypted SMTP password ciphertext out of the changelog JSON
+    # (serialize_object would otherwise dump it into every ObjectChange row).
+    _change_logging_excluded_fields = ['updated_at', 'smtp_password']
+    # System-wide singleton (no tenant) — attribute changes globally, not to the
+    # ambient request tenant.
+    changelog_global = True
+
     smtp_host = models.CharField(max_length=255, default='localhost', verbose_name=_("SMTP Host"))
     smtp_port = models.PositiveIntegerField(default=25, verbose_name=_("SMTP Port"))
     smtp_use_tls = models.BooleanField(default=True, verbose_name=_("SMTP Use TLS"))

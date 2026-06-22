@@ -2,7 +2,7 @@ from django import forms
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Column
 
-from core.forms import FilterForm
+from core.forms import FilterForm, scope_tenant_field
 from extras.models import Tag
 
 from ..models import Contact
@@ -20,7 +20,7 @@ class ContactForm(CustomFieldModelFormMixin, forms.ModelForm):
 
     class Meta:
         model = Contact
-        fields = ['name', 'title', 'phone', 'email', 'web_url', 'description', 'comments', 'tags']
+        fields = ['name', 'title', 'phone', 'email', 'web_url', 'tenant', 'description', 'comments', 'tags']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. Sales Director'}),
@@ -33,6 +33,13 @@ class ContactForm(CustomFieldModelFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Scope the owning-tenant picker to the user's accessible tenants and keep
+        # it optional: a blank tenant makes the contact global/shared (visible to
+        # all tenants) — overriding the global BaseForm patch that forces tenant
+        # required (core/apps.py).
+        scope_tenant_field(self)
+        if 'tenant' in self.fields:
+            self.fields['tenant'].required = False
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
         self.helper.form_tag = True
@@ -46,6 +53,10 @@ class ContactForm(CustomFieldModelFormMixin, forms.ModelForm):
                 Column('phone', css_class='form-group col-md-4 mb-0'),
                 Column('email', css_class='form-group col-md-4 mb-0'),
                 Column('web_url', css_class='form-group col-md-4 mb-0'),
+                css_class='mb-3'
+            ),
+            Row(
+                Column('tenant', css_class='form-group col-md-6 mb-0'),
                 css_class='mb-3'
             ),
             'description',

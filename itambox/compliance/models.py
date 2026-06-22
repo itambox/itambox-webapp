@@ -120,6 +120,18 @@ class CustodyReceipt(ChangeLoggingMixin, BaseModel):
     # _scope_by_asset_tenant). The default manager is intentionally unscoped so
     # the token-based public sign view (custody_eula_sign) can resolve a receipt
     # by its secret token regardless of the requester's tenant context.
+
+    # No tenant FK of its own: attribute the changelog to the asset's owning
+    # tenant (mirrors AssetAudit) so receipts signed in the unauthenticated
+    # public sign flow are not written tenant=None and lost to the owner.
+    changelog_tenant_lookup = 'asset__tenant'
+    # Keep the public sign token and the signature artifacts out of the
+    # changelog JSON — they are bearer credentials / signature evidence.
+    _change_logging_excluded_fields = [
+        'updated_at', 'token', 'signature_data', 'signature_hash',
+        'verification_hash', 'signature_canvas',
+    ]
+
     STATUS_PENDING = 'pending'
     STATUS_ACCEPTED = 'accepted'
     STATUS_DECLINED = 'declined'
@@ -174,6 +186,9 @@ class AuditSession(StandardModel, SoftDeleteMixin):
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()
     allow_global_tenant = True
+    # reconciliation_report is a large frozen JSON snapshot; keep it out of the
+    # changelog so each session UPDATE doesn't store the whole blob twice.
+    _change_logging_excluded_fields = ['updated_at', 'reconciliation_report']
 
     name = models.CharField(max_length=200, verbose_name=_("Name"))
     tenant = models.ForeignKey(

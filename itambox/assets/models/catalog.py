@@ -14,6 +14,7 @@ from assets.choices import StatusTypeChoices
 
 
 class StatusLabel(AutoSlugMixin, StandardModel, SoftDeleteMixin):
+    changelog_global = True  # global reference data → changelog attributed to tenant=None
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     # Back-compat aliases — canonical definitions live in assets.choices.
@@ -50,6 +51,7 @@ class StatusLabel(AutoSlugMixin, StandardModel, SoftDeleteMixin):
 
 
 class AssetRole(StandardModel, SoftDeleteMixin):
+    changelog_global = True  # global reference data → changelog attributed to tenant=None
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     """Categorizes assets based on their functional role (e.g., Laptop, Monitor, Server)."""
@@ -86,6 +88,7 @@ class AssetRole(StandardModel, SoftDeleteMixin):
 
 
 class Manufacturer(StandardModel, SoftDeleteMixin):
+    changelog_global = True  # global reference data → changelog attributed to tenant=None
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     name = models.CharField(max_length=255, verbose_name=_("Name"))
@@ -126,6 +129,7 @@ class Manufacturer(StandardModel, SoftDeleteMixin):
 
 
 class Depreciation(StandardModel, SoftDeleteMixin):
+    changelog_global = True  # global reference data → changelog attributed to tenant=None
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
 
@@ -181,6 +185,7 @@ class Depreciation(StandardModel, SoftDeleteMixin):
 
 
 class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMixin):
+    changelog_global = True  # global reference data → changelog attributed to tenant=None
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     """Defines a specific type of asset (e.g., a specific laptop model)."""
@@ -262,6 +267,7 @@ class AssetType(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMi
 
 
 class Supplier(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMixin):
+    changelog_global = True  # global reference data → changelog attributed to tenant=None
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     name = models.CharField(max_length=255, verbose_name=_("Name"))
@@ -294,6 +300,7 @@ class Supplier(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMix
 
 
 class Category(AutoSlugMixin, StandardModel, SoftDeleteMixin):
+    changelog_global = True  # global reference data → changelog attributed to tenant=None
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     name = models.CharField(max_length=255, verbose_name=_("Name"))

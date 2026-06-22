@@ -11,8 +11,15 @@ from core.events import dispatch_event
 
 logger = logging.getLogger(__name__)
 
+# Models excluded from event dispatch + watcher-notify. Recursion guards
+# (ObjectChange/Event/Notification) plus high-frequency operational/archive rows
+# (Job lifecycle, scheduled-report archives) that would otherwise flood
+# EventRules/webhooks on every status flip. (Bookmark/ObjectWatch/Event no longer
+# inherit ChangeLoggingMixin, so the issubclass guard already skips them; their
+# entries are kept here as defensive belt-and-suspenders.)
 _SIGNAL_SKIP_MODELS = frozenset(
-    ('Event', 'ObjectChange', 'JournalEntry', 'Notification', 'Bookmark', 'ObjectWatch')
+    ('Event', 'ObjectChange', 'JournalEntry', 'Notification', 'Bookmark', 'ObjectWatch',
+     'Job', 'ReportGenerationArchive')
 )
 
 # Sentinel distinguishing "no prior row was looked up" (create, or a non-soft-delete
