@@ -14,8 +14,8 @@ A **Report Template** defines a template format used to compile and export syste
 | **Include Summary Cards** | Toggle displaying top card widgets (totals, counts, financial sums). | Boolean | Yes |
 | **Included Columns** | Checked columns to render in the report data grid. | JSON | No |
 | **Name** | Unique name of the template. | String | Yes |
-| **Report Type** | Catalog definition: `asset_summary`, `license_utilization`, `subscription_renewals`. | Choice | Yes |
-| **Style Preset** | The style preset of the report template. | Choice | Yes |
+| **Report Type** | Which data set to compile. One of: `asset_summary`, `license_utilization`, `subscription_renewals`, `asset_maintenance`, `asset_depreciation`, `software_inventory`, `contract_renewals`, `warranty_expiration`, `asset_disposal_eol`, `hardware_inventory`, `custody_compliance`. | Choice | Yes |
+| **Style Preset** | Visual layout for the HTML/PDF render. One of: `default` (Executive — branded indigo band + accented summary cards), `compact` (dense rows + zebra striping for audit/ops lists), `financial` (formal stone ledger with emphasized money totals and tabular figures), `minimal` (clean black-on-white, single indigo hairline — for forwarding/embedding/print). | Choice | Yes |
 | **Template Content** | Jinja2 HTML layout override structure. | Text | No |
 | **Tenant** | The tenant owning this report template. Null represents system-wide templates. | Foreign Key | No |
 

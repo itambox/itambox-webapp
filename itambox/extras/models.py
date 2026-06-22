@@ -16,6 +16,7 @@ from core.csv_utils import csv_safe, safe_csv_filename
 
 
 class Tag(ChangeLoggingMixin, BaseModel, SoftDeleteMixin, BookmarkableMixin):
+    changelog_global = True  # global reference data → changelog attributed to tenant=None
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     name = models.CharField(max_length=100, verbose_name=_("Name"))
@@ -126,6 +127,7 @@ class Dashboard(models.Model):
 
 
 class CustomField(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
+    changelog_global = True  # global config → changelog attributed to tenant=None
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     FIELD_TYPE_TEXT = 'text'
@@ -178,6 +180,7 @@ class CustomField(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
 
 
 class CustomFieldset(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
+    changelog_global = True  # global config → changelog attributed to tenant=None
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     name = models.CharField(max_length=100, verbose_name=_("Fieldset Name"))
@@ -198,7 +201,10 @@ class CustomFieldset(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         return reverse('extras:customfieldset_detail', kwargs={'pk': self.pk})
 
 
-class Event(ChangeLoggingMixin, BaseModel):
+# Machine-generated event-bus row. Intentionally NOT change-logged: it is
+# append-only, and logging it would write a second ObjectChange for every
+# tracked change (plus one more for the processed-flag flip), doubling volume.
+class Event(BaseModel):
     ACTION_CREATE = 'create'
     ACTION_UPDATE = 'update'
     ACTION_DELETE = 'delete'
@@ -318,6 +324,9 @@ class WebhookEndpoint(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()
     allow_global_tenant = True
+    # Keep the (encrypted) HMAC secret and the headers — which may carry
+    # Authorization tokens — out of the changelog JSON.
+    _change_logging_excluded_fields = ['updated_at', 'secret', 'headers']
 
     HTTP_GET = 'GET'
     HTTP_POST = 'POST'
@@ -445,7 +454,9 @@ class JournalEntry(ChangeLoggingMixin, BaseModel):
         super().save(*args, **kwargs)
 
 
-class Bookmark(ChangeLoggingMixin, BaseModel):
+class Bookmark(BaseModel):
+    # Personal pin — intentionally NOT change-logged: no audit value, and with no
+    # tenant of its own the changelog would mis-attribute to the ambient tenant.
     user = models.ForeignKey(
         to=settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -475,8 +486,10 @@ class Bookmark(ChangeLoggingMixin, BaseModel):
         return f"Bookmark by {self.user} on {self.content_object}"
 
 
-class ObjectWatch(ChangeLoggingMixin, BaseModel):
+class ObjectWatch(BaseModel):
     """Notify the user on every change to the watched object (bell / Watch feature)."""
+    # Personal subscription — intentionally NOT change-logged: no audit value, and
+    # no tenant of its own to attribute the change to.
     user = models.ForeignKey(
         to=settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -507,6 +520,10 @@ class ObjectWatch(ChangeLoggingMixin, BaseModel):
 
 
 class ImageAttachment(ChangeLoggingMixin, BaseModel):
+    # Attribute the changelog to the parent object's tenant (None for global
+    # parents) via the generic FK, instead of the ambient request tenant.
+    changelog_tenant_lookup = 'content_object__tenant'
+
     model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='image_attachments')
     object_id = models.PositiveBigIntegerField(db_index=True)
     content_object = GenericForeignKey('model', 'object_id')
@@ -532,6 +549,10 @@ class ImageAttachment(ChangeLoggingMixin, BaseModel):
 
 
 class FileAttachment(ChangeLoggingMixin, BaseModel):
+    # Attribute the changelog to the parent object's tenant (None for global
+    # parents) via the generic FK, instead of the ambient request tenant.
+    changelog_tenant_lookup = 'content_object__tenant'
+
     model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='file_attachments')
     object_id = models.PositiveBigIntegerField(db_index=True)
     content_object = GenericForeignKey('model', 'object_id')
@@ -557,7 +578,10 @@ class FileAttachment(ChangeLoggingMixin, BaseModel):
         return reverse('file_attachment_download', kwargs={'pk': self.pk})
 
 
-class ExportTemplate(BaseModel):
+class ExportTemplate(ChangeLoggingMixin, BaseModel):
+    changelog_global = True  # global template → changelog attributed to tenant=None
+    # Server-side Jinja2 template (an SSTI surface) — audit changes to it, to
+    # match its siblings LabelTemplate / ReportTemplate which already log.
     # Fallback Content-Type when ``mime_type`` is left blank (NetBox parity).
     DEFAULT_MIME_TYPE = 'text/plain; charset=utf-8'
 
@@ -645,6 +669,7 @@ class ExportTemplate(BaseModel):
 
 
 class LabelTemplate(ChangeLoggingMixin, BaseModel):
+    changelog_global = True  # global template → changelog attributed to tenant=None
     name = models.CharField(max_length=255, unique=True, verbose_name=_("Name"))
     description = models.TextField(blank=True, verbose_name=_("Description"))
     page_width = models.FloatField(default=2.25, verbose_name=_("Page Width"), help_text=_("Label width in inches"))
@@ -681,6 +706,14 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     REPORT_TYPE_ASSET_DEPRECIATION = 'asset_depreciation'
     REPORT_TYPE_SOFTWARE_INVENTORY = 'software_inventory'
 
+    REPORT_TYPE_CONTRACT_RENEWALS = 'contract_renewals'
+    REPORT_TYPE_WARRANTY_EXPIRATION = 'warranty_expiration'
+    REPORT_TYPE_ASSET_DISPOSAL_EOL = 'asset_disposal_eol'
+    REPORT_TYPE_HARDWARE_INVENTORY = 'hardware_inventory'
+    REPORT_TYPE_CUSTODY_COMPLIANCE = 'custody_compliance'
+
+    
+
     REPORT_TYPE_CHOICES = [
         (REPORT_TYPE_ASSET_SUMMARY, _('Asset Inventory Summary')),
         (REPORT_TYPE_LICENSE_UTILIZATION, _('License Utilization')),
@@ -688,6 +721,11 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         (REPORT_TYPE_ASSET_MAINTENANCE, _('Asset Maintenance & Repairs')),
         (REPORT_TYPE_ASSET_DEPRECIATION, _('Asset Depreciation Summary')),
         (REPORT_TYPE_SOFTWARE_INVENTORY, _('Software Catalog & Installations')),
+        (REPORT_TYPE_CONTRACT_RENEWALS, _('Contract Renewals & Expirations')),
+        (REPORT_TYPE_WARRANTY_EXPIRATION, _('Warranty Expiration')),
+        (REPORT_TYPE_ASSET_DISPOSAL_EOL, _('Asset Disposal & End-of-Life')),
+        (REPORT_TYPE_HARDWARE_INVENTORY, _('Hardware Inventory (Accessories, Consumables, Components)')),
+        (REPORT_TYPE_CUSTODY_COMPLIANCE, _('Custody & EULA Sign-off Compliance')),
     ]
 
     name = models.CharField(max_length=255, verbose_name=_("Name"))
@@ -715,9 +753,10 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     include_distribution_chart = models.BooleanField(default=False, verbose_name=_("Include Distribution Chart"), help_text=_("Toggle embedding spend or status distribution charts in the HTML report."))
     group_by_field = models.CharField(max_length=100, blank=True, verbose_name=_("Group By Field"), help_text=_("Optional column key to group grid records under (e.g. location, status)."))
     style_preset = models.CharField(max_length=50, default='default', verbose_name=_("Style Preset"), choices=[
-        ('default', _('Professional Layout')),
-        ('compact', _('Compact Audit Sheet')),
-        ('financial', _('Financial Spend Summary'))
+        ('default', _('Executive (Branded)')),
+        ('compact', _('Compact (Dense)')),
+        ('financial', _('Financial (Ledger)')),
+        ('minimal', _('Minimal (Clean)')),
     ])
     advanced_mode = models.BooleanField(default=False, verbose_name=_("Advanced Mode"), help_text=_("Enable custom Jinja2/HTML template code override."))
     template_content = models.TextField(
@@ -756,9 +795,13 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
 
     FORMAT_HTML = 'html'
     FORMAT_CSV = 'csv'
+    FORMAT_PDF = 'pdf'
+    FORMAT_XLSX = 'xlsx'
     FORMAT_CHOICES = [
         (FORMAT_HTML, _('HTML Email')),
         (FORMAT_CSV, _('CSV Attachment')),
+        (FORMAT_PDF, _('PDF Attachment')),
+        (FORMAT_XLSX, _('Excel (XLSX) Attachment')),
     ]
 
     FREQUENCY_ONCE = 'once'
@@ -892,6 +935,9 @@ class ReportGenerationArchive(ChangeLoggingMixin, BaseModel):
 class NotificationChannel(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()
+    # config holds channel secrets (SMTP password, Slack/Teams webhook URLs with
+    # embedded tokens); keep it out of the changelog JSON.
+    _change_logging_excluded_fields = ['updated_at', 'config']
 
     TYPE_EMAIL = 'email'
     TYPE_IN_APP = 'in_app'

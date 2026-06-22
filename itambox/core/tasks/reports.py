@@ -70,18 +70,20 @@ def generate_scheduled_report_task(scheduled_report_id):
             )
             context_data['scheduled_report'] = sched
 
-            # Determine metrics variables for legacy CSV/Jinja format matching
-            total_assets = len(rows)
-            try:
-                acquisition_sum = sum(float(r[headers[8]].replace('$', '').replace(',', '')) for r in rows if len(headers) > 8 and headers[8] in r and r[headers[8]] != '-')
-            except Exception:
-                acquisition_sum = 0
-
-            total_active = len(rows)
-            try:
-                total_monthly_spend = sum(float(r[headers[3]].replace('$', '').replace(',', '')) for r in rows if len(headers) > 3 and headers[3] in r and r[headers[3]] != '-')
-            except Exception:
-                total_monthly_spend = 0
+            # Per-currency display strings for the summary metrics, taken straight
+            # from the already-currency-correct summary cards. NEVER re-parse the
+            # formatted grid strings — they are localized per record currency, so a
+            # '$'-strip + float() silently yields 0 for any non-USD report.
+            def _card_value(cards, label):
+                for c in (cards or []):
+                    if c.get('label') == label:
+                        return c.get('value', '')
+                return ''
+            total_rows = len(rows)
+            total_assets = total_rows
+            total_active = total_rows
+            acquisition_display = _card_value(summary_cards, _('Total Acquisition Sum'))
+            monthly_spend_display = _card_value(summary_cards, _('Est. Monthly Spend'))
 
             # 2. Render HTML Email Body
             email_body = ""
@@ -89,28 +91,50 @@ def generate_scheduled_report_task(scheduled_report_id):
             attachment_filename = ""
             attachment_mime = ""
 
-            if sched.format == ScheduledReport.FORMAT_HTML:
+            def _render_report_html():
+                # Render the report to HTML — the author's sandboxed Jinja2 template
+                # in advanced mode, else the polished system template. Shared by the
+                # HTML and PDF formats (PDF is this HTML run through xhtml2pdf).
                 if template.advanced_mode and template.template_content.strip():
-                    try:
-                        # inline import: defer optional/heavy jinja2 dependency to
-                        # the advanced-mode branch that actually renders templates.
-                        from jinja2.sandbox import SandboxedEnvironment
-                        env = SandboxedEnvironment()
-                        jinja_template = env.from_string(template.template_content)
-                        if template.report_type == ReportTemplate.REPORT_TYPE_ASSET_SUMMARY:
-                            context_data.update({
-                                'total_assets': total_assets,
-                                'acquisition_sum': acquisition_sum,
-                                'location_distribution': [{'location': k, 'count': len(v)} for k, v in grouped_data.items()]
-                            })
-                        email_body = jinja_template.render(context_data)
-                    except Exception as je:
-                        logger.exception(f"Jinja2 sandboxed render failed: {je}")
-                        raise je
-                else:
-                    html_template_str = get_polished_system_html_template()
-                    django_template = Template(html_template_str)
-                    email_body = django_template.render(Context(context_data))
+                    # inline import: defer the optional/heavy jinja2 dependency.
+                    from jinja2.sandbox import SandboxedEnvironment
+                    env = SandboxedEnvironment()
+                    jinja_template = env.from_string(template.template_content)
+                    if template.report_type == ReportTemplate.REPORT_TYPE_ASSET_SUMMARY:
+                        context_data.update({
+                            'total_assets': total_assets,
+                            'acquisition_sum': acquisition_display,
+                            'location_distribution': [{'location': k, 'count': len(v)} for k, v in grouped_data.items()]
+                        })
+                    return jinja_template.render(context_data)
+                return Template(get_polished_system_html_template()).render(Context(context_data))
+
+            if sched.format == ScheduledReport.FORMAT_HTML:
+                try:
+                    email_body = _render_report_html()
+                except Exception as je:
+                    logger.exception(f"Report HTML render failed: {je}")
+                    raise je
+
+            elif sched.format == ScheduledReport.FORMAT_PDF:
+                from core.reports.exporters import report_pdf_bytes, PDF_MIME
+                attachment_content = report_pdf_bytes(_render_report_html())
+                attachment_filename = f"{safe_csv_filename(template.name).lower().replace(' ', '_')}_{timezone.now():%Y%m%d}.pdf"
+                attachment_mime = PDF_MIME
+                email_body = _("Please find attached the scheduled PDF report for '%(name)s' generated on %(timestamp)s UTC.") % {
+                    'name': template.name,
+                    'timestamp': f"{timezone.now():%Y-%m-%d %H:%M:%S}",
+                }
+
+            elif sched.format == ScheduledReport.FORMAT_XLSX:
+                from core.reports.exporters import report_xlsx_bytes, XLSX_MIME
+                attachment_content = report_xlsx_bytes(headers, rows, sheet_title=template.name)
+                attachment_filename = f"{safe_csv_filename(template.name).lower().replace(' ', '_')}_{timezone.now():%Y%m%d}.xlsx"
+                attachment_mime = XLSX_MIME
+                email_body = _("Please find attached the scheduled XLSX report for '%(name)s' generated on %(timestamp)s UTC.") % {
+                    'name': template.name,
+                    'timestamp': f"{timezone.now():%Y-%m-%d %H:%M:%S}",
+                }
 
             elif sched.format == ScheduledReport.FORMAT_CSV:
                 csv_buffer = io.StringIO()
@@ -121,7 +145,7 @@ def generate_scheduled_report_task(scheduled_report_id):
                     if template.report_type == ReportTemplate.REPORT_TYPE_ASSET_SUMMARY:
                         writer.writerow(['Metric', 'Value'])
                         writer.writerow(['Total Hardware Assets', total_assets])
-                        writer.writerow(['Total Acquisition Sum ($)', acquisition_sum])
+                        writer.writerow(['Total Acquisition Sum', acquisition_display])
                         writer.writerow([])
                         writer.writerow(['Location', 'Allocated Count'])
                         for k, v in grouped_data.items():
@@ -132,7 +156,7 @@ def generate_scheduled_report_task(scheduled_report_id):
                             writer.writerow([csv_safe(r.get(_('License Name'))), csv_safe(r.get(_('Software'))), r.get(_('Total Seats')), r.get(_('Assigned Seats')), r.get(_('Available Seats')), r.get(_('Utilization Rate'))])
                     elif template.report_type == ReportTemplate.REPORT_TYPE_SUBSCRIPTION_RENEWALS:
                         writer.writerow(['Active Subscriptions', total_active])
-                        writer.writerow(['Monthly Spend ($)', total_monthly_spend])
+                        writer.writerow(['Est. Monthly Spend', monthly_spend_display])
                         writer.writerow([])
                         writer.writerow(['Subscription', 'Provider', 'Billing Cycle', 'Cost', 'End Date'])
                         for r in rows:
@@ -169,7 +193,7 @@ def generate_scheduled_report_task(scheduled_report_id):
                     filename = f"{template.name.lower().replace(' ', '_')}_{timezone.now():%Y%m%d}.html"
                 else:
                     content_bytes = attachment_content.encode('utf-8') if isinstance(attachment_content, str) else attachment_content
-                    mime = 'text/csv'
+                    mime = attachment_mime or 'application/octet-stream'
                     filename = attachment_filename
 
                 content_file = ContentFile(content_bytes, name=filename)
@@ -209,18 +233,22 @@ def generate_scheduled_report_task(scheduled_report_id):
 
             # 5. Dispatch to configured Notification Channels (email, in_app, Slack, Teams)
             report_subject = _("[Scheduled Report] %(name)s") % {'name': sched.name}
+            # Generic, currency-correct summary built from the compiled summary cards
+            # (works for every report type; no asset-specific or '$'-hardcoded figures).
+            # Falls back to a row count when summary cards are disabled.
+            card_lines = "\n".join(
+                "%s: %s" % (c.get('label'), c.get('value')) for c in (summary_cards or [])
+            ) or (_("Rows: %(n)s") % {'n': total_rows})
             report_body = _(
                 "Scheduled report '%(name)s' was successfully generated "
                 "on %(timestamp)s UTC.\n"
                 "Format: %(format)s\n"
-                "Total Assets: %(total_assets)s\n"
-                "Acquisition Sum: $%(acquisition_sum)s"
+                "%(summary)s"
             ) % {
                 'name': sched.name,
                 'timestamp': f"{timezone.now():%Y-%m-%d %H:%M:%S}",
                 'format': sched.format.upper(),
-                'total_assets': total_assets,
-                'acquisition_sum': f"{acquisition_sum:,.2f}",
+                'summary': card_lines,
             }
             for channel in sched.channels.all():
                 if not channel.enabled:

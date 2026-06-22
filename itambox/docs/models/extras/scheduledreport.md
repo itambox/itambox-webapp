@@ -9,7 +9,7 @@ A **Scheduled Report** configures periodic background compilation of a Report Te
 | **Channels** | delivery channels (`NotificationChannel`). | Many to Many | No |
 | **Cron Expression** | Cron string evaluated via `croniter` (e.g. `0 9 * * 1`). | String | Yes |
 | **Filter Tenants** | Many-to-many list of tenants to scope data (constellation filters). | Many to Many | No |
-| **Format** | Delivery layout format: `html`, `csv`. | Choice | Yes |
+| **Format** | Delivery layout format: `html` (inline email), `csv`, `pdf` (rendered via xhtml2pdf), or `xlsx` (Excel via openpyxl). CSV/PDF/XLSX are delivered as attachments. | Choice | Yes |
 | **Frequency** | The frequency of the scheduled report. | Choice | Yes |
 | **Is Active** | Active schedules are evaluated by workers. | Boolean | Yes |
 | **Last Run** | Timestamp of last execution. | DateTime | No |

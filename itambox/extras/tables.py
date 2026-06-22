@@ -4,9 +4,10 @@ from django_tables2.utils import A
 from django.utils.safestring import mark_safe
 from django.urls import reverse
 from django.utils.html import escape, format_html
+from django.utils.text import Truncator
 from django.utils.translation import gettext_lazy as _
 from .models import (
-    Tag, CustomField, CustomFieldset, SavedFilter,
+    Tag, CustomField, CustomFieldset, SavedFilter, JournalEntry,
     AlertRule, AlertLog, NotificationChannel, ReportTemplate, ScheduledReport,
 )
 from core.tables import ActionsColumn, BaseTable, ToggleColumn, BooleanColumn
@@ -146,11 +147,57 @@ class SavedFilterTable(BaseTable):
         return value or mark_safe('<span class="badge bg-secondary">Global</span>')
 
 
+class JournalEntryTable(BaseTable):
+    """Global activity list of journal entries across every object.
+
+    There is no per-entry detail page (journaling is an inline-add feature), so
+    the Object column links straight to the journaled object's detail view.
+    """
+    created = tables.DateTimeColumn(verbose_name=_('Created'), format='Y-m-d H:i:s', linkify=False)
+    content_object = tables.Column(
+        verbose_name=_('Object'),
+        accessor='content_object',
+        orderable=False,
+        empty_values=(),
+    )
+    model = tables.Column(verbose_name=_('Object Type'), linkify=False)
+    user = tables.Column(verbose_name=_('User'), linkify=False)
+    comment = tables.Column(verbose_name=_('Comment'), orderable=False)
+
+    class Meta(BaseTable.Meta):
+        model = JournalEntry
+        fields = ('created', 'content_object', 'model', 'user', 'comment')
+        default_columns = ('created', 'content_object', 'model', 'user', 'comment')
+        order_by = ('-created',)
+
+    def render_content_object(self, value):
+        if value is None:
+            return mark_safe('<span class="text-muted">&mdash;</span>')
+        get_url = getattr(value, 'get_absolute_url', None)
+        url = None
+        if get_url is not None:
+            try:
+                url = get_url()
+            except Exception:
+                url = None
+        if url:
+            return format_html('<a href="{}">{}</a>', url, str(value))
+        return str(value)
+
+    def render_model(self, value):
+        model = value.model_class()
+        return model._meta.verbose_name.title() if model else value.model
+
+    def render_comment(self, value):
+        return Truncator(str(value)).chars(120)
+
+
 # =============================================================================
 # Alerting Tables
 # =============================================================================
 
 class AlertRuleTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
     name = tables.Column(linkify=True)
     alert_type = tables.Column(verbose_name=_('Alert Type'))
     threshold_value = tables.Column(verbose_name=_('Threshold'))
@@ -183,8 +230,8 @@ class AlertRuleTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = AlertRule
-        fields = ('name', 'alert_type', 'threshold_value', 'severity', 'is_active', 'is_muted', 'tenant', 'actions')
-        sequence = ('name', 'alert_type', 'threshold_value', 'severity', 'is_active', 'is_muted', 'tenant', 'actions')
+        fields = ('pk', 'name', 'alert_type', 'threshold_value', 'severity', 'is_active', 'is_muted', 'tenant', 'actions')
+        sequence = ('pk', 'name', 'alert_type', 'threshold_value', 'severity', 'is_active', 'is_muted', 'tenant', 'actions')
 
     def render_severity(self, value):
         color = 'secondary'
@@ -198,6 +245,7 @@ class AlertRuleTable(BaseTable):
 
 
 class NotificationChannelTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
     name = tables.Column(linkify=False)
     channel_type = tables.Column(verbose_name=_('Channel Type'))
     enabled = BooleanColumn()
@@ -233,8 +281,8 @@ class NotificationChannelTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = NotificationChannel
-        fields = ('name', 'channel_type', 'enabled', 'tenant', 'actions')
-        sequence = ('name', 'channel_type', 'enabled', 'tenant', 'actions')
+        fields = ('pk', 'name', 'channel_type', 'enabled', 'tenant', 'actions')
+        sequence = ('pk', 'name', 'channel_type', 'enabled', 'tenant', 'actions')
 
 
 class AlertLogTable(BaseTable):
@@ -333,16 +381,18 @@ class AlertLogTable(BaseTable):
 # =============================================================================
 
 class ReportTemplateTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
     name = tables.Column(linkify=True)
     report_type = tables.Column(verbose_name=_('Type'))
 
     class Meta(BaseTable.Meta):
         model = ReportTemplate
-        fields = ('name', 'description', 'report_type')
-        sequence = ('name', 'description', 'report_type')
+        fields = ('pk', 'name', 'description', 'report_type')
+        sequence = ('pk', 'name', 'description', 'report_type')
 
 
 class ScheduledReportTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
     name = tables.Column(linkify=False)
     report = tables.Column(linkify=True)
     recipients = tables.Column()
@@ -383,7 +433,7 @@ class ScheduledReportTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = ScheduledReport
-        fields = ('name', 'report', 'recipients', 'format', 'is_active', 'last_run', 'last_status', 'actions')
-        sequence = ('name', 'report', 'recipients', 'format', 'is_active', 'last_run', 'last_status', 'actions')
+        fields = ('pk', 'name', 'report', 'recipients', 'format', 'is_active', 'last_run', 'last_status', 'actions')
+        sequence = ('pk', 'name', 'report', 'recipients', 'format', 'is_active', 'last_run', 'last_status', 'actions')
 
 

@@ -675,6 +675,75 @@ class ReportTemplateForm(forms.ModelForm):
         ('maintenance_start_date', _('Start Date')),
         ('maintenance_completion_date', _('Completion Date')),
         ('maintenance_downtime', _('Downtime (Days)')),
+        # Asset Depreciation Columns
+        ('salvage_value', _('Salvage Value')),
+        ('depreciation_months', _('Depreciation Lifespan (Months)')),
+        ('current_value', _('Depreciated Value')),
+        # Software Inventory Columns
+        ('software_name', _('Software Product')),
+        ('version', _('Version')),
+        ('category', _('Category')),
+        ('license_type', _('License Type')),
+        ('installed_count', _('Installed Count')),
+        # Contract Renewals & Expirations Columns
+        ('contract_number', _('Contract #')),
+        ('contract_name', _('Contract Name')),
+        ('contract_type', _('Contract Type')),
+        ('contract_status', _('Contract Status')),
+        ('contract_supplier', _('Supplier')),
+        ('contract_start_date', _('Start Date')),
+        ('contract_end_date', _('End Date')),
+        ('contract_renewal_date', _('Renewal Date')),
+        ('contract_days_until_expiry', _('Days Until Expiry')),
+        ('contract_cost', _('Contract Cost')),
+        ('contract_billing_cycle', _('Billing Cycle')),
+        ('contract_auto_renew', _('Auto-Renew')),
+        ('contract_covered_assets', _('Covered Assets')),
+        ('contract_sla_response_time', _('SLA Response Time')),
+        ('contract_sla_resolution_time', _('SLA Resolution Time')),
+        ('contract_coverage_hours', _('Coverage Hours')),
+        # Warranty Expiration Columns
+        ('warranty_asset', _('Asset')),
+        ('warranty_type', _('Warranty Type')),
+        ('warranty_provider', _('Provider')),
+        ('warranty_start_date', _('Start Date')),
+        ('warranty_end_date', _('End Date')),
+        ('warranty_days_remaining', _('Days Remaining')),
+        ('warranty_status', _('Status')),
+        ('warranty_cost', _('Warranty Cost')),
+        ('warranty_reference', _('Reference')),
+        # Asset Disposal & End-of-Life Columns
+        ('disposal_asset', _('Asset')),
+        ('disposal_date', _('Disposal Date')),
+        ('disposal_method', _('Disposal Method')),
+        ('disposal_sanitization_method', _('Data Sanitization Method')),
+        ('disposal_sanitization_certificate', _('Sanitization Certificate')),
+        ('disposal_sanitized_by', _('Sanitized By')),
+        ('disposal_recipient', _('Recipient')),
+        ('disposal_proceeds', _('Proceeds')),
+        ('disposal_weee_compliant', _('WEEE Compliant')),
+        ('disposal_notes', _('Notes')),
+        # Hardware Inventory (Accessories, Consumables, Components) Columns
+        ('hw_item_type', _('Item Type')),
+        ('hw_name', _('Name')),
+        ('hw_manufacturer', _('Manufacturer')),
+        ('hw_category', _('Category')),
+        ('hw_part_number', _('Part Number')),
+        ('hw_total_stock', _('Total Stock')),
+        ('hw_available', _('Available')),
+        ('hw_min_qty', _('Safety Threshold')),
+        ('hw_status', _('Stock Status')),
+        # Custody & EULA Sign-off Compliance Columns
+        ('custody_asset', _('Asset')),
+        ('custody_holder', _('Holder')),
+        ('custody_status', _('Acceptance Status')),
+        ('custody_accepted_date', _('Accepted Date')),
+        ('custody_eula_version', _('EULA Version')),
+        ('custody_signature_provider', _('Signature Provider')),
+        ('custody_qms_reference', _('QMS Reference')),
+        ('custody_ip_address', _('IP Address')),
+        ('custody_created_date', _('Created Date')),
+        ('license_count', _('License Count')),
     ]
 
     included_columns = forms.MultipleChoiceField(
@@ -1102,4 +1171,29 @@ class NotificationChannelForm(forms.ModelForm):
 class ObjectChangeFilterForm(FilterForm):
     from core.filters import ObjectChangeFilterSet
     filterset_class = ObjectChangeFilterSet
+
+
+class JournalEntryFilterForm(FilterForm):
+    from extras.filters import JournalEntryFilterSet
+    filterset_class = JournalEntryFilterSet
+
+
+class AlertRuleFilterForm(FilterForm):
+    from extras.filters import AlertRuleFilterSet
+    filterset_class = AlertRuleFilterSet
+
+
+class NotificationChannelFilterForm(FilterForm):
+    from extras.filters import NotificationChannelFilterSet
+    filterset_class = NotificationChannelFilterSet
+
+
+class ReportTemplateFilterForm(FilterForm):
+    from extras.filters import ReportTemplateFilterSet
+    filterset_class = ReportTemplateFilterSet
+
+
+class ScheduledReportFilterForm(FilterForm):
+    from extras.filters import ScheduledReportFilterSet
+    filterset_class = ScheduledReportFilterSet
 

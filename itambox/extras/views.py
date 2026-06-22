@@ -312,8 +312,13 @@ from .tables import (
 )
 from .forms import (
     AlertRuleForm, NotificationChannelForm, ReportTemplateForm, ScheduledReportForm,
+    AlertRuleFilterForm, NotificationChannelFilterForm, ReportTemplateFilterForm,
+    ScheduledReportFilterForm,
 )
-from .filters import AlertLogFilterSet
+from .filters import (
+    AlertLogFilterSet, AlertRuleFilterSet, NotificationChannelFilterSet,
+    ReportTemplateFilterSet, ScheduledReportFilterSet,
+)
 from itambox.views.generic.service_views import SimplePostView
 
 logger = logging.getLogger(__name__)
@@ -322,6 +327,8 @@ logger = logging.getLogger(__name__)
 @method_decorator(login_required, name='dispatch')
 class AlertRuleListView(ObjectListView):
     queryset = AlertRule.objects.all()
+    filterset = AlertRuleFilterSet
+    filterset_form = AlertRuleFilterForm
     table = AlertRuleTable
     template_name = 'core/alerts/alert_rule_list.html'
     action_buttons = ('add',)
@@ -380,6 +387,10 @@ class AlertRuleUpdateView(ObjectEditView):
 class AlertRuleDeleteView(ObjectDeleteView):
     queryset = AlertRule.objects.all()
     template_name = 'core/alerts/alert_rule_confirm_delete.html'
+
+
+class AlertRuleBulkDeleteView(ObjectBulkDeleteView):
+    queryset = AlertRule.objects.all()
 
 
 class AlertRuleRunNowView(SimplePostView):
@@ -544,6 +555,8 @@ class AlertBulkResolveView(_BulkAlertActionView):
 @method_decorator(login_required, name='dispatch')
 class NotificationChannelListView(ObjectListView):
     queryset = NotificationChannel.objects.all()
+    filterset = NotificationChannelFilterSet
+    filterset_form = NotificationChannelFilterForm
     table = NotificationChannelTable
     template_name = 'core/alerts/notificationchannel_list.html'
     action_buttons = ('add',)
@@ -590,6 +603,10 @@ class NotificationChannelDeleteView(ObjectDeleteView):
     template_name = 'core/alerts/notificationchannel_confirm_delete.html'
 
 
+class NotificationChannelBulkDeleteView(ObjectBulkDeleteView):
+    queryset = NotificationChannel.objects.all()
+
+
 class NotificationChannelTestView(SimplePostView):
     """Send a test notification through a channel and report success/failure inline."""
     queryset = NotificationChannel.objects.all()
@@ -620,6 +637,8 @@ class NotificationChannelTestView(SimplePostView):
 @method_decorator(login_required, name='dispatch')
 class ReportTemplateListView(ObjectListView):
     queryset = ReportTemplate.objects.all()
+    filterset = ReportTemplateFilterSet
+    filterset_form = ReportTemplateFilterForm
     table = ReportTemplateTable
     template_name = 'core/reports/report_template_list.html'
     action_buttons = ('add',)
@@ -680,9 +699,15 @@ class ReportTemplateDeleteView(ObjectDeleteView):
     template_name = 'core/reports/report_template_confirm_delete.html'
 
 
+class ReportTemplateBulkDeleteView(ObjectBulkDeleteView):
+    queryset = ReportTemplate.objects.all()
+
+
 @method_decorator(login_required, name='dispatch')
 class ScheduledReportListView(ObjectListView):
     queryset = ScheduledReport.objects.select_related('report')
+    filterset = ScheduledReportFilterSet
+    filterset_form = ScheduledReportFilterForm
     table = ScheduledReportTable
     template_name = 'core/reports/report_list.html'
     action_buttons = ('add',)
@@ -799,6 +824,10 @@ class ScheduledReportUpdateView(ObjectEditView):
 class ScheduledReportDeleteView(ObjectDeleteView):
     queryset = ScheduledReport.objects.all()
     template_name = 'core/reports/report_schedule_confirm_delete.html'
+
+
+class ScheduledReportBulkDeleteView(ObjectBulkDeleteView):
+    queryset = ScheduledReport.objects.all()
 
 
 @method_decorator(login_required, name='dispatch')
@@ -945,58 +974,69 @@ class ReportTemplateDownloadView(PermissionRequiredMixin, LoginRequiredMixin, Vi
             )
 
             format_type = request.GET.get('format', 'html').lower()
+            from core.csv_utils import safe_csv_filename
+            safe_name = safe_csv_filename(template.name).lower().replace(' ', '_')
+            stamp = f"{timezone.now():%Y%m%d}"
 
             if format_type == 'csv':
                 import io
                 import csv
-                from core.csv_utils import csv_safe, safe_csv_filename
+                from core.csv_utils import csv_safe
                 csv_buffer = io.StringIO()
                 writer = csv.writer(csv_buffer)
-
-                # Write headers
                 writer.writerow(headers)
-                # Write rows in sequence (each cell neutralized against formula injection)
+                # Each cell neutralized against CSV formula injection.
                 for r in rows:
                     writer.writerow([csv_safe(r.get(head, '-')) for head in headers])
-
                 response = HttpResponse(csv_buffer.getvalue(), content_type='text/csv')
-                filename = f"{safe_csv_filename(template.name).lower().replace(' ', '_')}_{timezone.now():%Y%m%d}.csv"
-                response['Content-Disposition'] = f'attachment; filename="{filename}"'
+                response['Content-Disposition'] = f'attachment; filename="{safe_name}_{stamp}.csv"'
                 return response
 
+            if format_type == 'xlsx':
+                from core.reports.exporters import report_xlsx_bytes, XLSX_MIME
+                response = HttpResponse(report_xlsx_bytes(headers, rows, sheet_title=template.name), content_type=XLSX_MIME)
+                response['Content-Disposition'] = f'attachment; filename="{safe_name}_{stamp}.xlsx"'
+                return response
+
+            # HTML render — shared by the html and pdf formats.
+            if template.advanced_mode and template.template_content.strip():
+                try:
+                    from jinja2.sandbox import SandboxedEnvironment
+                    # autoescape escapes {{ data }} expressions (e.g. a malicious asset
+                    # name) when rendered into the text/html report; the author's literal
+                    # template markup is unaffected.
+                    env = SandboxedEnvironment(autoescape=True)
+                    jinja_template = env.from_string(template.template_content)
+                    if template.report_type == ReportTemplate.REPORT_TYPE_ASSET_SUMMARY:
+                        context_data.update({
+                            'total_assets': len(rows),
+                            # Currency-correct figure from the summary card — never re-parse
+                            # the per-currency-formatted grid strings ('$'-strip yields 0 for
+                            # non-USD).
+                            'acquisition_sum': next((c.get('value', '') for c in summary_cards if c.get('label') == gettext('Total Acquisition Sum')), ''),
+                            'location_distribution': [{'location': k, 'count': len(v)} for k, v in grouped_data.items()]
+                        })
+                    rendered_html = jinja_template.render(context_data)
+                except Exception as je:
+                    logger.exception(f"Jinja2 sandboxed render failed: {je}")
+                    raise je
             else:
-                # HTML compiler
-                if template.advanced_mode and template.template_content.strip():
-                    try:
-                        from jinja2.sandbox import SandboxedEnvironment
-                        # autoescape escapes {{ data }} expressions (e.g. a malicious asset
-                        # name) when rendered into the text/html report; the author's literal
-                        # template markup is unaffected.
-                        env = SandboxedEnvironment(autoescape=True)
-                        jinja_template = env.from_string(template.template_content)
-                        if template.report_type == ReportTemplate.REPORT_TYPE_ASSET_SUMMARY:
-                            context_data.update({
-                                'total_assets': len(rows),
-                                'acquisition_sum': sum(float(r[headers[8]].replace('$', '').replace(',', '')) for r in rows if headers[8] in r and r[headers[8]] != '-') if len(headers) > 8 else 0,
-                                'location_distribution': [{'location': k, 'count': len(v)} for k, v in grouped_data.items()]
-                            })
-                        rendered_html = jinja_template.render(context_data)
-                    except Exception as je:
-                        logger.exception(f"Jinja2 sandboxed render failed: {je}")
-                        raise je
-                else:
-                    html_template_str = get_polished_system_html_template()
-                    django_template = Template(html_template_str)
-                    context_data['request'] = request
-                    rendered_html = django_template.render(Context(context_data))
+                html_template_str = get_polished_system_html_template()
+                django_template = Template(html_template_str)
+                context_data['request'] = request
+                rendered_html = django_template.render(Context(context_data))
 
-                response = HttpResponse(rendered_html, content_type='text/html')
-                filename = f"{template.name.lower().replace(' ', '_')}_{timezone.now():%Y%m%d}.html"
-                if request.GET.get('print') == 'true':
-                    response['Content-Disposition'] = f'inline; filename="{filename}"'
-                else:
-                    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            if format_type == 'pdf':
+                from core.reports.exporters import report_pdf_bytes, PDF_MIME
+                response = HttpResponse(report_pdf_bytes(rendered_html), content_type=PDF_MIME)
+                disposition = 'inline' if request.GET.get('print') == 'true' else 'attachment'
+                response['Content-Disposition'] = f'{disposition}; filename="{safe_name}_{stamp}.pdf"'
                 return response
+
+            response = HttpResponse(rendered_html, content_type='text/html')
+            disposition = 'inline' if request.GET.get('print') == 'true' else 'attachment'
+            response['Content-Disposition'] = f'{disposition}; filename="{safe_name}_{stamp}.html"'
+            return response
         except Exception as e:
             logger.exception("Template Render Error in download")
             return HttpResponse(f"<h3>{gettext('Template Render Error:')}</h3><pre>{str(e)}</pre>", status=400)

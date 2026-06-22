@@ -2,11 +2,13 @@ import django_filters
 from django import forms
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
+from django.contrib.auth import get_user_model
 from core.filters import BaseFilterSet
 from django.contrib.contenttypes.models import ContentType
 from .models import (
     Tag, CustomField, CustomFieldset, SavedFilter, AlertLog, AlertRule,
     EventRule, WebhookEndpoint, NotificationChannel, JournalEntry,
+    ReportTemplate, ScheduledReport,
 )
 
 class TagFilter(django_filters.FilterSet):
@@ -181,8 +183,35 @@ class AlertLogFilterSet(BaseFilterSet):
         fields = ['status', 'severity', 'rule', 'created_after', 'created_before']
 
 
-class JournalEntryFilterSet(django_filters.FilterSet):
-    q = django_filters.CharFilter(method='search', label=_('Search'))
+class JournalEntryFilterSet(BaseFilterSet):
+    q = django_filters.CharFilter(
+        method='search',
+        label=_('Search'),
+        widget=forms.TextInput(attrs={'placeholder': _('Search comments…')}),
+    )
+    model = django_filters.ModelMultipleChoiceFilter(
+        field_name='model',
+        queryset=ContentType.objects.order_by('app_label', 'model'),
+        label=_('Object Type'),
+        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
+    )
+    user = django_filters.ModelChoiceFilter(
+        queryset=get_user_model().objects.order_by('username'),
+        label=_('User'),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+    created_after = django_filters.DateTimeFilter(
+        field_name='created',
+        lookup_expr='gte',
+        label=_('After'),
+        widget=forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+    )
+    created_before = django_filters.DateTimeFilter(
+        field_name='created',
+        lookup_expr='lte',
+        label=_('Before'),
+        widget=forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+    )
 
     class Meta:
         model = JournalEntry
@@ -192,3 +221,35 @@ class JournalEntryFilterSet(django_filters.FilterSet):
         if not value.strip():
             return queryset
         return queryset.filter(Q(comment__icontains=value)).distinct()
+
+
+class ReportTemplateFilterSet(django_filters.FilterSet):
+    q = django_filters.CharFilter(method='search', label=_('Search'))
+
+    class Meta:
+        model = ReportTemplate
+        fields = ['report_type', 'style_preset', 'advanced_mode']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(description__icontains=value)
+        ).distinct()
+
+
+class ScheduledReportFilterSet(django_filters.FilterSet):
+    q = django_filters.CharFilter(method='search', label=_('Search'))
+
+    class Meta:
+        model = ScheduledReport
+        fields = ['report', 'frequency', 'format', 'is_active']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(recipients__icontains=value)
+        ).distinct()

@@ -2,13 +2,13 @@
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
-#
+# 
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-18 21:56+0200\n"
+"POT-Creation-Date: 2026-06-22 22:18+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,243 +18,610 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-msgid "%(count)s selected"
-msgstr "%(count)s ausgewählt"
-
-msgid "No items selected."
-msgstr "Keine Artikel ausgewählt."
-
-msgid ""
-"Are you sure you want to PERMANENTLY delete the selected items? This cannot "
-"be undone!"
-msgstr ""
-"Möchten Sie die ausgewählten Elemente wirklich DAUERHAFT löschen? Dies kann "
-"nicht rückgängig gemacht werden!"
-
-msgid "Saved"
-msgstr "Gespeichert"
-
-msgid "No assets assigned to active status labels."
-msgstr "Keine Assets aktiven Status-Labels zugewiesen."
-
-msgid "%(count)s assets"
-msgstr "%(count)s Assets"
-
-msgid "Assets"
-msgstr "Assets"
-
-msgid "Total"
-msgstr "Gesamt"
-
-msgid "Spend"
-msgstr "Ausgaben"
-
-msgid "You have unsaved changes. Leave this page?"
-msgstr "Sie haben ungespeicherte Änderungen. Diese Seite verlassen?"
-
-msgid "Saving..."
-msgstr "Wird gespeichert..."
-
-msgid "Are you sure?"
-msgstr "Sind Sie sicher?"
-
-msgid "Copied!"
-msgstr "Kopiert!"
-
-msgid "This action is disabled in preview mode."
-msgstr "Diese Aktion ist im Vorschaumodus deaktiviert."
-
-msgid "No results found"
-msgstr "Keine Ergebnisse gefunden"
-
-msgid "Visual inventory compilation."
-msgstr "Visuelle Inventarzusammenstellung."
-
-msgid "Asset Tag"
-msgstr "Inventarnummer"
-
-msgid "Asset Name"
-msgstr "Asset-Name"
-
-msgid "Manufacturer"
-msgstr "Hersteller"
-
-msgid "Model"
-msgstr "Modell"
-
-msgid "Serial Number"
-msgstr "Seriennummer"
-
-msgid "Status Label"
-msgstr "Status-Label"
-
-msgid "Location"
-msgstr "Lagerort"
-
-msgid "Asset Holder"
-msgstr "Asset-Inhaber"
-
-msgid "Purchase Cost"
-msgstr "Anschaffungskosten"
-
-msgid "Purchase Date"
-msgstr "Kaufdatum"
-
-msgid "Warranty (Months)"
-msgstr "Garantie (Monate)"
-
-msgid "License Name"
-msgstr "Lizenzname"
-
-msgid "Software"
-msgstr "Software"
-
-msgid "Total Seats"
-msgstr "Gesamtplätze"
-
-msgid "Assigned Seats"
-msgstr "Zugewiesene Plätze"
-
-msgid "Available Seats"
-msgstr "Verfügbare Plätze"
-
-msgid "Utilization Rate"
-msgstr "Auslastungsrate"
-
-msgid "Subscription Name"
-msgstr "Abonnementname"
-
-msgid "Provider"
-msgstr "Anbieter"
-
-msgid "Billing Cycle"
-msgstr "Abrechnungszyklus"
-
-msgid "Cost"
-msgstr "Kosten"
-
-msgid "End Date"
-msgstr "Enddatum"
-
-msgid "Salvage Value"
-msgstr "Restwert"
-
-msgid "Depreciation Lifespan (Months)"
-msgstr "Abschreibungsdauer (Monate)"
-
-msgid "Depreciated Value"
-msgstr "Abgeschriebener Wert"
-
-msgid "Software Product"
-msgstr "Softwareprodukt"
-
-msgid "Installed Count"
-msgstr "Anzahl Installationen"
-
-msgid "License Count"
-msgstr "Anzahl Lizenzen"
-
-msgid "Maintenance Title"
-msgstr "Wartungsbezeichnung"
-
-msgid "Asset"
-msgstr "Asset"
-
-msgid "Type"
-msgstr "Typ"
-
-msgid "Status"
-msgstr "Status"
-
-msgid "No records found."
-msgstr "Keine Datensätze gefunden."
-
-msgid "Sent automatically by ITAMbox — IT Asset Management Console."
-msgstr "Automatisch versendet von ITAMbox — IT-Asset-Management-Konsole."
-
-msgid "Selected Sequence (Orderable)"
-msgstr "Ausgewählte Reihenfolge (sortierbar)"
-
-msgid "No columns selected. Click available columns to add them."
-msgstr ""
-"Keine Spalten ausgewählt. Klicken Sie auf verfügbare Spalten, um sie "
-"hinzuzufügen."
-
-msgid "Available Columns"
-msgstr "Verfügbare Spalten"
-
-msgid "Move Up"
-msgstr "Nach oben"
-
-msgid "Move Down"
-msgstr "Nach unten"
-
-msgid "Remove"
-msgstr "Entfernen"
-
-msgid "Bootstrap from Visual Builder"
-msgstr "Aus dem visuellen Builder übernehmen"
-
-msgid ""
-"Are you sure you want to overwrite the current custom template with the "
-"selections from the Visual Builder?"
-msgstr ""
-"Möchten Sie die aktuelle benutzerdefinierte Vorlage wirklich mit den "
-"Auswahlen aus dem visuellen Builder überschreiben?"
-
-msgid "Preview Report"
-msgstr "Bericht in der Vorschau anzeigen"
-
-msgid "Template rendering failed."
-msgstr "Rendern der Vorlage fehlgeschlagen."
-
-msgid "Preview Render Error"
-msgstr "Fehler beim Rendern der Vorschau"
-
-msgid ""
-"Camera unavailable. On iPhone/iPad, scanning requires HTTPS. Please use a "
-"hardware scanner or type the asset tag."
-msgstr ""
-"Kamera nicht verfügbar. Auf iPhone/iPad erfordert das Scannen HTTPS. Bitte "
-"verwenden Sie einen Hardware-Scanner oder geben Sie die Inventarnummer ein."
-
-msgid ""
-"Camera permission denied. On iPhone/iPad check Settings › Safari › Camera, "
-"or use a hardware scanner / type the tag."
-msgstr ""
-"Kamerazugriff verweigert. Prüfen Sie auf iPhone/iPad Einstellungen › Safari "
-"› Kamera, oder verwenden Sie einen Hardware-Scanner / geben Sie die Nummer "
-"ein."
-
-msgid ""
-"Camera unavailable. Please use a hardware scanner or type the asset tag."
-msgstr ""
-"Kamera nicht verfügbar. Bitte verwenden Sie einen Hardware-Scanner oder "
-"geben Sie die Inventarnummer ein."
-
-msgid "No asset matches: %(code)s"
-msgstr "Kein Asset stimmt überein: %(code)s"
-
-msgid "Generate from name"
-msgstr "Aus Namen generieren"
-
-msgid "Failed to save configuration"
-msgstr "Speichern der Konfiguration fehlgeschlagen"
-
-msgid "Error saving configuration: "
-msgstr "Fehler beim Speichern der Konfiguration: "
-
-msgid "Error resetting configuration: "
-msgstr "Fehler beim Zurücksetzen der Konfiguration: "
-
+#: .\static\dist\itambox.js:1
 msgid "Close"
 msgstr "Schließen"
 
-msgid "Added: %(label)s"
-msgstr "Hinzugefügt: %(label)s"
+#: .\static\dist\itambox.js:1
+msgid "Generate from name"
+msgstr "Aus Namen generieren"
 
+#: .\static\dist\itambox.js:1
+msgid "%(count)s selected"
+msgstr "%(count)s ausgewählt"
+
+#: .\static\dist\itambox.js:1
+msgid "No items selected."
+msgstr "Keine Artikel ausgewählt."
+
+#: .\static\dist\itambox.js:1
+msgid "Are you sure you want to PERMANENTLY delete the selected items? This cannot be undone!"
+msgstr "Möchten Sie die ausgewählten Elemente wirklich DAUERHAFT löschen? Dies kann nicht rückgängig gemacht werden!"
+
+#: .\static\dist\itambox.js:1
+msgid "No results found"
+msgstr "Keine Ergebnisse gefunden"
+
+#: .\static\dist\itambox.js:1
+msgid "Failed to save configuration"
+msgstr "Speichern der Konfiguration fehlgeschlagen"
+
+#: .\static\dist\itambox.js:1
+msgid "Error saving configuration: "
+msgstr "Fehler beim Speichern der Konfiguration: "
+
+#: .\static\dist\itambox.js:1
+msgid "Error resetting configuration: "
+msgstr "Fehler beim Zurücksetzen der Konfiguration: "
+
+#: .\static\dist\itambox.js:1
+msgid "You have unsaved changes. Leave this page?"
+msgstr "Sie haben ungespeicherte Änderungen. Diese Seite verlassen?"
+
+#: .\static\dist\itambox.js:1
+msgid "Saving..."
+msgstr "Wird gespeichert..."
+
+#: .\static\dist\itambox.js:1
+msgid "Saved"
+msgstr "Gespeichert"
+
+#: .\static\dist\itambox.js:1
+msgid "No assets assigned to active status labels."
+msgstr "Keine Assets aktiven Status-Labels zugewiesen."
+
+#: .\static\dist\itambox.js:1
+msgid "%(count)s assets"
+msgstr "%(count)s Assets"
+
+#: .\static\dist\itambox.js:1
+msgid "Assets"
+msgstr "Assets"
+
+#: .\static\dist\itambox.js:1
+msgid "Total"
+msgstr "Gesamt"
+
+#: .\static\dist\itambox.js:1
+msgid "Spend"
+msgstr "Ausgaben"
+
+#: .\static\dist\itambox.js:1
+msgid "Camera unavailable. On iPhone/iPad, scanning requires HTTPS. Please use a hardware scanner or type the asset tag."
+msgstr "Kamera nicht verfügbar. Auf iPhone/iPad erfordert das Scannen HTTPS. Bitte verwenden Sie einen Hardware-Scanner oder geben Sie die Inventarnummer ein."
+
+#: .\static\dist\itambox.js:1
+msgid "Camera permission denied. On iPhone/iPad check Settings › Safari › Camera, or use a hardware scanner / type the tag."
+msgstr "Kamerazugriff verweigert. Prüfen Sie auf iPhone/iPad Einstellungen › Safari › Kamera, oder verwenden Sie einen Hardware-Scanner / geben Sie die Nummer ein."
+
+#: .\static\dist\itambox.js:1
+msgid "Camera unavailable. Please use a hardware scanner or type the asset tag."
+msgstr "Kamera nicht verfügbar. Bitte verwenden Sie einen Hardware-Scanner oder geben Sie die Inventarnummer ein."
+
+#: .\static\dist\itambox.js:1 .\static\dist\itambox.js:226
+msgid "No asset matches: %(code)s"
+msgstr "Kein Asset stimmt überein: %(code)s"
+
+#: .\static\dist\itambox.js:1 .\static\dist\itambox.js:226
 msgid "Already in basket: %(code)s"
 msgstr "Bereits im Korb: %(code)s"
 
+#: .\static\dist\itambox.js:1 .\static\dist\itambox.js:226
+msgid "Added: %(label)s"
+msgstr "Hinzugefügt: %(label)s"
+
+#: .\static\dist\itambox.js:1 .\static\dist\itambox.js:226
 msgid "You do not have permission to do this."
 msgstr "Sie haben dazu keine Berechtigung."
+
+#: .\static\dist\itambox.js:1
+msgid "Visual inventory compilation."
+msgstr "Visuelle Inventarzusammenstellung."
+
+#: .\static\dist\itambox.js:1
+msgid "Asset Tag"
+msgstr "Inventarnummer"
+
+#: .\static\dist\itambox.js:1
+msgid "Asset Name"
+msgstr "Asset-Name"
+
+#: .\static\dist\itambox.js:1
+msgid "Manufacturer"
+msgstr "Hersteller"
+
+#: .\static\dist\itambox.js:1
+msgid "Model"
+msgstr "Modell"
+
+#: .\static\dist\itambox.js:1
+msgid "Serial Number"
+msgstr "Seriennummer"
+
+#: .\static\dist\itambox.js:1
+msgid "Status Label"
+msgstr "Status-Label"
+
+#: .\static\dist\itambox.js:1
+msgid "Location"
+msgstr "Lagerort"
+
+#: .\static\dist\itambox.js:1
+msgid "Asset Holder"
+msgstr "Asset-Inhaber"
+
+#: .\static\dist\itambox.js:1
+msgid "Purchase Cost"
+msgstr "Anschaffungskosten"
+
+#: .\static\dist\itambox.js:1
+msgid "Purchase Date"
+msgstr "Kaufdatum"
+
+#: .\static\dist\itambox.js:1
+msgid "Warranty (Months)"
+msgstr "Garantie (Monate)"
+
+#: .\static\dist\itambox.js:1
+msgid "License Name"
+msgstr "Lizenzname"
+
+#: .\static\dist\itambox.js:1
+msgid "Software"
+msgstr "Software"
+
+#: .\static\dist\itambox.js:1
+msgid "Total Seats"
+msgstr "Gesamtplätze"
+
+#: .\static\dist\itambox.js:1
+msgid "Assigned Seats"
+msgstr "Zugewiesene Plätze"
+
+#: .\static\dist\itambox.js:1
+msgid "Available Seats"
+msgstr "Verfügbare Plätze"
+
+#: .\static\dist\itambox.js:1
+msgid "Utilization Rate"
+msgstr "Auslastungsrate"
+
+#: .\static\dist\itambox.js:1
+msgid "Subscription Name"
+msgstr "Abonnementname"
+
+#: .\static\dist\itambox.js:1
+msgid "Provider"
+msgstr "Anbieter"
+
+#: .\static\dist\itambox.js:1
+msgid "Billing Cycle"
+msgstr "Abrechnungszyklus"
+
+#: .\static\dist\itambox.js:1
+msgid "Cost"
+msgstr "Kosten"
+
+#: .\static\dist\itambox.js:1
+msgid "End Date"
+msgstr "Enddatum"
+
+#: .\static\dist\itambox.js:1
+msgid "Salvage Value"
+msgstr "Restwert"
+
+#: .\static\dist\itambox.js:1
+msgid "Depreciation Lifespan (Months)"
+msgstr "Abschreibungsdauer (Monate)"
+
+#: .\static\dist\itambox.js:1
+msgid "Depreciated Value"
+msgstr "Abgeschriebener Wert"
+
+#: .\static\dist\itambox.js:1
+msgid "Software Product"
+msgstr "Softwareprodukt"
+
+#: .\static\dist\itambox.js:1
+msgid "Installed Count"
+msgstr "Anzahl Installationen"
+
+#: .\static\dist\itambox.js:1
+msgid "License Count"
+msgstr "Anzahl Lizenzen"
+
+#: .\static\dist\itambox.js:1
+msgid "Maintenance Title"
+msgstr "Wartungsbezeichnung"
+
+#: .\static\dist\itambox.js:1
+msgid "Asset"
+msgstr "Asset"
+
+#: .\static\dist\itambox.js:1
+msgid "Type"
+msgstr "Typ"
+
+#: .\static\dist\itambox.js:1
+msgid "Status"
+msgstr "Status"
+
+#: .\static\dist\itambox.js:1
+msgid "Contract #"
+msgstr "Vertragsnr."
+
+#: .\static\dist\itambox.js:1
+msgid "Contract Name"
+msgstr "Vertragsname"
+
+#: .\static\dist\itambox.js:1
+msgid "Contract Type"
+msgstr "Vertragstyp"
+
+#: .\static\dist\itambox.js:1
+msgid "Contract Status"
+msgstr "Vertragsstatus"
+
+#: .\static\dist\itambox.js:1
+msgid "Supplier"
+msgstr ""
+
+#: .\static\dist\itambox.js:1
+msgid "Start Date"
+msgstr ""
+
+#: .\static\dist\itambox.js:1
+#, fuzzy
+#| msgid "End Date"
+msgid "Renewal Date"
+msgstr "Enddatum"
+
+#: .\static\dist\itambox.js:1
+msgid "Days Until Expiry"
+msgstr "Tage bis Ablauf"
+
+#: .\static\dist\itambox.js:1
+msgid "Contract Cost"
+msgstr "Vertragskosten"
+
+#: .\static\dist\itambox.js:1
+msgid "Auto-Renew"
+msgstr "Autom. Verlängerung"
+
+#: .\static\dist\itambox.js:1
+#, fuzzy
+#| msgid "Assets"
+msgid "Covered Assets"
+msgstr "Assets"
+
+#: .\static\dist\itambox.js:1
+msgid "SLA Response Time"
+msgstr "SLA-Reaktionszeit"
+
+#: .\static\dist\itambox.js:1
+msgid "SLA Resolution Time"
+msgstr "SLA-Lösungszeit"
+
+#: .\static\dist\itambox.js:1
+msgid "Coverage Hours"
+msgstr "Abdeckungszeiten"
+
+#: .\static\dist\itambox.js:1
+#, fuzzy
+#| msgid "Warranty (Months)"
+msgid "Warranty Type"
+msgstr "Garantie (Monate)"
+
+#: .\static\dist\itambox.js:1
+msgid "Days Remaining"
+msgstr "Verbleibende Tage"
+
+#: .\static\dist\itambox.js:1
+#, fuzzy
+#| msgid "Warranty (Months)"
+msgid "Warranty Cost"
+msgstr "Garantie (Monate)"
+
+#: .\static\dist\itambox.js:1
+msgid "Reference"
+msgstr ""
+
+#: .\static\dist\itambox.js:1
+msgid "Disposal Date"
+msgstr "Entsorgungsdatum"
+
+#: .\static\dist\itambox.js:1
+msgid "Disposal Method"
+msgstr "Entsorgungsmethode"
+
+#: .\static\dist\itambox.js:1
+msgid "Data Sanitization Method"
+msgstr "Datenlöschmethode"
+
+#: .\static\dist\itambox.js:1
+#, fuzzy
+#| msgid "Utilization Rate"
+msgid "Sanitization Certificate"
+msgstr "Auslastungsrate"
+
+#: .\static\dist\itambox.js:1
+msgid "Sanitized By"
+msgstr "Bereinigt von"
+
+#: .\static\dist\itambox.js:1
+msgid "Recipient"
+msgstr ""
+
+#: .\static\dist\itambox.js:1
+msgid "Proceeds"
+msgstr "Erlös"
+
+#: .\static\dist\itambox.js:1
+msgid "WEEE Compliant"
+msgstr "WEEE-konform"
+
+#: .\static\dist\itambox.js:1
+msgid "Notes"
+msgstr ""
+
+#: .\static\dist\itambox.js:1
+#, fuzzy
+#| msgid "Type"
+msgid "Item Type"
+msgstr "Typ"
+
+#: .\static\dist\itambox.js:1
+msgid "Name"
+msgstr ""
+
+#: .\static\dist\itambox.js:1
+msgid "Category"
+msgstr ""
+
+#: .\static\dist\itambox.js:1
+#, fuzzy
+#| msgid "Serial Number"
+msgid "Part Number"
+msgstr "Seriennummer"
+
+#: .\static\dist\itambox.js:1
+#, fuzzy
+#| msgid "Total Seats"
+msgid "Total Stock"
+msgstr "Gesamtplätze"
+
+#: .\static\dist\itambox.js:1
+#, fuzzy
+#| msgid "Available Seats"
+msgid "Available"
+msgstr "Verfügbare Plätze"
+
+#: .\static\dist\itambox.js:1
+msgid "Safety Threshold"
+msgstr ""
+
+#: .\static\dist\itambox.js:1
+#, fuzzy
+#| msgid "Status"
+msgid "Stock Status"
+msgstr "Status"
+
+#: .\static\dist\itambox.js:1
+#, fuzzy
+#| msgid "Asset Holder"
+msgid "Holder"
+msgstr "Asset-Inhaber"
+
+#: .\static\dist\itambox.js:1
+msgid "Acceptance Status"
+msgstr "Annahmestatus"
+
+#: .\static\dist\itambox.js:1
+msgid "Accepted Date"
+msgstr "Annahmedatum"
+
+#: .\static\dist\itambox.js:1
+msgid "EULA Version"
+msgstr "EULA-Version"
+
+#: .\static\dist\itambox.js:1
+#, fuzzy
+#| msgid "Provider"
+msgid "Signature Provider"
+msgstr "Anbieter"
+
+#: .\static\dist\itambox.js:1
+msgid "QMS Reference"
+msgstr "QMS-Referenz"
+
+#: .\static\dist\itambox.js:1
+msgid "IP Address"
+msgstr ""
+
+#: .\static\dist\itambox.js:1
+#, fuzzy
+#| msgid "Purchase Date"
+msgid "Created Date"
+msgstr "Kaufdatum"
+
+#: .\static\dist\itambox.js:170
+msgid "No records found."
+msgstr "Keine Datensätze gefunden."
+
+#: .\static\dist\itambox.js:179
+msgid "Sent automatically by ITAMbox — IT Asset Management Console."
+msgstr "Automatisch versendet von ITAMbox — IT-Asset-Management-Konsole."
+
+#: .\static\dist\itambox.js:189
+msgid "Move Up"
+msgstr "Nach oben"
+
+#: .\static\dist\itambox.js:192
+msgid "Move Down"
+msgstr "Nach unten"
+
+#: .\static\dist\itambox.js:195
+msgid "Remove"
+msgstr "Entfernen"
+
+#: .\static\dist\itambox.js:202 .\static\dist\itambox.js:210
+msgid "No columns selected. Click available columns to add them."
+msgstr "Keine Spalten ausgewählt. Klicken Sie auf verfügbare Spalten, um sie hinzuzufügen."
+
+#: .\static\dist\itambox.js:207
+msgid "Selected Sequence (Orderable)"
+msgstr "Ausgewählte Reihenfolge (sortierbar)"
+
+#: .\static\dist\itambox.js:215
+msgid "Available Columns"
+msgstr "Verfügbare Spalten"
+
+#: .\static\dist\itambox.js:221
+msgid "Bootstrap from Visual Builder"
+msgstr "Aus dem visuellen Builder übernehmen"
+
+#: .\static\dist\itambox.js:221
+msgid "Are you sure you want to overwrite the current custom template with the selections from the Visual Builder?"
+msgstr "Möchten Sie die aktuelle benutzerdefinierte Vorlage wirklich mit den Auswahlen aus dem visuellen Builder überschreiben?"
+
+#: .\static\dist\itambox.js:221
+msgid "Preview Report"
+msgstr "Bericht in der Vorschau anzeigen"
+
+#: .\static\dist\itambox.js:221
+msgid "Template rendering failed."
+msgstr "Rendern der Vorlage fehlgeschlagen."
+
+#: .\static\dist\itambox.js:222
+msgid "Preview Render Error"
+msgstr "Fehler beim Rendern der Vorschau"
+
+#: .\static\dist\itambox.js:226
+msgid "Are you sure?"
+msgstr "Sind Sie sicher?"
+
+#: .\static\dist\itambox.js:226
+msgid "Copied!"
+msgstr "Kopiert!"
+
+#: .\static\dist\itambox.js:226
+msgid "This action is disabled in preview mode."
+msgstr "Diese Aktion ist im Vorschaumodus deaktiviert."
+
+#: .\static\dist\itambox.js:226
+msgid "Matching"
+msgstr ""
+
+#: .\static\dist\itambox.js:226
+msgid "Mismatch"
+msgstr ""
+
+#: .\static\dist\itambox.js:226
+msgid "Surprise"
+msgstr ""
+
+#: .\static\dist\itambox.js:226
+msgid "This asset cannot be audited."
+msgstr ""
+
+#: .\static\dist\vendor\tom-select.complete.min.js:286
+msgid "loading"
+msgstr ""
+
+#: .\static\dist\vendor\tom-select.complete.min.js:286
+#, fuzzy
+#| msgid "No results found"
+msgid "no_results"
+msgstr "Keine Ergebnisse gefunden"
+
+#: .\static\dist\vendor\tom-select.complete.min.js:286
+msgid "not_loading"
+msgstr ""
+
+#: .\static\dist\vendor\tom-select.complete.min.js:286
+msgid "option_create"
+msgstr ""
+
+msgid "Contract Renewals & Expirations"
+msgstr "Vertragsverlängerungen & -abläufe"
+
+msgid "Warranty Expiration"
+msgstr "Garantieablauf"
+
+msgid "Asset Disposal & End-of-Life"
+msgstr "Anlagenentsorgung & End-of-Life"
+
+msgid "Hardware Inventory (Accessories, Consumables, Components)"
+msgstr "Hardware-Bestand (Zubehör, Verbrauchsmaterial, Komponenten)"
+
+msgid "Custody & EULA Sign-off Compliance"
+msgstr "Verwahrungs- & EULA-Bestätigungs-Compliance"
+
+msgid "PDF Attachment"
+msgstr "PDF-Anhang"
+
+msgid "Excel (XLSX) Attachment"
+msgstr "Excel (XLSX)-Anhang"
+
+msgid "Out of Stock"
+msgstr "Nicht vorrätig"
+
+msgid "Low Stock"
+msgstr "Geringer Bestand"
+
+msgid "In Stock"
+msgstr "Vorrätig"
+
+msgid "Uncategorized"
+msgstr "Nicht kategorisiert"
+
+msgid "Active Contracts"
+msgstr "Aktive Verträge"
+
+msgid "Expiring Within 30 Days"
+msgstr "Ablauf innerhalb von 30 Tagen"
+
+msgid "Est. Annual Spend"
+msgstr "Geschätzte Jahresausgaben"
+
+msgid "Total Warranties"
+msgstr "Garantien gesamt"
+
+msgid "Already Expired"
+msgstr "Bereits abgelaufen"
+
+msgid "Total Disposals"
+msgstr "Entsorgungen gesamt"
+
+msgid "WEEE Compliant Count"
+msgstr "Anzahl WEEE-konform"
+
+msgid "Total Proceeds"
+msgstr "Erlöse gesamt"
+
+msgid "Total Receipts"
+msgstr "Belege gesamt"
+
+msgid "Pending Sign-offs"
+msgstr "Ausstehende Bestätigungen"
+
+msgid "Acceptance Rate"
+msgstr "Annahmequote"
+
+msgid "Accessory SKUs"
+msgstr "Zubehör-SKUs"
+
+msgid "Consumable SKUs"
+msgstr "Verbrauchsmaterial-SKUs"
+
+msgid "Component SKUs"
+msgstr "Komponenten-SKUs"
+
+msgid "Items at Zero Stock"
+msgstr "Artikel ohne Bestand"
+
+msgid "Hardware Inventory by Type"
+msgstr "Hardware-Bestand nach Typ"
+
+msgid "Annual Spend by Supplier"
+msgstr "Jährliche Ausgaben nach Lieferant"
