@@ -5,7 +5,7 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django_tables2.utils import A
 
-from core.tables import BaseTable, ToggleColumn, ActionsColumn, ColorChipColumn
+from core.tables import BaseTable, ToggleColumn, ActionsColumn, ColorChipColumn, CountLinkColumn
 from extras.tables import TagColumn
 from .models import Accessory, AccessoryAssignment, AccessoryStock, Consumable, ConsumableAssignment, ConsumableStock, Kit, Component, ComponentStock, ComponentAllocation
 
@@ -19,8 +19,8 @@ class AccessoryTable(CheckableInventoryTableMixin, BaseTable):
     manufacturer = tables.Column(linkify=True)
     category = ColorChipColumn(accessor='category', verbose_name=_('Category'), order_by=('category__name',))
     part_number = tables.Column(verbose_name=_('Part Number'))
-    total_stock = tables.Column(accessor='total_stock', verbose_name=_('Total Stock'))
-    checked_out_qty = tables.Column(accessor='checked_out_qty', verbose_name=_('Checked Out'))
+    total_stock = CountLinkColumn('inventory:accessorystock_list', 'accessory', accessor='total_stock', verbose_name=_('Total Stock'))
+    checked_out_qty = CountLinkColumn('inventory:accessoryassignment_list', 'accessory', accessor='checked_out_qty', verbose_name=_('Checked Out'))
     available = tables.Column(accessor='available', verbose_name=_('Available'))
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name=_('Tenant'))
     tags = TagColumn(url_name='inventory:accessory_list')
@@ -36,19 +36,6 @@ class AccessoryTable(CheckableInventoryTableMixin, BaseTable):
         elif value < record.min_qty:
             return format_html('<span class="badge bg-warning-lt text-warning font-weight-bold">{} (Low)</span>', value)
         return value
-
-    def render_total_stock(self, value, record):
-        if record and value:
-            url = f"{reverse('inventory:accessorystock_list')}?accessory={record.pk}"
-            return format_html('<a href="{}">{}</a>', url, value)
-        return value or 0
-
-    def render_checked_out_qty(self, value, record):
-        if record and value:
-            url = f"{reverse('inventory:accessoryassignment_list')}?accessory={record.pk}"
-            return format_html('<a href="{}">{}</a>', url, value)
-        return value or 0
-
 
 class AccessoryStockTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
@@ -178,8 +165,8 @@ class ConsumableTable(CheckableInventoryTableMixin, BaseTable):
     manufacturer = tables.Column(linkify=True)
     category = ColorChipColumn(accessor='category', verbose_name=_('Category'), order_by=('category__name',))
     part_number = tables.Column(verbose_name=_('Part Number'))
-    total_stock = tables.Column(accessor='total_stock', verbose_name=_('Total Qty'))
-    consumed_qty = tables.Column(accessor='consumed_qty', verbose_name=_('Consumed'))
+    total_stock = CountLinkColumn('inventory:consumablestock_list', 'consumable', accessor='total_stock', verbose_name=_('Total Qty'))
+    consumed_qty = CountLinkColumn('inventory:consumableassignment_list', 'consumable', accessor='consumed_qty', verbose_name=_('Consumed'))
     available = tables.Column(accessor='available', verbose_name=_('Available'))
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant.pk')], accessor='tenant.name', verbose_name=_('Tenant'))
     tags = TagColumn(url_name='inventory:consumable_list')
@@ -195,19 +182,6 @@ class ConsumableTable(CheckableInventoryTableMixin, BaseTable):
         elif value < record.min_qty:
             return format_html('<span class="badge bg-warning-lt text-warning font-weight-bold">{} (Low Stock)</span>', value)
         return value
-
-    def render_total_stock(self, value, record):
-        if record and value:
-            url = f"{reverse('inventory:consumablestock_list')}?consumable={record.pk}"
-            return format_html('<a href="{}">{}</a>', url, value)
-        return value or 0
-
-    def render_consumed_qty(self, value, record):
-        if record and value:
-            url = f"{reverse('inventory:consumableassignment_list')}?consumable={record.pk}"
-            return format_html('<a href="{}">{}</a>', url, value)
-        return value or 0
-
 
 class ConsumableStockTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
@@ -330,7 +304,7 @@ class ComponentTable(CheckableInventoryTableMixin, BaseTable):
     manufacturer = tables.Column(linkify=True)
     category = ColorChipColumn(accessor='category', verbose_name=_('Category'), order_by=('category__name',))
     part_number = tables.Column(verbose_name=_('Part Number'))
-    total_stock = tables.Column(verbose_name=_('Total Stock'), orderable=False)
+    total_stock = CountLinkColumn('inventory:componentstock_list', 'component', verbose_name=_('Total Stock'), orderable=False)
     available_stock = tables.Column(verbose_name=_('Available'), orderable=False)
     min_qty = tables.Column(verbose_name=_('Safety Threshold'))
     tenant = tables.Column(linkify=True)
@@ -340,13 +314,6 @@ class ComponentTable(CheckableInventoryTableMixin, BaseTable):
         model = Component
         fields = ('pk', 'name', 'manufacturer', 'category', 'part_number', 'total_stock', 'available_stock', 'min_qty', 'tenant', 'tags', 'actions')
         default_columns = ('pk', 'name', 'manufacturer', 'category', 'part_number', 'total_stock', 'available_stock', 'min_qty', 'tenant', 'tags', 'actions')
-
-    def render_total_stock(self, value, record):
-        if record and value:
-            url = f"{reverse('inventory:componentstock_list')}?component={record.pk}"
-            return format_html('<a href="{}">{}</a>', url, value)
-        return value or 0
-
 
 class ComponentStockTable(BaseTable):
     pk = ToggleColumn(accessor='pk')

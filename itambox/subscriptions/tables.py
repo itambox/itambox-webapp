@@ -3,7 +3,7 @@ from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django_tables2.utils import A
-from core.tables import ActionsColumn, BaseTable, ToggleColumn
+from core.tables import ActionsColumn, BaseTable, CountLinkColumn, ToggleColumn
 from extras.tables import TagColumn
 from .models import Provider, Subscription, SubscriptionAssignment, SubscriptionStatusChoices
 
@@ -13,7 +13,7 @@ class ProviderTable(BaseTable):
     name = tables.LinkColumn('subscriptions:provider_detail', args=[A('pk')], verbose_name=_('Name'))
     is_active = tables.BooleanColumn(verbose_name=_('Active'), yesno='✓,✗')
     contact_email = tables.Column(accessor='primary_contact.email', verbose_name=_('Contact Email'))
-    subscription_count = tables.Column(accessor='subscription_count', verbose_name=_('Subscriptions'), orderable=False)
+    subscription_count = CountLinkColumn('subscriptions:subscription_list', 'provider', accessor='subscription_count', verbose_name=_('Subscriptions'), orderable=False)
     tags = TagColumn(url_name='subscriptions:provider_list')
     actions = ActionsColumn()
 
@@ -21,12 +21,6 @@ class ProviderTable(BaseTable):
         model = Provider
         fields = ('pk', 'name', 'is_active', 'account_id', 'contact_email', 'subscription_count', 'tags', 'actions')
         default_columns = ('pk', 'name', 'is_active', 'account_id', 'subscription_count', 'tags', 'actions')
-
-    def render_subscription_count(self, value, record):
-        if record and value:
-            url = f"{reverse('subscriptions:subscription_list')}?provider={record.pk}"
-            return format_html('<a href="{}">{}</a>', url, value)
-        return value or 0
 
 
 class SubscriptionTable(BaseTable):

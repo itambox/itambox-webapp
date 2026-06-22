@@ -1,7 +1,7 @@
 import django_tables2 as tables
 from django.utils.translation import gettext_lazy as _
 from assets.models import Manufacturer
-from core.tables import BaseTable, BooleanColumn, ToggleColumn, ActionsColumn
+from core.tables import BaseTable, BooleanColumn, ToggleColumn, ActionsColumn, CountLinkColumn
 from extras.tables import TagColumn
 from .models import Software, InstalledSoftware
 
@@ -21,7 +21,7 @@ class SoftwareTable(BaseTable):
         accessor='manufacturer.name',
         verbose_name=_("Manufacturer")
     )
-    license_count = tables.Column(verbose_name=_("Licenses"), orderable=False)
+    license_count = CountLinkColumn('licenses:license_list', 'software', verbose_name=_("Licenses"), orderable=False)
     installed_count = tables.Column(verbose_name=_("Installs"), orderable=False)
     tags = TagColumn(
         url_name='software:software_list' # Link back to the list view filtered by tag
@@ -32,12 +32,6 @@ class SoftwareTable(BaseTable):
         model = Software
         fields = ('pk', 'name', 'manufacturer', 'license_count', 'installed_count', 'description', 'tags', 'created_at', 'updated_at', 'actions')
         default_columns = ('pk', 'name', 'manufacturer', 'license_count', 'installed_count', 'description', 'tags', 'actions')
-
-    def render_license_count(self, value, record=None):
-        if record and value:
-            url = f"{reverse('licenses:license_list')}?software={record.pk}"
-            return format_html('<a href="{}">{}</a>', url, value)
-        return value or 0
 
     def render_installed_count(self, value, record=None):
         if record and value:

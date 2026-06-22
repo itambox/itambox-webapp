@@ -2,7 +2,7 @@
 import django_tables2 as tables
 from django_tables2.utils import A
 from .models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, Contact, ContactRole, ContactAssignment, TenantRole, TenantMembership, CostCenter
-from core.tables import ActionsColumn, BaseTable, ToggleColumn
+from core.tables import ActionsColumn, BaseTable, CountLinkColumn, ToggleColumn
 from extras.tables import TagColumn
 
 from assets.models import Asset, AssetAssignment
@@ -15,7 +15,7 @@ from django.utils.translation import gettext_lazy as _
 class RegionTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:region_detail', args=[A('pk')], verbose_name=_('Name'))
-    site_count = tables.Column(verbose_name=_('Sites'), orderable=False)
+    site_count = CountLinkColumn('organization:site_list', 'region', verbose_name=_('Sites'), orderable=False)
     tags = TagColumn(url_name='organization:region_list')
     actions = ActionsColumn()
 
@@ -24,16 +24,10 @@ class RegionTable(BaseTable):
         fields = ('pk', 'name', 'slug', 'description', 'site_count', 'tags', 'actions')
         default_columns = ('pk', 'name', 'site_count', 'description', 'tags', 'actions')
 
-    def render_site_count(self, value, record=None):
-        if record and value:
-            url = f"{reverse('organization:site_list')}?region={record.pk}"
-            return format_html('<a href="{}">{}</a>', url, value)
-        return value or 0
-
 class SiteGroupTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:sitegroup_detail', args=[A('pk')], verbose_name=_('Name'))
-    site_count = tables.Column(verbose_name=_('Sites'), orderable=False)
+    site_count = CountLinkColumn('organization:site_list', 'group', verbose_name=_('Sites'), orderable=False)
     tags = TagColumn(url_name='organization:sitegroup_list')
     actions = ActionsColumn()
 
@@ -42,20 +36,14 @@ class SiteGroupTable(BaseTable):
         fields = ('pk', 'name', 'site_count', 'description', 'tags', 'actions')
         default_columns = ('pk', 'name', 'site_count', 'description', 'tags', 'actions')
 
-    def render_site_count(self, value, record=None):
-        if record and value:
-            url = f"{reverse('organization:site_list')}?group={record.pk}"
-            return format_html('<a href="{}">{}</a>', url, value)
-        return value or 0
-
 class SiteTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:site_detail', args=[A('pk')], verbose_name=_('Name'))
     region = tables.LinkColumn('organization:region_detail', args=[A('region_id')], accessor='region')
     group = tables.LinkColumn('organization:sitegroup_detail', args=[A('group_id')], accessor='group')
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant')
-    location_count = tables.Column(verbose_name=_('Locations'), orderable=False)
-    asset_count = tables.Column(verbose_name=_('Assets'), orderable=False)
+    location_count = CountLinkColumn('organization:location_list', 'site', verbose_name=_('Locations'), orderable=False)
+    asset_count = CountLinkColumn('assets:asset_list', 'site', verbose_name=_('Assets'), orderable=False)
     tags = TagColumn(url_name='organization:site_list')
     actions = ActionsColumn()
 
@@ -63,18 +51,6 @@ class SiteTable(BaseTable):
         model = Site
         fields = ('pk', 'name', 'slug', 'status', 'region', 'group', 'tenant', 'description', 'location_count', 'asset_count', 'tags', 'actions')
         default_columns = ('pk', 'name', 'status', 'region', 'group', 'tenant', 'location_count', 'asset_count', 'tags', 'actions')
-
-    def render_location_count(self, value, record=None):
-        if record and value:
-            url = f"{reverse('organization:location_list')}?site={record.pk}"
-            return format_html('<a href="{}">{}</a>', url, value)
-        return value or 0
-
-    def render_asset_count(self, value, record=None):
-        if record and value:
-            url = f"{reverse('assets:asset_list')}?site={record.pk}"
-            return format_html('<a href="{}">{}</a>', url, value)
-        return value or 0
 
     def render_status(self, value, record):
         if record and record.status:
@@ -93,7 +69,7 @@ class LocationTable(BaseTable):
     name = tables.LinkColumn('organization:location_detail', args=[A('pk')], verbose_name=_('Name'))
     site = tables.LinkColumn('organization:site_detail', args=[A('site_id')], accessor='site')
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant')
-    asset_count = tables.Column(verbose_name=_('Assets'), orderable=False)
+    asset_count = CountLinkColumn('assets:asset_list', 'location', verbose_name=_('Assets'), orderable=False)
     tags = TagColumn(url_name='organization:location_list')
     actions = ActionsColumn()
 
@@ -101,12 +77,6 @@ class LocationTable(BaseTable):
         model = Location
         fields = ('pk', 'name', 'slug', 'status', 'site', 'tenant', 'description', 'asset_count', 'tags', 'actions')
         default_columns = ('pk', 'name', 'status', 'site', 'tenant', 'asset_count', 'tags', 'actions')
-
-    def render_asset_count(self, value, record=None):
-        if record and value:
-            url = f"{reverse('assets:asset_list')}?location={record.pk}"
-            return format_html('<a href="{}">{}</a>', url, value)
-        return value or 0
 
     def render_status(self, value, record):
         if record and record.status:
@@ -123,7 +93,7 @@ class LocationTable(BaseTable):
 class TenantGroupTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:tenantgroup_detail', args=[A('pk')], verbose_name=_('Name'))
-    tenant_count = tables.Column(verbose_name=_('Tenants'), orderable=False)
+    tenant_count = CountLinkColumn('organization:tenant_list', 'group', verbose_name=_('Tenants'), orderable=False)
     tags = TagColumn(url_name='organization:tenantgroup_list')
     actions = ActionsColumn()
 
@@ -132,18 +102,12 @@ class TenantGroupTable(BaseTable):
         fields = ('pk', 'name', 'slug', 'description', 'tenant_count', 'tags', 'actions')
         default_columns = ('pk', 'name', 'tenant_count', 'description', 'tags', 'actions')
 
-    def render_tenant_count(self, value, record=None):
-        if record and value:
-            url = f"{reverse('organization:tenant_list')}?group={record.pk}"
-            return format_html('<a href="{}">{}</a>', url, value)
-        return value or 0
-
 class TenantTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:tenant_detail', args=[A('pk')], verbose_name=_('Name'))
     group = tables.LinkColumn('organization:tenantgroup_detail', args=[A('group_id')], accessor='group')
-    site_count = tables.Column(verbose_name=_('Sites'), orderable=False)
-    location_count = tables.Column(verbose_name=_('Locations'), orderable=False)
+    site_count = CountLinkColumn('organization:site_list', 'tenant', verbose_name=_('Sites'), orderable=False)
+    location_count = CountLinkColumn('organization:location_list', 'tenant', verbose_name=_('Locations'), orderable=False)
     tags = TagColumn(url_name='organization:tenant_list')
     actions = ActionsColumn()
 
@@ -151,18 +115,6 @@ class TenantTable(BaseTable):
         model = Tenant
         fields = ('pk', 'name', 'slug', 'group', 'description', 'site_count', 'location_count', 'tags', 'actions')
         default_columns = ('pk', 'name', 'group', 'site_count', 'location_count', 'tags', 'actions')
-
-    def render_site_count(self, value, record=None):
-        if record and value:
-            url = f"{reverse('organization:site_list')}?tenant={record.pk}"
-            return format_html('<a href="{}">{}</a>', url, value)
-        return value or 0
-
-    def render_location_count(self, value, record=None):
-        if record and value:
-            url = f"{reverse('organization:location_list')}?tenant={record.pk}"
-            return format_html('<a href="{}">{}</a>', url, value)
-        return value or 0
 
 
 # --- AssetHolder Table ---
@@ -172,7 +124,7 @@ class AssetHolderTable(BaseTable):
     first_name = tables.Column()
     last_name = tables.Column()
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant', verbose_name=_('Tenant'))
-    assignment_count = tables.Column(verbose_name=_('Assignments'), orderable=False, accessor='assignment_count')
+    assignment_count = CountLinkColumn('assets:asset_list', 'assigned_to', verbose_name=_('Assignments'), orderable=False, accessor='assignment_count')
     tags = TagColumn(url_name='organization:assetholder_list')
     actions = ActionsColumn()
 
@@ -180,12 +132,6 @@ class AssetHolderTable(BaseTable):
         model = AssetHolder
         fields = ('pk', 'upn', 'first_name', 'last_name', 'email', 'tenant', 'assignment_count', 'description', 'tags', 'actions')
         default_columns = ('pk', 'upn', 'first_name', 'last_name', 'tenant', 'assignment_count', 'tags', 'actions')
-
-    def render_assignment_count(self, value, record=None):
-        if record and value:
-            url = f"{reverse('assets:asset_list')}?assigned_to={record.pk}"
-            return format_html('<a href="{}">{}</a>', url, value)
-        return value or 0
 
 # --- AssetAssignment Table ---
 class AssetAssignmentTable(BaseTable):
@@ -320,7 +266,7 @@ class CostCenterTable(BaseTable):
     code = tables.Column(verbose_name=_('Code'))
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant', verbose_name=_('Tenant'))
     parent = tables.LinkColumn('organization:costcenter_detail', args=[A('parent_id')], accessor='parent', verbose_name=_('Parent'))
-    child_count = tables.Column(verbose_name=_('Sub-units'), orderable=False)
+    child_count = CountLinkColumn('organization:costcenter_list', 'parent', verbose_name=_('Sub-units'), orderable=False)
     is_active = tables.BooleanColumn(verbose_name=_('Active'))
     actions = ActionsColumn()
 
@@ -328,9 +274,3 @@ class CostCenterTable(BaseTable):
         model = CostCenter
         fields = ('pk', 'code', 'name', 'tenant', 'parent', 'description', 'child_count', 'is_active', 'actions')
         default_columns = ('pk', 'code', 'name', 'tenant', 'parent', 'child_count', 'is_active', 'actions')
-
-    def render_child_count(self, value, record=None):
-        if record and value:
-            url = f"{reverse('organization:costcenter_list')}?parent={record.pk}"
-            return format_html('<a href="{}">{}</a>', url, value)
-        return value or 0

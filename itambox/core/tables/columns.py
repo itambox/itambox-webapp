@@ -36,6 +36,32 @@ class ColorChipColumn(tables.Column):
         )
 
 
+class CountLinkColumn(tables.Column):
+    """A numeric column that links its count to a pre-filtered list view.
+
+    Renders ``value`` as a link to ``reverse(viewname)?<url_param>=<record.pk>``; an
+    empty/zero value — or a row with no record, e.g. a table footer — renders as a plain
+    ``0`` with no link. Replaces the hand-written ``render_<x>_count`` methods that built
+    this identical link inline across the app's tables (so the link format and the
+    empty/zero fallback live in one place).
+
+    Usage::
+
+        asset_count = CountLinkColumn('assets:asset_list', 'status', verbose_name=_('Assets'))
+    """
+
+    def __init__(self, viewname, url_param, *args, **kwargs):
+        self.viewname = viewname
+        self.url_param = url_param
+        super().__init__(*args, **kwargs)
+
+    def render(self, value, record=None):
+        if record is not None and value:
+            url = f"{reverse(self.viewname)}?{self.url_param}={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
+        return value or 0
+
+
 class BooleanColumn(tables.Column):
     TRUE_MARK = mark_safe(
         '<span class="text-success">'
