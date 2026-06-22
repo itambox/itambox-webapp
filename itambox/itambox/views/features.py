@@ -3,7 +3,7 @@ import json
 import difflib
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.http import Http404, HttpResponse, HttpResponseRedirect
+from django.http import Http404, HttpResponse, HttpResponseBadRequest, HttpResponseRedirect
 from django.core.exceptions import PermissionDenied
 from django.apps import apps
 from django.urls import reverse, NoReverseMatch
@@ -194,8 +194,10 @@ class ObjectExportView(LoginRequiredMixin, View):
 
         pks = request.GET.get('pk', '')
         if pks:
-            pks = [int(p) for p in pks.split(',') if p.strip()]
-            queryset = model.objects.filter(pk__in=pks)
+            valid_pks = [int(p) for p in pks.split(',') if p.strip().isdigit()]
+            if not valid_pks:
+                return HttpResponseBadRequest(_("Invalid pk value(s)."))
+            queryset = model.objects.filter(pk__in=valid_pks)
         elif export_scope == 'filtered':
             queryset = model.objects.all()
             filterset_class = get_filterset_for_model(model)
@@ -234,7 +236,7 @@ class ObjectExportView(LoginRequiredMixin, View):
                         elif isinstance(val, (int, float, bool)):
                             row_dict[field.name] = val
                         else:
-                            row_dict[field.name] = csv_safe(str(val))
+                            row_dict[field.name] = str(val)
                     export_data.append(row_dict)
 
                 yaml_content = yaml.safe_dump(export_data, default_flow_style=False, sort_keys=False)

@@ -41,7 +41,7 @@ class SoftwareTable(BaseTable):
 
     def render_installed_count(self, value, record=None):
         if record and value:
-            url = f"{reverse('software:software_detail', args=[record.pk])}#instances"
+            url = f"{reverse('software:software_detail', args=[record.pk])}#installed-instances"
             return format_html('<a href="{}">{}</a>', url, value)
         return value or 0
 

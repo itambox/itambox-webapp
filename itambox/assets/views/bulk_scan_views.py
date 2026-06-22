@@ -3,7 +3,7 @@
 Both flows share a "scan basket" page: the user accumulates assets by camera
 scan (mobile), USB/keyboard barcode scan or manual entry (desktop), then applies
 one action to the whole batch. The batch is processed by a background ``Job``
-(mirrors ``bulk_assign_assets``) so it scales and survives request timeouts.
+so it scales and survives request timeouts.
 
 - ``AssetScanActionResolveView`` — JSON endpoint resolving a scanned code to an
   asset plus per-mode eligibility (reused for server-side seeding).

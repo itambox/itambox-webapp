@@ -8,15 +8,18 @@ both miss the lookup and each insert a row, leaving duplicate schedules that
 fire the same task more than once.
 
 ``register_schedule`` collapses every call to exactly one row per ``func``: it
-locks the existing rows, keeps the first, deletes any extras, and refreshes its
-defaults — or creates a single row when none exist. The de-dupe makes the call
-self-healing, so even a transient double-insert from a true create-race is
-cleaned up on the next registration.
+acquires a PostgreSQL transaction-level advisory lock keyed on the func string
+(so no two concurrent transactions can enter the critical section for the same
+func simultaneously), locks the existing rows, keeps the first, deletes any
+extras, and refreshes its defaults — or creates a single row when none exist.
+The de-dupe makes the call self-healing, so even a transient double-insert from
+a true create-race is cleaned up on the next registration.
 """
 
 import logging
+import zlib
 
-from django.db import transaction
+from django.db import connection, transaction
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +39,21 @@ def register_schedule(func, *, defaults=None):
         from django_q.models import Schedule
 
         with transaction.atomic():
+            # Acquire a transaction-level advisory lock keyed on the func
+            # string.  select_for_update().filter() only locks *existing* rows,
+            # so two concurrent first-inserts would both see an empty queryset
+            # and both proceed to create — the advisory lock prevents that by
+            # serializing the entire check-and-create block on a per-func basis.
+            # zlib.crc32 is deterministic across processes (unlike hash()).
+            # The result is masked to a signed 64-bit integer as required by
+            # pg_advisory_xact_lock.
+            lock_key = zlib.crc32(func.encode()) & 0xFFFFFFFF
+            # Shift into signed 64-bit range so Postgres accepts it.
+            if lock_key > 0x7FFFFFFF:
+                lock_key -= 0x100000000
+            with connection.cursor() as cur:
+                cur.execute("SELECT pg_advisory_xact_lock(%s)", [lock_key])
+
             # Lock existing rows for this func so concurrent registrations of an
             # already-present schedule serialize rather than racing.
             existing = list(

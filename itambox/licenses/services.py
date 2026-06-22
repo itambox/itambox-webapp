@@ -26,7 +26,22 @@ def checkout_license(
         
         if lic.available_seats < 1:
             raise ValidationError(_("No available seats left for this software license."))
-            
+
+        # Reject a second active seat for the same target. The DB enforces this with
+        # a partial UniqueConstraint, but checking here turns a duplicate request into
+        # a clean ValidationError (HTTP 400) instead of an IntegrityError (HTTP 500).
+        duplicate = LicenseSeatAssignment.objects.filter(license=lic)
+        duplicate = (
+            duplicate.filter(asset=asset) if asset is not None
+            else duplicate.filter(assigned_holder=assigned_holder)
+        )
+        if duplicate.exists():
+            raise ValidationError(
+                _("%(target)s already holds a seat on this license.") % {
+                    'target': asset or assigned_holder,
+                }
+            )
+
         assignment = LicenseSeatAssignment.objects.create(
             license=lic,
             asset=asset,

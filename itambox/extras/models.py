@@ -11,7 +11,7 @@ from core.managers import (
     TenantScopingSoftDeleteManager, TenantScopingAllObjectsManager,
 )
 from core.mixins import SoftDeleteMixin, BookmarkableMixin
-from core.validators import validate_image_attachment, validate_file_attachment
+from core.validators import validate_image_attachment, validate_file_attachment, validate_external_url
 from core.csv_utils import csv_safe, safe_csv_filename
 
 
@@ -202,11 +202,15 @@ class Event(ChangeLoggingMixin, BaseModel):
     ACTION_CREATE = 'create'
     ACTION_UPDATE = 'update'
     ACTION_DELETE = 'delete'
+    ACTION_RESTORE = 'restore'
 
     ACTION_CHOICES = [
         (ACTION_CREATE, _('Create')),
         (ACTION_UPDATE, _('Update')),
         (ACTION_DELETE, _('Delete')),
+        # Emitted on a soft-delete restore (set -> None). A distinct, subscribable
+        # action so EventRules can target restores and the value is a declared choice.
+        (ACTION_RESTORE, _('Restore')),
     ]
 
     model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='events')
@@ -368,7 +372,6 @@ class WebhookEndpoint(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         if self.url:
             # SSRF guard at the WRITE boundary (forms/admin/full_clean), not only at dispatch:
             # reject loopback/link-local/private/metadata URLs before they are persisted.
-            from core.validators import validate_external_url
             validate_external_url(self.url)
 
     def save(self, *args, **kwargs):

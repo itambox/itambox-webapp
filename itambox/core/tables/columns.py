@@ -1,3 +1,5 @@
+import re
+
 import django_tables2 as tables
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
@@ -18,11 +20,19 @@ class ColorChipColumn(tables.Column):
     def render(self, value):
         if not value:
             return mark_safe('<span class="text-muted">&mdash;</span>')
+        raw_color = value.color or ''
+        # Sanitize: accept only valid 3- or 6-digit hex strings; fall back to a
+        # neutral grey so that an invalid/arbitrary value stored in the DB cannot
+        # inject CSS metacharacters into the style attribute.
+        if re.fullmatch(r'[0-9A-Fa-f]{3,6}', raw_color):
+            safe_color = raw_color
+        else:
+            safe_color = '6c757d'
         return format_html(
             '<a href="{}" class="text-reset text-decoration-none d-inline-flex align-items-center">'
             '<span class="d-inline-block rounded-circle me-1" '
             'style="width:.6rem;height:.6rem;background-color:#{};"></span>{}</a>',
-            value.get_absolute_url(), value.color or '6c757d', value.name,
+            value.get_absolute_url(), safe_color, value.name,
         )
 
 

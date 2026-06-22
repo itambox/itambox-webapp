@@ -2,7 +2,7 @@ import json
 import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 from django.http import HttpResponse, HttpResponseRedirect
@@ -65,14 +65,6 @@ class AssetListView(ObjectListView):
             to_attr='prefetched_active_assignments',
         ),
     )
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        # The bulk-assign dropdown only renders on the full page; skip loading
-        # the entire holder directory for partial table refreshes.
-        if not (self.is_htmx_partial() and self.content_partial_name):
-            context['asset_holders'] = AssetHolder.objects.all().order_by('last_name', 'first_name')
-        return context
 
     filterset = filters.AssetFilterSet
     filterset_form = forms.AssetFilterForm
@@ -419,6 +411,8 @@ class AssetAuditView(GenericTransactionView):
 @login_required
 def asset_label_print(request, pk, template_id=None):
     asset = get_object_or_404(Asset, pk=pk)
+    if not request.user.has_perm("assets.view_asset", obj=asset):
+        raise PermissionDenied
 
     if template_id:
         from extras.models import LabelTemplate
@@ -439,85 +433,6 @@ def asset_label_print(request, pk, template_id=None):
         'label_card': _default_label_card(asset, barcode_uri),
     }
     return render(request, "assets/assets/asset_label.html", context)
-
-
-@login_required
-def bulk_assign_assets(request):
-    if not request.user.has_perm('assets.change_asset'):
-        return HttpResponse(status=403)
-    if request.method != 'POST':
-        return HttpResponse(status=405)
-
-    object_pks = request.POST.getlist('pk')
-    holder_id = request.POST.get('holder_id')
-
-    if not object_pks or not holder_id:
-        messages.error(request, _("No assets selected or no holder specified."))
-        return HttpResponseRedirect(safe_return_url(request, request.META.get('HTTP_REFERER'), reverse('assets:asset_list')))
-
-    holder = get_object_or_404(AssetHolder, pk=holder_id)
-
-    from django_q.tasks import async_task
-    from django.contrib.contenttypes.models import ContentType
-    from core.models import Job
-    from core.managers import get_current_tenant
-    from django.conf import settings
-    from django.db import transaction
-
-    ct = ContentType.objects.get_for_model(Asset)
-    current_tenant = get_current_tenant()
-    tenant_id = current_tenant.pk if current_tenant else None
-
-    job = Job.objects.create(
-        name=f"Bulk Checkout: {len(object_pks)} Assets to {holder}",
-        tenant=current_tenant,
-        model=ct,
-        status=Job.STATUS_PENDING
-    )
-
-    if getattr(settings, 'Q_CLUSTER', {}).get('sync', False):
-        async_task(
-            'core.tasks.bulk_checkout_task',
-            job.pk,
-            object_pks,
-            'assetholder',
-            holder.pk,
-            request.user.pk,
-            f'Bulk assigned to {holder}',
-            None,
-            tenant_id
-        )
-    else:
-        transaction.on_commit(
-            lambda: async_task(
-                'core.tasks.bulk_checkout_task',
-                job.pk,
-                object_pks,
-                'assetholder',
-                holder.pk,
-                request.user.pk,
-                f'Bulk assigned to {holder}',
-                None,
-                tenant_id
-            )
-        )
-
-    try:
-        redirect_url = reverse('job_detail', kwargs={'pk': job.pk})
-    except NoReverseMatch:
-        redirect_url = f"/jobs/{job.pk}/"
-
-    messages.success(
-        request,
-        _("Asynchronous checkout job '%(job)s' enqueued successfully! Tracking progress in real-time.") % {"job": job.name}
-    )
-
-    if request.htmx:
-        response = HttpResponse(status=204)
-        response['HX-Redirect'] = redirect_url
-        return response
-
-    return HttpResponseRedirect(redirect_url)
 
 
 class AssetBulkEditView(ObjectBulkEditView):

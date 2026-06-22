@@ -4,7 +4,9 @@ import hashlib
 import logging
 
 import requests
+from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from core.models import ChangeLoggingMixin
@@ -30,7 +32,11 @@ def _resolve_instance_tenant_id(instance):
         return tenant_id
     # Models that derive their tenant through a relation (assignments/stock) declare a
     # ``tenant_lookup`` ORM path (e.g. 'asset__tenant'); walk it to the owning tenant.
-    lookup = getattr(type(instance), 'tenant_lookup', None)
+    # Fall back to ``changelog_tenant_lookup`` (used by models such as AssetAudit that
+    # only declare the changelog attribute) so their events match tenant EventRules.
+    lookup = getattr(type(instance), 'tenant_lookup', None) or getattr(
+        type(instance), 'changelog_tenant_lookup', None
+    )
     if lookup:
         obj = instance
         for part in lookup.split('__'):
@@ -67,8 +73,6 @@ def process_event_rules(event, instance_tenant_id=None):
     ambient tenant contextvar (which fails open in system contexts). See
     ``_resolve_instance_tenant_id``.
     """
-    from django.db.models import Q
-
     rules = EventRule._base_manager.filter(
         model=event.model,
         enabled=True,
@@ -78,6 +82,8 @@ def process_event_rules(event, instance_tenant_id=None):
     ).select_related('webhook')
 
     if not rules.exists():
+        event.processed = True
+        event.save(update_fields=['processed'])
         return
 
     for rule in rules:
@@ -300,7 +306,6 @@ def _send_notification(rule, event):
         # A tenant-scoped rule must fan out to the rule's tenant members, NOT create a global
         # user=None row that any authenticated user could open by pk (cross-tenant leak of the
         # rule's subject/body + the target object's URL). Mirrors the IN_APP channel branch.
-        from django.contrib.auth import get_user_model
         User = get_user_model()
         users = User.objects.filter(
             memberships__tenant_id=rule.tenant_id, is_active=True
@@ -439,7 +444,6 @@ def send_notification_to_channel(channel, subject, body):
 
     elif channel.channel_type == NotificationChannel.TYPE_IN_APP:
         from core.models import Notification
-        from django.contrib.auth import get_user_model
         User = get_user_model()
 
         # Resolve target users: explicit list in config → tenant members → global staff

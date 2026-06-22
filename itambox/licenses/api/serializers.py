@@ -1,9 +1,10 @@
-from django.db import transaction
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from itambox.api.base import BaseModelSerializer
 from itambox.api.nested_serializers import NestedManufacturerSerializer, NestedAssetSerializer
 from licenses.models import License, LicenseSeatAssignment
+from licenses.services import checkout_license
 from extras.api.serializers import TagSerializer
 from software.api.serializers import SoftwareSerializer
 from organization.api.serializers import AssetHolderSerializer, NestedTenantSerializer
@@ -49,6 +50,20 @@ class LicenseSerializer(BaseModelSerializer):
         )
         brief_fields = ['id', 'name', 'software', 'license_type', 'seats', 'available_seats']
 
+    def validate(self, data):
+        # Enforce the seat-capacity invariant on PATCH/PUT: seats cannot be reduced below
+        # the number of currently-active assignments.  License.clean() holds the same rule
+        # for the form/admin path; BaseModelSerializer never calls full_clean, so we call
+        # assert_seat_capacity() directly here — DRY: the logic lives once on the model.
+        instance = self.instance
+        if instance is not None and 'seats' in data:
+            try:
+                instance.assert_seat_capacity(seats=data['seats'])
+            except DjangoValidationError as exc:
+                # Re-raise as DRF ValidationError so the response uses the expected format.
+                raise serializers.ValidationError(exc.message_dict)
+        return super().validate(data)
+
 
 class LicenseSeatAssignmentSerializer(BaseModelSerializer):
     license = LicenseSerializer(read_only=True)
@@ -84,28 +99,29 @@ class LicenseSeatAssignmentSerializer(BaseModelSerializer):
         brief_fields = ['id', 'license', 'asset']
 
     def create(self, validated_data):
-        # The seat-availability + locking guard lives in checkout_license(); the REST CRUD
-        # path bypassed it, so N+1 POSTs could over-allocate a license and the same target
-        # could consume multiple seats. Re-apply the invariant here under a row lock (held
-        # through perform_create's transaction) so the API can't over-allocate.
+        # Delegate to checkout_license() so the parent-License changelog entry
+        # ("Checked out seat to …") is recorded on the API path just as on the UI
+        # path.  The service also holds the seat-availability lock + duplicate guard,
+        # removing the previously duplicated availability logic that lived here.
         license_obj = validated_data['license']
         asset = validated_data.get('asset')
         holder = validated_data.get('assigned_holder')
-        with transaction.atomic():
-            lic = License.objects.select_for_update().get(pk=license_obj.pk)
-            if lic.available_seats < 1:
-                raise serializers.ValidationError(
-                    {'license_id': _("No available seats left for this license.")}
-                )
-            existing = LicenseSeatAssignment.objects.filter(license=lic)
-            if asset is not None and existing.filter(asset=asset).exists():
-                raise serializers.ValidationError(
-                    {'asset_id': _("This asset already holds a seat on this license.")}
-                )
-            if holder is not None and existing.filter(assigned_holder=holder).exists():
-                raise serializers.ValidationError(
-                    {'assigned_holder_id': _("This holder already holds a seat on this license.")}
-                )
-            validated_data['license'] = lic
-            return super().create(validated_data)
+        notes = validated_data.get('notes', '')
+        try:
+            assignment = checkout_license(
+                license_obj=license_obj,
+                asset=asset,
+                assigned_holder=holder,
+                notes=notes,
+            )
+        except DjangoValidationError as exc:
+            # Surface service-layer errors as DRF validation errors (friendly 400 response).
+            raise serializers.ValidationError(exc.messages)
+        # If the caller supplied installed_software, persist it now — checkout_license
+        # only wires the core assignment; the optional SAM link is layered on top.
+        installed_software = validated_data.get('installed_software')
+        if installed_software is not None:
+            assignment.installed_software = installed_software
+            assignment.save(update_fields=['installed_software'])
+        return assignment
 

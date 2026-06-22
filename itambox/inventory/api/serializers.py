@@ -18,8 +18,14 @@ class _AssignmentAvailabilityMixin:
 
     def create(self, validated_data):
         item = validated_data.get(self.item_source_field)
-        qty = validated_data.get('qty') or 0
-        if item is not None and qty:
+        # Use the effective qty: what was supplied, or the model-field default (1).
+        # The previous `or 0` falsy-coercion caused the availability guard to be
+        # skipped when qty was omitted, while the model default of 1 still
+        # materialised and reduced stock — a silent over-allocation bypass.
+        qty = validated_data.get('qty')
+        if qty is None:
+            qty = 1  # mirrors AbstractAssignment.qty default=1
+        if item is not None:
             with transaction.atomic():
                 locked = type(item).objects.select_for_update().get(pk=item.pk)
                 if not locked.allow_overallocate and locked.available < qty:

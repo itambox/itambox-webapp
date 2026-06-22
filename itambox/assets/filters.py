@@ -228,6 +228,11 @@ class AssetTypeFilterSet(BaseFilterSet):
         field_name='manufacturer',
         label=_('Manufacturer')
     )
+    category = django_filters.ModelChoiceFilter(
+        queryset=Category.objects.all(),
+        label=_('Category'),
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
     requestable = django_filters.BooleanFilter(
         label=_('Requestable'),
         widget=forms.Select(choices=[('', _('Any')), ('true', _('Yes')), ('false', _('No'))], attrs={'class': 'form-select'})
@@ -235,7 +240,7 @@ class AssetTypeFilterSet(BaseFilterSet):
 
     class Meta:
         model = AssetType
-        fields = ['manufacturer', 'model', 'part_number', 'requestable']
+        fields = ['manufacturer', 'model', 'part_number', 'category', 'requestable']
 
     def search(self, queryset, name, value):
         if not value.strip():

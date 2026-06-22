@@ -4,7 +4,8 @@ from .models import Accessory, Consumable, Kit, Component
 from assets.models import Manufacturer, Category, Supplier
 from core.graphql_utils import check_permission, get_object_or_denied, generate_slug, paginate_queryset
 from graphql import GraphQLError
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, PermissionDenied
+from django.utils.translation import gettext_lazy as _
 
 class AccessoryNode(DjangoObjectType):
     class Meta:
@@ -200,7 +201,14 @@ class CreateAccessory(graphene.Mutation):
         
         mfr = get_object_or_denied(Manufacturer, manufacturer_id, user, tenant=active_tenant)
         acc = Accessory(manufacturer=mfr, tenant=active_tenant)
-        
+
+        # A globally-visible (tenant=None) row is visible to every tenant.
+        # Without this guard a tenant member in a context where active_tenant is
+        # None could mint a global Accessory (REST path is already protected by
+        # StrictTenantPermission + perform_create).
+        if acc.tenant is None and not user.is_superuser:
+            raise PermissionDenied(_("Only superusers can create global accessories."))
+
         if 'category_id' in kwargs:
             acc.category = get_object_or_denied(Category, kwargs.pop('category_id'), user, tenant=active_tenant)
         if 'supplier_id' in kwargs:
@@ -296,7 +304,14 @@ class CreateConsumable(graphene.Mutation):
         
         mfr = get_object_or_denied(Manufacturer, manufacturer_id, user, tenant=active_tenant)
         cons = Consumable(manufacturer=mfr, tenant=active_tenant)
-        
+
+        # A globally-visible (tenant=None) row is visible to every tenant.
+        # Without this guard a tenant member in a context where active_tenant is
+        # None could mint a global Consumable (REST path is already protected by
+        # StrictTenantPermission + perform_create).
+        if cons.tenant is None and not user.is_superuser:
+            raise PermissionDenied(_("Only superusers can create global consumables."))
+
         if 'category_id' in kwargs:
             cons.category = get_object_or_denied(Category, kwargs.pop('category_id'), user, tenant=active_tenant)
             
@@ -381,11 +396,19 @@ class CreateKit(graphene.Mutation):
         active_tenant = getattr(info.context, 'active_tenant', None)
         
         kt = Kit(tenant=active_tenant)
+
+        # Kit.allow_global_tenant is True — a tenant=None Kit is visible to every
+        # tenant. Without this guard a tenant member in a context where active_tenant
+        # is None could mint a global Kit (REST path is already protected by
+        # StrictTenantPermission + perform_create).
+        if kt.tenant is None and not user.is_superuser:
+            raise PermissionDenied(_("Only superusers can create global kits."))
+
         ALLOWED_FIELDS = {'name', 'description'}
         for key, val in kwargs.items():
             if key in ALLOWED_FIELDS:
                 setattr(kt, key, val)
-                
+
         try:
             kt.full_clean()
         except ValidationError as e:
@@ -457,9 +480,16 @@ class CreateComponent(graphene.Mutation):
         
         mfr = get_object_or_denied(Manufacturer, manufacturer_id, user, tenant=active_tenant)
         cat = get_object_or_denied(Category, category_id, user, tenant=active_tenant)
-        
+
         comp = Component(manufacturer=mfr, category=cat, tenant=active_tenant)
-        
+
+        # A globally-visible (tenant=None) row is visible to every tenant.
+        # Without this guard a tenant member in a context where active_tenant is
+        # None could mint a global Component (REST path is already protected by
+        # StrictTenantPermission + perform_create).
+        if comp.tenant is None and not user.is_superuser:
+            raise PermissionDenied(_("Only superusers can create global components."))
+
         if 'min_stock_level' in kwargs:
             kwargs['min_qty'] = kwargs.pop('min_stock_level')
         if 'description' in kwargs:

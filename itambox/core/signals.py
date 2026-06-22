@@ -5,6 +5,7 @@ from django.db.models.signals import post_save, post_delete, pre_save
 from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 
+from core.mixins import SoftDeleteMixin
 from core.models import ChangeLoggingMixin
 from core.events import dispatch_event
 
@@ -51,7 +52,8 @@ def capture_prior_soft_delete_state(sender, instance, **kwargs):
     default manager by the active tenant context or the soft-delete filter, but the
     transition delete -> set / set -> None still has to be observed precisely.
     """
-    from core.mixins import SoftDeleteMixin
+    if kwargs.get('raw'):
+        return
     if not isinstance(instance, SoftDeleteMixin):
         return
     if instance._state.adding or instance.pk is None:
@@ -68,11 +70,11 @@ def _resolve_save_action(instance, created):
     """Map a save to ('create' | 'update' | 'delete' | 'restore'), watch-verb pair.
 
     A soft-delete is precise: it fires 'delete' only on the None -> set transition,
-    'restore' on the set -> None transition, and a plain 'update' when editing an
+    a distinct 'restore' on the set -> None transition (so a restore does not
+    masquerade as an 'update'; 'restore' is a declared Event.ACTION_CHOICES value so
+    EventRules can subscribe to it), and a plain 'update' when editing an
     already-archived row (no deleted_at transition) so 'delete' is not re-emitted.
     """
-    from core.mixins import SoftDeleteMixin
-
     if created:
         return 'create', 'created'
 
@@ -98,6 +100,8 @@ def _resolve_save_action(instance, created):
 
 @receiver(post_save)
 def event_on_save(sender, instance, created, **kwargs):
+    if kwargs.get('raw'):
+        return
     if not issubclass(sender, ChangeLoggingMixin):
         return
     if sender.__name__ in _SIGNAL_SKIP_MODELS:

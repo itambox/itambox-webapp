@@ -147,17 +147,31 @@ class License(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
         # Seats cannot be reduced below the number of currently-assigned seats (which would
         # silently leave the pool over-allocated with no audit signal).
         if self.pk and self.seats is not None:
-            from .models import LicenseSeatAssignment
-            assigned = LicenseSeatAssignment.all_objects.filter(
-                license=self,
-                deleted_at__isnull=True
-            ).count()
-            if self.seats < assigned:
-                raise ValidationError({
-                    'seats': _("Cannot set seats to %(seats)s — %(n)s are already assigned.") % {
-                        'seats': self.seats, 'n': assigned,
-                    },
-                })
+            self.assert_seat_capacity(seats=self.seats)
+
+    def assert_seat_capacity(self, seats=None):
+        """Raise ValidationError when the proposed seat count is below the number of active assignments.
+
+        Called from clean() (form/admin path) and from LicenseSerializer.validate()
+        (REST PATCH/PUT path) so the invariant is enforced on every write path.
+        ``seats`` defaults to self.seats when not provided.
+        """
+        # LicenseSeatAssignment is defined later in this module; it resolves from the
+        # module globals at call time, so no import is needed here.
+        proposed = seats if seats is not None else self.seats
+        if not self.pk or proposed is None:
+            return
+        assigned = LicenseSeatAssignment.all_objects.filter(
+            license=self,
+            deleted_at__isnull=True,
+        ).count()
+        if proposed < assigned:
+            raise ValidationError({
+                'seats': _("Cannot set seats to %(seats)s — %(n)s are already assigned.") % {
+                    'seats': proposed,
+                    'n': assigned,
+                },
+            })
 
     def get_absolute_url(self):
         try:

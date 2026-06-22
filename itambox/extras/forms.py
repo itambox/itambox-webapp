@@ -201,6 +201,8 @@ from django.contrib.contenttypes.models import ContentType
 from crispy_forms.layout import Layout, Field, HTML, Div, Submit, Row, Column, Fieldset
 from .models import WebhookEndpoint, EventRule, Event, ExportTemplate, LabelTemplate, ReportTemplate, ScheduledReport, AlertRule, NotificationChannel
 from itambox.middleware import get_current_user
+from core.forms.import_forms import is_model_importable
+from core.validators import validate_external_url
 
 
 def logged_content_types():
@@ -231,8 +233,6 @@ def exportable_content_types():
     of the hundreds of internal ContentTypes (sessions, permissions, tokens, …)
     that a bare ``content_type`` field would otherwise list.
     """
-    from core.forms.import_forms import is_model_importable
-
     ids = []
     for ct in ContentType.objects.all():
         model = ct.model_class()
@@ -1065,7 +1065,15 @@ class NotificationChannelForm(forms.ModelForm):
             if not url:
                 self.add_error('webhook_url', _('This channel type requires an incoming webhook URL.'))
             else:
-                config['webhook_url'] = url
+                # SSRF guard: apply the same boundary check used by WebhookEndpoint.clean
+                # and the DRF serializer so the UI form cannot persist a loopback/
+                # private/metadata URL.
+                try:
+                    validate_external_url(url)
+                except DjangoValidationError as exc:
+                    self.add_error('webhook_url', exc.message)
+                else:
+                    config['webhook_url'] = url
 
         elif channel_type == NotificationChannel.TYPE_IN_APP:
             users = cleaned.get('in_app_recipient_users')

@@ -1,6 +1,8 @@
+import csv
+import json
+
 import django_tables2 as tables
 from django_tables2.utils import A
-import json
 from django.shortcuts import get_object_or_404, render
 from django.http import HttpResponse, JsonResponse
 from django.urls import reverse_lazy
@@ -11,6 +13,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.utils.translation import gettext_lazy as _
 from django import forms
+
+from core.csv_utils import csv_safe
 
 from core.tables import BaseTable, ToggleColumn, ActionsColumn
 from itambox.views.generic import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
@@ -269,6 +273,9 @@ class AuditSessionCommitView(LoginRequiredMixin, PermissionRequiredMixin, View):
                     except Asset.DoesNotExist:
                         raise ValidationError(_("Asset with ID %(pk)s does not exist.") % {'pk': asset_pk})
 
+                    # Skip an asset already verified in this session so re-committing
+                    # a basket is idempotent (audit_asset would otherwise raise on the
+                    # duplicate and abort the whole batch).
                     if AssetAudit.objects.filter(session=session, asset=asset).exists():
                         continue
 
@@ -346,8 +353,6 @@ class AuditSessionReportCsvView(LoginRequiredMixin, PermissionRequiredMixin, Vie
     permission_required = 'compliance.view_auditsession'
 
     def get(self, request, pk, *args, **kwargs):
-        import csv
-        from core.csv_utils import csv_safe
         session = get_object_or_404(AuditSession, pk=pk, status='completed')
         report = session.reconciliation_report or {}
         rows = report.get('rows', [])

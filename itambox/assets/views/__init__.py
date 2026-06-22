@@ -2,7 +2,7 @@ from .asset_views import (
     AssetListView, AssetDetailView, AssetEditView, AssetDeleteView,
     AssetCloneView, AssetBulkEditView, AssetBulkDeleteView,
     AssetCheckoutView, AssetCheckinView, AssetAuditView, asset_label_print,
-    bulk_assign_assets, bulk_print_labels,
+    bulk_print_labels,
 )
 from .bulk_scan_views import (
     AssetScanActionResolveView, BulkCheckinScanView, BulkCheckoutScanView,
