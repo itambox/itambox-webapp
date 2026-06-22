@@ -482,6 +482,13 @@ class TenantMembership(ChangeLoggingMixin, models.Model):
         verbose_name=_("Role")
     )
     joined_at = models.DateTimeField(auto_now_add=True)
+    # Per-tenant activation. False = the user is suspended/deprovisioned in THIS tenant
+    # (e.g. an IdP sent SCIM active=false) but the row, role and AssetHolder are retained
+    # so the membership can be reactivated and other tenants are unaffected. Access gates
+    # (TenantMembershipBackend, TenantMiddleware) must treat an inactive membership as
+    # "not a member" for this tenant. The global User.is_active is only cleared when the
+    # user has NO active membership in any tenant.
+    is_active = models.BooleanField(default=True, db_index=True, verbose_name=_("Active"))
 
     class Meta:
         verbose_name = _("Tenant Membership")

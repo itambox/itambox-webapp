@@ -211,7 +211,8 @@ class TenantMiddleware:
             if session_tenant_id:
                 active_membership = TenantMembership.objects.filter(
                     user=request.user,
-                    tenant_id=session_tenant_id
+                    tenant_id=session_tenant_id,
+                    is_active=True,
                 ).select_related('tenant', 'role').first()
                 if active_membership:
                     active_tenant = active_membership.tenant
@@ -219,10 +220,11 @@ class TenantMiddleware:
                     session_tenant_id = None
 
             elif session_group_id:
-                # Standard user must have membership in at least one tenant of the group
+                # Standard user must have an ACTIVE membership in at least one tenant of the group
                 memberships = TenantMembership.objects.filter(
                     user=request.user,
-                    tenant__group_id=session_group_id
+                    tenant__group_id=session_group_id,
+                    is_active=True,
                 ).select_related('tenant', 'tenant__group', 'role')
                 if memberships.exists():
                     # _base_manager: resolve the active group unscoped (bootstrap —
@@ -234,10 +236,12 @@ class TenantMiddleware:
                 else:
                     session_group_id = None
 
-            # If no membership/group is found for the selected choice, default to their first membership
+            # If no membership/group is found for the selected choice, default to their first
+            # ACTIVE membership (a suspended membership must not silently become the scope).
             if not active_tenant and not active_tenant_group:
                 active_membership = TenantMembership.objects.filter(
-                    user=request.user
+                    user=request.user,
+                    is_active=True,
                 ).select_related('tenant', 'role').first()
                 if active_membership:
                     active_tenant = active_membership.tenant

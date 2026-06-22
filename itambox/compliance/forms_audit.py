@@ -60,7 +60,7 @@ class AuditSessionForm(forms.ModelForm):
         if request and request.user.is_authenticated and not request.user.is_superuser:
             from organization.models import TenantMembership
             member_tenant_ids = TenantMembership.objects.filter(
-                user=request.user
+                user=request.user, is_active=True
             ).values_list('tenant_id', flat=True)
             self.fields['tenant'] = forms.ModelChoiceField(
                 queryset=Tenant.objects.filter(pk__in=member_tenant_ids),

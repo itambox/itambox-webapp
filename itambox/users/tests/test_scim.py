@@ -430,6 +430,56 @@ class SCIMProvisioningTests(TestCase):
         self.assertTrue(shared.is_active)
         self.assertEqual(shared.username, "shared")
         self.assertTrue(TenantMembership.objects.filter(user=shared, tenant=self.other_tenant).exists())
+        # active=false is now applied PER-TENANT: this tenant's membership is suspended,
+        # the other tenant's stays active (no cross-tenant write, but a real local revoke).
+        self.assertFalse(TenantMembership.objects.get(user=shared, tenant=self.tenant).is_active)
+        self.assertTrue(TenantMembership.objects.get(user=shared, tenant=self.other_tenant).is_active)
+
+    def test_scim_active_false_deprovisions_this_tenant_only(self):
+        """active=false on a multi-tenant user suspends THIS tenant's membership (revoking
+        access here) while leaving the global account and other tenants untouched; the SCIM
+        response reflects the per-tenant state, and active=true restores access."""
+        from core.auth import TenantMembershipBackend
+        backend = TenantMembershipBackend()
+
+        shared = User.objects.create_user(username="shared2", email="shared2@x.com", is_active=True)
+        TenantMembership.objects.create(user=shared, tenant=self.tenant, role=self.role_member)
+        other_role = TenantRole.objects.create(
+            tenant=self.other_tenant, name="Member", permissions=["assets.view_asset"]
+        )
+        TenantMembership.objects.create(user=shared, tenant=self.other_tenant, role=other_role)
+
+        # Baseline: the membership grants access in this tenant.
+        self.assertTrue(backend.has_perm(User.objects.get(pk=shared.pk), 'assets.view_asset', obj=self.tenant))
+
+        detail_url = reverse('api:scim:user-detail', kwargs={'tenant_slug': self.tenant.slug, 'pk': shared.id})
+
+        # Deprovision this tenant.
+        resp = self.client.patch(detail_url, data={
+            "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+            "Operations": [{"op": "replace", "path": "active", "value": False}],
+        }, content_type='application/json', **self.auth_headers)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        # SCIM response reports active=false FOR THIS TENANT (not the global flag).
+        self.assertFalse(resp.json()['active'])
+
+        shared.refresh_from_db()
+        self.assertTrue(shared.is_active)  # global account stays enabled (other tenant active)
+        self.assertFalse(TenantMembership.objects.get(user=shared, tenant=self.tenant).is_active)
+        self.assertTrue(TenantMembership.objects.get(user=shared, tenant=self.other_tenant).is_active)
+        # Access is revoked HERE but unaffected in the other tenant.
+        self.assertFalse(backend.has_perm(User.objects.get(pk=shared.pk), 'assets.view_asset', obj=self.tenant))
+        self.assertTrue(backend.has_perm(User.objects.get(pk=shared.pk), 'assets.view_asset', obj=self.other_tenant))
+
+        # Reactivate this tenant.
+        resp = self.client.patch(detail_url, data={
+            "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+            "Operations": [{"op": "replace", "path": "active", "value": True}],
+        }, content_type='application/json', **self.auth_headers)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(resp.json()['active'])
+        self.assertTrue(TenantMembership.objects.get(user=shared, tenant=self.tenant).is_active)
+        self.assertTrue(backend.has_perm(User.objects.get(pk=shared.pk), 'assets.view_asset', obj=self.tenant))
 
     def test_scim_put_updates_sole_tenant_user(self):
         """Control for WS1-3: a user whose ONLY membership is this tenant is still fully

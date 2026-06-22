@@ -58,7 +58,11 @@ class TenantMembershipBackend:
                 cache_key = f'_tenant_membership_{obj_tenant.pk}'
                 if not hasattr(user_obj, cache_key):
                     try:
-                        membership = TenantMembership.objects.select_related('role').get(user=user_obj, tenant=obj_tenant)
+                        # is_active=True: a suspended membership grants no permissions in
+                        # this tenant (treated as non-membership).
+                        membership = TenantMembership.objects.select_related('role').get(
+                            user=user_obj, tenant=obj_tenant, is_active=True,
+                        )
                         setattr(user_obj, cache_key, membership)
                     except TenantMembership.DoesNotExist:
                         setattr(user_obj, cache_key, None)
@@ -80,7 +84,7 @@ class TenantMembershipBackend:
 
         if not membership:
             from organization.models import TenantMembership
-            membership = TenantMembership.objects.filter(user=user_obj).select_related('tenant', 'role').first()
+            membership = TenantMembership.objects.filter(user=user_obj, is_active=True).select_related('tenant', 'role').first()
             if membership:
                 from core.managers import set_current_tenant, set_current_membership
                 set_current_tenant(membership.tenant)
@@ -107,7 +111,7 @@ class TenantMembershipBackend:
             membership = None
         if not membership:
             from organization.models import TenantMembership
-            membership = TenantMembership.objects.filter(user=user_obj).select_related('tenant', 'role').first()
+            membership = TenantMembership.objects.filter(user=user_obj, is_active=True).select_related('tenant', 'role').first()
             if membership:
                 from core.managers import set_current_tenant, set_current_membership
                 set_current_tenant(membership.tenant)

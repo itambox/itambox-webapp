@@ -290,7 +290,7 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
                         "permissions": ["assets.view_asset", "extras.view_dashboard"]
                     }
                 )
-                TenantMembership.objects.create(user=user, tenant=self.tenant, role=role)
+                TenantMembership.objects.create(user=user, tenant=self.tenant, role=role, is_active=active)
                 link_or_create_assetholder(user, self.tenant)
         else:
             with transaction.atomic():
@@ -312,7 +312,7 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
                         "permissions": ["assets.view_asset", "extras.view_dashboard"]
                     }
                 )
-                TenantMembership.objects.create(user=user, tenant=self.tenant, role=role)
+                TenantMembership.objects.create(user=user, tenant=self.tenant, role=role, is_active=active)
                 link_or_create_assetholder(user, self.tenant)
 
         serializer = SCIMUserSerializer(
@@ -335,35 +335,60 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
                              first_name=_UNSET, last_name=_UNSET, active=_UNSET):
         """Apply SCIM-provisioned identity/active changes to the User.
 
-        A SCIM token is bound to exactly one tenant. It must NEVER rewrite the global
-        identity (username/email/name) or globally (de)activate a user who is also a member
-        of another tenant — that is a cross-tenant write on a shared principal (it would lock
-        them out of, or hijack their identity in, the other tenant). For such shared users
-        these changes are ignored; the only tenant-scoped de-provisioning path is DELETE,
-        which drops just this tenant's membership. For a user whose sole membership is this
-        tenant, the global User is updated as before.
+        A SCIM token is bound to exactly one tenant.
+
+        - ``active`` is applied PER-TENANT: it (de)activates this tenant's membership only.
+          A multi-tenant user is therefore never globally locked out by one tenant's token
+          (which would deny access in the other tenant). The global ``User.is_active`` is
+          reconciled to mirror whether the user has any active membership left, so a fully
+          de-provisioned user can no longer authenticate at all. Access gates
+          (TenantMembershipBackend, TenantMiddleware) honour the membership flag, so an
+          ``active=false`` here genuinely revokes access in this tenant — unlike before,
+          when it was silently dropped for shared users.
+        - identity (username/email/name) must NEVER be rewritten for a user who is also a
+          member of another tenant — that is a cross-tenant write on a shared principal
+          (it would hijack their identity in the other tenant). Those changes apply only to
+          a user whose sole membership is this tenant. (DELETE still drops the membership.)
         """
         has_other = (
             TenantMembership.objects.filter(user=user)
             .exclude(tenant=self.tenant)
             .exists()
         )
+
+        if active is not _UNSET:
+            membership = TenantMembership.objects.filter(user=user, tenant=self.tenant).first()
+            if membership is not None and membership.is_active != active:
+                membership.is_active = active
+                membership.save(update_fields=['is_active'])
+            # Mirror the global flag to "has any active membership anywhere": clears login
+            # only when the user is fully de-provisioned, never from a single tenant's token.
+            any_active = TenantMembership.objects.filter(user=user, is_active=True).exists()
+            if user.is_active != any_active:
+                user.is_active = any_active
+                user.save(update_fields=['is_active'])
+
         if has_other:
-            # Keep this tenant's AssetHolder linked, but leave the shared global User alone.
+            # Keep this tenant's AssetHolder linked, but leave the shared global identity alone.
             link_or_create_assetholder(user, self.tenant)
             return user
 
+        # Sole-tenant user: the global identity is safe to update.
+        identity_fields = []
         if username is not _UNSET:
             user.username = username
+            identity_fields.append('username')
         if email is not _UNSET:
             user.email = email
+            identity_fields.append('email')
         if first_name is not _UNSET:
             user.first_name = first_name
+            identity_fields.append('first_name')
         if last_name is not _UNSET:
             user.last_name = last_name
-        if active is not _UNSET:
-            user.is_active = active
-        user.save()
+            identity_fields.append('last_name')
+        if identity_fields:
+            user.save(update_fields=identity_fields)
         link_or_create_assetholder(user, self.tenant)
         return user
 

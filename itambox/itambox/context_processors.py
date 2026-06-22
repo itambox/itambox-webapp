@@ -76,7 +76,9 @@ def tenant_switcher_processor(request):
     def get_grouped_memberships():
         if request.user.is_superuser:
             return []
-        memberships = TenantMembership.objects.filter(user=request.user).select_related('tenant', 'tenant__group').order_by('tenant__group__name', 'tenant__name')
+        # Only active memberships: a suspended membership cannot be switched into
+        # (TenantMiddleware would reject it), so it must not appear in the switcher.
+        memberships = TenantMembership.objects.filter(user=request.user, is_active=True).select_related('tenant', 'tenant__group').order_by('tenant__group__name', 'tenant__name')
         
         group_map = defaultdict(list)
         for m in memberships:

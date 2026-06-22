@@ -10,7 +10,7 @@ class SCIMUserSerializer(serializers.ModelSerializer):
     userName = serializers.CharField(source='username')
     name = serializers.SerializerMethodField(required=False)
     emails = serializers.SerializerMethodField(required=False)
-    active = serializers.BooleanField(source='is_active', required=False, default=True)
+    active = serializers.SerializerMethodField()
     groups = serializers.SerializerMethodField(read_only=True)
     meta = serializers.SerializerMethodField(read_only=True)
 
@@ -23,6 +23,19 @@ class SCIMUserSerializer(serializers.ModelSerializer):
 
     def get_schemas(self, obj):
         return ["urn:ietf:params:scim:schemas:core:2.0:User"]
+
+    def get_active(self, obj):
+        # SCIM is tenant-scoped: report the user's active state IN THIS TENANT, i.e. the
+        # membership flag (so an IdP that de-provisioned this tenant via active=false sees
+        # active=false), gated by the global flag (a globally disabled user is inactive
+        # everywhere). Falls back to the global flag if no tenant context is present.
+        if not obj.is_active:
+            return False
+        tenant = self.context.get('tenant')
+        if tenant is None:
+            return bool(obj.is_active)
+        membership = TenantMembership.objects.filter(user=obj, tenant=tenant).first()
+        return bool(membership and membership.is_active)
 
     def get_name(self, obj):
         return {
