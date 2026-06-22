@@ -21,12 +21,14 @@ from django_tables2 import RequestConfig
 from core.models import ObjectChange
 from extras.models import WebhookEndpoint, EventRule, ExportTemplate, LabelTemplate, JournalEntry, ImageAttachment, FileAttachment
 from core.tables import (
-    ObjectChangeTable, ExportTemplateTable, WebhookEndpointTable, 
+    ObjectChangeTable, ExportTemplateTable, WebhookEndpointTable,
     EventRuleTable, LabelTemplateTable
 )
+from extras.tables import JournalEntryTable
 from core.forms import JournalEntryForm
-from extras.forms import WebhookEndpointForm, EventRuleForm, ExportTemplateForm, LabelTemplateForm, ObjectChangeFilterForm
+from extras.forms import WebhookEndpointForm, EventRuleForm, ExportTemplateForm, LabelTemplateForm, ObjectChangeFilterForm, JournalEntryFilterForm
 from core.filters import ObjectChangeFilterSet
+from extras.filters import JournalEntryFilterSet
 from itambox.registry import registry
 from itambox.panels import Panel
 
@@ -57,6 +59,32 @@ class ObjectChangeListView(ObjectListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = _('Changelog')
+        return context
+
+
+@method_decorator(login_required, name='dispatch')
+class JournalEntryListView(ObjectListView):
+    # Global activity list of journal entries across all objects (NetBox-style
+    # "Journal Entries" under Monitoring › Activity). Tenant scoping is re-applied
+    # per request by TenantScopingViewMixin; allow_global_tenant keeps entries on
+    # shared/global objects visible. content_object is prefetched for the linked
+    # Object column (a GFK cannot be select_related).
+    queryset = JournalEntry.objects.select_related('model', 'user', 'tenant').prefetch_related('content_object')
+    filterset = JournalEntryFilterSet
+    filterset_form = JournalEntryFilterForm
+    table = JournalEntryTable
+    template_name = 'extras/journalentry/journalentry_list.html'
+    action_buttons = ()
+
+    def get_breadcrumbs(self):
+        return [
+            (reverse('dashboard'), _('Dashboard')),
+            (None, _('Journal Entries')),
+        ]
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = _('Journal Entries')
         return context
 
 

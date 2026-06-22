@@ -366,6 +366,12 @@ MONITORING_MENU = Menu(
                     buttons=(),
                 ),
                 MenuItem(
+                    link='journalentry_list',
+                    link_text=_('Journal Entries'),
+                    permissions=['extras.view_journalentry'],
+                    buttons=(),
+                ),
+                MenuItem(
                     link='job_list',
                     link_text=_('Background Jobs'),
                     permissions=['core.view_job'],

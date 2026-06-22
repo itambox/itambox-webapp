@@ -31,6 +31,7 @@ from itambox.views.features import (
     ObjectChangeListView, ObjectChangeView, ObjectExportView,
     ImageAttachmentUploadView, ImageAttachmentDeleteView,
     FileAttachmentUploadView, FileAttachmentDeleteView, JournalEntryCreateView,
+    JournalEntryListView,
     LabelSelectView, LabelPrintView,
     FileAttachmentDownloadView, ImageAttachmentServeView,
 )
@@ -107,6 +108,9 @@ urlpatterns = [
     # Changelog
     path('changelog/', ObjectChangeListView.as_view(), name='objectchange_list'),
     path('changelog/<int:pk>/', ObjectChangeView.as_view(), name='objectchange'),
+
+    # Journal Entries (global activity list)
+    path('journal/', JournalEntryListView.as_view(), name='journalentry_list'),
 
     # Background Jobs & Tasks UI
     path('jobs/', JobListView.as_view(), name='job_list'),

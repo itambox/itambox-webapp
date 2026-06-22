@@ -178,13 +178,14 @@ class ContactTable(BaseTable):
     title = tables.Column()
     phone = tables.Column()
     email = tables.EmailColumn()
+    tenant = tables.Column(verbose_name=_('Tenant'), default=_('Global'))
     tags = TagColumn(url_name='organization:contact_list')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = Contact
-        fields = ('pk', 'name', 'title', 'phone', 'email', 'web_url', 'description', 'tags', 'actions')
-        default_columns = ('pk', 'name', 'title', 'phone', 'email', 'tags', 'actions')
+        fields = ('pk', 'name', 'title', 'phone', 'email', 'web_url', 'tenant', 'description', 'tags', 'actions')
+        default_columns = ('pk', 'name', 'title', 'phone', 'email', 'tenant', 'tags', 'actions')
 
 
 # --- ContactRole Table ---
