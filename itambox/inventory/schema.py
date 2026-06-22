@@ -248,6 +248,12 @@ class UpdateAccessory(graphene.Mutation):
         user = check_permission(info, 'inventory.change_accessory')
         active_tenant = getattr(info.context, 'active_tenant', None)
         acc = get_object_or_denied(Accessory, id, user, tenant=active_tenant)
+        # A global (tenant=None) row is reachable by a non-superuser in a tenant-group
+        # context: active_tenant is None there, so get_object_or_denied skips its tenant
+        # filter and the allow_global_tenant manager returns tenant=None rows. Only a
+        # superuser may modify/delete a global catalogue row — mirrors the create guard.
+        if acc.tenant is None and not user.is_superuser:
+            raise PermissionDenied(_("Only superusers can modify global accessories."))
         check_permission(info, 'inventory.change_accessory', obj=acc)
         
         if 'manufacturer_id' in kwargs:
@@ -282,6 +288,8 @@ class DeleteAccessory(graphene.Mutation):
         user = check_permission(info, 'inventory.delete_accessory')
         active_tenant = getattr(info.context, 'active_tenant', None)
         acc = get_object_or_denied(Accessory, id, user, tenant=active_tenant)
+        if acc.tenant is None and not user.is_superuser:
+            raise PermissionDenied(_("Only superusers can delete global accessories."))
         check_permission(info, 'inventory.delete_accessory', obj=acc)
         acc.delete()
         return DeleteAccessory(success=True)
@@ -348,6 +356,8 @@ class UpdateConsumable(graphene.Mutation):
         user = check_permission(info, 'inventory.change_consumable')
         active_tenant = getattr(info.context, 'active_tenant', None)
         cons = get_object_or_denied(Consumable, id, user, tenant=active_tenant)
+        if cons.tenant is None and not user.is_superuser:
+            raise PermissionDenied(_("Only superusers can modify global consumables."))
         check_permission(info, 'inventory.change_consumable', obj=cons)
         
         if 'manufacturer_id' in kwargs:
@@ -380,6 +390,8 @@ class DeleteConsumable(graphene.Mutation):
         user = check_permission(info, 'inventory.delete_consumable')
         active_tenant = getattr(info.context, 'active_tenant', None)
         cons = get_object_or_denied(Consumable, id, user, tenant=active_tenant)
+        if cons.tenant is None and not user.is_superuser:
+            raise PermissionDenied(_("Only superusers can delete global consumables."))
         check_permission(info, 'inventory.delete_consumable', obj=cons)
         cons.delete()
         return DeleteConsumable(success=True)
@@ -431,6 +443,8 @@ class UpdateKit(graphene.Mutation):
         user = check_permission(info, 'inventory.change_kit')
         active_tenant = getattr(info.context, 'active_tenant', None)
         kt = get_object_or_denied(Kit, id, user, tenant=active_tenant)
+        if kt.tenant is None and not user.is_superuser:
+            raise PermissionDenied(_("Only superusers can modify global kits."))
         check_permission(info, 'inventory.change_kit', obj=kt)
         
         ALLOWED_FIELDS = {'name', 'description'}
@@ -458,6 +472,8 @@ class DeleteKit(graphene.Mutation):
         user = check_permission(info, 'inventory.delete_kit')
         active_tenant = getattr(info.context, 'active_tenant', None)
         kt = get_object_or_denied(Kit, id, user, tenant=active_tenant)
+        if kt.tenant is None and not user.is_superuser:
+            raise PermissionDenied(_("Only superusers can delete global kits."))
         check_permission(info, 'inventory.delete_kit', obj=kt)
         kt.delete()
         return DeleteKit(success=True)
@@ -528,6 +544,8 @@ class UpdateComponent(graphene.Mutation):
         user = check_permission(info, 'inventory.change_component')
         active_tenant = getattr(info.context, 'active_tenant', None)
         comp = get_object_or_denied(Component, id, user, tenant=active_tenant)
+        if comp.tenant is None and not user.is_superuser:
+            raise PermissionDenied(_("Only superusers can modify global components."))
         check_permission(info, 'inventory.change_component', obj=comp)
         
         if 'manufacturer_id' in kwargs:
@@ -566,6 +584,8 @@ class DeleteComponent(graphene.Mutation):
         user = check_permission(info, 'inventory.delete_component')
         active_tenant = getattr(info.context, 'active_tenant', None)
         comp = get_object_or_denied(Component, id, user, tenant=active_tenant)
+        if comp.tenant is None and not user.is_superuser:
+            raise PermissionDenied(_("Only superusers can delete global components."))
         check_permission(info, 'inventory.delete_component', obj=comp)
         comp.delete()
         return DeleteComponent(success=True)
