@@ -2,8 +2,7 @@ import logging
 from django.db.models.signals import pre_save, post_save, post_delete
 from django.dispatch import receiver
 from django.contrib.auth import get_user_model
-from django.contrib.contenttypes.models import ContentType
-from core.models import ObjectChange
+from core.models import write_object_change
 from itambox.utils import serialize_object
 from itambox.middleware import get_current_user, get_current_request_id
 from core.managers import get_current_tenant
@@ -41,20 +40,15 @@ def user_post_save(sender, instance, created, **kwargs):
     if action == ObjectChangeActionChoices.ACTION_UPDATE and prechange_data == postchange_data:
         return
 
-    user = get_current_user()
-    ct = ContentType.objects.get_for_model(User)
-    change_tenant = get_current_tenant()
-
-    ObjectChange._base_manager.create(
-        tenant=change_tenant,
-        user=user,
-        user_name=user.username if user else 'System',
-        request_id=request_id,
+    # User can't inherit ChangeLoggingMixin, so emit via the shared audit-row helper
+    # (single source of truth for the payload shape). User has no tenant of its own,
+    # so attribute to the active request tenant.
+    write_object_change(
+        instance=instance,
         action=action,
-        changed_object_type=ct,
-        changed_object_id=instance.pk,
-        object_repr=str(instance)[:200],
-        object_type_repr=f"{ct.app_label} | {ct.model}",
+        user=get_current_user(),
+        request_id=request_id,
+        change_tenant=get_current_tenant(),
         prechange_data=prechange_data,
         postchange_data=postchange_data,
     )
@@ -68,24 +62,16 @@ def user_post_delete(sender, instance, **kwargs):
     prechange_data = getattr(instance, '_prechange_snapshot', None)
     if not prechange_data:
         prechange_data = serialize_object(
-            instance, 
+            instance,
             exclude_fields=['password', 'last_login', 'updated_at']
         )
 
-    user = get_current_user()
-    ct = ContentType.objects.get_for_model(User)
-    change_tenant = get_current_tenant()
-
-    ObjectChange._base_manager.create(
-        tenant=change_tenant,
-        user=user,
-        user_name=user.username if user else 'System',
-        request_id=request_id,
+    write_object_change(
+        instance=instance,
         action=ObjectChangeActionChoices.ACTION_DELETE,
-        changed_object_type=ct,
-        changed_object_id=instance.pk,
-        object_repr=str(instance)[:200],
-        object_type_repr=f"{ct.app_label} | {ct.model}",
+        user=get_current_user(),
+        request_id=request_id,
+        change_tenant=get_current_tenant(),
         prechange_data=prechange_data,
         postchange_data=None,
     )

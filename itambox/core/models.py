@@ -164,6 +164,32 @@ class ObjectChange(models.Model):
 _user_validation_cache = contextvars.ContextVar('user_validation_cache', default=None)
 
 
+def write_object_change(*, instance, action, user, request_id, change_tenant,
+                        prechange_data=None, postchange_data=None):
+    """Create the ``ObjectChange`` audit row for a logged change.
+
+    Single source of truth for the audit-row payload shape, shared by
+    ``ChangeLoggingMixin._log_change`` and the auth-``User`` signal receivers
+    (``users/signals.py`` — ``User`` cannot inherit the mixin). Each caller resolves
+    ``user``/``change_tenant`` itself (their rules differ) and passes them in; this builds
+    the row from the instance.
+    """
+    ct = ContentType.objects.get_for_model(instance.__class__)
+    return ObjectChange._base_manager.create(
+        tenant=change_tenant,
+        user=user,
+        user_name=user.username if user else 'System',
+        request_id=request_id,
+        action=action,
+        changed_object_type=ct,
+        changed_object_id=instance.pk,
+        object_repr=str(instance)[:200],
+        object_type_repr=f"{ct.app_label} | {ct.model}",
+        prechange_data=prechange_data,
+        postchange_data=postchange_data,
+    )
+
+
 class ChangeLoggingMixin:
     _change_logging_excluded_fields = ['updated_at']
 
@@ -206,8 +232,6 @@ class ChangeLoggingMixin:
                 else:
                     user = None
 
-        ct = ContentType.objects.get_for_model(self.__class__)
-
         # Attribute the change to a tenant so the changelog can be scoped. Prefer
         # the changed object's own tenant (works for both direct `tenant` fields
         # and relation-derived `tenant` properties); next follow an explicit
@@ -224,16 +248,12 @@ class ChangeLoggingMixin:
         if change_tenant is None:
             change_tenant = get_current_tenant()
 
-        ObjectChange._base_manager.create(
-            tenant=change_tenant,
-            user=user,
-            user_name=user.username if user else 'System',
-            request_id=request_id,
+        write_object_change(
+            instance=self,
             action=action,
-            changed_object_type=ct,
-            changed_object_id=self.pk,
-            object_repr=str(self)[:200],
-            object_type_repr=f"{ct.app_label} | {ct.model}",
+            user=user,
+            request_id=request_id,
+            change_tenant=change_tenant,
             prechange_data=prechange_data,
             postchange_data=postchange_data,
         )
