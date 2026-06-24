@@ -1,6 +1,5 @@
 from django.test import TestCase
 from django.core.exceptions import ValidationError
-from django.db.models import ProtectedError
 from django.contrib.auth import get_user_model
 from organization.models import Tenant, TenantMembership, TenantRole
 from organization.forms import TenantRoleForm
@@ -87,9 +86,9 @@ class TenantRoleSecurityTests(TestCase):
         membership = TenantMembership.objects.create(
             user=self.user_a,
             tenant=self.tenant_a,
-            role=role
         )
-        
+        membership.roles.add(role)
+
         set_current_membership(membership)
         set_current_tenant(self.tenant_a)
         
@@ -138,8 +137,8 @@ class TenantRoleSecurityTests(TestCase):
         membership = TenantMembership.objects.create(
             user=self.user_a,
             tenant=self.tenant_a,
-            role=role
         )
+        membership.roles.add(role)
         set_current_membership(membership)
         set_current_tenant(self.tenant_a)
         
@@ -163,12 +162,12 @@ class TenantRoleSecurityTests(TestCase):
         membership_a = TenantMembership.objects.create(
             user=self.user_a,
             tenant=self.tenant_a,
-            role=reader_role
         )
-        
+        membership_a.roles.add(reader_role)
+
         set_current_membership(membership_a)
         set_current_tenant(self.tenant_a)
-        
+
         # User A tries to create a role with Delete Asset permission (Privilege Escalation!)
         form_data = {
             'name': 'Rogue Admin',
@@ -185,45 +184,60 @@ class TenantRoleSecurityTests(TestCase):
         set_current_membership(None)
         set_current_tenant(None)
 
-    def test_invalid_codename_whitelist_validation(self):
-        # Form clean handles parsing, but let's test invalid permissions by patching MATRIX_MODELS in test
+    def test_invalid_codenames_are_dropped_not_blocking(self):
+        """A matrix row that maps to a permission which doesn't exist (a model without
+        that action, an uninstalled plugin, or an app-label typo) must NOT block the
+        save. The bogus codename is dropped; valid permissions still save. (Previously
+        the whole save was rejected, which blocked legitimate roles on any matrix bug.)"""
         from organization.forms.tenantrole_form import MATRIX_MODELS
-        
-        # Add an invalid mock model definition to MATRIX_MODELS
+
         MATRIX_MODELS['mock_invalid'] = {
             'label': 'Invalid Model',
             'app': 'nonexistentapp',
-            'model_name': 'do_magic'
+            'model_name': 'do_magic',
         }
-        
         try:
             form_data = {
                 'name': 'Magician',
-                'description': 'Uses nonexistent permissions',
-                'perm_mock_invalid_read': True,
+                'description': 'Uses a nonexistent permission alongside a real one',
+                'perm_mock_invalid_read': True,   # nonexistentapp.view_do_magic -> dropped
+                'perm_asset_read': True,          # assets.view_asset -> kept
             }
             form = TenantRoleForm(data=form_data, tenant=self.tenant_a, user=self.super_user)
-            self.assertFalse(form.is_valid())
-            self.assertIn('__all__', form.errors)
-            self.assertTrue(any("Invalid permission codenames" in e for e in form.errors['__all__']))
+            self.assertTrue(form.is_valid(), form.errors)
+            self.assertNotIn('nonexistentapp.view_do_magic', form.instance.permissions)
+            self.assertIn('assets.view_asset', form.instance.permissions)
         finally:
             del MATRIX_MODELS['mock_invalid']
 
-    def test_role_deletion_protection(self):
+    def test_role_deletion_clears_membership_m2m(self):
+        """Deleting a TenantRole removes it from the M2M join table.
+
+        With roles as a ManyToManyField on TenantMembership, there is no FK PROTECT
+        constraint — deleting (or soft-deleting) a role simply removes the M2M rows so
+        the membership continues to exist but no longer carries that role's permissions.
+        """
         role = TenantRole.objects.create(
             tenant=self.tenant_a,
             name="Deletable?",
             permissions=["assets.view_asset"]
         )
-        TenantMembership.objects.create(
+        membership = TenantMembership.objects.create(
             user=self.user_a,
             tenant=self.tenant_a,
-            role=role
         )
-        
-        # Since membership.role on_delete=models.PROTECT, we should get a ProtectedError on deletion
-        with self.assertRaises(ProtectedError):
-            role.delete()
+        membership.roles.add(role)
+
+        self.assertIn(role, membership.roles.all())
+
+        # Deleting the role must not raise — M2M rows are cascaded by the DB.
+        role.delete()
+
+        membership.refresh_from_db()
+        # Role is gone from the membership's effective role set.
+        self.assertNotIn(role, membership.roles.all())
+        # The membership itself still exists.
+        self.assertTrue(TenantMembership.objects.filter(pk=membership.pk).exists())
 
     def test_global_mode_tenant_selection(self):
         # In global mode (no tenant in kwargs), tenant is selected in form fields
@@ -261,9 +275,9 @@ class TenantRoleSecurityTests(TestCase):
         membership_a = TenantMembership.objects.create(
             user=self.user_a,
             tenant=self.tenant_a,
-            role=reader_role
         )
-        
+        membership_a.roles.add(reader_role)
+
         # User B is a Software Manager (only has view_software, no view_asset)
         sw_role = TenantRole.objects.create(
             tenant=self.tenant_a,
@@ -273,8 +287,8 @@ class TenantRoleSecurityTests(TestCase):
         membership_b = TenantMembership.objects.create(
             user=self.user_b,
             tenant=self.tenant_a,
-            role=sw_role
         )
+        membership_b.roles.add(sw_role)
         
         # Login User A (with view_asset permission)
         self.client.force_login(self.user_a)
@@ -324,9 +338,9 @@ class TenantRoleSecurityTests(TestCase):
         membership_a = TenantMembership.objects.create(
             user=self.user_a,
             tenant=self.tenant_a,
-            role=alert_admin_role
         )
-        
+        membership_a.roles.add(alert_admin_role)
+
         # User B does not have change_alertlog
         reader_role = TenantRole.objects.create(
             tenant=self.tenant_a,
@@ -336,8 +350,8 @@ class TenantRoleSecurityTests(TestCase):
         membership_b = TenantMembership.objects.create(
             user=self.user_b,
             tenant=self.tenant_a,
-            role=reader_role
         )
+        membership_b.roles.add(reader_role)
         
         # Login User A
         self.client.force_login(self.user_a)
@@ -388,9 +402,9 @@ class TenantRoleSecurityTests(TestCase):
         membership_a = TenantMembership.objects.create(
             user=self.user_a,
             tenant=self.tenant_a,
-            role=report_admin_role
         )
-        
+        membership_a.roles.add(report_admin_role)
+
         # User B does not have report permissions
         reader_role = TenantRole.objects.create(
             tenant=self.tenant_a,
@@ -400,8 +414,8 @@ class TenantRoleSecurityTests(TestCase):
         membership_b = TenantMembership.objects.create(
             user=self.user_b,
             tenant=self.tenant_a,
-            role=reader_role
         )
+        membership_b.roles.add(reader_role)
         
         # Login User A
         self.client.force_login(self.user_a)
@@ -489,8 +503,8 @@ class TenantRoleSecurityTests(TestCase):
         membership = TenantMembership.objects.create(
             user=self.user_a,
             tenant=self.tenant_a,
-            role=role,
         )
+        membership.roles.add(role)
         set_current_tenant(self.tenant_a)
         set_current_membership(membership)
         self.assertTrue(

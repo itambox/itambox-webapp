@@ -30,11 +30,13 @@ class JournalEntryTenantIsolationAPITests(APITestCase):
         ]
         role_a = TenantRole.objects.create(tenant=self.tenant_a, name='JE Role A', permissions=perms)
         self.staff_a = User.objects.create_user(username='je_staff_a', password='pw')
-        TenantMembership.objects.create(user=self.staff_a, tenant=self.tenant_a, role=role_a)
+        m_a = TenantMembership.objects.create(user=self.staff_a, tenant=self.tenant_a)
+        m_a.roles.add(role_a)
         # A second tenant-A member with change rights, to prove edits do not
         # reassign authorship.
         self.staff_a2 = User.objects.create_user(username='je_staff_a2', password='pw')
-        TenantMembership.objects.create(user=self.staff_a2, tenant=self.tenant_a, role=role_a)
+        m_a2 = TenantMembership.objects.create(user=self.staff_a2, tenant=self.tenant_a)
+        m_a2.roles.add(role_a)
 
         self.mfr = Manufacturer.objects.create(name='JE-Mfr', slug='je-mfr')
         self.atype = AssetType.objects.create(manufacturer=self.mfr, model='JE-Model')

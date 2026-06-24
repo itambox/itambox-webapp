@@ -46,14 +46,16 @@ class ContactAssignmentCrossTenantTestCase(TestCase):
             tenant=self.tenant_a, name='Admin', permissions=ca_perms
         )
         self.membership_a = TenantMembership.objects.create(
-            user=self.user_a, tenant=self.tenant_a, role=self.role_a
+            user=self.user_a, tenant=self.tenant_a,
         )
+        self.membership_a.roles.add(self.role_a)
         self.role_b = TenantRole.objects.create(
             tenant=self.tenant_b, name='Admin', permissions=ca_perms
         )
         self.membership_b = TenantMembership.objects.create(
-            user=self.user_b, tenant=self.tenant_b, role=self.role_b
+            user=self.user_b, tenant=self.tenant_b,
         )
+        self.membership_b.roles.add(self.role_b)
 
         # Shared asset metadata. Use names/slugs unique to this test: the names
         # are uniquely constrained among active rows, and sibling tests in the

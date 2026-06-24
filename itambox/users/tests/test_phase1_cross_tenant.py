@@ -33,8 +33,9 @@ class UsersApiCrossTenantTestCase(TestCase):
             permissions=['auth.view_user', 'auth.view_group'],
         )
         self.membership_b = TenantMembership.objects.create(
-            user=self.user_b, tenant=self.tenant_b, role=self.role_b,
+            user=self.user_b, tenant=self.tenant_b,
         )
+        self.membership_b.roles.add(self.role_b)
 
         # A user that belongs ONLY to tenant A — must be invisible to user_b.
         self.user_a = User.objects.create_user(
@@ -44,8 +45,9 @@ class UsersApiCrossTenantTestCase(TestCase):
             tenant=self.tenant_a, name='Admin', permissions=['auth.view_user'],
         )
         self.membership_a = TenantMembership.objects.create(
-            user=self.user_a, tenant=self.tenant_a, role=self.role_a,
+            user=self.user_a, tenant=self.tenant_a,
         )
+        self.membership_a.roles.add(self.role_a)
 
         # Groups: one whose only member is in tenant A, one with a tenant-B member.
         self.group_a = Group.objects.create(name='Group A only')

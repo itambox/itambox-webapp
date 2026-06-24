@@ -16,7 +16,7 @@ from ..filters import TenantMembershipFilterSet
 
 
 class TenantMembershipListView(ObjectListView):
-    queryset = TenantMembership.objects.select_related('user', 'tenant', 'role')
+    queryset = TenantMembership.objects.select_related('user', 'tenant').prefetch_related('roles')
     filterset = TenantMembershipFilterSet
     filterset_form = TenantMembershipFilterForm
     table = TenantMembershipTable
@@ -117,9 +117,21 @@ class TenantMembershipBulkEditView(ObjectBulkEditView):
         if '_apply' in request.POST:
             form = TenantMembershipBulkRoleForm(request.POST)
             if form.is_valid():
-                new_role = form.cleaned_data['role']
+                # The bulk form provides roles_to_add and/or roles_to_remove.
+                # Fall back gracefully when only the legacy 'role' field is present
+                # (form not yet migrated) so the view does not crash mid-sprint.
+                roles_to_add = form.cleaned_data.get('roles_to_add') or []
+                roles_to_remove = form.cleaned_data.get('roles_to_remove') or []
+                # Legacy single-role field (removed once form is migrated).
+                legacy_role = form.cleaned_data.get('role')
+                if legacy_role and not roles_to_add:
+                    roles_to_add = [legacy_role]
 
-                # All memberships must share a single tenant and it must match the new role's tenant.
+                if not roles_to_add and not roles_to_remove:
+                    messages.warning(request, _("No roles to add or remove were specified."))
+                    return HttpResponseRedirect(return_url)
+
+                # All memberships must share a single tenant; each role must belong to that tenant.
                 tenant_pks = {m.tenant_id for m in objects}
                 if len(tenant_pks) > 1:
                     messages.error(
@@ -130,12 +142,13 @@ class TenantMembershipBulkEditView(ObjectBulkEditView):
                     return HttpResponseRedirect(return_url)
 
                 membership_tenant = objects[0].tenant
-                if new_role.tenant_id != membership_tenant.pk:
-                    messages.error(
-                        request,
-                        _("Role '%(role)s' belongs to a different tenant than the selected memberships.") % {'role': new_role}
-                    )
-                    return HttpResponseRedirect(return_url)
+                for role in list(roles_to_add) + list(roles_to_remove):
+                    if role.tenant_id != membership_tenant.pk:
+                        messages.error(
+                            request,
+                            _("Role '%(role)s' belongs to a different tenant than the selected memberships.") % {'role': role}
+                        )
+                        return HttpResponseRedirect(return_url)
 
                 if not request.user.has_perm('organization.change_tenantmembership', obj=membership_tenant):
                     messages.error(request, _("You do not have permission to change memberships for this tenant."))
@@ -144,13 +157,16 @@ class TenantMembershipBulkEditView(ObjectBulkEditView):
                 updated_count = 0
                 with transaction.atomic():
                     for obj in objects:
-                        obj.role = new_role
-                        obj.save()
+                        if roles_to_add:
+                            obj.roles.add(*roles_to_add)
+                        if roles_to_remove:
+                            obj.roles.remove(*roles_to_remove)
                         updated_count += 1
 
-                messages.success(request, _("Reassigned %(count)d membership(s) to role '%(role)s'.") % {
+                role_names = ', '.join(r.name for r in roles_to_add) if roles_to_add else '—'
+                messages.success(request, _("Updated roles for %(count)d membership(s) (added: %(roles)s).") % {
                     'count': updated_count,
-                    'role': new_role.name,
+                    'roles': role_names,
                 })
                 return HttpResponseRedirect(return_url)
         else:
@@ -164,10 +180,10 @@ class TenantMembershipBulkEditView(ObjectBulkEditView):
             'objects': objects,
             'object_pks': pks,
             'return_url': return_url,
-            'selected_fields': ['role'],
+            'selected_fields': ['roles'],
             'verbose_name': model._meta.verbose_name,
             'verbose_name_plural': model._meta.verbose_name_plural,
-            'title': _('Bulk Reassign Role'),
+            'title': _('Bulk Edit Roles'),
             'breadcrumbs': [
                 (reverse('dashboard'), _('Dashboard')),
                 (return_url, _('Memberships')),

@@ -38,7 +38,8 @@ class TenantGroupScopingTests(TestCase):
         self.member = User.objects.create_user(username='tgm', password='pw')
         self.superuser = User.objects.create_superuser(username='tgs', email='s@x.com', password='pw')
         role = TenantRole.objects.create(tenant=self.tenant, name='R', permissions=[])
-        TenantMembership.objects.create(user=self.member, tenant=self.tenant, role=role)
+        m = TenantMembership.objects.create(user=self.member, tenant=self.tenant)
+        m.roles.add(role)
 
     def _visible_slugs(self):
         return set(TenantGroup.objects.values_list('slug', flat=True))
@@ -71,7 +72,8 @@ class TenantGroupScopingTests(TestCase):
         # unrelated group they are a member of.
         unrelated_tenant = Tenant.objects.create(name='U', slug='tg-ut', group=self.unrelated)
         role = TenantRole.objects.create(tenant=unrelated_tenant, name='RU', permissions=[])
-        TenantMembership.objects.create(user=self.member, tenant=unrelated_tenant, role=role)
+        mu = TenantMembership.objects.create(user=self.member, tenant=unrelated_tenant)
+        mu.roles.add(role)
 
         _current_user.set(self.member)
         set_current_tenant(None)

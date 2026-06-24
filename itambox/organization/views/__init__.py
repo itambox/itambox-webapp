@@ -19,7 +19,7 @@ from .tenantgroup_views import (
 )
 from .tenant_views import (
     TenantListView, TenantDetailView, TenantEditView, TenantDeleteView, TenantBulkEditView, TenantBulkDeleteView,
-    tenant_ldap_sync,
+    TenantAccessView, tenant_ldap_sync,
 )
 from .assetholder_views import (
     AssetHolderListView, AssetHolderDetailView, AssetHolderEditView, AssetHolderDeleteView,
@@ -46,5 +46,12 @@ from .tenantmembership_views import (
 from .costcenter_views import (
     CostCenterListView, CostCenterDetailView, CostCenterEditView, CostCenterDeleteView,
     CostCenterCloneView, CostCenterBulkEditView, CostCenterBulkDeleteView,
+)
+from .provider_views import (
+    ProviderAdminMixin, ProviderDashboardView,
+    ProviderListView, ProviderDetailView, ProviderEditView, ProviderDeleteView,
+    ProviderRoleListView, ProviderRoleDetailView, ProviderRoleEditView, ProviderRoleDeleteView,
+    ProviderRoleTemplateListView, ProviderRoleTemplateDetailView, ProviderRoleTemplateEditView,
+    ProviderRoleTemplateDeleteView, ProviderRoleTemplateSyncView,
 )
 

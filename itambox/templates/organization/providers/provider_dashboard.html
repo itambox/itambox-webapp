@@ -1,0 +1,54 @@
+{% extends "layout.html" %}
+{% load i18n %}
+
+{% block title %}{% translate "Provider Dashboard" %} {% translate "— ITAMbox" %}{% endblock %}
+
+{% block page_header %}
+<div class="page-pretitle">
+    {% translate "Admin / Provider" %}
+</div>
+<h2 class="page-title">
+    {% translate "Provider Dashboard" %}
+</h2>
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'organization:provider_list' %}" class="btn btn-outline-secondary">
+    <i class="mdi mdi-format-list-bulleted"></i>
+    {% translate "All Providers" %}
+</a>
+{% endblock %}
+
+{% block content %}
+{% if providers %}
+<div class="row row-cards">
+    {% for row in providers %}
+    <div class="col-sm-6 col-lg-4">
+        <div class="card card-sm shadow-sm">
+            <div class="card-body">
+                <h3 class="card-title mb-3">
+                    <a href="{% url 'organization:provider_detail' pk=row.provider.pk %}">{{ row.provider.name }}</a>
+                </h3>
+                <div class="row g-3">
+                    <div class="col">
+                        <div class="text-muted small">{% translate "Tenants" %}</div>
+                        <div class="fw-bold fs-2">{{ row.tenant_count }}</div>
+                    </div>
+                    <div class="col">
+                        <div class="text-muted small">{% translate "Active Staff" %}</div>
+                        <div class="fw-bold fs-2">{{ row.staff_count }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body py-5 text-center text-muted">
+        <p class="mb-0">{% translate "No providers configured yet." %}</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

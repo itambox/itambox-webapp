@@ -41,7 +41,7 @@ class UserProfileView(LoginRequiredMixin, BaseHTMXView, UpdateView):
         context['active_tab'] = 'profile'
         context['user'] = self.request.user
         from organization.models import TenantMembership
-        context['user_memberships'] = TenantMembership.objects.filter(user=self.request.user).select_related('tenant', 'role')
+        context['user_memberships'] = TenantMembership.objects.filter(user=self.request.user).select_related('tenant').prefetch_related('roles')
         activity_qs = ObjectChange.objects.filter(user=self.request.user)[:15]
         activity_table = ObjectChangeTable(activity_qs, request=self.request)
         activity_table.configure(self.request, paginate=False)
@@ -591,3 +591,193 @@ class UserDeleteView(ObjectDeleteView):
             messages.error(request, _("You cannot delete your own user account."))
             return redirect(reverse('users:user_detail', kwargs={'pk': user_to_delete.pk}))
         return super().post(request, *args, **kwargs)
+
+
+# --------------------------------------------------------------------------- UserGroup
+# Relocated from organization/ — UserGroup is an identity-layer construct.
+from django.contrib.auth.mixins import UserPassesTestMixin
+from django.db import transaction
+from django.db.models import Count, Prefetch
+from itambox.views.generic import ObjectBulkDeleteView
+from organization.models import TenantRole, TenantMembership
+from .models import UserGroup
+from .tables import UserGroupTable
+from .filters import UserGroupFilterSet
+from .forms import UserGroupForm, UserGroupFilterForm, UserGroupAssignUsersForm
+
+
+def is_global_group_admin(user):
+    """User groups are global and can grant cross-tenant access, so only global admins
+    may manage them: superusers, provider staff holding ``can_manage_groups``, OR a user
+    directly granted the legacy ``users.manage_usergroups`` capability (single-company
+    backward compat). Delegates to core.auth.provider.can_manage_user_groups."""
+    from core.auth.provider import can_manage_user_groups
+    return can_manage_user_groups(user)
+
+
+class GlobalGroupAdminMixin(UserPassesTestMixin):
+    """Restrict a UserGroup view to global admins (see is_global_group_admin).
+
+    Group management is gated SOLELY on the global group-management capability — never on
+    the per-model ``view/add/change_usergroup`` permissions. ``test_func`` enforces the
+    capability; ``get_permission_required`` returns an empty set so the generic
+    PermissionRequiredMixin in the MRO does not additionally require ``view_usergroup``."""
+    def test_func(self):
+        return is_global_group_admin(self.request.user)
+
+    def get_permission_required(self):
+        return ()
+
+
+class UserGroupListView(GlobalGroupAdminMixin, ObjectListView):
+    queryset = UserGroup.objects.annotate(
+        member_count=Count('members', distinct=True),
+        role_count=Count('roles', distinct=True),
+    )
+    filterset = UserGroupFilterSet
+    filterset_form = UserGroupFilterForm
+    table = UserGroupTable
+    action_buttons = ('add',)
+
+
+class UserGroupDetailView(GlobalGroupAdminMixin, ObjectDetailView):
+    queryset = UserGroup.objects.prefetch_related(
+        Prefetch('roles', queryset=TenantRole.objects.order_by('name')),
+        'members',
+    ).annotate(
+        member_count=Count('members', distinct=True),
+    )
+    template_name = 'users/usergroups/usergroup_detail.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        group = self.get_object()
+
+        # Build union of permissions across all attached roles (for detail display).
+        all_perms = set()
+        for role in group.roles.all():
+            all_perms.update(role.permissions or [])
+        context['effective_permissions'] = sorted(all_perms)
+
+        context['members'] = group.members.all().order_by('username')
+        context['roles'] = group.roles.all()
+        context['member_count'] = getattr(group, 'member_count', 0) or 0
+        return context
+
+
+class UserGroupEditView(GlobalGroupAdminMixin, ObjectEditView):
+    queryset = UserGroup.objects.all()
+    model = UserGroup
+    model_form = UserGroupForm
+    template_name = 'generic/object_edit.html'
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        kwargs['tenant'] = getattr(self.request, 'active_tenant', None)
+        return kwargs
+
+
+class UserGroupDeleteView(GlobalGroupAdminMixin, ObjectDeleteView):
+    queryset = UserGroup.objects.all()
+    model = UserGroup
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('users:usergroup_list')
+
+
+class UserGroupBulkDeleteView(GlobalGroupAdminMixin, ObjectBulkDeleteView):
+    queryset = UserGroup.objects.all()
+
+    def post(self, request, *args, **kwargs):
+        from django.http import HttpResponseRedirect
+
+        pks = request.POST.getlist('pk')
+        model = self._get_model()
+        return_url = safe_return_url(
+            request,
+            request.POST.get('return_url') or request.META.get('HTTP_REFERER'),
+            reverse('users:usergroup_list'),
+        )
+
+        if not pks:
+            messages.warning(request, _("No user groups were selected."))
+            return HttpResponseRedirect(return_url)
+
+        queryset = self._get_queryset(pks)
+        objects_to_delete = list(queryset)
+
+        if not objects_to_delete:
+            messages.warning(request, _("No valid user groups selected for deletion."))
+            return HttpResponseRedirect(return_url)
+
+        if '_confirm' in request.POST:
+            deleted_count = 0
+            with transaction.atomic():
+                for obj in objects_to_delete:
+                    obj.delete()
+                    deleted_count += 1
+            messages.success(
+                request,
+                _("Successfully deleted %(count)d user group(s).") % {'count': deleted_count},
+            )
+            return HttpResponseRedirect(return_url)
+        else:
+            context = {
+                'model': model,
+                'model_name': f'{model._meta.app_label}.{model._meta.model_name}',
+                'model_verbose_name': model._meta.verbose_name,
+                'model_verbose_name_plural': model._meta.verbose_name_plural,
+                'objects': objects_to_delete,
+                'object_pks': pks,
+                'return_url': return_url,
+                'title': _('Confirm Bulk Deletion'),
+                'breadcrumbs': [
+                    (reverse('dashboard'), _('Dashboard')),
+                    (return_url, _('User Groups')),
+                    (None, _('Delete (%(count)d)') % {'count': len(objects_to_delete)}),
+                ],
+            }
+            return self.render_to_response(context)
+
+
+class UserGroupAssignUsersView(GlobalGroupAdminMixin, LoginRequiredMixin, View):
+    """Add one or more users to a (global) UserGroup's members (idempotent).
+
+    Groups are global, so any user may be a member; management is restricted to
+    global admins (GlobalGroupAdminMixin).
+    """
+    template_name = 'users/usergroups/usergroup_assign_users.html'
+
+    def _get_group(self, pk):
+        return get_object_or_404(UserGroup, pk=pk)
+
+    def get(self, request, pk, *args, **kwargs):
+        group = self._get_group(pk)
+        form = UserGroupAssignUsersForm()
+        return render(request, self.template_name, {'group': group, 'form': form})
+
+    def post(self, request, pk, *args, **kwargs):
+        group = self._get_group(pk)
+        form = UserGroupAssignUsersForm(request.POST)
+        if form.is_valid():
+            users = form.cleaned_data['users']
+            added = 0
+            already_member = 0
+            with transaction.atomic():
+                for user in users:
+                    if group.members.filter(pk=user.pk).exists():
+                        already_member += 1
+                    else:
+                        group.members.add(user)
+                        added += 1
+            messages.success(
+                request,
+                _("User group '%(group)s': %(added)d added, %(already)d already member.") % {
+                    'group': group.name,
+                    'added': added,
+                    'already': already_member,
+                },
+            )
+            return redirect(reverse('users:usergroup_detail', kwargs={'pk': group.pk}))
+
+        return render(request, self.template_name, {'group': group, 'form': form})

@@ -37,8 +37,9 @@ class TokenPermissionsBypassRemovedTests(TestCase):
             username='member-f7', password='password123'
         )
         self.membership = TenantMembership.objects.create(
-            user=self.member, tenant=self.tenant, role=self.role
+            user=self.member, tenant=self.tenant,
         )
+        self.membership.roles.add(self.role)
 
         # Unscoped user: authenticated, NOT a superuser, with NO membership
         # and NO asset-holder profile -> has no resolvable tenant.

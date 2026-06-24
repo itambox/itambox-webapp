@@ -27,7 +27,8 @@ class SoftwareGraphQLTenantPinningTestCase(TestCase):
                 'software.change_software', 'software.delete_software',
             ],
         )
-        TenantMembership.objects.create(user=self.user, tenant=self.tenant, role=role)
+        membership = TenantMembership.objects.create(user=self.user, tenant=self.tenant)
+        membership.roles.add(role)
         set_current_tenant(self.tenant)
         self.manufacturer = Manufacturer.objects.create(name='Acme', slug='acme-sw')
         self.factory = RequestFactory()

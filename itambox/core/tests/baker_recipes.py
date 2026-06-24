@@ -30,9 +30,12 @@ user = Recipe(
     email="testuser@example.com"
 )
 
+# TenantMembership.role was replaced by a `roles` M2M (+ `direct_permissions`),
+# which model_bakery cannot populate via `foreign_key`. The recipe creates a
+# membership with no roles; callers that need one add it after make, e.g.:
+#     m = baker.make_recipe('core.tenant_membership'); m.roles.add(role)
 tenant_membership = Recipe(
     TenantMembership,
     user=foreign_key(user),
     tenant=foreign_key(tenant),
-    role=foreign_key(tenant_role)
 )

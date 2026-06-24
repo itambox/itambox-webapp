@@ -70,8 +70,8 @@ class Phase3ChangeLoggingModelsTestCase(TestCase):
         membership = TenantMembership.objects.create(
             user=self.user,
             tenant=self.tenant,
-            role=self.role,
         )
+        membership.roles.add(self.role)
         self.assertGreater(ObjectChange._base_manager.count(), before)
         # TenantMembership has a direct tenant FK -> attributed to that tenant.
         self._assert_create_logged(membership, self.tenant)

@@ -21,6 +21,9 @@ def nav(context):
                     continue
                 if item.staff_only and not user.is_staff:
                     continue
+                condition = getattr(item, 'condition', None)
+                if condition is not None and not condition(user):
+                    continue
                 buttons = [
                     button for button in item.buttons
                     if user.has_perms(button.permissions)

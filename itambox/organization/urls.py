@@ -57,6 +57,7 @@ urlpatterns = [
     path('tenants/<int:pk>/', views.TenantDetailView.as_view(), name='tenant_detail'),
     path('tenants/<int:pk>/edit/', views.TenantEditView.as_view(), name='tenant_update'),
     path('tenants/<int:pk>/delete/', views.TenantDeleteView.as_view(), name='tenant_delete'),
+    path('tenants/<int:pk>/access/', views.TenantAccessView.as_view(), name='tenant_access'),
     path('tenants/<int:pk>/ldap-sync/', views.tenant_ldap_sync, name='tenant_ldap_sync'),
 
     # Asset Holders
@@ -116,6 +117,29 @@ urlpatterns = [
     # Invitations
     path('invite-user/', views.InviteUserView.as_view(), name='invite_user'),
     path('accept-invitation/<uuid:token>/', views.AcceptInvitationView.as_view(), name='accept_invitation'),
+
+    # Providers (MSP)
+    path('provider-dashboard/', views.ProviderDashboardView.as_view(), name='provider_dashboard'),
+    path('providers/', views.ProviderListView.as_view(), name='provider_list'),
+    path('providers/add/', views.ProviderEditView.as_view(), name='provider_create'),
+    path('providers/<int:pk>/', views.ProviderDetailView.as_view(), name='provider_detail'),
+    path('providers/<int:pk>/edit/', views.ProviderEditView.as_view(), name='provider_update'),
+    path('providers/<int:pk>/delete/', views.ProviderDeleteView.as_view(), name='provider_delete'),
+
+    # Provider Roles
+    path('provider-roles/', views.ProviderRoleListView.as_view(), name='providerrole_list'),
+    path('provider-roles/add/', views.ProviderRoleEditView.as_view(), name='providerrole_create'),
+    path('provider-roles/<int:pk>/', views.ProviderRoleDetailView.as_view(), name='providerrole_detail'),
+    path('provider-roles/<int:pk>/edit/', views.ProviderRoleEditView.as_view(), name='providerrole_update'),
+    path('provider-roles/<int:pk>/delete/', views.ProviderRoleDeleteView.as_view(), name='providerrole_delete'),
+
+    # Provider Role Templates
+    path('provider-role-templates/', views.ProviderRoleTemplateListView.as_view(), name='providerroletemplate_list'),
+    path('provider-role-templates/add/', views.ProviderRoleTemplateEditView.as_view(), name='providerroletemplate_create'),
+    path('provider-role-templates/<int:pk>/', views.ProviderRoleTemplateDetailView.as_view(), name='providerroletemplate_detail'),
+    path('provider-role-templates/<int:pk>/edit/', views.ProviderRoleTemplateEditView.as_view(), name='providerroletemplate_update'),
+    path('provider-role-templates/<int:pk>/sync/', views.ProviderRoleTemplateSyncView.as_view(), name='providerroletemplate_sync'),
+    path('provider-role-templates/<int:pk>/delete/', views.ProviderRoleTemplateDeleteView.as_view(), name='providerroletemplate_delete'),
 
     # Tenant Memberships
     path('memberships/', views.TenantMembershipListView.as_view(), name='tenantmembership_list'),

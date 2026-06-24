@@ -33,7 +33,8 @@ class GraphQLGlobalCatalogueGuardTests(TestCase):
                 'inventory.view_accessory', 'inventory.change_accessory', 'inventory.delete_accessory',
             ],
         )
-        self.membership = TenantMembership.objects.create(user=self.user, tenant=self.tenant, role=role)
+        self.membership = TenantMembership.objects.create(user=self.user, tenant=self.tenant)
+        self.membership.roles.add(role)
 
         # Create the global (tenant=None) rows the attacker would target.
         set_current_tenant(self.tenant)

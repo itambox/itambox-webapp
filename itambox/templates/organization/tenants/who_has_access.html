@@ -1,0 +1,53 @@
+{% extends "layout.html" %}
+{% load i18n %}
+
+{% block title %}{% translate "Who Has Access" %} — {{ tenant.name }} {% translate "— ITAMbox" %}{% endblock %}
+
+{% block page_header %}
+<div class="page-pretitle">
+    {% translate "Organization / Tenants" %}
+</div>
+<h2 class="page-title">
+    {% translate "Who Has Access" %} — {{ tenant.name }}
+</h2>
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'organization:tenant_detail' pk=tenant.pk %}" class="btn btn-outline-secondary">
+    <i class="mdi mdi-arrow-left"></i>
+    {% translate "Back to Tenant" %}
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        {% if access_report %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle border mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>{% translate "User" %}</th>
+                        <th>{% translate "Sources" %}</th>
+                        <th>{% translate "# Permissions" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in access_report %}
+                    <tr>
+                        <td>{{ entry.user }}</td>
+                        <td>{{ entry.sources|join:", " }}</td>
+                        <td>
+                            <span class="badge bg-secondary-lt">{{ entry.permissions|length }}</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0"><em>{% translate "No users currently have access to this tenant." %}</em></p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

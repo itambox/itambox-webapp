@@ -10,7 +10,8 @@ from rest_framework.permissions import IsAuthenticated
 
 from core.managers import set_current_tenant
 from itambox.middleware import set_current_user
-from organization.models import Tenant, TenantRole, TenantMembership, AssetHolder
+from organization.models import Tenant, TenantMembership, AssetHolder
+from users.models import UserGroup
 from users.api.scim.serializers import (
     SCIMUserSerializer, SCIMGroupSerializer, SCIMServiceProviderConfigSerializer
 )
@@ -66,18 +67,17 @@ def link_or_create_assetholder(user, tenant):
             logger.warning(f"Constraint or validation error creating AssetHolder for user {user.username}: {e}")
 
 
-def sync_group_members(tenant, role, member_ids):
-    # 1. Assign this role only to users who are ALREADY members of `tenant`. A SCIM token is
-    #    scoped to a single tenant, so group sync must never create a TenantMembership /
-    #    AssetHolder for an arbitrary global user id — that would be a cross-tenant
-    #    access-control write and a username-enumeration oracle (the group response reflects
-    #    member usernames). New members are provisioned exclusively through SCIM /Users;
-    #    unknown or non-member ids are skipped.
+def sync_group_members(tenant, group, member_ids):
+    # 1. Add to UserGroup.members only users who ALREADY have a TenantMembership in this
+    #    tenant. A SCIM token is scoped to a single tenant, so group sync must never write
+    #    cross-tenant membership or expose whether a global user id exists — that would be
+    #    a cross-tenant access-control write and a username-enumeration oracle. New members
+    #    are provisioned exclusively through SCIM /Users; unknown or non-member ids are skipped.
+    valid_member_ids = set()
     for uid in member_ids:
         membership = TenantMembership.objects.filter(user_id=uid, tenant=tenant).first()
         if membership:
-            membership.role = role
-            membership.save()
+            valid_member_ids.add(uid)
             link_or_create_assetholder(membership.user, tenant)
         else:
             logger.warning(
@@ -85,12 +85,16 @@ def sync_group_members(tenant, role, member_ids):
                 "(provision via SCIM /Users first).", uid, tenant.slug
             )
 
-    # 2. Drop this role from members no longer listed (within this tenant only).
-    #    Delete per-instance so ChangeLoggingMixin records each membership removal
-    #    (QuerySet.delete() bypasses Model.delete() and writes no ObjectChange).
-    to_remove = TenantMembership.objects.filter(tenant=tenant, role=role).exclude(user_id__in=member_ids)
-    for membership in to_remove:
-        membership.delete()
+    # 2. Reconcile group.members to match valid_member_ids (within this tenant only).
+    #    Use add/remove rather than set() so only the delta is applied; this keeps
+    #    ChangeLoggingMixin from firing unnecessarily on unchanged members.
+    current_members = set(group.members.filter(memberships__tenant=tenant).values_list('id', flat=True))
+    to_add = valid_member_ids - current_members
+    to_remove = current_members - valid_member_ids
+    if to_add:
+        group.members.add(*to_add)
+    if to_remove:
+        group.members.remove(*to_remove)
 
 
 class SCIMTenantMixin:
@@ -292,15 +296,9 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
                 }, status=status.HTTP_409_CONFLICT)
             
             with transaction.atomic():
-                role, _ = TenantRole.objects.get_or_create(
-                    tenant=self.tenant,
-                    name="Member",
-                    defaults={
-                        "description": "Default member role",
-                        "permissions": ["assets.view_asset", "extras.view_dashboard"]
-                    }
-                )
-                TenantMembership.objects.create(user=user, tenant=self.tenant, role=role, is_active=active)
+                # Roles are assigned in-app via UserGroup; SCIM provisioning creates the
+                # membership with an empty roles set (no get_or_create of a default role).
+                TenantMembership.objects.create(user=user, tenant=self.tenant, is_active=active)
                 link_or_create_assetholder(user, self.tenant)
         else:
             with transaction.atomic():
@@ -314,15 +312,9 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
                 user.set_unusable_password()
                 user.save()
 
-                role, _ = TenantRole.objects.get_or_create(
-                    tenant=self.tenant,
-                    name="Member",
-                    defaults={
-                        "description": "Default member role",
-                        "permissions": ["assets.view_asset", "extras.view_dashboard"]
-                    }
-                )
-                TenantMembership.objects.create(user=user, tenant=self.tenant, role=role, is_active=active)
+                # Roles are assigned in-app via UserGroup; SCIM provisioning creates the
+                # membership with an empty roles set (no get_or_create of a default role).
+                TenantMembership.objects.create(user=user, tenant=self.tenant, is_active=active)
                 link_or_create_assetholder(user, self.tenant)
 
         serializer = SCIMUserSerializer(
@@ -571,7 +563,9 @@ class SCIMGroupListView(SCIMTenantMixin, APIView):
                 "detail": str(e)
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        queryset = TenantRole.objects.filter(tenant=self.tenant).filter(q_obj).distinct()
+        # Groups are global; a tenant's SCIM endpoint sees (read-only) the groups that
+        # grant a role in THIS tenant.
+        queryset = UserGroup.objects.filter(roles__tenant=self.tenant).filter(q_obj).distinct()
         
         try:
             start_index = int(request.query_params.get('startIndex', 1))
@@ -589,7 +583,7 @@ class SCIMGroupListView(SCIMTenantMixin, APIView):
         total_results = queryset.count()
         sliced_queryset = queryset[start_index - 1 : start_index - 1 + count]
         
-        serializer = SCIMGroupSerializer(sliced_queryset, many=True, context={'request': request})
+        serializer = SCIMGroupSerializer(sliced_queryset, many=True, context={'request': request, 'tenant_slug': self.tenant.slug})
         
         return Response({
             "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
@@ -600,6 +594,15 @@ class SCIMGroupListView(SCIMTenantMixin, APIView):
         }, status=status.HTTP_200_OK)
 
     def post(self, request, *args, **kwargs):
+        # User groups are global and grant cross-tenant access; they are managed
+        # centrally by global admins, not provisioned per-tenant via SCIM.
+        return Response({
+            "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+            "status": "403",
+            "detail": "User groups are managed centrally and cannot be created via tenant SCIM.",
+        }, status=status.HTTP_403_FORBIDDEN)
+
+    def _disabled_post(self, request, *args, **kwargs):
         name = request.data.get('displayName')
         if not name:
             return Response({
@@ -615,8 +618,8 @@ class SCIMGroupListView(SCIMTenantMixin, APIView):
                 "detail": "displayName exceeds maximum length of 100 characters."
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        role = TenantRole.objects.filter(tenant=self.tenant, name=name).first()
-        if role:
+        group = UserGroup.objects.filter(tenant=self.tenant, name=name).first()
+        if group:
             return Response({
                 "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
                 "status": "409",
@@ -639,26 +642,34 @@ class SCIMGroupListView(SCIMTenantMixin, APIView):
                         }, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
-            role = TenantRole.objects.create(
+            group = UserGroup.objects.create(
                 tenant=self.tenant,
                 name=name,
-                permissions=["assets.view_asset", "extras.view_dashboard"]
             )
-            sync_group_members(self.tenant, role, member_ids)
+            sync_group_members(self.tenant, group, member_ids)
 
-        serializer = SCIMGroupSerializer(role, context={'request': request})
+        serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.tenant.slug})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class SCIMGroupDetailView(SCIMTenantMixin, APIView):
     def get(self, request, pk, *args, **kwargs):
-        role = get_object_or_404(TenantRole.objects.filter(tenant=self.tenant), id=pk)
-        serializer = SCIMGroupSerializer(role, context={'request': request})
+        group = get_object_or_404(
+            UserGroup.objects.filter(roles__tenant=self.tenant).distinct(), id=pk,
+        )
+        serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.tenant.slug})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def put(self, request, pk, *args, **kwargs):
-        role = get_object_or_404(TenantRole.objects.filter(tenant=self.tenant), id=pk)
-        
+        return Response({
+            "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+            "status": "403",
+            "detail": "User groups are managed centrally and cannot be modified via tenant SCIM.",
+        }, status=status.HTTP_403_FORBIDDEN)
+
+    def _disabled_put(self, request, pk, *args, **kwargs):
+        group = get_object_or_404(UserGroup.objects.filter(tenant=self.tenant), id=pk)
+
         name = request.data.get('displayName')
         if not name:
             return Response({
@@ -690,30 +701,40 @@ class SCIMGroupDetailView(SCIMTenantMixin, APIView):
                         }, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
-            role.name = name
-            role.save()
-            sync_group_members(self.tenant, role, member_ids)
+            group.name = name
+            group.save()
+            sync_group_members(self.tenant, group, member_ids)
 
-        serializer = SCIMGroupSerializer(role, context={'request': request})
+        serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.tenant.slug})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def patch(self, request, pk, *args, **kwargs):
-        role = get_object_or_404(TenantRole.objects.filter(tenant=self.tenant), id=pk)
-        
-        current_member_ids = set(role.memberships.values_list('user_id', flat=True))
-        
+        return Response({
+            "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+            "status": "403",
+            "detail": "User groups are managed centrally and cannot be modified via tenant SCIM.",
+        }, status=status.HTTP_403_FORBIDDEN)
+
+    def _disabled_patch(self, request, pk, *args, **kwargs):
+        group = get_object_or_404(UserGroup.objects.filter(tenant=self.tenant), id=pk)
+
+        # Build the desired member id set from the current group state, then apply PATCH ops.
+        current_member_ids = set(
+            group.members.filter(memberships__tenant=self.tenant).values_list('id', flat=True)
+        )
+
         with transaction.atomic():
             for op in request.data.get('Operations', []):
                 op_type = op.get('op', '').lower()
                 path = op.get('path', '')
                 value = op.get('value')
-                
+
                 val_list = []
                 if isinstance(value, list):
                     val_list = value
                 elif isinstance(value, dict):
                     val_list = [value]
-                    
+
                 if op_type == 'add':
                     for item in val_list:
                         uid = item.get('value')
@@ -761,7 +782,7 @@ class SCIMGroupDetailView(SCIMTenantMixin, APIView):
                                 "status": "400",
                                 "detail": "displayName exceeds maximum length of 100 characters."
                             }, status=status.HTTP_400_BAD_REQUEST)
-                        role.name = value
+                        group.name = value
                     elif isinstance(value, dict) and 'displayName' in value:
                         display_name = value['displayName']
                         if display_name and len(display_name) > 100:
@@ -770,7 +791,7 @@ class SCIMGroupDetailView(SCIMTenantMixin, APIView):
                                 "status": "400",
                                 "detail": "displayName exceeds maximum length of 100 characters."
                             }, status=status.HTTP_400_BAD_REQUEST)
-                        role.name = display_name
+                        group.name = display_name
                     elif path == 'members' or not path:
                         current_member_ids = set()
                         for item in val_list:
@@ -784,18 +805,25 @@ class SCIMGroupDetailView(SCIMTenantMixin, APIView):
                                         "status": "400",
                                         "detail": f"Invalid member ID: {uid}"
                                     }, status=status.HTTP_400_BAD_REQUEST)
-            
-            role.save()
-            sync_group_members(self.tenant, role, current_member_ids)
 
-        serializer = SCIMGroupSerializer(role, context={'request': request})
+            group.save()
+            sync_group_members(self.tenant, group, current_member_ids)
+
+        serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.tenant.slug})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def delete(self, request, pk, *args, **kwargs):
-        role = get_object_or_404(TenantRole.objects.filter(tenant=self.tenant), id=pk)
+        return Response({
+            "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+            "status": "403",
+            "detail": "User groups are managed centrally and cannot be deleted via tenant SCIM.",
+        }, status=status.HTTP_403_FORBIDDEN)
+
+    def _disabled_delete(self, request, pk, *args, **kwargs):
+        group = get_object_or_404(UserGroup.objects.filter(tenant=self.tenant), id=pk)
         with transaction.atomic():
-            # Per-instance delete so each membership removal is change-logged.
-            for membership in TenantMembership.objects.filter(tenant=self.tenant, role=role):
-                membership.delete()
-            role.delete()
+            # Deleting a UserGroup removes the group and its M2M links; it does NOT remove
+            # TenantMemberships — users remain members of the tenant with whatever direct
+            # roles/grants they have. Soft-delete via the model's delete() for change-logging.
+            group.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

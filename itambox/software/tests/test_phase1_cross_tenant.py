@@ -38,8 +38,9 @@ class SoftwareApiCrossTenantTestCase(TestCase):
             ],
         )
         self.membership_b = TenantMembership.objects.create(
-            user=self.user_b, tenant=self.tenant_b, role=self.role_b,
+            user=self.user_b, tenant=self.tenant_b,
         )
+        self.membership_b.roles.add(self.role_b)
 
         self.mfr = Manufacturer.objects.create(name='Microsoft', slug='microsoft')
 

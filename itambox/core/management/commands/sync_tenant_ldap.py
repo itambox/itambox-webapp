@@ -180,11 +180,11 @@ class Command(BaseCommand):
                                 ]
                             }
                         )
-                        TenantMembership.objects.update_or_create(
+                        membership, _ = TenantMembership.objects.get_or_create(
                             user=user,
                             tenant=tenant,
-                            defaults={'role': tenant_role}
                         )
+                        membership.roles.add(tenant_role)
 
                         if created:
                             created_count += 1

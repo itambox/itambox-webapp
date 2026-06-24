@@ -22,7 +22,10 @@ class BaseFilterSet(django_filters.FilterSet):
         for field_name, filter_obj in self.filters.items():
             if isinstance(filter_obj, (django_filters.ModelChoiceFilter, django_filters.ModelMultipleChoiceFilter)):
                 queryset = filter_obj.extra.get('queryset')
-                if queryset is not None:
+                # A callable queryset (a request-time resolver, e.g. a user picker) has
+                # no `.model`; django-filter resolves it per request, so it cannot be
+                # pre-scoped here — skip it instead of crashing on `.model`.
+                if queryset is not None and not callable(queryset):
                     model = queryset.model
                     
                     # 1. If model is Tenant, limit choices to the active tenant

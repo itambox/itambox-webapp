@@ -1,7 +1,7 @@
 # itambox/organization/tables.py
 import django_tables2 as tables
 from django_tables2.utils import A
-from .models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, Contact, ContactRole, ContactAssignment, TenantRole, TenantMembership, CostCenter
+from .models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, Contact, ContactRole, ContactAssignment, TenantRole, TenantMembership, CostCenter, Provider, ProviderRole, ProviderRoleTemplate
 from core.tables import ActionsColumn, BaseTable, CountLinkColumn, ToggleColumn
 from extras.tables import TagColumn
 
@@ -251,14 +251,21 @@ class TenantMembershipTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     user = tables.LinkColumn('users:user_detail', args=[A('user.pk')], verbose_name=_('User'))
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant', verbose_name=_('Tenant'))
-    role = tables.LinkColumn('organization:tenantrole_detail', args=[A('role_id')], accessor='role', verbose_name=_('Role'))
+    roles = tables.Column(verbose_name=_('Roles'), orderable=False)
     joined_at = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name=_('Joined'))
     actions = ActionsColumn(actions=('edit', 'delete'))
 
     class Meta(BaseTable.Meta):
         model = TenantMembership
-        fields = ('pk', 'user', 'tenant', 'role', 'joined_at', 'actions')
-        default_columns = ('pk', 'user', 'tenant', 'role', 'joined_at', 'actions')
+        fields = ('pk', 'user', 'tenant', 'roles', 'joined_at', 'actions')
+        default_columns = ('pk', 'user', 'tenant', 'roles', 'joined_at', 'actions')
+
+    def render_roles(self, value, record):
+        role_links = []
+        for role in record.roles.all():
+            url = reverse('organization:tenantrole_detail', kwargs={'pk': role.pk})
+            role_links.append(format_html('<a href="{}">{}</a>', url, role.name))
+        return mark_safe(', '.join(role_links)) if role_links else _('(none)')
 
 
 class CostCenterTable(BaseTable):
@@ -275,3 +282,47 @@ class CostCenterTable(BaseTable):
         model = CostCenter
         fields = ('pk', 'code', 'name', 'tenant', 'parent', 'description', 'child_count', 'is_active', 'actions')
         default_columns = ('pk', 'code', 'name', 'tenant', 'parent', 'child_count', 'is_active', 'actions')
+
+
+# --- Provider (MSP) Tables ---
+class ProviderTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    name = tables.LinkColumn('organization:provider_detail', args=[A('pk')], verbose_name=_('Name'))
+    slug = tables.Column(verbose_name=_('Slug'))
+    description = tables.Column(verbose_name=_('Description'))
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = Provider
+        fields = ('pk', 'name', 'slug', 'description', 'actions')
+        default_columns = ('pk', 'name', 'slug', 'description', 'actions')
+
+
+class ProviderRoleTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    name = tables.LinkColumn('organization:providerrole_detail', args=[A('pk')], verbose_name=_('Name'))
+    provider = tables.LinkColumn('organization:provider_detail', args=[A('provider_id')], accessor='provider', verbose_name=_('Provider'))
+    can_manage_tenants = tables.BooleanColumn(verbose_name=_('Manage tenants'))
+    can_manage_provider_users = tables.BooleanColumn(verbose_name=_('Manage provider users'))
+    can_manage_groups = tables.BooleanColumn(verbose_name=_('Manage groups'))
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = ProviderRole
+        fields = ('pk', 'name', 'provider', 'can_manage_tenants', 'can_manage_provider_users', 'can_manage_groups', 'actions')
+        default_columns = ('pk', 'name', 'provider', 'can_manage_tenants', 'can_manage_provider_users', 'can_manage_groups', 'actions')
+
+
+class ProviderRoleTemplateTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    name = tables.LinkColumn('organization:providerroletemplate_detail', args=[A('pk')], verbose_name=_('Name'))
+    provider = tables.LinkColumn('organization:provider_detail', args=[A('provider_id')], accessor='provider', verbose_name=_('Provider'))
+    is_default = tables.BooleanColumn(verbose_name=_('Default'))
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = ProviderRoleTemplate
+        fields = ('pk', 'name', 'provider', 'is_default', 'actions')
+        default_columns = ('pk', 'name', 'provider', 'is_default', 'actions')
+
+

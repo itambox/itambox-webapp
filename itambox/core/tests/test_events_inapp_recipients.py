@@ -27,14 +27,16 @@ class InAppChannelRecipientTests(TestCase):
         self.member = User.objects.create_user(
             username='member', password='pw', is_active=True
         )
-        TenantMembership.objects.create(user=self.member, tenant=self.tenant, role=role)
+        m = TenantMembership.objects.create(user=self.member, tenant=self.tenant)
+        m.roles.add(role)
 
         # A member of a DIFFERENT tenant — must NOT receive this channel's notice.
         other_role = TenantRole.objects.create(tenant=self.other_tenant, name='R', permissions=[])
         self.outsider = User.objects.create_user(
             username='outsider', password='pw', is_active=True
         )
-        TenantMembership.objects.create(user=self.outsider, tenant=self.other_tenant, role=other_role)
+        m2 = TenantMembership.objects.create(user=self.outsider, tenant=self.other_tenant)
+        m2.roles.add(other_role)
 
         self.channel = NotificationChannel.objects.create(
             name='Acme Feed',

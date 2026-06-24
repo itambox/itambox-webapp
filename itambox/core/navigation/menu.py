@@ -3,6 +3,31 @@ from functools import cache
 from django.utils.translation import gettext_lazy as _
 
 from . import Menu, MenuGroup, MenuItem, MenuItemButton, get_model_item
+from core.auth.provider import can_manage_user_groups
+
+
+def _provider_layer_active(user):
+    """Whether any Provider exists (cached per-request on the user object)."""
+    cached = getattr(user, '_provider_layer_active_cache', None)
+    if cached is None:
+        # inline import: avoids AppRegistryNotReady at module load
+        from organization.models import Provider
+        cached = Provider.objects.exists()
+        setattr(user, '_provider_layer_active_cache', cached)
+    return cached
+
+
+def _can_admin_provider(user):
+    """Show provider-admin nav only when a Provider exists AND the user may manage it
+    (superuser, or provider staff holding can_manage_provider_users)."""
+    if not getattr(user, 'is_authenticated', False):
+        return False
+    if not _provider_layer_active(user):
+        return False
+    if user.is_superuser:
+        return True
+    from core.auth.provider import has_provider_capability
+    return has_provider_capability(user, 'manage_provider_users')
 
 ORG_MENU = Menu(
     label=_('Organization'),
@@ -529,6 +554,76 @@ ADMIN_MENU = Menu(
                             title=_('Add'),
                             icon_class='mdi mdi-plus-thick',
                             permissions=['organization.add_tenantmembership'],
+                        ),
+                    ),
+                ),
+                MenuItem(
+                    link='users:usergroup_list',
+                    link_text=_('User Groups'),
+                    # Gated by the group-management capability (superuser / provider
+                    # can_manage_groups / legacy grant), not a Django permission string.
+                    permissions=(),
+                    condition=can_manage_user_groups,
+                    buttons=(
+                        MenuItemButton(
+                            link='users:usergroup_create',
+                            title=_('Add'),
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=(),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        MenuGroup(
+            label=_('Provider'),
+            items=(
+                MenuItem(
+                    link='organization:provider_dashboard',
+                    link_text=_('Provider Dashboard'),
+                    permissions=(),
+                    condition=_can_admin_provider,
+                    buttons=(),
+                ),
+                MenuItem(
+                    link='organization:provider_list',
+                    link_text=_('Providers'),
+                    permissions=(),
+                    condition=_can_admin_provider,
+                    buttons=(
+                        MenuItemButton(
+                            link='organization:provider_create',
+                            title=_('Add'),
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=(),
+                        ),
+                    ),
+                ),
+                MenuItem(
+                    link='organization:providerrole_list',
+                    link_text=_('Provider Roles'),
+                    permissions=(),
+                    condition=_can_admin_provider,
+                    buttons=(
+                        MenuItemButton(
+                            link='organization:providerrole_create',
+                            title=_('Add'),
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=(),
+                        ),
+                    ),
+                ),
+                MenuItem(
+                    link='organization:providerroletemplate_list',
+                    link_text=_('Role Templates'),
+                    permissions=(),
+                    condition=_can_admin_provider,
+                    buttons=(
+                        MenuItemButton(
+                            link='organization:providerroletemplate_create',
+                            title=_('Add'),
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=(),
                         ),
                     ),
                 ),

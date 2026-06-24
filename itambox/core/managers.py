@@ -7,6 +7,7 @@ import contextvars
 _current_tenant = contextvars.ContextVar('current_tenant', default=None)
 _current_tenant_group = contextvars.ContextVar('current_tenant_group', default=None)
 _current_membership = contextvars.ContextVar('current_membership', default=None)
+_current_provider_membership = contextvars.ContextVar('current_provider_membership', default=None)
 _descendant_group_ids_cache = contextvars.ContextVar('descendant_group_ids_cache', default=None)
 
 def set_current_tenant(tenant: Optional[Any]) -> None:
@@ -29,6 +30,15 @@ def set_current_membership(membership: Optional[Any]) -> None:
 
 def get_current_membership() -> Optional[Any]:
     return _current_membership.get()
+
+def set_current_provider_membership(membership: Optional[Any]) -> None:
+    # The user's ProviderMembership for the active tenant's provider (if any). Set by
+    # TenantMiddleware; available to views that need provider context. Does not affect
+    # ORM tenant scoping (provider staff still operate one tenant at a time).
+    _current_provider_membership.set(membership)
+
+def get_current_provider_membership() -> Optional[Any]:
+    return _current_provider_membership.get()
 
 
 

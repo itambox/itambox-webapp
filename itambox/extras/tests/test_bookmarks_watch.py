@@ -93,16 +93,16 @@ class WatchNotificationTests(TenantTestMixin, TestCase):
 
         # Associate users with the tenant so they pass the view permission checks
         from organization.models import TenantMembership
-        TenantMembership.objects.create(
+        watcher_membership = TenantMembership.objects.create(
             user=self.watcher,
             tenant=self.tenant,
-            role=self.tenant_role
         )
-        TenantMembership.objects.create(
+        watcher_membership.roles.add(self.tenant_role)
+        bookmarker_membership = TenantMembership.objects.create(
             user=self.bookmarker,
             tenant=self.tenant,
-            role=self.tenant_role
         )
+        bookmarker_membership.roles.add(self.tenant_role)
 
         from extras.models import Tag
         _set_user_context(self.watcher)
@@ -164,7 +164,8 @@ class WatchNotificationTests(TenantTestMixin, TestCase):
         extra_watchers = []
         for i in range(3):
             u = _make_user(f"watcher_bulk_{i}")
-            TenantMembership.objects.create(user=u, tenant=self.tenant, role=self.tenant_role)
+            m = TenantMembership.objects.create(user=u, tenant=self.tenant)
+            m.roles.add(self.tenant_role)
             ObjectWatch.objects.create(user=u, model=ct, object_id=self.tag.pk)
             extra_watchers.append(u)
 

@@ -1,0 +1,81 @@
+{% extends "generic/object_detail.html" %}
+{% load i18n %}
+
+{% block object_details %}
+<div class="row">
+    <div class="col-md-6 mb-3">
+        <label class="form-label text-muted">{% translate "Name" %}</label>
+        <div class="fw-bold fs-3 text-dark">{{ object.name }}</div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <label class="form-label text-muted">{% translate "Slug" %}</label>
+        <div><code>{{ object.slug }}</code></div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-3">
+        <label class="form-label text-muted">{% translate "Provider" %}</label>
+        <div>
+            {% if object.provider %}
+                <a href="{% url 'organization:provider_detail' pk=object.provider.pk %}">{{ object.provider.name }}</a>
+            {% else %}
+                <span class="text-muted">—</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <label class="form-label text-muted">{% translate "Tenant role template" %}</label>
+        <div>
+            {% if object.tenant_role_template %}
+                <a href="{% url 'organization:providerroletemplate_detail' pk=object.tenant_role_template.pk %}">{{ object.tenant_role_template.name }}</a>
+            {% else %}
+                <span class="text-muted">—</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if object.description %}
+<div class="mb-3">
+    <label class="form-label text-muted">{% translate "Description" %}</label>
+    <div>{{ object.description }}</div>
+</div>
+{% endif %}
+
+<hr class="my-4">
+
+<h4 class="card-title text-primary mb-3">{% translate "Capabilities" %}</h4>
+<div class="row">
+    <div class="col-md-4 mb-3">
+        <label class="form-label text-muted">{% translate "Can manage tenants" %}</label>
+        <div>
+            {% if object.can_manage_tenants %}
+                <span class="badge bg-success">{% translate "Yes" %}</span>
+            {% else %}
+                <span class="badge bg-secondary">{% translate "No" %}</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <label class="form-label text-muted">{% translate "Can manage provider users" %}</label>
+        <div>
+            {% if object.can_manage_provider_users %}
+                <span class="badge bg-success">{% translate "Yes" %}</span>
+            {% else %}
+                <span class="badge bg-secondary">{% translate "No" %}</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <label class="form-label text-muted">{% translate "Can manage groups" %}</label>
+        <div>
+            {% if object.can_manage_groups %}
+                <span class="badge bg-success">{% translate "Yes" %}</span>
+            {% else %}
+                <span class="badge bg-secondary">{% translate "No" %}</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock object_details %}

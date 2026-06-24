@@ -33,11 +33,11 @@ class ITAMBoxAPITestCase(APITestCase):
             name='Staff Role A',
             permissions=['assets.view_asset', 'assets.add_asset', 'assets.change_asset'],
         )
-        TenantMembership.objects.create(
+        _m = TenantMembership.objects.create(
             user=self.staff,
             tenant=self.tenant_a,
-            role=self.role_staff_a,
         )
+        _m.roles.add(self.role_staff_a)
 
         # Associate staff with Tenant A via AssetHolder profile
         self.holder_staff = AssetHolder.objects.create(
@@ -145,21 +145,17 @@ class ITAMBoxAPITestCase(APITestCase):
         """WS1-6: checkout is a state change -> requires assets.change_asset, not the
         POST-default assets.add_asset."""
         add_only = User.objects.create_user(username='addonly', password='pw')
-        TenantMembership.objects.create(
-            user=add_only, tenant=self.tenant_a,
-            role=TenantRole.objects.create(
-                tenant=self.tenant_a, name='Add Only',
-                permissions=['assets.view_asset', 'assets.add_asset'],
-            ),
-        )
+        _m_add = TenantMembership.objects.create(user=add_only, tenant=self.tenant_a)
+        _m_add.roles.add(TenantRole.objects.create(
+            tenant=self.tenant_a, name='Add Only',
+            permissions=['assets.view_asset', 'assets.add_asset'],
+        ))
         change_only = User.objects.create_user(username='changeonly', password='pw')
-        TenantMembership.objects.create(
-            user=change_only, tenant=self.tenant_a,
-            role=TenantRole.objects.create(
-                tenant=self.tenant_a, name='Change Only',
-                permissions=['assets.view_asset', 'assets.change_asset'],
-            ),
-        )
+        _m_change = TenantMembership.objects.create(user=change_only, tenant=self.tenant_a)
+        _m_change.roles.add(TenantRole.objects.create(
+            tenant=self.tenant_a, name='Change Only',
+            permissions=['assets.view_asset', 'assets.change_asset'],
+        ))
         checkout_url = reverse('api:assets_api:asset-checkout', kwargs={'pk': self.asset_a.pk})
 
         self.client.force_login(add_only)

@@ -179,7 +179,8 @@ class MitigationsPhase4Tests(TestCase):
             name='Tenant Staff',
             permissions=['assets.change_asset']
         )
-        TenantMembership.objects.create(user=staff_user, tenant=self.tenant, role=role)
+        membership_staff = TenantMembership.objects.create(user=staff_user, tenant=self.tenant)
+        membership_staff.roles.add(role)
         
         factory = RequestFactory()
         
@@ -259,7 +260,7 @@ class MitigationsPhase4Tests(TestCase):
         
         # Verify TenantMembership is provisioned with proper Admin role
         membership = TenantMembership.objects.get(user=ldap_user, tenant=self.tenant)
-        self.assertEqual(membership.role.name, 'Admin')
+        self.assertEqual(membership.roles.first().name, 'Admin')
 
     def test_saml_user_profile_and_membership_syncing(self):
         backend = TenantSaml2Backend()
@@ -297,4 +298,4 @@ class MitigationsPhase4Tests(TestCase):
         
         # Verify TenantMembership is provisioned with Manager role
         membership = TenantMembership.objects.get(user=saml_user, tenant=self.tenant)
-        self.assertEqual(membership.role.name, 'Manager')
+        self.assertEqual(membership.roles.first().name, 'Manager')

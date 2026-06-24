@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from organization.models import TenantRole, TenantMembership
+from organization.models import TenantMembership
+from users.models import UserGroup
 
 User = get_user_model()
 
@@ -57,15 +58,16 @@ class SCIMUserSerializer(serializers.ModelSerializer):
         tenant = self.context.get('tenant')
         if not tenant:
             return []
-        # Return custom roles mapped as SCIM groups
-        memberships = TenantMembership.objects.filter(user=obj, tenant=tenant).select_related('role')
+        # Groups are global; report the ones this user belongs to that grant a role in
+        # THIS tenant (SCIM /Groups maps to UserGroup, scoped per tenant for read).
+        user_groups = UserGroup.objects.filter(members=obj, roles__tenant=tenant).distinct()
         return [
             {
-                'value': str(m.role.id),
-                'display': m.role.name,
-                '$ref': f"/api/tenants/{tenant.slug}/scim/v2/Groups/{m.role.id}"
+                'value': str(g.id),
+                'display': g.name,
+                '$ref': f"/api/tenants/{tenant.slug}/scim/v2/Groups/{g.id}"
             }
-            for m in memberships
+            for g in user_groups
         ]
 
     def get_meta(self, obj):
@@ -86,7 +88,7 @@ class SCIMGroupSerializer(serializers.ModelSerializer):
     meta = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
-        model = TenantRole
+        model = UserGroup
         fields = ['schemas', 'id', 'displayName', 'members', 'meta']
         read_only_fields = ['id', 'schemas', 'meta']
 
@@ -94,24 +96,26 @@ class SCIMGroupSerializer(serializers.ModelSerializer):
         return ["urn:ietf:params:scim:schemas:core:2.0:Group"]
 
     def get_members(self, obj):
-        memberships = obj.memberships.select_related('user')
+        # UserGroup is global (no tenant); URLs use the request's tenant slug from context.
+        tenant_slug = self.context.get('tenant_slug', '')
         return [
             {
-                'value': str(m.user.id),
-                'display': m.user.username,
-                '$ref': f"/api/tenants/{obj.tenant.slug}/scim/v2/Users/{m.user.id}"
+                'value': str(user.id),
+                'display': user.username,
+                '$ref': f"/api/tenants/{tenant_slug}/scim/v2/Users/{user.id}"
             }
-            for m in memberships
+            for user in obj.members.all()
         ]
 
     def get_meta(self, obj):
         created_str = obj.created_at.isoformat() if hasattr(obj, 'created_at') and obj.created_at else ""
         updated_str = obj.updated_at.isoformat() if hasattr(obj, 'updated_at') and obj.updated_at else created_str
+        tenant_slug = self.context.get('tenant_slug', '')
         return {
             'resourceType': 'Group',
             'created': created_str,
             'lastModified': updated_str,
-            'location': f"/api/tenants/{obj.tenant.slug}/scim/v2/Groups/{obj.id}"
+            'location': f"/api/tenants/{tenant_slug}/scim/v2/Groups/{obj.id}"
         }
 
 

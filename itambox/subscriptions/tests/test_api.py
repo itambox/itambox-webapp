@@ -59,7 +59,8 @@ class SubscriptionAPITests(APITestCase):
                 'subscriptions.change_subscriptionassignment', 'subscriptions.delete_subscriptionassignment',
             ],
         )
-        TenantMembership.objects.create(user=self.staff, tenant=self.tenant, role=role)
+        membership = TenantMembership.objects.create(user=self.staff, tenant=self.tenant)
+        membership.roles.add(role)
 
     def test_provider_api_crud(self):
         self.client.force_authenticate(user=self.staff)

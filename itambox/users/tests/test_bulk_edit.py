@@ -30,18 +30,21 @@ class UserBulkEditTests(TestCase):
             name='Admin',
             permissions=['auth.view_user', 'auth.change_user'],
         )
-        TenantMembership.objects.create(user=self.admin_a, tenant=self.tenant_a, role=self.role_a)
+        m = TenantMembership.objects.create(user=self.admin_a, tenant=self.tenant_a)
+        m.roles.add(self.role_a)
 
         # Users belonging to Tenant A
         self.user_a1 = User.objects.create_user(
             username='user_a1', email='a1@test.com', password='password123', is_active=True
         )
-        TenantMembership.objects.create(user=self.user_a1, tenant=self.tenant_a, role=self.role_a)
+        m = TenantMembership.objects.create(user=self.user_a1, tenant=self.tenant_a)
+        m.roles.add(self.role_a)
 
         self.user_a2 = User.objects.create_user(
             username='user_a2', email='a2@test.com', password='password123', is_active=True
         )
-        TenantMembership.objects.create(user=self.user_a2, tenant=self.tenant_a, role=self.role_a)
+        m = TenantMembership.objects.create(user=self.user_a2, tenant=self.tenant_a)
+        m.roles.add(self.role_a)
 
         # User belonging to Tenant B (cross-tenant)
         self.user_b1 = User.objects.create_user(
@@ -52,7 +55,8 @@ class UserBulkEditTests(TestCase):
             name='Admin',
             permissions=['auth.view_user', 'auth.change_user'],
         )
-        TenantMembership.objects.create(user=self.user_b1, tenant=self.tenant_b, role=self.role_b)
+        m = TenantMembership.objects.create(user=self.user_b1, tenant=self.tenant_b)
+        m.roles.add(self.role_b)
 
         # URLs
         self.bulk_edit_url = reverse('users:user_bulk_edit')

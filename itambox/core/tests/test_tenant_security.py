@@ -4,6 +4,7 @@ from django.test import TestCase, RequestFactory
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from organization.models import TenantGroup, Tenant, TenantMembership, TenantRole, Site, Location
+from users.models import UserGroup
 from assets.models import StatusLabel, Asset, AssetRole, Manufacturer, AssetType
 from core.managers import set_current_tenant, set_current_membership
 
@@ -25,12 +26,13 @@ class CoreTenantSecurityTestCase(TestCase):
                 'assets.view_asset', 'assets.add_asset', 'assets.change_asset', 'assets.delete_asset'
             ]
         )
-        self.membership = TenantMembership.objects.create(user=self.user, tenant=self.tenant, role=self.role)
+        self.membership = TenantMembership.objects.create(user=self.user, tenant=self.tenant)
+        self.membership.roles.add(self.role)
 
     def test_tenant_group_scoping(self):
         from core.managers import set_current_tenant_group
         from itambox.middleware import _current_user
-        
+
         # Superuser scoping
         _current_user.set(self.superuser)
         set_current_tenant_group(self.tenant_group)
@@ -56,14 +58,14 @@ class CoreTenantSecurityTestCase(TestCase):
         group = TenantGroup.objects.create(name='Test Group 2', slug='test-group-2')
         tenant_admin = Tenant.objects.create(name='Admin Tenant', slug='admin-tenant', group=group)
         tenant_readonly = Tenant.objects.create(name='Readonly Tenant', slug='readonly-tenant', group=group)
-        
+
         # 2. Create status & role
         status = StatusLabel.objects.create(name='Test Active', slug='test-active', type='deployable')
         role = AssetRole.objects.create(name='Test Role', slug='test-role')
-        
+
         mfr = Manufacturer.objects.create(name='Dell', slug='dell')
         asset_type = AssetType.objects.create(manufacturer=mfr, model='Latitude 5550')
-        
+
         # 3. Create asset belonging to the readonly tenant
         asset_readonly = Asset.objects.create(
             name='Protected Desktop',
@@ -72,11 +74,11 @@ class CoreTenantSecurityTestCase(TestCase):
             asset_role=role,
             tenant=tenant_readonly
         )
-        
+
         # Create a non-superuser user
         test_user = User.objects.create_user(username='tenant_test_user', password='password123', is_superuser=False)
-        
-        # 4. Bind memberships
+
+        # 4. Bind memberships (M2M: create then add roles)
         admin_role = TenantRole.objects.create(
             tenant=tenant_admin,
             name='Admin',
@@ -91,54 +93,56 @@ class CoreTenantSecurityTestCase(TestCase):
                 'assets.view_asset'
             ]
         )
-        TenantMembership.objects.create(user=test_user, tenant=tenant_admin, role=admin_role)
-        TenantMembership.objects.create(user=test_user, tenant=tenant_readonly, role=reader_role)
-        
+        mem_admin = TenantMembership.objects.create(user=test_user, tenant=tenant_admin)
+        mem_admin.roles.add(admin_role)
+        mem_readonly = TenantMembership.objects.create(user=test_user, tenant=tenant_readonly)
+        mem_readonly.roles.add(reader_role)
+
         # Set active context in test client session
         self.client.force_login(test_user)
         session = self.client.session
         session['active_tenant_id'] = tenant_admin.pk
         session.save()
-        
+
         # 5. Set active context to the ADMIN tenant
         from core.managers import set_current_tenant, set_current_membership
         membership_admin = TenantMembership.objects.get(user=test_user, tenant=tenant_admin)
         set_current_tenant(tenant_admin)
         set_current_membership(membership_admin)
-        
+
         # 6. Verify that the user has general 'change_asset' permission (under active context)
         self.assertTrue(test_user.has_perm('assets.change_asset'))
-        
+
         # 7. BUT verify that the user CANNOT edit the specific asset of the READONLY tenant!
         self.assertFalse(test_user.has_perm('assets.change_asset', obj=asset_readonly))
-        
+
         # 8. Test that GET/POST requests are blocked (scoped out, resulting in 404 Not Found) for the readonly tenant asset
-        
+
         # Update GET
         url_update = reverse('assets:asset_update', kwargs={'pk': asset_readonly.pk})
         response = self.client.get(url_update)
         self.assertEqual(response.status_code, 404)
-        
+
         # Delete GET
         url_delete = reverse('assets:asset_delete', kwargs={'pk': asset_readonly.pk})
         response = self.client.get(url_delete)
         self.assertEqual(response.status_code, 404)
-        
+
         # Clone GET
         url_clone = reverse('assets:asset_clone', kwargs={'pk': asset_readonly.pk})
         response = self.client.get(url_clone)
         self.assertEqual(response.status_code, 404)
-        
+
         # Checkout GET (modal)
         url_checkout = reverse('assets:asset_checkout_modal', kwargs={'pk': asset_readonly.pk})
         response = self.client.get(url_checkout)
         self.assertEqual(response.status_code, 404)
-        
+
         # Checkin POST
         url_checkin = reverse('assets:asset_checkin', kwargs={'pk': asset_readonly.pk})
         response = self.client.post(url_checkin)
         self.assertEqual(response.status_code, 404)
-        
+
         # 9. Test that creating an asset and assigning it to the readonly tenant is blocked by form validation
         url_create = reverse('assets:asset_create')
         post_data = {
@@ -166,7 +170,7 @@ class CoreTenantSecurityTestCase(TestCase):
             created = Asset._base_manager.filter(asset_tag='TAG-ILLEGAL').first()
             self.assertIsNotNone(created)
             self.assertEqual(created.tenant_id, tenant_admin.pk)
-        
+
         # Cleanup context
         set_current_tenant(None)
         set_current_membership(None)
@@ -260,8 +264,9 @@ class CrossTenantAttackTestCase(TestCase):
             ]
         )
         self.membership_b = TenantMembership.objects.create(
-            user=self.user_b, tenant=self.tenant_b, role=self.role_b
+            user=self.user_b, tenant=self.tenant_b,
         )
+        self.membership_b.roles.add(self.role_b)
 
         # Login as user_b with active tenant = Tenant B
         self.client.force_login(self.user_b)
@@ -507,3 +512,347 @@ class EmailSettingsEncryptionTestCase(TestCase):
         db_obj = EmailSettings.objects.get(pk=1)
         self.assertFalse(db_obj.smtp_password)
         self.assertEqual(db_obj.smtp_password_decrypted, '')
+
+
+# ---------------------------------------------------------------------------
+# Multi-role RBAC tests (new shape: M2M roles + direct_permissions + UserGroup)
+# ---------------------------------------------------------------------------
+
+class MultiRoleUnionTestCase(TestCase):
+    """Verify the additive union of permission sources:
+    direct membership roles + direct_permissions + UserGroup roles."""
+
+    def setUp(self):
+        self.tenant = Tenant.objects.create(name='Union Tenant', slug='union-tenant')
+        self.user = User.objects.create_user(username='union_user', password='pass')
+
+        # Role A grants 'assets.view_asset'
+        self.role_a = TenantRole.objects.create(
+            tenant=self.tenant,
+            name='Role A',
+            permissions=['assets.view_asset'],
+        )
+        # Role B grants 'assets.add_asset'
+        self.role_b = TenantRole.objects.create(
+            tenant=self.tenant,
+            name='Role B',
+            permissions=['assets.add_asset'],
+        )
+        # Role C (for UserGroup) grants 'assets.change_asset'
+        self.role_c = TenantRole.objects.create(
+            tenant=self.tenant,
+            name='Role C',
+            permissions=['assets.change_asset'],
+        )
+
+        # Membership: direct role A + direct_permissions granting 'assets.delete_asset'
+        self.membership = TenantMembership.objects.create(
+            user=self.user,
+            tenant=self.tenant,
+            direct_permissions=['assets.delete_asset'],
+        )
+        self.membership.roles.add(self.role_a)
+
+        # UserGroup with role C
+        self.group = UserGroup.objects.create(name='Test Group', is_active=True)
+        self.group.roles.add(self.role_c)
+        self.group.members.add(self.user)
+
+        # Set context
+        set_current_tenant(self.tenant)
+        set_current_membership(self.membership)
+
+    def tearDown(self):
+        set_current_tenant(None)
+        set_current_membership(None)
+
+    def test_direct_role_perm_granted(self):
+        """Permission from a direct membership role resolves True."""
+        self.assertTrue(self.user.has_perm('assets.view_asset'))
+
+    def test_direct_permission_grant_resolves_true(self):
+        """Permission granted directly via direct_permissions resolves True."""
+        self.assertTrue(self.user.has_perm('assets.delete_asset'))
+
+    def test_usergroup_role_perm_granted(self):
+        """Permission from a role attached to the user's UserGroup resolves True."""
+        self.assertTrue(self.user.has_perm('assets.change_asset'))
+
+    def test_unrelated_perm_resolves_false(self):
+        """A permission not granted by any source resolves False."""
+        self.assertFalse(self.user.has_perm('assets.add_asset'))
+
+    def test_multi_role_membership_is_union(self):
+        """Two direct roles on a membership yield the union of both roles' permissions."""
+        self.membership.roles.add(self.role_b)
+        # Invalidate the per-request cache so the next has_perm re-queries
+        cache_key = f'_effective_perms_{self.tenant.pk}'
+        if hasattr(self.user, cache_key):
+            delattr(self.user, cache_key)
+        self.assertTrue(self.user.has_perm('assets.view_asset'))
+        self.assertTrue(self.user.has_perm('assets.add_asset'))
+
+
+class TenantBoundaryWithGroupsTestCase(TestCase):
+    """Strict tenant boundary: grants in tenant A must not apply to objects in tenant B."""
+
+    def setUp(self):
+        self.tenant_a = Tenant.objects.create(name='Boundary-A', slug='boundary-a')
+        self.tenant_b = Tenant.objects.create(name='Boundary-B', slug='boundary-b')
+        self.user = User.objects.create_user(username='boundary_user', password='pass')
+
+        self.role_a = TenantRole.objects.create(
+            tenant=self.tenant_a,
+            name='Full Admin A',
+            permissions=['assets.view_asset', 'assets.change_asset', 'assets.delete_asset'],
+        )
+
+        # Group in tenant A with full permissions
+        self.group_a = UserGroup.objects.create(name='Group A', is_active=True)
+        self.group_a.roles.add(self.role_a)
+        self.group_a.members.add(self.user)
+
+        # Membership in tenant A with direct_permissions
+        self.membership_a = TenantMembership.objects.create(
+            user=self.user,
+            tenant=self.tenant_a,
+            direct_permissions=['assets.delete_asset'],
+        )
+        self.membership_a.roles.add(self.role_a)
+
+        # Status/asset for tenant B
+        self.status = StatusLabel.objects.create(name='BA-Active', slug='ba-active', type='deployable')
+        self.asset_b = Asset.objects.create(
+            name='Boundary Asset B', asset_tag='BA-B-001',
+            status=self.status, tenant=self.tenant_b,
+        )
+
+        set_current_tenant(self.tenant_a)
+        set_current_membership(self.membership_a)
+
+    def tearDown(self):
+        set_current_tenant(None)
+        set_current_membership(None)
+
+    def test_group_grant_in_tenant_a_does_not_apply_to_tenant_b_object(self):
+        """UserGroup grant in tenant A must not allow access to a tenant B object."""
+        self.assertFalse(self.user.has_perm('assets.change_asset', obj=self.asset_b))
+
+    def test_direct_permission_in_tenant_a_does_not_apply_to_tenant_b_object(self):
+        """direct_permissions in tenant A must not allow access to a tenant B object."""
+        self.assertFalse(self.user.has_perm('assets.delete_asset', obj=self.asset_b))
+
+    def test_role_in_tenant_a_does_not_apply_to_tenant_b_object(self):
+        """Membership roles in tenant A must not allow access to a tenant B object."""
+        self.assertFalse(self.user.has_perm('assets.view_asset', obj=self.asset_b))
+
+
+class IsActiveGatingTestCase(TestCase):
+    """Suspended memberships, inactive groups, and AssetHolder-only users all get zero perms."""
+
+    def setUp(self):
+        self.tenant = Tenant.objects.create(name='Active Gating Tenant', slug='active-gating-tenant')
+        self.user = User.objects.create_user(username='gating_user', password='pass')
+
+        self.role = TenantRole.objects.create(
+            tenant=self.tenant,
+            name='Full Role',
+            permissions=['assets.view_asset', 'assets.change_asset'],
+        )
+
+        self.status = StatusLabel.objects.create(name='AG-Active', slug='ag-active', type='deployable')
+        self.asset = Asset.objects.create(
+            name='Gating Asset', asset_tag='AG-001',
+            status=self.status, tenant=self.tenant,
+        )
+
+    def tearDown(self):
+        set_current_tenant(None)
+        set_current_membership(None)
+
+    def _clear_perm_cache(self, user):
+        """Remove per-request effective-perm caches so the next has_perm call re-queries."""
+        for attr in list(vars(user)):
+            if attr.startswith('_effective_perms_') or attr.startswith('_tenant_membership_'):
+                delattr(user, attr)
+
+    def test_suspended_membership_own_roles_grant_nothing(self):
+        """is_active=False on a TenantMembership drops that membership's OWN roles and
+        direct_permissions. (Group access is a SEPARATE, independent path that is not
+        gated by membership — see test_user_groups.MembershipIndependenceTests.)"""
+        membership = TenantMembership.objects.create(
+            user=self.user, tenant=self.tenant, is_active=False,
+            direct_permissions=['assets.delete_asset'],
+        )
+        membership.roles.add(self.role)
+
+        set_current_tenant(self.tenant)
+        set_current_membership(membership)
+        self._clear_perm_cache(self.user)
+
+        self.assertFalse(self.user.has_perm('assets.view_asset'))    # membership role
+        self.assertFalse(self.user.has_perm('assets.delete_asset'))  # direct grant
+        self.assertFalse(self.user.has_perm('assets.view_asset', obj=self.asset))
+
+    def test_inactive_usergroup_contributes_nothing(self):
+        """An inactive UserGroup must not contribute its roles to the effective perm set."""
+        membership = TenantMembership.objects.create(
+            user=self.user, tenant=self.tenant, is_active=True,
+        )
+        # No direct roles on membership; only an inactive group
+        group = UserGroup.objects.create(name='Inactive Group', is_active=False)
+        group.roles.add(self.role)
+        group.members.add(self.user)
+
+        set_current_tenant(self.tenant)
+        set_current_membership(membership)
+        self._clear_perm_cache(self.user)
+
+        self.assertFalse(self.user.has_perm('assets.view_asset'))
+
+    def test_no_membership_user_in_active_group_gets_group_perms(self):
+        """Groups grant access INDEPENDENTLY of TenantMembership: a user with no
+        membership but in an active group gains that group's role perms in the role's
+        tenant (the MSP cross-tenant model)."""
+        other_user = User.objects.create_user(username='no_mem_user', password='pass')
+
+        group = UserGroup.objects.create(name='Group No Mem', is_active=True)
+        group.roles.add(self.role)
+        group.members.add(other_user)
+
+        set_current_tenant(self.tenant)
+        set_current_membership(None)
+        self._clear_perm_cache(other_user)
+
+        self.assertTrue(other_user.has_perm('assets.view_asset'))
+        self.assertTrue(other_user.has_perm('assets.view_asset', obj=self.asset))
+
+
+class SoftDeletedRoleGrantsNothingTestCase(TestCase):
+    """A soft-deleted TenantRole must not contribute permissions via any path."""
+
+    def setUp(self):
+        self.tenant = Tenant.objects.create(name='Soft-Del Tenant', slug='soft-del-tenant')
+        self.user = User.objects.create_user(username='softdel_user', password='pass')
+
+        self.role = TenantRole.objects.create(
+            tenant=self.tenant,
+            name='Soon Deleted Role',
+            permissions=['assets.view_asset', 'assets.change_asset'],
+        )
+        self.membership = TenantMembership.objects.create(
+            user=self.user, tenant=self.tenant,
+        )
+        self.membership.roles.add(self.role)
+
+        self.group = UserGroup.objects.create(name='SD Group', is_active=True)
+        self.group.roles.add(self.role)
+        self.group.members.add(self.user)
+
+        set_current_tenant(self.tenant)
+        set_current_membership(self.membership)
+
+    def tearDown(self):
+        set_current_tenant(None)
+        set_current_membership(None)
+
+    def _clear_perm_cache(self):
+        for attr in list(vars(self.user)):
+            if attr.startswith('_effective_perms_') or attr.startswith('_tenant_membership_'):
+                delattr(self.user, attr)
+
+    def test_active_role_grants_perms_before_delete(self):
+        """Sanity: role grants access while active."""
+        self._clear_perm_cache()
+        self.assertTrue(self.user.has_perm('assets.view_asset'))
+
+    def test_soft_deleted_role_on_membership_grants_nothing(self):
+        """After soft-deleting the role, membership path must yield no perms."""
+        self.role.delete()  # SoftDeleteMixin soft-delete
+        self._clear_perm_cache()
+        self.assertFalse(self.user.has_perm('assets.view_asset'))
+
+    def test_soft_deleted_role_on_group_grants_nothing(self):
+        """After soft-deleting the role, group path must also yield no perms."""
+        # Ensure only the group path is active
+        self.membership.roles.clear()
+        self.role.delete()  # SoftDeleteMixin soft-delete
+        self._clear_perm_cache()
+        self.assertFalse(self.user.has_perm('assets.view_asset'))
+
+
+class PermCacheTestCase(TestCase):
+    """Two has_perm calls within the same request must hit the cached perm set,
+    not re-query the database each time."""
+
+    def setUp(self):
+        self.tenant = Tenant.objects.create(name='Cache Tenant', slug='cache-tenant')
+        self.user = User.objects.create_user(username='cache_user', password='pass')
+
+        self.role = TenantRole.objects.create(
+            tenant=self.tenant,
+            name='Cache Role',
+            permissions=['assets.view_asset'],
+        )
+        self.membership = TenantMembership.objects.create(
+            user=self.user, tenant=self.tenant,
+        )
+        self.membership.roles.add(self.role)
+
+        set_current_tenant(self.tenant)
+        set_current_membership(self.membership)
+
+    def tearDown(self):
+        set_current_tenant(None)
+        set_current_membership(None)
+
+    def _clear_perm_cache(self):
+        for attr in list(vars(self.user)):
+            if attr.startswith('_effective_perms_') or attr.startswith('_tenant_membership_'):
+                delattr(self.user, attr)
+
+    def test_second_has_perm_call_uses_cache(self):
+        """After the first has_perm resolves perms, a second call must not issue new queries."""
+        self._clear_perm_cache()
+        # First call: populates the cache
+        self.assertTrue(self.user.has_perm('assets.view_asset'))
+        # Second call: must use the cached frozenset without hitting the DB
+        with self.assertNumQueries(0):
+            self.assertTrue(self.user.has_perm('assets.view_asset'))
+
+    def test_second_has_perm_for_different_perm_uses_cache(self):
+        """Cache is per-tenant perm-set, not per-perm — a second call for a different perm
+        that is absent should also be served from cache without a DB query."""
+        self._clear_perm_cache()
+        self.user.has_perm('assets.view_asset')  # warms the cache
+        with self.assertNumQueries(0):
+            result = self.user.has_perm('assets.add_asset')
+        self.assertFalse(result)
+
+
+class SuperuserBypassTestCase(TestCase):
+    """Superusers always get True, regardless of memberships, groups, or direct grants."""
+
+    def setUp(self):
+        self.tenant = Tenant.objects.create(name='SU Tenant', slug='su-tenant')
+        self.superuser = User.objects.create_superuser(username='su_bypass_user', password='pass')
+        # Superuser deliberately has NO TenantMembership in this tenant
+
+        set_current_tenant(self.tenant)
+        set_current_membership(None)
+
+    def tearDown(self):
+        set_current_tenant(None)
+        set_current_membership(None)
+
+    def test_superuser_has_perm_without_membership(self):
+        self.assertTrue(self.superuser.has_perm('assets.view_asset'))
+
+    def test_superuser_has_perm_on_any_object(self):
+        status = StatusLabel.objects.create(name='SU-Active', slug='su-active', type='deployable')
+        other_tenant = Tenant.objects.create(name='Other Tenant', slug='other-su-tenant')
+        asset = Asset.objects.create(
+            name='SU Asset', asset_tag='SU-001',
+            status=status, tenant=other_tenant,
+        )
+        self.assertTrue(self.superuser.has_perm('assets.change_asset', obj=asset))

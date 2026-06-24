@@ -19,7 +19,8 @@ class DashboardCreateMembershipTests(TestCase):
         self.role = TenantRole.objects.create(tenant=self.tenant_home, name="Member", permissions=[])
 
         self.member = User.objects.create_user(username="member", password="password")
-        TenantMembership.objects.create(user=self.member, tenant=self.tenant_home, role=self.role)
+        m = TenantMembership.objects.create(user=self.member, tenant=self.tenant_home)
+        m.roles.add(self.role)
 
         self.superuser = User.objects.create_superuser(username="root", password="password")
 
@@ -93,7 +94,8 @@ class DashboardManageModalScopingTests(TestCase):
         self.role = TenantRole.objects.create(tenant=self.tenant_home, name="Member", permissions=[])
 
         self.member = User.objects.create_user(username="member", password="password")
-        TenantMembership.objects.create(user=self.member, tenant=self.tenant_home, role=self.role)
+        m = TenantMembership.objects.create(user=self.member, tenant=self.tenant_home)
+        m.roles.add(self.role)
 
         self.superuser = User.objects.create_superuser(username="root", password="password")
 

@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 
 from organization.models import Tenant, TenantRole, TenantMembership
+from users.models import UserGroup
 from assets.models import Asset, StatusLabel, AssetRole, Manufacturer, AssetType
 
 User = get_user_model()
@@ -18,7 +19,7 @@ class SecurityBoundariesTestCase(TestCase):
         self.user_a = User.objects.create_user(username='user_a', password='password123')
         self.user_b = User.objects.create_user(username='user_b', password='password123')
 
-        # Bind Tenant A User
+        # Bind Tenant A User (M2M: create then add roles)
         self.role_a = TenantRole.objects.create(
             tenant=self.tenant_a,
             name='Admin',
@@ -29,10 +30,10 @@ class SecurityBoundariesTestCase(TestCase):
         self.membership_a = TenantMembership.objects.create(
             user=self.user_a,
             tenant=self.tenant_a,
-            role=self.role_a
         )
+        self.membership_a.roles.add(self.role_a)
 
-        # Bind Tenant B User
+        # Bind Tenant B User (M2M: create then add roles)
         self.role_b = TenantRole.objects.create(
             tenant=self.tenant_b,
             name='Admin',
@@ -43,8 +44,8 @@ class SecurityBoundariesTestCase(TestCase):
         self.membership_b = TenantMembership.objects.create(
             user=self.user_b,
             tenant=self.tenant_b,
-            role=self.role_b
         )
+        self.membership_b.roles.add(self.role_b)
 
         # Create base metadata
         self.status = StatusLabel.objects.create(name='Active', slug='active')
@@ -64,7 +65,7 @@ class SecurityBoundariesTestCase(TestCase):
 
     def test_graphql_cross_tenant_query_denied(self):
         self.client.force_login(self.user_a)
-        
+
         # Set request's active tenant to tenant_a
         session = self.client.session
         session['active_tenant_id'] = self.tenant_a.pk
@@ -130,3 +131,177 @@ class SecurityBoundariesTestCase(TestCase):
         }
         response = self.client.put(detail_url, data=put_data, content_type='application/json')
         self.assertEqual(response.status_code, 404)
+
+
+# ---------------------------------------------------------------------------
+# Security boundary tests for the new multi-role RBAC shape
+# ---------------------------------------------------------------------------
+
+class MultiRoleSecurityBoundaryTestCase(TestCase):
+    """Cross-cutting security boundary tests for the multi-role RBAC shape.
+
+    Verifies that the additive union never "leaks" across the tenant boundary
+    and that every deactivation mechanism correctly shuts down access.
+    """
+
+    def setUp(self):
+        from core.managers import set_current_tenant, set_current_membership
+        self.set_current_tenant = set_current_tenant
+        self.set_current_membership = set_current_membership
+
+        self.tenant_a = Tenant.objects.create(name='MRSB-Tenant-A', slug='mrsb-tenant-a')
+        self.tenant_b = Tenant.objects.create(name='MRSB-Tenant-B', slug='mrsb-tenant-b')
+
+        self.user = User.objects.create_user(username='mrsb_user', password='pass')
+
+        # Full-access role in Tenant A
+        self.role_a = TenantRole.objects.create(
+            tenant=self.tenant_a,
+            name='MRSB-Full-A',
+            permissions=[
+                'assets.view_asset', 'assets.add_asset',
+                'assets.change_asset', 'assets.delete_asset',
+            ],
+        )
+
+        # Membership in Tenant A
+        self.membership_a = TenantMembership.objects.create(
+            user=self.user, tenant=self.tenant_a,
+            direct_permissions=['assets.delete_asset'],
+        )
+        self.membership_a.roles.add(self.role_a)
+
+        # UserGroup in Tenant A (change perm via group)
+        self.group_a = UserGroup.objects.create(name='MRSB-Group-A', is_active=True)
+        self.group_a.roles.add(self.role_a)
+        self.group_a.members.add(self.user)
+
+        # Asset in Tenant B — this is what we must NOT access
+        self.status = StatusLabel.objects.create(name='MRSB-Status', slug='mrsb-status', type='deployable')
+        self.asset_b = Asset.objects.create(
+            name='MRSB-Asset-B', asset_tag='MRSB-B-001',
+            status=self.status, tenant=self.tenant_b,
+        )
+
+        set_current_tenant(self.tenant_a)
+        set_current_membership(self.membership_a)
+
+    def tearDown(self):
+        self.set_current_tenant(None)
+        self.set_current_membership(None)
+
+    def _clear_perm_cache(self):
+        for attr in list(vars(self.user)):
+            if attr.startswith('_effective_perms_') or attr.startswith('_tenant_membership_'):
+                delattr(self.user, attr)
+
+    # ------------------------------------------------------------------
+    # Tenant boundary
+    # ------------------------------------------------------------------
+
+    def test_membership_role_does_not_apply_across_tenants(self):
+        """A membership role in tenant A must not grant access to a tenant B object."""
+        self._clear_perm_cache()
+        self.assertFalse(self.user.has_perm('assets.view_asset', obj=self.asset_b))
+
+    def test_direct_permission_does_not_apply_across_tenants(self):
+        """direct_permissions in tenant A must not grant access to a tenant B object."""
+        self._clear_perm_cache()
+        self.assertFalse(self.user.has_perm('assets.delete_asset', obj=self.asset_b))
+
+    def test_usergroup_role_does_not_apply_across_tenants(self):
+        """UserGroup membership in tenant A must not grant access to a tenant B object."""
+        self._clear_perm_cache()
+        self.assertFalse(self.user.has_perm('assets.change_asset', obj=self.asset_b))
+
+    # ------------------------------------------------------------------
+    # is_active gating (membership)
+    # ------------------------------------------------------------------
+
+    def test_suspended_membership_denies_its_own_paths(self):
+        """Suspending the membership shuts off its OWN roles and direct_permissions. An
+        active UserGroup is a SEPARATE, independent access path and would still grant, so
+        the user is removed from the group here to isolate the membership paths."""
+        self.group_a.members.remove(self.user)
+        self.membership_a.is_active = False
+        self.membership_a.save()
+        self._clear_perm_cache()
+
+        self.assertFalse(self.user.has_perm('assets.view_asset'))    # role path
+        self.assertFalse(self.user.has_perm('assets.delete_asset'))  # direct_permissions path
+        self.assertFalse(self.user.has_perm('assets.change_asset'))  # role path
+
+    # ------------------------------------------------------------------
+    # is_active gating (UserGroup)
+    # ------------------------------------------------------------------
+
+    def test_inactive_group_excluded_from_union(self):
+        """An inactive UserGroup must not contribute its roles, even with an active membership."""
+        self.group_a.is_active = False
+        self.group_a.save()
+
+        # Remove roles from membership so group is the only change-perm source
+        self.membership_a.roles.clear()
+        self.membership_a.direct_permissions = []
+        self.membership_a.save()
+        self._clear_perm_cache()
+
+        self.assertFalse(self.user.has_perm('assets.change_asset'))
+
+    # ------------------------------------------------------------------
+    # Soft-deleted role
+    # ------------------------------------------------------------------
+
+    def test_soft_deleted_role_on_membership_contributes_nothing(self):
+        """After a role is soft-deleted it must be excluded from all perm paths."""
+        # Second role that we will soft-delete
+        transient_role = TenantRole.objects.create(
+            tenant=self.tenant_a,
+            name='Transient Role',
+            permissions=['organization.view_tenant'],
+        )
+        self.membership_a.roles.add(transient_role)
+        self._clear_perm_cache()
+        self.assertTrue(self.user.has_perm('organization.view_tenant'))
+
+        # Soft-delete the role
+        transient_role.delete()
+        self._clear_perm_cache()
+        self.assertFalse(self.user.has_perm('organization.view_tenant'))
+
+    def test_soft_deleted_role_on_group_contributes_nothing(self):
+        """A soft-deleted role attached only to a UserGroup must not grant perms."""
+        group_only_role = TenantRole.objects.create(
+            tenant=self.tenant_a,
+            name='Group-only Role',
+            permissions=['organization.view_tenant'],
+        )
+        extra_group = UserGroup.objects.create(name='Extra Group', is_active=True)
+        extra_group.roles.add(group_only_role)
+        extra_group.members.add(self.user)
+        self._clear_perm_cache()
+        self.assertTrue(self.user.has_perm('organization.view_tenant'))
+
+        group_only_role.delete()
+        self._clear_perm_cache()
+        self.assertFalse(self.user.has_perm('organization.view_tenant'))
+
+    # ------------------------------------------------------------------
+    # No membership at all
+    # ------------------------------------------------------------------
+
+    def test_user_with_no_membership_in_tenant_b_denied(self):
+        """The user has no TenantMembership in tenant B — all perms must be denied for tenant B objects."""
+        self._clear_perm_cache()
+        # Explicit obj path
+        self.assertFalse(self.user.has_perm('assets.view_asset', obj=self.asset_b))
+
+    # ------------------------------------------------------------------
+    # Superuser bypass
+    # ------------------------------------------------------------------
+
+    def test_superuser_bypasses_all_checks(self):
+        """Superuser must always return True regardless of memberships/groups."""
+        su = User.objects.create_superuser(username='mrsb_su', password='pass')
+        self.assertTrue(su.has_perm('assets.view_asset'))
+        self.assertTrue(su.has_perm('assets.view_asset', obj=self.asset_b))

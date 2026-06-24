@@ -73,7 +73,7 @@ class TokenAuthentication(BaseAuthentication):
         from core.managers import set_current_tenant, set_current_membership
         from organization.models import TenantMembership
         set_current_tenant(token.tenant)
-        membership = TenantMembership.objects.filter(user=token.user, tenant=token.tenant).select_related('role').first()
+        membership = TenantMembership.objects.filter(user=token.user, tenant=token.tenant).first()
         set_current_membership(membership)
 
         return (token.user, token)

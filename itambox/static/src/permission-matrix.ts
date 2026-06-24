@@ -11,11 +11,13 @@
       if ((toggle as any)._matrix_init) return;
       (toggle as any)._matrix_init = true;
       toggle.addEventListener('change', function (this: HTMLInputElement) {
+        // Capture desired state before dispatching (see row-toggle note below).
+        const desired = this.checked;
         const action = this.getAttribute('data-action');
         const targetClass = `.${action}-checkbox input[type="checkbox"]`;
         const targetCheckboxes = document.querySelectorAll(targetClass);
         targetCheckboxes.forEach(cb => {
-          (cb as HTMLInputElement).checked = this.checked;
+          (cb as HTMLInputElement).checked = desired;
           cb.dispatchEvent(new Event('change', { bubbles: true }));
         });
       });
@@ -72,8 +74,13 @@
       updateToggleState();
 
       toggle.addEventListener('change', function (this: HTMLInputElement) {
+        // Capture the desired state up-front. Dispatching 'change' on each checkbox
+        // re-runs updateToggleState, which flips THIS toggle's own .checked mid-loop
+        // (not all boxes are checked yet) — re-reading this.checked would then leave
+        // every box after the first unchecked. Use the captured value instead.
+        const desired = this.checked;
         checkboxes.forEach(cb => {
-          cb.checked = this.checked;
+          cb.checked = desired;
           cb.dispatchEvent(new Event('change', { bubbles: true }));
         });
       });

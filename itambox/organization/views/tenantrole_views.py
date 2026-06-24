@@ -197,11 +197,11 @@ class TenantRoleAssignUsersView(LoginRequiredMixin, View):
                 for user in users:
                     existing = TenantMembership.objects.filter(user=user, tenant=role.tenant).first()
                     if existing is None:
-                        TenantMembership.objects.create(user=user, tenant=role.tenant, role=role)
+                        membership = TenantMembership.objects.create(user=user, tenant=role.tenant)
+                        membership.roles.add(role)
                         added += 1
-                    elif existing.role_id != role.pk:
-                        existing.role = role
-                        existing.save()
+                    elif not existing.roles.filter(pk=role.pk).exists():
+                        existing.roles.add(role)
                         updated += 1
                     else:
                         unchanged += 1

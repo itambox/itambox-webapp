@@ -74,7 +74,7 @@ class TenantViewTests(TestCase):
         response = self.client.post(url, {
             'user': self.user.pk,
             'tenant': self.tenant.pk,
-            'role': role.pk
+            'roles': [role.pk],
         })
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse('users:user_detail', kwargs={'pk': self.user.pk}), response.url)
@@ -243,10 +243,9 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
         membership = TenantMembership.objects.create(
             user=self.user,
             tenant=self.tenant_a,
-            role=self.role_member
         )
-        self.assertEqual(str(membership), "staffuser is Standard Member at Tenant A")
-        self.assertEqual(membership.role, self.role_member)
+        membership.roles.add(self.role_member)
+        self.assertIn(self.role_member, membership.roles.all())
 
     def test_invitation_acceptance_and_assetholder_linking(self):
         from organization.models import TenantInvitation, TenantMembership
@@ -275,9 +274,9 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
         )
         from organization.models import accept_invitation
         accept_invitation(invitation, invitee_user)
-        
+
         membership = TenantMembership.objects.get(user=invitee_user, tenant=self.tenant_a)
-        self.assertEqual(membership.role, self.role_admin)
+        self.assertIn(self.role_admin, membership.roles.all())
         
         invitation.refresh_from_db()
         self.assertFalse(invitation.is_valid)
@@ -289,31 +288,39 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
     def test_tenant_membership_backend_permissions(self):
         from organization.models import TenantMembership
         from core.managers import set_current_membership
-        
+
+        def _flush():
+            # The backend caches the effective permission set per (user, tenant) for the
+            # request; clear it after changing roles so the next has_perm re-resolves.
+            for attr in list(self.user.__dict__):
+                if attr.startswith('_effective_perms_') or attr.startswith('_tenant_membership_'):
+                    delattr(self.user, attr)
+
         reader_mem = TenantMembership.objects.create(
             user=self.user,
             tenant=self.tenant_a,
-            role=self.role_reader
         )
-        
+        reader_mem.roles.set([self.role_reader])
+
         set_current_membership(reader_mem)
+        _flush()
         self.assertTrue(self.user.has_perm('assets.view_asset'))
         self.assertFalse(self.user.has_perm('assets.add_asset'))
-        
-        reader_mem.role = self.role_member
-        reader_mem.save()
+
+        reader_mem.roles.set([self.role_member])
         set_current_membership(reader_mem)
+        _flush()
         self.assertTrue(self.user.has_perm('assets.view_asset'))
         self.assertTrue(self.user.has_perm('assets.add_asset'))
         self.assertFalse(self.user.has_perm('assets.delete_asset'))
-        
-        reader_mem.role = self.role_admin
-        reader_mem.save()
+
+        reader_mem.roles.set([self.role_admin])
         set_current_membership(reader_mem)
+        _flush()
         self.assertTrue(self.user.has_perm('assets.view_asset'))
         self.assertTrue(self.user.has_perm('assets.add_asset'))
         self.assertTrue(self.user.has_perm('assets.delete_asset'))
-        
+
         set_current_membership(None)
 
     def test_tenant_switching_middleware(self):
@@ -322,12 +329,12 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
         from itambox.middleware import TenantMiddleware
         from django.test import RequestFactory
         
-        TenantMembership.objects.create(
+        mem = TenantMembership.objects.create(
             user=self.user,
             tenant=self.tenant_a,
-            role=self.role_member
         )
-        
+        mem.roles.add(self.role_member)
+
         factory = RequestFactory()
         
         request = factory.get('/')

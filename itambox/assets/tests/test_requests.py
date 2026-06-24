@@ -57,16 +57,16 @@ class RequisitionSystemTestCase(TestCase):
             ]
         )
 
-        TenantMembership.objects.create(
+        m1 = TenantMembership.objects.create(
             user=self.requester_user,
             tenant=self.tenant,
-            role=self.role_standard
         )
-        TenantMembership.objects.create(
+        m1.roles.add(self.role_standard)
+        m2 = TenantMembership.objects.create(
             user=self.other_user,
             tenant=self.tenant,
-            role=self.role_delegated
         )
+        m2.roles.add(self.role_delegated)
 
         # Set active tenant thread-local context
         set_current_tenant(self.tenant)
@@ -653,11 +653,11 @@ class RequisitionSystemTestCase(TestCase):
         new_user = User.objects.create_user(
             username='noprofileuser', password='password123', is_staff=False, is_superuser=False
         )
-        TenantMembership.objects.create(
+        m_new = TenantMembership.objects.create(
             user=new_user,
             tenant=self.tenant,
-            role=self.role_standard
         )
+        m_new.roles.add(self.role_standard)
         req_no_profile = AssetRequest.objects.create(
             requester=new_user,
             asset_type=self.type_requestable,

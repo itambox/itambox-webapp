@@ -53,8 +53,10 @@ class GraphQLAdversarialTestCase(TestCase):
                 'licenses.view_license', 'licenses.add_license', 'licenses.change_license', 'licenses.delete_license',
             ]
         )
-        self.membership_a = TenantMembership.objects.create(user=self.staff_a, tenant=self.tenant_a, role=self.role_admin_a)
-        self.membership_b = TenantMembership.objects.create(user=self.staff_b, tenant=self.tenant_b, role=self.role_admin_b)
+        self.membership_a = TenantMembership.objects.create(user=self.staff_a, tenant=self.tenant_a)
+        self.membership_a.roles.add(self.role_admin_a)
+        self.membership_b = TenantMembership.objects.create(user=self.staff_b, tenant=self.tenant_b)
+        self.membership_b.roles.add(self.role_admin_b)
 
         # Grant general Django permissions to staff users
         for user in [self.staff_a, self.staff_b]:

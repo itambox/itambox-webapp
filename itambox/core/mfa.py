@@ -53,10 +53,12 @@ def user_requires_mfa(user) -> bool:
     from core.auth.provisioning import PRIVILEGED_ROLE_NAMES
 
     privileged_names_lower = {name.lower() for name in PRIVILEGED_ROLE_NAMES}
-    # Fetch only the candidate roles' name/permissions, not whole rows; the
-    # mutating-perm check needs the JSON inspected in Python.
-    roles = TenantMembership.objects.filter(user=user).values_list(
-        'role__name', 'role__permissions',
+    # Fetch roles via the M2M: a membership now holds 0..n roles so we traverse
+    # the M2M join (memberships -> roles) to get each role's name + permissions.
+    # The mutating-perm check needs the JSON inspected in Python.
+    from organization.models import TenantRole
+    roles = TenantRole.objects.filter(memberships__user=user).values_list(
+        'name', 'permissions',
     )
     return any(
         _role_is_privileged(name, permissions, privileged_names_lower)

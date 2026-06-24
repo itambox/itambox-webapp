@@ -31,8 +31,8 @@ class TenantTestMixin:
         self.tenant_membership = TenantMembership.objects.create(
             user=self.tenant_user,
             tenant=self.tenant,
-            role=self.tenant_role
         )
+        self.tenant_membership.roles.add(self.tenant_role)
 
     def set_active_tenant(self, tenant, membership=None):
         """
@@ -83,8 +83,8 @@ class TenantTestMixin:
                 membership = TenantMembership.objects.create(
                     user=user,
                     tenant=tenant,
-                    role=role
                 )
+                membership.roles.add(role)
             self.set_active_tenant(tenant, membership)
         else:
             self.set_active_tenant(tenant, None)

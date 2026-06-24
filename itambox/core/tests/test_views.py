@@ -293,7 +293,8 @@ class CoreViewsTestCase(TestCase):
                 'assets.view_asset',
             ]
         )
-        membership = TenantMembership.objects.create(user=std_user, tenant=tenant, role=std_role)
+        membership = TenantMembership.objects.create(user=std_user, tenant=tenant)
+        membership.roles.add(std_role)
         
         # Setup asset
         mfr = Manufacturer.objects.create(name="Perm Mfr", slug="perm-mfr")
@@ -348,8 +349,7 @@ class CoreViewsTestCase(TestCase):
                 'core.delete_recyclebin',
             ]
         )
-        membership.role = role_obj
-        membership.save()
+        membership.roles.set([role_obj])
         
         # 4. Try again with permissions
         # Force a reload of the user object to update cached memberships

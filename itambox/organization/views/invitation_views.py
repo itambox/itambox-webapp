@@ -14,8 +14,12 @@ class InviteUserMixin(LoginRequiredMixin, UserPassesTestMixin):
         if self.request.user.is_superuser:
             return True
         membership = getattr(self.request, 'active_membership', None)
-        if membership and membership.role:
-            return 'organization.add_tenantinvitation' in membership.role.permissions or membership.role.name.lower() == 'admin'
+        if membership:
+            for role in membership.roles.all():
+                if 'organization.add_tenantinvitation' in (role.permissions or []):
+                    return True
+                if role.name.lower() == 'admin':
+                    return True
         return False
 
 class InviteUserView(InviteUserMixin, CreateView):

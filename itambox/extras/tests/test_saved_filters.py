@@ -27,9 +27,8 @@ class SavedFilterVisibilityTests(TenantTestMixin, TestCase):
         self.user_a2 = User.objects.create_user(
             username="user_a2", email="a2@example.com", password="password"
         )
-        TenantMembership.objects.create(
-            user=self.user_a2, tenant=self.tenant, role=self.tenant_role
-        )
+        m = TenantMembership.objects.create(user=self.user_a2, tenant=self.tenant)
+        m.roles.add(self.tenant_role)
         # Tenant B + a member.
         self.tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
         self.user_b = User.objects.create_user(

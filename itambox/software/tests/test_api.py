@@ -54,8 +54,8 @@ class SoftwareAPITests(APITestCase):
             TenantMembership,
             user=self.staff,
             tenant=self.tenant,
-            role=self.role
         )
+        self.membership.roles.add(self.role)
 
         # Make the catalogue row tenant-owned so this tenant's staff can mutate
         # it. A global (tenant=None) Software is mutable only by superusers

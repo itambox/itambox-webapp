@@ -20,8 +20,8 @@ class HTMXViewsTestCase(TestCase):
         self.membership = TenantMembership.objects.create(
             user=self.user,
             tenant=self.tenant,
-            role=self.role
         )
+        self.membership.roles.add(self.role)
         self.client.force_login(self.user)
 
     def test_non_htmx_request_returns_full_template(self):

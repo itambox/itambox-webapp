@@ -50,8 +50,8 @@ class ETagPreconditionTests(APITestCase):
             TenantMembership,
             user=self.staff,
             tenant=self.tenant,
-            role=self.role,
         )
+        self.membership.roles.add(self.role)
 
         self.manufacturer = baker.make(Manufacturer, name='Microsoft', slug='microsoft')
         self.software = baker.make(

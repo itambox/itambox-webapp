@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
 from django.urls import reverse_lazy
@@ -48,6 +48,10 @@ class MenuItem:
     auth_required: bool = False
     staff_only: bool = False
     buttons: Sequence[MenuItemButton] = ()
+    # Optional extra gate evaluated per-request with the user; used for capability/state
+    # checks the Django-permission strings can't express (e.g. provider capabilities,
+    # "only if a Provider exists"). The item is hidden when the callable returns False.
+    condition: Callable | None = None
 
     def __post_init__(self):
         if self.link:

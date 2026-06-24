@@ -89,8 +89,8 @@ class SeedAccessMixin:
                 # Account managers are scoped to their assigned customer groups; others span all tenants.
                 if group_scope is not None and meta['group_slug'] not in group_scope:
                     continue
-                TenantMembership.objects.get_or_create(
-                    user=user, tenant=tenant, defaults={'role': self._roles[(slug, role_name)]})
+                membership, _ = TenantMembership.objects.get_or_create(user=user, tenant=tenant)
+                membership.roles.add(self._roles[(slug, role_name)])
 
         if not self._engineer_users:
             self._engineer_users = list(self._users.values())
@@ -114,8 +114,9 @@ class SeedAccessMixin:
             customer_admins += 1
             for t in org['tenants']:
                 slug = t['slug']
-                TenantMembership.objects.get_or_create(
-                    user=user, tenant=self._tenants[slug], defaults={'role': self._roles[(slug, 'Administrator')]})
+                membership, _ = TenantMembership.objects.get_or_create(
+                    user=user, tenant=self._tenants[slug])
+                membership.roles.add(self._roles[(slug, 'Administrator')])
                 # Link this login to a holder profile in their first tenant.
                 holders = self._tenant_holders.get(slug, [])
                 if holders and holders[0].user_id is None:
@@ -151,8 +152,8 @@ class SeedAccessMixin:
                 self._users[username] = user
                 holder.user = user
                 holder.save(update_fields=['user'])
-                TenantMembership.objects.get_or_create(
-                    user=user, tenant=tenant, defaults={'role': self._roles[(slug, role_name)]})
+                membership, _ = TenantMembership.objects.get_or_create(user=user, tenant=tenant)
+                membership.roles.add(self._roles[(slug, role_name)])
                 if role_name == 'Asset Manager':
                     team_leads += 1
                 else:

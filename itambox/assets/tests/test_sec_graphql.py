@@ -44,8 +44,9 @@ class GraphQLSecurityTestCase(TestCase):
             permissions=['assets.view_asset'],
         )
         self.membership = TenantMembership.objects.create(
-            user=self.staff, tenant=self.tenant, role=self.role
+            user=self.staff, tenant=self.tenant
         )
+        self.membership.roles.add(self.role)
 
         self.token = Token.objects.create(user=self.staff)
 

@@ -1,10 +1,12 @@
 from django.shortcuts import redirect, render, get_object_or_404
 from django.urls import reverse, reverse_lazy
 from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Count
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth.decorators import login_required
+from django.views import View
 from django.views.decorators.http import require_POST
 
 from itambox.views.generic import (
@@ -20,6 +22,7 @@ from ..models import Tenant
 from ..forms import TenantForm, TenantFilterForm
 from ..tables import TenantTable, SiteTable, LocationTable, AssetHolderTable
 from ..filters import TenantFilterSet
+from ..access import accessible_tenant_ids, tenant_access_report
 from django_tables2 import RequestConfig
 
 
@@ -185,6 +188,21 @@ class TenantDetailView(ObjectDetailView):
             'title': _('Associated Subscriptions'),
             'empty_icon': 'mdi-file-document-outline',
             'empty_text': _('No subscriptions found for this tenant.'),
+        })
+
+
+class TenantAccessView(LoginRequiredMixin, View):
+    """Per-tenant "Who Has Access" audit: lists every user who can reach the tenant,
+    the source(s) of their access, and their effective permission count."""
+
+    def get(self, request, pk):
+        tenant = get_object_or_404(Tenant, pk=pk)
+        if not (request.user.is_superuser or tenant.pk in accessible_tenant_ids(request.user)):
+            raise Http404()
+        report = tenant_access_report(tenant)
+        return render(request, 'organization/tenants/who_has_access.html', {
+            'tenant': tenant,
+            'access_report': report,
         })
 
 

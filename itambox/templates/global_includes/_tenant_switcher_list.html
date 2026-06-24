@@ -45,18 +45,17 @@
                 {% translate "Ungrouped" %}
             </div>
         {% endif %}
-        {% for membership in item.memberships %}
-            <a href="?switch_tenant={{ membership.tenant.id }}" class="list-group-item list-group-item-action py-2 ps-4 {% if request.active_tenant.id == membership.tenant.id %}active{% endif %}">
+        {% for tenant in item.tenants %}
+            <a href="?switch_tenant={{ tenant.id }}" class="list-group-item list-group-item-action py-2 ps-4 {% if request.active_tenant.id == tenant.id %}active{% endif %}">
                 <div class="d-flex align-items-center">
-                    <span class="status-dot {% if membership.role == 'admin' %}bg-red{% elif membership.role == 'member' %}bg-green{% else %}bg-orange{% endif %} me-2"></span>
-                    <span class="text-truncate" style="max-width: 200px;">{{ membership.tenant.name }}</span>
-                    <span class="badge bg-secondary-lt ms-auto">{{ membership.get_role_display }}</span>
+                    <span class="status-dot bg-secondary me-2"></span>
+                    <span class="text-truncate" style="max-width: 200px;">{{ tenant.name }}</span>
                 </div>
             </a>
         {% endfor %}
     {% empty %}
         <div class="list-group-item text-muted text-center py-3">
-            {% translate "No workspace memberships" %}
+            {% translate "No accessible tenants" %}
         </div>
     {% endfor %}
 {% endif %}

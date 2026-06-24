@@ -36,13 +36,15 @@ class SubscriptionAssignmentCrossTenantTests(TestCase):
         self.role_a = TenantRole.objects.create(
             tenant=self.tenant_a, name='Admin', permissions=list(ASSIGNMENT_PERMS)
         )
-        TenantMembership.objects.create(user=self.user_a, tenant=self.tenant_a, role=self.role_a)
+        _membership_a = TenantMembership.objects.create(user=self.user_a, tenant=self.tenant_a)
+        _membership_a.roles.add(self.role_a)
 
         # Tenant B membership/role (same perms — block must be from scoping, not perms)
         self.role_b = TenantRole.objects.create(
             tenant=self.tenant_b, name='Admin', permissions=list(ASSIGNMENT_PERMS)
         )
-        TenantMembership.objects.create(user=self.user_b, tenant=self.tenant_b, role=self.role_b)
+        _membership_b = TenantMembership.objects.create(user=self.user_b, tenant=self.tenant_b)
+        _membership_b.roles.add(self.role_b)
 
         # Shared metadata
         self.status = StatusLabel.objects.create(name='Active', slug='active', type='deployable')

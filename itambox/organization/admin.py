@@ -2,6 +2,7 @@ from django.contrib import admin
 from .models import (
     Region, SiteGroup, Tenant, Location, TenantGroup, Site, Contact, ContactRole, ContactAssignment,
     TenantMembership, TenantInvitation, TenantRole, CostCenter,
+    Provider, ProviderRole, ProviderRoleTemplate,
 )
 
 
@@ -50,8 +51,8 @@ class ContactAssignmentAdmin(admin.ModelAdmin):
     list_filter = ('role', 'priority')
 
 class TenantMembershipAdmin(admin.ModelAdmin):
-    list_display = ('user', 'tenant', 'role', 'joined_at')
-    list_filter = ('tenant', 'role')
+    list_display = ('user', 'tenant', 'joined_at')
+    list_filter = ('tenant', 'roles')
     search_fields = ('user__username', 'user__email', 'tenant__name')
 
 class TenantInvitationAdmin(admin.ModelAdmin):
@@ -89,3 +90,27 @@ class CostCenterAdmin(admin.ModelAdmin):
 
 
 admin.site.register(CostCenter, CostCenterAdmin)
+
+
+class ProviderAdmin(admin.ModelAdmin):
+    list_display = ('name', 'slug', 'internal_tenant')
+    search_fields = ('name', 'slug', 'description', 'comments')
+    prepopulated_fields = {'slug': ('name',)}
+
+
+class ProviderRoleAdmin(admin.ModelAdmin):
+    list_display = ('name', 'provider', 'can_manage_tenants', 'can_manage_provider_users', 'can_manage_groups')
+    list_filter = ('provider', 'can_manage_tenants', 'can_manage_provider_users', 'can_manage_groups')
+    search_fields = ('name', 'slug', 'provider__name', 'description')
+    prepopulated_fields = {'slug': ('name',)}
+
+
+class ProviderRoleTemplateAdmin(admin.ModelAdmin):
+    list_display = ('name', 'provider', 'is_default')
+    list_filter = ('provider', 'is_default')
+    search_fields = ('name', 'provider__name', 'description')
+
+
+admin.site.register(Provider, ProviderAdmin)
+admin.site.register(ProviderRole, ProviderRoleAdmin)
+admin.site.register(ProviderRoleTemplate, ProviderRoleTemplateAdmin)

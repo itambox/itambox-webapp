@@ -24,7 +24,8 @@ class ApiCountCapTests(APITestCase):
         role = TenantRole.objects.create(
             tenant=self.tenant, name='R', permissions=['software.view_software']
         )
-        TenantMembership.objects.create(user=self.user, tenant=self.tenant, role=role)
+        _membership = TenantMembership.objects.create(user=self.user, tenant=self.tenant)
+        _membership.roles.add(role)
         mfr = Manufacturer.objects.create(name='MS', slug='capt-ms')
         for i in range(3):
             Software.objects.create(name=f'SW{i}', manufacturer=mfr, tenant=self.tenant)

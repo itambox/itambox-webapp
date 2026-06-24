@@ -23,10 +23,12 @@ class NewRequestNotifyRecipientTests(TenantTestMixin, TestCase):
         self.tenant_b = Tenant.objects.create(name='Tenant B', slug='req-tenant-b')
 
         self.staff_a = User.objects.create_user(username='req_staff_a', password='x', is_staff=True)
-        TenantMembership.objects.create(user=self.staff_a, tenant=self.tenant, role=self.tenant_role)
+        _m_a = TenantMembership.objects.create(user=self.staff_a, tenant=self.tenant)
+        _m_a.roles.add(self.tenant_role)
         self.staff_b = User.objects.create_user(username='req_staff_b', password='x', is_staff=True)
         role_b = TenantRole.objects.create(tenant=self.tenant_b, name='B role', permissions=[])
-        TenantMembership.objects.create(user=self.staff_b, tenant=self.tenant_b, role=role_b)
+        _m_b = TenantMembership.objects.create(user=self.staff_b, tenant=self.tenant_b)
+        _m_b.roles.add(role_b)
 
         self.set_active_tenant(self.tenant)
         # AssetRequest requires exactly one requested item category.

@@ -26,6 +26,13 @@ class UserForm(forms.ModelForm):
         required=False,
         help_text=_("Raw passwords are not stored. If editing a user, leave this blank to keep the current password.")
     )
+    is_group_manager = forms.BooleanField(
+        required=False,
+        label=_("Group Manager"),
+        help_text=_("Can create and manage global user groups (which grant cross-tenant access). "
+                    "A global capability granted only by superusers."),
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+    )
 
     class Meta:
         model = User
@@ -56,6 +63,15 @@ class UserForm(forms.ModelForm):
             if 'is_staff' in self.fields:
                 self.fields['is_staff'].disabled = True
 
+        # Group Manager is the global users.manage_usergroups capability; reflect
+        # the current grant and let only superusers change it.
+        if self.instance and self.instance.pk:
+            self.fields['is_group_manager'].initial = self.instance.user_permissions.filter(
+                content_type__app_label='users', codename='manage_usergroups',
+            ).exists()
+        if not self.request_user or not self.request_user.is_superuser:
+            self.fields['is_group_manager'].disabled = True
+
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
         self.helper.form_tag = True
@@ -77,6 +93,10 @@ class UserForm(forms.ModelForm):
                 Row(
                     Column('is_staff', css_class='col-md-6'),
                     Column('is_superuser', css_class='col-md-6'),
+                    css_class='row g-3',
+                ),
+                Row(
+                    Column('is_group_manager', css_class='col-md-12'),
                     css_class='row g-3',
                 ),
             ),
@@ -108,7 +128,24 @@ class UserForm(forms.ModelForm):
         if commit:
             user.save()
             self.save_m2m()
+            self._sync_group_manager(user)
         return user
+
+    def _sync_group_manager(self, user):
+        """Grant/revoke the global users.manage_usergroups capability. Only a
+        superuser may change it (the field is disabled otherwise)."""
+        if not self.request_user or not self.request_user.is_superuser:
+            return
+        from django.contrib.auth.models import Permission
+        perm = Permission.objects.filter(
+            content_type__app_label='users', codename='manage_usergroups',
+        ).first()
+        if not perm:
+            return
+        if self.cleaned_data.get('is_group_manager'):
+            user.user_permissions.add(perm)
+        else:
+            user.user_permissions.remove(perm)
 
 class UserPreferencesForm(forms.Form):
     # Define fields explicitly
@@ -430,5 +467,98 @@ class UserBulkEditForm(BulkEditForm):
                     self.add_error(field_name, _("Please select Yes or No for this field."))
 
         return cleaned_data
+
+
+# --------------------------------------------------------------------------- UserGroup
+# UserGroup is an identity-layer construct (relocated here from organization/): it grants
+# cross-tenant access, so it lives alongside the User model rather than the business-data
+# (organization) layer.
+from organization.models import TenantRole
+from core.auth.guards import validate_permission_grant
+from .models import UserGroup
+from .filters import UserGroupFilterSet
+
+
+class UserGroupForm(forms.ModelForm):
+    """Create/edit a global, cross-tenant UserGroup.
+
+    Groups are NOT tenant-bound: ``roles`` may reference roles from any tenant (each
+    role label includes its tenant) and ``members`` may be any user. A member gains
+    each role's permissions — and access — in that role's tenant. Because managing a
+    group can grant cross-tenant access, the views restrict this to global admins; the
+    escalation guard here is defence in depth for any non-superuser who reaches the form.
+    """
+    name = forms.CharField(
+        max_length=100,
+        label=_("Name"),
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
+    )
+    description = forms.CharField(
+        required=False,
+        label=_("Description"),
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+    )
+    roles = forms.ModelMultipleChoiceField(
+        queryset=TenantRole._base_manager.none(),
+        required=False,
+        label=_("Roles"),
+        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
+        help_text=_("Roles granted to members. A role may belong to any tenant (the "
+                    "label shows it); members gain that role's permissions and access "
+                    "in that tenant."),
+    )
+    members = forms.ModelMultipleChoiceField(
+        queryset=User.objects.none(),
+        required=False,
+        label=_("Members"),
+        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
+    )
+    is_active = forms.BooleanField(
+        required=False,
+        initial=True,
+        label=_("Active"),
+    )
+
+    class Meta:
+        model = UserGroup
+        fields = ['name', 'description', 'roles', 'members', 'is_active']
+
+    def __init__(self, *args, user=None, tenant=None, **kwargs):
+        # `tenant` is accepted for call-site compatibility but ignored: groups are global.
+        self._requesting_user = user
+        super().__init__(*args, **kwargs)
+        # Roles across ALL tenants (unscoped _base_manager overrides the core/apps.py
+        # current-tenant scoping applied during super().__init__); any user as member.
+        self.fields['roles'].queryset = TenantRole._base_manager.filter(
+            deleted_at__isnull=True,
+        ).select_related('tenant').order_by('tenant__name', 'name')
+        self.fields['members'].queryset = User.objects.all().order_by('username')
+
+    def clean(self):
+        cleaned_data = super().clean()
+        # Escalation guard (defence in depth; group management is global-admin only):
+        # a non-superuser may attach a role only if they hold every one of its
+        # permissions in that role's own tenant. Each role is validated against its own
+        # tenant because a group's roles may span tenants.
+        for role in (cleaned_data.get('roles') or []):
+            validate_permission_grant(self._requesting_user, role.permissions or [], role.tenant)
+        return cleaned_data
+
+
+class UserGroupFilterForm(FilterForm):
+    filterset_class = UserGroupFilterSet
+
+
+class UserGroupAssignUsersForm(forms.Form):
+    """Used by UserGroupAssignUsersView to pick users to add to a (global) group.
+
+    Groups are global, so any user may be added.
+    """
+    users = forms.ModelMultipleChoiceField(
+        queryset=User.objects.all().order_by('username'),
+        required=True,
+        label=_("Users"),
+        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
+    )
 
  

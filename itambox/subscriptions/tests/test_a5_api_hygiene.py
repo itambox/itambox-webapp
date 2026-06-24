@@ -71,7 +71,8 @@ class A5ApiHygieneTests(APITestCase):
                 'subscriptions.delete_subscription',
             ],
         )
-        TenantMembership.objects.create(user=self.staff, tenant=self.tenant, role=role)
+        membership = TenantMembership.objects.create(user=self.staff, tenant=self.tenant)
+        membership.roles.add(role)
 
     # ----- WS3-3 -----------------------------------------------------------
 

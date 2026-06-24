@@ -1,0 +1,42 @@
+{% extends "generic/object_detail.html" %}
+{% load i18n %}
+
+{% block object_details %}
+<div class="row">
+    <div class="col-md-6 mb-3">
+        <label class="form-label text-muted">{% translate "Name" %}</label>
+        <div class="fw-bold fs-3 text-dark">{{ object.name }}</div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <label class="form-label text-muted">{% translate "Slug" %}</label>
+        <div><code>{{ object.slug }}</code></div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-3">
+        <label class="form-label text-muted">{% translate "Internal tenant" %}</label>
+        <div>
+            {% if object.internal_tenant %}
+                <a href="{% url 'organization:tenant_detail' pk=object.internal_tenant.pk %}">{{ object.internal_tenant.name }}</a>
+            {% else %}
+                <span class="text-muted">—</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if object.description %}
+<div class="mb-3">
+    <label class="form-label text-muted">{% translate "Description" %}</label>
+    <div>{{ object.description }}</div>
+</div>
+{% endif %}
+
+{% if object.comments %}
+<div class="mb-3">
+    <label class="form-label text-muted">{% translate "Comments" %}</label>
+    <div>{{ object.comments }}</div>
+</div>
+{% endif %}
+{% endblock object_details %}

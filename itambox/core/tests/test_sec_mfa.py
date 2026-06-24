@@ -79,9 +79,10 @@ class MFAPolicyHelperTests(TestCase):
         manager_role = TenantRole.objects.create(
             tenant=self.tenant, name='Manager', permissions=self.WRITE_PERMS,
         )
-        TenantMembership.objects.create(
-            user=self.manager_user, tenant=self.tenant, role=manager_role,
+        m_manager = TenantMembership.objects.create(
+            user=self.manager_user, tenant=self.tenant,
         )
+        m_manager.roles.add(manager_role)
 
         # Admin: privileged by canonical name.
         self.admin_user = User.objects.create_user(
@@ -91,9 +92,10 @@ class MFAPolicyHelperTests(TestCase):
             tenant=self.tenant, name='Admin',
             permissions=self.WRITE_PERMS + ['assets.delete_asset'],
         )
-        TenantMembership.objects.create(
-            user=self.admin_user, tenant=self.tenant, role=admin_role,
+        m_admin = TenantMembership.objects.create(
+            user=self.admin_user, tenant=self.tenant,
         )
+        m_admin.roles.add(admin_role)
 
         # H4: a custom-named role that is NOT a canonical name but grants
         # add/change/delete is privileged by its permissions.
@@ -103,9 +105,10 @@ class MFAPolicyHelperTests(TestCase):
         custom_role = TenantRole.objects.create(
             tenant=self.tenant, name='Fleet Steward', permissions=self.WRITE_PERMS,
         )
-        TenantMembership.objects.create(
-            user=self.custom_user, tenant=self.tenant, role=custom_role,
+        m_custom = TenantMembership.objects.create(
+            user=self.custom_user, tenant=self.tenant,
         )
+        m_custom.roles.add(custom_role)
 
         # A read-only Viewer: neither a privileged name nor any mutating perm.
         self.viewer_user = User.objects.create_user(
@@ -114,9 +117,10 @@ class MFAPolicyHelperTests(TestCase):
         viewer_role = TenantRole.objects.create(
             tenant=self.tenant, name='Viewer', permissions=self.READ_ONLY_PERMS,
         )
-        TenantMembership.objects.create(
-            user=self.viewer_user, tenant=self.tenant, role=viewer_role,
+        m_viewer = TenantMembership.objects.create(
+            user=self.viewer_user, tenant=self.tenant,
         )
+        m_viewer.roles.add(viewer_role)
 
     def test_superuser_requires_mfa(self):
         self.assertTrue(user_requires_mfa(self.super_user))
@@ -154,8 +158,9 @@ class MFAPolicyNoStaleCacheTests(TestCase):
             tenant=self.tenant, name='Viewer', permissions=['assets.view_asset'],
         )
         self.membership = TenantMembership.objects.create(
-            user=self.user, tenant=self.tenant, role=self.viewer_role,
+            user=self.user, tenant=self.tenant,
         )
+        self.membership.roles.add(self.viewer_role)
 
     def _password_request(self):
         request = self.factory.get('/')
@@ -196,7 +201,8 @@ class MFAEnforcementMiddlewareTests(TestCase):
             username='enforce-admin-mfa', email='enforce-admin-mfa@example.com', password='pw-mfa',
         )
         admin_role = TenantRole.objects.create(tenant=self.tenant, name='Admin', permissions=[])
-        TenantMembership.objects.create(user=self.admin_user, tenant=self.tenant, role=admin_role)
+        m_admin = TenantMembership.objects.create(user=self.admin_user, tenant=self.tenant)
+        m_admin.roles.add(admin_role)
 
         # H4: a Manager (the SSO-provisioned privileged role) must be gated too.
         self.manager_user = User.objects.create_user(
@@ -206,7 +212,8 @@ class MFAEnforcementMiddlewareTests(TestCase):
             tenant=self.tenant, name='Manager',
             permissions=['assets.view_asset', 'assets.add_asset', 'assets.change_asset'],
         )
-        TenantMembership.objects.create(user=self.manager_user, tenant=self.tenant, role=manager_role)
+        m_manager = TenantMembership.objects.create(user=self.manager_user, tenant=self.tenant)
+        m_manager.roles.add(manager_role)
 
         self.member_user = User.objects.create_user(
             username='enforce-member-mfa', email='enforce-member-mfa@example.com', password='pw-mfa',
@@ -215,7 +222,8 @@ class MFAEnforcementMiddlewareTests(TestCase):
         member_role = TenantRole.objects.create(
             tenant=self.tenant, name='Member', permissions=['assets.view_asset'],
         )
-        TenantMembership.objects.create(user=self.member_user, tenant=self.tenant, role=member_role)
+        m_member = TenantMembership.objects.create(user=self.member_user, tenant=self.tenant)
+        m_member.roles.add(member_role)
 
     def _login_with_backend(self, user, backend):
         """force_login then pin the session auth backend (password vs SSO)."""
@@ -281,8 +289,7 @@ class MFAEnforcementMiddlewareTests(TestCase):
         membership = TenantMembership.objects.get(
             user=self.member_user, tenant=self.tenant,
         )
-        membership.role = privileged
-        membership.save()
+        membership.roles.set([privileged])
 
         # Next request on the SAME session is now gated.
         after = self.client.get(reverse('dashboard'))
@@ -327,7 +334,8 @@ class MFAGateViewTests(TestCase):
             username='gate-admin-mfa', email='gate-admin-mfa@example.com', password='pw-mfa',
         )
         admin_role = TenantRole.objects.create(tenant=self.tenant, name='Admin', permissions=[])
-        TenantMembership.objects.create(user=self.admin_user, tenant=self.tenant, role=admin_role)
+        m_admin = TenantMembership.objects.create(user=self.admin_user, tenant=self.tenant)
+        m_admin.roles.add(admin_role)
 
     def _login_password(self, user):
         self.client.force_login(user)

@@ -48,12 +48,14 @@ class UploadJournalPermTests(TestCase):
         # User with change_asset on tenant_a
         self.user_chg = User.objects.create_user("chg", password="pw")
         role_chg = _make_role(self.tenant_a, "changer", ["assets.change_asset"])
-        TenantMembership.objects.create(user=self.user_chg, tenant=self.tenant_a, role=role_chg)
+        m_chg = TenantMembership.objects.create(user=self.user_chg, tenant=self.tenant_a)
+        m_chg.roles.add(role_chg)
 
         # User with view-only on tenant_a (no change)
         self.user_view = User.objects.create_user("view", password="pw")
         role_view = _make_role(self.tenant_a, "viewer", ["assets.view_asset"])
-        TenantMembership.objects.create(user=self.user_view, tenant=self.tenant_a, role=role_view)
+        m_view = TenantMembership.objects.create(user=self.user_view, tenant=self.tenant_a)
+        m_view.roles.add(role_view)
 
         mfr = Manufacturer.objects.create(name="Dell", slug="dell")
         at = AssetType.objects.create(manufacturer=mfr, model="XPS 13")
@@ -186,7 +188,8 @@ class SearchTenantScopingTests(TestCase):
 
         self.user_a = User.objects.create_user("srch_a", password="pw")
         role_a = _make_role(self.tenant_a, "viewer", ["assets.view_asset"])
-        TenantMembership.objects.create(user=self.user_a, tenant=self.tenant_a, role=role_a)
+        m_a = TenantMembership.objects.create(user=self.user_a, tenant=self.tenant_a)
+        m_a.roles.add(role_a)
 
         mfr = Manufacturer.objects.create(name="HP", slug="hp")
         at = AssetType.objects.create(manufacturer=mfr, model="EliteBook")
@@ -245,7 +248,8 @@ class RESTCrossTenantTests(TestCase):
                 "subscriptions.view_subscription",
             ],
         )
-        TenantMembership.objects.create(user=self.user_a, tenant=self.tenant_a, role=role_a)
+        m_a = TenantMembership.objects.create(user=self.user_a, tenant=self.tenant_a)
+        m_a.roles.add(role_a)
         self.token_a = Token.objects.create(user=self.user_a)
 
         # Shared metadata

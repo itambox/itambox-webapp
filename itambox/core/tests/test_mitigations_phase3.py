@@ -33,7 +33,8 @@ class MitigationsPhase3Tests(TestCase):
                 'licenses.view_license',
             ]
         )
-        self.membership = TenantMembership.objects.create(user=self.staff, tenant=self.tenant, role=self.role)
+        self.membership = TenantMembership.objects.create(user=self.staff, tenant=self.tenant)
+        self.membership.roles.add(self.role)
         self.token = Token.objects.create(user=self.staff)
 
         # Setup related objects to query in select_related
@@ -149,7 +150,14 @@ class MitigationsPhase3Tests(TestCase):
             supplier=self.supplier
         )
         
-        with self.assertNumQueries(13):  # 1 for Token, 1 for UPDATE token last_used, 1 for Tenant, 2 for TenantMembership, 2 for TenantGroup, 1 for SELECT JOIN Asset, 1 for SELECT software (prefetch), 1 for django_session query, 3 for django_session write/release
+        # The key assertion is the single JOIN'd Asset query (select_related works — no
+        # N+1 on asset relations). The remaining queries are auth/tenant/permission
+        # overhead: token + last_used, tenant, TenantGroup, the membership lookup, and
+        # the additive-union permission resolution (membership roles + group roles +
+        # provider grants — bounded, cached per request), plus session read/write. The
+        # provider-grant resolution (MSP-RBAC redesign) adds one bounded ProviderMembership
+        # lookup per request — accepted cost, see PLAN_rbac_msp_redesign R2.
+        with self.assertNumQueries(19):
             response = self.client.post(
                 self.graphql_url,
                 data=json.dumps({'query': query}),

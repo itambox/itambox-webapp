@@ -31,7 +31,8 @@ class ScopeTenantFieldTests(TestCase):
         self.superuser = User.objects.create_superuser(username='root', email='r@x.com', password='pw')
         for t in (self.a1, self.a2):
             role = TenantRole.objects.create(tenant=t, name='R', permissions=[])
-            TenantMembership.objects.create(user=self.member, tenant=t, role=role)
+            m = TenantMembership.objects.create(user=self.member, tenant=t)
+            m.roles.add(role)
 
         # Load the URLconf now, under a clean (no-tenant) context, so view
         # `queryset = Model.objects.all()` class attributes bake UNSCOPED. The

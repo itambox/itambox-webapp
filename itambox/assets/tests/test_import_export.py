@@ -31,8 +31,8 @@ class ImportExportPermissionTestCase(TestCase):
         self.membership = TenantMembership.objects.create(
             user=self.staff,
             tenant=self.tenant,
-            role=self.role
         )
+        self.membership.roles.add(self.role)
 
     def test_list_view_gating_without_add_permission(self):
         # Log in as staff (with only view permission, no add permission)

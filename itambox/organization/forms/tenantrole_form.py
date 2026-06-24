@@ -3,6 +3,7 @@ from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout
 from core.forms import FilterForm
+from core.auth.guards import validate_permission_grant
 from ..models import TenantRole, Tenant
 from ..filters import TenantRoleFilterSet
 
@@ -58,7 +59,7 @@ MATRIX_MODELS = {
     },
     'component': {
         'label': _('Components'),
-        'app': 'components',
+        'app': 'inventory',
         'model_name': 'component',
         'group': _('Inventory & Hardware'),
     },
@@ -197,7 +198,7 @@ MATRIX_MODELS = {
     },
     'customfield': {
         'label': _('Custom Fields'),
-        'app': 'assets',
+        'app': 'extras',
         'model_name': 'customfield',
         'group': _('Metadata & Settings'),
     },
@@ -302,6 +303,68 @@ MATRIX_MODELS = {
         'group': _('User Management'),
     },
 
+    # Additional domain models
+    'warranty': {
+        'label': _('Warranties'),
+        'app': 'assets',
+        'model_name': 'warranty',
+        'group': _('Inventory & Hardware'),
+    },
+    'assetdisposal': {
+        'label': _('Asset Disposals'),
+        'app': 'assets',
+        'model_name': 'assetdisposal',
+        'group': _('Inventory & Hardware'),
+    },
+    'assetreservation': {
+        'label': _('Asset Reservations'),
+        'app': 'assets',
+        'model_name': 'assetreservation',
+        'group': _('Inventory & Hardware'),
+    },
+    'contract': {
+        'label': _('Contracts'),
+        'app': 'procurement',
+        'model_name': 'contract',
+        'group': _('Inventory & Hardware'),
+    },
+    'installedsoftware': {
+        'label': _('Installed Software'),
+        'app': 'software',
+        'model_name': 'installedsoftware',
+        'group': _('Software & Subscriptions'),
+    },
+    'assetrole': {
+        'label': _('Asset Roles'),
+        'app': 'assets',
+        'model_name': 'assetrole',
+        'group': _('Metadata & Settings'),
+    },
+    'costcenter': {
+        'label': _('Cost Centers'),
+        'app': 'organization',
+        'model_name': 'costcenter',
+        'group': _('Organization & Structure'),
+    },
+    'tenantmembership': {
+        'label': _('Tenant Assignments'),
+        'app': 'organization',
+        'model_name': 'tenantmembership',
+        'group': _('Organization & Structure'),
+    },
+    'journalentry': {
+        'label': _('Journal Entries'),
+        'app': 'extras',
+        'model_name': 'journalentry',
+        'group': _('System & Reporting'),
+    },
+    'configcontext': {
+        'label': _('Config Contexts'),
+        'app': 'extras',
+        'model_name': 'configcontext',
+        'group': _('System & Reporting'),
+    },
+
     # Plugins
     'docusignenvelope': {
         'label': _('DocuSign Envelopes'),
@@ -310,6 +373,14 @@ MATRIX_MODELS = {
         'group': _('Plugins'),
     },
 }
+
+# Plugin-provided rows only make sense when the plugin is installed; otherwise their
+# permission codenames don't exist and the whitelist validation would reject them.
+from django.apps import apps as _django_apps  # noqa: E402
+
+for _plugin_key, _plugin_app in (('docusignenvelope', 'itambox_esign'),):
+    if not _django_apps.is_installed(_plugin_app):
+        MATRIX_MODELS.pop(_plugin_key, None)
 
 class TenantRoleForm(forms.ModelForm):
     tenant = forms.ModelChoiceField(
@@ -443,30 +514,22 @@ class TenantRoleForm(forms.ModelForm):
             assigned_perms.add('extras.add_dashboard')
             assigned_perms.add('extras.delete_dashboard')
 
-        # Privilege escalation check: user cannot assign permissions they do not possess
-        request_user = self.current_user
-        if request_user and not request_user.is_superuser:
-            escalated = [p for p in assigned_perms if not request_user.has_perm(p)]
-            if escalated:
-                raise forms.ValidationError(
-                    _("Privilege escalation detected: You cannot assign the following permissions because you do not have them: %(perms)s") % {'perms': ', '.join(escalated)}
-                )
-
-        # Whitelist validation: check if permission codenames are valid in Django's Permission model
+        # Keep only real permission codenames. The matrix is built by us, so an
+        # invalid codename means a matrix row references a permission/action that does
+        # not exist — e.g. a model without an 'add' permission (RecycleBin) or an
+        # uninstalled plugin. Drop those silently rather than blocking the whole save
+        # on what is our own configuration, not user input. (App-label typos are
+        # caught in dev by the matrix audit, not by failing the user here.)
         from django.contrib.auth.models import Permission
-        all_codenames = set()
-        for p in Permission.objects.select_related('content_type').all():
-            all_codenames.add(f"{p.content_type.app_label}.{p.codename}")
+        all_codenames = set(
+            f"{p.content_type.app_label}.{p.codename}"
+            for p in Permission.objects.select_related('content_type').all()
+        )
+        assigned_perms = {p for p in assigned_perms if p in all_codenames}
 
-        invalid_perms = [p for p in assigned_perms if p not in all_codenames]
-        if invalid_perms:
-            raise forms.ValidationError(
-                _("Invalid permission codenames: %(perms)s") % {'perms': ', '.join(invalid_perms)}
-            )
-
-        self.instance.permissions = list(assigned_perms)
-        
-        # Set tenant automatically from form field or kwarg/instance
+        # Set tenant automatically from form field or kwarg/instance. Resolved BEFORE
+        # the escalation guard, which is evaluated against the granting user's effective
+        # permissions in this role's own tenant.
         tenant = cleaned_data.get('tenant')
         if tenant:
             self.instance.tenant = tenant
@@ -475,12 +538,18 @@ class TenantRoleForm(forms.ModelForm):
         elif self.instance.pk and getattr(self.instance, 'tenant', None):
             # Fallback to existing tenant when editing
             pass
-            
+
         if self.instance.tenant:
             cleaned_data['tenant'] = self.instance.tenant
         else:
             raise forms.ValidationError(_("Tenant assignment is required."))
-            
+
+        # Privilege escalation check: a non-superuser cannot assign permissions they do
+        # not themselves hold in this tenant. Centralised in core.auth.guards so the same
+        # rule applies to serializers / SCIM / model hooks.
+        validate_permission_grant(self.current_user, assigned_perms, self.instance.tenant)
+
+        self.instance.permissions = list(assigned_perms)
         return cleaned_data
 
     @property

@@ -260,6 +260,21 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
         from core.auth.provisioning import provision_membership
         provision_membership(user, tenant, db_role_name, self.get_permissions_for_role, 'OIDC')
 
+        # 3. Provider-level (MSP staff) group claims: if this tenant belongs to a provider
+        # and the provider's OIDC config maps any of the user's group claims to a
+        # ProviderRole, (re)assign the corresponding ProviderMembership. No mapping / no
+        # provider → no-op, so non-MSP installs are unaffected.
+        if getattr(tenant, 'provider_id', None) and groups_claim:
+            provider_configs = getattr(settings, 'ITAMBOX_PROVIDER_OIDC_CONFIGS', {})
+            provider_config = provider_configs.get(tenant.provider.slug, {})
+            provider_role_mapping = provider_config.get('OIDC_GROUP_PROVIDER_ROLE_MAPPING', {})
+            for group in groups_claim:
+                mapped_provider_role = provider_role_mapping.get(group)
+                if mapped_provider_role:
+                    from core.auth.provisioning import provision_provider_membership
+                    provision_provider_membership(user, tenant.provider, mapped_provider_role, 'OIDC')
+                    break
+
     def get_permissions_for_role(self, role_name):
         from organization.forms.tenantrole_form import MATRIX_MODELS
         perms = set()
