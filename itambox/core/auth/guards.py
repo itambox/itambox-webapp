@@ -14,18 +14,18 @@ current-tenant contextvar. Superusers bypass it (trusted by definition).
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
-from core.auth import TenantMembershipBackend
+from core.auth import MembershipBackend
 
 
-def validate_permission_grant(granting_user, permissions, tenant):
+def validate_permission_grant(granting_user, permissions, container):
     """Raise ``ValidationError`` if ``granting_user`` may not grant ``permissions``.
 
-    A non-superuser may only grant permission codenames they themselves hold in
-    ``tenant``. ``permissions`` is any iterable of codename strings. ``tenant`` is
-    the tenant the permissions apply in (e.g. the role's / membership's tenant).
+    A non-superuser may only grant permission codenames they themselves hold in the
+    target container (a ``Tenant`` for tenant-scoped grants, or a ``Provider`` for
+    provider-scoped grants). ``permissions`` is any iterable of codename strings.
 
     Superusers, an absent granting user, and an empty permission set are all
-    no-ops. When ``tenant`` is ``None`` a non-superuser holds nothing, so any
+    no-ops. When ``container`` is ``None`` a non-superuser holds nothing, so any
     non-empty grant is rejected (fail closed).
     """
     if granting_user is None:
@@ -37,10 +37,15 @@ def validate_permission_grant(granting_user, permissions, tenant):
     if not requested:
         return
 
-    if tenant is None:
+    backend = MembershipBackend()
+    if container is None:
         held = frozenset()
     else:
-        held = TenantMembershipBackend()._effective_perms(granting_user, tenant)
+        from organization.models import Provider
+        if isinstance(container, Provider):
+            held = backend._effective_perms_for_provider(granting_user, container)
+        else:
+            held = backend._effective_perms_for_tenant(granting_user, container)
 
     escalated = sorted(requested - set(held))
     if escalated:

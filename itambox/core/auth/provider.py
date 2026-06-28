@@ -1,66 +1,62 @@
-"""Provider-level capability checks (the MSP layer above tenants).
+"""Provider-level helpers (unified RBAC compatibility shims).
 
-Provider capabilities are a small fixed set carried as booleans on ``ProviderRole``
-(``can_manage_tenants``, ``can_manage_provider_users``, ``can_manage_groups``). They are
-checked DIRECTLY here rather than threaded through Django's per-tenant permission system —
-this replaces the old ``GlobalCapabilityBackend`` hack.
+After the unified-RBAC redesign, provider capabilities (``manage_tenants``,
+``manage_staff``, ``manage_groups``, ``manage_provider``) are plain Django permissions
+declared on ``organization.Provider.Meta.permissions``. They are granted by attaching
+them to a provider-scoped ``Role`` carried by an active staff ``Membership`` and resolved
+through ``user.has_perm('organization.<cap>', obj=provider)``.
 
-All functions are safe to call for any user (including AnonymousUser) and are cheap: each
-does at most one small query, and ``is_provider_staff`` caches its result per request on
-the user object.
+The helpers below survive purely to keep older call sites compiling; new code should call
+``has_perm`` directly.
 """
 
 
 def has_provider_capability(user, capability, provider=None):
     """Return True if ``user`` holds the provider capability ``capability``.
 
-    ``capability`` is the suffix of a ``ProviderRole.can_<capability>`` boolean, e.g.
-    ``'manage_tenants'``, ``'manage_provider_users'``, ``'manage_groups'``. Optionally
-    restrict to a single ``provider``. Superusers always pass.
+    ``capability`` is the codename suffix (e.g. ``'manage_tenants'``). Resolves through
+    ``user.has_perm('organization.<capability>', obj=provider)`` so all gating flows
+    through the unified backend.
     """
     if not getattr(user, 'is_authenticated', False):
         return False
     if user.is_superuser:
         return True
-    # inline import: avoids AppRegistryNotReady when this module is imported early
-    from users.models import ProviderMembership
-
-    qs = ProviderMembership.objects.filter(user=user, is_active=True)
+    perm = f'organization.{capability}'
     if provider is not None:
-        qs = qs.filter(provider=provider)
-    field = f'can_{capability}'
-    for pm in qs.select_related('provider_role'):
-        role = pm.provider_role
-        if role is not None and getattr(role, field, False):
+        return user.has_perm(perm, obj=provider)
+    # Without a specific provider, return True if the user holds the cap against ANY
+    # provider they staff for.
+    from organization.access import accessible_provider_ids
+    from organization.models import Provider
+    for provider_id in accessible_provider_ids(user):
+        prov = Provider._base_manager.filter(pk=provider_id).first()
+        if prov is not None and user.has_perm(perm, obj=prov):
             return True
     return False
 
 
 def is_provider_staff(user):
-    """True if ``user`` has any active ProviderMembership (i.e. is MSP staff).
-
-    Cached per request on the user object (like effective-perm resolution) so repeated
-    checks in a single request cost one query at most.
-    """
+    """True if ``user`` has any active staff Membership (i.e. is MSP staff)."""
     if not getattr(user, 'is_authenticated', False):
         return False
     cached = getattr(user, '_is_provider_staff_cache', None)
     if cached is not None:
         return cached
-    # inline import: avoids AppRegistryNotReady when this module is imported early
-    from users.models import ProviderMembership
-    result = ProviderMembership.objects.filter(user=user, is_active=True).exists()
+    from organization.models import Membership
+    result = Membership.objects.filter(
+        user=user, is_active=True, person_type=Membership.PERSON_STAFF,
+    ).exists()
     setattr(user, '_is_provider_staff_cache', result)
     return result
 
 
 def can_manage_user_groups(user):
-    """Unified gate for managing global/cross-tenant UserGroups.
+    """Unified gate for managing global UserGroups.
 
-    True for superusers, provider staff holding ``can_manage_groups``, OR (single-company
-    backward compat) a user directly granted the legacy ``users.manage_usergroups``
-    capability via ``user_permissions`` — so existing "Group Manager" grants keep working
-    without a Provider and without the removed GlobalCapabilityBackend.
+    True for superusers, a user holding ``organization.manage_groups`` against any
+    provider they staff for, OR a user directly granted that permission via the
+    legacy single-company ``user_permissions`` grant.
     """
     if not getattr(user, 'is_authenticated', False):
         return False
@@ -69,5 +65,5 @@ def can_manage_user_groups(user):
     if has_provider_capability(user, 'manage_groups'):
         return True
     return user.user_permissions.filter(
-        content_type__app_label='users', codename='manage_usergroups',
+        content_type__app_label='organization', codename='manage_groups',
     ).exists()

@@ -451,7 +451,7 @@ def send_notification_to_channel(channel, subject, body):
         if user_ids:
             users = list(User.objects.filter(pk__in=user_ids, is_active=True))
         elif channel.tenant_id:
-            # Members of the channel's tenant (via TenantMembership) — covers
+            # Members of the channel's tenant (via Membership) — covers
             # users with no AssetHolder profile, unlike the old
             # asset_holder_profiles join.
             users = list(

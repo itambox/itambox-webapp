@@ -193,6 +193,9 @@ DATABASES = {
     }
 }
 
+# Custom user model: stock AbstractUser + a dedicated ``can_login`` flag (see users.models.User).
+AUTH_USER_MODEL = 'users.User'
+
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -366,9 +369,9 @@ except Exception as e:
     logging.getLogger(__name__).warning('Failed to parse ITAMBOX_TENANT_OIDC_CONFIGS: %s', e)
     ITAMBOX_TENANT_OIDC_CONFIGS = {}
 
-# Provider-level SSO group → ProviderRole mapping (keyed by provider slug). Mirrors the
-# per-tenant configs above but provisions ProviderMembership (MSP staff) instead of
-# TenantMembership. Each entry may carry OIDC_GROUP_PROVIDER_ROLE_MAPPING /
+# Provider-level SSO group → Role mapping (keyed by provider slug). Mirrors the
+# per-tenant configs above but provisions Membership (MSP staff) instead of
+# Membership. Each entry may carry OIDC_GROUP_PROVIDER_ROLE_MAPPING /
 # SAML_GROUP_PROVIDER_ROLE_MAPPING / LDAP_GROUP_PROVIDER_ROLE_MAPPING dicts.
 for _prov_cfg in ('ITAMBOX_PROVIDER_OIDC_CONFIGS', 'ITAMBOX_PROVIDER_SAML_CONFIGS', 'ITAMBOX_PROVIDER_LDAP_CONFIGS'):
     try:

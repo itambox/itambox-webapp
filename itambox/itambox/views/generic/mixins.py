@@ -129,7 +129,11 @@ class BulkViewMixin:
                     model = apps.get_model(app_label, mn)
                 except (ValueError, LookupError):
                     raise Http404
-                if not hasattr(model.objects, 'filter_by_tenant'):
+                # A swapped-out model (e.g. the default ``auth.User`` once AUTH_USER_MODEL is
+                # overridden) has no usable manager — reject it like any non-tenant model.
+                # ``_meta.swapped`` is checked first so the short-circuit never touches the
+                # unavailable ``.objects`` manager.
+                if model._meta.swapped or not hasattr(model.objects, 'filter_by_tenant'):
                     raise Http404
                 return model
         return None

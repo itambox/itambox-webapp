@@ -18,7 +18,7 @@ PASSWORD_BACKEND = 'core.auth.PasswordLoginOnlyBackend'
 def _role_is_privileged(role_name, permissions, privileged_names_lower) -> bool:
     """True if a role is privileged by name or by granting any mutating perm.
 
-    Privilege in this app is the JSON ``permissions`` list on ``TenantRole``,
+    Privilege in this app is the JSON ``permissions`` list on ``Role``,
     not the role name. We treat a role as privileged when either:
     (a) its name is one of the canonical privileged names
         (``core.auth.provisioning.PRIVILEGED_ROLE_NAMES``, case-insensitive), or
@@ -49,15 +49,15 @@ def user_requires_mfa(user) -> bool:
     if getattr(user, 'is_superuser', False):
         return True
     # Lazy imports to avoid an import cycle at app-load (settings/middleware).
-    from organization.models import TenantMembership
+    from organization.models import Membership
     from core.auth.provisioning import PRIVILEGED_ROLE_NAMES
 
     privileged_names_lower = {name.lower() for name in PRIVILEGED_ROLE_NAMES}
     # Fetch roles via the M2M: a membership now holds 0..n roles so we traverse
     # the M2M join (memberships -> roles) to get each role's name + permissions.
     # The mutating-perm check needs the JSON inspected in Python.
-    from organization.models import TenantRole
-    roles = TenantRole.objects.filter(memberships__user=user).values_list(
+    from organization.models import Role
+    roles = Role.objects.filter(memberships__user=user).values_list(
         'name', 'permissions',
     )
     return any(

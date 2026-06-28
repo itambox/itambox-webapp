@@ -114,6 +114,14 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
     def get_all_permissions(self, user_obj, obj=None):
         return set()
 
+    def authenticate(self, request, **kwargs):
+        # ``can_login=False`` bars all interactive login, including OIDC/SSO. super() runs the
+        # full OIDC code-exchange and user resolution; gate the resolved user post-hoc.
+        user = super().authenticate(request, **kwargs)
+        if user and not getattr(user, 'can_login', True):
+            return None
+        return user
+
     def filter_users_by_claims(self, claims):
         email = claims.get('email')
         if email:
@@ -176,7 +184,7 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
         if not tenant:
             return
 
-        from organization.models import AssetHolder, TenantRole, TenantMembership
+        from organization.models import AssetHolder, Role, Membership
         from django.db.utils import IntegrityError
 
         # 1. Profile Provisioning / Linking
@@ -219,7 +227,7 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
                     logger.warning(f"IntegrityError while creating AssetHolder: {e}")
                     holder = None
 
-        # 2. TenantMembership & Role Syncing
+        # 2. Membership & Role Syncing
         groups_claim = claims.get('groups', [])
         if isinstance(groups_claim, str):
             groups_claim = [groups_claim]
@@ -262,7 +270,7 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
 
         # 3. Provider-level (MSP staff) group claims: if this tenant belongs to a provider
         # and the provider's OIDC config maps any of the user's group claims to a
-        # ProviderRole, (re)assign the corresponding ProviderMembership. No mapping / no
+        # Role, (re)assign the corresponding Membership. No mapping / no
         # provider → no-op, so non-MSP installs are unaffected.
         if getattr(tenant, 'provider_id', None) and groups_claim:
             provider_configs = getattr(settings, 'ITAMBOX_PROVIDER_OIDC_CONFIGS', {})
@@ -276,7 +284,7 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
                     break
 
     def get_permissions_for_role(self, role_name):
-        from organization.forms.tenantrole_form import MATRIX_MODELS
+        from organization.forms.role_form import MATRIX_MODELS
         perms = set()
         for key, info in MATRIX_MODELS.items():
             app = info['app']

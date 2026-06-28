@@ -41,7 +41,7 @@ def tenant_switcher_processor(request):
         }
 
     from django.utils.functional import SimpleLazyObject
-    from organization.models import Tenant, TenantMembership
+    from organization.models import Tenant, Membership
     from collections import defaultdict
 
     def get_all_tenants():
@@ -129,4 +129,4 @@ def base_template_processor(request):
             base_template = 'base_htmx.html'
 
     return {'base_template': base_template}
-
+

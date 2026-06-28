@@ -60,8 +60,8 @@ class TokenPermissions(BasePermission):
         # Ensure active tenant context is set and valid
         from core.managers import get_current_tenant, set_current_tenant, set_current_membership
         if not get_current_tenant():
-            from organization.models import TenantMembership
-            membership = TenantMembership.objects.filter(user=request.user, is_active=True).select_related('tenant').first()
+            from organization.models import Membership
+            membership = Membership.objects.filter(user=request.user, is_active=True).select_related('tenant').first()
             if membership:
                 set_current_tenant(membership.tenant)
                 set_current_membership(membership)

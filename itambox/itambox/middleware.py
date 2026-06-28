@@ -175,7 +175,7 @@ class TenantMiddleware:
         query_tenant_id = request.GET.get('switch_tenant')
         query_group_id = request.GET.get('switch_tenant_group')
 
-        from organization.models import TenantMembership, Tenant, TenantGroup
+        from organization.models import Membership, Tenant, TenantGroup
 
         # If query parameters are provided to switch, update them
         if query_tenant_id is not None:
@@ -239,7 +239,7 @@ class TenantMiddleware:
                 if _as_int(session_tenant_id) in accessible:
                     active_tenant = Tenant._base_manager.filter(pk=session_tenant_id).first()
                     # May be None when access is via a group grant (no direct membership).
-                    active_membership = TenantMembership.objects.filter(
+                    active_membership = Membership.objects.filter(
                         user=request.user,
                         tenant_id=session_tenant_id,
                         is_active=True,
@@ -257,7 +257,7 @@ class TenantMiddleware:
                     # _base_manager: resolve the active group unscoped (bootstrap —
                     # the scope isn't established yet).
                     active_tenant_group = TenantGroup._base_manager.get(pk=session_group_id)
-                    active_membership = TenantMembership.objects.filter(
+                    active_membership = Membership.objects.filter(
                         user=request.user,
                         tenant__group_id=session_group_id,
                         is_active=True,
@@ -268,7 +268,7 @@ class TenantMiddleware:
             # If nothing resolved, default to the first accessible tenant (a direct
             # membership first, else a group-granted tenant).
             if not active_tenant and not active_tenant_group:
-                active_membership = TenantMembership.objects.filter(
+                active_membership = Membership.objects.filter(
                     user=request.user,
                     is_active=True,
                 ).select_related('tenant').first()
@@ -296,10 +296,11 @@ class TenantMiddleware:
             and getattr(active_tenant, 'provider_id', None)
             and not request.user.is_superuser
         ):
-            from users.models import ProviderMembership
-            active_provider_membership = ProviderMembership.objects.filter(
+            from organization.models import Membership
+            active_provider_membership = Membership.objects.filter(
                 user=request.user, provider_id=active_tenant.provider_id, is_active=True,
-            ).select_related('provider_role').first()
+                person_type=Membership.PERSON_STAFF,
+            ).prefetch_related('roles').first()
 
         # Bind to request
         request.active_tenant = active_tenant
