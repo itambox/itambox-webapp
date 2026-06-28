@@ -301,6 +301,29 @@ class SeedOrganizationsMixin:
                 holders = self._make_holders(tenant, org['domain'], t['headcount'])
                 self._tenant_holders[t['slug']] = holders
 
+        # Provider (MSP) layer: create the Northwind provider and link every tenant to it, so the
+        # MSP admin surfaces (provider dashboard, customer-tenants list, technician onboarding,
+        # provider-staff -> tenant permission projection) are populated and the "Provider (MSP)"
+        # nav group is shown. Single-company installs simply have no Provider rows and the whole
+        # layer stays hidden.
+        from organization.models import Provider
+        provider, _ = Provider.objects.get_or_create(
+            slug='northwind-msp',
+            defaults={
+                'name': 'Northwind Managed Services',
+                'description': ('Berlin-based managed-service provider administering its own IT '
+                                'and its customers from a single ITAMbox install.'),
+            })
+        self._provider = provider
+        internal = self._tenants.get('northwind-internal-it')
+        if internal is not None and provider.internal_tenant_id != internal.pk:
+            provider.internal_tenant = internal
+            provider.save(update_fields=['internal_tenant'])
+        for tenant in self._tenants.values():
+            if tenant.provider_id != provider.pk:
+                tenant.provider = provider
+                tenant.save(update_fields=['provider'])
+
         # Contacts: a primary customer contact per customer group/tenant + vendor reps
         self._contact_roles = {}
         for name, slug in [('Account Manager', 'account-manager'), ('Customer Primary Contact', 'customer-primary'),
