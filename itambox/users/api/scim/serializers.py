@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from organization.models import TenantMembership
+from organization.models import Membership
 from users.models import UserGroup
 
 User = get_user_model()
@@ -35,7 +35,7 @@ class SCIMUserSerializer(serializers.ModelSerializer):
         tenant = self.context.get('tenant')
         if tenant is None:
             return bool(obj.is_active)
-        membership = TenantMembership.objects.filter(user=obj, tenant=tenant).first()
+        membership = Membership.objects.filter(user=obj, tenant=tenant).first()
         return bool(membership and membership.is_active)
 
     def get_name(self, obj):

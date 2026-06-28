@@ -220,7 +220,7 @@ class JournalEntrySerializer(BaseModelSerializer):
             # within the active tenant. validate_gfk_target_tenant resolves via
             # the target's default manager AND compares obj.tenant to the active
             # tenant, so it also guards tenant-owned models whose default manager
-            # is NOT tenant-scoping (Dashboard, Job, Token, TenantMembership) — a
+            # is NOT tenant-scoping (Dashboard, Job, Token, Membership) — a
             # plain .exists() check would let those through cross-tenant.
             request = self.context.get('request')
             if request is not None and request.user.is_authenticated:

@@ -10,7 +10,8 @@ from rest_framework.permissions import IsAuthenticated
 
 from itambox.middleware import set_current_user
 from organization.models import Provider
-from users.models import UserGroup, ProviderMembership
+from users.models import UserGroup
+from organization.models import Membership
 from users.api.scim.serializers import (
     SCIMUserSerializer, SCIMGroupSerializer, SCIMServiceProviderConfigSerializer
 )
@@ -27,7 +28,7 @@ _UNSET = object()
 def sync_provider_group_members(provider, group, member_ids):
     """Reconcile ``group.members`` to ``member_ids``, restricted to provider staff.
 
-    Only users with an active ``ProviderMembership`` in THIS provider may be added. A
+    Only users with an active ``Membership`` in THIS provider may be added. A
     provider SCIM token is scoped to a single provider, so group sync must never write a
     user who is not provider staff (that would be a cross-scope write and a user-id
     enumeration oracle). New staff are provisioned exclusively through SCIM /Users; unknown
@@ -35,7 +36,7 @@ def sync_provider_group_members(provider, group, member_ids):
     """
     valid_member_ids = set()
     for uid in member_ids:
-        membership = ProviderMembership.objects.filter(
+        membership = Membership.objects.filter(
             user_id=uid, provider=provider, is_active=True
         ).first()
         if membership:
@@ -148,8 +149,8 @@ class ProviderServiceProviderConfigView(SCIMProviderMixin, APIView):
 class SCIMProviderUserListView(SCIMProviderMixin, APIView):
     def get(self, request, *args, **kwargs):
         queryset = User.objects.filter(
-            provider_memberships__provider=self.provider,
-            provider_memberships__is_active=True,
+            memberships__provider=self.provider, memberships__person_type=Membership.PERSON_STAFF,
+            memberships__is_active=True,
         ).distinct()
 
         try:
@@ -239,7 +240,7 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
 
         user = User.objects.filter(username=username).first()
         if user:
-            existing = ProviderMembership.objects.filter(user=user, provider=self.provider).first()
+            existing = Membership.objects.filter(user=user, provider=self.provider, person_type=Membership.PERSON_STAFF).first()
             if existing:
                 return Response({
                     "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
@@ -248,7 +249,7 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
                 }, status=status.HTTP_409_CONFLICT)
 
             with transaction.atomic():
-                ProviderMembership.objects.create(user=user, provider=self.provider, is_active=active)
+                Membership.objects.create(user=user, provider=self.provider, person_type=Membership.PERSON_STAFF, tenant_scope=Membership.SCOPE_EXPLICIT, is_active=active)
         else:
             with transaction.atomic():
                 user = User.objects.create_user(
@@ -261,7 +262,7 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
                 user.set_unusable_password()
                 user.save()
 
-                ProviderMembership.objects.create(user=user, provider=self.provider, is_active=active)
+                Membership.objects.create(user=user, provider=self.provider, person_type=Membership.PERSON_STAFF, tenant_scope=Membership.SCOPE_EXPLICIT, is_active=active)
 
         serializer = SCIMUserSerializer(
             user,
@@ -273,8 +274,8 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
 class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
     def _staff_queryset(self):
         return User.objects.filter(
-            provider_memberships__provider=self.provider,
-            provider_memberships__is_active=True,
+            memberships__provider=self.provider, memberships__person_type=Membership.PERSON_STAFF,
+            memberships__is_active=True,
         ).distinct()
 
     def get(self, request, pk, *args, **kwargs):
@@ -300,24 +301,24 @@ class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
           principal. Those changes apply only to a user whose sole membership is this provider.
         """
         # inline import: avoids users <-> organization import cycle at module load
-        from organization.models import TenantMembership
+        from organization.models import Membership as _M
 
         has_other_provider = (
-            ProviderMembership.objects.filter(user=user)
+            Membership.objects.filter(user=user, provider__isnull=False, person_type=Membership.PERSON_STAFF)
             .exclude(provider=self.provider)
             .exists()
         )
-        has_tenant = TenantMembership.objects.filter(user=user).exists()
+        has_tenant = _M.objects.filter(user=user, tenant__isnull=False).exists()
         has_other = has_other_provider or has_tenant
 
         if active is not _UNSET:
-            membership = ProviderMembership.objects.filter(user=user, provider=self.provider).first()
+            membership = Membership.objects.filter(user=user, provider=self.provider, person_type=Membership.PERSON_STAFF).first()
             if membership is not None and membership.is_active != active:
                 membership.is_active = active
                 membership.save(update_fields=['is_active'])
             # Mirror the global flag to "has any active provider membership". (Tenant-only
             # users are governed by their tenant memberships, not by this provider token.)
-            any_active = ProviderMembership.objects.filter(user=user, is_active=True).exists()
+            any_active = Membership.objects.filter(user=user, provider__isnull=False, person_type=Membership.PERSON_STAFF, is_active=True).exists()
             if not any_active and not has_tenant:
                 if user.is_active:
                     user.is_active = False
@@ -489,7 +490,7 @@ class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
         with transaction.atomic():
             # Remove only the membership for this provider. Delete per-instance so each
             # removal is change-logged (QuerySet.delete() bypasses ChangeLoggingMixin).
-            for membership in ProviderMembership.objects.filter(user=user, provider=self.provider):
+            for membership in Membership.objects.filter(user=user, provider=self.provider, person_type=Membership.PERSON_STAFF):
                 membership.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -542,9 +543,10 @@ class SCIMProviderGroupListView(SCIMProviderMixin, APIView):
                 "detail": "displayName exceeds maximum length of 100 characters."
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Name uniqueness on UserGroup is global (active rows); reject duplicates anywhere
-        # to surface a clean 409 rather than a DB IntegrityError.
-        if UserGroup.objects.filter(name=name).exists():
+        # Group names are unique PER PROVIDER (active rows): reject only a duplicate within
+        # THIS provider, surfacing a clean 409 rather than a DB IntegrityError. A different
+        # provider may legitimately reuse the same displayName.
+        if UserGroup.objects.filter(provider=self.provider, name=name).exists():
             return Response({
                 "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
                 "status": "409",

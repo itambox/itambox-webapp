@@ -45,7 +45,7 @@ class Command(BaseCommand):
 
         # TaskContext sets the tenant scope AND wires _request_id + _current_user
         # so that ChangeLoggingMixin records ObjectChange entries for all User/
-        # TenantMembership saves that happen during the sync.
+        # Membership saves that happen during the sync.
         # No user_id is available when the command is invoked directly from the
         # CLI (no --user argument). Changes are attributed to a system/anonymous
         # actor (user=None). When called via sync_tenant_ldap_task the outer
@@ -161,8 +161,8 @@ class Command(BaseCommand):
                         )
                         
                         # Add user to tenant membership as member by default
-                        from organization.models import TenantMembership, TenantRole
-                        tenant_role, _ = TenantRole.objects.get_or_create(
+                        from organization.models import Membership, Role
+                        tenant_role, _ = Role.objects.get_or_create(
                             tenant=tenant,
                             name='Member',
                             defaults={
@@ -180,7 +180,7 @@ class Command(BaseCommand):
                                 ]
                             }
                         )
-                        membership, _ = TenantMembership.objects.get_or_create(
+                        membership, _ = Membership.objects.get_or_create(
                             user=user,
                             tenant=tenant,
                         )

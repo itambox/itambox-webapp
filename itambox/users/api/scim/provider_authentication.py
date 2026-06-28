@@ -82,7 +82,7 @@ class SCIMProviderBearerTokenAuthentication(BaseAuthentication):
             if not user.is_superuser:
                 if token.provider_id != provider.pk:
                     raise exceptions.AuthenticationFailed('Token is not scoped to this provider.')
-                if not has_provider_capability(user, 'manage_provider_users', provider=provider):
+                if not has_provider_capability(user, 'manage_staff', provider=provider):
                     raise exceptions.AuthenticationFailed(
                         'User does not have sufficient permissions (manage_provider_users required).'
                     )

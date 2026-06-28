@@ -4,7 +4,7 @@ from rest_framework.authentication import BaseAuthentication, get_authorization_
 from rest_framework import exceptions
 from django.utils import timezone
 from users.models import Token
-from organization.models import Tenant, TenantMembership
+from organization.models import Tenant, Membership
 
 logger = logging.getLogger('itambox.scim.auth')
 
@@ -66,7 +66,7 @@ class SCIMBearerTokenAuthentication(BaseAuthentication):
 
             # Verify tenant membership with admin/owner role
             if not user.is_superuser:
-                membership = TenantMembership.objects.filter(user=user, tenant=tenant).prefetch_related('roles').first()
+                membership = Membership.objects.filter(user=user, tenant=tenant).prefetch_related('roles').first()
                 if not membership:
                     raise exceptions.AuthenticationFailed('User does not have a membership in this tenant.')
                 # Authorise admin/owner only. Roles are now an M2M: accept if ANY attached

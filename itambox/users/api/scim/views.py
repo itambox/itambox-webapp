@@ -10,7 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 
 from core.managers import set_current_tenant
 from itambox.middleware import set_current_user
-from organization.models import Tenant, TenantMembership, AssetHolder
+from organization.models import Tenant, Membership, AssetHolder, Role
 from users.models import UserGroup
 from users.api.scim.serializers import (
     SCIMUserSerializer, SCIMGroupSerializer, SCIMServiceProviderConfigSerializer
@@ -68,14 +68,14 @@ def link_or_create_assetholder(user, tenant):
 
 
 def sync_group_members(tenant, group, member_ids):
-    # 1. Add to UserGroup.members only users who ALREADY have a TenantMembership in this
+    # 1. Add to UserGroup.members only users who ALREADY have a Membership in this
     #    tenant. A SCIM token is scoped to a single tenant, so group sync must never write
     #    cross-tenant membership or expose whether a global user id exists — that would be
     #    a cross-tenant access-control write and a username-enumeration oracle. New members
     #    are provisioned exclusively through SCIM /Users; unknown or non-member ids are skipped.
     valid_member_ids = set()
     for uid in member_ids:
-        membership = TenantMembership.objects.filter(user_id=uid, tenant=tenant).first()
+        membership = Membership.objects.filter(user_id=uid, tenant=tenant).first()
         if membership:
             valid_member_ids.add(uid)
             link_or_create_assetholder(membership.user, tenant)
@@ -287,7 +287,7 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
 
         user = User.objects.filter(username=username).first()
         if user:
-            membership = TenantMembership.objects.filter(user=user, tenant=self.tenant).first()
+            membership = Membership.objects.filter(user=user, tenant=self.tenant).first()
             if membership:
                 return Response({
                     "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
@@ -298,7 +298,7 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
             with transaction.atomic():
                 # Roles are assigned in-app via UserGroup; SCIM provisioning creates the
                 # membership with an empty roles set (no get_or_create of a default role).
-                TenantMembership.objects.create(user=user, tenant=self.tenant, is_active=active)
+                Membership.objects.create(user=user, tenant=self.tenant, person_type=Membership.PERSON_MEMBER, is_active=active)
                 link_or_create_assetholder(user, self.tenant)
         else:
             with transaction.atomic():
@@ -314,7 +314,7 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
 
                 # Roles are assigned in-app via UserGroup; SCIM provisioning creates the
                 # membership with an empty roles set (no get_or_create of a default role).
-                TenantMembership.objects.create(user=user, tenant=self.tenant, is_active=active)
+                Membership.objects.create(user=user, tenant=self.tenant, person_type=Membership.PERSON_MEMBER, is_active=active)
                 link_or_create_assetholder(user, self.tenant)
 
         serializer = SCIMUserSerializer(
@@ -353,19 +353,19 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
           a user whose sole membership is this tenant. (DELETE still drops the membership.)
         """
         has_other = (
-            TenantMembership.objects.filter(user=user)
+            Membership.objects.filter(user=user)
             .exclude(tenant=self.tenant)
             .exists()
         )
 
         if active is not _UNSET:
-            membership = TenantMembership.objects.filter(user=user, tenant=self.tenant).first()
+            membership = Membership.objects.filter(user=user, tenant=self.tenant).first()
             if membership is not None and membership.is_active != active:
                 membership.is_active = active
                 membership.save(update_fields=['is_active'])
             # Mirror the global flag to "has any active membership anywhere": clears login
             # only when the user is fully de-provisioned, never from a single tenant's token.
-            any_active = TenantMembership.objects.filter(user=user, is_active=True).exists()
+            any_active = Membership.objects.filter(user=user, is_active=True).exists()
             if user.is_active != any_active:
                 user.is_active = any_active
                 user.save(update_fields=['is_active'])
@@ -539,13 +539,13 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
             # Remove only the membership for the current tenant. Delete per-instance
             # so each removal is change-logged (QuerySet.delete() bypasses
             # ChangeLoggingMixin / SoftDeleteMixin entirely).
-            for membership in TenantMembership.objects.filter(user=user, tenant=self.tenant):
+            for membership in Membership.objects.filter(user=user, tenant=self.tenant):
                 membership.delete()
             # Soft-delete the associated AssetHolder for this tenant if one exists.
             for holder in AssetHolder.objects.filter(user=user, tenant=self.tenant):
                 holder.delete()
             # If user has no remaining memberships, deactivate instead of hard-deleting
-            if not TenantMembership.objects.filter(user=user).exists():
+            if not Membership.objects.filter(user=user).exists():
                 user.is_active = False
                 user.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -565,7 +565,7 @@ class SCIMGroupListView(SCIMTenantMixin, APIView):
         
         # Groups are global; a tenant's SCIM endpoint sees (read-only) the groups that
         # grant a role in THIS tenant.
-        queryset = UserGroup.objects.filter(roles__tenant=self.tenant).filter(q_obj).distinct()
+        queryset = UserGroup.objects.filter(roles__scope=Role.SCOPE_TENANT, roles__tenant=self.tenant).filter(q_obj).distinct()
         
         try:
             start_index = int(request.query_params.get('startIndex', 1))
@@ -655,7 +655,7 @@ class SCIMGroupListView(SCIMTenantMixin, APIView):
 class SCIMGroupDetailView(SCIMTenantMixin, APIView):
     def get(self, request, pk, *args, **kwargs):
         group = get_object_or_404(
-            UserGroup.objects.filter(roles__tenant=self.tenant).distinct(), id=pk,
+            UserGroup.objects.filter(roles__scope=Role.SCOPE_TENANT, roles__tenant=self.tenant).distinct(), id=pk,
         )
         serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.tenant.slug})
         return Response(serializer.data, status=status.HTTP_200_OK)

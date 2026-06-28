@@ -1,6 +1,6 @@
-"""Report-only audit of TenantRole.permissions JSON against real auth.Permission codenames.
+"""Report-only audit of Role.permissions JSON against real auth.Permission codenames.
 
-Permissions on a ``TenantRole`` are stored as raw ``app_label.codename`` strings in a
+Permissions on a ``Role`` are stored as raw ``app_label.codename`` strings in a
 JSONField, so there is no FK integrity: a typo, a removed permission, or a renamed model
 silently persists as a dead entry. This command scans every role (across all tenants,
 unscoped) and flags any codename that does not match an existing ``auth.Permission``.
@@ -13,11 +13,11 @@ from django.core.management.base import BaseCommand
 
 
 class Command(BaseCommand):
-    help = "Report TenantRole.permissions codenames that do not match any auth.Permission (read-only)."
+    help = "Report Role.permissions codenames that do not match any auth.Permission (read-only)."
 
     def handle(self, *args, **options):
         # inline import: avoids AppRegistryNotReady when the command module is imported early
-        from organization.models import TenantRole
+        from organization.models import Role
 
         valid = {
             f"{app_label}.{codename}"
@@ -27,7 +27,7 @@ class Command(BaseCommand):
         }
 
         # _base_manager: scan every role regardless of tenant scoping / soft-delete state.
-        roles = TenantRole._base_manager.all().select_related('tenant')
+        roles = Role._base_manager.all().select_related('tenant')
         total_roles = 0
         roles_with_stale = 0
         stale_total = 0

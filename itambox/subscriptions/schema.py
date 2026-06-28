@@ -23,8 +23,8 @@ def _resolve_owner(owner_id, user, active_tenant):
     user_model = get_user_model()
     owner = get_object_or_denied(user_model, owner_id, user)
     if active_tenant is not None:
-        from organization.models import TenantMembership
-        if not TenantMembership.objects.filter(user=owner, tenant=active_tenant).exists():
+        from organization.models import Membership
+        if not Membership.objects.filter(user=owner, tenant=active_tenant).exists():
             raise PermissionDenied(_("Owner must be a member of the active tenant."))
     return owner
 

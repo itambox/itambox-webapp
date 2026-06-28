@@ -28,7 +28,7 @@ class SeedAccessMixin:
     """Mixin for Command(BaseCommand).  Reads/writes self._ registries."""
 
     def _seed_access(self):
-        from organization.models import TenantRole, TenantMembership
+        from organization.models import Role, Membership
         self.stdout.write('--- Access: users, roles, memberships ---')
 
         # Build permission catalogs from Django's permission table.
@@ -49,10 +49,10 @@ class SeedAccessMixin:
         ROLE_PERMS = {'Administrator': ADMIN, 'Technician': TECH, 'Asset Manager': ASSETMGR, 'Read-Only': READONLY}
 
         # Per-tenant roles
-        self._roles = {}  # (tenant_slug, role_name) -> TenantRole
+        self._roles = {}  # (tenant_slug, role_name) -> Role
         for slug, tenant in self._tenants.items():
             for role_name, perms in ROLE_PERMS.items():
-                role, _ = TenantRole.objects.get_or_create(
+                role, _ = Role.objects.get_or_create(
                     tenant=tenant, name=role_name,
                     defaults={'permissions': perms, 'description': f'{role_name} role for {tenant.name}'})
                 self._roles[(slug, role_name)] = role
@@ -89,7 +89,7 @@ class SeedAccessMixin:
                 # Account managers are scoped to their assigned customer groups; others span all tenants.
                 if group_scope is not None and meta['group_slug'] not in group_scope:
                     continue
-                membership, _ = TenantMembership.objects.get_or_create(user=user, tenant=tenant)
+                membership, _ = Membership.objects.get_or_create(user=user, tenant=tenant)
                 membership.roles.add(self._roles[(slug, role_name)])
 
         if not self._engineer_users:
@@ -114,7 +114,7 @@ class SeedAccessMixin:
             customer_admins += 1
             for t in org['tenants']:
                 slug = t['slug']
-                membership, _ = TenantMembership.objects.get_or_create(
+                membership, _ = Membership.objects.get_or_create(
                     user=user, tenant=self._tenants[slug])
                 membership.roles.add(self._roles[(slug, 'Administrator')])
                 # Link this login to a holder profile in their first tenant.
@@ -152,14 +152,14 @@ class SeedAccessMixin:
                 self._users[username] = user
                 holder.user = user
                 holder.save(update_fields=['user'])
-                membership, _ = TenantMembership.objects.get_or_create(user=user, tenant=tenant)
+                membership, _ = Membership.objects.get_or_create(user=user, tenant=tenant)
                 membership.roles.add(self._roles[(slug, role_name)])
                 if role_name == 'Asset Manager':
                     team_leads += 1
                 else:
                     end_users += 1
 
-        total_memberships = TenantMembership.objects.count()
+        total_memberships = Membership.objects.count()
         self.stdout.write(f'  {team_leads} single-tenant team leads (Asset Manager), '
                           f'{end_users} single-tenant read-only end users.')
         self.stdout.write(f'  {len(self._roles)} tenant roles, {len(self._users)} login users '
