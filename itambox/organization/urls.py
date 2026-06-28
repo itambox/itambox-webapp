@@ -118,7 +118,6 @@ urlpatterns = [
     path('accept-invitation/<uuid:token>/', views.AcceptInvitationView.as_view(), name='accept_invitation'),
 
     # Providers (MSP)
-    path('provider-dashboard/', views.ProviderDashboardView.as_view(), name='provider_dashboard'),
     path('providers/', views.ProviderListView.as_view(), name='provider_list'),
     path('providers/add/', views.ProviderEditView.as_view(), name='provider_create'),
     path('providers/<int:pk>/', views.ProviderDetailView.as_view(), name='provider_detail'),

@@ -48,7 +48,7 @@ from .costcenter_views import (
     CostCenterCloneView, CostCenterBulkEditView, CostCenterBulkDeleteView,
 )
 from .provider_views import (
-    ProviderAdminMixin, ProviderDashboardView,
+    ProviderAdminMixin,
     ProviderListView, ProviderDetailView, ProviderEditView, ProviderDeleteView,
     CustomerTenantListView,
     TechnicianQuickAddView,

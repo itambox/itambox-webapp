@@ -4,13 +4,13 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
-from django.views.generic import FormView, TemplateView
+from django.views.generic import FormView
 
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
 )
 
-from ..models import Provider, Tenant, Membership
+from ..models import Provider, Tenant
 from ..forms import (
     ProviderForm, ProviderFilterForm,
     TechnicianQuickForm,
@@ -68,26 +68,6 @@ class ProviderDeleteView(ProviderAdminMixin, ObjectDeleteView):
     model = Provider
     template_name = 'generic/object_confirm_delete.html'
     success_url = reverse_lazy('organization:provider_list')
-
-
-class ProviderDashboardView(ProviderAdminMixin, TemplateView):
-    """Overview: each provider with tenant + staff + role counts."""
-    template_name = 'organization/providers/provider_dashboard.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        providers = []
-        for provider in Provider.objects.all():
-            providers.append({
-                'provider': provider,
-                'tenant_count': provider.tenants.count(),
-                'staff_count': provider.memberships.filter(
-                    is_active=True, person_type=Membership.PERSON_STAFF,
-                ).count(),
-                'role_count': provider.roles.count(),
-            })
-        context['providers'] = providers
-        return context
 
 
 class CustomerTenantListView(ProviderAdminMixin, ObjectListView):

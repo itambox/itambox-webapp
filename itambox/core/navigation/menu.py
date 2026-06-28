@@ -585,13 +585,6 @@ ADMIN_MENU = Menu(
             label=_('Provider (MSP)'),
             items=(
                 MenuItem(
-                    link='organization:provider_dashboard',
-                    link_text=_('Provider Dashboard'),
-                    permissions=(),
-                    condition=_can_admin_provider,
-                    buttons=(),
-                ),
-                MenuItem(
                     link='organization:provider_list',
                     link_text=_('Providers'),
                     permissions=(),
