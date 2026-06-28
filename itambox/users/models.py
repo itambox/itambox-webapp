@@ -4,6 +4,7 @@ import ipaddress
 import secrets
 
 from django.conf import settings
+from django.contrib.auth.models import AbstractUser
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -55,6 +56,26 @@ def validate_cidr_list(value):
                 _('"%(prefix)s" is not a valid IP address or CIDR prefix.'),
                 params={'prefix': prefix},
             )
+
+
+class User(AbstractUser):
+    """Project user model — stock ``AbstractUser`` plus a dedicated ``can_login`` flag.
+
+    ``can_login`` controls whether the person may perform *interactive* login (password or
+    SSO). It is a separate axis from ``is_active`` (account / membership status, which must
+    not be overloaded) and from API-token access. A person who is tracked in the directory
+    but must never sign in simply has ``can_login=False`` — there is no separate "contact"
+    person type.
+    """
+    can_login = models.BooleanField(
+        default=True,
+        db_index=True,
+        verbose_name=_("Can log in"),
+        help_text=_(
+            "If unchecked, this user cannot perform interactive login (password or SSO). "
+            "API tokens and account status (is_active) are unaffected."
+        ),
+    )
 
 
 class UserPreference(models.Model):
@@ -234,20 +255,21 @@ class Token(ChangeLoggingMixin, models.Model):
 
 
 class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
-    """A global, cross-tenant group of users granted one or more TenantRoles.
+    """A global, cross-cutting group of users granted one or more Roles.
 
     A group is NOT bound to a single tenant: its ``roles`` may reference roles from
-    any number of tenants, and a member is granted each role's permissions in that
-    role's tenant — which in turn grants access to those tenants (no per-tenant
-    TenantMembership required). This models MSP teams (e.g. "Senior Technicians"
-    holding admin roles across customers A, B and C) as well as single-tenant groups
-    (whose roles all happen to belong to one tenant).
+    any number of tenants or providers, and a member is granted each role's permissions
+    in that role's container — which in turn grants access to those containers (no
+    per-tenant Membership required). This models MSP teams (e.g. "Senior Technicians"
+    holding admin roles across customers A, B and C) as well as single-tenant groups.
 
     A user's effective permissions in a tenant are the additive union of every group
-    role for that tenant plus the user's own TenantMembership roles/direct_permissions
-    there. Lives in the identity layer (``users``) rather than ``organization`` because
-    it answers "who can do what", not "what exists in the business". Global by design:
-    managing groups can grant cross-tenant access, so it is a privileged operation.
+    role for that tenant plus the user's own Membership roles/direct_permissions there.
+    Lives in the identity layer (``users``) because it answers "who can do what",
+    not "what exists in the business". Group management is gated by the standard
+    Django permission ``users.change_usergroup`` / ``users.add_usergroup`` —
+    superusers and provider admins (via the ``organization.manage_groups`` capability
+    attached to a provider-scoped Role) grant it through the unified RBAC.
     """
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
@@ -256,12 +278,12 @@ class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     slug = models.SlugField(max_length=100, verbose_name=_("Slug"))
     description = models.TextField(blank=True, verbose_name=_("Description"))
     roles = models.ManyToManyField(
-        'organization.TenantRole',
+        'organization.Role',
         related_name='user_groups',
         blank=True,
         verbose_name=_("Roles"),
-        help_text=_("Roles granted to members. Roles may span multiple tenants; a "
-                    "member gets each role's permissions in that role's tenant."),
+        help_text=_("Roles granted to members. Roles may span multiple tenants or "
+                    "providers; a member gets each role's permissions in its container."),
     )
     members = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
@@ -269,8 +291,8 @@ class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         blank=True,
         verbose_name=_("Members"),
     )
-    # Provider-scoping: a group with provider=X is visible only to provider X's admins;
-    # NULL = global group (superuser-managed), backward-compatible with single-company use.
+    # SCIM provisioning scope: a group with provider=X is shown and managed by provider X's
+    # admins via SCIM. NULL = global group (superuser-managed). Not used for permission resolution.
     provider = models.ForeignKey(
         'organization.Provider',
         on_delete=models.SET_NULL,
@@ -285,20 +307,29 @@ class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         ordering = ['name']
         verbose_name = _("User Group")
         verbose_name_plural = _("User Groups")
-        # Global capability (NOT a per-tenant role permission): grants the ability to
-        # create/manage user groups, which can hand out cross-tenant access. Held by
-        # superusers implicitly and grantable to designated (MSP) admins.
-        permissions = [('manage_usergroups', 'Can manage user groups (global)')]
         constraints = [
+            # Unique (provider, name) for provider-specific groups
+            models.UniqueConstraint(
+                fields=['provider', 'name'],
+                condition=models.Q(deleted_at__isnull=True) & models.Q(provider__isnull=False),
+                name='users_usergroup_unique_provider_name_active',
+            ),
+            # Unique name for global groups (where provider is NULL)
             models.UniqueConstraint(
                 fields=['name'],
-                condition=models.Q(deleted_at__isnull=True),
-                name='users_usergroup_unique_name_active',
+                condition=models.Q(deleted_at__isnull=True) & models.Q(provider__isnull=True),
+                name='users_usergroup_unique_global_name_active',
+            ),
+            # Same for slug
+            models.UniqueConstraint(
+                fields=['provider', 'slug'],
+                condition=models.Q(deleted_at__isnull=True) & models.Q(provider__isnull=False),
+                name='users_usergroup_unique_provider_slug_active',
             ),
             models.UniqueConstraint(
                 fields=['slug'],
-                condition=models.Q(deleted_at__isnull=True),
-                name='users_usergroup_unique_slug_active',
+                condition=models.Q(deleted_at__isnull=True) & models.Q(provider__isnull=True),
+                name='users_usergroup_unique_global_slug_active',
             ),
         ]
 
@@ -307,81 +338,3 @@ class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
 
     def get_absolute_url(self):
         return reverse('users:usergroup_detail', kwargs={'pk': self.pk})
-
-
-class ProviderMembership(ChangeLoggingMixin, models.Model):
-    """Links a user to a Provider as provider staff (the identity-layer equivalent of
-    TenantMembership, one level up).
-
-    The ProviderRole determines WHAT the user may do; ``tenant_scope`` (+ assignment)
-    determines WHICH provider-managed tenants they reach:
-      - ``explicit`` (default, least privilege): only ``assigned_tenants``
-      - ``tenant_group``: all tenants in ``scope_group`` (and its descendants)
-      - ``all``: every tenant managed by the provider
-    """
-    changelog_global = True  # above tenants → changelog attributed to tenant=None
-
-    SCOPE_EXPLICIT = 'explicit'
-    SCOPE_TENANT_GROUP = 'tenant_group'
-    SCOPE_ALL = 'all'
-    SCOPE_CHOICES = [
-        (SCOPE_EXPLICIT, _('Explicit (assigned tenants only)')),
-        (SCOPE_TENANT_GROUP, _('Tenant group')),
-        (SCOPE_ALL, _('All provider tenants')),
-    ]
-
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='provider_memberships',
-        verbose_name=_("User"),
-    )
-    provider = models.ForeignKey(
-        'organization.Provider',
-        on_delete=models.CASCADE,
-        related_name='memberships',
-        verbose_name=_("Provider"),
-    )
-    provider_role = models.ForeignKey(
-        'organization.ProviderRole',
-        on_delete=models.SET_NULL,
-        related_name='memberships',
-        blank=True,
-        null=True,
-        verbose_name=_("Provider role"),
-    )
-    tenant_scope = models.CharField(
-        max_length=20,
-        choices=SCOPE_CHOICES,
-        default=SCOPE_EXPLICIT,
-        verbose_name=_("Tenant scope"),
-    )
-    scope_group = models.ForeignKey(
-        'organization.TenantGroup',
-        on_delete=models.SET_NULL,
-        related_name='provider_membership_scopes',
-        blank=True,
-        null=True,
-        verbose_name=_("Scope group"),
-        help_text=_("Used when tenant scope is 'Tenant group'."),
-    )
-    assigned_tenants = models.ManyToManyField(
-        'organization.Tenant',
-        related_name='provider_assignments',
-        blank=True,
-        verbose_name=_("Assigned tenants"),
-        help_text=_("Used when tenant scope is 'Explicit'."),
-    )
-    is_active = models.BooleanField(default=True, db_index=True, verbose_name=_("Active"))
-    joined_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['provider', 'user']
-        verbose_name = _("Provider Membership")
-        verbose_name_plural = _("Provider Memberships")
-        constraints = [
-            models.UniqueConstraint(fields=['user', 'provider'], name='users_providermembership_unique_user_provider'),
-        ]
-
-    def __str__(self):
-        return f"{self.user} @ {self.provider} ({self.get_tenant_scope_display()})"

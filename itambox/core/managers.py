@@ -32,7 +32,7 @@ def get_current_membership() -> Optional[Any]:
     return _current_membership.get()
 
 def set_current_provider_membership(membership: Optional[Any]) -> None:
-    # The user's ProviderMembership for the active tenant's provider (if any). Set by
+    # The user's Membership for the active tenant's provider (if any). Set by
     # TenantMiddleware; available to views that need provider context. Does not affect
     # ORM tenant scoping (provider staff still operate one tenant at a time).
     _current_provider_membership.set(membership)
@@ -106,8 +106,8 @@ class TenantScopingQuerySet(models.QuerySet):
                 if user and user.is_superuser:
                     allowed_tenant_ids = list(Tenant._base_manager.filter(group_id__in=allowed_group_ids).values_list('pk', flat=True))
                 elif user:
-                    from organization.models import TenantMembership
-                    allowed_tenant_ids = list(TenantMembership.objects.filter(user=user, tenant__group_id__in=allowed_group_ids).values_list('tenant_id', flat=True))
+                    from organization.models import Membership
+                    allowed_tenant_ids = list(Membership.objects.filter(user=user, tenant__group_id__in=allowed_group_ids).values_list('tenant_id', flat=True))
                 else:
                     allowed_tenant_ids = list(Tenant._base_manager.filter(group_id__in=allowed_group_ids).values_list('pk', flat=True))
 
@@ -160,9 +160,9 @@ class TenantScopingQuerySet(models.QuerySet):
                     # the scope with their own accessible groups + ancestors. The
                     # scoped group itself always survives — middleware only grants a
                     # group scope to a member with a tenant directly in that group.
-                    from organization.models import TenantMembership
+                    from organization.models import Membership
                     member_group_ids = set(
-                        TenantMembership.objects.filter(user=tg_user)
+                        Membership.objects.filter(user=tg_user)
                         .values_list('tenant__group_id', flat=True)
                     )
                     member_group_ids.discard(None)
@@ -173,9 +173,9 @@ class TenantScopingQuerySet(models.QuerySet):
                 # containing a tenant they belong to, plus those groups' ancestors.
                 if tg_user is None or getattr(tg_user, 'is_superuser', False):
                     return self
-                from organization.models import TenantMembership
+                from organization.models import Membership
                 member_group_ids = set(
-                    TenantMembership.objects.filter(user=tg_user)
+                    Membership.objects.filter(user=tg_user)
                     .values_list('tenant__group_id', flat=True)
                 )
                 member_group_ids.discard(None)
@@ -250,7 +250,7 @@ class TenantScopingQuerySet(models.QuerySet):
         # nothing instead. Superusers keep the global view, and system /
         # anonymous contexts (migrations, background tasks with no bound user,
         # the pre-tenant bootstrap in TenantMiddleware) are unaffected — those
-        # paths legitimately operate without a tenant. Note TenantMembership
+        # paths legitimately operate without a tenant. Note Membership
         # uses the default (unscoped) manager, so tenant resolution itself is
         # not affected by this guard.
         from itambox.middleware import get_current_user
