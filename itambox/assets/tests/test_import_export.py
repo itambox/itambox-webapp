@@ -21,15 +21,14 @@ class ImportExportPermissionTestCase(TestCase):
         )
 
         # Grant staff standard view permission on assets via multi-tenant RBAC
-        from organization.models import Tenant, TenantRole, TenantMembership
+        from organization.models import Tenant, Role, Membership
         self.tenant = Tenant.objects.create(name='Test Tenant', slug='test-tenant')
-        self.role = TenantRole.objects.create(
+        self.role = Role.objects.create(
             tenant=self.tenant,
             name='Staff Role',
             permissions=['assets.view_asset']
         )
-        self.membership = TenantMembership.objects.create(
-            user=self.staff,
+        self.membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.staff,
             tenant=self.tenant,
         )
         self.membership.roles.add(self.role)

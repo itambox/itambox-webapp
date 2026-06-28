@@ -44,7 +44,7 @@ from django.urls import reverse
 
 from assets.models import Asset, Manufacturer, AssetRole, StatusLabel
 from core.tests.mixins import TenantTestMixin
-from organization.models import Tenant, TenantMembership, TenantRole
+from organization.models import Tenant, Membership, Role
 
 User = get_user_model()
 

@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase
 
-from organization.models import Tenant, TenantRole, TenantMembership
+from organization.models import Tenant, Role, Membership
 from assets.models import Manufacturer
 from software.models import Software
 from core.managers import set_current_tenant
@@ -26,12 +26,12 @@ class SoftwareApiTenantRepinTests(APITestCase):
     def setUp(self):
         self.tenant_a = Tenant.objects.create(name='Tenant A', slug='tenant-a')
         self.user = User.objects.create_user(username='member_a', password='pw')
-        self.role = TenantRole.objects.create(
+        self.role = Role.objects.create(
             tenant=self.tenant_a,
             name='Role A',
             permissions=['software.view_software', 'software.change_software'],
         )
-        _membership = TenantMembership.objects.create(user=self.user, tenant=self.tenant_a)
+        _membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user, tenant=self.tenant_a)
         _membership.roles.add(self.role)
 
         self.mfr = Manufacturer.objects.create(name='MS', slug='ms')

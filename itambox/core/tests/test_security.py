@@ -2,12 +2,15 @@ from django.test import TestCase, override_settings
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.contenttypes.models import ContentType
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.urls import reverse
 from model_bakery import baker
 
 from core.validators import validate_file_attachment, validate_image_attachment
+
+User = get_user_model()
+
 
 class MockUploadedFile(SimpleUploadedFile):
     def __init__(self, name, content, size_bytes):

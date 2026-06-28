@@ -3,11 +3,11 @@
 Post-redesign semantics (see lucky-swimming-quill.md + the MSP requirement):
   - UserGroup is GLOBAL — no tenant FK. Its ``roles`` M2M may span tenants.
   - A user's effective permissions in a tenant T are the additive union of:
-      (a) their ACTIVE TenantMembership in T (its roles' perms + direct_permissions), and
+      (a) their ACTIVE Membership in T (its roles' perms + direct_permissions), and
       (b) the perms of every role whose ``role.tenant == T`` carried by an ACTIVE
           UserGroup the user belongs to — granted INDEPENDENTLY of any membership.
     So being in a group grants access to each of its roles' tenants, with no
-    TenantMembership required (the MSP "team" model).
+    Membership required (the MSP "team" model).
   - Group MANAGEMENT is the global ``organization.manage_usergroups`` capability
     (superusers implicitly, plus explicit grantees), enforced on the group views.
 """
@@ -18,7 +18,7 @@ from django.urls import reverse
 
 from core.managers import set_current_tenant, set_current_membership
 from organization.access import accessible_tenant_ids
-from organization.models import Tenant, TenantMembership, TenantRole
+from organization.models import Tenant, Membership, Role
 from users.models import UserGroup
 from users.views import is_global_group_admin
 
@@ -32,7 +32,7 @@ def _tenant(name, slug):
 
 
 def _role(tenant, name, perms=None):
-    return TenantRole.objects.create(tenant=tenant, name=name, permissions=perms or [])
+    return Role.objects.create(tenant=tenant, name=name, permissions=perms or [])
 
 
 def _user(username):
@@ -44,8 +44,7 @@ def _superuser(username):
 
 
 def _membership(user, tenant, roles=None, direct=None, active=True):
-    m = TenantMembership.objects.create(
-        user=user, tenant=tenant, is_active=active, direct_permissions=direct or [],
+    m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=user, tenant=tenant, is_active=active, direct_permissions=direct or [],
     )
     if roles:
         m.roles.set(roles)
@@ -63,7 +62,7 @@ def _group(name, roles=None, members=None, active=True):
 
 def _grant_group_manager(user):
     user.user_permissions.add(
-        Permission.objects.get(content_type__app_label='users', codename='manage_usergroups')
+        Permission.objects.get(content_type__app_label='organization', codename='manage_groups')
     )
 
 
@@ -71,7 +70,7 @@ class _PermCacheMixin:
     """Clears the per-request permission caches the auth backend stamps on the user."""
     def _flush(self, user):
         for attr in list(user.__dict__):
-            if (attr.startswith('_effective_perms_') or attr.startswith('_tenant_membership_')
+            if (attr.startswith('_perms_tenant_') or attr.startswith('_tenant_membership_')
                     or attr == '_global_caps_cache'):
                 delattr(user, attr)
 
@@ -100,6 +99,19 @@ class UserGroupModelTests(_PermCacheMixin, TestCase):
         UserGroup.objects.create(name="Ops")
         with self.assertRaises(Exception):
             UserGroup.objects.create(name="Ops")
+
+    def test_provider_scoped_group_name_uniqueness(self):
+        from organization.models import Provider
+        provider_a = Provider.objects.create(name="MSP A", slug="msp-a")
+        provider_b = Provider.objects.create(name="MSP B", slug="msp-b")
+
+        # 1. Different providers can use the same group name
+        UserGroup.objects.create(name="Ops", provider=provider_a)
+        UserGroup.objects.create(name="Ops", provider=provider_b)
+
+        # 2. Same provider cannot use the same group name
+        with self.assertRaises(Exception):
+            UserGroup.objects.create(name="Ops", provider=provider_a)
 
     def test_soft_delete_frees_name(self):
         g = UserGroup.objects.create(name="Temp")
@@ -132,7 +144,7 @@ class CrossTenantAccessTests(_PermCacheMixin, TestCase):
         self.group = _group("Senior Techs", roles=[self.role_a, self.role_b], members=[self.user])
 
     def test_group_grants_access_without_membership(self):
-        self.assertEqual(TenantMembership.objects.filter(user=self.user).count(), 0)
+        self.assertEqual(Membership.objects.filter(user=self.user).count(), 0)
         set_current_tenant(self.ta); self._flush(self.user)
         self.assertTrue(self.user.has_perm("assets.change_asset"))   # role_a in A
         set_current_tenant(self.tb); self._flush(self.user)
@@ -188,7 +200,7 @@ class PermissionUnionTests(_PermCacheMixin, TestCase):
 
 
 class MembershipIndependenceTests(_PermCacheMixin, TestCase):
-    """Group grants are independent of TenantMembership presence/active state."""
+    """Group grants are independent of Membership presence/active state."""
     def setUp(self):
         super().setUp()
         self.t = _tenant("Ind", "ind")
@@ -242,7 +254,7 @@ class SoftDeletedRoleTests(_PermCacheMixin, TestCase):
 
 class GroupManagerCapabilityTests(_PermCacheMixin, TestCase):
     def test_capability_resolution(self):
-        # The legacy users.manage_usergroups grant is resolved via the group-management
+        # The legacy organization.manage_groups grant is resolved via the group-management
         # capability gate (can_manage_user_groups / is_global_group_admin), NOT via
         # has_perm — GlobalCapabilityBackend was removed in the MSP-RBAC redesign.
         plain = _user("plain")
@@ -283,7 +295,7 @@ class UserGroupFormTests(_PermCacheMixin, TestCase):
         form = UserGroupForm(user=self.superuser)
         self.assertNotIn('tenant', form.fields)
         # roles span all tenants; members are all users
-        self.assertEqual(form.fields['roles'].queryset.count(), TenantRole._base_manager.count())
+        self.assertEqual(form.fields['roles'].queryset.count(), Role._base_manager.count())
         self.assertEqual(form.fields['members'].queryset.count(), User.objects.count())
 
     def test_superuser_can_assign_cross_tenant_roles(self):
@@ -383,7 +395,7 @@ class UserGroupFilterSetTests(_PermCacheMixin, TestCase):
         self.assertEqual(f.qs.distinct().count(), 3)
 
 
-# --------------------------------------------------------------------------- TenantMembership.direct_permissions form
+# --------------------------------------------------------------------------- Membership.direct_permissions form
 
 class MembershipDirectPermissionsTests(_PermCacheMixin, TestCase):
     def setUp(self):
@@ -403,7 +415,7 @@ class MembershipDirectPermissionsTests(_PermCacheMixin, TestCase):
         self.assertTrue(self.target.has_perm("assets.view_asset"))
 
     def test_membership_form_escalation_on_direct_permissions(self):
-        from organization.forms import TenantMembershipForm
+        from organization.forms import MembershipForm as TenantMembershipForm
         set_current_tenant(self.t); set_current_membership(self.limited_m); self._flush(self.limited)
         data = {'user': self.target.pk, 'tenant': self.t.pk, 'direct_permissions': ["assets.delete_asset"]}
         form = TenantMembershipForm(data=data, instance=self.target_m, user=self.limited, tenant=self.t)
@@ -412,7 +424,7 @@ class MembershipDirectPermissionsTests(_PermCacheMixin, TestCase):
         self.assertIn("escalation", errs)
 
     def test_superuser_assigns_direct_permissions_freely(self):
-        from organization.forms import TenantMembershipForm
+        from organization.forms import MembershipForm as TenantMembershipForm
         set_current_tenant(self.t)
         data = {'user': self.target.pk, 'tenant': self.t.pk, 'direct_permissions': ["assets.delete_asset"]}
         form = TenantMembershipForm(data=data, instance=self.target_m, user=self.superuser, tenant=self.t)

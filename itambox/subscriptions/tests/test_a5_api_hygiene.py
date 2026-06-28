@@ -19,7 +19,7 @@ from rest_framework.test import APITestCase
 from core.models import ObjectChange
 from core.choices import ObjectChangeActionChoices
 from organization.models import (
-    TenantGroup, Tenant, AssetHolder, TenantRole, TenantMembership,
+    TenantGroup, Tenant, AssetHolder, Role, Membership,
 )
 from subscriptions.models import (
     Provider, Subscription,
@@ -62,7 +62,7 @@ class A5ApiHygieneTests(APITestCase):
             tenant=self.tenant,
         )
 
-        role = TenantRole.objects.create(
+        role = Role.objects.create(
             tenant=self.tenant,
             name='A5 Role',
             permissions=[
@@ -71,7 +71,7 @@ class A5ApiHygieneTests(APITestCase):
                 'subscriptions.delete_subscription',
             ],
         )
-        membership = TenantMembership.objects.create(user=self.staff, tenant=self.tenant)
+        membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.staff, tenant=self.tenant)
         membership.roles.add(role)
 
     # ----- WS3-3 -----------------------------------------------------------

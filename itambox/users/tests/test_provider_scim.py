@@ -4,8 +4,9 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 
-from organization.models import Tenant, Provider, ProviderRole
-from users.models import Token, UserGroup, ProviderMembership
+from organization.models import Tenant, Provider, Role
+from users.models import Token, UserGroup
+from organization.models import Membership
 
 User = get_user_model()
 
@@ -18,36 +19,38 @@ class ProviderSCIMProvisioningTests(TestCase):
         self.provider = Provider.objects.create(name="MSP One", slug="msp-one")
         self.other_provider = Provider.objects.create(name="MSP Two", slug="msp-two")
 
-        # Provider role granting the manage_provider_users capability.
-        self.role_staff = ProviderRole.objects.create(
+        # Provider-scoped role granting the manage_staff capability.
+        self.role_staff = Role.objects.create(
             provider=self.provider,
             name="Staff Admin",
-            can_manage_provider_users=True,
+            permissions=['organization.manage_staff'],
         )
         # A role WITHOUT the capability.
-        self.role_readonly = ProviderRole.objects.create(
+        self.role_readonly = Role.objects.create(
             provider=self.provider,
             name="Read Only",
-            can_manage_provider_users=False,
+            permissions=[],
         )
 
-        # Authorised provider-staff user + active ProviderMembership.
+        # Authorised provider-staff user + active Membership.
         self.admin_user = User.objects.create_user(
             username="provadmin", email="provadmin@msp.com", password="adminpassword"
         )
-        ProviderMembership.objects.create(
-            user=self.admin_user, provider=self.provider,
-            provider_role=self.role_staff, is_active=True,
+        m_admin = Membership.objects.create(
+            person_type=Membership.PERSON_STAFF, user=self.admin_user, provider=self.provider,
+            is_active=True,
         )
+        m_admin.roles.add(self.role_staff)
 
         # A user with a membership but no capability.
         self.weak_user = User.objects.create_user(
             username="weak", email="weak@msp.com", password="password123"
         )
-        ProviderMembership.objects.create(
-            user=self.weak_user, provider=self.provider,
-            provider_role=self.role_readonly, is_active=True,
+        m_weak = Membership.objects.create(
+            person_type=Membership.PERSON_STAFF, user=self.weak_user, provider=self.provider,
+            is_active=True,
         )
+        m_weak.roles.add(self.role_readonly)
 
         # Tokens. Token.key plaintext is available right after create().
         self.valid_token = Token.objects.create(
@@ -133,7 +136,7 @@ class ProviderSCIMProvisioningTests(TestCase):
         user = User.objects.get(username="newstaff@msp.com")
         self.assertTrue(user.is_active)
         self.assertTrue(
-            ProviderMembership.objects.filter(user=user, provider=self.provider, is_active=True).exists()
+            Membership.objects.filter(user=user, provider=self.provider, is_active=True).exists()
         )
 
         # Conflict on duplicate membership.
@@ -163,7 +166,7 @@ class ProviderSCIMProvisioningTests(TestCase):
         user = User.objects.get(id=pk)
         self.assertEqual(user.username, "lifecycle_renamed")
         self.assertFalse(
-            ProviderMembership.objects.get(user=user, provider=self.provider).is_active
+            Membership.objects.get(user=user, provider=self.provider).is_active
         )
 
         # PATCH active back to true. Detail queryset requires active membership, so first
@@ -177,10 +180,10 @@ class ProviderSCIMProvisioningTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
         # Reactivate directly, then DELETE removes the membership.
-        ProviderMembership.objects.filter(user=user, provider=self.provider).update(is_active=True)
+        Membership.objects.filter(user=user, provider=self.provider).update(is_active=True)
         response = self.client.delete(detail_url, **self.auth_headers)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(ProviderMembership.objects.filter(user=user, provider=self.provider).exists())
+        self.assertFalse(Membership.objects.filter(user=user, provider=self.provider).exists())
         # The User row survives.
         self.assertTrue(User.objects.filter(id=pk).exists())
 

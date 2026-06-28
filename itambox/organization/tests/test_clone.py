@@ -1,16 +1,16 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 
-from organization.models import Tenant, TenantRole
-from organization.forms import TenantRoleForm
-from organization.views.tenantrole_views import TenantRoleCloneView
+from organization.models import Tenant, Role
+from organization.forms import RoleForm as TenantRoleForm
+from organization.views.role_views import RoleCloneView as TenantRoleCloneView
 from core.managers import set_current_tenant, set_current_membership
 
 User = get_user_model()
 
 
 class TenantRoleCloneTests(TestCase):
-    """The TenantRole clone flow supports onboarding a new tenant with an
+    """The Role clone flow supports onboarding a new tenant with an
     existing role's permission set: the clone is created unsaved with its tenant
     cleared, and the admin assigns a target tenant on the form."""
 
@@ -22,7 +22,7 @@ class TenantRoleCloneTests(TestCase):
         self.superuser = User.objects.create_superuser(
             username='super', email='super@example.com', password='pw'
         )
-        self.source = TenantRole.objects.create(
+        self.source = Role.objects.create(
             tenant=self.tenant_a,
             name="Inventory Manager",
             permissions=["assets.view_asset", "assets.add_asset"],
@@ -34,7 +34,7 @@ class TenantRoleCloneTests(TestCase):
 
     def test_str_is_null_safe_without_tenant(self):
         # An unsaved clone awaiting a tenant assignment must not crash on str().
-        self.assertEqual(str(TenantRole(name="Orphan")), "Orphan")
+        self.assertEqual(str(Role(name="Orphan")), "Orphan")
 
     def test_clone_view_builds_unsaved_tenantless_copy(self):
         set_current_tenant(self.tenant_a)
@@ -49,7 +49,7 @@ class TenantRoleCloneTests(TestCase):
         self.assertEqual(clone.name, "Inventory Manager (Copy)")
         self.assertEqual(clone.permissions, ["assets.view_asset", "assets.add_asset"])
         # Nothing new was written to the DB on GET.
-        self.assertEqual(TenantRole.objects.filter(name="Inventory Manager (Copy)").count(), 0)
+        self.assertEqual(Role.objects.filter(name="Inventory Manager (Copy)").count(), 0)
 
     def test_form_on_clone_requires_tenant_and_prechecks_permissions(self):
         clone = self.source.clone()

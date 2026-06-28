@@ -7,7 +7,7 @@ from core.managers import set_current_tenant, get_current_tenant
 from core.auth.ldap import MultiTenantLDAPBackend
 import ldap
 from core.auth.saml import load_saml_config
-from organization.models import Tenant, TenantMembership
+from organization.models import Tenant, Membership
 
 User = get_user_model()
 
@@ -202,7 +202,7 @@ class MultiTenantAuthTestCase(TestCase):
         self.assertEqual(user.last_name, 'Doe')
 
         # Check tenant membership was created
-        membership = TenantMembership.objects.get(user=user, tenant=self.tenant_alpha)
+        membership = Membership.objects.get(user=user, tenant=self.tenant_alpha)
         self.assertEqual(membership.roles.first().name, 'Member')
 
     def test_sync_tenant_ldap_command_invalid_tenant(self):

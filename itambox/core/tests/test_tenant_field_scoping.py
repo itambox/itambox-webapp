@@ -8,7 +8,7 @@ from django import forms
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 
-from organization.models import Tenant, TenantGroup, TenantRole, TenantMembership
+from organization.models import Tenant, TenantGroup, Role, Membership
 from core.forms import scope_tenant_field
 from core.managers import set_current_tenant, set_current_tenant_group
 from itambox.middleware import _current_user
@@ -30,8 +30,8 @@ class ScopeTenantFieldTests(TestCase):
         self.member = User.objects.create_user(username='member', password='pw')
         self.superuser = User.objects.create_superuser(username='root', email='r@x.com', password='pw')
         for t in (self.a1, self.a2):
-            role = TenantRole.objects.create(tenant=t, name='R', permissions=[])
-            m = TenantMembership.objects.create(user=self.member, tenant=t)
+            role = Role.objects.create(tenant=t, name='R', permissions=[])
+            m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.member, tenant=t)
             m.roles.add(role)
 
         # Load the URLconf now, under a clean (no-tenant) context, so view

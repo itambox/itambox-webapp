@@ -5,7 +5,7 @@ from django.urls import reverse
 
 from assets.models import Asset
 from extras.models import ExportTemplate
-from organization.models import Tenant, TenantRole, TenantMembership
+from organization.models import Tenant, Role, Membership
 
 User = get_user_model()
 
@@ -18,7 +18,7 @@ class ExportTemplateSuperuserGateTests(TestCase):
 
     def setUp(self):
         self.tenant = Tenant.objects.create(name='Tenant', slug='t-exp')
-        self.role = TenantRole.objects.create(
+        self.role = Role.objects.create(
             tenant=self.tenant,
             name='Full Extras Role',
             permissions=[
@@ -27,7 +27,7 @@ class ExportTemplateSuperuserGateTests(TestCase):
             ],
         )
         self.member = User.objects.create_user(username='member', password='pw')
-        m = TenantMembership.objects.create(user=self.member, tenant=self.tenant)
+        m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.member, tenant=self.tenant)
         m.roles.add(self.role)
         self.superuser = User.objects.create_superuser(
             username='root', email='root@example.com', password='pw'

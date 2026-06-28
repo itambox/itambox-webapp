@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from model_bakery import baker
 
-from organization.models import Tenant, TenantGroup, TenantMembership, TenantRole, Location, Site
+from organization.models import Tenant, TenantGroup, Membership, Role, Location, Site
 from assets.models import Asset, AssetType, StatusLabel, AssetRole, Manufacturer, Category, Supplier, Depreciation
 from software.models import Software
 from licenses.models import License
@@ -24,7 +24,7 @@ class MitigationsPhase3Tests(TestCase):
         self.tenant = Tenant.objects.create(name="Tenant", slug="tenant", group=self.tenant_group)
         self.site = Site.objects.create(name="Site", slug="site")
 
-        self.role = TenantRole.objects.create(
+        self.role = Role.objects.create(
             tenant=self.tenant,
             name='Staff Role',
             permissions=[
@@ -33,7 +33,7 @@ class MitigationsPhase3Tests(TestCase):
                 'licenses.view_license',
             ]
         )
-        self.membership = TenantMembership.objects.create(user=self.staff, tenant=self.tenant)
+        self.membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.staff, tenant=self.tenant)
         self.membership.roles.add(self.role)
         self.token = Token.objects.create(user=self.staff)
 
@@ -155,7 +155,7 @@ class MitigationsPhase3Tests(TestCase):
         # overhead: token + last_used, tenant, TenantGroup, the membership lookup, and
         # the additive-union permission resolution (membership roles + group roles +
         # provider grants — bounded, cached per request), plus session read/write. The
-        # provider-grant resolution (MSP-RBAC redesign) adds one bounded ProviderMembership
+        # provider-grant resolution (MSP-RBAC redesign) adds one bounded Membership
         # lookup per request — accepted cost, see PLAN_rbac_msp_redesign R2.
         with self.assertNumQueries(19):
             response = self.client.post(

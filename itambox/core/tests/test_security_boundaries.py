@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
-from organization.models import Tenant, TenantRole, TenantMembership
+from organization.models import Tenant, Role, Membership
 from users.models import UserGroup
 from assets.models import Asset, StatusLabel, AssetRole, Manufacturer, AssetType
 
@@ -20,29 +20,27 @@ class SecurityBoundariesTestCase(TestCase):
         self.user_b = User.objects.create_user(username='user_b', password='password123')
 
         # Bind Tenant A User (M2M: create then add roles)
-        self.role_a = TenantRole.objects.create(
+        self.role_a = Role.objects.create(
             tenant=self.tenant_a,
             name='Admin',
             permissions=[
                 'assets.view_asset', 'assets.add_asset', 'assets.change_asset', 'assets.delete_asset'
             ]
         )
-        self.membership_a = TenantMembership.objects.create(
-            user=self.user_a,
+        self.membership_a = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_a,
             tenant=self.tenant_a,
         )
         self.membership_a.roles.add(self.role_a)
 
         # Bind Tenant B User (M2M: create then add roles)
-        self.role_b = TenantRole.objects.create(
+        self.role_b = Role.objects.create(
             tenant=self.tenant_b,
             name='Admin',
             permissions=[
                 'assets.view_asset', 'assets.add_asset', 'assets.change_asset', 'assets.delete_asset'
             ]
         )
-        self.membership_b = TenantMembership.objects.create(
-            user=self.user_b,
+        self.membership_b = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_b,
             tenant=self.tenant_b,
         )
         self.membership_b.roles.add(self.role_b)
@@ -155,7 +153,7 @@ class MultiRoleSecurityBoundaryTestCase(TestCase):
         self.user = User.objects.create_user(username='mrsb_user', password='pass')
 
         # Full-access role in Tenant A
-        self.role_a = TenantRole.objects.create(
+        self.role_a = Role.objects.create(
             tenant=self.tenant_a,
             name='MRSB-Full-A',
             permissions=[
@@ -165,8 +163,7 @@ class MultiRoleSecurityBoundaryTestCase(TestCase):
         )
 
         # Membership in Tenant A
-        self.membership_a = TenantMembership.objects.create(
-            user=self.user, tenant=self.tenant_a,
+        self.membership_a = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user, tenant=self.tenant_a,
             direct_permissions=['assets.delete_asset'],
         )
         self.membership_a.roles.add(self.role_a)
@@ -192,7 +189,11 @@ class MultiRoleSecurityBoundaryTestCase(TestCase):
 
     def _clear_perm_cache(self):
         for attr in list(vars(self.user)):
-            if attr.startswith('_effective_perms_') or attr.startswith('_tenant_membership_'):
+            if (
+                attr.startswith('_perms_tenant_')
+                or attr.startswith('_perms_provider_')
+                or attr.startswith('_tenant_membership_')
+            ):
                 delattr(self.user, attr)
 
     # ------------------------------------------------------------------
@@ -255,7 +256,7 @@ class MultiRoleSecurityBoundaryTestCase(TestCase):
     def test_soft_deleted_role_on_membership_contributes_nothing(self):
         """After a role is soft-deleted it must be excluded from all perm paths."""
         # Second role that we will soft-delete
-        transient_role = TenantRole.objects.create(
+        transient_role = Role.objects.create(
             tenant=self.tenant_a,
             name='Transient Role',
             permissions=['organization.view_tenant'],
@@ -271,7 +272,7 @@ class MultiRoleSecurityBoundaryTestCase(TestCase):
 
     def test_soft_deleted_role_on_group_contributes_nothing(self):
         """A soft-deleted role attached only to a UserGroup must not grant perms."""
-        group_only_role = TenantRole.objects.create(
+        group_only_role = Role.objects.create(
             tenant=self.tenant_a,
             name='Group-only Role',
             permissions=['organization.view_tenant'],
@@ -291,7 +292,7 @@ class MultiRoleSecurityBoundaryTestCase(TestCase):
     # ------------------------------------------------------------------
 
     def test_user_with_no_membership_in_tenant_b_denied(self):
-        """The user has no TenantMembership in tenant B — all perms must be denied for tenant B objects."""
+        """The user has no Membership in tenant B — all perms must be denied for tenant B objects."""
         self._clear_perm_cache()
         # Explicit obj path
         self.assertFalse(self.user.has_perm('assets.view_asset', obj=self.asset_b))

@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
-from organization.models import Tenant, TenantMembership, TenantRole, AssetHolder
+from organization.models import Tenant, Membership, Role, AssetHolder
 from users.models import Token, UserGroup
 from rest_framework import status
 
@@ -21,13 +21,12 @@ class SCIMStressTests(TestCase):
         self.admin_user = User.objects.create_user(
             username="admin", email="admin@acme.com", password="adminpassword"
         )
-        self.role_admin = TenantRole.objects.create(
+        self.role_admin = Role.objects.create(
             tenant=self.tenant,
             name="Admin",
             permissions=["assets.view_asset", "assets.add_asset", "extras.view_dashboard"]
         )
-        admin_membership = TenantMembership.objects.create(
-            user=self.admin_user,
+        admin_membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.admin_user,
             tenant=self.tenant,
         )
         admin_membership.roles.add(self.role_admin)

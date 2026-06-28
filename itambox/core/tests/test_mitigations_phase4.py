@@ -7,7 +7,7 @@ from django.db.models import ProtectedError
 from django.urls import reverse
 from model_bakery import baker
 
-from organization.models import Tenant, TenantMembership, TenantRole, AssetHolder, Location
+from organization.models import Tenant, Membership, Role, AssetHolder, Location
 from assets.models import Asset, AssetType, StatusLabel, AssetAssignment, AssetRequest
 from compliance.models import CustodyReceipt
 from assets.models import AssetMaintenance
@@ -174,12 +174,12 @@ class MitigationsPhase4Tests(TestCase):
         staff_user = User.objects.create_user(
             username='staff', email='staff@example.com', password='password123'
         )
-        role = TenantRole.objects.create(
+        role = Role.objects.create(
             tenant=self.tenant,
             name='Tenant Staff',
             permissions=['assets.change_asset']
         )
-        membership_staff = TenantMembership.objects.create(user=staff_user, tenant=self.tenant)
+        membership_staff = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=staff_user, tenant=self.tenant)
         membership_staff.roles.add(role)
         
         factory = RequestFactory()
@@ -258,8 +258,8 @@ class MitigationsPhase4Tests(TestCase):
         self.assertEqual(holder.last_name, 'User')
         self.assertEqual(holder.tenant, self.tenant)
         
-        # Verify TenantMembership is provisioned with proper Admin role
-        membership = TenantMembership.objects.get(user=ldap_user, tenant=self.tenant)
+        # Verify Membership is provisioned with proper Admin role
+        membership = Membership.objects.get(user=ldap_user, tenant=self.tenant)
         self.assertEqual(membership.roles.first().name, 'Admin')
 
     def test_saml_user_profile_and_membership_syncing(self):
@@ -296,6 +296,6 @@ class MitigationsPhase4Tests(TestCase):
         self.assertEqual(holder.email, 'saml@example.com')
         self.assertEqual(holder.first_name, 'Saml')
         
-        # Verify TenantMembership is provisioned with Manager role
-        membership = TenantMembership.objects.get(user=saml_user, tenant=self.tenant)
+        # Verify Membership is provisioned with Manager role
+        membership = Membership.objects.get(user=saml_user, tenant=self.tenant)
         self.assertEqual(membership.roles.first().name, 'Manager')

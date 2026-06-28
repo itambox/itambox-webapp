@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
-from organization.models import Tenant, Location, TenantGroup, TenantMembership, TenantRole, Site
+from organization.models import Tenant, Location, TenantGroup, Membership, Role, Site
 from assets.models import Asset, AssetType, StatusLabel, AssetRole, Manufacturer, Category, Supplier
 from software.models import Software
 from licenses.models import License
@@ -35,7 +35,7 @@ class GraphQLAdversarialTestCase(TestCase):
         self.site = Site.objects.create(name="HQ Site", slug="hq-site")
 
         # Associate staff with Tenant membership/roles
-        self.role_admin_a = TenantRole.objects.create(
+        self.role_admin_a = Role.objects.create(
             tenant=self.tenant_a,
             name='Admin Role A',
             permissions=[
@@ -44,7 +44,7 @@ class GraphQLAdversarialTestCase(TestCase):
                 'licenses.view_license', 'licenses.add_license', 'licenses.change_license', 'licenses.delete_license',
             ]
         )
-        self.role_admin_b = TenantRole.objects.create(
+        self.role_admin_b = Role.objects.create(
             tenant=self.tenant_b,
             name='Admin Role B',
             permissions=[
@@ -53,9 +53,9 @@ class GraphQLAdversarialTestCase(TestCase):
                 'licenses.view_license', 'licenses.add_license', 'licenses.change_license', 'licenses.delete_license',
             ]
         )
-        self.membership_a = TenantMembership.objects.create(user=self.staff_a, tenant=self.tenant_a)
+        self.membership_a = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.staff_a, tenant=self.tenant_a)
         self.membership_a.roles.add(self.role_admin_a)
-        self.membership_b = TenantMembership.objects.create(user=self.staff_b, tenant=self.tenant_b)
+        self.membership_b = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.staff_b, tenant=self.tenant_b)
         self.membership_b.roles.add(self.role_admin_b)
 
         # Grant general Django permissions to staff users

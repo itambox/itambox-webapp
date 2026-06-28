@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
-from organization.models import Tenant, TenantRole, TenantMembership
+from organization.models import Tenant, Role, Membership
 from extras.models import Dashboard
 
 User = get_user_model()
@@ -16,10 +16,10 @@ class DashboardCreateMembershipTests(TestCase):
         self.tenant_home = Tenant.objects.create(name="Home Corp", slug="home-corp")
         self.tenant_foreign = Tenant.objects.create(name="Foreign Corp", slug="foreign-corp")
 
-        self.role = TenantRole.objects.create(tenant=self.tenant_home, name="Member", permissions=[])
+        self.role = Role.objects.create(tenant=self.tenant_home, name="Member", permissions=[])
 
         self.member = User.objects.create_user(username="member", password="password")
-        m = TenantMembership.objects.create(user=self.member, tenant=self.tenant_home)
+        m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.member, tenant=self.tenant_home)
         m.roles.add(self.role)
 
         self.superuser = User.objects.create_superuser(username="root", password="password")
@@ -91,10 +91,10 @@ class DashboardManageModalScopingTests(TestCase):
         self.tenant_home = Tenant.objects.create(name="Home Corp", slug="home-corp")
         self.tenant_foreign = Tenant.objects.create(name="Foreign Corp", slug="foreign-corp")
 
-        self.role = TenantRole.objects.create(tenant=self.tenant_home, name="Member", permissions=[])
+        self.role = Role.objects.create(tenant=self.tenant_home, name="Member", permissions=[])
 
         self.member = User.objects.create_user(username="member", password="password")
-        m = TenantMembership.objects.create(user=self.member, tenant=self.tenant_home)
+        m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.member, tenant=self.tenant_home)
         m.roles.add(self.role)
 
         self.superuser = User.objects.create_superuser(username="root", password="password")

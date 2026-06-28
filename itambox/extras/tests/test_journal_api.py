@@ -5,7 +5,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from assets.models import Asset, AssetType, StatusLabel, Manufacturer
-from organization.models import Tenant, TenantRole, TenantMembership
+from organization.models import Tenant, Role, Membership
 from core.models import Job
 from extras.models import JournalEntry, Tag
 
@@ -28,14 +28,14 @@ class JournalEntryTenantIsolationAPITests(APITestCase):
             'extras.view_journalentry', 'extras.add_journalentry',
             'extras.change_journalentry', 'extras.delete_journalentry',
         ]
-        role_a = TenantRole.objects.create(tenant=self.tenant_a, name='JE Role A', permissions=perms)
+        role_a = Role.objects.create(tenant=self.tenant_a, name='JE Role A', permissions=perms)
         self.staff_a = User.objects.create_user(username='je_staff_a', password='pw')
-        m_a = TenantMembership.objects.create(user=self.staff_a, tenant=self.tenant_a)
+        m_a = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.staff_a, tenant=self.tenant_a)
         m_a.roles.add(role_a)
         # A second tenant-A member with change rights, to prove edits do not
         # reassign authorship.
         self.staff_a2 = User.objects.create_user(username='je_staff_a2', password='pw')
-        m_a2 = TenantMembership.objects.create(user=self.staff_a2, tenant=self.tenant_a)
+        m_a2 = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.staff_a2, tenant=self.tenant_a)
         m_a2.roles.add(role_a)
 
         self.mfr = Manufacturer.objects.create(name='JE-Mfr', slug='je-mfr')

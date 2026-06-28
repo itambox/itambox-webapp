@@ -278,22 +278,22 @@ class CoreViewsTestCase(TestCase):
 
     def test_recycle_bin_permissions(self):
         """Test Recycle Bin access control for superusers, standard roles, and restricted users."""
-        from organization.models import Tenant, TenantRole, TenantMembership
+        from organization.models import Tenant, Role, Membership
         from django.contrib.contenttypes.models import ContentType
         
         # 1. Setup tenant and standard user
         tenant = Tenant.objects.create(name="ACME Corp", slug="acme")
         std_user = User.objects.create_user(username='stduser', password='password123')
         
-        # Create standard TenantRole with view permissions but NO recycle bin permissions
-        std_role = TenantRole.objects.create(
+        # Create standard Role with view permissions but NO recycle bin permissions
+        std_role = Role.objects.create(
             tenant=tenant,
             name="Standard Viewer",
             permissions=[
                 'assets.view_asset',
             ]
         )
-        membership = TenantMembership.objects.create(user=std_user, tenant=tenant)
+        membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=std_user, tenant=tenant)
         membership.roles.add(std_role)
         
         # Setup asset
@@ -335,9 +335,9 @@ class CoreViewsTestCase(TestCase):
         response = self.client.post(purge_url)
         self.assertEqual(response.status_code, 403) # Forbidden
         
-        # 3. Create TenantRole with Recycle Bin permissions
+        # 3. Create Role with Recycle Bin permissions
         # We need to give view_asset/change_asset/delete_asset permissions as well for the standard asset views
-        role_obj = TenantRole.objects.create(
+        role_obj = Role.objects.create(
             tenant=tenant,
             name="Recycle Bin Manager",
             permissions=[

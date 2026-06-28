@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from unittest.mock import patch
-from organization.models import Tenant, TenantGroup, AssetHolder, TenantRole
+from organization.models import Tenant, TenantGroup, AssetHolder, Role
 
 User = get_user_model()
 
@@ -64,13 +64,13 @@ class TenantViewTests(TestCase):
         self.assertTrue(Tenant.objects.filter(name='Globex Inc').exists())
 
     def test_tenant_membership_create_view(self):
-        from organization.models import TenantRole, TenantMembership
-        role = TenantRole.objects.create(
+        from organization.models import Role, Membership
+        role = Role.objects.create(
             tenant=self.tenant,
             name="Test Role",
             permissions=[]
         )
-        url = reverse('organization:tenantmembership_create') + f"?user={self.user.pk}"
+        url = reverse('organization:membership_create') + f"?user={self.user.pk}"
         response = self.client.post(url, {
             'user': self.user.pk,
             'tenant': self.tenant.pk,
@@ -78,7 +78,7 @@ class TenantViewTests(TestCase):
         })
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse('users:user_detail', kwargs={'pk': self.user.pk}), response.url)
-        self.assertTrue(TenantMembership.objects.filter(user=self.user, tenant=self.tenant).exists())
+        self.assertTrue(Membership.objects.filter(user=self.user, tenant=self.tenant).exists())
 
 
     def test_edit_view_post(self):
@@ -192,7 +192,7 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
             username='staffuser', email='staff@example.com', password='password123'
         )
         # Create standard tenant roles
-        self.role_admin = TenantRole.objects.create(
+        self.role_admin = Role.objects.create(
             tenant=self.tenant_a,
             name='Administrator',
             permissions=[
@@ -207,7 +207,7 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
                 'extras.view_dashboard', 'extras.add_dashboard', 'extras.change_dashboard', 'extras.delete_dashboard',
             ]
         )
-        self.role_member = TenantRole.objects.create(
+        self.role_member = Role.objects.create(
             tenant=self.tenant_a,
             name='Standard Member',
             permissions=[
@@ -222,7 +222,7 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
                 'extras.view_dashboard', 'extras.add_dashboard', 'extras.change_dashboard',
             ]
         )
-        self.role_reader = TenantRole.objects.create(
+        self.role_reader = Role.objects.create(
             tenant=self.tenant_a,
             name='Read-Only Viewer',
             permissions=[
@@ -239,16 +239,15 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
         )
 
     def test_tenant_membership_creation_and_string_representation(self):
-        from organization.models import TenantMembership
-        membership = TenantMembership.objects.create(
-            user=self.user,
+        from organization.models import Membership
+        membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user,
             tenant=self.tenant_a,
         )
         membership.roles.add(self.role_member)
         self.assertIn(self.role_member, membership.roles.all())
 
     def test_invitation_acceptance_and_assetholder_linking(self):
-        from organization.models import TenantInvitation, TenantMembership
+        from organization.models import TenantInvitation, Membership
         from django.utils import timezone
         
         holder = AssetHolder.objects.create(
@@ -275,7 +274,7 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
         from organization.models import accept_invitation
         accept_invitation(invitation, invitee_user)
 
-        membership = TenantMembership.objects.get(user=invitee_user, tenant=self.tenant_a)
+        membership = Membership.objects.get(user=invitee_user, tenant=self.tenant_a)
         self.assertIn(self.role_admin, membership.roles.all())
         
         invitation.refresh_from_db()
@@ -286,18 +285,17 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
         self.assertEqual(holder.user, invitee_user)
 
     def test_tenant_membership_backend_permissions(self):
-        from organization.models import TenantMembership
+        from organization.models import Membership
         from core.managers import set_current_membership
 
         def _flush():
             # The backend caches the effective permission set per (user, tenant) for the
             # request; clear it after changing roles so the next has_perm re-resolves.
             for attr in list(self.user.__dict__):
-                if attr.startswith('_effective_perms_') or attr.startswith('_tenant_membership_'):
+                if attr.startswith('_perms_tenant_') or attr.startswith('_tenant_membership_'):
                     delattr(self.user, attr)
 
-        reader_mem = TenantMembership.objects.create(
-            user=self.user,
+        reader_mem = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user,
             tenant=self.tenant_a,
         )
         reader_mem.roles.set([self.role_reader])
@@ -324,13 +322,12 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
         set_current_membership(None)
 
     def test_tenant_switching_middleware(self):
-        from organization.models import TenantMembership
+        from organization.models import Membership
         from django.contrib.sessions.middleware import SessionMiddleware
         from itambox.middleware import TenantMiddleware
         from django.test import RequestFactory
         
-        mem = TenantMembership.objects.create(
-            user=self.user,
+        mem = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user,
             tenant=self.tenant_a,
         )
         mem.roles.add(self.role_member)

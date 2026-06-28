@@ -16,7 +16,7 @@ walk, middleware group resolution) stays on TenantGroup._base_manager.
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 
-from organization.models import Tenant, TenantGroup, TenantRole, TenantMembership
+from organization.models import Tenant, TenantGroup, Role, Membership
 from core.managers import set_current_tenant, set_current_tenant_group
 from itambox.middleware import _current_user
 
@@ -37,8 +37,8 @@ class TenantGroupScopingTests(TestCase):
         self.tenant = Tenant.objects.create(name='T', slug='tg-t', group=self.child)
         self.member = User.objects.create_user(username='tgm', password='pw')
         self.superuser = User.objects.create_superuser(username='tgs', email='s@x.com', password='pw')
-        role = TenantRole.objects.create(tenant=self.tenant, name='R', permissions=[])
-        m = TenantMembership.objects.create(user=self.member, tenant=self.tenant)
+        role = Role.objects.create(tenant=self.tenant, name='R', permissions=[])
+        m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.member, tenant=self.tenant)
         m.roles.add(role)
 
     def _visible_slugs(self):
@@ -71,8 +71,8 @@ class TenantGroupScopingTests(TestCase):
         # scope they would see both trees. Scoping to `root` must hide the
         # unrelated group they are a member of.
         unrelated_tenant = Tenant.objects.create(name='U', slug='tg-ut', group=self.unrelated)
-        role = TenantRole.objects.create(tenant=unrelated_tenant, name='RU', permissions=[])
-        mu = TenantMembership.objects.create(user=self.member, tenant=unrelated_tenant)
+        role = Role.objects.create(tenant=unrelated_tenant, name='RU', permissions=[])
+        mu = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.member, tenant=unrelated_tenant)
         mu.roles.add(role)
 
         _current_user.set(self.member)

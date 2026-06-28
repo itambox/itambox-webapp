@@ -5,7 +5,7 @@ from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
 from core.models import Notification
-from organization.models import TenantGroup, Tenant, TenantMembership, Site, Location
+from organization.models import TenantGroup, Tenant, Membership, Site, Location
 from assets.models import Asset
 from subscriptions.models import (
     Provider, Subscription, SubscriptionAssignment,
@@ -37,8 +37,8 @@ class SubscriptionFixesTests(TestCase):
         )
         
         # Create roles
-        from organization.models import TenantRole
-        self.role_a = TenantRole.objects.create(
+        from organization.models import Role
+        self.role_a = Role.objects.create(
             tenant=self.tenant_a,
             name="Role A",
             permissions=[
@@ -47,22 +47,22 @@ class SubscriptionFixesTests(TestCase):
                 'subscriptions.add_subscriptionassignment',
             ]
         )
-        self.role_b = TenantRole.objects.create(
+        self.role_b = Role.objects.create(
             tenant=self.tenant_b,
             name="Role B",
             permissions=[]
         )
 
         # Create memberships
-        m_a = TenantMembership.objects.create(user=self.user_a, tenant=self.tenant_a)
+        m_a = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_a, tenant=self.tenant_a)
         m_a.roles.add(self.role_a)
-        m_b = TenantMembership.objects.create(user=self.user_b, tenant=self.tenant_b)
+        m_b = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_b, tenant=self.tenant_b)
         m_b.roles.add(self.role_b)
         # super_user is a platform operator who is also a member of tenant_a, so it
         # receives tenant_a's subscription notifications. Expiry/reminder recipients
         # are scoped to staff who are MEMBERS of the subscription's tenant (B7) —
         # a bare is_staff user with no membership is no longer notified.
-        m_super = TenantMembership.objects.create(user=self.super_user, tenant=self.tenant_a)
+        m_super = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.super_user, tenant=self.tenant_a)
         m_super.roles.add(self.role_a)
 
 

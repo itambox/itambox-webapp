@@ -17,7 +17,7 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
-from organization.models import Tenant, TenantRole, TenantMembership, AssetHolder
+from organization.models import Tenant, Role, Membership, AssetHolder
 from assets.models import Manufacturer, StatusLabel, Asset
 from software.models import Software
 from licenses.models import License, LicenseSeatAssignment, LicenseTypeChoices
@@ -31,13 +31,12 @@ class SeatCreateCrossTenantTests(TestCase):
         self.tenant_b = Tenant.objects.create(name='Tenant B', slug='tenant-b')
 
         self.user_b = User.objects.create_user(username='user_b', password='password123')
-        self.role_b = TenantRole.objects.create(
+        self.role_b = Role.objects.create(
             tenant=self.tenant_b,
             name='Admin',
             permissions=['licenses.add_licenseseatassignment', 'licenses.view_licenseseatassignment'],
         )
-        self.membership_b = TenantMembership.objects.create(
-            user=self.user_b, tenant=self.tenant_b,
+        self.membership_b = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_b, tenant=self.tenant_b,
         )
         self.membership_b.roles.add(self.role_b)
 
@@ -85,13 +84,12 @@ class GlobalLicenseMintTests(TestCase):
     def setUp(self):
         self.tenant_b = Tenant.objects.create(name='Tenant B', slug='tenant-b')
         self.user_b = User.objects.create_user(username='user_b', password='password123')
-        self.role_b = TenantRole.objects.create(
+        self.role_b = Role.objects.create(
             tenant=self.tenant_b,
             name='Admin',
             permissions=['licenses.add_license', 'licenses.view_license'],
         )
-        self.membership_b = TenantMembership.objects.create(
-            user=self.user_b, tenant=self.tenant_b,
+        self.membership_b = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_b, tenant=self.tenant_b,
         )
         self.membership_b.roles.add(self.role_b)
         self.mfr = Manufacturer.objects.create(name='Microsoft', slug='microsoft')
@@ -131,11 +129,11 @@ class SeatOverAllocationTests(TestCase):
     def setUp(self):
         self.tenant = Tenant.objects.create(name='Tenant', slug='t-seat')
         self.user = User.objects.create_user(username='seatuser', password='pw')
-        role = TenantRole.objects.create(
+        role = Role.objects.create(
             tenant=self.tenant, name='Admin',
             permissions=['licenses.add_licenseseatassignment', 'licenses.view_licenseseatassignment'],
         )
-        m = TenantMembership.objects.create(user=self.user, tenant=self.tenant)
+        m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user, tenant=self.tenant)
         m.roles.add(role)
         self.mfr = Manufacturer.objects.create(name='MS', slug='ms-seat')
         self.software = Software.objects.create(name='Office', manufacturer=self.mfr, tenant=self.tenant)

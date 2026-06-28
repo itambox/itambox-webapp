@@ -6,7 +6,7 @@ every tenant's users (incl. is_staff/email) and groups. These tests assert the
 get_queryset() overrides scope list output to the requester's active tenant.
 
 Auth/fixture pattern mirrors core/tests/test_security_boundaries.py: real
-Tenant + TenantRole + TenantMembership rows, force_login, and an
+Tenant + Role + Membership rows, force_login, and an
 `active_tenant_id` session value that TenantMiddleware turns into the active
 tenant for the request.
 """
@@ -15,7 +15,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.urls import reverse
 
-from organization.models import Tenant, TenantRole, TenantMembership
+from organization.models import Tenant, Role, Membership
 
 User = get_user_model()
 
@@ -27,13 +27,12 @@ class UsersApiCrossTenantTestCase(TestCase):
 
         # Requesting user is a member of tenant B and may view users/groups.
         self.user_b = User.objects.create_user(username='user_b', password='password123')
-        self.role_b = TenantRole.objects.create(
+        self.role_b = Role.objects.create(
             tenant=self.tenant_b,
             name='Admin',
-            permissions=['auth.view_user', 'auth.view_group'],
+            permissions=['users.view_user', 'auth.view_group'],
         )
-        self.membership_b = TenantMembership.objects.create(
-            user=self.user_b, tenant=self.tenant_b,
+        self.membership_b = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_b, tenant=self.tenant_b,
         )
         self.membership_b.roles.add(self.role_b)
 
@@ -41,11 +40,10 @@ class UsersApiCrossTenantTestCase(TestCase):
         self.user_a = User.objects.create_user(
             username='user_a', password='password123', email='a@example.com', is_staff=True,
         )
-        self.role_a = TenantRole.objects.create(
-            tenant=self.tenant_a, name='Admin', permissions=['auth.view_user'],
+        self.role_a = Role.objects.create(
+            tenant=self.tenant_a, name='Admin', permissions=['users.view_user'],
         )
-        self.membership_a = TenantMembership.objects.create(
-            user=self.user_a, tenant=self.tenant_a,
+        self.membership_a = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_a, tenant=self.tenant_a,
         )
         self.membership_a.roles.add(self.role_a)
 

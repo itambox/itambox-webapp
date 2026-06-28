@@ -6,7 +6,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
 from core.managers import set_current_tenant, get_current_tenant
 from core.auth.oidc import TenantOIDCBackend, TenantOIDCAuthorizeView, TenantOIDCCallbackView
-from organization.models import Tenant, TenantMembership, TenantRole, AssetHolder
+from organization.models import Tenant, Membership, Role, AssetHolder
 
 User = get_user_model()
 
@@ -147,7 +147,7 @@ class TenantOIDCTestCase(TestCase):
         }
         user_admin = backend.create_user(claims_admin)
 
-        membership_admin = TenantMembership.objects.get(user=user_admin, tenant=self.tenant_alpha)
+        membership_admin = Membership.objects.get(user=user_admin, tenant=self.tenant_alpha)
         self.assertEqual(membership_admin.roles.first().name, "Admin")
         # Admin should have delete permission on normal models
         self.assertTrue(any("delete_" in p for p in membership_admin.roles.first().permissions if "dashboard" not in p))
@@ -160,7 +160,7 @@ class TenantOIDCTestCase(TestCase):
         }
         user_mgr = backend.create_user(claims_manager)
 
-        membership_mgr = TenantMembership.objects.get(user=user_mgr, tenant=self.tenant_alpha)
+        membership_mgr = Membership.objects.get(user=user_mgr, tenant=self.tenant_alpha)
         self.assertEqual(membership_mgr.roles.first().name, "Manager")
         # Manager should not have delete permission on normal models but should have add/change
         self.assertFalse(any("delete_" in p for p in membership_mgr.roles.first().permissions if "dashboard" not in p))
@@ -173,7 +173,7 @@ class TenantOIDCTestCase(TestCase):
         }
         user_mem = backend.create_user(claims_fallback)
 
-        membership_mem = TenantMembership.objects.get(user=user_mem, tenant=self.tenant_alpha)
+        membership_mem = Membership.objects.get(user=user_mem, tenant=self.tenant_alpha)
         self.assertEqual(membership_mem.roles.first().name, "Member")
 
     def test_authorize_view_tenant_routing(self):
@@ -242,7 +242,7 @@ class TenantOIDCTestCase(TestCase):
             "groups": ["alpha-admins"]
         }
         user_admin = backend.create_user(claims_admin)
-        membership_admin = TenantMembership.objects.get(user=user_admin, tenant=self.tenant_alpha)
+        membership_admin = Membership.objects.get(user=user_admin, tenant=self.tenant_alpha)
         self.assertEqual(membership_admin.roles.first().name, "Admin")
 
         claims_mgr = {
@@ -251,7 +251,7 @@ class TenantOIDCTestCase(TestCase):
             "groups": ["alpha-managers"]
         }
         user_mgr = backend.create_user(claims_mgr)
-        membership_mgr = TenantMembership.objects.get(user=user_mgr, tenant=self.tenant_alpha)
+        membership_mgr = Membership.objects.get(user=user_mgr, tenant=self.tenant_alpha)
         self.assertEqual(membership_mgr.roles.first().name, "Manager")
 
         claims_mem = {
@@ -260,7 +260,7 @@ class TenantOIDCTestCase(TestCase):
             "groups": ["alpha-members"]
         }
         user_mem = backend.create_user(claims_mem)
-        membership_mem = TenantMembership.objects.get(user=user_mem, tenant=self.tenant_alpha)
+        membership_mem = Membership.objects.get(user=user_mem, tenant=self.tenant_alpha)
         self.assertEqual(membership_mem.roles.first().name, "Member")
 
     def test_authorize_view_invalid_tenant_slug(self):
@@ -343,7 +343,7 @@ class TenantOIDCTestCase(TestCase):
             
         # Verify membership and profile were created for tenant-beta
         self.assertTrue(user.asset_holder_profiles.filter(tenant=self.tenant_beta).exists())
-        self.assertTrue(TenantMembership.objects.filter(user=user, tenant=self.tenant_beta).exists())
+        self.assertTrue(Membership.objects.filter(user=user, tenant=self.tenant_beta).exists())
 
     def test_malformed_missing_oidc_claims(self):
         backend = TenantOIDCBackend()
@@ -387,7 +387,7 @@ class TenantOIDCTestCase(TestCase):
             "email": "nogroups@alpha.com",
         }
         user_no_groups = backend.create_user(claims_no_groups)
-        membership_no_groups = TenantMembership.objects.get(user=user_no_groups, tenant=self.tenant_alpha)
+        membership_no_groups = Membership.objects.get(user=user_no_groups, tenant=self.tenant_alpha)
         self.assertEqual(membership_no_groups.roles.first().name, "Member") # Fallback to Member
 
         # Case D: malformed 'groups' claim (e.g. not a list or string, like a dict or integer)
@@ -397,7 +397,7 @@ class TenantOIDCTestCase(TestCase):
             "groups": {"some": "dict"}
         }
         user_dict_groups = backend.create_user(claims_dict_groups)
-        membership_dict_groups = TenantMembership.objects.get(user=user_dict_groups, tenant=self.tenant_alpha)
+        membership_dict_groups = Membership.objects.get(user=user_dict_groups, tenant=self.tenant_alpha)
         self.assertEqual(membership_dict_groups.roles.first().name, "Member") # Fallback to Member
 
         claims_int_groups = {
@@ -406,7 +406,7 @@ class TenantOIDCTestCase(TestCase):
             "groups": 12345
         }
         user_int_groups = backend.create_user(claims_int_groups)
-        membership_int_groups = TenantMembership.objects.get(user=user_int_groups, tenant=self.tenant_alpha)
+        membership_int_groups = Membership.objects.get(user=user_int_groups, tenant=self.tenant_alpha)
         self.assertEqual(membership_int_groups.roles.first().name, "Member") # Fallback to Member
 
     def test_upn_and_onetoone_collisions_multitenant(self):
@@ -441,7 +441,7 @@ class TenantOIDCTestCase(TestCase):
         # Verify user_b was created, is in tenant_alpha, but has no asset_holder_profile
         user_b.refresh_from_db()
         self.assertFalse(user_b.asset_holder_profiles.filter(tenant=self.tenant_alpha).exists())
-        self.assertTrue(TenantMembership.objects.filter(user=user_b, tenant=self.tenant_alpha).exists())
+        self.assertTrue(Membership.objects.filter(user=user_b, tenant=self.tenant_alpha).exists())
 
         # No OneToOne Constraint Collision:
         # A user already has a linked profile in Tenant Alpha. They now log into Tenant Beta.
@@ -461,7 +461,7 @@ class TenantOIDCTestCase(TestCase):
         user_a.refresh_from_db()
         self.assertTrue(user_a.asset_holder_profiles.filter(tenant=self.tenant_beta).exists())
         # Verify user_a has membership in Tenant Beta now
-        self.assertTrue(TenantMembership.objects.filter(user=user_a, tenant=self.tenant_beta).exists())
+        self.assertTrue(Membership.objects.filter(user=user_a, tenant=self.tenant_beta).exists())
 
     def test_group_priority_selection(self):
         backend = TenantOIDCBackend()
@@ -475,7 +475,7 @@ class TenantOIDCTestCase(TestCase):
             "groups": ["alpha-members", "alpha-admins", "alpha-managers"]
         }
         user = backend.create_user(claims)
-        membership = TenantMembership.objects.get(user=user, tenant=self.tenant_alpha)
+        membership = Membership.objects.get(user=user, tenant=self.tenant_alpha)
         self.assertEqual(membership.roles.first().name, "Admin")
 
         # User is in alpha-members (Member) and alpha-managers (Manager)
@@ -486,7 +486,7 @@ class TenantOIDCTestCase(TestCase):
             "groups": ["alpha-members", "alpha-managers"]
         }
         user_mgr = backend.create_user(claims_mgr)
-        membership_mgr = TenantMembership.objects.get(user=user_mgr, tenant=self.tenant_alpha)
+        membership_mgr = Membership.objects.get(user=user_mgr, tenant=self.tenant_alpha)
         self.assertEqual(membership_mgr.roles.first().name, "Manager")
 
     def test_group_name_lookup_case_sensitivity(self):
@@ -502,7 +502,7 @@ class TenantOIDCTestCase(TestCase):
             "groups": ["ALPHA-ADMINS"]
         }
         user = backend.create_user(claims)
-        membership = TenantMembership.objects.get(user=user, tenant=self.tenant_alpha)
+        membership = Membership.objects.get(user=user, tenant=self.tenant_alpha)
         self.assertEqual(membership.roles.first().name, "Member")
 
     @override_settings(

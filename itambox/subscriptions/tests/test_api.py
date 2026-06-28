@@ -20,7 +20,7 @@ class SubscriptionAPITests(APITestCase):
         )
 
         # Create Tenant & AssetHolder profile for staff user
-        from organization.models import TenantGroup, Tenant, AssetHolder, TenantRole, TenantMembership
+        from organization.models import TenantGroup, Tenant, AssetHolder, Role, Membership
         self.tg = TenantGroup.objects.create(name="API TG", slug="api-tg")
         self.tenant = Tenant.objects.create(name="API Tenant", slug="api-tenant", group=self.tg)
         self.holder = AssetHolder.objects.create(
@@ -46,8 +46,8 @@ class SubscriptionAPITests(APITestCase):
             tenant=self.tenant
         )
 
-        # Grant permissions via TenantRole + TenantMembership (RBAC backend requires this)
-        role = TenantRole.objects.create(
+        # Grant permissions via Role + Membership (RBAC backend requires this)
+        role = Role.objects.create(
             tenant=self.tenant,
             name='Staff Role',
             permissions=[
@@ -59,7 +59,7 @@ class SubscriptionAPITests(APITestCase):
                 'subscriptions.change_subscriptionassignment', 'subscriptions.delete_subscriptionassignment',
             ],
         )
-        membership = TenantMembership.objects.create(user=self.staff, tenant=self.tenant)
+        membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.staff, tenant=self.tenant)
         membership.roles.add(role)
 
     def test_provider_api_crud(self):

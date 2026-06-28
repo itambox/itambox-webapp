@@ -3,8 +3,9 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from core.auth.provisioning import provision_provider_membership
-from organization.models import Provider, ProviderRole, Tenant
-from users.models import ProviderMembership, Token
+from organization.models import Provider, Role, Tenant
+from organization.models import Membership
+from users.models import Token
 
 User = get_user_model()
 
@@ -12,34 +13,33 @@ User = get_user_model()
 class ProvisionProviderMembershipTests(TestCase):
     def setUp(self):
         self.provider = Provider.objects.create(name="MSP")
-        self.role = ProviderRole.objects.create(provider=self.provider, name="Provider Admin")
+        self.role = Role.objects.create(provider=self.provider, name="Provider Admin")
         self.user = User.objects.create_user(username="u", email="u@e.com", password="pw")
 
     def test_assigns_membership_for_mapped_role(self):
         m = provision_provider_membership(self.user, self.provider, "Provider Admin", "OIDC")
         self.assertIsNotNone(m)
-        self.assertEqual(m.provider_role_id, self.role.pk)
+        self.assertIn(self.role, m.roles.all())
         self.assertTrue(m.is_active)
         self.assertEqual(
-            ProviderMembership.objects.filter(user=self.user, provider=self.provider).count(), 1
+            Membership.objects.filter(user=self.user, provider=self.provider).count(), 1
         )
 
     def test_missing_role_is_noop(self):
         m = provision_provider_membership(self.user, self.provider, "Nonexistent", "OIDC")
         self.assertIsNone(m)
-        self.assertFalse(ProviderMembership.objects.filter(user=self.user).exists())
+        self.assertFalse(Membership.objects.filter(user=self.user).exists())
 
     def test_reactivates_and_updates_existing_membership(self):
-        ProviderMembership.objects.create(
-            user=self.user, provider=self.provider, is_active=False,
+        Membership.objects.create(person_type=Membership.PERSON_STAFF, user=self.user, provider=self.provider, is_active=False,
         )
         m = provision_provider_membership(self.user, self.provider, "Provider Admin", "OIDC")
         self.assertIsNotNone(m)
         self.assertTrue(m.is_active)
-        self.assertEqual(m.provider_role_id, self.role.pk)
+        self.assertIn(self.role, m.roles.all())
         # Idempotent: still a single membership row.
         self.assertEqual(
-            ProviderMembership.objects.filter(user=self.user, provider=self.provider).count(), 1
+            Membership.objects.filter(user=self.user, provider=self.provider).count(), 1
         )
 
 

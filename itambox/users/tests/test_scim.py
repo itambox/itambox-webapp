@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
-from organization.models import Tenant, TenantMembership, TenantRole, AssetHolder
+from organization.models import Tenant, Membership, Role, AssetHolder
 from users.models import Token, UserGroup
 from rest_framework import status
 
@@ -28,20 +28,19 @@ class SCIMProvisioningTests(TestCase):
         )
 
         # Create Tenant Roles
-        self.role_member = TenantRole.objects.create(
+        self.role_member = Role.objects.create(
             tenant=self.tenant,
             name="Member",
             permissions=["assets.view_asset", "extras.view_dashboard"]
         )
-        self.role_admin = TenantRole.objects.create(
+        self.role_admin = Role.objects.create(
             tenant=self.tenant,
             name="Admin",
             permissions=["assets.view_asset", "assets.add_asset", "extras.view_dashboard"]
         )
 
         # Create Tenant Memberships — create first, then add roles (no role= kwarg).
-        admin_membership = TenantMembership.objects.create(
-            user=self.admin_user,
+        admin_membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.admin_user,
             tenant=self.tenant,
         )
         admin_membership.roles.add(self.role_admin)
@@ -128,7 +127,7 @@ class SCIMProvisioningTests(TestCase):
 
         # Create another user in tenant to test filters — create membership, then add role.
         user2 = User.objects.create_user(username="user2", email="user2@acme.com")
-        m2 = TenantMembership.objects.create(user=user2, tenant=self.tenant)
+        m2 = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=user2, tenant=self.tenant)
         m2.roles.add(self.role_member)
 
         # Total count is 2
@@ -171,13 +170,13 @@ class SCIMProvisioningTests(TestCase):
         self.assertEqual(res_data["userName"], "newuser@example.com")
         self.assertEqual(res_data["name"]["givenName"], "John")
 
-        # Verify User and AssetHolder and TenantMembership.
+        # Verify User and AssetHolder and Membership.
         # SCIM /Users provisioning creates the membership with NO role assigned —
         # roles are granted in-app via UserGroup, not at provisioning time.
         user = User.objects.get(username="newuser@example.com")
         self.assertTrue(user.is_active)
 
-        membership = TenantMembership.objects.get(user=user, tenant=self.tenant)
+        membership = Membership.objects.get(user=user, tenant=self.tenant)
         self.assertFalse(membership.roles.exists())
 
         holder = AssetHolder.objects.get(user=user, tenant=self.tenant)
@@ -226,7 +225,7 @@ class SCIMProvisioningTests(TestCase):
     def test_user_detail_put_patch_delete(self):
         # Create user — create membership, then add role.
         user = User.objects.create_user(username="testuser", email="test@acme.com")
-        m = TenantMembership.objects.create(user=user, tenant=self.tenant)
+        m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=user, tenant=self.tenant)
         m.roles.add(self.role_member)
         AssetHolder.objects.create(
             user=user, first_name="Test", last_name="User", upn="test@acme.com", email="test@acme.com", tenant=self.tenant
@@ -284,7 +283,7 @@ class SCIMProvisioningTests(TestCase):
         self.assertTrue(User.objects.filter(id=user.id).exists())
         user.refresh_from_db()
         self.assertFalse(user.is_active)
-        self.assertFalse(TenantMembership.objects.filter(user=user, tenant=self.tenant).exists())
+        self.assertFalse(Membership.objects.filter(user=user, tenant=self.tenant).exists())
 
     def test_group_endpoint_is_read_only(self):
         """SCIM /Groups is READ-ONLY: user groups are global and managed centrally
@@ -343,7 +342,7 @@ class SCIMProvisioningTests(TestCase):
     def test_filter_parsing_bracketed_emails(self):
         url = reverse('api:scim:user-list', kwargs={'tenant_slug': self.tenant.slug})
         user2 = User.objects.create_user(username="user2", email="user2@acme.com")
-        m2 = TenantMembership.objects.create(user=user2, tenant=self.tenant)
+        m2 = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=user2, tenant=self.tenant)
         m2.roles.add(self.role_member)
 
         response = self.client.get(f"{url}?filter=emails[type eq \"work\"].value eq \"user2@acme.com\"", **self.auth_headers)
@@ -386,9 +385,9 @@ class SCIMProvisioningTests(TestCase):
         """WS1-3: a tenant-A SCIM token must NOT globally deactivate or rename a user who is
         also a member of tenant B (cross-tenant write on a shared principal)."""
         shared = User.objects.create_user(username="shared", email="shared@x.com", is_active=True)
-        TenantMembership.objects.create(user=shared, tenant=self.tenant)
-        other_role = TenantRole.objects.create(tenant=self.other_tenant, name="Member", permissions=[])
-        other_m = TenantMembership.objects.create(user=shared, tenant=self.other_tenant)
+        Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=shared, tenant=self.tenant)
+        other_role = Role.objects.create(tenant=self.other_tenant, name="Member", permissions=[])
+        other_m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=shared, tenant=self.other_tenant)
         other_m.roles.add(other_role)
 
         detail_url = reverse('api:scim:user-detail', kwargs={'tenant_slug': self.tenant.slug, 'pk': shared.id})
@@ -406,11 +405,11 @@ class SCIMProvisioningTests(TestCase):
         # Global identity/active are untouched — the user stays active & authenticatable to B.
         self.assertTrue(shared.is_active)
         self.assertEqual(shared.username, "shared")
-        self.assertTrue(TenantMembership.objects.filter(user=shared, tenant=self.other_tenant).exists())
+        self.assertTrue(Membership.objects.filter(user=shared, tenant=self.other_tenant).exists())
         # active=false is now applied PER-TENANT: this tenant's membership is suspended,
         # the other tenant's stays active (no cross-tenant write, but a real local revoke).
-        self.assertFalse(TenantMembership.objects.get(user=shared, tenant=self.tenant).is_active)
-        self.assertTrue(TenantMembership.objects.get(user=shared, tenant=self.other_tenant).is_active)
+        self.assertFalse(Membership.objects.get(user=shared, tenant=self.tenant).is_active)
+        self.assertTrue(Membership.objects.get(user=shared, tenant=self.other_tenant).is_active)
 
     def test_scim_active_false_deprovisions_this_tenant_only(self):
         """active=false on a multi-tenant user suspends THIS tenant's membership (revoking
@@ -420,12 +419,12 @@ class SCIMProvisioningTests(TestCase):
         backend = TenantMembershipBackend()
 
         shared = User.objects.create_user(username="shared2", email="shared2@x.com", is_active=True)
-        m_this = TenantMembership.objects.create(user=shared, tenant=self.tenant)
+        m_this = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=shared, tenant=self.tenant)
         m_this.roles.add(self.role_member)
-        other_role = TenantRole.objects.create(
+        other_role = Role.objects.create(
             tenant=self.other_tenant, name="Member", permissions=["assets.view_asset"]
         )
-        m_other = TenantMembership.objects.create(user=shared, tenant=self.other_tenant)
+        m_other = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=shared, tenant=self.other_tenant)
         m_other.roles.add(other_role)
 
         # Baseline: the membership grants access in this tenant.
@@ -444,8 +443,8 @@ class SCIMProvisioningTests(TestCase):
 
         shared.refresh_from_db()
         self.assertTrue(shared.is_active)  # global account stays enabled (other tenant active)
-        self.assertFalse(TenantMembership.objects.get(user=shared, tenant=self.tenant).is_active)
-        self.assertTrue(TenantMembership.objects.get(user=shared, tenant=self.other_tenant).is_active)
+        self.assertFalse(Membership.objects.get(user=shared, tenant=self.tenant).is_active)
+        self.assertTrue(Membership.objects.get(user=shared, tenant=self.other_tenant).is_active)
         # Access is revoked HERE but unaffected in the other tenant.
         self.assertFalse(backend.has_perm(User.objects.get(pk=shared.pk), 'assets.view_asset', obj=self.tenant))
         self.assertTrue(backend.has_perm(User.objects.get(pk=shared.pk), 'assets.view_asset', obj=self.other_tenant))
@@ -457,14 +456,14 @@ class SCIMProvisioningTests(TestCase):
         }, content_type='application/json', **self.auth_headers)
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertTrue(resp.json()['active'])
-        self.assertTrue(TenantMembership.objects.get(user=shared, tenant=self.tenant).is_active)
+        self.assertTrue(Membership.objects.get(user=shared, tenant=self.tenant).is_active)
         self.assertTrue(backend.has_perm(User.objects.get(pk=shared.pk), 'assets.view_asset', obj=self.tenant))
 
     def test_scim_put_updates_sole_tenant_user(self):
         """Control for WS1-3: a user whose ONLY membership is this tenant is still fully
         updatable (the guard must not over-block single-tenant users)."""
         solo = User.objects.create_user(username="solo", email="solo@acme.com", is_active=True)
-        m = TenantMembership.objects.create(user=solo, tenant=self.tenant)
+        m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=solo, tenant=self.tenant)
         m.roles.add(self.role_member)
         detail_url = reverse('api:scim:user-detail', kwargs={'tenant_slug': self.tenant.slug, 'pk': solo.id})
         put_payload = {
@@ -484,9 +483,9 @@ class SCIMProvisioningTests(TestCase):
         """Group creation via tenant SCIM is rejected outright (groups are global and
         managed centrally), so it cannot create a group, provision a foreign user, or
         leak usernames."""
-        foreign_role = TenantRole.objects.create(tenant=self.other_tenant, name="Member", permissions=[])
+        foreign_role = Role.objects.create(tenant=self.other_tenant, name="Member", permissions=[])
         foreign_user = User.objects.create_user(username="foreignuser", email="foreign@other.com")
-        fm = TenantMembership.objects.create(user=foreign_user, tenant=self.other_tenant)
+        fm = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=foreign_user, tenant=self.other_tenant)
         fm.roles.add(foreign_role)
 
         list_url = reverse('api:scim:group-list', kwargs={'tenant_slug': self.tenant.slug})
@@ -500,5 +499,5 @@ class SCIMProvisioningTests(TestCase):
 
         # Nothing was created or provisioned.
         self.assertFalse(UserGroup.objects.filter(name="Injected Group").exists())
-        self.assertFalse(TenantMembership.objects.filter(user=foreign_user, tenant=self.tenant).exists())
+        self.assertFalse(Membership.objects.filter(user=foreign_user, tenant=self.tenant).exists())
         self.assertFalse(AssetHolder.objects.filter(user=foreign_user, tenant=self.tenant).exists())

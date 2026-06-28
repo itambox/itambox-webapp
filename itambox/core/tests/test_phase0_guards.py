@@ -16,7 +16,7 @@ from django.test import RequestFactory, TestCase
 from core.auth.guards import validate_permission_grant
 from core.managers import set_current_tenant, set_current_membership
 from itambox.api.permissions import TokenPermissions
-from organization.models import Tenant, TenantMembership, TenantRole
+from organization.models import Tenant, Membership, Role
 
 User = get_user_model()
 
@@ -26,7 +26,7 @@ def _tenant(name, slug):
 
 
 def _role(tenant, name, perms=None):
-    return TenantRole.objects.create(tenant=tenant, name=name, permissions=perms or [])
+    return Role.objects.create(tenant=tenant, name=name, permissions=perms or [])
 
 
 def _user(username):
@@ -38,7 +38,7 @@ def _superuser(username):
 
 
 def _membership(user, tenant, roles=None):
-    m = TenantMembership.objects.create(user=user, tenant=tenant, is_active=True)
+    m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=user, tenant=tenant, is_active=True)
     if roles:
         m.roles.set(roles)
     return m
@@ -55,7 +55,7 @@ class _Ctx:
 
     def _flush(self, user):
         for attr in list(user.__dict__):
-            if (attr.startswith('_effective_perms_') or attr.startswith('_tenant_membership_')
+            if (attr.startswith('_perms_tenant_') or attr.startswith('_tenant_membership_')
                     or attr == '_global_caps_cache'):
                 delattr(user, attr)
 
@@ -108,8 +108,8 @@ class TokenObjectPermissionTests(_Ctx, TestCase):
         self.ta = _tenant("TA", "ta")
         self.tb = _tenant("TB", "tb")
         self.user = _user("apiuser")
-        _membership(self.user, self.ta, roles=[_role(self.ta, "Viewer", ["organization.view_tenantrole"])])
-        # Objects in each tenant (TenantRole is tenant-scoped and exposes .tenant).
+        _membership(self.user, self.ta, roles=[_role(self.ta, "Viewer", ["organization.view_role"])])
+        # Objects in each tenant (Role is tenant-scoped and exposes .tenant).
         self.obj_a = _role(self.ta, "ObjA")
         self.obj_b = _role(self.tb, "ObjB")
         self._flush(self.user)
@@ -118,7 +118,7 @@ class TokenObjectPermissionTests(_Ctx, TestCase):
         perm = TokenPermissions()
         request = self.factory.get('/')
         request.user = self.user
-        view = SimpleNamespace(queryset=TenantRole._base_manager.all())
+        view = SimpleNamespace(queryset=Role._base_manager.all())
         return perm.has_object_permission(request, view, obj)
 
     def test_object_in_member_tenant_allowed(self):

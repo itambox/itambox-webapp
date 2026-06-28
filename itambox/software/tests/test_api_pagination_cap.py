@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase
 
-from organization.models import Tenant, TenantRole, TenantMembership
+from organization.models import Tenant, Role, Membership
 from assets.models import Manufacturer
 from software.models import Software
 
@@ -21,10 +21,10 @@ class ApiCountCapTests(APITestCase):
     def setUp(self):
         self.tenant = Tenant.objects.create(name='Tenant A', slug='capt-a')
         self.user = User.objects.create_user(username='capt_member', password='pw')
-        role = TenantRole.objects.create(
+        role = Role.objects.create(
             tenant=self.tenant, name='R', permissions=['software.view_software']
         )
-        _membership = TenantMembership.objects.create(user=self.user, tenant=self.tenant)
+        _membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user, tenant=self.tenant)
         _membership.roles.add(role)
         mfr = Manufacturer.objects.create(name='MS', slug='capt-ms')
         for i in range(3):

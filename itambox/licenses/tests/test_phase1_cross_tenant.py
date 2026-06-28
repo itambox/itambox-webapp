@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
-from organization.models import Tenant, TenantRole, TenantMembership, AssetHolder
+from organization.models import Tenant, Role, Membership, AssetHolder
 from assets.models import Manufacturer
 from software.models import Software
 from licenses.models import License, LicenseSeatAssignment, LicenseTypeChoices
@@ -38,18 +38,16 @@ class LicenseSeatAssignmentCrossTenantTests(TestCase):
             'licenses.change_licenseseatassignment',
             'licenses.delete_licenseseatassignment',
         ]
-        self.role_a = TenantRole.objects.create(
+        self.role_a = Role.objects.create(
             tenant=self.tenant_a, name='Admin', permissions=seat_perms
         )
-        self.membership_a = TenantMembership.objects.create(
-            user=self.user_a, tenant=self.tenant_a,
+        self.membership_a = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_a, tenant=self.tenant_a,
         )
         self.membership_a.roles.add(self.role_a)
-        self.role_b = TenantRole.objects.create(
+        self.role_b = Role.objects.create(
             tenant=self.tenant_b, name='Admin', permissions=seat_perms
         )
-        self.membership_b = TenantMembership.objects.create(
-            user=self.user_b, tenant=self.tenant_b,
+        self.membership_b = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_b, tenant=self.tenant_b,
         )
         self.membership_b.roles.add(self.role_b)
 
@@ -182,11 +180,10 @@ class GlobalLicenseSeatResidualTests(TestCase):
             'licenses.change_licenseseatassignment',
             'licenses.delete_licenseseatassignment',
         ]
-        self.role_b = TenantRole.objects.create(
+        self.role_b = Role.objects.create(
             tenant=self.tenant_b, name='Admin', permissions=seat_perms
         )
-        self.membership_b = TenantMembership.objects.create(
-            user=self.user_b, tenant=self.tenant_b,
+        self.membership_b = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_b, tenant=self.tenant_b,
         )
         self.membership_b.roles.add(self.role_b)
 

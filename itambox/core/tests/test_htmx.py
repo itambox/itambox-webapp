@@ -1,7 +1,7 @@
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
-from organization.models import Tenant, TenantRole, TenantMembership
+from organization.models import Tenant, Role, Membership
 
 User = get_user_model()
 
@@ -9,7 +9,7 @@ class HTMXViewsTestCase(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='htmxuser', password='password123')
         self.tenant = Tenant.objects.create(name='HTMX Tenant', slug='htmx-tenant')
-        self.role = TenantRole.objects.create(
+        self.role = Role.objects.create(
             tenant=self.tenant,
             name='Admin',
             permissions=[
@@ -17,8 +17,7 @@ class HTMXViewsTestCase(TestCase):
                 'assets.view_manufacturer',
             ]
         )
-        self.membership = TenantMembership.objects.create(
-            user=self.user,
+        self.membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user,
             tenant=self.tenant,
         )
         self.membership.roles.add(self.role)

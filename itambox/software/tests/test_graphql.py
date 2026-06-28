@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from core.schema import schema
 from software.models import Software
 from assets.models import Manufacturer
-from organization.models import Tenant, TenantRole, TenantMembership
+from organization.models import Tenant, Role, Membership
 from itambox.middleware import set_current_tenant
 
 
@@ -19,7 +19,7 @@ class SoftwareGraphQLTenantPinningTestCase(TestCase):
         )
         self.tenant = Tenant.objects.create(name='Tenant A', slug='tenant-a-sw')
         self.other_tenant = Tenant.objects.create(name='Tenant B', slug='tenant-b-sw')
-        role = TenantRole.objects.create(
+        role = Role.objects.create(
             tenant=self.tenant,
             name='SW Role',
             permissions=[
@@ -27,7 +27,7 @@ class SoftwareGraphQLTenantPinningTestCase(TestCase):
                 'software.change_software', 'software.delete_software',
             ],
         )
-        membership = TenantMembership.objects.create(user=self.user, tenant=self.tenant)
+        membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user, tenant=self.tenant)
         membership.roles.add(role)
         set_current_tenant(self.tenant)
         self.manufacturer = Manufacturer.objects.create(name='Acme', slug='acme-sw')

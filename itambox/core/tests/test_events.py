@@ -85,14 +85,14 @@ class EventsSystemTestCase(TransactionTestCase):
         Also covers WS5-2: a tenant rule's notification fans out to the rule's members, not a
         global user=None broadcast."""
         from django.contrib.auth import get_user_model
-        from organization.models import Tenant, Location, TenantRole, TenantMembership
+        from organization.models import Tenant, Location, Role, Membership
         from core.managers import set_current_tenant
 
         tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
         tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
         member_a = get_user_model().objects.create_user(username='member_a', password='pw')
-        m_a = TenantMembership.objects.create(user=member_a, tenant=tenant_a)
-        m_a.roles.add(TenantRole.objects.create(tenant=tenant_a, name='R', permissions=[]))
+        m_a = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=member_a, tenant=tenant_a)
+        m_a.roles.add(Role.objects.create(tenant=tenant_a, name='R', permissions=[]))
         loc_ct = ContentType.objects.get_for_model(Location)
 
         EventRule.objects.create(

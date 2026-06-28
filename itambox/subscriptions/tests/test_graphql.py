@@ -6,7 +6,7 @@ from graphql import GraphQLError
 
 from core.schema import schema
 from subscriptions.models import Provider, Subscription, SubscriptionAssignment
-from organization.models import Tenant, TenantGroup, AssetHolder, TenantRole, TenantMembership
+from organization.models import Tenant, TenantGroup, AssetHolder, Role, Membership
 from assets.models import Supplier, Asset, StatusLabel
 from itambox.middleware import set_current_tenant
 
@@ -30,8 +30,8 @@ class SubscriptionsGraphQLTestCase(TestCase):
             tenant=self.tenant
         )
 
-        # Grant permissions via TenantRole + TenantMembership (RBAC backend requires this)
-        role = TenantRole.objects.create(
+        # Grant permissions via Role + Membership (RBAC backend requires this)
+        role = Role.objects.create(
             tenant=self.tenant,
             name='Test Role',
             permissions=[
@@ -44,7 +44,7 @@ class SubscriptionsGraphQLTestCase(TestCase):
                 'assets.view_asset', 'assets.add_asset',
             ],
         )
-        membership = TenantMembership.objects.create(user=self.user, tenant=self.tenant)
+        membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user, tenant=self.tenant)
         membership.roles.add(role)
 
         # Set thread-local tenant context for models creation

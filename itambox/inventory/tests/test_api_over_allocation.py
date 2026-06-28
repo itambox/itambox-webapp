@@ -8,7 +8,7 @@ from django.urls import reverse
 from assets.models import Manufacturer, Category
 from inventory.models import Accessory, AccessoryStock
 from organization.models import (
-    Tenant, TenantRole, TenantMembership, AssetHolder, Location, Site,
+    Tenant, Role, Membership, AssetHolder, Location, Site,
 )
 
 User = get_user_model()
@@ -18,11 +18,11 @@ class InventoryAssignmentOverAllocationTests(TestCase):
     def setUp(self):
         self.tenant = Tenant.objects.create(name='Tenant', slug='t-inv')
         self.user = User.objects.create_user(username='invuser', password='pw')
-        role = TenantRole.objects.create(
+        role = Role.objects.create(
             tenant=self.tenant, name='Admin',
             permissions=['inventory.add_accessoryassignment', 'inventory.view_accessoryassignment'],
         )
-        membership = TenantMembership.objects.create(user=self.user, tenant=self.tenant)
+        membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user, tenant=self.tenant)
         membership.roles.add(role)
         self.mfr = Manufacturer.objects.create(name='Logitech', slug='logi-inv')
         self.cat = Category.objects.create(

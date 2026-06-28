@@ -223,15 +223,15 @@ class ExportTemplateTenantIsolationTests(TestCase):
     explicitly so a future regression in scoping is caught here too."""
 
     def setUp(self):
-        from organization.models import Tenant, TenantRole, TenantMembership
+        from organization.models import Tenant, Role, Membership
         self.tenant_a = Tenant.objects.create(name='Tenant A', slug='ten-a-exp')
         self.tenant_b = Tenant.objects.create(name='Tenant B', slug='ten-b-exp')
-        role = TenantRole.objects.create(
+        role = Role.objects.create(
             tenant=self.tenant_a, name='Viewer',
             permissions=['assets.view_asset', 'extras.view_exporttemplate'],
         )
         self.member = User.objects.create_user(username='iso-member', password='pw')
-        m = TenantMembership.objects.create(user=self.member, tenant=self.tenant_a)
+        m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.member, tenant=self.tenant_a)
         m.roles.add(role)
 
         status = StatusLabel.objects.create(name='Active', slug='active')

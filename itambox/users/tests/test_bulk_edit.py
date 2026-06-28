@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.messages import get_messages
 from model_bakery import baker
 
-from organization.models import Tenant, TenantRole, TenantMembership
+from organization.models import Tenant, Role, Membership
 from core.models import ObjectChange
 
 User = get_user_model()
@@ -25,37 +25,37 @@ class UserBulkEditTests(TestCase):
         self.admin_a = User.objects.create_user(
             username='admin_a', email='admin_a@test.com', password='password123', is_staff=True
         )
-        self.role_a = TenantRole.objects.create(
+        self.role_a = Role.objects.create(
             tenant=self.tenant_a,
             name='Admin',
-            permissions=['auth.view_user', 'auth.change_user'],
+            permissions=['users.view_user', 'users.change_user'],
         )
-        m = TenantMembership.objects.create(user=self.admin_a, tenant=self.tenant_a)
+        m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.admin_a, tenant=self.tenant_a)
         m.roles.add(self.role_a)
 
         # Users belonging to Tenant A
         self.user_a1 = User.objects.create_user(
             username='user_a1', email='a1@test.com', password='password123', is_active=True
         )
-        m = TenantMembership.objects.create(user=self.user_a1, tenant=self.tenant_a)
+        m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_a1, tenant=self.tenant_a)
         m.roles.add(self.role_a)
 
         self.user_a2 = User.objects.create_user(
             username='user_a2', email='a2@test.com', password='password123', is_active=True
         )
-        m = TenantMembership.objects.create(user=self.user_a2, tenant=self.tenant_a)
+        m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_a2, tenant=self.tenant_a)
         m.roles.add(self.role_a)
 
         # User belonging to Tenant B (cross-tenant)
         self.user_b1 = User.objects.create_user(
             username='user_b1', email='b1@test.com', password='password123', is_active=True
         )
-        self.role_b = TenantRole.objects.create(
+        self.role_b = Role.objects.create(
             tenant=self.tenant_b,
             name='Admin',
-            permissions=['auth.view_user', 'auth.change_user'],
+            permissions=['users.view_user', 'users.change_user'],
         )
-        m = TenantMembership.objects.create(user=self.user_b1, tenant=self.tenant_b)
+        m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_b1, tenant=self.tenant_b)
         m.roles.add(self.role_b)
 
         # URLs
@@ -123,7 +123,7 @@ class UserBulkEditTests(TestCase):
         response = self.client.post(self.bulk_edit_url, data)
         # Form should be invalid and render error page
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Only superusers can grant or modify staff or superuser status.", response.content.decode('utf-8'))
+        self.assertIn("Only superusers can grant or modify staff, superuser, or login status.", response.content.decode('utf-8'))
 
         self.user_a1.refresh_from_db()
         self.assertFalse(self.user_a1.is_superuser)

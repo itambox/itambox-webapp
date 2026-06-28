@@ -4,7 +4,7 @@ from django.urls import reverse
 
 from assets.models import Asset, StatusLabel
 from extras.models import LabelTemplate
-from organization.models import Tenant, TenantRole, TenantMembership
+from organization.models import Tenant, Role, Membership
 
 User = get_user_model()
 
@@ -23,8 +23,8 @@ class LabelPrintPermissionTests(TestCase):
 
     def _login(self, username, perms):
         user = User.objects.create_user(username=username, password='pw')
-        role = TenantRole.objects.create(tenant=self.tenant, name=f'role-{username}', permissions=perms)
-        membership = TenantMembership.objects.create(user=user, tenant=self.tenant)
+        role = Role.objects.create(tenant=self.tenant, name=f'role-{username}', permissions=perms)
+        membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=user, tenant=self.tenant)
         membership.roles.add(role)
         self.client.force_login(user)
         session = self.client.session

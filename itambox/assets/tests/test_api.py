@@ -4,7 +4,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from assets.models import Asset, AssetType, StatusLabel, AssetRole, Manufacturer
-from organization.models import AssetHolder, Site, Location, Tenant, TenantRole, TenantMembership
+from organization.models import AssetHolder, Site, Location, Tenant, Role, Membership
 from licenses.models import License, LicenseSeatAssignment
 from software.models import Software
 
@@ -25,16 +25,15 @@ class ITAMBoxAPITestCase(APITestCase):
         self.tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
         self.tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
 
-        # Give staff a proper TenantRole + TenantMembership in Tenant A so the
+        # Give staff a proper Role + Membership in Tenant A so the
         # RBAC backend (TenantMembershipBackend) grants permissions through the
         # JSON-role system instead of the removed ModelBackend fallback.
-        self.role_staff_a = TenantRole.objects.create(
+        self.role_staff_a = Role.objects.create(
             tenant=self.tenant_a,
             name='Staff Role A',
             permissions=['assets.view_asset', 'assets.add_asset', 'assets.change_asset'],
         )
-        _m = TenantMembership.objects.create(
-            user=self.staff,
+        _m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.staff,
             tenant=self.tenant_a,
         )
         _m.roles.add(self.role_staff_a)
@@ -108,8 +107,8 @@ class ITAMBoxAPITestCase(APITestCase):
             tenant=self.tenant_a
         )
 
-        # Permissions for self.staff are granted via TenantRole.permissions (JSON)
-        # on the TenantMembership created above. The removed ModelBackend fallback
+        # Permissions for self.staff are granted via Role.permissions (JSON)
+        # on the Membership created above. The removed ModelBackend fallback
         # means user_permissions.add(...) no longer grants access through the
         # PasswordLoginOnlyBackend, so those calls are intentionally omitted here.
 
@@ -145,14 +144,14 @@ class ITAMBoxAPITestCase(APITestCase):
         """WS1-6: checkout is a state change -> requires assets.change_asset, not the
         POST-default assets.add_asset."""
         add_only = User.objects.create_user(username='addonly', password='pw')
-        _m_add = TenantMembership.objects.create(user=add_only, tenant=self.tenant_a)
-        _m_add.roles.add(TenantRole.objects.create(
+        _m_add = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=add_only, tenant=self.tenant_a)
+        _m_add.roles.add(Role.objects.create(
             tenant=self.tenant_a, name='Add Only',
             permissions=['assets.view_asset', 'assets.add_asset'],
         ))
         change_only = User.objects.create_user(username='changeonly', password='pw')
-        _m_change = TenantMembership.objects.create(user=change_only, tenant=self.tenant_a)
-        _m_change.roles.add(TenantRole.objects.create(
+        _m_change = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=change_only, tenant=self.tenant_a)
+        _m_change.roles.add(Role.objects.create(
             tenant=self.tenant_a, name='Change Only',
             permissions=['assets.view_asset', 'assets.change_asset'],
         ))
