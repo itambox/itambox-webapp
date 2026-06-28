@@ -5,7 +5,11 @@ from django.db.models import Q
 from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import gettext_lazy as _
 from assets.models import Manufacturer, AssetType
-from organization.models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, Contact, ContactRole, ContactAssignment, TenantRole, TenantMembership, CostCenter, Provider, ProviderRole, ProviderRoleTemplate
+from organization.models import (
+    Site, Region, SiteGroup, Location, Tenant, TenantGroup,
+    AssetHolder, Contact, ContactRole, ContactAssignment,
+    Role, Membership, CostCenter, Provider,
+)
 
 from extras.models import Tag # Import Tag
 from crispy_forms.helper import FormHelper
@@ -258,61 +262,80 @@ class ContactRoleFilterSet(BaseOrgFilterSet):
 
 
 
-class TenantRoleFilterSet(BaseOrgFilterSet):
-    tag = None  # TenantRole has no tags field
-    tenant = django_filters.ModelChoiceFilter(
-        queryset=Tenant.objects.all(),
-        widget=forms.Select(attrs={'class': 'form-select'})
-    )
-
-    class Meta:
-        model = TenantRole
-        fields = ['name', 'tenant']
-
-    def search(self, queryset, name, value):
-        if not value.strip():
-            return queryset
-        return queryset.filter(
-            Q(name__icontains=value) |
-            Q(description__icontains=value)
-        ).distinct()
-
-
 def _user_queryset(request):
     from django.contrib.auth import get_user_model
     return get_user_model().objects.all()
 
 
-class TenantMembershipFilterSet(BaseOrgFilterSet):
-    tag = None  # TenantMembership has no tags field
+class RoleFilterSet(BaseOrgFilterSet):
+    tag = None  # Role has no tags field
+    scope = django_filters.ChoiceFilter(
+        choices=Role.SCOPE_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
     tenant = django_filters.ModelChoiceFilter(
-        queryset=Tenant.objects.all(),
-        label=_("Tenant"),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        queryset=Tenant._base_manager.filter(deleted_at__isnull=True),
+        widget=forms.Select(attrs={'class': 'form-select'}),
     )
-    roles = django_filters.ModelMultipleChoiceFilter(
-        queryset=TenantRole.objects.all(),
-        label=_("Roles"),
-        widget=forms.SelectMultiple(attrs={'class': 'form-select'})
-    )
-    user = django_filters.ModelChoiceFilter(
-        queryset=_user_queryset,
-        label=_("User"),
-        widget=forms.Select(attrs={'class': 'form-select'})
+    provider = django_filters.ModelChoiceFilter(
+        queryset=Provider._base_manager.filter(deleted_at__isnull=True),
+        widget=forms.Select(attrs={'class': 'form-select'}),
     )
 
     class Meta:
-        model = TenantMembership
-        fields = ['tenant', 'roles', 'user']
+        model = Role
+        fields = ['name', 'scope', 'tenant', 'provider']
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
         return queryset.filter(
-            Q(user__username__icontains=value) |
-            Q(user__email__icontains=value) |
-            Q(roles__name__icontains=value) |
-            Q(tenant__name__icontains=value)
+            Q(name__icontains=value) | Q(description__icontains=value)
+        ).distinct()
+
+
+class MembershipFilterSet(BaseOrgFilterSet):
+    tag = None
+    person_type = django_filters.ChoiceFilter(
+        choices=Membership.PERSON_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+    tenant = django_filters.ModelChoiceFilter(
+        queryset=Tenant._base_manager.filter(deleted_at__isnull=True),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+    provider = django_filters.ModelChoiceFilter(
+        queryset=Provider._base_manager.filter(deleted_at__isnull=True),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+    roles = django_filters.ModelMultipleChoiceFilter(
+        queryset=Role._base_manager.filter(deleted_at__isnull=True),
+        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
+    )
+    user = django_filters.ModelChoiceFilter(
+        queryset=_user_queryset,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+    is_active = django_filters.BooleanFilter(
+        widget=forms.Select(
+            choices=[('', _('Any')), ('true', _('Yes')), ('false', _('No'))],
+            attrs={'class': 'form-select'},
+        ),
+    )
+
+    class Meta:
+        model = Membership
+        fields = ['person_type', 'tenant', 'provider', 'roles', 'user', 'is_active']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(user__username__icontains=value)
+            | Q(user__email__icontains=value)
+            | Q(roles__name__icontains=value)
+            | Q(tenant__name__icontains=value)
+            | Q(provider__name__icontains=value)
         ).distinct()
 
 
@@ -398,49 +421,3 @@ class ProviderFilterSet(BaseOrgFilterSet):
         ).distinct()
 
 
-# --- ProviderRole Filter ---
-class ProviderRoleFilterSet(BaseOrgFilterSet):
-    tag = None  # ProviderRole has no tags field
-    provider = django_filters.ModelChoiceFilter(
-        queryset=Provider.objects.all(),
-        widget=forms.Select(attrs={'class': 'form-select'})
-    )
-
-    class Meta:
-        model = ProviderRole
-        fields = ['provider']
-
-    def search(self, queryset, name, value):
-        if not value.strip():
-            return queryset
-        return queryset.filter(
-            Q(name__icontains=value) |
-            Q(description__icontains=value)
-        ).distinct()
-
-
-# --- ProviderRoleTemplate Filter ---
-class ProviderRoleTemplateFilterSet(BaseOrgFilterSet):
-    tag = None  # ProviderRoleTemplate has no tags field
-    provider = django_filters.ModelChoiceFilter(
-        queryset=Provider.objects.all(),
-        widget=forms.Select(attrs={'class': 'form-select'})
-    )
-    is_default = django_filters.BooleanFilter(
-        widget=forms.Select(
-            choices=[('', _('Any')), ('true', _('Yes')), ('false', _('No'))],
-            attrs={'class': 'form-select'},
-        ),
-    )
-
-    class Meta:
-        model = ProviderRoleTemplate
-        fields = ['provider', 'is_default']
-
-    def search(self, queryset, name, value):
-        if not value.strip():
-            return queryset
-        return queryset.filter(
-            Q(name__icontains=value) |
-            Q(description__icontains=value)
-        ).distinct()

@@ -2,7 +2,7 @@
 {% load i18n %}
 
 {% block extra_page_actions %}
-<a href="{% url 'organization:tenantrole_assign_users' pk=object.pk %}" class="btn btn-ghost-secondary">
+<a href="{% url 'organization:role_assign_users' pk=object.pk %}" class="btn btn-ghost-secondary">
     <i class="mdi mdi-account-multiple-plus"></i>
     {% translate "Assign Users" %}
 </a>

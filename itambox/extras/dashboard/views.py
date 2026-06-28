@@ -16,7 +16,7 @@ from extras.dashboard.forms import DashboardWidgetAddForm, DashboardWidgetConfig
 from extras.dashboard.utils import get_dashboard, get_default_dashboard
 from extras.dashboard.widgets import get_widget, get_registered_widgets
 from extras.models import Dashboard
-from organization.models import Tenant, TenantMembership
+from organization.models import Tenant, Membership
 
 
 class DashboardWidgetAddView(LoginRequiredMixin, View):
@@ -197,7 +197,7 @@ class DashboardManageModalView(LoginRequiredMixin, View):
         if request.user.is_superuser:
             tenants = Tenant._base_manager.all().order_by('name')
         else:
-            member_tenant_ids = TenantMembership.objects.filter(
+            member_tenant_ids = Membership.objects.filter(
                 user=request.user
             ).values_list('tenant_id', flat=True)
             tenants = Tenant._base_manager.filter(
@@ -239,7 +239,7 @@ class DashboardCreateView(LoginRequiredMixin, View):
         # A user may only bind a dashboard to a tenant they belong to; a
         # superuser may bind to any tenant. Without this check a member could
         # POST a foreign tenant_id (Tenant._base_manager bypasses scoping).
-        is_member = TenantMembership.objects.filter(
+        is_member = Membership.objects.filter(
             user=request.user, tenant=tenant
         ).exists()
         if not request.user.is_superuser and not is_member:

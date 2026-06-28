@@ -6,7 +6,7 @@ from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML
 
-from organization.models import Tenant, TenantRole
+from organization.models import Tenant, Role
 from .models import UserGroup
 
 User = get_user_model()
@@ -31,10 +31,17 @@ class UserFilterSet(django_filters.FilterSet):
             ('false', _('Non-Staff')),
         ), attrs={'class': 'form-select'})
     )
+    can_login = django_filters.BooleanFilter(
+        widget=forms.Select(choices=(
+            ('', _('All')),
+            ('true', _('Can log in')),
+            ('false', _('Cannot log in')),
+        ), attrs={'class': 'form-select'})
+    )
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'is_active', 'is_staff']
+        fields = ['username', 'email', 'is_active', 'is_staff', 'can_login']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -42,7 +49,7 @@ class UserFilterSet(django_filters.FilterSet):
         self.form.helper.form_method = 'get'
         self.form.helper.form_tag = False
         self.form.helper.layout = Layout(
-            'q', 'is_active', 'is_staff',
+            'q', 'is_active', 'can_login', 'is_staff',
             HTML('<div class="mt-3">'),
             Submit('submit', _('Apply Filter'), css_class='btn btn-primary'),
             HTML('<a href="{{ request.path }}" class="btn btn-secondary ms-2">%s</a>' % _('Clear Filters')),
@@ -69,7 +76,7 @@ class UserGroupFilterSet(django_filters.FilterSet):
         widget=forms.TextInput(attrs={'placeholder': _('Search...')})
     )
     roles = django_filters.ModelMultipleChoiceFilter(
-        queryset=TenantRole._base_manager.all(),
+        queryset=Role._base_manager.all(),
         label=_("Roles"),
         widget=forms.SelectMultiple(attrs={'class': 'form-select'})
     )

@@ -1,29 +1,33 @@
-from django.urls import reverse_lazy
+"""Provider CRUD + onboarding views (unified RBAC)."""
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.shortcuts import get_object_or_404, redirect
-from django.utils.translation import gettext as _
-from django.views.generic import TemplateView, View
+from django.shortcuts import redirect
+from django.urls import reverse, reverse_lazy
+from django.utils.translation import gettext_lazy as _
+from django.views.generic import FormView, TemplateView
 
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
 )
 
-from ..models import Provider, ProviderRole, ProviderRoleTemplate
+from ..models import Provider, Tenant, Membership
 from ..forms import (
     ProviderForm, ProviderFilterForm,
-    ProviderRoleForm, ProviderRoleFilterForm,
-    ProviderRoleTemplateForm, ProviderRoleTemplateFilterForm,
+    TechnicianQuickForm,
 )
-from ..tables import ProviderTable, ProviderRoleTable, ProviderRoleTemplateTable
-from ..filters import ProviderFilterSet, ProviderRoleFilterSet, ProviderRoleTemplateFilterSet
+from ..tables import ProviderTable, TenantTable
+from ..filters import ProviderFilterSet, TenantFilterSet
+from ..forms import TenantFilterForm
 
 
 class ProviderAdminMixin(UserPassesTestMixin):
-    """Restrict the Provider admin CRUD views to provider administrators: superusers, or
-    provider staff holding the ``can_manage_provider_users`` capability. ``test_func``
-    enforces this; ``get_permission_required`` returns an empty set so the generic
-    PermissionRequiredMixin does not additionally require per-model view/add/change perms."""
+    """Restrict Provider-admin views to users holding ``organization.manage_provider``
+    against any Provider (or to superusers).
+
+    Resolution is unified: the capability is a plain Django permission carried by a
+    provider-scoped Role attached to a staff Membership and resolved through
+    ``user.has_perm()``.
+    """
 
     def test_func(self):
         user = self.request.user
@@ -32,7 +36,7 @@ class ProviderAdminMixin(UserPassesTestMixin):
         if user.is_superuser:
             return True
         from core.auth.provider import has_provider_capability
-        return has_provider_capability(user, 'manage_provider_users')
+        return has_provider_capability(user, 'manage_provider')
 
     def get_permission_required(self):
         return ()
@@ -66,83 +70,8 @@ class ProviderDeleteView(ProviderAdminMixin, ObjectDeleteView):
     success_url = reverse_lazy('organization:provider_list')
 
 
-# --------------------------------------------------------------------------- ProviderRole
-class ProviderRoleListView(ProviderAdminMixin, ObjectListView):
-    queryset = ProviderRole.objects.select_related('provider')
-    filterset = ProviderRoleFilterSet
-    filterset_form = ProviderRoleFilterForm
-    table = ProviderRoleTable
-    action_buttons = ('add',)
-
-
-class ProviderRoleDetailView(ProviderAdminMixin, ObjectDetailView):
-    queryset = ProviderRole.objects.select_related('provider', 'tenant_role_template')
-    template_name = 'organization/providers/providerrole_detail.html'
-
-
-class ProviderRoleEditView(ProviderAdminMixin, ObjectEditView):
-    queryset = ProviderRole.objects.all()
-    model = ProviderRole
-    model_form = ProviderRoleForm
-    template_name = 'generic/object_edit.html'
-
-
-class ProviderRoleDeleteView(ProviderAdminMixin, ObjectDeleteView):
-    queryset = ProviderRole.objects.all()
-    model = ProviderRole
-    template_name = 'generic/object_confirm_delete.html'
-    success_url = reverse_lazy('organization:providerrole_list')
-
-
-# --------------------------------------------------------------------------- ProviderRoleTemplate
-class ProviderRoleTemplateListView(ProviderAdminMixin, ObjectListView):
-    queryset = ProviderRoleTemplate.objects.select_related('provider')
-    filterset = ProviderRoleTemplateFilterSet
-    filterset_form = ProviderRoleTemplateFilterForm
-    table = ProviderRoleTemplateTable
-    action_buttons = ('add',)
-
-
-class ProviderRoleTemplateDetailView(ProviderAdminMixin, ObjectDetailView):
-    queryset = ProviderRoleTemplate.objects.select_related('provider')
-    template_name = 'organization/providers/providerroletemplate_detail.html'
-
-
-class ProviderRoleTemplateEditView(ProviderAdminMixin, ObjectEditView):
-    queryset = ProviderRoleTemplate.objects.all()
-    model = ProviderRoleTemplate
-    model_form = ProviderRoleTemplateForm
-    template_name = 'generic/object_edit.html'
-
-
-class ProviderRoleTemplateDeleteView(ProviderAdminMixin, ObjectDeleteView):
-    queryset = ProviderRoleTemplate.objects.all()
-    model = ProviderRoleTemplate
-    template_name = 'generic/object_confirm_delete.html'
-    success_url = reverse_lazy('organization:providerroletemplate_list')
-
-
-class ProviderRoleTemplateSyncView(LoginRequiredMixin, ProviderAdminMixin, View):
-    """POST-only action that pushes a ProviderRoleTemplate's permissions out to the
-    TenantRoles across the provider's tenants, then redirects back to the template detail."""
-
-    def post(self, request, pk):
-        template = get_object_or_404(ProviderRoleTemplate, pk=pk)
-        created, updated = template.sync_to_tenant_roles()
-        messages.success(
-            request,
-            _("Synced: %(created)d created, %(updated)d updated") % {
-                'created': created,
-                'updated': updated,
-            },
-        )
-        return redirect('organization:providerroletemplate_detail', pk=template.pk)
-
-
-# --------------------------------------------------------------------------- Provider dashboard
 class ProviderDashboardView(ProviderAdminMixin, TemplateView):
-    """Minimal provider overview: each provider with its tenant and active-staff counts."""
-
+    """Overview: each provider with tenant + staff + role counts."""
     template_name = 'organization/providers/provider_dashboard.html'
 
     def get_context_data(self, **kwargs):
@@ -152,7 +81,52 @@ class ProviderDashboardView(ProviderAdminMixin, TemplateView):
             providers.append({
                 'provider': provider,
                 'tenant_count': provider.tenants.count(),
-                'staff_count': provider.memberships.filter(is_active=True).count(),
+                'staff_count': provider.memberships.filter(
+                    is_active=True, person_type=Membership.PERSON_STAFF,
+                ).count(),
+                'role_count': provider.roles.count(),
             })
         context['providers'] = providers
         return context
+
+
+class CustomerTenantListView(ProviderAdminMixin, ObjectListView):
+    """Provider-managed tenants (provider FK set). Uses _base_manager — a provider
+    admin legitimately views across tenants, guarded by ProviderAdminMixin."""
+    queryset = Tenant._base_manager.filter(
+        provider__isnull=False, deleted_at__isnull=True,
+    ).select_related('provider', 'group')
+    filterset = TenantFilterSet
+    filterset_form = TenantFilterForm
+    table = TenantTable
+    action_buttons = ()
+
+
+# --------------------------------------------------------------------------- Quick onboarding
+class TechnicianQuickAddView(ProviderAdminMixin, FormView):
+    """Single-form provider technician onboarding."""
+    template_name = 'organization/providers/technician_quick.html'
+    form_class = TechnicianQuickForm
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
+    def form_valid(self, form):
+        provider = form.cleaned_data['provider']
+        if not self.request.user.is_superuser and not self.request.user.has_perm('organization.manage_staff', obj=provider):
+            messages.error(self.request, _("You do not have permission to manage staff for this provider."))
+            return self.form_invalid(form)
+
+        user, membership = form.save()
+        messages.success(
+            self.request,
+            _("Onboarded %(user)s as staff of %(provider)s.") % {
+                'user': user, 'provider': membership.provider,
+            },
+        )
+        return redirect(reverse('organization:membership_detail', kwargs={'pk': membership.pk}))
+
+
+

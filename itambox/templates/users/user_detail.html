@@ -32,6 +32,16 @@
                 </td>
             </tr>
             <tr>
+                <td><strong>{% translate "Can Log In" %}:</strong></td>
+                <td>
+                    {% if object.can_login %}
+                        <span class="badge bg-success">{% translate "Can log in" %}</span>
+                    {% else %}
+                        <span class="badge bg-danger">{% translate "No login" %}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
                 <td><strong>{% translate "Staff Status" %}:</strong></td>
                 <td>
                     {% if object.is_staff %}
@@ -68,7 +78,7 @@
 <div class="card mb-3 shadow-sm">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h3 class="card-title mb-0">{% translate "Tenant Memberships" %}</h3>
-        <a href="{% url 'organization:tenantmembership_create' %}?user={{ object.pk }}" class="btn btn-sm btn-primary">
+        <a href="{% url 'organization:membership_create' %}?user={{ object.pk }}" class="btn btn-sm btn-primary">
             <i class="mdi mdi-plus-thick"></i> {% translate "Add" %}
         </a>
     </div>
@@ -76,7 +86,9 @@
         {% for membership in object.memberships.all %}
             <div class="list-group-item d-flex justify-content-between align-items-center">
                 <div>
-                    <i class="mdi mdi-domain me-1"></i> <strong>{{ membership.tenant.name }}</strong>
+                    <i class="mdi mdi-domain me-1"></i>
+                    <strong>{% if membership.tenant_id %}{{ membership.tenant.name }}{% else %}{{ membership.provider.name }}{% endif %}</strong>
+                    <span class="badge bg-secondary-lt ms-1">{{ membership.get_person_type_display }}</span>
                     {% with roles=membership.roles.all %}
                     {% if roles %}
                     ({% for r in roles %}{{ r.name }}{% if not forloop.last %}, {% endif %}{% endfor %})
@@ -88,7 +100,7 @@
                     <span class="badge bg-secondary-lt ms-1" title="{% translate "Direct permission grants" %}">+{{ membership.direct_permissions|length }}</span>
                     {% endif %}
                 </div>
-                <a href="{% url 'organization:tenantmembership_delete' pk=membership.pk %}" class="btn btn-sm btn-outline-danger" title="{% translate "Remove Membership" %}">
+                <a href="{% url 'organization:membership_delete' pk=membership.pk %}" class="btn btn-sm btn-outline-danger" title="{% translate "Remove Membership" %}">
                     <i class="mdi mdi-trash-can-outline"></i>
                 </a>
             </div>

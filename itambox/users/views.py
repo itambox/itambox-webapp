@@ -40,8 +40,8 @@ class UserProfileView(LoginRequiredMixin, BaseHTMXView, UpdateView):
         context = super().get_context_data(**kwargs)
         context['active_tab'] = 'profile'
         context['user'] = self.request.user
-        from organization.models import TenantMembership
-        context['user_memberships'] = TenantMembership.objects.filter(user=self.request.user).select_related('tenant').prefetch_related('roles')
+        from organization.models import Membership
+        context['user_memberships'] = Membership.objects.filter(user=self.request.user).select_related('tenant').prefetch_related('roles')
         activity_qs = ObjectChange.objects.filter(user=self.request.user)[:15]
         activity_table = ObjectChangeTable(activity_qs, request=self.request)
         activity_table.configure(self.request, paginate=False)
@@ -515,6 +515,12 @@ class UserBulkEditView(ObjectBulkEditView):
                     is_active = form.cleaned_data.get('is_active')
                     is_superuser = form.cleaned_data.get('is_superuser')
                     is_staff = form.cleaned_data.get('is_staff')
+                    can_login = form.cleaned_data.get('can_login')
+
+                    if 'can_login' in selected_fields and can_login is False:
+                        messages.error(request, _("You cannot revoke your own login ability in a bulk edit operation."))
+                        context = self.get_context_data_compat(form, queryset, pks, return_url, selected_fields, model)
+                        return self.render_to_response(context)
 
                     if 'is_active' in selected_fields and is_active is False:
                         messages.error(request, _("You cannot deactivate your own user account in a bulk edit operation."))
@@ -554,7 +560,9 @@ class UserBulkEditView(ObjectBulkEditView):
 
 
 class UserDetailView(ObjectDetailView):
-    queryset = User.objects.prefetch_related('memberships__tenant', 'memberships__role')
+    queryset = User.objects.prefetch_related(
+        'memberships__tenant', 'memberships__provider', 'memberships__roles',
+    )
     template_name = 'users/user_detail.html'
 
     def has_permission(self):
@@ -599,7 +607,7 @@ from django.contrib.auth.mixins import UserPassesTestMixin
 from django.db import transaction
 from django.db.models import Count, Prefetch
 from itambox.views.generic import ObjectBulkDeleteView
-from organization.models import TenantRole, TenantMembership
+from organization.models import Role, Membership
 from .models import UserGroup
 from .tables import UserGroupTable
 from .filters import UserGroupFilterSet
@@ -609,7 +617,7 @@ from .forms import UserGroupForm, UserGroupFilterForm, UserGroupAssignUsersForm
 def is_global_group_admin(user):
     """User groups are global and can grant cross-tenant access, so only global admins
     may manage them: superusers, provider staff holding ``can_manage_groups``, OR a user
-    directly granted the legacy ``users.manage_usergroups`` capability (single-company
+    directly granted the legacy ``organization.manage_groups`` capability (single-company
     backward compat). Delegates to core.auth.provider.can_manage_user_groups."""
     from core.auth.provider import can_manage_user_groups
     return can_manage_user_groups(user)
@@ -642,7 +650,7 @@ class UserGroupListView(GlobalGroupAdminMixin, ObjectListView):
 
 class UserGroupDetailView(GlobalGroupAdminMixin, ObjectDetailView):
     queryset = UserGroup.objects.prefetch_related(
-        Prefetch('roles', queryset=TenantRole.objects.order_by('name')),
+        Prefetch('roles', queryset=Role.objects.order_by('scope', 'name')),
         'members',
     ).annotate(
         member_count=Count('members', distinct=True),

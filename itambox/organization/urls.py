@@ -1,7 +1,7 @@
 from django.urls import path
 from . import views
 
-app_name = 'organization' # Namespace for this app's URLs
+app_name = 'organization'
 
 urlpatterns = [
     # Sites
@@ -69,7 +69,6 @@ urlpatterns = [
     path('asset-holders/<int:pk>/edit/', views.AssetHolderEditView.as_view(), name='assetholder_update'),
     path('asset-holders/<int:pk>/delete/', views.AssetHolderDeleteView.as_view(), name='assetholder_delete'),
 
-
     # Contacts
     path('contacts/', views.ContactListView.as_view(), name='contact_list'),
     path('contacts/add/', views.ContactEditView.as_view(), name='contact_create'),
@@ -94,15 +93,15 @@ urlpatterns = [
     path('contact-assignments/add/', views.ContactAssignmentCreateView.as_view(), name='contactassignment_create'),
     path('contact-assignments/<int:pk>/delete/', views.ContactAssignmentDeleteView.as_view(), name='contactassignment_delete'),
 
-    # Tenant Roles
-    path('roles/', views.TenantRoleListView.as_view(), name='tenantrole_list'),
-    path('roles/add/', views.TenantRoleEditView.as_view(), name='tenantrole_create'),
-    path('roles/delete/', views.TenantRoleBulkDeleteView.as_view(), name='tenantrole_bulk_delete'),
-    path('roles/<int:pk>/', views.TenantRoleDetailView.as_view(), name='tenantrole_detail'),
-    path('roles/<int:pk>/edit/', views.TenantRoleEditView.as_view(), name='tenantrole_update'),
-    path('roles/<int:pk>/clone/', views.TenantRoleCloneView.as_view(), name='tenantrole_clone'),
-    path('roles/<int:pk>/delete/', views.TenantRoleDeleteView.as_view(), name='tenantrole_delete'),
-    path('roles/<int:pk>/assign/', views.TenantRoleAssignUsersView.as_view(), name='tenantrole_assign_users'),
+    # Roles (unified — tenant- and provider-scoped)
+    path('roles/', views.RoleListView.as_view(), name='role_list'),
+    path('roles/add/', views.RoleEditView.as_view(), name='role_create'),
+    path('roles/delete/', views.RoleBulkDeleteView.as_view(), name='role_bulk_delete'),
+    path('roles/<int:pk>/', views.RoleDetailView.as_view(), name='role_detail'),
+    path('roles/<int:pk>/edit/', views.RoleEditView.as_view(), name='role_update'),
+    path('roles/<int:pk>/clone/', views.RoleCloneView.as_view(), name='role_clone'),
+    path('roles/<int:pk>/delete/', views.RoleDeleteView.as_view(), name='role_delete'),
+    path('roles/<int:pk>/assign/', views.RoleAssignUsersView.as_view(), name='role_assign_users'),
 
     # Cost Centers
     path('cost-centers/', views.CostCenterListView.as_view(), name='costcenter_list'),
@@ -126,28 +125,19 @@ urlpatterns = [
     path('providers/<int:pk>/edit/', views.ProviderEditView.as_view(), name='provider_update'),
     path('providers/<int:pk>/delete/', views.ProviderDeleteView.as_view(), name='provider_delete'),
 
-    # Provider Roles
-    path('provider-roles/', views.ProviderRoleListView.as_view(), name='providerrole_list'),
-    path('provider-roles/add/', views.ProviderRoleEditView.as_view(), name='providerrole_create'),
-    path('provider-roles/<int:pk>/', views.ProviderRoleDetailView.as_view(), name='providerrole_detail'),
-    path('provider-roles/<int:pk>/edit/', views.ProviderRoleEditView.as_view(), name='providerrole_update'),
-    path('provider-roles/<int:pk>/delete/', views.ProviderRoleDeleteView.as_view(), name='providerrole_delete'),
+    # Customer Tenants (provider-managed tenant list)
+    path('customer-tenants/', views.CustomerTenantListView.as_view(), name='customer_tenant_list'),
 
-    # Provider Role Templates
-    path('provider-role-templates/', views.ProviderRoleTemplateListView.as_view(), name='providerroletemplate_list'),
-    path('provider-role-templates/add/', views.ProviderRoleTemplateEditView.as_view(), name='providerroletemplate_create'),
-    path('provider-role-templates/<int:pk>/', views.ProviderRoleTemplateDetailView.as_view(), name='providerroletemplate_detail'),
-    path('provider-role-templates/<int:pk>/edit/', views.ProviderRoleTemplateEditView.as_view(), name='providerroletemplate_update'),
-    path('provider-role-templates/<int:pk>/sync/', views.ProviderRoleTemplateSyncView.as_view(), name='providerroletemplate_sync'),
-    path('provider-role-templates/<int:pk>/delete/', views.ProviderRoleTemplateDeleteView.as_view(), name='providerroletemplate_delete'),
+    # Quick onboarding
+    path('onboard/technician/', views.TechnicianQuickAddView.as_view(), name='technician_quick_add'),
 
-    # Tenant Memberships
-    path('memberships/', views.TenantMembershipListView.as_view(), name='tenantmembership_list'),
-    path('memberships/add/', views.TenantMembershipCreateView.as_view(), name='tenantmembership_create'),
-    path('memberships/edit/', views.TenantMembershipBulkEditView.as_view(), name='tenantmembership_bulk_edit'),
-    path('memberships/delete/', views.TenantMembershipBulkDeleteView.as_view(), name='tenantmembership_bulk_delete'),
-    path('memberships/<int:pk>/edit/', views.TenantMembershipEditView.as_view(), name='tenantmembership_update'),
-    path('memberships/<int:pk>/delete/', views.TenantMembershipDeleteView.as_view(), name='tenantmembership_delete'),
+
+    # Memberships (unified)
+    path('memberships/', views.MembershipListView.as_view(), name='membership_list'),
+    path('memberships/add/', views.MembershipCreateView.as_view(), name='membership_create'),
+    path('memberships/edit/', views.MembershipBulkEditView.as_view(), name='membership_bulk_edit'),
+    path('memberships/delete/', views.MembershipBulkDeleteView.as_view(), name='membership_bulk_delete'),
+    path('memberships/<int:pk>/', views.MembershipDetailView.as_view(), name='membership_detail'),
+    path('memberships/<int:pk>/edit/', views.MembershipEditView.as_view(), name='membership_update'),
+    path('memberships/<int:pk>/delete/', views.MembershipDeleteView.as_view(), name='membership_delete'),
 ]
-
- 

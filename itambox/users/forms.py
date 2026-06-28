@@ -36,13 +36,14 @@ class UserForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ['username', 'first_name', 'last_name', 'email', 'is_active', 'is_staff', 'is_superuser']
+        fields = ['username', 'first_name', 'last_name', 'email', 'is_active', 'can_login', 'is_staff', 'is_superuser']
         widgets = {
             'username': forms.TextInput(attrs={'class': 'form-control'}),
             'first_name': forms.TextInput(attrs={'class': 'form-control'}),
             'last_name': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'can_login': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'is_staff': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'is_superuser': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
@@ -56,18 +57,21 @@ class UserForm(forms.ModelForm):
         else:
             self.fields['password'].required = True
 
-        # Security check: only superusers can modify is_superuser and is_staff
+        # Security check: only superusers can modify is_superuser, is_staff, and can_login
+        # (login capability is a global account flag, not a per-tenant setting).
         if not self.request_user or not self.request_user.is_superuser:
             if 'is_superuser' in self.fields:
                 self.fields['is_superuser'].disabled = True
             if 'is_staff' in self.fields:
                 self.fields['is_staff'].disabled = True
+            if 'can_login' in self.fields:
+                self.fields['can_login'].disabled = True
 
-        # Group Manager is the global users.manage_usergroups capability; reflect
+        # Group Manager is the global organization.manage_groups capability; reflect
         # the current grant and let only superusers change it.
         if self.instance and self.instance.pk:
             self.fields['is_group_manager'].initial = self.instance.user_permissions.filter(
-                content_type__app_label='users', codename='manage_usergroups',
+                content_type__app_label='organization', codename='manage_groups',
             ).exists()
         if not self.request_user or not self.request_user.is_superuser:
             self.fields['is_group_manager'].disabled = True
@@ -90,6 +94,10 @@ class UserForm(forms.ModelForm):
             'email',
             Fieldset(
                 _('Permissions'),
+                Row(
+                    Column('can_login', css_class='col-md-12'),
+                    css_class='row g-3',
+                ),
                 Row(
                     Column('is_staff', css_class='col-md-6'),
                     Column('is_superuser', css_class='col-md-6'),
@@ -132,13 +140,13 @@ class UserForm(forms.ModelForm):
         return user
 
     def _sync_group_manager(self, user):
-        """Grant/revoke the global users.manage_usergroups capability. Only a
+        """Grant/revoke the global organization.manage_groups capability. Only a
         superuser may change it (the field is disabled otherwise)."""
         if not self.request_user or not self.request_user.is_superuser:
             return
         from django.contrib.auth.models import Permission
         perm = Permission.objects.filter(
-            content_type__app_label='users', codename='manage_usergroups',
+            content_type__app_label='organization', codename='manage_groups',
         ).first()
         if not perm:
             return
@@ -438,27 +446,36 @@ class UserBulkEditForm(BulkEditForm):
                 (False, _('No')),
             ), attrs={'class': 'form-select'})
         )
+        self.fields['can_login'] = forms.NullBooleanField(
+            required=False,
+            label=_('Can log in'),
+            widget=forms.Select(choices=(
+                (None, _('— No Change —')),
+                (True, _('Yes')),
+                (False, _('No')),
+            ), attrs={'class': 'form-select'})
+        )
 
-        # Security check: only superusers can modify is_superuser and is_staff
+        # Security check: only superusers can modify is_superuser, is_staff, and can_login
         if not self.request_user or not self.request_user.is_superuser:
-            if 'is_superuser' in self.fields:
-                self.fields['is_superuser'].disabled = True
-                self.fields['is_superuser'].widget.attrs['disabled'] = 'disabled'
-            if 'is_staff' in self.fields:
-                self.fields['is_staff'].disabled = True
-                self.fields['is_staff'].widget.attrs['disabled'] = 'disabled'
+            for f in ('is_superuser', 'is_staff', 'can_login'):
+                if f in self.fields:
+                    self.fields[f].disabled = True
+                    self.fields[f].widget.attrs['disabled'] = 'disabled'
 
     def clean(self):
         cleaned_data = super().clean()
         selected_fields = self.data.getlist('_selected_fields') if self.data else []
 
-        # Only superusers can change is_superuser / is_staff
-        has_privilege_field_selected = 'is_superuser' in selected_fields or 'is_staff' in selected_fields
+        # Only superusers can change is_superuser / is_staff / can_login
+        has_privilege_field_selected = any(
+            f in selected_fields for f in ('is_superuser', 'is_staff', 'can_login')
+        )
         if has_privilege_field_selected and (not self.request_user or not self.request_user.is_superuser):
-            raise forms.ValidationError(_("Only superusers can grant or modify staff or superuser status."))
+            raise forms.ValidationError(_("Only superusers can grant or modify staff, superuser, or login status."))
 
         # Prevent non-nullable fields from being set to None if they are selected
-        for field_name in ['is_active', 'is_staff', 'is_superuser']:
+        for field_name in ['is_active', 'is_staff', 'is_superuser', 'can_login']:
             if field_name in selected_fields:
                 val = cleaned_data.get(field_name)
                 # If they are superuser, these fields aren't disabled and we validate they aren't None.
@@ -473,7 +490,7 @@ class UserBulkEditForm(BulkEditForm):
 # UserGroup is an identity-layer construct (relocated here from organization/): it grants
 # cross-tenant access, so it lives alongside the User model rather than the business-data
 # (organization) layer.
-from organization.models import TenantRole
+from organization.models import Role
 from core.auth.guards import validate_permission_grant
 from .models import UserGroup
 from .filters import UserGroupFilterSet
@@ -499,7 +516,7 @@ class UserGroupForm(forms.ModelForm):
         widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
     )
     roles = forms.ModelMultipleChoiceField(
-        queryset=TenantRole._base_manager.none(),
+        queryset=Role._base_manager.none(),
         required=False,
         label=_("Roles"),
         widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
@@ -529,7 +546,7 @@ class UserGroupForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         # Roles across ALL tenants (unscoped _base_manager overrides the core/apps.py
         # current-tenant scoping applied during super().__init__); any user as member.
-        self.fields['roles'].queryset = TenantRole._base_manager.filter(
+        self.fields['roles'].queryset = Role._base_manager.filter(
             deleted_at__isnull=True,
         ).select_related('tenant').order_by('tenant__name', 'name')
         self.fields['members'].queryset = User.objects.all().order_by('username')

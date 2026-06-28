@@ -22,7 +22,7 @@ from ..models import Tenant
 from ..forms import TenantForm, TenantFilterForm
 from ..tables import TenantTable, SiteTable, LocationTable, AssetHolderTable
 from ..filters import TenantFilterSet
-from ..access import accessible_tenant_ids, tenant_access_report
+from ..access import tenant_access_report
 from django_tables2 import RequestConfig
 
 
@@ -197,8 +197,15 @@ class TenantAccessView(LoginRequiredMixin, View):
 
     def get(self, request, pk):
         tenant = get_object_or_404(Tenant, pk=pk)
-        if not (request.user.is_superuser or tenant.pk in accessible_tenant_ids(request.user)):
-            raise Http404()
+        has_access = (
+            request.user.is_superuser or
+            request.user.has_perm('organization.view_membership', obj=tenant) or
+            request.user.has_perm('organization.change_tenant', obj=tenant) or
+            request.user.has_perm('organization.manage_staff', obj=tenant)
+        )
+        if not has_access:
+            from django.core.exceptions import PermissionDenied
+            raise PermissionDenied(_("You do not have permission to view the access report for this tenant."))
         report = tenant_access_report(tenant)
         return render(request, 'organization/tenants/who_has_access.html', {
             'tenant': tenant,

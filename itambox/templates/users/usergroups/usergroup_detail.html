@@ -59,7 +59,7 @@
             {% for role in roles %}
             <tr>
                 <td>
-                    <a href="{% url 'organization:tenantrole_detail' pk=role.pk %}">{{ role.name }}</a>
+                    <a href="{% url 'organization:role_detail' pk=role.pk %}">{{ role.name }}</a>
                 </td>
                 <td>{{ role.tenant.name }}</td>
                 <td>

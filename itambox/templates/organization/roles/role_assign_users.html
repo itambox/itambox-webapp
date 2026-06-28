@@ -14,7 +14,7 @@
 {% endblock %}
 
 {% block page_actions %}
-<a href="{% url 'organization:tenantrole_detail' pk=role.pk %}" class="btn btn-outline-secondary">
+<a href="{% url 'organization:role_detail' pk=role.pk %}" class="btn btn-outline-secondary">
     <i class="mdi mdi-arrow-left"></i>
     {% translate "Back to Role" %}
 </a>
@@ -40,7 +40,7 @@
                             <i class="mdi mdi-account-multiple-check"></i>
                             {% translate "Assign" %}
                         </button>
-                        <a href="{% url 'organization:tenantrole_detail' pk=role.pk %}" class="btn btn-outline-secondary ms-2">
+                        <a href="{% url 'organization:role_detail' pk=role.pk %}" class="btn btn-outline-secondary ms-2">
                             {% translate "Cancel" %}
                         </a>
                     </div>

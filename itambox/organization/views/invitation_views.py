@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.views.generic import CreateView, View
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.utils.translation import gettext_lazy as _
-from ..models import TenantInvitation, TenantRole, accept_invitation
+from ..models import TenantInvitation, Role, accept_invitation
 from ..forms import TenantInvitationForm
 
 class InviteUserMixin(LoginRequiredMixin, UserPassesTestMixin):

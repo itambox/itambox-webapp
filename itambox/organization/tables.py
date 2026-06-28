@@ -1,7 +1,11 @@
 # itambox/organization/tables.py
 import django_tables2 as tables
 from django_tables2.utils import A
-from .models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, Contact, ContactRole, ContactAssignment, TenantRole, TenantMembership, CostCenter, Provider, ProviderRole, ProviderRoleTemplate
+from .models import (
+    Site, Region, SiteGroup, Location, Tenant, TenantGroup,
+    AssetHolder, Contact, ContactRole, ContactAssignment,
+    Role, Membership, CostCenter, Provider,
+)
 from core.tables import ActionsColumn, BaseTable, CountLinkColumn, ToggleColumn
 from extras.tables import TagColumn
 
@@ -228,44 +232,65 @@ class ContactAssignmentTable(BaseTable):
         return record.content_type.model_class()._meta.verbose_name.title()
 
 
-class TenantRoleTable(BaseTable):
+class RoleTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('organization:tenantrole_detail', args=[A('pk')], verbose_name=_('Name'))
-    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant')
+    name = tables.LinkColumn('organization:role_detail', args=[A('pk')], verbose_name=_('Name'))
+    scope = tables.Column(verbose_name=_('Scope'))
+    container = tables.Column(verbose_name=_('Owner'), accessor='owner', orderable=False)
     description = tables.Column()
     member_count = tables.Column(verbose_name=_('Members'), orderable=True, empty_values=[])
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
-        model = TenantRole
-        fields = ('pk', 'name', 'tenant', 'description', 'member_count', 'actions')
-        default_columns = ('pk', 'name', 'tenant', 'description', 'member_count', 'actions')
+        model = Role
+        fields = ('pk', 'name', 'scope', 'container', 'description', 'member_count', 'actions')
+        default_columns = ('pk', 'name', 'scope', 'container', 'description', 'member_count', 'actions')
+
+    def render_scope(self, value, record):
+        return record.get_scope_display()
+
+    def render_container(self, value, record):
+        owner = record.owner
+        if owner is None:
+            return '—'
+        return format_html('<a href="{}">{}</a>', owner.get_absolute_url(), owner)
 
     def render_member_count(self, value, record):
         count = getattr(record, 'member_count', 0) or 0
-        url = f"{reverse('organization:tenantmembership_list')}?role={record.pk}"
+        url = f"{reverse('organization:membership_list')}?role={record.pk}"
         return format_html('<a href="{}">{}</a>', url, count)
 
 
-class TenantMembershipTable(BaseTable):
+class MembershipTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     user = tables.LinkColumn('users:user_detail', args=[A('user.pk')], verbose_name=_('User'))
-    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant', verbose_name=_('Tenant'))
+    person_type = tables.Column(verbose_name=_('Type'))
+    container = tables.Column(verbose_name=_('Container'), accessor='container', orderable=False)
     roles = tables.Column(verbose_name=_('Roles'), orderable=False)
+    is_active = tables.BooleanColumn(verbose_name=_('Active'))
     joined_at = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name=_('Joined'))
     actions = ActionsColumn(actions=('edit', 'delete'))
 
     class Meta(BaseTable.Meta):
-        model = TenantMembership
-        fields = ('pk', 'user', 'tenant', 'roles', 'joined_at', 'actions')
-        default_columns = ('pk', 'user', 'tenant', 'roles', 'joined_at', 'actions')
+        model = Membership
+        fields = ('pk', 'user', 'person_type', 'container', 'roles', 'is_active', 'joined_at', 'actions')
+        default_columns = ('pk', 'user', 'person_type', 'container', 'roles', 'is_active', 'joined_at', 'actions')
+
+    def render_person_type(self, value, record):
+        return record.get_person_type_display()
+
+    def render_container(self, value, record):
+        owner = record.container
+        if owner is None:
+            return '—'
+        return format_html('<a href="{}">{}</a>', owner.get_absolute_url(), owner)
 
     def render_roles(self, value, record):
-        role_links = []
+        links = []
         for role in record.roles.all():
-            url = reverse('organization:tenantrole_detail', kwargs={'pk': role.pk})
-            role_links.append(format_html('<a href="{}">{}</a>', url, role.name))
-        return mark_safe(', '.join(role_links)) if role_links else _('(none)')
+            url = reverse('organization:role_detail', kwargs={'pk': role.pk})
+            links.append(format_html('<a href="{}">{}</a>', url, role.name))
+        return mark_safe(', '.join(links)) if links else _('(none)')
 
 
 class CostCenterTable(BaseTable):
@@ -284,7 +309,7 @@ class CostCenterTable(BaseTable):
         default_columns = ('pk', 'code', 'name', 'tenant', 'parent', 'child_count', 'is_active', 'actions')
 
 
-# --- Provider (MSP) Tables ---
+# --- Provider (MSP) Table ---
 class ProviderTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:provider_detail', args=[A('pk')], verbose_name=_('Name'))
@@ -296,33 +321,5 @@ class ProviderTable(BaseTable):
         model = Provider
         fields = ('pk', 'name', 'slug', 'description', 'actions')
         default_columns = ('pk', 'name', 'slug', 'description', 'actions')
-
-
-class ProviderRoleTable(BaseTable):
-    pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('organization:providerrole_detail', args=[A('pk')], verbose_name=_('Name'))
-    provider = tables.LinkColumn('organization:provider_detail', args=[A('provider_id')], accessor='provider', verbose_name=_('Provider'))
-    can_manage_tenants = tables.BooleanColumn(verbose_name=_('Manage tenants'))
-    can_manage_provider_users = tables.BooleanColumn(verbose_name=_('Manage provider users'))
-    can_manage_groups = tables.BooleanColumn(verbose_name=_('Manage groups'))
-    actions = ActionsColumn()
-
-    class Meta(BaseTable.Meta):
-        model = ProviderRole
-        fields = ('pk', 'name', 'provider', 'can_manage_tenants', 'can_manage_provider_users', 'can_manage_groups', 'actions')
-        default_columns = ('pk', 'name', 'provider', 'can_manage_tenants', 'can_manage_provider_users', 'can_manage_groups', 'actions')
-
-
-class ProviderRoleTemplateTable(BaseTable):
-    pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('organization:providerroletemplate_detail', args=[A('pk')], verbose_name=_('Name'))
-    provider = tables.LinkColumn('organization:provider_detail', args=[A('provider_id')], accessor='provider', verbose_name=_('Provider'))
-    is_default = tables.BooleanColumn(verbose_name=_('Default'))
-    actions = ActionsColumn()
-
-    class Meta(BaseTable.Meta):
-        model = ProviderRoleTemplate
-        fields = ('pk', 'name', 'provider', 'is_default', 'actions')
-        default_columns = ('pk', 'name', 'provider', 'is_default', 'actions')
 
 

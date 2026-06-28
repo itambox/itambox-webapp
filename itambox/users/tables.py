@@ -14,14 +14,15 @@ class UserTable(BaseTable):
     last_name = tables.Column(verbose_name=_('Last Name'))
     email = tables.EmailColumn(verbose_name=_('Email'))
     is_active = BooleanColumn(verbose_name=_('Active'))
+    can_login = BooleanColumn(verbose_name=_('Can log in'))
     is_staff = BooleanColumn(verbose_name=_('Staff'))
     is_superuser = BooleanColumn(verbose_name=_('Superuser'))
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = User
-        fields = ('pk', 'username', 'first_name', 'last_name', 'email', 'is_active', 'is_staff', 'is_superuser', 'actions')
-        default_columns = ('pk', 'username', 'first_name', 'last_name', 'email', 'is_active', 'actions')
+        fields = ('pk', 'username', 'first_name', 'last_name', 'email', 'is_active', 'can_login', 'is_staff', 'is_superuser', 'actions')
+        default_columns = ('pk', 'username', 'first_name', 'last_name', 'email', 'is_active', 'can_login', 'actions')
 
 
 class UserGroupTable(BaseTable):

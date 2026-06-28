@@ -1,7 +1,7 @@
 from django import forms
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout
-from ..models import TenantInvitation, TenantRole
+from ..models import TenantInvitation, Role
 
 class TenantInvitationForm(forms.ModelForm):
     class Meta:
@@ -16,9 +16,9 @@ class TenantInvitationForm(forms.ModelForm):
         tenant = kwargs.pop('tenant', None)
         super().__init__(*args, **kwargs)
         if tenant:
-            self.fields['role'].queryset = TenantRole.objects.filter(tenant=tenant)
+            self.fields['role'].queryset = Role.objects.filter(tenant=tenant)
         else:
-            self.fields['role'].queryset = TenantRole.objects.none()
+            self.fields['role'].queryset = Role.objects.none()
             
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
