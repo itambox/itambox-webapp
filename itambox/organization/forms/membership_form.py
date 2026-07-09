@@ -69,6 +69,15 @@ class MembershipForm(forms.ModelForm):
         self._provider_ctx = kwargs.pop('provider', None)
         super().__init__(*args, **kwargs)
 
+        # Tenant / Provider stay ``required=False`` at the field level — the tenant/provider
+        # XOR is enforced in ``clean()`` against whichever container is populated. Without this
+        # reset, core.apps's scoped_baseform_init monkey-patch forces ``tenant`` required on any
+        # form with a 'tenant' field and no 'tenant_group' field once Tenant rows exist, which
+        # would reject every provider-staff submission (tenant left blank). role_form.py resets
+        # the same two fields for the identical reason.
+        self.fields['tenant'].required = False
+        self.fields['provider'].required = False
+
         self.fields['user'].queryset = User.objects.order_by('username')
 
         # Provider-related global pickers must use the unscoped base manager so they're
@@ -84,13 +93,13 @@ class MembershipForm(forms.ModelForm):
         # still has to pick tenant vs provider.
         container_known = True
         if self.instance.pk:
-            is_staff = self.instance.provider_id is not None
+            is_staff = self.instance.is_provider_staff
             if self.instance.tenant_id:
                 self.fields['tenant'].queryset = Tenant._base_manager.filter(pk=self.instance.tenant_id)
                 self.fields['tenant'].initial = self.instance.tenant_id
                 self.fields['tenant'].disabled = True
                 self.fields['provider'].widget = forms.HiddenInput()
-            if self.instance.provider_id:
+            if self.instance.is_provider_staff:
                 self.fields['provider'].queryset = Provider._base_manager.filter(pk=self.instance.provider_id)
                 self.fields['provider'].initial = self.instance.provider_id
                 self.fields['provider'].disabled = True
@@ -101,11 +110,23 @@ class MembershipForm(forms.ModelForm):
             self.fields['provider'].initial = self._provider_ctx.pk
             self.fields['provider'].widget = forms.HiddenInput()
             self.fields['tenant'].widget = forms.HiddenInput()
+            # The other container may still carry a stale initial from a route that
+            # blindly copies GET params (e.g. an active tenant in session). Clear both
+            # the field-level default and any same-keyed entry in self.initial — the
+            # latter wins over field.initial in Django's initial-value resolution, so
+            # clearing only one leaves the hidden tenant input populated and the form
+            # unsubmittable (tenant/provider XOR in clean()).
+            self.fields['tenant'].initial = None
+            self.initial.pop('tenant', None)
         elif self._tenant_ctx is not None:
             is_staff = False
             self.fields['tenant'].initial = self._tenant_ctx.pk
             self.fields['tenant'].widget = forms.HiddenInput()
             self.fields['provider'].widget = forms.HiddenInput()
+            # Symmetric case: clear any stale provider initial (e.g. a ?provider=<pk>
+            # GET param) so only the tenant container is populated.
+            self.fields['provider'].initial = None
+            self.initial.pop('provider', None)
         else:
             # Context-free create: the user picks a tenant or a provider. The kind isn't known
             # yet, so the staff scoping fields stay visible (cleared if a tenant is chosen).
@@ -118,7 +139,7 @@ class MembershipForm(forms.ModelForm):
             self.fields['roles'].queryset = Role._base_manager.filter(
                 scope=Role.SCOPE_TENANT, tenant_id=self.instance.tenant_id, deleted_at__isnull=True,
             ).order_by('name')
-        elif self.instance.pk and self.instance.provider_id:
+        elif self.instance.pk and self.instance.is_provider_staff:
             self.fields['roles'].queryset = Role._base_manager.filter(
                 scope=Role.SCOPE_PROVIDER, provider_id=self.instance.provider_id, deleted_at__isnull=True,
             ).order_by('name')
@@ -241,7 +262,7 @@ class MembershipForm(forms.ModelForm):
         instance = super().save(commit=commit)
         if commit:
             cleaned = self.cleaned_data
-            if instance.provider_id:  # provider staff
+            if instance.is_provider_staff:  # provider staff
                 tenants = cleaned.get('assigned_tenants') or []
                 instance.assigned_tenants.set(tenants)
             else:

@@ -140,7 +140,20 @@ class MembershipCreateView(ObjectEditView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
-        kwargs['tenant'] = getattr(self.request, 'active_tenant', None)
+        # An explicit ?provider=<pk> request (e.g. from a "add provider staff" link) must win
+        # over the ambient active tenant — passing both context kwargs would make the form's
+        # tenant-ctx branch clear the very provider initial the caller asked for.
+        provider = None
+        provider_param = self.request.GET.get('provider')
+        if provider_param:
+            try:
+                provider = Provider._base_manager.filter(pk=provider_param).first()
+            except (TypeError, ValueError):  # non-numeric ?provider= must not 500
+                provider = None
+        if provider is not None:
+            kwargs['provider'] = provider
+        else:
+            kwargs['tenant'] = getattr(self.request, 'active_tenant', None)
         return kwargs
 
     def get_success_url(self):

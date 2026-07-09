@@ -455,14 +455,17 @@ class RoleForm(forms.ModelForm):
         """Whether this form is editing/creating a provider-scoped role.
 
         Drives which sections the template renders. On edit the scope is locked to the
-        instance; on create it follows the resolved ``scope`` field initial (which the
-        ``__init__`` derives from the bound container).
+        saved instance. On create/clone it follows ``fields['scope'].initial``, which
+        ``__init__`` already derives with the right precedence — bound ``initial['scope']``
+        (a cloned instance's real scope flows in this way: Django folds the clone's field
+        values into ``self.initial`` before ``__init__`` runs) over the explicit
+        ``provider``/``tenant`` kwarg over the model default. Do NOT fall back to
+        ``self.instance.scope`` here for the pk-less case: a bare ``Role()`` always carries
+        the model field's default (``scope='tenant'``), which would misclassify a fresh
+        ``RoleForm(provider=...)`` as tenant-scoped before this property ever looks at the
+        resolved initial.
         """
         if self.instance.pk:
-            return self.instance.scope == Role.SCOPE_PROVIDER
-        # Create / clone: a cloned provider role carries scope on the unsaved instance;
-        # a fresh create falls back to the field initial derived in ``__init__``.
-        if getattr(self.instance, 'scope', None):
             return self.instance.scope == Role.SCOPE_PROVIDER
         return self.fields['scope'].initial == Role.SCOPE_PROVIDER
 
